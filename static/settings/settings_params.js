@@ -20,6 +20,10 @@
             max_tool_calls: parseInt(s.max_tool_calls, 10) || 10
         };
 
+        if (s.reasoning_effort && s.reasoning_effort !== "disabled") {
+            params.reasoning_effort = s.reasoning_effort;
+        }
+
         if (s.text_format === "json") {
             params.text = {
                 format: "json",

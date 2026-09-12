@@ -166,7 +166,7 @@ function formatInline(text) {
         .replace(/`(.+?)`/g, '<code>$1</code>');
 }
 
-function addMessage(text, role, save, cost, timings, totalDurationMs) {
+function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
 
@@ -178,7 +178,12 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
     
     const bubble = document.createElement("div");
     bubble.className = "bubble";
-    bubble.innerHTML = parseMarkdown(text);
+    let htmlContent = "";
+    if (reasoning && reasoning.trim() !== "") {
+        htmlContent += `<details style="margin-bottom:10px;font-size:13px;background:rgba(0,0,0,0.05);border-radius:8px;padding:8px 12px;border:1px dashed var(--border-color);"><summary style="cursor:pointer;font-weight:600;color:var(--accent);">🧠 Ход мыслей модели (Reasoning)</summary><div style="margin-top:8px;white-space:pre-wrap;font-family:monospace;font-size:12px;color:var(--text-main);opacity:0.85;">${parseMarkdown(reasoning)}</div></details>`;
+    }
+    htmlContent += parseMarkdown(text);
+    bubble.innerHTML = htmlContent;
     msg.appendChild(bubble);
 
     const copyBtn = document.createElement("button");
@@ -297,7 +302,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 addMessage("Ошибка: " + data.error, "bot", false, 0);
             } else {
                 const clientTotalMs = Math.round(performance.now() - t0);
-                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs);
+                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning);
             }
         })
         .catch(e => {

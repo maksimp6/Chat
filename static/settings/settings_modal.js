@@ -133,6 +133,10 @@
                 '<div>' + UI.lbl('Max Output Tokens') + UI.inp('set-tokens', 'number', settings.max_output_tokens, ' step="100" min="1"') + '</div>',
                 '<div>' + UI.lbl('Truncation') + UI.sel('set-trunc', '<option value="disabled"' + (settings.truncation === 'disabled' ? ' selected' : '') + '>Disabled</option><option value="auto"' + (settings.truncation === 'auto' ? ' selected' : '') + '>Auto</option>') + '</div>'
             ),
+            UI.gap2(
+                '<div>' + UI.lbl('Reasoning Effort (Мышление)') + UI.sel('set-reasoning', '<option value="disabled"' + (settings.reasoning_effort === 'disabled' ? ' selected' : '') + '>Disabled</option><option value="low"' + (settings.reasoning_effort === 'low' ? ' selected' : '') + '>Low</option><option value="medium"' + (!settings.reasoning_effort || settings.reasoning_effort === 'medium' ? ' selected' : '') + '>Medium</option><option value="high"' + (settings.reasoning_effort === 'high' ? ' selected' : '') + '>High</option>') + '</div>',
+                '<div></div>'
+            ),
             UI.gap3(
                 '<div>' + UI.chk('set-store', settings.store !== false, 'Store Responses') + '</div>',
                 '<div>' + UI.chk('set-bg', settings.background !== false, 'Background Polling') + '</div>',
@@ -241,6 +245,7 @@
             settings.top_p = parseFloat(document.getElementById('set-topp').value) || 1.0;
             settings.max_output_tokens = parseInt(document.getElementById('set-tokens').value, 10) || 2000;
             settings.truncation = document.getElementById('set-trunc').value;
+            settings.reasoning_effort = document.getElementById('set-reasoning').value;
             settings.store = document.getElementById('set-store').checked;
             settings.background = document.getElementById('set-bg').checked;
             settings.stream = document.getElementById('set-stream').checked;

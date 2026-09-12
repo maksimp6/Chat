@@ -189,9 +189,11 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if params.get("text"): payload["text"] = params["text"]
         if params.get("truncation"): payload["truncation"] = params["truncation"]
         if params.get("service_tier"): payload["service_tier"] = params["service_tier"]
+        if params.get("reasoning"):
+            payload["reasoning"] = params["reasoning"]
+        elif params.get("reasoning_effort") and params.get("reasoning_effort") != "disabled":
+            payload["reasoning"] = {"effort": params["reasoning_effort"]}
 
-        # Корректная обработка tools и parallel_tool_calls:
-        # parallel_tool_calls передаётся строго при непустом массиве tools
         raw_tools = params.get("tools")
         cleaned_tools = _clean_tools(raw_tools) if raw_tools else []
         if cleaned_tools:
@@ -260,20 +262,35 @@ class YandexResponsesClient(YandexFileManagerMixin):
         raise YandexClientError(f"Timeout ({timeout}s) waiting for task {task_id}")
 
     @staticmethod
-    def extract_text(data):
-        if not isinstance(data, dict): return str(data or "")
-        if data.get("output_text") and isinstance(data["output_text"], str): return data["output_text"]
+    def extract_reasoning_and_text(data):
+        if not isinstance(data, dict):
+            return "", str(data or "")
+        reasoning_parts = []
+        text_parts = []
         for item in data.get("output", []):
             if isinstance(item, dict):
-                if item.get("type") == "message" and item.get("role") == "assistant":
-                    for part in item.get("content", []):
-                        if isinstance(part, dict) and part.get("type") == "output_text" and part.get("text"):
-                            return str(part["text"])
-                        elif isinstance(part, str): return part
+                content_list = item.get("content", [])
+                if isinstance(content_list, list):
+                    for part in content_list:
+                        if isinstance(part, dict):
+                            p_type = part.get("type")
+                            p_text = part.get("text", "")
+                            if p_type == "reasoning_text" and p_text:
+                                reasoning_parts.append(p_text)
+                            elif p_type in ("output_text", "text") and p_text:
+                                text_parts.append(p_text)
+                        elif isinstance(part, str):
+                            text_parts.append(part)
                 elif item.get("type") == "output_text" and item.get("text"):
-                    return str(item["text"])
-        val = data.get("text")
-        return str(val) if val else ""
+                    text_parts.append(str(item["text"]))
+        final_text = "".join(text_parts) or data.get("output_text") or data.get("text") or ""
+        final_reasoning = "\n\n".join(reasoning_parts)
+        return final_reasoning, str(final_text)
+
+    @staticmethod
+    def extract_text(data):
+        _, text = YandexResponsesClient.extract_reasoning_and_text(data)
+        return text
 
     @staticmethod
     def extract_usage(data):
@@ -321,7 +338,6 @@ class YandexMcpMixin:
         step_timings = []
         import time as _t
 
-        # 1. MCP серверы
         mcp_tools = []
         all_servers = mcp_storage.list_servers()
         enabled_servers = []
@@ -339,7 +355,6 @@ class YandexMcpMixin:
                     "authorization": s.get("authorization")
                 })
 
-        # 2. Локальные инструменты строго по базе данных
         active_cats = None
         if conversation_id:
             conv_settings = get_conv_settings(conversation_id)
@@ -356,7 +371,6 @@ class YandexMcpMixin:
         params["tools"] = mcp_tools + local_tools
         api_logger.info(f"[ROUTER] Подключено {len(params['tools'])} инструментов. Категории: {active_set}")
 
-        # 3. Маршрутизация (поиск вызовов LLM)
         t0 = _t.perf_counter()
         response = self.ask(message, model_key, conversation_id, params)
         t1 = _t.perf_counter()
@@ -378,7 +392,6 @@ class YandexMcpMixin:
             response["step_timings"] = step_timings
             return response
 
-        # 4. Параллельное выполнение вызванных инструментов в пуле потоков
         is_parallel = params.get("parallel_tool_calls", True)
         max_workers = min(len(tool_calls), 8) if is_parallel else 1
         raw_outputs_text = []
@@ -390,7 +403,6 @@ class YandexMcpMixin:
                 step_timings.append(res["timing"])
                 raw_outputs_text.append(f"[{res['name']}]: {res['content']}")
 
-        # 5. Синтез ответа (с очищенным списком инструментов во избежание рекурсии)
         tool_summary = "\n".join(raw_outputs_text)
         prompt = (
             f"Пользователь запросил: \"{message}\"\n"

@@ -80,7 +80,9 @@ def chat():
                         "original_message": message
                     })
 
-        reply = client.extract_text(response) or "Команда выполнена успешно."
+        reasoning, reply = client.extract_reasoning_and_text(response)
+        if not reply:
+            reply = "Команда выполнена успешно."
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
@@ -94,7 +96,8 @@ def chat():
             "usage": usage,
             "cost": cost,
             "timings": timings,
-            "total_duration_ms": total_ms
+            "total_duration_ms": total_ms,
+            "reasoning": reasoning
         })
     except Exception as e:
         logger.exception(f"[CHAT] Ошибка: {e}")
