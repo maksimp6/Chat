@@ -130,7 +130,6 @@ TERMUX_TOOLS = {
             "properties": {
                 "screen": {
                     "type": "string",
-                    "enum": ["overlay", "app_details", "battery"],
                     "description": "Тип экрана: 'overlay' — доступ поверх других окон (для съемки в фоне), 'app_details' — все разрешения приложения, 'battery' — работа в фоне/аккумулятор."
                 },
                 "package_name": {
@@ -164,7 +163,7 @@ TERMUX_TOOLS = {
     "termux_battery_status": {
         "func": termux_battery_status,
         "description": "Получить детальную информацию о батарее устройства (процент заряда, температура, статус зарядки).",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "parameters": {"type": "object", "properties": {"dummy": {"type": "string", "description": "unused"}}, "required": []}
     },
     "termux_toast": {
         "func": termux_toast,
@@ -196,7 +195,7 @@ TERMUX_TOOLS = {
     "termux_clipboard_get": {
         "func": termux_clipboard_get,
         "description": "Прочитать текущий текст из буфера обмена Android.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "parameters": {"type": "object", "properties": {"dummy": {"type": "string", "description": "unused"}}, "required": []}
     },
     "termux_clipboard_set": {
         "func": termux_clipboard_set,

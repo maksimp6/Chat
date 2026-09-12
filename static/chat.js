@@ -1,3 +1,62 @@
+
+function renderApprovalCard(toolCall, origMsg) {
+    const chatbox = document.getElementById("chatbox");
+    if (!chatbox) return;
+
+    const card = document.createElement("div");
+    card.className = "msg bot";
+    card.style.cssText = "border: 1px solid var(--accent); background: rgba(0, 122, 255, 0.05); border-radius: 12px; padding: 14px;";
+
+    const paramsStr = JSON.stringify(toolCall.arguments, null, 2);
+    card.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 6px; color: var(--accent);">⚠️ Требуется подтверждение действия</div>
+        <div style="font-size: 14px; margin-bottom: 8px;"><strong>Действие:</strong> ${toolCall.description || toolCall.name}</div>
+        <pre style="font-size: 12px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-bottom: 10px;"><code>${paramsStr}</code></pre>
+        <div style="display: flex; gap: 10px;">
+            <button id="btn-approve-${toolCall.call_id}" style="padding: 6px 14px; background: #28a745; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">✓ Разрешить</button>
+            <button id="btn-reject-${toolCall.call_id}" style="padding: 6px 14px; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer;">✗ Отклонить</button>
+        </div>
+    `;
+
+    chatbox.appendChild(card);
+    chatbox.scrollTop = chatbox.scrollHeight;
+
+    document.getElementById(`btn-approve-${toolCall.call_id}`).onclick = function() {
+        card.innerHTML = "<em>Выполняется...</em>";
+        fetch("/api/mcp/execute-approved", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                conversation_id: currentConvId,
+                model: currentModel,
+                name: toolCall.name,
+                arguments: toolCall.arguments,
+                original_message: origMsg
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            card.remove();
+            if (data.requires_approval) {
+                renderApprovalCard(data.tool_call, text);
+            } else if (data.error) {
+                addMessage("Ошибка выполнения: " + data.error, "bot", false, 0);
+            } else {
+                addMessage(data.reply, "bot", true, data.cost || 0);
+            }
+        })
+        .catch(err => {
+            card.remove();
+            addMessage("Сетевая ошибка при выполнении действия", "bot", false, 0);
+        });
+    };
+
+    document.getElementById(`btn-reject-${toolCall.call_id}`).onclick = function() {
+        card.remove();
+        addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
+    };
+}
+
 // Простой и безопасный парсер Markdown
 function parseMarkdown(text) {
     if (!text) return "";

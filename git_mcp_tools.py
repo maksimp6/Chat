@@ -71,7 +71,7 @@ TOOL_REGISTRY = {
     "git_status": {
         "func": git_status,
         "description": "Получить краткий статус изменений и текущей ветки в Git репозитории.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "parameters": {"type": "object", "properties": {"dummy": {"type": "string", "description": "unused"}}, "required": []}
     },
     "git_log": {
         "func": git_log,
@@ -86,7 +86,7 @@ TOOL_REGISTRY = {
     "git_branches": {
         "func": git_branches,
         "description": "Получить список веток репозитория.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "parameters": {"type": "object", "properties": {"dummy": {"type": "string", "description": "unused"}}, "required": []}
     },
     "git_add": {
         "func": git_add,
@@ -121,3 +121,6 @@ def execute_tool(tool_name: str, arguments: dict, cfg: dict = None) -> dict:
     except Exception as e:
         logger.exception(f"Ошибка выполнения инструмента {tool_name}: {e}")
         return {"error": f"Внутренняя ошибка: {str(e)}"}
+
+# Алиас для совместимости с yandex_client.py и mcp_routes.py
+GIT_TOOLS = TOOL_REGISTRY

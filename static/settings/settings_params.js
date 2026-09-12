@@ -30,7 +30,7 @@
         if (s.previous_response_id)
             params.previous_response_id = s.previous_response_id;
         if (s.reasoning_effort && s.reasoning_effort !== "none")
-            params.reasoning = { effort: s.reasoning_effort };
+            /* reasoning отключен во избежание 500 ошибки */
 
         // Формат вывода: text или json_schema
         if (s.text_format === "json") {
