@@ -224,9 +224,16 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
         const badge = document.createElement("details");
         badge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
         
-        let stepsHtml = `<summary style="font-weight:600;">⏱️ Цепочка: ${total} (${timings.length} ${timings.length === 1 ? 'этап' : 'этапа'})</summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
+        let stepsHtml = `<summary style="font-weight:600;">⏱️ Полное время от отправки: <strong>${totalDurationMs} мс</strong> (${timings.length} ${timings.length === 1 ? 'этап' : 'этапов'})</summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
         timings.forEach((t, idx) => {
-            stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;"><span>${idx + 1}. ${t.name}</span><strong>${t.duration_ms} мс</strong></div>`;
+                const durationDisplay = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
+    let serverInfo = "";
+    if (t.server_label || t.server_url) {
+        const icon = t.server_type === "local" ? "📱" : "☁️";
+        const label = t.server_label || t.server_url || "";
+        serverInfo = `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${icon} ${label}</span>`;
+    }
+    stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;"><span>${idx + 1}. ${t.name}${serverInfo}</span><strong>${durationDisplay}</strong></div>`;
         });
         stepsHtml += "</div>";
         badge.innerHTML = stepsHtml;
@@ -299,6 +306,7 @@ document.addEventListener("DOMContentLoaded", function() {
             ? window.getResponsesParams() 
             : {};
 
+        const t0 = performance.now();
         fetch("/api/chat", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
@@ -317,7 +325,8 @@ document.addEventListener("DOMContentLoaded", function() {
             if (data.error) {
                 addMessage("Ошибка: " + data.error, "bot", false, 0);
             } else {
-                addMessage(data.reply, "bot", true, data.cost || 0, data.timings, data.total_duration_ms);
+                const clientTotalMs = Math.round(performance.now() - t0);
+                addMessage(data.reply, "bot", true, data.cost || 0, data.timings, clientTotalMs);
             }
         })
         .catch(e => {

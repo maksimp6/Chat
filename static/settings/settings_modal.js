@@ -7,7 +7,12 @@
         else console.warn("[settings_modal] Element not found: #" + id);
     }
 
-    window.openSettingsModal = function() {
+    window.openSettingsModal = async function() {
+    // 👇 НОВОЕ: Ждем загрузки актуальных настроек с сервера перед рендером модалки
+    if (typeof currentConvId !== 'undefined' && currentConvId && typeof window.loadServerConvSettings === "function") {
+        await window.loadServerConvSettings(currentConvId);
+    }
+
         var UI = window.SettingsUI;
         var ex = document.getElementById("settings-modal");
         if (ex) ex.remove();

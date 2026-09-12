@@ -29,11 +29,16 @@
     
     var STORAGE_KEY = "alice_pro_settings";
     var SKILLS_BACKUP_KEY = "alice_pro_skills_backup";
-    
+    var serverSettingsCache = {};
+
     function convKey(convId) { return STORAGE_KEY + "_conv_" + convId; }
 
+    // Синхронная загрузка (из кэша или localStorage для обратной совместимости)
     function load(convId) {
         convId = convId || (typeof currentConvId !== 'undefined' && currentConvId ? currentConvId : null);
+        if (convId && serverSettingsCache[convId]) {
+            return JSON.parse(JSON.stringify(serverSettingsCache[convId]));
+        }
         var base = JSON.parse(JSON.stringify(DEFAULTS));
         try { 
             var global = localStorage.getItem(STORAGE_KEY); 
@@ -48,17 +53,60 @@
         return base;
     }
     
+    // Сохранение локально и на сервер
     function save(settings, convId) {
         convId = convId || (typeof currentConvId !== 'undefined' && currentConvId ? currentConvId : null);
-        if (convId) localStorage.setItem(convKey(convId), JSON.stringify(settings));
-        else localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        if (convId) {
+            serverSettingsCache[convId] = settings;
+            localStorage.setItem(convKey(convId), JSON.stringify(settings));
+            // Асинхронная отправка в бэкенд SQLite
+            fetch("/api/conversations/" + convId + "/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(settings)
+            }).catch(function(e) { console.warn("[SETTINGS] Failed to save on server:", e); });
+        } else {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        }
     }
+
+    // Загрузка настроек с сервера при смене диалога
+    window.loadServerConvSettings = function(convId) {
+        if (!convId) return Promise.resolve(load(convId));
+        return fetch("/api/conversations/" + convId + "/settings")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var base = JSON.parse(JSON.stringify(DEFAULTS));
+                try {
+                    var global = localStorage.getItem(STORAGE_KEY);
+                    if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global));
+                } catch(e) {}
+                if (data && Object.keys(data).length > 0) {
+                    base = window.SettingsUI.deepMerge(base, data);
+                }
+                serverSettingsCache[convId] = base;
+                return base;
+            })
+            .catch(function() {
+                return load(convId);
+            });
+    };
 
     window.getSettings = function(convId) { return load(convId); };
     window.saveSettings = function(settings, convId) { save(settings, convId); };
     window.resetSettings = function(convId) {
         convId = convId || (typeof currentConvId !== 'undefined' && currentConvId ? currentConvId : null);
-        if (convId) localStorage.removeItem(convKey(convId)); else localStorage.removeItem(STORAGE_KEY);
+        if (convId) {
+            localStorage.removeItem(convKey(convId));
+            delete serverSettingsCache[convId];
+            fetch("/api/conversations/" + convId + "/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(DEFAULTS)
+            }).catch(function() {});
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
+        }
         return JSON.parse(JSON.stringify(DEFAULTS));
     };
     window.clearConversationSettings = function(convId) { if (convId) localStorage.removeItem(convKey(convId)); };

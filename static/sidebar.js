@@ -106,6 +106,12 @@ function selectConv(id, updateHistory) {
             window.changeModel(conv.model || "aliceai-llm", true);
         }
     }
+if (typeof window.loadServerConvSettings === "function") {
+    window.loadServerConvSettings(id).then(function() {
+        // Настройки для этого диалога загружены в кэш
+    });
+}
+
     if (typeof loadHistory === "function") loadHistory(id);
     if (typeof renderSidebar === "function") renderSidebar();
     var sidebar = document.getElementById("sidebar");

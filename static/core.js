@@ -97,6 +97,12 @@ document.addEventListener("DOMContentLoaded", async function() {
                 } catch (e) {
                     console.error("[CORE] Failed to load history:", e);
                 }
+
+// 👇 НОВОЕ: Синхронизация настроек с сервером при старте
+if (typeof window.loadServerConvSettings === "function") {
+    await window.loadServerConvSettings(currentConvId);
+    console.log("[CORE] Настройки диалога синхронизированы с сервером");
+}
             }
         } else {
              if (typeof updateUIForModel === "function") updateUIForModel();

@@ -44,6 +44,8 @@ def find_tool_registry(func_name: str):
 
 @mcp_bp.route('/api/chat', methods=['POST'])
 def chat():
+    import time as _time
+    t_start = _time.perf_counter()
     try:
         data = request.get_json(silent=True) or {}
         conv_id = data.get('conversation_id')
@@ -107,7 +109,7 @@ def chat():
         logger.info(f"[CHAT] Ответ получен. Токены: {usage}, Стоимость: {cost} руб.")
 
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
-        total_ms = sum(t.get("duration_ms", 0) for t in timings)
+        total_ms = round((_time.perf_counter() - t_start) * 1000)
         return jsonify({
             "reply": reply,
             "usage": usage,

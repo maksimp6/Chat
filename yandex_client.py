@@ -618,7 +618,27 @@ class YandexMcpMixin:
                 for part in item.get("content", []):
                     if isinstance(part, dict) and part.get("type") in ("function_call", "tool_call"):
                         tool_calls.append(part)
-        if not tool_calls:
+        # Строим мапу серверов для быстрого поиска по server_label (один раз за вызов)
+        server_map = {srv.get("server_label"): srv for srv in all_servers}
+
+        # Извлекаем внешние MCP-вызовы, выполненные Yandex Cloud
+        for item in output:
+            if isinstance(item, dict) and item.get("type") == "mcp_call":
+                label = item.get("server_label", "External MCP")
+                target = server_map.get(label)
+                real_url = target.get("server_url") if target else "Unknown"
+
+                step_timings.append({
+                    "name": f"MCP: {item.get('name', 'unknown')}",
+                    "duration_ms": 0,
+                    "duration_source": "unavailable",
+                    "server_type": "mcp",
+                    "server_label": label,
+                    "server_url": real_url,
+                    "status": item.get("status", "completed")
+                })
+
+        if not tool_calls and not any(t.get("server_type") == "mcp" for t in step_timings):
             response["step_timings"] = step_timings
             return response
         api_logger.info(f"[MCP] Выполняю {len(tool_calls)} локальных вызовов")
@@ -630,7 +650,17 @@ class YandexMcpMixin:
             t_tool_start = _t.perf_counter()
             res_obj = _execute_local_tool_call(tc, all_servers)
             t_tool_end = _t.perf_counter()
-            step_timings.append({"name": f"Tool: {name}", "duration_ms": round((t_tool_end - t_tool_start) * 1000)})
+            srv_info = {"type": "local", "label": "Local Termux", "url": "localhost"}
+            if name.startswith("git_"): srv_info["label"] = "Local Git"
+            elif name in ("read_file", "write_file", "list_directory", "run_command"): srv_info["label"] = "Local Filesystem"
+            
+            step_timings.append({
+                "name": f"Tool: {name}", 
+                "duration_ms": round((t_tool_end - t_tool_start) * 1000),
+                "server_type": srv_info["type"],
+                "server_label": srv_info["label"],
+                "server_url": srv_info["url"]
+            })
             res_content = res_obj.get("content", "")
             tool_results.append({"call_id": call_id, "name": name, "content": res_content})
             raw_outputs_text.append(f"[{name}]: {res_content}")
@@ -644,6 +674,7 @@ class YandexMcpMixin:
             final_response = self.ask(None, model_key, conversation_id, {**final_params, "input": fc_inputs})
             text = self.extract_text(final_response)
             if text:
+                final_response["step_timings"] = step_timings
                 return final_response
         except Exception as e1:
             api_logger.info(f"[MCP] Стратегия 1 не сработала: {e1}")
@@ -660,6 +691,7 @@ class YandexMcpMixin:
             final_response = self.ask(None, model_key, None, {**final_params, "input": new_input})
             text = self.extract_text(final_response)
             if text:
+                final_response["step_timings"] = step_timings
                 return final_response
         except Exception as e2:
             api_logger.info(f"[MCP] Стратегия 2 не сработала: {e2}")
