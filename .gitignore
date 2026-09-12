@@ -5,3 +5,6 @@ project_dump.txt
 project_files.txt
 analysis.txt
 alice_pro.zip
+*.db
+logs/
+__pycache__/

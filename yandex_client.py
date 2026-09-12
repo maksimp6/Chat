@@ -606,7 +606,13 @@ class YandexMcpMixin:
         local_function_tools = _build_function_tools(local_cids)
         params["tools"] = cleaned_tools + local_function_tools
 
+        import time as _t
+        step_timings = []
+        t0 = _t.perf_counter()
+
         response = self.ask(message, model_key, conversation_id, params)
+        t1 = _t.perf_counter()
+        step_timings.append({"name": "LLM Router (поиск инструментов)", "duration_ms": round((t1 - t0) * 1000)})
 
         # 1. Извлечение вызовов функций (поддержка function_call и tool_call)
         output = response.get("output", [])
@@ -623,6 +629,7 @@ class YandexMcpMixin:
                         tool_calls.append(part)
 
         if not tool_calls:
+            response["step_timings"] = step_timings
             return response
 
         api_logger.info(f"[MCP] Выполняю {len(tool_calls)} локальных вызовов")
@@ -632,7 +639,10 @@ class YandexMcpMixin:
         for tc in tool_calls:
             name = tc.get("name") or tc.get("function", {}).get("name")
             call_id = tc.get("call_id") or tc.get("id") or name
+            t_tool_start = _t.perf_counter()
             res_obj = _execute_local_tool_call(tc, all_servers)
+            t_tool_end = _t.perf_counter()
+            step_timings.append({"name": f"Tool: {name}", "duration_ms": round((t_tool_end - t_tool_start) * 1000)})
             res_content = res_obj.get("content", "")
             tool_results.append({
                 "call_id": call_id,
@@ -697,12 +707,16 @@ class YandexMcpMixin:
         try:
             tool_summary = "\n".join(raw_outputs_text)
             prompt = f"Пользователь запросил: \"{message}\"\n\nРезультат выполнения локальной команды:\n{tool_summary}\n\nОбъясни этот результат пользователю кратко и по делу."
+            t_synth_start = _t.perf_counter()
             final_response = self.ask(
                 prompt,
                 model_key,
                 conversation_id,
                 final_params
             )
+            t_synth_end = _t.perf_counter()
+            step_timings.append({"name": "LLM Synthesis (финальный ответ)", "duration_ms": round((t_synth_end - t_synth_start) * 1000)})
+            final_response["step_timings"] = step_timings
             return final_response
         except Exception as e3:
             api_logger.error(f"[MCP] Стратегия 3 не сработала: {e3}")

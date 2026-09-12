@@ -51,10 +51,14 @@ def chat():
         add_message(conv_id, "assistant", str(reply), cost=cost)
         logger.info(f"[CHAT] Ответ получен. Токены: {usage}, Стоимость: {cost} руб.")
 
+        timings = response.get("step_timings", []) if isinstance(response, dict) else []
+        total_ms = sum(t.get("duration_ms", 0) for t in timings)
         return jsonify({
             "reply": reply,
             "usage": usage,
-            "cost": cost
+            "cost": cost,
+            "timings": timings,
+            "total_duration_ms": total_ms
         })
 
     except Exception as e:

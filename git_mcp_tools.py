@@ -10,6 +10,8 @@ def _get_repo_path(cfg: dict = None) -> str:
     path = cfg.get("repo_path")
     if path and os.path.isdir(path):
         return path
+    if os.path.isdir("/storage/emulated/0/alice_pro"):
+        return "/storage/emulated/0/alice_pro"
     if os.path.isdir("/sdcard/alice_pro"):
         return "/sdcard/alice_pro"
     return os.getcwd()
@@ -17,8 +19,8 @@ def _get_repo_path(cfg: dict = None) -> str:
 def _run_git_command(args: list, cfg: dict = None) -> dict:
     cfg = cfg or {}
     repo_path = _get_repo_path(cfg)
-    timeout = cfg.get("timeout", 15)
-    allowed_commands = cfg.get("allowed_commands", ["status", "log", "diff", "branch", "show"])
+    timeout = cfg.get("timeout", 20)
+    allowed_commands = cfg.get("allowed_commands", ["status", "log", "diff", "branch", "show", "add", "commit"])
 
     if not os.path.isdir(repo_path):
         return {"error": f"Директория не найдена: {repo_path}"}
@@ -31,9 +33,9 @@ def _run_git_command(args: list, cfg: dict = None) -> dict:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         if result.returncode == 0:
-            return {"success": True, "output": result.stdout.strip() or "(пустой вывод / изменений нет)"}
+            return {"success": True, "output": result.stdout.strip() or "(успешно / вывод пуст)"}
         else:
-            return {"success": False, "error": result.stderr.strip()}
+            return {"success": False, "error": result.stderr.strip() or f"Код ошибки: {result.returncode}"}
     except subprocess.TimeoutExpired:
         return {"success": False, "error": f"Превышено время ожидания ({timeout} сек)"}
     except Exception as e:
@@ -57,6 +59,14 @@ def git_diff(args: dict, cfg: dict) -> dict:
 def git_branches(args: dict, cfg: dict) -> dict:
     return _run_git_command(["branch", "--list"], cfg)
 
+def git_add(args: dict, cfg: dict) -> dict:
+    target = args.get("path") or args.get("files") or "."
+    return _run_git_command(["add", target], cfg)
+
+def git_commit(args: dict, cfg: dict) -> dict:
+    msg = args.get("message") or "Auto-commit via MCP"
+    return _run_git_command(["commit", "-m", msg], cfg)
+
 TOOL_REGISTRY = {
     "git_status": {
         "func": git_status,
@@ -77,6 +87,28 @@ TOOL_REGISTRY = {
         "func": git_branches,
         "description": "Получить список веток репозитория.",
         "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    "git_add": {
+        "func": git_add,
+        "description": "Индексировать изменения в Git (git add). По умолчанию добавляет все файлы ('.').",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Путь к файлу или '.' для всех изменений"}
+            },
+            "required": []
+        }
+    },
+    "git_commit": {
+        "func": git_commit,
+        "description": "Зафиксировать проиндексированные изменения с сообщением коммита.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Текст сообщения коммита"}
+            },
+            "required": ["message"]
+        }
     }
 }
 

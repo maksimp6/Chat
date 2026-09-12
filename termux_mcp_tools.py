@@ -1,3 +1,4 @@
+import os
 """Local Termux:API integration tools for Android OS."""
 import subprocess
 import json
@@ -53,7 +54,113 @@ def termux_notification(args: dict, cfg: dict) -> dict:
     content = args.get("content", "")
     return _run_termux_cmd(["termux-notification", "--title", title, "--content", content])
 
+def termux_camera_photo(args: dict, cfg: dict) -> dict:
+    import time
+    camera_id = str(args.get("camera_id", 0))
+    file_name = args.get("file_name") or f"photo_{int(time.time())}.jpg"
+    file_path = os.path.abspath(file_name)
+    res = _run_termux_cmd(["termux-camera-photo", "-c", camera_id, file_path], timeout=25)
+    if res.get("success"):
+        return {
+            "success": True,
+            "message": f"Фото успешно сохранено: {file_path}",
+            "file_path": file_path,
+            "camera_id": camera_id
+        }
+    return res
+
+def termux_open_app_settings(args: dict, cfg: dict) -> dict:
+    screen = args.get("screen", "overlay")
+    pkg = args.get("package_name", "com.termux.api")
+
+    if screen == "overlay":
+        cmd = ["am", "start", "-a", "android.settings.action.MANAGE_OVERLAY_PERMISSION", "-d", f"package:{pkg}"]
+    elif screen == "battery":
+        cmd = ["am", "start", "-a", "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS"]
+    else:  # "app_details" — общая карточка приложения и список разрешений
+        cmd = ["am", "start", "-a", "android.settings.APPLICATION_DETAILS_SETTINGS", "-d", f"package:{pkg}"]
+
+    res = _run_termux_cmd(cmd, timeout=10)
+    if res.get("success"):
+        return {
+            "success": True,
+            "message": f"Системный экран настроек ({screen}) для {pkg} успешно открыт на экране телефона."
+        }
+    return res
+
+def remove_file(args: dict, cfg: dict) -> dict:
+    import glob
+    pattern = args.get("pattern") or args.get("path")
+    if not pattern:
+        return {"success": False, "error": "Не указан путь или паттерн для удаления"}
+    matched = glob.glob(pattern)
+    if not matched:
+        return {"success": True, "message": "Файлы по данному шаблону не найдены"}
+    deleted = []
+    for f in matched:
+        try:
+            if os.path.isfile(f):
+                os.remove(f)
+                deleted.append(f)
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка при удалении {f}: {str(e)}"}
+    return {"success": True, "message": f"Удалено файлов: {len(deleted)} ({', '.join(deleted)})"}
+
 TERMUX_TOOLS = {
+    "remove_file": {
+        "func": remove_file,
+        "description": "Удалить один или несколько файлов по имени или шаблону (например, 'photo_*.jpg').",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Имя файла или шаблон поиска (например, photo_*.jpg)"
+                }
+            },
+            "required": ["pattern"]
+        }
+    },
+
+    "termux_open_app_settings": {
+        "func": termux_open_app_settings,
+        "description": "Открыть экран системных настроек Android (разрешение 'Поверх других приложений', карточка разрешений Termux:API или настройки батареи).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "screen": {
+                    "type": "string",
+                    "enum": ["overlay", "app_details", "battery"],
+                    "description": "Тип экрана: 'overlay' — доступ поверх других окон (для съемки в фоне), 'app_details' — все разрешения приложения, 'battery' — работа в фоне/аккумулятор."
+                },
+                "package_name": {
+                    "type": "string",
+                    "description": "Имя пакета (по умолчанию 'com.termux.api')"
+                }
+            },
+            "required": []
+        }
+    },
+
+    "termux_camera_photo": {
+        "func": termux_camera_photo,
+        "description": "Сделать снимок с камеры смартфона (0 — задняя/основная, 1 — фронтальная) и сохранить его в локальный файл.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "camera_id": {
+                    "type": "integer",
+                    "description": "ID камеры: 0 для задней камеры, 1 для селфи-камеры (по умолчанию 0)"
+                },
+                "file_name": {
+                    "type": "string",
+                    "description": "Имя файла для сохранения снимка (по умолчанию генерируется автоматически, например photo_1789211000.jpg)"
+                }
+            },
+            "required": []
+        }
+    },
+
     "termux_battery_status": {
         "func": termux_battery_status,
         "description": "Получить детальную информацию о батарее устройства (процент заряда, температура, статус зарядки).",

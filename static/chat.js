@@ -116,7 +116,7 @@ function formatInline(text) {
         .replace(/`(.+?)`/g, '<code>$1</code>'); // Инлайн-код
 }
 
-function addMessage(text, role, save, cost) {
+function addMessage(text, role, save, cost, timings, totalDurationMs) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
 
@@ -150,11 +150,32 @@ function addMessage(text, role, save, cost) {
     };
     msg.appendChild(copyBtn);
 
+    const metaWrap = document.createElement("div");
+    metaWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;";
+
     if (cost && cost > 0) {
         const billing = document.createElement("div");
         billing.className = "billing-bubble";
         billing.textContent = `≈ ${cost.toFixed(2)} ₽`;
-        msg.appendChild(billing);
+        metaWrap.appendChild(billing);
+    }
+
+    if (timings && timings.length > 0) {
+        const total = totalDurationMs ? `${totalDurationMs} мс` : "";
+        const badge = document.createElement("details");
+        badge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
+        
+        let stepsHtml = `<summary style="font-weight:600;">⏱️ Цепочка: ${total} (${timings.length} ${timings.length === 1 ? 'этап' : 'этапа'})</summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
+        timings.forEach((t, idx) => {
+            stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;"><span>${idx + 1}. ${t.name}</span><strong>${t.duration_ms} мс</strong></div>`;
+        });
+        stepsHtml += "</div>";
+        badge.innerHTML = stepsHtml;
+        metaWrap.appendChild(badge);
+    }
+
+    if (metaWrap.children.length > 0) {
+        msg.appendChild(metaWrap);
     }
 
     chatbox.appendChild(msg);
@@ -237,7 +258,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (data.error) {
                 addMessage("Ошибка: " + data.error, "bot", false, 0);
             } else {
-                addMessage(data.reply, "bot", true, data.cost || 0);
+                addMessage(data.reply, "bot", true, data.cost || 0, data.timings, data.total_duration_ms);
             }
         })
         .catch(e => {
