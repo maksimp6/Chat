@@ -207,7 +207,13 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if params.get("stream") is not None: payload["stream"] = params["stream"]
         if params.get("truncation"): payload["truncation"] = params["truncation"]
         if params.get("tool_choice"): payload["tool_choice"] = params["tool_choice"]
-        if params.get("parallel_tool_calls") is not None: payload["parallel_tool_calls"] = params["parallel_tool_calls"]
+        ptc = params.get("parallel_tool_calls")
+        if ptc is not None:
+            if isinstance(ptc, str):
+                ptc = ptc.lower() not in ("false", "0")
+            payload["parallel_tool_calls"] = bool(ptc)
+        else:
+            payload["parallel_tool_calls"] = True if payload.get("tools") else False
         if params.get("max_tool_calls"): payload["max_tool_calls"] = int(params["max_tool_calls"])
         if params.get("metadata"): payload["metadata"] = params["metadata"]
         if params.get("service_tier"): payload["service_tier"] = params["service_tier"]
@@ -665,7 +671,7 @@ class YandexMcpMixin:
             tool_results.append({"call_id": call_id, "name": name, "content": res_content})
             raw_outputs_text.append(f"[{name}]: {res_content}")
             api_logger.debug(f"[MCP] Результат {name}: {res_content[:150]}")
-        final_params = {**params, "tools": None}
+        final_params = {**params}
         try:
             fc_inputs = [
                 {"type": "function_call_output", "call_id": tr["call_id"], "output": tr["content"]}

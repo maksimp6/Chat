@@ -116,7 +116,7 @@
         h += UI.section('Флаги выполнения');
         h += '<div style="display:flex;flex-wrap:wrap;gap:15px;margin-top:10px;">';
         h += UI.chk('set-stream', s.stream, 'Stream', ' class="track-change"', 'SSE поток');
-        h += UI.chk('set-parallel', s.parallel_tool_calls, 'Parallel Tools', ' class="track-change"', 'Параллельные вызовы');
+        h += UI.chk('set-parallel', s.parallel_tool_calls !== false, 'Parallel Tools', ' class="track-change"', 'Параллельные вызовы');
         h += UI.chk('set-store', s.store, 'Store', ' class="track-change"', 'Сохранять ответ');
         h += '</div>';
 

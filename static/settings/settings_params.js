@@ -14,7 +14,7 @@
             background: s.background,
             stream: s.stream,
             instructions: s.instructions,
-            parallel_tool_calls: s.parallel_tool_calls
+            parallel_tool_calls: (s.parallel_tool_calls !== false && s.parallel_tool_calls !== 'false')
         };
         if (s.conv_metadata) {
             try { params.metadata = JSON.parse(s.conv_metadata); } catch(e) {}
