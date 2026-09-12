@@ -470,8 +470,8 @@ import mcp_storage
 def _build_function_tools(connectors):
     tools = []
     
-    # 1. Git (по условию подключения)
-    if 'local_git' in connectors or True: # Включаем по умолчанию для автономности
+    # 1. Git
+    if 'local_git' in connectors or True:
         try:
             from git_mcp_tools import GIT_TOOLS
             for name, cfg in GIT_TOOLS.items():
@@ -488,7 +488,7 @@ def _build_function_tools(connectors):
         except Exception as e:
             api_logger.error(f"[TOOLS] Ошибка загрузки TERMUX_TOOLS: {e}")
 
-    # 3. System Tools (всегда доступны)
+    # 3. System Tools
     try:
         from termux_system_tools import SYSTEM_TOOLS
         for name, cfg in SYSTEM_TOOLS.items():
@@ -496,13 +496,21 @@ def _build_function_tools(connectors):
     except Exception as e:
         api_logger.error(f"[TOOLS] Ошибка загрузки SYSTEM_TOOLS: {e}")
 
-    # 4. Filesystem Tools (всегда доступны для самомодификации)
+    # 4. Filesystem Tools
     try:
         from filesystem_mcp_tools import FILESYSTEM_TOOLS
         for name, cfg in FILESYSTEM_TOOLS.items():
             tools.append({"type": "function", "name": name, "description": cfg["description"], "parameters": cfg["parameters"]})
     except Exception as e:
         api_logger.error(f"[TOOLS] КРИТИЧЕСКАЯ ОШИБКА загрузки FILESYSTEM_TOOLS: {e}")
+
+    # 5. Wikipedia Tools
+    try:
+        from wikipedia_mcp_tools import WIKIPEDIA_TOOLS
+        for name, cfg in WIKIPEDIA_TOOLS.items():
+            tools.append({"type": "function", "name": name, "description": cfg["description"], "parameters": cfg["parameters"]})
+    except Exception as e:
+        api_logger.error(f"[TOOLS] Ошибка загрузки WIKIPEDIA_TOOLS: {e}")
 
     return tools
 
@@ -542,6 +550,12 @@ def _execute_local_tool_call(tool_call, server_configs):
         if func_name in TERMUX_TOOLS:
             cfg = next((s.get('config', {}) for s in server_configs if s.get('connector_id') == 'termux_api'), {})
             result = execute_termux_tool(func_name, arguments, cfg)
+    except Exception:
+        pass
+    try:
+        from wikipedia_mcp_tools import WIKIPEDIA_TOOLS
+        if func_name in WIKIPEDIA_TOOLS:
+            result = WIKIPEDIA_TOOLS[func_name]["func"](arguments, {})
     except Exception:
         pass
     call_id = tool_call.get("call_id") or tool_call.get("id") or tool_call.get("tool_call_id") or func_name
@@ -635,10 +649,8 @@ class YandexMcpMixin:
                 for part in item.get("content", []):
                     if isinstance(part, dict) and part.get("type") in ("function_call", "tool_call"):
                         tool_calls.append(part)
-        # Строим мапу серверов для быстрого поиска по server_label (один раз за вызов)
         server_map = {srv.get("server_label"): srv for srv in all_servers}
 
-        # Извлекаем внешние MCP-вызовы, выполненные Yandex Cloud
         for item in output:
             if isinstance(item, dict) and item.get("type") == "mcp_call":
                 label = item.get("server_label", "External MCP")
@@ -669,7 +681,8 @@ class YandexMcpMixin:
             t_tool_end = _t.perf_counter()
             srv_info = {"type": "local", "label": "Local Termux", "url": "localhost"}
             if name.startswith("git_"): srv_info["label"] = "Local Git"
-            elif name in ("read_file", "write_file", "list_directory", "run_command"): srv_info["label"] = "Local Filesystem"
+            elif name.startswith("wikipedia_"): srv_info["label"] = "Wikipedia API"
+            elif name in ("read_file", "write_file", "apply_patch", "list_directory", "run_command"): srv_info["label"] = "Local Filesystem"
             
             step_timings.append({
                 "name": f"Tool: {name}", 
@@ -682,39 +695,11 @@ class YandexMcpMixin:
             tool_results.append({"call_id": call_id, "name": name, "content": res_content})
             raw_outputs_text.append(f"[{name}]: {res_content}")
             api_logger.debug(f"[MCP] Результат {name}: {res_content[:150]}")
+        
         final_params = {**params}
         try:
-            fc_inputs = [
-                {"type": "function_call_output", "call_id": tr["call_id"], "output": tr["content"]}
-                for tr in tool_results
-            ]
-            final_response = self.ask(None, model_key, conversation_id, {**final_params, "input": fc_inputs})
-            text = self.extract_text(final_response)
-            if text:
-                final_response["step_timings"] = step_timings
-                return final_response
-        except Exception as e1:
-            api_logger.info(f"[MCP] Стратегия 1 не сработала: {e1}")
-        try:
-            tool_msg_inputs = [
-                {"role": "tool", "tool_call_id": tr["call_id"], "content": tr["content"]}
-                for tr in tool_results
-            ]
-            new_input = [
-                {"role": "user", "content": message},
-                {"role": "assistant", "content": tool_calls},
-                *tool_msg_inputs
-            ]
-            final_response = self.ask(None, model_key, None, {**final_params, "input": new_input})
-            text = self.extract_text(final_response)
-            if text:
-                final_response["step_timings"] = step_timings
-                return final_response
-        except Exception as e2:
-            api_logger.info(f"[MCP] Стратегия 2 не сработала: {e2}")
-        try:
             tool_summary = "\n".join(raw_outputs_text)
-            prompt = f"Пользователь запросил: \"{message}\"\nРезультат выполнения локальной команды:\n{tool_summary}\nОбъясни этот результат пользователю кратко и по делу."
+            prompt = f"Пользователь запросил: \"{message}\"\nРезультат выполнения локальной команды/инструментов:\n{tool_summary}\nДай полноценный и подробный ответ пользователю на основе полученных данных."
             t_synth_start = _t.perf_counter()
             final_response = self.ask(prompt, model_key, conversation_id, final_params)
             t_synth_end = _t.perf_counter()
@@ -722,5 +707,5 @@ class YandexMcpMixin:
             final_response["step_timings"] = step_timings
             return final_response
         except Exception as e3:
-            api_logger.error(f"[MCP] Стратегия 3 не сработала: {e3}")
-            return {"output_text": "Команда выполнена успешно:\n" + "\n".join(raw_outputs_text), "status": "completed"}
+            api_logger.error(f"[MCP] Ошибка синтеза: {e3}")
+            return {"output_text": "Данные получены:\n" + "\n".join(raw_outputs_text), "status": "completed", "step_timings": step_timings}

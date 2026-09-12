@@ -37,6 +37,11 @@ def find_tool_registry(func_name: str):
         registries.append(TERMUX_TOOLS)
     except Exception:
         pass
+    try:
+        from wikipedia_mcp_tools import WIKIPEDIA_TOOLS
+        registries.append(WIKIPEDIA_TOOLS)
+    except Exception:
+        pass
     for reg in registries:
         if func_name in reg:
             return reg[func_name]

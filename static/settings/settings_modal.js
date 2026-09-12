@@ -69,12 +69,12 @@
             UI.chk("set-fs-en", fs.enabled || false, "<strong>File Search</strong> (семантический поиск в Vector Store)") +
             '<div style="margin-top:6px;">' + UI.lbl("Vector Store IDs") + UI.inp("set-fs-vids", "text", fs.vector_store_ids || "", ' placeholder="vs_xxxx, vs_yyyy"') + '</div>' +
             '</div>',
-            UI.section("Локальные драйверы Termux"),
-            '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:8px;">Локальные функции выполняются непосредственно в Termux:</div>',
+            UI.section("Локальные драйверы Termux и Файловой системы"),
+            '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:8px;">Локальные функции выполняются непосредственно на устройстве:</div>',
             '<div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">',
-            '    <label><input type="checkbox" checked disabled> 📱 <strong>Termux Hardware API</strong> (батарея, буфер обмена, тосты, TTS, уведомления)</label>',
-            '    <label><input type="checkbox" checked disabled> 🌿 <strong>Local Git</strong> (ветки, статус, diff, коммиты)</label>',
-            '    <label><input type="checkbox" checked disabled> ⚙️ <strong>Filesystem Agent Tools</strong> (AST outline, безопасное чтение, бэкапы, diff-патчи)</label>',
+            '    <label><input type="checkbox" checked disabled> 📱 <strong>Termux Hardware API</strong></label>',
+            '    <label><input type="checkbox" checked disabled> 🌿 <strong>Local Git</strong></label>',
+            '    <label><input type="checkbox" checked disabled> ⚙️ <strong>Filesystem Agent Tools (включая apply_patch)</strong></label>',
             '</div>',
             '</div>'
         ].join('');

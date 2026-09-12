@@ -183,3 +183,27 @@ def remove_file_from_vs(vs_id, file_id):
         return jsonify(result)
     except YandexClientError as e:
         return _err_response(e)
+
+
+# === Local Files API (/sdcard/repo) ===
+LOCAL_REPO_DIR = "/sdcard/repo"
+
+@file_bp.route('/api/local-files', methods=['GET'])
+def list_local_files():
+    try:
+        subpath = request.args.get('path', '').strip('/')
+        target_dir = os.path.join(LOCAL_REPO_DIR, subpath)
+        
+        if not os.path.exists(target_dir):
+            return jsonify({"error": f"Папка не найдена: {target_dir}"}), 404
+            
+        items = []
+        for entry in os.scandir(target_dir):
+            items.append({
+                "name": entry.name,
+                "is_dir": entry.is_dir(),
+                "size": entry.stat().st_size if entry.is_file() else 0
+            })
+        return jsonify({"success": True, "path": target_dir, "items": items})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

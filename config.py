@@ -70,3 +70,5 @@ def calculate_full_cost(model_key, usage):
 
 # Singleton instance for backward compatibility
 config = Config()
+
+REPO_DIR = "/sdcard/repo"
