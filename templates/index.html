@@ -4,26 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Alice Pro</title>
-    <link rel="stylesheet" href="/static/style.css?v=9">
-    
-    <!-- Отладочный инструмент -->
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-    <script>
-        try { eruda.init(); } catch(e) { console.error("Eruda init failed:", e); }
-    </script>
-    
-    <!-- Файловый менеджер -->
+    <link rel="stylesheet" href="/static/style.css?v=10">
     <script src="/static/file_manager.js" defer></script>
-    
-    <!-- Модули настроек (строго в этом порядке) -->
     <script src="/static/settings/ui_helpers.js"></script>
     <script src="/static/settings/settings_storage.js"></script>
     <script src="/static/settings/settings_mcp.js"></script>
     <script src="/static/settings/settings_params.js"></script>
     <script src="/static/settings/settings_modal.js"></script>
     <script src="/static/settings.js"></script>
-    
-    <!-- Основные скрипты приложения -->
     <script src="/static/core.js"></script>
     <script src="/static/sidebar.js"></script>
     <script src="/static/models.js"></script>
@@ -40,20 +28,21 @@
             </div>
             <div id="conv-list"></div>
         </div>
-
-        <!-- Overlay -->
         <div id="overlay"></div>
 
         <!-- Main Content -->
         <div id="main">
-            <!-- Header -->
+            <!-- Header с разнесенными кнопками -->
             <div id="header">
                 <button id="menu-btn" class="header-btn">☰</button>
                 <button id="model-btn" class="header-btn model-btn">🤖 Alice AI LLM</button>
-                <!-- Кнопка настроек -->
-                <button id="settings-btn" class="header-btn" onclick="openSettingsModal()">⚙️</button>
-                <!-- Кнопка файлового менеджера -->
-                <button id="file-manager-btn" class="header-btn" onclick="window.openFileManagerModal()">📁</button>
+                <!-- Инструменты (Локальные драйверы) -->
+                <button id="tools-btn" class="header-btn" title="Локальные инструменты" onclick="openToolsModal()">🧰</button>
+                <!-- Внешние MCP серверы -->
+                <button id="mcp-btn" class="header-btn" title="Внешние MCP шлюзы" onclick="window.openMcpManagerModal()">🌐</button>
+                <!-- Настройки LLM параметров -->
+                <button id="settings-btn" class="header-btn" title="Параметры генерации" onclick="openSettingsModal()">⚙️</button>
+                <button id="file-manager-btn" class="header-btn" title="Файловый менеджер" onclick="window.openFileManagerModal()">📁</button>
                 <button id="theme-toggle" class="header-btn">🌙</button>
             </div>
 
