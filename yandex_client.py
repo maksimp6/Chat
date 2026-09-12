@@ -509,6 +509,8 @@ def _build_function_tools(connectors):
 def _execute_local_tool_call(tool_call, server_configs):
     import json
     func_name = tool_call.get("name") or tool_call.get("function", {}).get("name")
+    if func_name and "<|" in func_name:
+        func_name = func_name.split("<|")[0].strip()
     arguments = tool_call.get("arguments") or tool_call.get("function", {}).get("arguments", {})
     if isinstance(arguments, str):
         try:

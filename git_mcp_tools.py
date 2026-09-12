@@ -5,67 +5,79 @@ import logging
 
 logger = logging.getLogger("git_mcp")
 
-def _get_repo_path(cfg: dict = None) -> str:
+def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     cfg = cfg or {}
-    path = cfg.get("repo_path")
-    if path and os.path.isdir(path):
-        return path
-    if os.path.isdir("/storage/emulated/0/alice_pro"):
-        return "/storage/emulated/0/alice_pro"
-    if os.path.isdir("/sdcard/alice_pro"):
-        return "/sdcard/alice_pro"
-    return os.getcwd()
+    base_dir = cfg.get("repos_base_dir") or "/sdcard/repo"
+    target = repo_name or cfg.get("active_repo") or cfg.get("repo_path") or "alice_pro"
+    
+    # Если передан абсолютный путь существующей папки
+    if os.path.isabs(target) and os.path.isdir(target):
+        return target
+    
+    # Проверяем внутри базовой папки хранения
+    candidate = os.path.join(base_dir, target)
+    if os.path.isdir(candidate):
+        return candidate
+        
+    # Запасные стандартные пути Termux/Android
+    for fallback_base in ["/sdcard/repo", "/sdcard", os.getcwd()]:
+        alt = os.path.join(fallback_base, target)
+        if os.path.isdir(alt):
+            return alt
 
-def _run_git_command(args: list, cfg: dict = None) -> dict:
+    return candidate
+
+def _run_git_command(args: list, cfg: dict = None, repo_name: str = None) -> dict:
     cfg = cfg or {}
-    repo_path = _get_repo_path(cfg)
+    repo_path = _resolve_repo_path(repo_name, cfg)
     timeout = cfg.get("timeout", 20)
-    allowed_commands = cfg.get("allowed_commands", ["status", "log", "diff", "branch", "show", "add", "commit"])
+    allowed_commands = ["status", "log", "diff", "branch", "show", "add", "commit", "checkout"]
 
     if not os.path.isdir(repo_path):
-        return {"error": f"Директория не найдена: {repo_path}"}
+        return {"success": False, "error": f"Папка репозитория не найдена: {repo_path}"}
+
+    if not os.path.isdir(os.path.join(repo_path, ".git")):
+        return {"success": False, "error": f"В папке {repo_path} отсутствует .git"}
 
     if args and args[0] not in allowed_commands:
-        return {"error": f"Команда не разрешена: {args[0]}"}
+        return {"success": False, "error": f"Команда не разрешена: {args[0]}"}
 
     cmd = ["git", "-C", repo_path] + args
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
-        if result.returncode == 0:
-            return {"success": True, "output": result.stdout.strip() or "(успешно / вывод пуст)"}
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        rel_name = os.path.basename(repo_path)
+        if res.returncode == 0:
+            return {"success": True, "repo": rel_name, "output": res.stdout.strip() or "(успешно)"}
         else:
-            return {"success": False, "error": result.stderr.strip() or f"Код ошибки: {result.returncode}"}
+            return {"success": False, "repo": rel_name, "error": res.stderr.strip() or f"Код: {res.returncode}"}
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": f"Превышено время ожидания ({timeout} сек)"}
+        return {"success": False, "error": f"Превышен таймаут ({timeout}с)"}
     except Exception as e:
-        logger.exception(f"Ошибка выполнения git: {e}")
         return {"success": False, "error": str(e)}
 
 def git_status(args: dict, cfg: dict) -> dict:
-    return _run_git_command(["status", "--short", "--branch"], cfg)
+    return _run_git_command(["status", "--short", "--branch"], cfg, args.get("repo") or args.get("repo_path"))
 
 def git_log(args: dict, cfg: dict) -> dict:
     limit = args.get("limit") or cfg.get("default_log_limit", 5)
-    return _run_git_command(["log", f"-n{limit}", "--oneline", "--no-decorate"], cfg)
+    return _run_git_command(["log", f"-n{limit}", "--oneline", "--no-decorate"], cfg, args.get("repo") or args.get("repo_path"))
 
 def git_diff(args: dict, cfg: dict) -> dict:
     cmd_args = ["diff", "HEAD"]
     if args.get("file_path"):
-        cmd_args.append("--")
-        cmd_args.append(args["file_path"])
-    return _run_git_command(cmd_args, cfg)
+        cmd_args.extend(["--", args["file_path"]])
+    return _run_git_command(cmd_args, cfg, args.get("repo") or args.get("repo_path"))
 
 def git_branches(args: dict, cfg: dict) -> dict:
-    return _run_git_command(["branch", "--list"], cfg)
+    return _run_git_command(["branch", "--list"], cfg, args.get("repo") or args.get("repo_path"))
 
 def git_add(args: dict, cfg: dict) -> dict:
     target = args.get("path") or args.get("files") or "."
-    return _run_git_command(["add", target], cfg)
+    return _run_git_command(["add", target], cfg, args.get("repo") or args.get("repo_path"))
 
 def git_commit(args: dict, cfg: dict) -> dict:
     msg = args.get("message") or "Auto-commit via MCP"
-    return _run_git_command(["commit", "-m", msg], cfg)
+    return _run_git_command(["commit", "-m", msg], cfg, args.get("repo") or args.get("repo_path"))
 
 TOOL_REGISTRY = {
     "git_status": {

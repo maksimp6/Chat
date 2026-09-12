@@ -1,6 +1,6 @@
 #!/bin/bash
 OUTPUT="project_dump.txt"
-MAX_LOG_LINES=30
+MAX_LOG_LINES=15000
 MAX_FILE_SIZE=50000  # 50KB лимит на файл
 
 echo "Собираю файлы проекта в $OUTPUT..."

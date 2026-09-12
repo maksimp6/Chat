@@ -78,6 +78,8 @@ def chat():
 
             for tc in calls:
                 func_name = tc.get("name") or tc.get("function", {}).get("name")
+                if func_name and "<|" in func_name:
+                    func_name = func_name.split("<|")[0].strip()
                 tool_config = find_tool_registry(func_name)
 
                 if tool_config and tool_config.get("requires_approval"):

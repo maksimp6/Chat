@@ -376,3 +376,5 @@ def execute_termux_tool(tool_name: str, arguments: dict, cfg: dict = None) -> di
     if tool_name not in TOOL_REGISTRY:
         return {"error": f"Неизвестный инструмент Termux: {tool_name}"}
     return TOOL_REGISTRY[tool_name]["func"](arguments, cfg or {})
+
+SYSTEM_TOOLS = {}
