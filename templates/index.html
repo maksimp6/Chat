@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Alice Pro</title>
+    <link rel="stylesheet" href="/static/style.css?v=9">
+    
+    <!-- Отладочный инструмент -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>
+        try { eruda.init(); } catch(e) { console.error("Eruda init failed:", e); }
+    </script>
+    
+    <!-- Файловый менеджер -->
+    <script src="/static/file_manager.js" defer></script>
+    
+    <!-- Модули настроек (строго в этом порядке) -->
+    <script src="/static/settings/ui_helpers.js"></script>
+    <script src="/static/settings/settings_storage.js"></script>
+    <script src="/static/settings/settings_mcp.js"></script>
+    <script src="/static/settings/settings_params.js"></script>
+    <script src="/static/settings/settings_modal.js"></script>
+    <script src="/static/settings.js"></script>
+    
+    <!-- Основные скрипты приложения -->
+    <script src="/static/core.js"></script>
+    <script src="/static/sidebar.js"></script>
+    <script src="/static/models.js"></script>
+    <script src="/static/chat.js"></script>
+    <script src="/static/voice.js"></script>
+</head>
+<body>
+    <div id="app-root" class="alice-pro-app">
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div id="sidebar-header">
+                <button id="new-chat-btn">+ Новый чат</button>
+                <button id="close-sidebar-btn">&times;</button>
+            </div>
+            <div id="conv-list"></div>
+        </div>
+
+        <!-- Overlay -->
+        <div id="overlay"></div>
+
+        <!-- Main Content -->
+        <div id="main">
+            <!-- Header -->
+            <div id="header">
+                <button id="menu-btn" class="header-btn">☰</button>
+                <button id="model-btn" class="header-btn model-btn">🤖 Alice AI LLM</button>
+                <!-- Кнопка настроек -->
+                <button id="settings-btn" class="header-btn" onclick="openSettingsModal()">⚙️</button>
+                <!-- Кнопка файлового менеджера -->
+                <button id="file-manager-btn" class="header-btn" onclick="window.openFileManagerModal()">📁</button>
+                <button id="theme-toggle" class="header-btn">🌙</button>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="chatbox">
+                <div class="empty-state">Начните диалог или выберите модель</div>
+            </div>
+
+            <!-- Voice UI -->
+            <div id="voice-ui">
+                <canvas id="waveform"></canvas>
+                <div id="voice-status"></div>
+                <button id="mic-btn">🎤</button>
+            </div>
+
+            <!-- Text Input Area -->
+            <div id="text-ui">
+                <div id="response-mode-wrap" style="display:none;">
+                    <select id="response-mode-select">
+                        <option value="audio">🔊 Голос</option>
+                        <option value="text">📝 Текст</option>
+                        <option value="both">🔊+📝 Оба</option>
+                    </select>
+                </div>
+                <button id="upload-image-btn" class="icon-btn" style="display:none;" onclick="window.uploadImage()">📷</button>
+                <button id="mic-btn-inline" class="icon-btn" style="display:none;">🎤</button>
+                <input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off">
+                <button id="send-btn">➤</button>
+            </div>
+        </div>
+
+        <!-- Model Selection Modal -->
+        <div id="model-modal" class="modal">
+            <div class="modal-content">
+                <h3>Выбор модели</h3>
+                <button id="close-modal">&times;</button>
+                <div id="model-list"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
