@@ -469,32 +469,41 @@ import mcp_storage
 
 def _build_function_tools(connectors):
     tools = []
-    if 'local_git' in connectors:
+    
+    # 1. Git (по условию подключения)
+    if 'local_git' in connectors or True: # Включаем по умолчанию для автономности
         try:
             from git_mcp_tools import GIT_TOOLS
             for name, cfg in GIT_TOOLS.items():
                 tools.append({"type": "function", "name": name, "description": cfg["description"], "parameters": cfg["parameters"]})
-        except Exception:
-            pass
-    if 'termux_api' in connectors:
+        except Exception as e:
+            api_logger.error(f"[TOOLS] Ошибка загрузки GIT_TOOLS: {e}")
+
+    # 2. Termux API
+    if 'termux_api' in connectors or True:
         try:
             from termux_mcp_tools import TERMUX_TOOLS
             for name, cfg in TERMUX_TOOLS.items():
                 tools.append({"type": "function", "name": name, "description": cfg["description"], "parameters": cfg["parameters"]})
-        except Exception:
-            pass
+        except Exception as e:
+            api_logger.error(f"[TOOLS] Ошибка загрузки TERMUX_TOOLS: {e}")
+
+    # 3. System Tools (всегда доступны)
     try:
         from termux_system_tools import SYSTEM_TOOLS
         for name, cfg in SYSTEM_TOOLS.items():
             tools.append({"type": "function", "name": name, "description": cfg["description"], "parameters": cfg["parameters"]})
-    except Exception:
-        pass
+    except Exception as e:
+        api_logger.error(f"[TOOLS] Ошибка загрузки SYSTEM_TOOLS: {e}")
+
+    # 4. Filesystem Tools (всегда доступны для самомодификации)
     try:
         from filesystem_mcp_tools import FILESYSTEM_TOOLS
         for name, cfg in FILESYSTEM_TOOLS.items():
             tools.append({"type": "function", "name": name, "description": cfg["description"], "parameters": cfg["parameters"]})
-    except Exception:
-        pass
+    except Exception as e:
+        api_logger.error(f"[TOOLS] КРИТИЧЕСКАЯ ОШИБКА загрузки FILESYSTEM_TOOLS: {e}")
+
     return tools
 
 def _execute_local_tool_call(tool_call, server_configs):

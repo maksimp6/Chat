@@ -1,4 +1,3 @@
-
 function renderApprovalCard(toolCall, origMsg) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
@@ -38,7 +37,7 @@ function renderApprovalCard(toolCall, origMsg) {
         .then(data => {
             card.remove();
             if (data.requires_approval) {
-                renderApprovalCard(data.tool_call, text);
+                renderApprovalCard(data.tool_call, origMsg);
             } else if (data.error) {
                 addMessage("Ошибка выполнения: " + data.error, "bot", false, 0);
             } else {
@@ -57,27 +56,22 @@ function renderApprovalCard(toolCall, origMsg) {
     };
 }
 
-// Простой и безопасный парсер Markdown
 function parseMarkdown(text) {
     if (!text) return "";
 
-    // 1. Экранируем HTML во всём тексте (защита от XSS)
     var safe = text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-    // 2. Извлекаем блоки кода (уже экранированные, повторно не нужно)
     var codeBlocks = [];
-    safe = safe.replace(/```(\w*)\n?([\s\S]*?)```/g, function(m, lang, code) {
+    safe = safe.replace(/```([\w\-\+\#]*)\n?([\s\S]*?)```/g, function(m, lang, code) {
         var ph = "\x00CB" + codeBlocks.length + "\x00";
-        // Убираем лишний перенос строки в начале блока, если он есть
         code = code.replace(/^\n/, ''); 
         codeBlocks.push('<pre><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre>');
         return ph;
     });
 
-    // 3. Построчная обработка блочных элементов
     var lines = safe.split('\n');
     var out = [];
     var inList = false;
@@ -88,8 +82,6 @@ function parseMarkdown(text) {
         var line = lines[i];
         var nextLine = lines[i + 1] || '';
 
-        // --- Таблицы ---
-        // Проверяем, является ли текущая строка началом таблицы (есть | и следующая строка - разделитель)
         var isTableStart = /^\s*\|.*\|\s*$/.test(line) && /^\s*\|?[\s:]*-+[\s:|-]*\|?\s*$/.test(nextLine);
 
         if (isTableStart && !inTable) {
@@ -99,7 +91,7 @@ function parseMarkdown(text) {
             var hdr = line.split('|').filter(function(c) { return c.trim() !== ''; });
             hdr.forEach(function(c) { tableHtml += '<th>' + formatInline(c.trim()) + '</th>'; });
             tableHtml += '</tr></thead><tbody>';
-            i++; // пропускаем строку-разделитель
+            i++;
             continue;
         }
 
@@ -107,27 +99,26 @@ function parseMarkdown(text) {
             if (/^\s*\|.*\|\s*$/.test(line)) {
                 var cells = line.split('|').filter(function(c) { return c.trim() !== ''; });
                 tableHtml += '<tr>';
-                cells.forEach(function(c) { tableHtml += '<td>' + formatInline(c.trim()) + '</td>'; });
+                cells.forEach(function(c) { 
+            var cellContent = c.trim().replace(/&lt;ul&gt;/g, "<ul>").replace(/&lt;\/ul&gt;/g, "</ul>").replace(/&lt;li&gt;/g, "<li>").replace(/&lt;\/li&gt;/g, "</li>");
+            tableHtml += "<td>" + formatInline(cellContent) + "</td>"; 
+        });
                 tableHtml += '</tr>';
                 continue;
             } else {
-                // Конец таблицы
                 tableHtml += '</tbody></table>';
                 out.push(tableHtml);
                 tableHtml = '';
                 inTable = false;
-                // Падаем в обработку текущей строки как обычного текста
             }
         }
 
-        // --- Горизонтальная линия ---
         if (/^(-{3,}|_{3,}|\*{3,})$/.test(line.trim())) {
             if (inList) { out.push('</ul>'); inList = false; }
             out.push('<hr>');
             continue;
         }
 
-        // --- Заголовки ---
         var hdr = line.match(/^(#{1,6})\s+(.*)$/);
         if (hdr) {
             if (inList) { out.push('</ul>'); inList = false; }
@@ -135,7 +126,6 @@ function parseMarkdown(text) {
             continue;
         }
 
-        // --- Списки ---
         var li = line.match(/^\s*[-*+]\s+(.*)$/);
         if (li) {
             if (!inList) { out.push('<ul>'); inList = true; }
@@ -146,20 +136,21 @@ function parseMarkdown(text) {
             inList = false;
         }
 
-        // --- Пустые строки ---
         if (line.trim() === '') {
             out.push('<br>');
             continue;
         }
 
-        // --- Обычный текст ---
-        out.push('<p>' + formatInline(line) + '</p>');
+        if (line.trim().indexOf('\x00CB') === 0) {
+            out.push(line);
+        } else {
+            out.push('<p>' + formatInline(line) + '</p>');
+        }
     }
 
     if (inList) out.push('</ul>');
     if (inTable) { tableHtml += '</tbody></table>'; out.push(tableHtml); }
 
-    // 4. Восстанавливаем блоки кода
     var result = out.join('\n');
     for (var j = 0; j < codeBlocks.length; j++) {
         result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
@@ -170,9 +161,9 @@ function parseMarkdown(text) {
 
 function formatInline(text) {
     return text
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Жирный
-        .replace(/(?<!\s)\*(?!\s)(.+?)(?<!\s)\*(?!\s)/g, '<em>$1</em>') // Курсив (без пробелов вокруг)
-        .replace(/`(.+?)`/g, '<code>$1</code>'); // Инлайн-код
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(?<!\s)\*(?!\s)(.+?)(?<!\s)\*(?!\s)/g, '<em>$1</em>')
+        .replace(/`(.+?)`/g, '<code>$1</code>');
 }
 
 function addMessage(text, role, save, cost, timings, totalDurationMs) {
@@ -187,20 +178,15 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
     
     const bubble = document.createElement("div");
     bubble.className = "bubble";
-    // Используем innerHTML для рендеринга отформатированного текста
     bubble.innerHTML = parseMarkdown(text);
     
     msg.appendChild(bubble);
 
-    // Кнопка копирования
     const copyBtn = document.createElement("button");
     copyBtn.className = "copy-btn";
     copyBtn.textContent = "📋";
     copyBtn.title = "Копировать";
-    copyBtn.style.marginLeft = "10px";
-    copyBtn.style.cursor = "pointer";
-    copyBtn.style.background = "none";
-    copyBtn.style.border = "none";
+    copyBtn.style.cssText = "margin-left:10px;cursor:pointer;background:none;border:none;";
     copyBtn.onclick = function() {
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = "✅";
@@ -224,16 +210,16 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
         const badge = document.createElement("details");
         badge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
         
-        let stepsHtml = `<summary style="font-weight:600;">⏱️ Полное время от отправки: <strong>${totalDurationMs} мс</strong> (${timings.length} ${timings.length === 1 ? 'этап' : 'этапов'})</summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
+        let stepsHtml = `<summary style="font-weight:600;">⏱️ Полное время от отправки: <strong>${totalDurationMs} мс</strong> (${timings.length} этапов)</summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
         timings.forEach((t, idx) => {
-                const durationDisplay = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
-    let serverInfo = "";
-    if (t.server_label || t.server_url) {
-        const icon = t.server_type === "local" ? "📱" : "☁️";
-        const label = t.server_label || t.server_url || "";
-        serverInfo = `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${icon} ${label}</span>`;
-    }
-    stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;"><span>${idx + 1}. ${t.name}${serverInfo}</span><strong>${durationDisplay}</strong></div>`;
+            const durationDisplay = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
+            let serverInfo = "";
+            if (t.server_label || t.server_url) {
+                const icon = t.server_type === "local" ? "📱" : "☁️";
+                const label = t.server_label || t.server_url || "";
+                serverInfo = `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${icon} ${label}</span>`;
+            }
+            stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;"><span>${idx + 1}. ${t.name}${serverInfo}</span><strong>${durationDisplay}</strong></div>`;
         });
         stepsHtml += "</div>";
         badge.innerHTML = stepsHtml;
@@ -301,7 +287,6 @@ document.addEventListener("DOMContentLoaded", function() {
         input.value = "";
         addMessage(text, "user", true, 0);
 
-        // Получаем параметры настроек, если они есть
         const params = (typeof window.getResponsesParams === "function") 
             ? window.getResponsesParams() 
             : {};
@@ -317,9 +302,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 params: params
             })
         })
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
+        .then(async r => {
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                throw new Error(data.error || `HTTP ${r.status}`);
+            }
+            return data;
         })
         .then(data => {
             if (data.error) {
@@ -330,7 +318,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         })
         .catch(e => {
-            addMessage("Ошибка сети при отправке сообщения", "bot", false, 0);
+            addMessage("Ошибка: " + (e.message || "Сетевой сбой"), "bot", false, 0);
         });
     }
 
@@ -344,41 +332,4 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
-
-    window.uploadImage = async function() {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept = "image/*";
-        fileInput.capture = "environment";
-        
-        fileInput.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            addMessage(`📷 Загрузка фото: ${file.name}`, "user", true, 0);
-
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("message", "Проанализируй это изображение.");
-            if (currentConvId) formData.append("conversation_id", currentConvId);
-
-            try {
-                const res = await fetch("/api/chat-with-image", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await res.json();
-                
-                if (data.error) {
-                    addMessage("Ошибка анализа: " + data.error, "bot", false, 0);
-                } else {
-                    addMessage(data.reply, "bot", true, data.cost || 0);
-                }
-            } catch (err) {
-                addMessage("Ошибка сети при загрузке фото", "bot", false, 0);
-            }
-        };
-        
-        fileInput.click();
-    };
 });
