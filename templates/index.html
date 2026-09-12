@@ -4,7 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Alice Pro</title>
-    <link rel="stylesheet" href="/static/style.css?v=10">
+    <link rel="stylesheet" href="/static/style.css?v=12">
+    
+    <!-- Eruda консоль отладки для мобильного интерфейса -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>
+        (function() {
+            var script = document.createElement('script');
+            script.src = "//cdn.jsdelivr.net/npm/eruda";
+            document.body ? initEruda() : window.addEventListener('DOMContentLoaded', initEruda);
+            function initEruda() {
+                if (typeof eruda !== 'undefined') {
+                    eruda.init();
+                } else {
+                    var s = document.createElement('script');
+                    s.src = "https://cdn.jsdelivr.net/npm/eruda";
+                    s.onload = function() { eruda.init(); };
+                    document.head.appendChild(s);
+                }
+            }
+        })();
+    </script>
+    
     <script src="/static/file_manager.js" defer></script>
     <script src="/static/settings/ui_helpers.js"></script>
     <script src="/static/settings/settings_storage.js"></script>
@@ -32,15 +53,11 @@
 
         <!-- Main Content -->
         <div id="main">
-            <!-- Header с разнесенными кнопками -->
             <div id="header">
                 <button id="menu-btn" class="header-btn">☰</button>
                 <button id="model-btn" class="header-btn model-btn">🤖 Alice AI LLM</button>
-                <!-- Инструменты (Локальные драйверы) -->
                 <button id="tools-btn" class="header-btn" title="Локальные инструменты" onclick="openToolsModal()">🧰</button>
-                <!-- Внешние MCP серверы -->
                 <button id="mcp-btn" class="header-btn" title="Внешние MCP шлюзы" onclick="window.openMcpManagerModal()">🌐</button>
-                <!-- Настройки LLM параметров -->
                 <button id="settings-btn" class="header-btn" title="Параметры генерации" onclick="openSettingsModal()">⚙️</button>
                 <button id="file-manager-btn" class="header-btn" title="Файловый менеджер" onclick="window.openFileManagerModal()">📁</button>
                 <button id="theme-toggle" class="header-btn">🌙</button>

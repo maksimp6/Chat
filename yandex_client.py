@@ -1,6 +1,5 @@
 import sqlite3
 import uuid
-"""Alice Pro - Yandex API Client с раздельными контурами Tools и MCP"""
 import json
 import time
 import requests
@@ -11,8 +10,10 @@ import logging
 import os
 import base64
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tool_registry import registry
 import mcp_storage
+from db import get_conv_settings
 
 os.makedirs('logs', exist_ok=True)
 api_logger = logging.getLogger("yandex_api_debug")
@@ -83,8 +84,7 @@ def _clean_tools(tools):
     for t in tools:
         if isinstance(t, dict) and t.get("type") == "mcp":
             res = _clean_mcp_tool(t)
-            if res is not None:
-                cleaned.append(res)
+            if res is not None: cleaned.append(res)
         else:
             cleaned.append(t)
     return cleaned
@@ -137,8 +137,7 @@ class YandexResponsesClient(YandexFileManagerMixin):
             raise YandexClientError("Create conv: " + str(e))
 
     def _resolve_yandex_conv_id(self, conv_id):
-        if not conv_id:
-            return None
+        if not conv_id: return None
         import uuid as _uuid
         try:
             val = _uuid.UUID(str(conv_id))
@@ -165,20 +164,17 @@ class YandexResponsesClient(YandexFileManagerMixin):
             cur.execute("INSERT OR REPLACE INTO conv_yandex_map (local_id, yandex_id) VALUES (?, ?)", (conv_id, y_id))
             conn.commit()
             conn.close()
-            api_logger.info(f"[CONV_MAP] Связан локальный ID {conv_id} -> Yandex UUID {y_id}")
             return y_id
         except Exception as e:
-            api_logger.error(f"[CONV_MAP] Ошибка создания Yandex conversation: {e}")
+            api_logger.error(f"[CONV_MAP] Ошибка: {e}")
             return None
 
     def ask(self, message, model_key, conversation_id=None, params=None):
         params = params or {}
         is_background = params.get("background", True)
         is_stream = params.get("stream", False)
-        if is_background:
-            params["store"] = True
-        if is_stream:
-            raise YandexClientError("Streaming is not supported by ask().")
+        if is_background: params["store"] = True
+        
         payload = {
             "model": "gpt://" + self._config.PROJECT_ID + "/" + model_key + "/latest",
             "input": params.get("input") or [{"role": "user", "content": message}],
@@ -189,21 +185,29 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if params.get("temperature") is not None: payload["temperature"] = float(params["temperature"])
         if params.get("top_p") is not None: payload["top_p"] = float(params["top_p"])
         if params.get("max_output_tokens"): payload["max_output_tokens"] = int(params["max_output_tokens"])
-        if params.get("tools"): payload["tools"] = _clean_tools(params["tools"])
         if params.get("prompt"): payload["prompt"] = params["prompt"]
         if params.get("text"): payload["text"] = params["text"]
         if params.get("truncation"): payload["truncation"] = params["truncation"]
-        if params.get("tool_choice"): payload["tool_choice"] = params["tool_choice"]
-        
-        ptc = params.get("parallel_tool_calls")
-        if ptc is not None:
-            if isinstance(ptc, str): ptc = ptc.lower() not in ("false", "0")
-            payload["parallel_tool_calls"] = bool(ptc)
-        else:
-            payload["parallel_tool_calls"] = True if payload.get("tools") else False
-
-        if params.get("max_tool_calls"): payload["max_tool_calls"] = int(params["max_tool_calls"])
         if params.get("service_tier"): payload["service_tier"] = params["service_tier"]
+
+        # Корректная обработка tools и parallel_tool_calls:
+        # parallel_tool_calls передаётся строго при непустом массиве tools
+        raw_tools = params.get("tools")
+        cleaned_tools = _clean_tools(raw_tools) if raw_tools else []
+        if cleaned_tools:
+            payload["tools"] = cleaned_tools
+            if params.get("tool_choice"):
+                payload["tool_choice"] = params["tool_choice"]
+            if params.get("max_tool_calls"):
+                payload["max_tool_calls"] = int(params["max_tool_calls"])
+
+            ptc = params.get("parallel_tool_calls")
+            if ptc is not None:
+                if isinstance(ptc, str):
+                    ptc = ptc.lower() not in ("false", "0")
+                payload["parallel_tool_calls"] = bool(ptc)
+            else:
+                payload["parallel_tool_calls"] = True
         
         yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
         if yandex_conv_id:
@@ -249,8 +253,7 @@ class YandexResponsesClient(YandexFileManagerMixin):
                     err = data.get('error')
                     err_msg = err.get('message', 'unknown') if isinstance(err, dict) else str(err)
                     raise YandexClientError(f"Task failed: {err_msg}")
-                if status == "cancelled":
-                    raise YandexClientError("Task cancelled")
+                if status == "cancelled": raise YandexClientError("Task cancelled")
                 return data
             time.sleep(delay)
             delay = min(delay * 1.5, 3)
@@ -258,18 +261,15 @@ class YandexResponsesClient(YandexFileManagerMixin):
 
     @staticmethod
     def extract_text(data):
-        if not isinstance(data, dict):
-            return str(data or "")
-        if data.get("output_text") and isinstance(data["output_text"], str):
-            return data["output_text"]
+        if not isinstance(data, dict): return str(data or "")
+        if data.get("output_text") and isinstance(data["output_text"], str): return data["output_text"]
         for item in data.get("output", []):
             if isinstance(item, dict):
                 if item.get("type") == "message" and item.get("role") == "assistant":
                     for part in item.get("content", []):
                         if isinstance(part, dict) and part.get("type") == "output_text" and part.get("text"):
                             return str(part["text"])
-                        elif isinstance(part, str):
-                            return part
+                        elif isinstance(part, str): return part
                 elif item.get("type") == "output_text" and item.get("text"):
                     return str(item["text"])
         val = data.get("text")
@@ -286,23 +286,34 @@ class YandexResponsesClient(YandexFileManagerMixin):
         }
 
 class YandexMcpMixin:
-    def _execute_local_tool_call(self, tool_call, server_configs):
-        func_name = tool_call.get("name") or tool_call.get("function", {}).get("name")
-        if func_name and "<|" in func_name:
-            func_name = func_name.split("<|")[0].strip()
-        args = tool_call.get("arguments") or tool_call.get("function", {}).get("arguments", {})
+    def _execute_single_tool(self, tc, all_servers):
+        import time as _t
+        name = tc.get("name") or tc.get("function", {}).get("name")
+        if name and "<|" in name:
+            name = name.split("<|")[0].strip()
+        args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
         if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except Exception:
-                args = {}
+            try: args = json.loads(args)
+            except Exception: args = {}
 
-        result = registry.execute(func_name, args, server_configs)
-        call_id = tool_call.get("call_id") or tool_call.get("id") or tool_call.get("tool_call_id") or func_name
+        t_start = _t.perf_counter()
+        result = registry.execute(name, args, all_servers)
+        t_end = _t.perf_counter()
+
+        call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
+        content_str = json.dumps(result, ensure_ascii=False) if isinstance(result, (dict, list)) else str(result)
+        
+        timing = {
+            "name": f"Tool: {name}",
+            "duration_ms": round((t_end - t_start) * 1000),
+            "server_type": "local",
+            "server_label": "Local Registry"
+        }
         return {
-            "role": "tool",
-            "tool_call_id": call_id,
-            "content": json.dumps(result, ensure_ascii=False) if isinstance(result, (dict, list)) else str(result)
+            "call_id": call_id,
+            "name": name,
+            "content": content_str,
+            "timing": timing
         }
 
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None):
@@ -310,15 +321,13 @@ class YandexMcpMixin:
         step_timings = []
         import time as _t
 
-        # 1. Сборка внешних MCP серверов
+        # 1. MCP серверы
         mcp_tools = []
         all_servers = mcp_storage.list_servers()
         enabled_servers = []
         if conversation_id:
-            try:
-                enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
-            except Exception:
-                enabled_servers = []
+            try: enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
+            except Exception: enabled_servers = []
         
         for s in enabled_servers:
             if s.get("server_url") or (s.get("connector_id") or "").startswith("connector_"):
@@ -330,15 +339,24 @@ class YandexMcpMixin:
                     "authorization": s.get("authorization")
                 })
 
-        # 2. Сборка встроенных локальных инструментов
-        active_tool_categories = params.get("active_tool_categories")
-        if active_tool_categories is None:
-            active_tool_categories = {"git", "termux", "system", "filesystem", "wikipedia", "profiler"}
+        # 2. Локальные инструменты строго по базе данных
+        active_cats = None
+        if conversation_id:
+            conv_settings = get_conv_settings(conversation_id)
+            if conv_settings and "active_tool_categories" in conv_settings:
+                active_cats = conv_settings["active_tool_categories"]
 
-        local_tools = registry.get_definitions(set(active_tool_categories))
+        if active_cats is None:
+            active_cats = params.get("active_tool_categories")
+        if active_cats is None:
+            active_cats = ["git", "termux", "system", "filesystem", "wikipedia", "profiler"]
+
+        active_set = set(active_cats)
+        local_tools = registry.get_definitions(active_set)
         params["tools"] = mcp_tools + local_tools
+        api_logger.info(f"[ROUTER] Подключено {len(params['tools'])} инструментов. Категории: {active_set}")
 
-        # 3. Первый вызов: LLM Router
+        # 3. Маршрутизация (поиск вызовов LLM)
         t0 = _t.perf_counter()
         response = self.ask(message, model_key, conversation_id, params)
         t1 = _t.perf_counter()
@@ -360,35 +378,29 @@ class YandexMcpMixin:
             response["step_timings"] = step_timings
             return response
 
-        # 4. Выполнение вызовов локальных инструментов
-        tool_results = []
+        # 4. Параллельное выполнение вызванных инструментов в пуле потоков
+        is_parallel = params.get("parallel_tool_calls", True)
+        max_workers = min(len(tool_calls), 8) if is_parallel else 1
         raw_outputs_text = []
-        for tc in tool_calls:
-            name = tc.get("name") or tc.get("function", {}).get("name")
-            call_id = tc.get("call_id") or tc.get("id") or name
-            t_start = _t.perf_counter()
-            res_obj = self._execute_local_tool_call(tc, all_servers)
-            t_end = _t.perf_counter()
 
-            step_timings.append({
-                "name": f"Tool: {name}",
-                "duration_ms": round((t_end - t_start) * 1000),
-                "server_type": "local",
-                "server_label": "Local Registry"
-            })
-            content = res_obj.get("content", "")
-            tool_results.append({"call_id": call_id, "name": name, "content": content})
-            raw_outputs_text.append(f"[{name}]: {content}")
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_tc = {executor.submit(self._execute_single_tool, tc, all_servers): tc for tc in tool_calls}
+            for future in as_completed(future_to_tc):
+                res = future.result()
+                step_timings.append(res["timing"])
+                raw_outputs_text.append(f"[{res['name']}]: {res['content']}")
 
-        # 5. Синтез ответа
+        # 5. Синтез ответа (с очищенным списком инструментов во избежание рекурсии)
         tool_summary = "\n".join(raw_outputs_text)
         prompt = (
             f"Пользователь запросил: \"{message}\"\n"
-            f"Результат выполнения локальных инструментов:\n{tool_summary}\n"
-            f"Дай исчерпывающий и структурированный ответ на основе этих данных."
+            f"Результат выполнения инструментов:\n{tool_summary}\n"
+            f"Дай полноценный и точный ответ на основе этих данных."
         )
+        synth_params = {k: v for k, v in params.items() if k not in ("tools", "parallel_tool_calls", "tool_choice")}
+
         t_synth_start = _t.perf_counter()
-        final_response = self.ask(prompt, model_key, conversation_id, params)
+        final_response = self.ask(prompt, model_key, conversation_id, synth_params)
         t_synth_end = _t.perf_counter()
         step_timings.append({"name": "LLM Synthesis (финальный ответ)", "duration_ms": round((t_synth_end - t_synth_start) * 1000)})
         final_response["step_timings"] = step_timings

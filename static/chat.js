@@ -41,10 +41,10 @@ function renderApprovalCard(toolCall, origMsg) {
             } else if (data.error) {
                 addMessage("Ошибка выполнения: " + data.error, "bot", false, 0);
             } else {
-                addMessage(data.reply, "bot", true, data.cost || 0);
+                addMessage(data.reply, "bot", false, data.cost || 0);
             }
         })
-        .catch(err => {
+        .catch(() => {
             card.remove();
             addMessage("Сетевая ошибка при выполнении действия", "bot", false, 0);
         });
@@ -88,8 +88,8 @@ function parseMarkdown(text) {
             if (inList) { out.push('</ul>'); inList = false; }
             inTable = true;
             tableHtml = '<table class="md-table"><thead><tr>';
-            var hdr = line.split('|').filter(function(c) { return c.trim() !== ''; });
-            hdr.forEach(function(c) { tableHtml += '<th>' + formatInline(c.trim()) + '</th>'; });
+            var hdr = line.split('|').filter(c => c.trim() !== '');
+            hdr.forEach(c => { tableHtml += '<th>' + formatInline(c.trim()) + '</th>'; });
             tableHtml += '</tr></thead><tbody>';
             i++;
             continue;
@@ -97,12 +97,12 @@ function parseMarkdown(text) {
 
         if (inTable) {
             if (/^\s*\|.*\|\s*$/.test(line)) {
-                var cells = line.split('|').filter(function(c) { return c.trim() !== ''; });
+                var cells = line.split('|').filter(c => c.trim() !== '');
                 tableHtml += '<tr>';
-                cells.forEach(function(c) { 
-            var cellContent = c.trim().replace(/&lt;ul&gt;/g, "<ul>").replace(/&lt;\/ul&gt;/g, "</ul>").replace(/&lt;li&gt;/g, "<li>").replace(/&lt;\/li&gt;/g, "</li>");
-            tableHtml += "<td>" + formatInline(cellContent) + "</td>"; 
-        });
+                cells.forEach(c => { 
+                    var cellContent = c.trim().replace(/&lt;ul&gt;/g, "<ul>").replace(/&lt;\/ul&gt;/g, "</ul>").replace(/&lt;li&gt;/g, "<li>").replace(/&lt;\/li&gt;/g, "</li>");
+                    tableHtml += "<td>" + formatInline(cellContent) + "</td>"; 
+                });
                 tableHtml += '</tr>';
                 continue;
             } else {
@@ -119,10 +119,10 @@ function parseMarkdown(text) {
             continue;
         }
 
-        var hdr = line.match(/^(#{1,6})\s+(.*)$/);
-        if (hdr) {
+        var hdrMatch = line.match(/^(#{1,6})\s+(.*)$/);
+        if (hdrMatch) {
             if (inList) { out.push('</ul>'); inList = false; }
-            out.push('<h' + hdr[1].length + '>' + formatInline(hdr[2]) + '</h' + hdr[1].length + '>');
+            out.push('<h' + hdrMatch[1].length + '>' + formatInline(hdrMatch[2]) + '</h' + hdrMatch[1].length + '>');
             continue;
         }
 
@@ -179,7 +179,6 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.innerHTML = parseMarkdown(text);
-    
     msg.appendChild(bubble);
 
     const copyBtn = document.createElement("button");
@@ -210,16 +209,14 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
         const badge = document.createElement("details");
         badge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
         
-        let stepsHtml = `<summary style="font-weight:600;">⏱️ Полное время от отправки: <strong>${totalDurationMs} мс</strong> (${timings.length} этапов)</summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
+        let stepsHtml = `<summary style="font-weight:600;">⏱️ Выполнение: <strong>${total || (timings.length + ' этапов')}</strong></summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
         timings.forEach((t, idx) => {
-            const durationDisplay = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
-            let serverInfo = "";
-            if (t.server_label || t.server_url) {
-                const icon = t.server_type === "local" ? "📱" : "☁️";
-                const label = t.server_label || t.server_url || "";
-                serverInfo = `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${icon} ${label}</span>`;
+            const dur = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
+            let srv = "";
+            if (t.server_label) {
+                srv = `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${t.server_label}</span>`;
             }
-            stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;"><span>${idx + 1}. ${t.name}${serverInfo}</span><strong>${durationDisplay}</strong></div>`;
+            stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;"><span>${idx + 1}. ${t.name}${srv}</span><strong>${dur}</strong></div>`;
         });
         stepsHtml += "</div>";
         badge.innerHTML = stepsHtml;
@@ -232,37 +229,26 @@ function addMessage(text, role, save, cost, timings, totalDurationMs) {
 
     chatbox.appendChild(msg);
     chatbox.scrollTop = chatbox.scrollHeight;
-
-    if (save && currentConvId) {
-        const msgs = getMessages(currentConvId);
-        msgs.push({ role, text, cost: cost || 0 });
-        saveMessages(currentConvId, msgs);
-    }
 }
 
 function loadHistory(convId) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
-    
     chatbox.innerHTML = "";
     
     fetch(`/api/conversations/${convId}/messages`)
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        })
+        .then(r => r.json())
         .then(data => {
             if (data.messages && data.messages.length) {
                 data.messages.forEach(msg => {
                     const role = msg.role === "assistant" ? "bot" : "user";
-                    addMessage(msg.text, role, false, msg.cost || 0);
+                    addMessage(msg.text, role, false, msg.cost || 0, msg.timings, 0);
                 });
             } else {
                 chatbox.innerHTML = '<div class="empty-state">Начните диалог</div>';
             }
         })
-        .catch(e => {
-            console.error("Load history error:", e);
+        .catch(() => {
             chatbox.innerHTML = '<div class="empty-state">Ошибка загрузки истории</div>';
         });
 }
@@ -273,7 +259,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function sendMessage() {
         if (!input) return; 
-        
         const text = input.value.trim();
         if (!text) return;
 
@@ -285,7 +270,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         input.value = "";
-        addMessage(text, "user", true, 0);
+        addMessage(text, "user", false, 0);
 
         const params = (typeof window.getResponsesParams === "function") 
             ? window.getResponsesParams() 
@@ -304,9 +289,7 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(async r => {
             const data = await r.json().catch(() => ({}));
-            if (!r.ok) {
-                throw new Error(data.error || `HTTP ${r.status}`);
-            }
+            if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
             return data;
         })
         .then(data => {
@@ -314,7 +297,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 addMessage("Ошибка: " + data.error, "bot", false, 0);
             } else {
                 const clientTotalMs = Math.round(performance.now() - t0);
-                addMessage(data.reply, "bot", true, data.cost || 0, data.timings, clientTotalMs);
+                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs);
             }
         })
         .catch(e => {
@@ -323,7 +306,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     if (sendBtn) sendBtn.addEventListener("click", sendMessage);
-    
     if (input) {
         input.addEventListener("keydown", function(e) {
             if (e.key === "Enter" && !e.shiftKey) {

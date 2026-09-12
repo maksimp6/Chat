@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    // === 1. Автономное модальное окно локальных инструментов (Tools) ===
+    // === 1. Модальное окно локальных инструментов (Tools) с немедленным сохранением в БД ===
     window.openToolsModal = function() {
         var UI = window.SettingsUI;
         var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
@@ -21,12 +21,12 @@
             '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Локальные инструменты (Tools)</h2>',
             '    <button id="tools-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
             '</div>',
-            '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Включайте или отключайте модули функций для текущего диалога:</div>',
+            '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Отключенные категории полностью исключаются из контекста LLM:</div>',
             '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">',
             '    <div style="padding:10px;text-align:center;color:var(--m-muted,#888);">Загрузка инструментов...</div>',
             '</div>',
             '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
-            '    <button id="tools-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить активность</button>',
+            '    <button id="tools-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить в диалог</button>',
             '</div>'
         ].join('');
 
@@ -39,7 +39,7 @@
         ov.addEventListener('click', function(e) { if (e.target === ov) closeModal(); });
 
         var categoryLabels = {
-            "termux": "📱 Termux Hardware (батарея, буфер, датчики, тосты)",
+            "termux": "📱 Termux Hardware (батарея, буфер, сенсоры, TTS, тосты)",
             "git": "🌿 Local Git (статус, ветки, diff, коммиты)",
             "filesystem": "⚙️ Файловая система (чтение, запись, apply_patch)",
             "system": "🔧 Системные драйверы Termux",
@@ -49,11 +49,13 @@
 
         Promise.all([
             fetch('/api/tools/categories').then(r => r.json()),
-            currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools').then(r => r.json()) : Promise.resolve({active_tool_categories: []})
+            currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools').then(r => r.json()) : Promise.resolve({active_tool_categories: null})
         ]).then(([catData, activeData]) => {
             var listEl = document.getElementById('tools-category-list');
             var categories = catData.categories || {};
-            var active = activeData.active_tool_categories || Object.keys(categories);
+            var active = (activeData && activeData.active_tool_categories !== null) 
+                ? activeData.active_tool_categories 
+                : Object.keys(categories);
 
             listEl.innerHTML = Object.keys(categories).map(function(cat) {
                 var isChecked = active.indexOf(cat) !== -1;
@@ -81,14 +83,16 @@
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({active_tool_categories: selected})
-                }).then(() => closeModal());
+                }).then(r => r.json()).then(res => {
+                    closeModal();
+                }).catch(() => closeModal());
             } else {
                 closeModal();
             }
         });
     };
 
-    // === 2. Полное модальное окно параметров LLM (Со всеми полями Yandex API) ===
+    // === 2. Полное окно конфигурации параметров LLM ===
     window.openSettingsModal = function() {
         var UI = window.SettingsUI;
         var Storage = window.SettingsStorage;
@@ -118,7 +122,6 @@
             '</div>'
         ].join('');
 
-        // 1. Сэмплинг и генерация
         var tabGen = [
             '<div id="tab-gen" class="llm-tab-content">',
             UI.section("Базовый сэмплинг"),
@@ -139,7 +142,6 @@
             '</div>'
         ].join('');
 
-        // 2. Формат и структура вывода
         var tabOutput = [
             '<div id="tab-output" class="llm-tab-content" style="display:none;">',
             UI.section("Структура ответа (Text / JSON Schema)"),
@@ -154,7 +156,6 @@
             '</div>'
         ].join('');
 
-        // 3. Вызовы тулов и сервисный уровень
         var tabRouting = [
             '<div id="tab-routing" class="llm-tab-content" style="display:none;">',
             UI.section("Политики Tool Calling"),
@@ -174,7 +175,6 @@
             '</div>'
         ].join('');
 
-        // 4. Шаблоны и метаданные
         var tabAdv = [
             '<div id="tab-adv" class="llm-tab-content" style="display:none;">',
             UI.section("Промпт-шаблоны и кэширование"),
@@ -205,7 +205,6 @@
         document.getElementById('set-close-btn').addEventListener('click', closeModal);
         ov.addEventListener('click', function(e) { if (e.target === ov) closeModal(); });
 
-        // Переключение табов
         md.querySelectorAll('.llm-tab-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 md.querySelectorAll('.llm-tab-btn').forEach(function(b) {
@@ -226,7 +225,6 @@
             });
         });
 
-        // Показ поля JSON Schema
         document.getElementById('set-text-fmt').addEventListener('change', function() {
             document.getElementById('json-schema-wrap').style.display = this.value === 'json' ? 'block' : 'none';
         });

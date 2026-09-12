@@ -1,4 +1,4 @@
-"""Маршруты чата с раздельной обработкой Tools и MCP-коннекторов."""
+"""Маршруты чата с сохранением полной цепочки выполнения в БД."""
 from flask import Blueprint, request, jsonify
 import logging
 import uuid
@@ -32,7 +32,7 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
-        # Читаем конфигурацию инструментов диалога
+        # Получаем сохраненные настройки инструментов диалога из БД
         conv_settings = get_conv_settings(conv_id) or {}
         active_tools = conv_settings.get("active_tool_categories")
         if active_tools is not None:
@@ -83,10 +83,11 @@ def chat():
         reply = client.extract_text(response) or "Команда выполнена успешно."
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
-
-        add_message(conv_id, "assistant", str(reply), cost=cost)
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
         total_ms = round((_time.perf_counter() - t_start) * 1000)
+
+        # Сохранение ответа и цепочки шагов в базу данных
+        add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings)
 
         return jsonify({
             "reply": reply,
@@ -99,7 +100,6 @@ def chat():
         logger.exception(f"[CHAT] Ошибка: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Управление категориями локальных инструментов
 @mcp_bp.route('/api/tools/categories', methods=['GET'])
 def list_tool_categories():
     return jsonify({
@@ -122,7 +122,6 @@ def conv_tools(conv_id):
         cats = list(registry.get_available_categories().keys())
     return jsonify({"active_tool_categories": cats})
 
-# Управление MCP серверами
 @mcp_bp.route('/api/mcp-servers', methods=['GET', 'POST'])
 def handle_mcp_servers():
     if request.method == 'POST':
