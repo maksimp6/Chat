@@ -1,17 +1,15 @@
-# STREAMING_CHUNK:Configuring module header and imports...
 """Инструменты стандартной библиотеки Python и файловой системы для Alice Pro.
-
 Включает:
-  - C-style позиционированное чтение файлов (fseek + fread) для мгновенного чтения хвостов логов
-  - Безопасную атомарную запись файлов с проверкой синтаксиса (py_compile) и автобэкапом
-  - Анализ структуры кода через AST (ast.parse): классы, методы, функции, импорты
-  - Инспекцию локальных баз данных SQLite (sqlite3)
-  - Вычисление контрольных сумм (hashlib: sha256, md5, sha1)
-  - Работу с архивами (zipfile: сжатие и безопасная распаковка с защитой от Zip Slip)
-  - Сетевые HTTP-запросы без внешних зависимостей (urllib.request)
-  - Поиск файлов (glob) и содержимого (grep / regex)
-  - Управление файлами и папками (os, shutil): copy, move, delete, mkdir
-  - Запуск bash-команд (subprocess) и сбор сведений о системе (platform, shutil)
+- C-style позиционированное чтение файлов (fseek + fread) для мгновенного чтения хвостов логов
+- Безопасную атомарную запись файлов с проверкой синтаксиса (py_compile) и автобэкапом
+- Анализ структуры кода через AST (ast.parse): классы, методы, функции, импорты
+- Инспекцию локальных баз данных SQLite (sqlite3)
+- Вычисление контрольных сумм (hashlib: sha256, md5, sha1)
+- Работу с архивами (zipfile: сжатие и безопасная распаковка с защитой от Zip Slip)
+- Сетевые HTTP-запросы без внешних зависимостей (urllib.request)
+- Поиск файлов (glob) и содержимого (grep / regex)
+- Управление файлами и папками (os, shutil): copy, move, delete, mkdir
+- Запуск bash-команд (subprocess) и сбор сведений о системе (platform, shutil)
 """
 import os
 import re
@@ -32,7 +30,6 @@ import urllib.error
 
 logger = logging.getLogger("filesystem_mcp")
 
-# STREAMING_CHUNK:Setting up project directory paths and security validator...
 BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
 BACKUP_DIR = os.path.join(BASE_DIR, ".safe_backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -51,7 +48,6 @@ def _get_abs_path(path: str) -> str:
         raise PermissionError("Доступ запрещен: недопустимый путь к файлу")
     return target
 
-# STREAMING_CHUNK:Implementing C-style low-level file reader...
 def read_file(args: dict) -> dict:
     """Низкоуровневое позиционированное чтение файлов (аналог C fopen + fseek + fread)."""
     path = args.get("path") or args.get("file_path") or args.get("filename")
@@ -63,7 +59,6 @@ def read_file(args: dict) -> dict:
             return {"error": f"Файл '{path}' не найден"}
 
         file_size = os.path.getsize(abs_path)
-
         raw_whence = args.get("whence", 0)
         if isinstance(raw_whence, str):
             w_norm = raw_whence.lower().strip()
@@ -105,24 +100,22 @@ def read_file(args: dict) -> dict:
             read_size = length if (length is not None and length > 0) else max_chunk
             chunk_data = f.read(read_size)
             has_more = f.tell() < file_size
+            content = chunk_data.decode("utf-8", errors="replace")
 
-        content = chunk_data.decode("utf-8", errors="replace")
-
-        return {
-            "success": True,
-            "path": path,
-            "file_size": file_size,
-            "offset": actual_offset,
-            "bytes_read": len(chunk_data),
-            "has_more": has_more,
-            "content": content,
-            "lines_count": len(content.splitlines())
-        }
+            return {
+                "success": True,
+                "path": path,
+                "file_size": file_size,
+                "offset": actual_offset,
+                "bytes_read": len(chunk_data),
+                "has_more": has_more,
+                "content": content,
+                "lines_count": len(content.splitlines())
+            }
     except Exception as e:
         logger.exception(f"[FS] Ошибка чтения файла {path}: {e}")
         return {"error": f"Ошибка чтения: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing atomic safe file writer with pre-flight check...
 def write_file(args: dict) -> dict:
     """Безопасная запись файла с валидацией синтаксиса Python и автобэкапом."""
     path = args.get("path") or args.get("file_path") or args.get("filename")
@@ -138,7 +131,6 @@ def write_file(args: dict) -> dict:
         target_dir = os.path.dirname(abs_path)
         os.makedirs(target_dir, exist_ok=True)
 
-        # Создаем временный файл в целевой директории для исключения EXDEV (Errno 18)
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=target_dir, delete=False, prefix=".tmp_", suffix=".tmp") as tmp:
             tmp.write(content)
             tmp_path = tmp.name
@@ -151,10 +143,8 @@ def write_file(args: dict) -> dict:
             )
             if verify.returncode != 0:
                 if os.path.exists(tmp_path):
-                    try:
-                        os.remove(tmp_path)
-                    except OSError:
-                        pass
+                    try: os.remove(tmp_path)
+                    except OSError: pass
                 err_msg = verify.stderr.strip() or verify.stdout.strip()
                 logger.error(f"[FS] Ошибка синтаксиса при записи в {path}: {err_msg}")
                 return {
@@ -195,17 +185,38 @@ def write_file(args: dict) -> dict:
             "message": f"Файл '{path}' успешно проверен и сохранен.",
             "diff": "\n".join(diff[:60]) if diff else "(файл создан заново)"
         }
-
     except Exception as e:
         if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+            try: os.remove(tmp_path)
+            except OSError: pass
         logger.exception(f"[FS] Ошибка записи файла {path}: {e}")
         return {"error": f"Ошибка записи: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing Python AST code outline analyzer...
+def apply_patch(args: dict, cfg: dict = None) -> dict:
+    """Точечно заменить участок текста в файле на новый."""
+    path = args.get("file_path") or args.get("path")
+    search_text = args.get("search_text")
+    replace_text = args.get("replace_text") or args.get("patch") or args.get("diff")
+    if not path or not search_text:
+        return {"success": False, "error": "Параметры 'path' и 'search_text' обязательны"}
+    try:
+        abs_path = _get_abs_path(path)
+        if not os.path.isfile(abs_path):
+            return {"success": False, "error": f"Файл не найден: {path}"}
+        
+        with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+            
+        if search_text not in content:
+            return {"success": False, "error": "Искомый текст (search_text) не найден в файле."}
+            
+        content = content.replace(search_text, replace_text or "", 1)
+        
+        # Переиспользуем write_file для сохранения с проверкой синтаксиса
+        return write_file({"path": path, "content": content})
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 def python_ast_outline(args: dict) -> dict:
     """Анализ структуры Python-файла через модуль ast без его выполнения."""
     path = args.get("path")
@@ -269,7 +280,6 @@ def python_ast_outline(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка AST-анализа: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing SQLite inspection and queries...
 def sqlite_query(args: dict) -> dict:
     """Выполнение безопасного запроса к локальной базе данных SQLite."""
     db_name = args.get("db_path", "alice_pro.db")
@@ -312,7 +322,6 @@ def sqlite_query(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка выполнения SQLite: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing cryptographic checksum calculation...
 def calculate_hash(args: dict) -> dict:
     """Вычисление хеша файла (sha256, md5, sha1) для проверки целостности."""
     path = args.get("path")
@@ -342,7 +351,6 @@ def calculate_hash(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка вычисления хеша: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing ZIP archiving and safe extraction...
 def zip_compress(args: dict) -> dict:
     """Создание ZIP-архива файлов или каталога."""
     source_path = args.get("source_path")
@@ -412,7 +420,6 @@ def zip_extract(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка распаковки архива: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing standard library HTTP fetching...
 def http_fetch(args: dict) -> dict:
     """Простой HTTP GET-запрос через стандартный urllib."""
     url = args.get("url")
@@ -434,21 +441,20 @@ def http_fetch(args: dict) -> dict:
             status_code = resp.getcode()
             headers = dict(resp.info())
 
-        text = raw.decode("utf-8", errors="replace")
-        return {
-            "success": True,
-            "url": url,
-            "status": status_code,
-            "bytes_received": len(raw),
-            "headers": {k: headers[k] for k in list(headers.keys())[:10]},
-            "body": text[:2000]
-        }
+            text = raw.decode("utf-8", errors="replace")
+            return {
+                "success": True,
+                "url": url,
+                "status": status_code,
+                "bytes_received": len(raw),
+                "headers": {k: headers[k] for k in list(headers.keys())[:10]},
+                "body": text[:2000]
+            }
     except urllib.error.HTTPError as he:
         return {"success": False, "status": he.code, "error": f"HTTP Error {he.code}: {he.reason}"}
     except Exception as e:
         return {"success": False, "error": f"Ошибка сетевого запроса: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing directory and file manipulation functions...
 def make_directory(args: dict) -> dict:
     """Создание директории проекта (mkdir -p)."""
     path = args.get("path")
@@ -516,7 +522,6 @@ def delete_path(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка удаления: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing search and navigation utilities...
 def list_directory(args: dict) -> dict:
     """Получение списка файлов и папок в директории проекта."""
     path = args.get("path") or "."
@@ -524,6 +529,7 @@ def list_directory(args: dict) -> dict:
         abs_path = _get_abs_path(path)
         if not os.path.isdir(abs_path):
             return {"error": f"Директория '{path}' не найдена"}
+
         items = []
         for entry in os.scandir(abs_path):
             if entry.name.startswith((".", "__pycache__")):
@@ -598,7 +604,6 @@ def grep_search(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка grep-поиска: {str(e)}"}
 
-# STREAMING_CHUNK:Implementing system inspection and shell command execution...
 def file_stat(args: dict) -> dict:
     """Получение детальных метаданных файла."""
     path = args.get("path")
@@ -608,6 +613,7 @@ def file_stat(args: dict) -> dict:
         abs_path = _get_abs_path(path)
         if not os.path.exists(abs_path):
             return {"error": f"Путь '{path}' не существует"}
+
         st = os.stat(abs_path)
         return {
             "success": True,
@@ -627,8 +633,8 @@ def run_command(args: dict) -> dict:
     command = args.get("command") or args.get("cmd")
     if not command:
         return {"error": "Параметр 'command' обязателен"}
-    timeout = int(args.get("timeout", 30))
 
+    timeout = int(args.get("timeout", 30))
     try:
         res = subprocess.run(
             command,
@@ -667,14 +673,12 @@ def get_system_info(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка сбора системной информации: {str(e)}"}
 
-# STREAMING_CHUNK:Registering tools into TOOL_REGISTRY...
 TOOL_REGISTRY = {
     "apply_patch": {
         "func": apply_patch,
         "description": "Apply patch/changes to file.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "patch": {"type": "string"}}, "required": ["path", "patch"]}
     },
-
     "read_file": {
         "func": read_file,
         "description": "Позиционированное чтение файла в стиле Си (fseek + fread). Позволяет читать хвосты логов (whence='end') и фрагменты произвольной длины без перегрузки памяти.",
@@ -891,13 +895,3 @@ def execute_fs_tool(tool_name: str, arguments: dict) -> dict:
     if tool_name not in TOOL_REGISTRY:
         return {"error": f"Неизвестный системный инструмент: {tool_name}"}
     return TOOL_REGISTRY[tool_name]["func"](arguments)
-
-
-def apply_patch(args: dict, cfg: dict = None) -> dict:
-    fp = args.get("file_path") or args.get("path")
-    content = args.get("patch") or args.get("diff")
-    if not fp or not content: return {"success": False, "error": "No path or patch"}
-    try:
-        with open(fp, "w", encoding="utf-8") as f: f.write(content)
-        return {"success": True, "output": f"Patched {fp}"}
-    except Exception as e: return {"success": False, "error": str(e)}

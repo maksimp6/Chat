@@ -294,12 +294,20 @@ class YandexResponsesClient(YandexFileManagerMixin):
 
     @staticmethod
     def extract_usage(data):
-        u = data.get("usage")
-        if not u: return None
+        if not isinstance(data, dict): return None
+        u = data.get("usage") or {}
+        in_det = u.get("input_tokens_details") or {}
+        out_det = u.get("output_tokens_details") or {}
         return {
             "input_tokens": u.get("input_tokens", 0),
             "output_tokens": u.get("output_tokens", 0),
             "total_tokens": u.get("total_tokens", 0),
+            "cached_tokens": in_det.get("cached_tokens", 0),
+            "tool_tokens": in_det.get("tool_tokens", 0),
+            "reasoning_tokens": out_det.get("reasoning_tokens", 0),
+            "created_at": data.get("created_at"),
+            "completed_at": data.get("completed_at"),
+            "incomplete_details": data.get("incomplete_details")
         }
 
 class YandexMcpMixin:

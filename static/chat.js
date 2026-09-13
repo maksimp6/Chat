@@ -58,8 +58,9 @@ function renderApprovalCard(toolCall, origMsg) {
 
 function parseMarkdown(text) {
     if (!text) return "";
+    var strText = typeof text === "string" ? text : JSON.stringify(text);
 
-    var safe = text
+    var safe = strText
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
@@ -206,7 +207,9 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning)
         const billing = document.createElement("div");
         billing.className = "billing-bubble";
         billing.textContent = `≈ ${cost.toFixed(2)} ₽`;
-        metaWrap.appendChild(billing);
+        
+
+    metaWrap.appendChild(billing);
     }
 
     if (timings && timings.length > 0) {
@@ -244,17 +247,23 @@ function loadHistory(convId) {
     fetch(`/api/conversations/${convId}/messages`)
         .then(r => r.json())
         .then(data => {
-            if (data.messages && data.messages.length) {
-                data.messages.forEach(msg => {
-                    const role = msg.role === "assistant" ? "bot" : "user";
-                    addMessage(msg.text, role, false, msg.cost || 0, msg.timings, 0);
-                });
-            } else {
-                chatbox.innerHTML = '<div class="empty-state">Начните диалог</div>';
+            try {
+                if (data.messages && data.messages.length) {
+                    data.messages.forEach(msg => {
+                        const role = msg.role === "assistant" ? "bot" : "user";
+                        addMessage(msg.text, role, false, msg.cost || 0, msg.timings, 0);
+                    });
+                } else {
+                    chatbox.innerHTML = '<div class="empty-state">Начните диалог</div>';
+                }
+            } catch (renderErr) {
+                console.error("[CHAT] Render history error:", renderErr);
+                chatbox.innerHTML = `<div class="empty-state">Ошибка отрисовки истории: ${renderErr.message}</div>`;
             }
         })
-        .catch(() => {
-            chatbox.innerHTML = '<div class="empty-state">Ошибка загрузки истории</div>';
+        .catch(err => {
+            console.error("[CHAT] Fetch history error:", err);
+            chatbox.innerHTML = `<div class="empty-state">Ошибка сети: ${err.message}</div>`;
         });
 }
 
