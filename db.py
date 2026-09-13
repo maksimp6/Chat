@@ -180,3 +180,41 @@ def get_conv_settings(conv_id):
         return json.loads(row["settings_json"])
     except Exception:
         return None
+
+# --- Подсистема конфигураций в SQLite ---
+import json
+
+def init_config_table():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS configs (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def get_config(key: str, default=None):
+    init_config_table()
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM configs WHERE key = ?", (key,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return default
+    try:
+        return json.loads(row[0])
+    except Exception:
+        return row[0]
+
+def set_config(key: str, value):
+    init_config_table()
+    val_str = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO configs (key, value) VALUES (?, ?)", (key, val_str))
+    conn.commit()
+    conn.close()
