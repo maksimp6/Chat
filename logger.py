@@ -88,7 +88,8 @@ def log_request(logger_name='app'):
             from flask import request
             logger.info(f"→ {request.method} {request.path}")
             if request.json:
-                logger.debug(f"  Body: {json.dumps(request.json, ensure_ascii=False)[:500]}")
+                body = json.dumps(request.json, ensure_ascii=False).replace("\\r\\n", " ").replace("\\n", " ").replace("\\r", " ")
+                logger.debug(f"  Body: {body[:500]}")
             start_time = datetime.now()
             try:
                 result = func(*args, **kwargs)

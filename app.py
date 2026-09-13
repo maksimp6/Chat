@@ -87,5 +87,34 @@ def save_dialog_settings(conv_id):
     save_conv_settings(conv_id, data)
     return jsonify({"status": "ok"})
 
+# --- Подсистема глобальной памяти ---
+from memory_manager import load_memory_config, save_memory_config, clear_global_memory
+from db import get_conn
+import sqlite3
+
+@app.route("/api/memory/manage", methods=["GET"])
+def api_memory_panel_data():
+    cfg = load_memory_config()
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM global_memory ORDER BY updated_at DESC")
+    facts = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return jsonify({"config": cfg, "facts": facts})
+
+@app.route("/api/memory/config", methods=["PUT"])
+def api_update_memory_config():
+    data = request.get_json(silent=True) or {}
+    save_memory_config(data)
+    return jsonify({"status": "ok", "config": load_memory_config()})
+
+@app.route("/api/memory/clear", methods=["POST"])
+def api_clear_memory():
+    data = request.get_json(silent=True) or {}
+    category = data.get("category")
+    clear_global_memory(category)
+    return jsonify({"status": "cleared", "category": category or "all"})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
