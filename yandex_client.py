@@ -326,6 +326,18 @@ class YandexMcpMixin:
 
         t_start = _t.perf_counter()
         result = registry.execute(name, args, all_servers)
+        api_logger.debug(
+            "[LOCAL TOOL RESULT] name=%s call_id=%s\n%s",
+            name,
+            tc.get("call_id") or tc.get("id"),
+            json.dumps(
+                _sanitize_for_log(result),
+                ensure_ascii=False,
+                indent=2
+            ) if isinstance(result, (dict, list))
+            else str(result)
+        )
+
         t_end = _t.perf_counter()
 
         call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
@@ -467,6 +479,35 @@ class YandexMcpMixin:
         t1 = _t.perf_counter()
         step_timings.append({"name": "LLM Router (поиск инструментов)", "duration_ms": round((t1 - t0) * 1000)})
 
+        api_logger.debug(
+            "[ROUTER RESPONSE] response_id=%r status=%r output_count=%d",
+            response.get("id"),
+            response.get("status"),
+            len(response.get("output", []) or [])
+        )
+
+        for i, item in enumerate(response.get("output", []) or []):
+            if not isinstance(item, dict):
+                api_logger.debug("[OUTPUT %d] non-dict: %r", i, item)
+                continue
+
+            api_logger.debug(
+                "[OUTPUT %d] type=%r id=%r",
+                i,
+                item.get("type"),
+                item.get("id")
+            )
+
+            api_logger.debug(
+                "[OUTPUT %d BODY]\n%s",
+                i,
+                json.dumps(
+                    _sanitize_for_log(item),
+                    ensure_ascii=False,
+                    indent=2
+                )
+            )
+
         output = response.get("output", [])
         tool_calls = []
         for item in output:
@@ -478,6 +519,22 @@ class YandexMcpMixin:
                 for part in item.get("content", []):
                     if isinstance(part, dict) and part.get("type") in ("function_call", "tool_call"):
                         tool_calls.append(part)
+
+        api_logger.debug(
+            "[TOOL CALLS] обнаружено=%d",
+            len(tool_calls)
+        )
+
+        for i, tc in enumerate(tool_calls):
+            api_logger.debug(
+                "[TOOL CALL %d]\n%s",
+                i,
+                json.dumps(
+                    _sanitize_for_log(tc),
+                    ensure_ascii=False,
+                    indent=2
+                )
+            )
 
         if not tool_calls:
             response["step_timings"] = step_timings
@@ -504,6 +561,15 @@ class YandexMcpMixin:
 
         t_synth_start = _t.perf_counter()
         final_response = self.ask(prompt, model_key, conversation_id, synth_params)
+
+        api_logger.debug(
+            "[SYNTHESIS RESPONSE]\n%s",
+            json.dumps(
+                _sanitize_for_log(final_response),
+                ensure_ascii=False,
+                indent=2
+            )
+        )
         t_synth_end = _t.perf_counter()
         step_timings.append({"name": "LLM Synthesis (финальный ответ)", "duration_ms": round((t_synth_end - t_synth_start) * 1000)})
         final_response["step_timings"] = step_timings
