@@ -1,5 +1,5 @@
 """
-logger.py - Централизованная система логирования для Alice Pro[span_0](start_span)[span_0](end_span)
+logger.py - Централизованная система логирования для Alice Pro
 """
 import logging
 import os
@@ -7,17 +7,26 @@ import json
 from datetime import datetime
 from functools import wraps
 from logging.handlers import RotatingFileHandler
+from yc_logging import yc_logger
 
 os.makedirs('logs', exist_ok=True)
 
 LOG_FORMAT = '%(asctime)s | %(levelname)-7s | %(name)s | %(message)s'
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
+class YCLoggingHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            yc_logger.emit(record.levelname, msg, stream_name=record.name)
+        except Exception:
+            pass
+
 class AliceLogger:
     def __init__(self):
         self.loggers = {}
         self._setup_loggers()
-    
+
     def _setup_loggers(self):
         self.loggers['app'] = self._create_logger('alice_pro', 'logs/app.txt')
         self.loggers['api'] = self._create_logger('yandex_api', 'logs/api_debug.txt')
@@ -29,7 +38,7 @@ class AliceLogger:
         self.loggers['prompts'] = self._create_logger('prompts', 'logs/prompts.txt')
         self.loggers['stats'] = self._create_logger('stats', 'logs/stats.txt')
         self.loggers['error'] = self._create_logger('errors', 'logs/errors.txt')
-    
+
     def _create_logger(self, name, filename):
         logger = logging.getLogger(name)
         logger.setLevel(logging.DEBUG)
@@ -39,12 +48,17 @@ class AliceLogger:
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
         logger.addHandler(fh)
+
         ch = logging.StreamHandler()
         ch.setLevel(logging.ERROR)
         ch.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
         logger.addHandler(ch)
+
+        yc_h = YCLoggingHandler()
+        yc_h.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
+        logger.addHandler(yc_h)
         return logger
-    
+
     def get(self, name):
         return self.loggers.get(name, self.loggers['app'])
 

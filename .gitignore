@@ -8,3 +8,4 @@ alice_pro.zip
 *.db
 logs/
 __pycache__/
+iam_key.json
