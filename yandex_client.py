@@ -189,6 +189,9 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if params.get("text"): payload["text"] = params["text"]
         if params.get("truncation"): payload["truncation"] = params["truncation"]
         if params.get("service_tier"): payload["service_tier"] = params["service_tier"]
+        cache_key = params.get("prompt_cache_key") or conversation_id
+        if cache_key:
+            payload["prompt_cache_key"] = str(cache_key)
         if params.get("reasoning"):
             payload["reasoning"] = params["reasoning"]
         elif params.get("reasoning_effort") and params.get("reasoning_effort") != "disabled":
