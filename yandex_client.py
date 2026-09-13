@@ -441,7 +441,9 @@ class YandexMcpMixin:
         if code_cfg.get("enabled"):
             hosted_tools.append({
                 "type": "code_interpreter",
-                "container": "auto"
+                "container": {
+                    "type": "auto"
+                }
             })
 
         active_set = set(active_cats)

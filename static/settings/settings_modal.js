@@ -118,6 +118,7 @@
             '    <button class="llm-tab-btn active" data-tab="tab-gen" style="padding:8px 12px;border:none;background:none;border-bottom:2px solid var(--m-accent,#4a90d9);color:var(--m-text,#222);font-weight:600;cursor:pointer;white-space:nowrap;">Сэмплинг</button>',
             '    <button class="llm-tab-btn" data-tab="tab-output" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Формат вывода</button>',
             '    <button class="llm-tab-btn" data-tab="tab-routing" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Маршрутизация вызовов</button>',
+            '    <button class="llm-tab-btn" data-tab="tab-tools" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Встроенные тулы</button>',
             '    <button class="llm-tab-btn" data-tab="tab-adv" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Промпты & Кэш</button>',
             '</div>'
         ].join('');
@@ -179,7 +180,106 @@
             '</div>'
         ].join('');
 
-        var tabAdv = [
+        var cfg = settings.tools_config || {};
+    var ws = cfg.web_search || {};
+    var fs = cfg.file_search || {};
+    var ci = cfg.code_interpreter || {};
+
+    var tabTools = [
+        '<div id="tab-tools" class="llm-tab-content" style="display:none;">',
+
+        UI.section("Встроенные инструменты Yandex AI Studio"),
+
+        UI.chk(
+            'set-ws-en',
+            ws.enabled || false,
+            '<strong>🌐 Web Search</strong> (поиск в интернете)'
+        ),
+
+        UI.gap2(
+            '<div>' +
+                UI.lbl('Search Context Size') +
+                UI.sel(
+                    'set-ws-context',
+                    '<option value="low"' +
+                        (ws.context_size === 'low' ? ' selected' : '') +
+                        '>Low</option>' +
+                    '<option value="medium"' +
+                        (!ws.context_size || ws.context_size === 'medium' ? ' selected' : '') +
+                        '>Medium</option>' +
+                    '<option value="high"' +
+                        (ws.context_size === 'high' ? ' selected' : '') +
+                        '>High</option>'
+                ) +
+            '</div>',
+            '<div></div>'
+        ),
+
+        '<div style="margin-top:10px;">' +
+            UI.lbl('Разрешённые домены') +
+            UI.inp(
+                'set-ws-allow',
+                'text',
+                ws.allowed_domains || '',
+                ' placeholder="example.com, wikipedia.org"'
+            ) +
+        '</div>',
+
+        '<div style="margin-top:10px;">' +
+            UI.lbl('Заблокированные домены') +
+            UI.inp(
+                'set-ws-block',
+                'text',
+                ws.blocked_domains || '',
+                ' placeholder="example.org"'
+            ) +
+        '</div>',
+
+        '<hr style="margin:16px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
+
+        UI.chk(
+            'set-ci-en',
+            ci.enabled || false,
+            '<strong>🧮 Code Interpreter</strong> (Python)'
+        ),
+
+        '<hr style="margin:16px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
+
+        UI.chk(
+            'set-fs-en',
+            fs.enabled || false,
+            '<strong>📚 File Search</strong> (поиск по Vector Store)'
+        ),
+
+        '<div style="margin-top:10px;">' +
+            UI.lbl('Vector Store IDs') +
+            UI.inp(
+                'set-fs-vids',
+                'text',
+                fs.vector_store_ids || '',
+                ' placeholder="vs_xxx, vs_yyy"'
+            ) +
+        '</div>',
+
+        '<div style="margin-top:10px;">' +
+            UI.lbl('Максимум результатов') +
+            UI.inp(
+                'set-fs-max',
+                'number',
+                fs.max_results || 20,
+                ' min="1" max="50"'
+            ) +
+        '</div>',
+
+        '<div style="margin-top:14px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">' +
+            'Эти инструменты выполняются на стороне Yandex AI Studio. ' +
+            'Они независимы от MCP и локального Tool Registry.' +
+        '</div>',
+
+        '</div>'
+    ].join('');
+
+var tabAdv = [
             '<div id="tab-adv" class="llm-tab-content" style="display:none;">',
             UI.section("Промпт-шаблоны и кэширование"),
             UI.gap2(
@@ -201,7 +301,7 @@
             '</div>'
         ].join('');
 
-        md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabAdv + footer;
+        md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabTools + tabAdv + footer;
         ov.appendChild(md);
         document.body.appendChild(ov);
 
@@ -269,6 +369,31 @@
             settings.prompt_version = document.getElementById('set-prompt-ver').value.trim();
             settings.prompt_variables = document.getElementById('set-prompt-vars').value.trim();
             settings.conv_metadata = document.getElementById('set-conv-meta').value.trim();
+        // Встроенные инструменты Yandex AI Studio.
+        // MCP и локальные инструменты здесь не изменяются.
+        settings.tools_config = {
+            web_search: {
+                enabled: document.getElementById('set-ws-en').checked,
+                context_size: document.getElementById('set-ws-context').value,
+                allowed_domains: document.getElementById('set-ws-allow').value.trim(),
+                blocked_domains: document.getElementById('set-ws-block').value.trim()
+            },
+            code_interpreter: {
+                enabled: document.getElementById('set-ci-en').checked
+            },
+            file_search: {
+                enabled: document.getElementById('set-fs-en').checked,
+                vector_store_ids: document.getElementById('set-fs-vids').value.trim(),
+                max_results: Math.max(
+                    1,
+                    Math.min(
+                        parseInt(document.getElementById('set-fs-max').value, 10) || 20,
+                        50
+                    )
+                )
+            }
+        };
+
 
             Storage.save(settings, currentConvId);
             closeModal();
