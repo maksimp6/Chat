@@ -60,22 +60,26 @@ function parseMarkdown(text) {
     if (!text) return "";
     var strText = typeof text === "string" ? text : JSON.stringify(text);
 
+    strText = strText.replace(/^\s*```(?:markdown|md|html)?\s*\n([\s\S]*)\n?```\s*$/i, "$1");
+
     var safe = strText
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
     var codeBlocks = [];
+    // Аккуратно вырезаем блоки кода вместе с языковой меткой
     safe = safe.replace(/```([\w\-\+\#]*)\n?([\s\S]*?)```/g, function(m, lang, code) {
         var ph = "\x00CB" + codeBlocks.length + "\x00";
-        code = code.replace(/^\n/, ''); 
-        codeBlocks.push('<pre><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre>');
+        code = code.replace(/^\n/, '').replace(/\n$/, ''); 
+        var langHeader = lang ? '<div style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">' + lang + '</div>' : '';
+        codeBlocks.push('<div style="margin:8px 0;"><pre style="margin:0;"><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre></div>');
         return ph;
     });
 
     var lines = safe.split('\n');
     var out = [];
-    var inList = false;
+    var listType = null;
     var inTable = false;
     var tableHtml = '';
 
@@ -86,7 +90,7 @@ function parseMarkdown(text) {
         var isTableStart = /^\s*\|.*\|\s*$/.test(line) && /^\s*\|?[\s:]*-+[\s:|-]*\|?\s*$/.test(nextLine);
 
         if (isTableStart && !inTable) {
-            if (inList) { out.push('</ul>'); inList = false; }
+            if (listType) { out.push('</' + listType + '>'); listType = null; }
             inTable = true;
             tableHtml = '<table class="md-table"><thead><tr>';
             var hdr = line.split('|').filter(c => c.trim() !== '');
@@ -115,31 +119,49 @@ function parseMarkdown(text) {
         }
 
         if (/^(-{3,}|_{3,}|\*{3,})$/.test(line.trim())) {
-            if (inList) { out.push('</ul>'); inList = false; }
+            if (listType) { out.push('</' + listType + '>'); listType = null; }
             out.push('<hr>');
             continue;
         }
 
         var hdrMatch = line.match(/^(#{1,6})\s+(.*)$/);
         if (hdrMatch) {
-            if (inList) { out.push('</ul>'); inList = false; }
+            if (listType) { out.push('</' + listType + '>'); listType = null; }
             out.push('<h' + hdrMatch[1].length + '>' + formatInline(hdrMatch[2]) + '</h' + hdrMatch[1].length + '>');
             continue;
         }
 
-        var li = line.match(/^\s*[-*+]\s+(.*)$/);
-        if (li) {
-            if (!inList) { out.push('<ul>'); inList = true; }
-            out.push('<li>' + formatInline(li[1]) + '</li>');
+        var liMatch = line.match(/^\s*([-*+]|\d+\.)\s+(.*)$/);
+        if (liMatch) {
+            var currentListType = /^\d+\.$/.test(liMatch[1]) ? 'ol' : 'ul';
+            if (!listType) {
+                out.push('<' + currentListType + '>');
+                listType = currentListType;
+            } else if (listType !== currentListType) {
+                out.push('</' + listType + '>');
+                out.push('<' + currentListType + '>');
+                listType = currentListType;
+            }
+            out.push('<li>' + formatInline(liMatch[2]) + '</li>');
             continue;
-        } else if (inList) {
-            out.push('</ul>');
-            inList = false;
         }
 
         if (line.trim() === '') {
+            var nextLiMatch = nextLine.match(/^\s*([-*+]|\d+\.)\s+(.*)$/);
+            if (listType && nextLiMatch) {
+                continue;
+            }
+            if (listType) {
+                out.push('</' + listType + '>');
+                listType = null;
+            }
             out.push('<br>');
             continue;
+        }
+
+        if (listType) {
+            out.push('</' + listType + '>');
+            listType = null;
         }
 
         if (line.trim().indexOf('\x00CB') === 0) {
@@ -149,7 +171,7 @@ function parseMarkdown(text) {
         }
     }
 
-    if (inList) out.push('</ul>');
+    if (listType) out.push('</' + listType + '>');
     if (inTable) { tableHtml += '</tbody></table>'; out.push(tableHtml); }
 
     var result = out.join('\n');
