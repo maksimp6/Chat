@@ -2,8 +2,28 @@ import time
 import subprocess
 import os
 import logging
+import threading
+from functools import wraps
 
 logger = logging.getLogger("git_mcp")
+
+_read_lock = threading.RLock()
+_write_lock = threading.RLock()
+
+def read_op(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with _read_lock:
+            return func(*args, **kwargs)
+    return wrapper
+
+def write_op(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with _write_lock:
+            with _read_lock:
+                return func(*args, **kwargs)
+    return wrapper
 
 def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     cfg = cfg or {}
@@ -17,8 +37,8 @@ def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
     if os.path.isdir(candidate):
         return candidate
 
-    for fallback_base in ["/sdcard/repo", "/sdcard", os.getcwd()]:
-        alt = os.path.join(fallback_base, target)
+    for fallback in ["/sdcard/repo", "/sdcard", os.getcwd()]:
+        alt = os.path.join(fallback, target)
         if os.path.isdir(alt):
             return alt
 
@@ -27,7 +47,6 @@ def _resolve_repo_path(repo_name: str = None, cfg: dict = None) -> str:
 def _is_bare_repo(repo_path: str) -> bool:
     if not os.path.isdir(repo_path):
         return False
-    # В bare репозитории HEAD и objects лежат прямо в корне
     if os.path.isfile(os.path.join(repo_path, "HEAD")) and os.path.isdir(os.path.join(repo_path, "objects")) and not os.path.isdir(os.path.join(repo_path, ".git")):
         return True
     try:
@@ -36,136 +55,147 @@ def _is_bare_repo(repo_path: str) -> bool:
     except Exception:
         return False
 
-def _run_git_command(args: list, cfg: dict = None, repo_name: str = None) -> dict:
+def _run_git(args: list, cfg: dict = None, repo_name: str = None, is_read: bool = False) -> dict:
     cfg = cfg or {}
     repo_path = _resolve_repo_path(repo_name, cfg)
     timeout = cfg.get("timeout", 25)
-    allowed_commands = [
-        "status", "log", "diff", "branch", "show",
-        "add", "commit", "checkout", "remote", "push",
-        "pull", "fetch", "init", "rev-parse"
-    ]
 
     if not os.path.isdir(repo_path):
-        return {"success": False, "error": f"Папка репозитория не найдена: {repo_path}"}
+        return {"success": False, "error": f"Каталог не найден: {repo_path}"}
 
     is_bare = _is_bare_repo(repo_path)
     if not is_bare and not os.path.isdir(os.path.join(repo_path, ".git")):
         if not (args and args[0] == "init"):
-            return {"success": False, "error": f"В папке {repo_path} отсутствует .git и это не bare-репозиторий"}
+            return {"success": False, "error": f"В каталоге {repo_path} нет .git"}
 
     lock_file = os.path.join(repo_path, "index.lock") if is_bare else os.path.join(repo_path, ".git", "index.lock")
-    wait_start = time.time()
-    while os.path.exists(lock_file):
-        if time.time() - wait_start > 10:
-            try:
+    if os.path.exists(lock_file):
+        try:
+            if time.time() - os.path.getmtime(lock_file) > 2.0:
                 os.remove(lock_file)
-            except Exception:
-                pass
-            break
-        time.sleep(0.2)
+                time.sleep(0.05)
+        except Exception:
+            pass
 
-    if args and args[0] not in allowed_commands:
-        return {"success": False, "error": f"Команда не разрешена: {args[0]}"}
+    cmd = ["git"]
+    if is_read:
+        cmd.append("--no-optional-locks")
+    cmd.extend(["-C", repo_path] + args)
 
-    cmd = ["git", "-C", repo_path] + args
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         rel_name = os.path.basename(repo_path)
+        out = res.stdout.strip()
+        err = res.stderr.strip()
+        
+        # Если статус коммита "nothing to commit" — это не фатальный сбой, а информационный ответ
+        if res.returncode != 0 and ("nothing to commit" in out or "nothing to commit" in err):
+            return {"success": True, "repo": rel_name, "output": "Нечего коммитить, рабочая директория чиста.", "is_bare": is_bare}
+
         if res.returncode == 0:
-            return {
-                "success": True,
-                "repo": rel_name,
-                "output": res.stdout.strip() or "(успешно)",
-                "is_bare": is_bare
-            }
+            return {"success": True, "repo": rel_name, "output": out or "(успешно)", "is_bare": is_bare}
         else:
-            return {
-                "success": False,
-                "repo": rel_name,
-                "error": res.stderr.strip() or f"Код: {res.returncode}",
-                "is_bare": is_bare
-            }
-    except subprocess.TimeoutExpired:
-        return {"success": False, "error": f"Превышен таймаут ({timeout}с)"}
+            return {"success": False, "repo": rel_name, "error": err or out or f"Код: {res.returncode}", "is_bare": is_bare}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+# --- Чтение ---
+
+@read_op
 def git_status(args: dict, cfg: dict) -> dict:
     repo_path = _resolve_repo_path(args.get("repo") or args.get("repo_path"), cfg)
     if _is_bare_repo(repo_path) and not args.get("work_tree"):
-        branches = _run_git_command(["branch", "-a"], cfg, repo_path)
-        head = _run_git_command(["rev-parse", "--abbrev-ref", "HEAD"], cfg, repo_path)
+        branches = _run_git(["branch", "-a"], cfg, repo_path, is_read=True)
+        head = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cfg, repo_path, is_read=True)
         return {
             "success": True,
             "is_bare": True,
             "repo": os.path.basename(repo_path),
             "head_branch": head.get("output"),
             "branches": branches.get("output", "").splitlines(),
-            "output": f"Bare-репозиторий (HEAD: {head.get('output', 'unknown')}). Рабочая директория отсутствует."
+            "output": f"Bare-репозиторий (HEAD -> {head.get('output', 'unknown')}). Ветки:\n{branches.get('output', '')}"
         }
     status_args = ["status", "--short", "--branch"]
     if args.get("work_tree"):
         status_args = ["--work-tree", args["work_tree"]] + status_args
-    return _run_git_command(status_args, cfg, args.get("repo") or args.get("repo_path"))
+    return _run_git(status_args, cfg, args.get("repo") or args.get("repo_path"), is_read=True)
 
+@read_op
 def git_log(args: dict, cfg: dict) -> dict:
     limit = args.get("limit") or cfg.get("default_log_limit", 5)
-    return _run_git_command(["log", f"-n{limit}", "--oneline"], cfg, args.get("repo") or args.get("repo_path"))
+    branch = args.get("branch") or "HEAD"
+    return _run_git(["log", f"-n{limit}", "--oneline", branch], cfg, args.get("repo") or args.get("repo_path"), is_read=True)
 
+@read_op
 def git_diff(args: dict, cfg: dict) -> dict:
-    cmd_args = ["diff", "HEAD"]
+    cmd = ["diff", "HEAD"]
     if args.get("file_path"):
-        cmd_args.extend(["--", args["file_path"]])
-    return _run_git_command(cmd_args, cfg, args.get("repo") or args.get("repo_path"))
+        cmd.extend(["--", args["file_path"]])
+    return _run_git(cmd, cfg, args.get("repo") or args.get("repo_path"), is_read=True)
 
+@read_op
 def git_branches(args: dict, cfg: dict) -> dict:
-    return _run_git_command(["branch", "-a"], cfg, args.get("repo") or args.get("repo_path"))
+    return _run_git(["branch", "-a"], cfg, args.get("repo") or args.get("repo_path"), is_read=True)
 
+# --- Запись ---
+
+@write_op
 def git_add(args: dict, cfg: dict) -> dict:
     target = args.get("path") or args.get("files") or "."
-    return _run_git_command(["add", target], cfg, args.get("repo") or args.get("repo_path"))
+    return _run_git(["add", target], cfg, args.get("repo") or args.get("repo_path"), is_read=False)
 
+@write_op
 def git_commit(args: dict, cfg: dict) -> dict:
-    msg = args.get("message") or "Auto-commit via MCP"
-    _run_git_command(["add", "."], cfg, args.get("repo") or args.get("repo_path"))
-    return _run_git_command(["commit", "-m", msg], cfg, args.get("repo") or args.get("repo_path"))
+    msg = args.get("message") or "Update via Agent"
+    repo = args.get("repo") or args.get("repo_path")
+    files = args.get("files") or args.get("path")
 
+    # Автоматическая индексация перед коммитом
+    if files:
+        target = [files] if isinstance(files, str) else files
+        _run_git(["add"] + target, cfg, repo, is_read=False)
+    else:
+        _run_git(["add", "-A"], cfg, repo, is_read=False)
+    
+    time.sleep(0.15)
+    return _run_git(["commit", "-m", msg], cfg, repo, is_read=False)
+
+@write_op
 def git_remote(args: dict, cfg: dict) -> dict:
     action = args.get("action", "list")
     repo = args.get("repo") or args.get("repo_path")
     if action == "list":
-        return _run_git_command(["remote", "-v"], cfg, repo)
+        return _run_git(["remote", "-v"], cfg, repo, is_read=True)
     name = args.get("name", "origin")
     url = args.get("url")
     if action == "add":
-        if not url:
-            return {"success": False, "error": "URL обязателен для remote add"}
-        return _run_git_command(["remote", "add", name, url], cfg, repo)
+        if not url: return {"success": False, "error": "URL обязателен"}
+        return _run_git(["remote", "add", name, url], cfg, repo, is_read=False)
     elif action == "set_url":
-        if not url:
-            return {"success": False, "error": "URL обязателен для remote set-url"}
-        return _run_git_command(["remote", "set-url", name, url], cfg, repo)
+        if not url: return {"success": False, "error": "URL обязателен"}
+        return _run_git(["remote", "set-url", name, url], cfg, repo, is_read=False)
     elif action == "remove":
-        return _run_git_command(["remote", "remove", name], cfg, repo)
+        return _run_git(["remote", "remove", name], cfg, repo, is_read=False)
     elif action == "show":
-        return _run_git_command(["remote", "show", name], cfg, repo)
+        return _run_git(["remote", "show", name], cfg, repo, is_read=True)
     return {"success": False, "error": f"Неизвестное действие: {action}"}
 
+@write_op
 def git_push(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
     remote = args.get("remote", "origin")
-    branch = args.get("branch")
+    branch = args.get("branch") or "master"
     cmd = ["push"]
     if args.get("set_upstream"):
         cmd.append("-u")
     if args.get("mirror"):
         cmd.append("--mirror")
     cmd.append(remote)
-    if branch and not args.get("mirror"):
+    if not args.get("mirror"):
         cmd.append(branch)
-    return _run_git_command(cmd, cfg, repo)
+    return _run_git(cmd, cfg, repo, is_read=False)
 
+@write_op
 def git_pull(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
     remote = args.get("remote", "origin")
@@ -173,15 +203,16 @@ def git_pull(args: dict, cfg: dict) -> dict:
     cmd = ["pull", remote]
     if branch:
         cmd.append(branch)
-    return _run_git_command(cmd, cfg, repo)
+    return _run_git(cmd, cfg, repo, is_read=False)
 
+@write_op
 def git_fetch(args: dict, cfg: dict) -> dict:
     repo = args.get("repo") or args.get("repo_path")
     remote = args.get("remote", "origin")
     cmd = ["fetch", remote]
     if args.get("prune"):
         cmd.append("--prune")
-    return _run_git_command(cmd, cfg, repo)
+    return _run_git(cmd, cfg, repo, is_read=False)
 
 TOOL_REGISTRY = {
     "git_status": {
@@ -192,7 +223,7 @@ TOOL_REGISTRY = {
     "git_log": {
         "func": git_log,
         "description": "Получить историю коммитов репозитория.",
-        "parameters": {"type": "object", "properties": {"limit": {"type": "integer"}, "repo_path": {"type": "string"}}, "required": []}
+        "parameters": {"type": "object", "properties": {"limit": {"type": "integer"}, "branch": {"type": "string"}, "repo_path": {"type": "string"}}, "required": []}
     },
     "git_diff": {
         "func": git_diff,
@@ -206,13 +237,21 @@ TOOL_REGISTRY = {
     },
     "git_add": {
         "func": git_add,
-        "description": "Индексировать изменения (git add).",
+        "description": "Индексировать файлы.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "repo_path": {"type": "string"}}, "required": []}
     },
     "git_commit": {
         "func": git_commit,
-        "description": "Зафиксировать коммит.",
-        "parameters": {"type": "object", "properties": {"message": {"type": "string"}, "repo_path": {"type": "string"}}, "required": ["message"]}
+        "description": "Зафиксировать коммит с сообщением. Автоматически индексирует изменения перед коммитом.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Текст сообщения коммита"},
+                "files": {"type": "string", "description": "Путь к файлу или пусто для всех изменений"},
+                "repo_path": {"type": "string"}
+            },
+            "required": ["message"]
+        }
     },
     "git_remote": {
         "func": git_remote,
@@ -230,7 +269,7 @@ TOOL_REGISTRY = {
     },
     "git_push": {
         "func": git_push,
-        "description": "Отправка изменений в remote (включая bare-репозитории).",
+        "description": "Отправка изменений в remote (по умолчанию ветка master).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -263,7 +302,7 @@ def execute_tool(tool_name: str, arguments: dict, cfg: dict = None) -> dict:
     try:
         return tool["func"](arguments or {}, cfg or {})
     except Exception as e:
-        logger.exception(f"Ошибка выполнения инструмента {tool_name}: {e}")
-        return {"error": f"Внутренняя ошибка: {str(e)}"}
+        logger.exception(f"Ошибка выполнения {tool_name}: {e}")
+        return {"error": str(e)}
 
 GIT_TOOLS = TOOL_REGISTRY
