@@ -167,7 +167,9 @@ function formatInline(text) {
         .replace(/`(.+?)`/g, '<code>$1</code>');
 }
 
-function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning) {
+function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning, usage) {
+
+
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
 
@@ -202,6 +204,24 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning)
 
     const metaWrap = document.createElement("div");
     metaWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;";
+
+    if (usage && (usage.input_tokens || usage.total_tokens)) {
+        const usageBadge = document.createElement("details");
+        usageBadge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.04);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
+        let detailsHtml = `<summary style="font-weight:500;">📊 Токены: <strong>${usage.total_tokens || 0}</strong> (вход: ${usage.input_tokens}, выход: ${usage.output_tokens})</summary>` +
+                          `<div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;font-family:monospace;font-size:11px;">` +
+                          `<div>💾 Кэшированные: <strong>${usage.cached_tokens || 0}</strong></div>` +
+                          `<div>🧰 Инструменты: <strong>${usage.tool_tokens || 0}</strong></div>` +
+                          `<div>🧠 Рассуждения: <strong>${usage.reasoning_tokens || 0}</strong></div>`;
+        if (usage.incomplete_details) {
+            detailsHtml += `<div style="color:var(--danger);">⚠️ Прерывание: ${JSON.stringify(usage.incomplete_details)}</div>`;
+        }
+        detailsHtml += `</div>`;
+        usageBadge.innerHTML = detailsHtml;
+        metaWrap.appendChild(usageBadge);
+    }
+
+
 
     if (cost && cost > 0) {
         const billing = document.createElement("div");
@@ -311,7 +331,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 addMessage("Ошибка: " + data.error, "bot", false, 0);
             } else {
                 const clientTotalMs = Math.round(performance.now() - t0);
-                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning);
+                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning, data.usage);
             }
         })
         .catch(e => {
