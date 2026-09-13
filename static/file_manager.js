@@ -1,3 +1,10 @@
+window.fetchVectorStores = function() {
+    return fetch('/api/vector-stores')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { return data.data || data || []; })
+        .catch(function() { return []; });
+};
+
 (function() {
     "use strict";
 
