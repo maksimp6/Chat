@@ -377,10 +377,88 @@ class YandexMcpMixin:
         if active_cats is None:
             active_cats = ["git", "termux", "system", "filesystem", "wikipedia", "profiler"]
 
+        # Встроенные инструменты Yandex AI Studio.
+        # Они выполняются на стороне Yandex Responses API.
+        hosted_tools = []
+
+        conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
+        tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
+
+        # Web Search
+        web_cfg = tools_config.get("web_search") or {}
+        if web_cfg.get("enabled"):
+            web_tool = {
+                "type": "web_search",
+                "search_context_size": web_cfg.get("context_size") or "medium"
+            }
+
+            allowed = web_cfg.get("allowed_domains") or ""
+            blocked = web_cfg.get("blocked_domains") or ""
+
+            allowed_domains = [
+                x.strip() for x in allowed.replace("\\n", ",").split(",")
+                if x.strip()
+            ]
+            blocked_domains = [
+                x.strip() for x in blocked.replace("\\n", ",").split(",")
+                if x.strip()
+            ]
+
+            if allowed_domains or blocked_domains:
+                web_tool["filters"] = {}
+                if allowed_domains:
+                    web_tool["filters"]["allowed_domains"] = allowed_domains
+                if blocked_domains:
+                    web_tool["filters"]["blocked_domains"] = blocked_domains
+
+            hosted_tools.append(web_tool)
+
+        # File Search
+        file_cfg = tools_config.get("file_search") or {}
+        if file_cfg.get("enabled"):
+            vector_ids = file_cfg.get("vector_store_ids") or ""
+            vector_store_ids = [
+                x.strip() for x in vector_ids.replace("\\n", ",").split(",")
+                if x.strip()
+            ]
+
+            if vector_store_ids:
+                hosted_tools.append({
+                    "type": "file_search",
+                    "vector_store_ids": vector_store_ids,
+                    "max_num_results": max(
+                        1,
+                        min(int(file_cfg.get("max_results") or 20), 50)
+                    )
+                })
+            else:
+                api_logger.warning(
+                    "[HOSTED TOOLS] File Search включён, но vector_store_ids не указаны"
+                )
+
+        # Code Interpreter
+        code_cfg = tools_config.get("code_interpreter") or {}
+        if code_cfg.get("enabled"):
+            hosted_tools.append({
+                "type": "code_interpreter",
+                "container": "auto"
+            })
+
         active_set = set(active_cats)
         local_tools = registry.get_definitions(active_set)
-        params["tools"] = mcp_tools + local_tools
-        api_logger.info(f"[ROUTER] Подключено {len(params['tools'])} инструментов. Категории: {active_set}")
+
+        # Порядок:
+        # 1. встроенные Yandex Tools
+        # 2. MCP
+        # 3. локальные Python tools
+        params["tools"] = hosted_tools + mcp_tools + local_tools
+
+        api_logger.info(
+            f"[ROUTER] Подключено инструментов: "
+            f"hosted={len(hosted_tools)}, "
+            f"mcp={len(mcp_tools)}, "
+            f"local={len(local_tools)}"
+        )
 
         t0 = _t.perf_counter()
         response = self.ask(message, model_key, conversation_id, params)
