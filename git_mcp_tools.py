@@ -90,6 +90,7 @@ def git_add(args: dict, cfg: dict) -> dict:
 
 def git_commit(args: dict, cfg: dict) -> dict:
     msg = args.get("message") or "Auto-commit via MCP"
+    _run_git_command(["add", "."], cfg, args.get("repo") or args.get("repo_path"))
     return _run_git_command(["commit", "-m", msg], cfg, args.get("repo") or args.get("repo_path"))
 
 TOOL_REGISTRY = {
