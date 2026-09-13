@@ -1,3 +1,4 @@
+import time
 """Локальные MCP-инструменты для работы с Git в Termux."""
 import subprocess
 import os
@@ -32,6 +33,18 @@ def _run_git_command(args: list, cfg: dict = None, repo_name: str = None) -> dic
     repo_path = _resolve_repo_path(repo_name, cfg)
     timeout = cfg.get("timeout", 20)
     allowed_commands = ["status", "log", "diff", "branch", "show", "add", "commit", "checkout"]
+
+    # Аккуратное ожидание завершения параллельных процессов Git (index.lock)
+    lock_file = os.path.join(repo_path, ".git", "index.lock")
+    wait_start = time.time()
+    while os.path.exists(lock_file):
+        if time.time() - wait_start > 10:  # если процесс завис дольше 10 секунд — сбрасываем принудительно
+            try:
+                os.remove(lock_file)
+            except Exception:
+                pass
+            break
+        time.sleep(0.2)
 
     if not os.path.isdir(repo_path):
         return {"success": False, "error": f"Папка репозитория не найдена: {repo_path}"}
