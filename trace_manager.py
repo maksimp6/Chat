@@ -31,11 +31,36 @@ class ExecutionTrace:
             "errors": []
         }
 
-    def get_metadata(self) -> Dict[str, str]:
-        """Return metadata for Yandex API."""
-        return {
+    def get_metadata(self) -> Dict[str, Any]:
+        """Return compact correlation/observability metadata for Yandex API."""
+        metadata: Dict[str, Any] = {
             "trace_id": str(self.trace_id)
         }
+
+        request = self.trace.get("request")
+        params = request.get("params") if isinstance(request, dict) else None
+        tools = params.get("tools") if isinstance(params, dict) else None
+
+        if isinstance(tools, list):
+            function_tools = [
+                tool for tool in tools
+                if isinstance(tool, dict) and tool.get("type") == "function"
+            ]
+            deferred_tools = [
+                tool for tool in tools
+                if isinstance(tool, dict) and tool.get("defer_loading") is True
+            ]
+            strict_tools = [
+                tool for tool in function_tools
+                if tool.get("strict") is True
+            ]
+
+            metadata["tool_count"] = len(tools)
+            metadata["function_tool_count"] = len(function_tools)
+            metadata["strict_tool_count"] = len(strict_tools)
+            metadata["deferred_tool_count"] = len(deferred_tools)
+
+        return metadata
 
     def set_request(self, payload: Dict[str, Any]) -> None:
         """Store the initial request payload."""
