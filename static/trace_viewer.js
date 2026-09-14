@@ -62,7 +62,7 @@
 .alice-trace-waterfall-head{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:11px;font-weight:750;letter-spacing:.03em;text-transform:uppercase;opacity:.72}.alice-trace-waterfall-sub{font-size:10px;font-weight:500;text-transform:none;letter-spacing:0;white-space:nowrap}
 .alice-trace-timeline{min-width:520px}.alice-trace-axis-labels{display:grid;grid-template-columns:108px 1fr;align-items:end;margin-bottom:4px;font:10px ui-monospace,SFMono-Regular,Menlo,monospace;opacity:.5}.alice-trace-axis-values{display:flex;justify-content:space-between;padding:0 2px}
 .alice-trace-timeline-body{position:relative}.alice-trace-gridline{position:absolute;top:0;bottom:0;width:1px;background:rgba(127,127,127,.12);pointer-events:none}.alice-trace-timeline-row{display:grid;grid-template-columns:108px 1fr;min-height:27px;align-items:center}.alice-trace-row-label{padding-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;opacity:.72}.alice-trace-row-track{position:relative;height:27px;border-bottom:1px solid rgba(127,127,127,.06)}
-.alice-trace-bar{position:absolute;top:7px;height:13px;border-radius:5px;min-width:5px;background:var(--accent,#7aa2ff);opacity:.92;cursor:pointer;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}.alice-trace-bar.tool{background:var(--accent,#7aa2ff)}.alice-trace-bar.selected{outline:2px solid rgba(255,255,255,.75);outline-offset:1px}
+.alice-trace-bar{position:absolute;top:7px;height:13px;border-radius:5px;min-width:5px;background:var(--accent,#7aa2ff);opacity:.92;cursor:pointer;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}.alice-trace-bar.tool{background:var(--accent,#7aa2ff)}.alice-trace-bar.response{background:#a794ff}.alice-trace-bar.inferred{background:rgba(167,148,255,.58);background-image:repeating-linear-gradient(135deg,transparent 0,transparent 4px,rgba(255,255,255,.16) 4px,rgba(255,255,255,.16) 6px)}.alice-trace-bar.selected{outline:2px solid rgba(255,255,255,.75);outline-offset:1px}
 .alice-trace-point{position:absolute;top:9px;width:9px;height:9px;border-radius:50%;background:var(--text-main,#eee);transform:translateX(-50%);cursor:pointer;box-shadow:0 0 0 2px rgba(127,127,127,.22)}.alice-trace-point.response{background:#a794ff}.alice-trace-point.event{background:#e7e7e7}
 .alice-trace-main{display:flex;min-height:0;flex:1}.alice-trace-nav{width:280px;min-width:220px;border-right:1px solid var(--border-color,rgba(255,255,255,.08));overflow:auto;padding:8px}.alice-trace-inspector{min-width:0;flex:1;overflow:auto}
 .alice-trace-section-title{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.55;padding:7px 8px}.alice-trace-item{width:100%;box-sizing:border-box;text-align:left;border:0;background:transparent;color:inherit;padding:8px;border-radius:8px;cursor:pointer;display:flex;gap:8px;align-items:flex-start}.alice-trace-item:hover,.alice-trace-item.active{background:rgba(127,127,127,.1)}.alice-trace-icon{width:18px;flex:0 0 18px;text-align:center}.alice-trace-item-main{min-width:0}.alice-trace-item-name{font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alice-trace-item-meta{font-size:10px;opacity:.55;margin-top:2px}
@@ -72,9 +72,10 @@
 .alice-trace-json-wrap{min-width:0;max-width:100%;overflow:hidden}.alice-trace-notice{padding:10px 12px;border-radius:8px;background:rgba(127,127,127,.06);font-size:12px;opacity:.75}
 @media(max-width:820px){
 .alice-trace-modal{padding:0}.alice-trace-window{border-radius:0}.alice-trace-nav{display:none}
-.alice-trace-mobile-tabs{display:flex;gap:5px;padding:7px 8px;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));overflow-x:auto;flex:0 0 auto}
+.alice-trace-mobile-tabs{display:flex;gap:5px;padding:7px 8px;border-bottom:0;overflow-x:auto;flex:0 0 auto}
 .alice-trace-mobile-tab{flex:0 0 auto;border:1px solid var(--border-color,rgba(255,255,255,.12));background:transparent;color:inherit;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer}.alice-trace-mobile-tab.active{background:rgba(127,127,127,.12);font-weight:700}
-.alice-trace-mobile-list{display:block;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));max-height:170px;overflow:auto}.alice-trace-mobile-list .alice-trace-item{padding:8px 12px;border-radius:0}
+.alice-trace-mobile-list{display:block;height:170px;min-height:170px;max-height:170px;box-sizing:border-box;border-bottom:1px solid var(--border-color,rgba(255,255,255,.08));border-top:1px solid var(--border-color,rgba(255,255,255,.08));overflow-y:auto;overflow-x:hidden}
+.alice-trace-mobile-list .alice-trace-item{padding:8px 12px;border-radius:0}
 .alice-trace-main{display:block;min-height:0;flex:1;overflow:hidden}.alice-trace-main .alice-trace-inspector{display:block;min-height:0;max-height:none;overflow:auto}
 .alice-trace-header{padding:9px}.alice-trace-waterfall{padding-left:8px;padding-right:8px}.alice-trace-inspector-inner{padding:12px}.alice-trace-timeline{min-width:460px}
 }
@@ -112,7 +113,8 @@
             items.push({kind:"tool", index:i, name:tool.name || "tool", timestamp:hasSpan ? end : getTimestamp(tool), start:start, end:end, data:tool});
         });
         (trace.responses || []).forEach(function (resp, i) {
-            items.push({kind:"response", index:i, name:"Responses API #" + (resp.step || i + 1), timestamp:getTimestamp(resp), data:resp});
+            var timestamp = getTimestamp(resp);
+            items.push({kind:"response", index:i, name:"Responses API #" + (resp.step || i + 1), timestamp:timestamp, start:null, end:timestamp, data:resp});
         });
         items.sort(function(a,b){ return (a.timestamp == null ? Infinity : a.timestamp) - (b.timestamp == null ? Infinity : b.timestamp); });
         return items;
@@ -163,7 +165,7 @@
         var wrap = el("div", {className:"alice-trace-waterfall"});
         var head = el("div", {className:"alice-trace-waterfall-head"});
         head.appendChild(el("span",{},"Waterfall"));
-        head.appendChild(el("span",{className:"alice-trace-waterfall-sub"},"tools = реальный start/end · Responses/events = timestamps"));
+        head.appendChild(el("span",{className:"alice-trace-waterfall-sub"},"tools = реальный start/end · Responses = end, start inferred · events = instant"));
         wrap.appendChild(head);
 
         var timed = items.filter(function(it){ return Number.isFinite(it.timestamp) || (Number.isFinite(it.start) && Number.isFinite(it.end)); });
@@ -196,19 +198,22 @@
             body.appendChild(line);
         });
 
-        function addRow(label, item) {
+        var previousResponseEnd = Number(trace.created_at);
+        if (!Number.isFinite(previousResponseEnd)) previousResponseEnd = min;
+
+        function addRow(label, item, barStart, barEnd, inferred) {
             var row = el("div",{className:"alice-trace-timeline-row"});
             row.appendChild(el("div",{className:"alice-trace-row-label",title:label},label));
             var track = el("div",{className:"alice-trace-row-track"});
-            if (item.kind === "tool" && Number.isFinite(item.start) && Number.isFinite(item.end)) {
-                var left = Math.max(0,Math.min(100,((item.start-min)/span)*100));
-                var width = Math.max(.9,Math.min(100-left,((item.end-item.start)/span)*100));
-                var bar=el("div",{className:"alice-trace-bar tool",title:item.name + " · " + fmtMs((item.end-item.start)*1000)});
+            if (Number.isFinite(barStart) && Number.isFinite(barEnd) && barEnd >= barStart) {
+                var left = Math.max(0,Math.min(100,((barStart-min)/span)*100));
+                var width = Math.max(.9,Math.min(100-left,((barEnd-barStart)/span)*100));
+                var bar=el("div",{className:"alice-trace-bar " + item.kind + (inferred ? " inferred" : ""),title:item.name + " · " + fmtMs((barEnd-barStart)*1000) + (inferred ? " · start inferred" : "")});
                 bar.style.left=left+"%"; bar.style.width=width+"%";
                 bar.onclick=function(){selectItem(item);};
                 track.appendChild(bar);
             } else if (Number.isFinite(item.timestamp)) {
-                var point=el("div",{className:"alice-trace-point " + item.kind,title:item.name});
+                var point=el("div",{className:"alice-trace-point " + item.kind,title:item.name + " · instant"});
                 point.style.left=Math.max(0,Math.min(100,((item.timestamp-min)/span)*100))+"%";
                 point.onclick=function(){selectItem(item);};
                 track.appendChild(point);
@@ -216,9 +221,20 @@
             row.appendChild(track); body.appendChild(row);
         }
 
-        timed.filter(function(it){return it.kind === "tool";}).forEach(function(it){ addRow("🔧 " + it.name,it); });
-        timed.filter(function(it){return it.kind === "response";}).forEach(function(it){ addRow("🤖 " + it.name,it); });
-        timed.filter(function(it){return it.kind === "event";}).forEach(function(it){ addRow("• " + it.name,it); });
+        timed.filter(function(it){return it.kind === "tool";}).forEach(function(it){
+            addRow("🔧 " + it.name,it,it.start,it.end,false);
+        });
+        timed.filter(function(it){return it.kind === "response";}).forEach(function(it){
+            var end = it.end;
+            var start = previousResponseEnd;
+            if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) start = Number(trace.created_at);
+            if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) start = end;
+            addRow("🤖 " + it.name,it,start,end,true);
+            previousResponseEnd = end;
+        });
+        timed.filter(function(it){return it.kind === "event";}).forEach(function(it){
+            addRow("• " + it.name,it,null,null,false);
+        });
 
         timeline.appendChild(body); wrap.appendChild(timeline); return wrap;
     }
@@ -248,6 +264,7 @@
         var list=state.nav.querySelector(".alice-trace-mobile-list");
         if(!list){list=el("div",{className:"alice-trace-mobile-list"});state.nav.appendChild(list);}
         list.textContent="";
+        if(!items.length){ list.appendChild(el("div",{className:"alice-trace-notice"},"Нет элементов в этом фильтре.")); return; }
         items.forEach(function(item){
             var btn=el("button",{className:"alice-trace-item"});
             btn.appendChild(el("span",{className:"alice-trace-icon"},item.kind==="tool"?"🔧":item.kind==="response"?"🤖":"•"));
