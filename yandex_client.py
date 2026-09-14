@@ -182,6 +182,11 @@ class YandexResponsesClient(YandexFileManagerMixin):
             "background": is_background,
             "store": params.get("store", True),
         }
+        
+        # Add metadata from execution_trace if provided
+        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            payload["metadata"] = execution_trace.get_metadata()
+        
         if params.get("instructions"): payload["instructions"] = params["instructions"]
         if params.get("temperature") is not None: payload["temperature"] = float(params["temperature"])
         if params.get("top_p") is not None: payload["top_p"] = float(params["top_p"])
@@ -484,7 +489,7 @@ class YandexMcpMixin:
         })
 
         t0 = _t.perf_counter()
-        response = self.ask(message, model_key, conversation_id, params)
+        response = self.ask(message, model_key, conversation_id, params, execution_trace=trace)
         t1 = _t.perf_counter()
         step_timings.append({"name": "LLM Router (поиск инструментов)", "duration_ms": round((t1 - t0) * 1000)})
         trace.add_response(response, step_index=1)
@@ -547,6 +552,7 @@ class YandexMcpMixin:
             )
 
         if not tool_calls:
+            trace.finalize()
             response["step_timings"] = step_timings
             response["trace"] = trace.finalize()
             return response
@@ -580,7 +586,7 @@ class YandexMcpMixin:
         synth_params = {k: v for k, v in params.items() if k not in ("tools", "parallel_tool_calls", "tool_choice")}
 
         t_synth_start = _t.perf_counter()
-        final_response = self.ask(prompt, model_key, conversation_id, synth_params)
+        final_response = self.ask(prompt, model_key, conversation_id, synth_params, execution_trace=trace)
 
         api_logger.debug(
             "[SYNTHESIS RESPONSE]\n%s",
