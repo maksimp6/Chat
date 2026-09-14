@@ -1,7 +1,9 @@
 """Единый реестр локальных инструментов приложения Alice Pro."""
+import copy
 import logging
 
 logger = logging.getLogger("tool_registry")
+
 
 class ToolRegistry:
     def __init__(self):
@@ -64,17 +66,72 @@ class ToolRegistry:
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Profiler: {e}")
 
+    @staticmethod
+    def _strict_schema(schema: dict) -> dict:
+        """Normalize a JSON Schema for strict function calling.
+
+        Strict schemas require every declared property to be required and
+        reject undeclared properties. Properties that were optional before
+        strict mode are therefore made nullable while remaining required.
+        """
+        if not isinstance(schema, dict):
+            return schema
+
+        result = copy.deepcopy(schema)
+        schema_type = result.get("type")
+
+        if schema_type == "object" or "properties" in result:
+            properties = result.get("properties") or {}
+            normalized = {}
+            for name, prop in properties.items():
+                normalized[name] = ToolRegistry._strict_schema(prop)
+
+            result["properties"] = normalized
+            result["required"] = list(normalized.keys())
+            result["additionalProperties"] = False
+
+            # Preserve the old optional/required semantics by allowing an
+            # omitted value to be represented as JSON null. The key itself
+            # stays required, which is what strict constrained decoding needs.
+            original_required = set(schema.get("required") or [])
+            for name, prop in normalized.items():
+                if name not in original_required:
+                    if isinstance(prop, dict) and "anyOf" not in prop:
+                        normalized[name] = {
+                            "anyOf": [prop, {"type": "null"}]
+                        }
+        elif schema_type == "array" and isinstance(result.get("items"), dict):
+            result["items"] = ToolRegistry._strict_schema(result["items"])
+        elif isinstance(result.get("anyOf"), list):
+            result["anyOf"] = [
+                ToolRegistry._strict_schema(item) if isinstance(item, dict) else item
+                for item in result["anyOf"]
+            ]
+
+        return result
+
     def get_definitions(self, active_categories: set = None) -> list:
         tools_list = []
         for name, cfg in self._tools.items():
             category = next((cat for cat, names in self._categories.items() if name in names), "general")
             if active_categories is not None and category not in active_categories:
                 continue
+
+            parameters = cfg.get(
+                "parameters",
+                {"type": "object", "properties": {}}
+            )
+            strict_parameters = self._strict_schema(parameters)
+
             tools_list.append({
                 "type": "function",
                 "name": name,
                 "description": cfg.get("description", ""),
-                "parameters": cfg.get("parameters", {"type": "object", "properties": {}})
+                "parameters": strict_parameters,
+                "strict": True,
+                # Local tools are small and always available. Deferred
+                # discovery is reserved for large MCP tool catalogs.
+                "defer_loading": False
             })
         return tools_list
 
