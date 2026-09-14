@@ -90,6 +90,7 @@ def chat():
         total_ms = round((_time.perf_counter() - t_start) * 1000)
 
         # Сохранение ответа и цепочки шагов в базу данных
+        # trace already finalized by ask_with_mcp, trace.finalize() was called
         add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
 
         return jsonify({
