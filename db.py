@@ -35,6 +35,7 @@ def init_db():
             created_at INTEGER NOT NULL,
             cost REAL DEFAULT 0.0,
             timings_json TEXT DEFAULT '[]',
+            trace_json TEXT DEFAULT '{}',
             FOREIGN KEY (conversation_id) REFERENCES conversations(id)
         )
     """)
@@ -42,6 +43,12 @@ def init_db():
     # Миграция: добавляем timings_json если таблица уже существовала
     try:
         cur.execute("ALTER TABLE messages ADD COLUMN timings_json TEXT DEFAULT '[]'")
+    except sqlite3.OperationalError:
+        pass
+
+    # Миграция: добавляем trace_json если таблица уже существовала
+    try:
+        cur.execute("ALTER TABLE messages ADD COLUMN trace_json TEXT DEFAULT '{}'")
     except sqlite3.OperationalError:
         pass
 
@@ -146,6 +153,7 @@ def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, mode
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
     timings_str = json.dumps(timings or [], ensure_ascii=False)
+    trace_str = json.dumps(trace or {}, ensure_ascii=False)
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -153,7 +161,7 @@ def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, mode
         INSERT INTO messages (conversation_id, role, content, created_at, cost, timings_json, trace_json)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (conv_id, role, content, now, cost, timings_str, json.dumps(trace or {}, ensure_ascii=False))
+        (conv_id, role, content, now, cost, timings_str, trace_str)
     )
     cur.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, conv_id))
     conn.commit()
