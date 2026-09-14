@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import logging
+import json
 from config import Config, TEXT_MODELS, VOICE_MODELS
 from yandex_client import YandexResponsesClient, YandexMcpMixin
 from db import (
@@ -160,12 +161,13 @@ def api_chat():
     step = 1
 
     try:
-        # Шаг 1. Первый вызов Responses API
-        resp_1 = client.ask(execution_trace=trace, 
+        # Шаг 1. Первый вызов Responses API с передачей trace
+        resp_1 = client.ask(
             message=message_text,
+            model_key=model_name,
             conversation_id=conv_id,
-            model=model_name,
-            temperature=temperature
+            params={"temperature": temperature, "background": True},
+            execution_trace=trace
         )
         trace.add_response(resp_1, step_index=step)
 
@@ -207,9 +209,10 @@ def api_chat():
             
             resp_2 = client.ask(
                 message=tool_context_msg,
+                model_key=model_name,
                 conversation_id=conv_id,
-                model=model_name,
-                temperature=temperature
+                params={"temperature": temperature, "background": True},
+                execution_trace=trace
             )
             trace.add_response(resp_2, step_index=step)
             final_reply_text = client.extract_text(resp_2)
@@ -228,6 +231,7 @@ def api_chat():
         trace.record_error("chat_pipeline", str(exc))
         final_reply_text = f"Произошла ошибка при генерации ответа: {str(exc)}"
 
+    # Финализируем trace на ВСЕХ ветках (нормальное завершение или ошибка)
     final_trace_dict = trace.finalize()
 
     # 4. Сохраняем сообщение ассистента вместе с trace_json в БД
@@ -240,6 +244,7 @@ def api_chat():
     )
 
     # 5. Возвращаем клиенту ответ и изолированный трейс
+    # BACKWARD COMPATIBLE: сохраняем существующие ключи (reply, usage, timings, cost)
     return jsonify({
         "reply": final_reply_text,
         "conversation_id": conv_id,
