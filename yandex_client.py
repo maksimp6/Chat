@@ -1,3 +1,4 @@
+from trace_manager import ExecutionTrace
 import sqlite3
 import uuid
 import json
@@ -169,7 +170,7 @@ class YandexResponsesClient(YandexFileManagerMixin):
             api_logger.error(f"[CONV_MAP] Ошибка: {e}")
             return None
 
-    def ask(self, message, model_key, conversation_id=None, params=None):
+    def ask(self, message, model_key, conversation_id=None, params=None, execution_trace=None):
         params = params or {}
         is_background = params.get("background", True)
         is_stream = params.get("stream", False)
@@ -474,10 +475,19 @@ class YandexMcpMixin:
             f"local={len(local_tools)}"
         )
 
+        trace = ExecutionTrace()
+        trace.set_request({
+            "model": model_key,
+            "conversation_id": conversation_id,
+            "message": message,
+            "params": params
+        })
+
         t0 = _t.perf_counter()
         response = self.ask(message, model_key, conversation_id, params)
         t1 = _t.perf_counter()
         step_timings.append({"name": "LLM Router (поиск инструментов)", "duration_ms": round((t1 - t0) * 1000)})
+        trace.add_response(response, step_index=1)
 
         api_logger.debug(
             "[ROUTER RESPONSE] response_id=%r status=%r output_count=%d",
@@ -538,6 +548,7 @@ class YandexMcpMixin:
 
         if not tool_calls:
             response["step_timings"] = step_timings
+            response["trace"] = trace.finalize()
             return response
 
         is_parallel = params.get("parallel_tool_calls", True)
@@ -550,6 +561,15 @@ class YandexMcpMixin:
                 res = future.result()
                 step_timings.append(res["timing"])
                 raw_outputs_text.append(f"[{res['name']}]: {res['content']}")
+                tc_orig = future_to_tc[future]
+                trace.trace["tool_calls"].append({
+                    "name": res.get("name"),
+                    "arguments": tc_orig.get("arguments") or tc_orig.get("function", {}).get("arguments"),
+                    "result": res.get("content"),
+                    "timing_ms": res.get("timing", {}).get("duration_ms", 0),
+                    "server": res.get("timing", {}).get("server_label")
+                })
+                trace.add_event("tool_executed", {"name": res.get("name"), "duration_ms": res.get("timing", {}).get("duration_ms", 0)})
 
         tool_summary = "\n".join(raw_outputs_text)
         prompt = (
@@ -572,5 +592,7 @@ class YandexMcpMixin:
         )
         t_synth_end = _t.perf_counter()
         step_timings.append({"name": "LLM Synthesis (финальный ответ)", "duration_ms": round((t_synth_end - t_synth_start) * 1000)})
+        trace.add_response(final_response, step_index=2)
         final_response["step_timings"] = step_timings
+        final_response["trace"] = trace.finalize()
         return final_response

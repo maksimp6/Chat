@@ -126,16 +126,22 @@ def get_messages(conv_id):
             parsed_timings = json.loads(t_json)
         except Exception:
             parsed_timings = []
+        tr_json = r["trace_json"] if "trace_json" in r.keys() and r["trace_json"] else "{}"
+        try:
+            parsed_trace = json.loads(tr_json)
+        except Exception:
+            parsed_trace = {}
         res.append({
             "role": r["role"],
             "text": r["content"],
             "cost": r["cost"],
             "created_at": r["created_at"],
-            "timings": parsed_timings
+            "timings": parsed_timings,
+            "trace": parsed_trace
         })
     return res
 
-def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, model=None, source=None):
+def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, model=None, source=None, trace=None):
     now = int(datetime.utcnow().timestamp())
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
@@ -144,10 +150,10 @@ def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, mode
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO messages (conversation_id, role, content, created_at, cost, timings_json)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (conversation_id, role, content, created_at, cost, timings_json, trace_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (conv_id, role, content, now, cost, timings_str)
+        (conv_id, role, content, now, cost, timings_str, json.dumps(trace or {}, ensure_ascii=False))
     )
     cur.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, conv_id))
     conn.commit()

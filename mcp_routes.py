@@ -86,10 +86,11 @@ def chat():
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
+        trace_data = response.get("trace", {}) if isinstance(response, dict) else {}
         total_ms = round((_time.perf_counter() - t_start) * 1000)
 
         # Сохранение ответа и цепочки шагов в базу данных
-        add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings)
+        add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
 
         return jsonify({
             "reply": reply,
@@ -97,7 +98,8 @@ def chat():
             "cost": cost,
             "timings": timings,
             "total_duration_ms": total_ms,
-            "reasoning": reasoning
+            "reasoning": reasoning,
+            "trace": trace_data
         })
     except Exception as e:
         logger.exception(f"[CHAT] Ошибка: {e}")
