@@ -281,7 +281,19 @@ TOOL_REGISTRY = {
             }
         }
     },
-    "git_fetch": {
+        "git_pull": {
+        "func": git_pull,
+        "description": "Получение и слияние изменений из remote (git pull).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "remote": {"type": "string"},
+                "branch": {"type": "string"},
+                "repo_path": {"type": "string"}
+            }
+        }
+    },
+"git_fetch": {
         "func": git_fetch,
         "description": "Получение изменений из remote.",
         "parameters": {

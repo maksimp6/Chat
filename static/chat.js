@@ -41,7 +41,7 @@ function renderApprovalCard(toolCall, origMsg) {
             } else if (data.error) {
                 addMessage("Ошибка выполнения: " + data.error, "bot", false, 0);
             } else {
-                addMessage(data.reply, "bot", false, data.cost || 0);
+                addMessage(data.reply, "bot", false, data.cost || 0, null, null, null, null, data.trace);
             }
         })
         .catch(() => {
@@ -189,7 +189,7 @@ function formatInline(text) {
         .replace(/`(.+?)`/g, '<code>$1</code>');
 }
 
-function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning, usage) {
+function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning, usage, trace) {
 
 
     const chatbox = document.getElementById("chatbox");
@@ -273,6 +273,31 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
         metaWrap.appendChild(badge);
     }
 
+        if (trace) {
+        let traceObj = trace;
+        if (typeof trace === "string") {
+            try { traceObj = JSON.parse(trace); } catch (_) { traceObj = null; }
+        }
+        if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
+            const traceEl = document.createElement("details");
+            traceEl.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);width:100%;margin-top:4px;";
+
+            const summary = document.createElement("summary");
+            summary.style.fontWeight = "600";
+            const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
+            const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
+            summary.textContent = `🔍 Trace [${traceId}...] (${eventsCount} соб.)`;
+            traceEl.appendChild(summary);
+
+            const pre = document.createElement("pre");
+            pre.style.cssText = "margin-top:6px;max-height:250px;overflow-y:auto;background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;font-family:monospace;font-size:10px;white-space:pre-wrap;text-align:left;";
+            pre.textContent = JSON.stringify(traceObj, null, 2);
+            traceEl.appendChild(pre);
+
+            metaWrap.appendChild(traceEl);
+        }
+    }
+
     if (metaWrap.children.length > 0) {
         msg.appendChild(metaWrap);
     }
@@ -293,7 +318,7 @@ function loadHistory(convId) {
                 if (data.messages && data.messages.length) {
                     data.messages.forEach(msg => {
                         const role = msg.role === "assistant" ? "bot" : "user";
-                        addMessage(msg.text, role, false, msg.cost || 0, msg.timings, 0);
+                        addMessage(msg.text, role, false, msg.cost || 0, msg.timings, 0, msg.reasoning, msg.usage, msg.trace);
                     });
                 } else {
                     chatbox.innerHTML = '<div class="empty-state">Начните диалог</div>';
@@ -353,7 +378,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 addMessage("Ошибка: " + data.error, "bot", false, 0);
             } else {
                 const clientTotalMs = Math.round(performance.now() - t0);
-                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning, data.usage);
+                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning, data.usage, data.trace);
             }
         })
         .catch(e => {

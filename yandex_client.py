@@ -322,43 +322,83 @@ class YandexResponsesClient(YandexFileManagerMixin):
 class YandexMcpMixin:
     def _execute_single_tool(self, tc, all_servers):
         import time as _t
+
         name = tc.get("name") or tc.get("function", {}).get("name")
         if name and "<|" in name:
             name = name.split("<|")[0].strip()
+
         args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
         if isinstance(args, str):
-            try: args = json.loads(args)
-            except Exception: args = {}
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
 
-        t_start = _t.perf_counter()
-        result = registry.execute(name, args, all_servers)
-        api_logger.debug(
-            "[LOCAL TOOL RESULT] name=%s call_id=%s\n%s",
-            name,
-            tc.get("call_id") or tc.get("id"),
-            json.dumps(
-                _sanitize_for_log(result),
-                ensure_ascii=False,
-                indent=2
-            ) if isinstance(result, (dict, list))
-            else str(result)
+        call_id = (
+            tc.get("call_id")
+            or tc.get("id")
+            or tc.get("tool_call_id")
+            or name
         )
 
-        t_end = _t.perf_counter()
+        start_timestamp = _t.time()
+        t_start = _t.perf_counter()
 
-        call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
-        content_str = json.dumps(result, ensure_ascii=False) if isinstance(result, (dict, list)) else str(result)
-        
+        try:
+            result = registry.execute(name, args, all_servers)
+            error = None
+
+            api_logger.debug(
+                "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
+                name,
+                call_id,
+                json.dumps(
+                    _sanitize_for_log(result),
+                    ensure_ascii=False,
+                    indent=2
+                ) if isinstance(result, (dict, list))
+                else str(result)
+            )
+
+        except Exception as exc:
+            result = None
+            error = str(exc)
+
+            api_logger.exception(
+                "[LOCAL TOOL ERROR] name=%s call_id=%s",
+                name,
+                call_id
+            )
+
+        t_end = _t.perf_counter()
+        end_timestamp = _t.time()
+
+        duration_ms = round((t_end - t_start) * 1000, 2)
+
+        content_str = (
+            json.dumps(result, ensure_ascii=False)
+            if isinstance(result, (dict, list))
+            else str(result)
+            if result is not None
+            else ""
+        )
+
         timing = {
             "name": f"Tool: {name}",
-            "duration_ms": round((t_end - t_start) * 1000),
+            "duration_ms": duration_ms,
             "server_type": "local",
-            "server_label": "Local Registry"
+            "server_label": "Local Registry",
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "success": error is None
         }
+
         return {
             "call_id": call_id,
             "name": name,
             "content": content_str,
+            "result": result,
+            "error": error,
             "timing": timing
         }
 
@@ -552,7 +592,6 @@ class YandexMcpMixin:
             )
 
         if not tool_calls:
-            trace.finalize()
             response["step_timings"] = step_timings
             response["trace"] = trace.finalize()
             return response
@@ -562,20 +601,126 @@ class YandexMcpMixin:
         raw_outputs_text = []
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_tc = {executor.submit(self._execute_single_tool, tc, all_servers): tc for tc in tool_calls}
+            future_to_tc = {
+                executor.submit(
+                    self._execute_single_tool,
+                    tc,
+                    all_servers
+                ): tc
+                for tc in tool_calls
+            }
+
             for future in as_completed(future_to_tc):
-                res = future.result()
-                step_timings.append(res["timing"])
-                raw_outputs_text.append(f"[{res['name']}]: {res['content']}")
                 tc_orig = future_to_tc[future]
-                trace.trace["tool_calls"].append({
-                    "name": res.get("name"),
-                    "arguments": tc_orig.get("arguments") or tc_orig.get("function", {}).get("arguments"),
-                    "result": res.get("content"),
-                    "timing_ms": res.get("timing", {}).get("duration_ms", 0),
-                    "server": res.get("timing", {}).get("server_label")
-                })
-                trace.add_event("tool_executed", {"name": res.get("name"), "duration_ms": res.get("timing", {}).get("duration_ms", 0)})
+
+                call_id = (
+                    tc_orig.get("call_id")
+                    or tc_orig.get("id")
+                    or tc_orig.get("tool_call_id")
+                )
+
+                tool_name = (
+                    tc_orig.get("name")
+                    or tc_orig.get("function", {}).get("name")
+                    or "unknown_tool"
+                )
+
+                arguments = (
+                    tc_orig.get("arguments")
+                    or tc_orig.get("function", {}).get("arguments")
+                    or {}
+                )
+
+                try:
+                    res = future.result()
+
+                    timing = res.get("timing", {}) or {}
+                    duration_ms = timing.get("duration_ms", 0)
+
+                    step_timings.append(timing)
+
+                    raw_outputs_text.append(
+                        f"[{res.get('name', tool_name)}]: "
+                        f"{res.get('content', '')}"
+                    )
+
+                    tool_entry = {
+                        "name": res.get("name", tool_name),
+                        "arguments": arguments,
+                        "result": res.get("content"),
+                        "error": res.get("error"),
+                        "timing_ms": duration_ms,
+                        "timestamp": timing.get(
+                            "end_timestamp",
+                            _t.time()
+                        ),
+                        "start_timestamp": timing.get(
+                            "start_timestamp"
+                        ),
+                        "end_timestamp": timing.get(
+                            "end_timestamp"
+                        ),
+                        "server": timing.get("server_label"),
+                        "call_id": res.get("call_id") or call_id,
+                        "step": 1
+                    }
+
+                    trace.trace["tool_calls"].append(tool_entry)
+
+                    trace.add_event(
+                        "tool_executed",
+                        {
+                            "name": res.get("name", tool_name),
+                            "duration_ms": duration_ms,
+                            "success": res.get("error") is None,
+                            "call_id": res.get("call_id") or call_id,
+                            "step": 1,
+                            "start_timestamp": timing.get(
+                                "start_timestamp"
+                            ),
+                            "end_timestamp": timing.get(
+                                "end_timestamp"
+                            )
+                        }
+                    )
+
+                    if res.get("error"):
+                        trace.record_error(
+                            f"tool:{tool_name}",
+                            res["error"],
+                            call_id=res.get("call_id") or call_id,
+                            step=1,
+                            error_type="ToolExecutionError"
+                        )
+
+                except Exception as exc:
+                    error_message = str(exc)
+
+                    trace.record_error(
+                        f"tool:{tool_name}",
+                        error_message,
+                        call_id=call_id,
+                        step=1,
+                        error_type=type(exc).__name__
+                    )
+
+                    trace.trace["tool_calls"].append({
+                        "name": tool_name,
+                        "arguments": arguments,
+                        "result": None,
+                        "error": error_message,
+                        "timing_ms": 0,
+                        "timestamp": _t.time(),
+                        "start_timestamp": None,
+                        "end_timestamp": _t.time(),
+                        "server": "Local Registry",
+                        "call_id": call_id,
+                        "step": 1
+                    })
+
+                    raw_outputs_text.append(
+                        f"[{tool_name}]: ERROR: {error_message}"
+                    )
 
         tool_summary = "\n".join(raw_outputs_text)
         prompt = (
