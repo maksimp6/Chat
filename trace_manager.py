@@ -34,6 +34,31 @@ class ExecutionTrace:
             "keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []
         })
 
+    def _infer_response_start(self, step_index: int, end_timestamp: float) -> Optional[float]:
+        """Infer an API step start without letting tool execution leak into its duration."""
+        candidates = []
+
+        if self.trace["responses"]:
+            previous = self.trace["responses"][-1]
+            previous_end = previous.get("end_timestamp", previous.get("timestamp"))
+            if isinstance(previous_end, (int, float)):
+                candidates.append(float(previous_end))
+        else:
+            created = self.trace.get("created_at")
+            if isinstance(created, (int, float)):
+                candidates.append(float(created))
+
+        # When a tool was executed between two API calls, the next API request
+        # starts after the tool finishes. This prevents the response bar from
+        # visually and numerically including git/MCP execution time.
+        if step_index > 1:
+            for tool in self.trace.get("tool_calls", []):
+                tool_end = tool.get("end_timestamp")
+                if isinstance(tool_end, (int, float)) and tool_end <= end_timestamp:
+                    candidates.append(float(tool_end))
+
+        return max(candidates) if candidates else None
+
     def add_response(
         self,
         raw_json: Dict[str, Any],
@@ -43,33 +68,34 @@ class ExecutionTrace:
         timing_ms: Optional[float] = None,
         **kwargs
     ) -> None:
-        """Store a Yandex response with the actual request interval when supplied."""
+        """Store a Yandex response and its actual/inferred execution interval."""
         idx = step_index or kwargs.get("call_index", 1)
         clean_raw = ({k: v for k, v in raw_json.items() if k not in ("trace", "step_timings")}
                      if isinstance(raw_json, dict) else raw_json)
 
         completed_at = end_timestamp if end_timestamp is not None else time.time()
+        if start_timestamp is None:
+            start_timestamp = self._infer_response_start(idx, completed_at)
+        if timing_ms is None and start_timestamp is not None:
+            timing_ms = round(max(0.0, completed_at - start_timestamp) * 1000, 2)
+
         response_entry = {
             "step": idx,
             "timestamp": completed_at,
-            "raw": clean_raw
+            "raw": clean_raw,
+            "start_timestamp": start_timestamp,
+            "end_timestamp": completed_at,
+            "timing_ms": timing_ms
         }
-
-        if start_timestamp is not None:
-            response_entry["start_timestamp"] = start_timestamp
-        if end_timestamp is not None:
-            response_entry["end_timestamp"] = end_timestamp
-        if timing_ms is not None:
-            response_entry["timing_ms"] = timing_ms
-
         self.trace["responses"].append(response_entry)
+
         self.add_event("api_response_received", {
             "step": idx,
             "status": raw_json.get("status") if isinstance(raw_json, dict) else None,
             "has_tool_calls": bool(raw_json.get("output")) if isinstance(raw_json, dict) else False,
-            **({"start_timestamp": start_timestamp} if start_timestamp is not None else {}),
-            **({"end_timestamp": completed_at} if end_timestamp is not None else {}),
-            **({"timing_ms": timing_ms} if timing_ms is not None else {})
+            "start_timestamp": start_timestamp,
+            "end_timestamp": completed_at,
+            "timing_ms": timing_ms
         })
 
     def track_tool_execution(self, name: str, arguments: Dict[str, Any], executor_fn, *args,
