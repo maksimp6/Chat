@@ -72,7 +72,7 @@
         }
         items.sort(function(a,b){return(a.timestamp==null?Infinity:a.timestamp)-(b.timestamp==null?Infinity:b.timestamp);});
         var prev=Number(trace.created_at);if(!Number.isFinite(prev))prev=items.length&&Number.isFinite(items[0].timestamp)?items[0].timestamp:null;
-        items.filter(function(x){return x.kind==="response"&&(!Number.isFinite(x.start)||!Number.isFinite(x.end);}).sort(function(a,b){return a.index-b.index;}).forEach(function(x){x.start=prev;if(Number.isFinite(x.end)&&Number.isFinite(prev)&&x.end>=prev)prev=x.end;});
+        items.filter(function(x){return x.kind==="response"&&(!Number.isFinite(x.start)||!Number.isFinite(x.end));}).sort(function(a,b){return a.index-b.index;}).forEach(function(x){x.start=prev;if(Number.isFinite(x.end)&&Number.isFinite(prev)&&x.end>=prev)prev=x.end;});
         return items;
     }
     function duration(trace){if(trace.timings&&Number.isFinite(Number(trace.timings.total_duration_ms)))return Number(trace.timings.total_duration_ms);var st=Number(trace.created_at),en=null;(trace.events||[]).forEach(function(e){var t=getTimestamp(e);if(t!==null)en=en===null?t:Math.max(en,t);});return Number.isFinite(st)&&en!==null?Math.max(0,(en-st)*1000):null;}
