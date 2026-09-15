@@ -1,288 +1,125 @@
-"""
-Tests for partial output extraction and error handling in ExecutionTrace.
-Tests cover:
-- A. Error before model response
-- B. Model response + subsequent error
-- C. Multiple Responses API calls
-- D. Tool call + error
-- E. Successful request (no regression)
-- F. Persistence of partial output after reload
-"""
+"""Tests for partial output extraction and error handling in ExecutionTrace."""
 import unittest
-import json
-import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from partial_output import extract_last_response_text, format_partial_output_message
 from trace_manager import ExecutionTrace
 
 
 class TestPartialOutputExtraction(unittest.TestCase):
-    """Test extract_last_response_text() function"""
-
     def test_empty_responses_list(self):
-        """A. Empty responses list returns empty string"""
         text, response = extract_last_response_text([])
         self.assertEqual(text, "")
         self.assertIsNone(response)
 
     def test_no_text_in_responses(self):
-        """A. Responses without text output return empty string"""
-        responses = [
-            {
-                "raw": {
-                    "output": [
-                        {"type": "function_call", "name": "tool", "arguments": {}}
-                    ]
-                }
-            }
-        ]
+        responses = [{"raw": {"output": [{"type": "function_call", "name": "tool", "arguments": {}}]}}]
         text, response = extract_last_response_text(responses)
         self.assertEqual(text, "")
         self.assertIsNone(response)
 
     def test_single_text_output(self):
-        """B. Extract text from single response"""
-        responses = [
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "text", "text": "Hello world"}
-                            ]
-                        }
-                    ]
-                }
-            }
-        ]
+        responses = [{"raw": {"output": [{"type": "message", "content": [{"type": "text", "text": "Hello world"}]}]}}]
         text, response = extract_last_response_text(responses)
         self.assertEqual(text, "Hello world")
         self.assertIsNotNone(response)
 
     def test_output_text_type(self):
-        """Extract output_text type"""
-        responses = [
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "output_text", "text": "Output text"}
-                            ]
-                        }
-                    ]
-                }
-            }
-        ]
+        responses = [{"raw": {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Output text"}]}]}}]
         text, response = extract_last_response_text(responses)
-        self.assertEqual(text, "Output_text type")
+        self.assertEqual(text, "Output text")
+        self.assertIsNotNone(response)
 
     def test_skip_reasoning_text(self):
-        """Skip reasoning_text, only get output_text"""
-        responses = [
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "reasoning_text", "text": "Internal reasoning"},
-                                {"type": "output_text", "text": "Final answer"}
-                            ]
-                        }
-                    ]
-                }
-            }
-        ]
-        text, response = extract_last_response_text(responses)
+        responses = [{"raw": {"output": [{"type": "message", "content": [
+            {"type": "reasoning_text", "text": "Internal reasoning"},
+            {"type": "output_text", "text": "Final answer"}
+        ]}]}}]
+        text, _ = extract_last_response_text(responses)
         self.assertEqual(text, "Final answer")
 
     def test_multiple_responses_get_last(self):
-        """C. Multiple Responses API - return last non-empty"""
         responses = [
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "text", "text": "First response"}
-                            ]
-                        }
-                    ]
-                }
-            },
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "text", "text": "Second response"}
-                            ]
-                        }
-                    ]
-                }
-            }
+            {"raw": {"output": [{"type": "message", "content": [{"type": "text", "text": "First response"}]}]}},
+            {"raw": {"output": [{"type": "message", "content": [{"type": "text", "text": "Second response"}]}]}}
         ]
         text, response = extract_last_response_text(responses)
         self.assertEqual(text, "Second response")
+        self.assertIs(response, responses[1])
 
     def test_multiple_responses_skip_empty(self):
-        """C. Multiple Responses - skip empty, get last with text"""
         responses = [
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "text", "text": "First response"}
-                            ]
-                        }
-                    ]
-                }
-            },
-            {
-                "raw": {
-                    "output": [
-                        {"type": "function_call", "name": "tool"}  # No text
-                    ]
-                }
-            }
+            {"raw": {"output": [{"type": "message", "content": [{"type": "text", "text": "First response"}]}]}},
+            {"raw": {"output": [{"type": "function_call", "name": "tool"}]}}
         ]
         text, response = extract_last_response_text(responses)
         self.assertEqual(text, "First response")
+        self.assertIs(response, responses[0])
 
     def test_concatenate_multiple_text_parts(self):
-        """Concatenate multiple text parts in one response"""
-        responses = [
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "text", "text": "Hello "},
-                                {"type": "text", "text": "world"}
-                            ]
-                        }
-                    ]
-                }
-            }
-        ]
-        text, response = extract_last_response_text(responses)
+        responses = [{"raw": {"output": [{"type": "message", "content": [
+            {"type": "text", "text": "Hello "}, {"type": "text", "text": "world"}
+        ]}]}}]
+        text, _ = extract_last_response_text(responses)
         self.assertEqual(text, "Hello world")
 
     def test_fallback_to_top_level_text(self):
-        """Fallback to top-level text field"""
-        responses = [
-            {
-                "raw": {
-                    "text": "Top level text",
-                    "output": []
-                }
-            }
-        ]
-        text, response = extract_last_response_text(responses)
+        responses = [{"raw": {"text": "Top level text", "output": []}}]
+        text, _ = extract_last_response_text(responses)
         self.assertEqual(text, "Top level text")
 
+    def test_fallback_to_top_level_output_text(self):
+        responses = [{"raw": {"output_text": "Top level output text", "output": []}}]
+        text, _ = extract_last_response_text(responses)
+        self.assertEqual(text, "Top level output text")
+
     def test_malformed_response_skipped(self):
-        """Malformed responses are skipped"""
         responses = [
             {"raw": "not a dict"},
-            {
-                "raw": {
-                    "output": [
-                        {
-                            "type": "message",
-                            "content": [
-                                {"type": "text", "text": "Valid response"}
-                            ]
-                        }
-                    ]
-                }
-            }
+            {"raw": {"output": [{"type": "message", "content": [{"type": "text", "text": "Valid response"}]}]}}
         ]
-        text, response = extract_last_response_text(responses)
+        text, _ = extract_last_response_text(responses)
         self.assertEqual(text, "Valid response")
 
 
 class TestFormatPartialOutputMessage(unittest.TestCase):
-    """Test format_partial_output_message() function"""
-
     def test_no_partial_output(self):
-        """A. Only error when no partial output"""
-        result = format_partial_output_message("", "Connection timeout")
-        self.assertEqual(result, "⚠️ Ошибка: Connection timeout")
+        self.assertEqual(format_partial_output_message("", "Connection timeout"), "⚠️ Ошибка: Connection timeout")
 
     def test_with_partial_output(self):
-        """B. Combine partial output and error"""
         result = format_partial_output_message("Generated text", "Process error")
-        self.assertIn("Generated text", result)
-        self.assertIn("⚠️ Ошибка:", result)
-        self.assertIn("Process error", result)
         self.assertTrue(result.startswith("Generated text"))
+        self.assertIn("⚠️ Ошибка: Process error", result)
 
     def test_newline_separation(self):
-        """B. Proper newline separation between output and error"""
-        result = format_partial_output_message("Output", "Error")
-        lines = result.split("\n\n")
-        self.assertEqual(len(lines), 2)
-        self.assertEqual(lines[0], "Output")
-        self.assertIn("⚠️ Ошибка:", lines[1])
+        self.assertEqual(format_partial_output_message("Output", "Error"), "Output\n\n⚠️ Ошибка: Error")
 
 
 class TestExecutionTraceErrorHandling(unittest.TestCase):
-    """Test ExecutionTrace error recording and response handling"""
-
     def test_error_recording(self):
-        """Record error in trace"""
         trace = ExecutionTrace()
         try:
             raise ValueError("Test error")
         except ValueError as e:
             trace.record_error("test_source", str(e), exception=e)
-        
         trace_dict = trace.finalize()
-        self.assertGreater(len(trace_dict["errors"]), 0)
         error_entry = trace_dict["errors"][0]
         self.assertEqual(error_entry["source"], "test_source")
         self.assertEqual(error_entry["error"], "Test error")
         self.assertIn("python_exception", error_entry)
 
     def test_error_with_response(self):
-        """Responses preserved when error occurs"""
         trace = ExecutionTrace()
-        
-        # Add a response before error
-        response_data = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [
-                        {"type": "text", "text": "Partial output"}
-                    ]
-                }
-            ]
-        }
+        response_data = {"output": [{"type": "message", "content": [{"type": "text", "text": "Partial output"}]}]}
         trace.add_response(response_data, step_index=1)
-        
-        # Record error
         trace.record_error("pipeline", "Error after response")
-        
         trace_dict = trace.finalize()
-        self.assertGreater(len(trace_dict["responses"]), 0)
-        self.assertGreater(len(trace_dict["errors"]), 0)
+        self.assertEqual(extract_last_response_text(trace_dict["responses"])[0], "Partial output")
+        self.assertTrue(trace_dict["errors"])
 
     def test_trace_finalize_called_on_error(self):
-        """Trace must be finalized even on error"""
         trace = ExecutionTrace()
         trace.set_request({"test": "request"})
         trace.record_error("test", "error")
-        
         trace_dict = trace.finalize()
         self.assertIn("trace_id", trace_dict)
         self.assertIn("created_at", trace_dict)
@@ -290,147 +127,105 @@ class TestExecutionTraceErrorHandling(unittest.TestCase):
         self.assertGreater(trace_dict["timings"]["total_duration_ms"], 0)
 
     def test_secret_redaction_in_error(self):
-        """Secrets redacted in error context"""
         trace = ExecutionTrace()
-        
         try:
-            # Simulate exception with sensitive local variable
             api_key = "secret_key_123"
+            password = "super_secret_password"
             raise ValueError("Error occurred")
         except ValueError as e:
             trace.record_error("test", str(e), exception=e)
-        
-        trace_dict = trace.finalize()
-        error_entry = trace_dict["errors"][0]
-        
-        # Check that locals are captured and redacted
-        if "python_exception" in error_entry:
-            exc_state = error_entry["python_exception"]
-            self.assertIn("frames", exc_state)
+        serialized = str(trace.finalize()["errors"][0]["python_exception"])
+        self.assertNotIn("secret_key_123", serialized)
+        self.assertNotIn("super_secret_password", serialized)
 
 
 class TestPartialOutputIntegration(unittest.TestCase):
-    """Integration tests for partial output in error scenarios"""
-
     def test_scenario_a_error_before_response(self):
-        """A. Error before model response - no partial output"""
         trace = ExecutionTrace()
         trace.set_request({"message": "test"})
-        
-        # No responses added
         error_msg = "Connection failed"
         trace.record_error("api", error_msg)
         trace_dict = trace.finalize()
-        
-        # Extract should find nothing
-        text, _ = extract_last_response_text(trace_dict.get("responses", []))
-        self.assertEqual(text, "")
-        
-        # Format should just show error
-        formatted = format_partial_output_message(text, error_msg)
-        self.assertEqual(formatted, f"⚠️ Ошибка: {error_msg}")
+        text, _ = extract_last_response_text(trace_dict["responses"])
+        self.assertEqual(format_partial_output_message(text, error_msg), f"⚠️ Ошибка: {error_msg}")
 
     def test_scenario_b_response_then_error(self):
-        """B. Response + error - partial output preserved"""
         trace = ExecutionTrace()
         trace.set_request({"message": "test"})
-        
-        # Add response with text
-        response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "text", "text": "Model output"}]
-                }
-            ]
-        }
-        trace.add_response(response, step_index=1)
-        
-        # Record error
+        trace.add_response({"output": [{"type": "message", "content": [{"type": "text", "text": "Model output"}]}]}, step_index=1)
         error_msg = "Post-processing failed"
         trace.record_error("pipeline", error_msg)
         trace_dict = trace.finalize()
-        
-        # Extract should find text
-        text, _ = extract_last_response_text(trace_dict.get("responses", []))
+        text, _ = extract_last_response_text(trace_dict["responses"])
         self.assertEqual(text, "Model output")
-        
-        # Format should include both
-        formatted = format_partial_output_message(text, error_msg)
-        self.assertIn("Model output", formatted)
-        self.assertIn("⚠️ Ошибка:", formatted)
-        self.assertIn(error_msg, formatted)
+        self.assertIn(error_msg, format_partial_output_message(text, error_msg))
 
     def test_scenario_c_multiple_responses(self):
-        """C. Multiple Responses API - get last relevant text"""
         trace = ExecutionTrace()
-        
-        # First response with text
-        resp1 = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "text", "text": "First step"}]
-                }
-            ]
-        }
-        trace.add_response(resp1, step_index=1)
-        
-        # Second response with more text
-        resp2 = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "text", "text": "Second step"}]
-                }
-            ]
-        }
-        trace.add_response(resp2, step_index=2)
-        
-        error_msg = "Error at step 3"
-        trace.record_error("pipeline", error_msg)
-        trace_dict = trace.finalize()
-        
-        # Should get second response text
-        text, _ = extract_last_response_text(trace_dict.get("responses", []))
-        self.assertEqual(text, "Second step")
+        trace.add_response({"output": [{"type": "message", "content": [{"type": "text", "text": "First step"}]}]}, step_index=1)
+        trace.add_response({"output": [{"type": "message", "content": [{"type": "text", "text": "Second step"}]}]}, step_index=2)
+        trace.record_error("pipeline", "Error at step 3")
+        self.assertEqual(extract_last_response_text(trace.finalize()["responses"])[0], "Second step")
 
     def test_scenario_d_tool_call_error(self):
-        """D. Tool call + error - both preserved in trace"""
         trace = ExecutionTrace()
-        trace.set_request({"message": "test"})
-        
-        # Response with initial text
-        response = {
-            "output": [
-                {
-                    "type": "message",
-                    "content": [{"type": "text", "text": "Starting..."}]
-                }
-            ]
-        }
-        trace.add_response(response, step_index=1)
-        
-        # Tool call
+        trace.add_response({"output": [{"type": "message", "content": [{"type": "text", "text": "Starting..."}]}]}, step_index=1)
+
         def failing_tool():
             raise RuntimeError("Tool failed")
-        
-        try:
+
+        with self.assertRaises(RuntimeError):
             trace.track_tool_execution("test_tool", {}, failing_tool)
-        except RuntimeError:
-            pass
-        
         trace_dict = trace.finalize()
-        
-        # Verify tool call is recorded
-        self.assertGreater(len(trace_dict["tool_calls"]), 0)
-        tool_entry = trace_dict["tool_calls"][0]
-        self.assertEqual(tool_entry["name"], "test_tool")
-        self.assertIsNotNone(tool_entry["error"])
-        
-        # Partial output still available
-        text, _ = extract_last_response_text(trace_dict.get("responses", []))
-        self.assertEqual(text, "Starting...")
+        self.assertEqual(trace_dict["tool_calls"][0]["name"], "test_tool")
+        self.assertIsNotNone(trace_dict["tool_calls"][0]["error"])
+        self.assertEqual(extract_last_response_text(trace_dict["responses"])[0], "Starting...")
+
+
+class TestActiveChatRoute(unittest.TestCase):
+    """Exercise the actual registered MCP /api/chat route."""
+
+    def test_partial_output_is_returned_and_persisted_when_pipeline_fails(self):
+        from app import app
+        import mcp_routes
+
+        captured = {}
+
+        class FakeClient:
+            def ask_with_mcp(self, message, model_key, conversation_id, params):
+                params["execution_trace"].add_response({
+                    "output": [{"type": "message", "content": [{"type": "text", "text": "Generated before failure"}]}]
+                }, step_index=1)
+                return {"output": []}
+
+            @staticmethod
+            def extract_reasoning_and_text(_response):
+                raise RuntimeError("Failure after model response")
+
+        def fake_add_message(conv_id, role, content, **kwargs):
+            captured.update(conv_id=conv_id, role=role, content=content, trace=kwargs.get("trace"))
+
+        with patch.object(mcp_routes, "AliceClient", FakeClient), \
+             patch.object(mcp_routes, "get_conv_settings", return_value={}), \
+             patch.object(mcp_routes, "add_message", side_effect=fake_add_message):
+            app.config["TESTING"] = True
+            with app.test_client() as client:
+                response = client.post("/api/chat", json={
+                    "conversation_id": "test-conv",
+                    "message": "trigger failure",
+                    "model": "aliceai-llm",
+                    "params": {}
+                })
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json()
+        self.assertEqual(payload["partial_output"], "Generated before failure")
+        self.assertIn("Generated before failure", payload["reply"])
+        self.assertIn("Failure after model response", payload["reply"])
+        self.assertTrue(payload["trace"]["responses"])
+        self.assertTrue(payload["trace"]["errors"])
+        self.assertEqual(captured["content"], payload["reply"])
+        self.assertEqual(captured["trace"]["trace_id"], payload["trace"]["trace_id"])
 
 
 if __name__ == "__main__":
