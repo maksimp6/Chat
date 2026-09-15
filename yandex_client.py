@@ -225,29 +225,58 @@ class YandexResponsesClient(YandexFileManagerMixin):
 
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
+        trace_step_number = trace_step
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            step = trace_step
-            if step is None:
-                step = len(execution_trace.trace.get("api_requests", [])) + 1
+            if trace_step_number is None:
+                trace_step_number = len(execution_trace.trace.get("api_requests", [])) + 1
             execution_trace.add_api_request(
                 _sanitize_for_log(payload),
-                step_index=step,
+                step_index=trace_step_number,
                 start_timestamp=request_start_timestamp
             )
             execution_trace.add_event("api_request_sent", {
                 "method": "POST",
                 "url": self.responses_url,
-                "step": step,
+                "step": trace_step_number,
                 "payload": _sanitize_for_log(payload)
             })
 
         self._log_request("POST", self.responses_url, json=payload)
+        resp = None
         try:
             resp = self._log_response(self.session.post(self.responses_url, json=payload, timeout=90))
             resp.raise_for_status()
         except requests.RequestException as e:
-            raise YandexClientError(f"Ask Request Error: {e}")
+            error_timestamp = time.time()
+            status_code = resp.status_code if resp is not None else None
+            error_detail = None
+            if resp is not None:
+                try:
+                    error_body = resp.json()
+                    error_detail = _sanitize_for_log(error_body)
+                except ValueError:
+                    error_detail = resp.text[:4000]
+
+            error_message = str(e)
+            if status_code is not None:
+                error_message = f"HTTP {status_code}: {error_message}"
+
+            if execution_trace and isinstance(execution_trace, ExecutionTrace):
+                execution_trace.add_event("api_request_error", {
+                    "method": "POST",
+                    "url": self.responses_url,
+                    "step": trace_step_number,
+                    "model": payload.get("model"),
+                    "status_code": status_code,
+                    "error": error_message,
+                    "detail": error_detail,
+                    "start_timestamp": request_start_timestamp,
+                    "end_timestamp": error_timestamp,
+                    "timing_ms": round((time.perf_counter() - request_start_perf) * 1000, 2)
+                })
+
+            raise YandexClientError(error_message, status_code=status_code) from e
 
         request_end_timestamp = time.time()
         request_duration_ms = round(
@@ -465,9 +494,8 @@ class YandexMcpMixin:
 
         active_cats = None
         if conversation_id:
-            conv_settings = get_conv_settings(conversation_id)
-            if conv_settings and "active_tool_categories" in conv_settings:
-                active_cats = conv_settings["active_tool_categories"]
+            try: active_cats = get_conv_settings(conversation_id).get("active_tool_categories") if get_conv_settings(conversation_id) else None
+            except Exception: active_cats = None
 
         if active_cats is None:
             active_cats = params.get("active_tool_categories")
@@ -475,7 +503,6 @@ class YandexMcpMixin:
             active_cats = ["git", "termux", "system", "filesystem", "wikipedia", "profiler"]
 
         hosted_tools = []
-
         conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
 
@@ -485,316 +512,47 @@ class YandexMcpMixin:
                 "type": "web_search",
                 "search_context_size": web_cfg.get("context_size") or "medium"
             }
-
             allowed = web_cfg.get("allowed_domains") or ""
             blocked = web_cfg.get("blocked_domains") or ""
-
-            allowed_domains = [
-                x.strip() for x in allowed.replace("\\n", ",").split(",")
-                if x.strip()
-            ]
-            blocked_domains = [
-                x.strip() for x in blocked.replace("\\n", ",").split(",")
-                if x.strip()
-            ]
-
+            allowed_domains = [x.strip() for x in allowed.replace("\\n", ",").split(",") if x.strip()]
+            blocked_domains = [x.strip() for x in blocked.replace("\\n", ",").split(",") if x.strip()]
             if allowed_domains or blocked_domains:
                 web_tool["filters"] = {}
-                if allowed_domains:
-                    web_tool["filters"]["allowed_domains"] = allowed_domains
-                if blocked_domains:
-                    web_tool["filters"]["blocked_domains"] = blocked_domains
-
+                if allowed_domains: web_tool["filters"]["allowed_domains"] = allowed_domains
+                if blocked_domains: web_tool["filters"]["blocked_domains"] = blocked_domains
             hosted_tools.append(web_tool)
 
         file_cfg = tools_config.get("file_search") or {}
         if file_cfg.get("enabled"):
             vector_ids = file_cfg.get("vector_store_ids") or ""
-            vector_store_ids = [
-                x.strip() for x in vector_ids.replace("\\n", ",").split(",")
-                if x.strip()
-            ]
-
+            vector_store_ids = [x.strip() for x in vector_ids.replace("\\n", ",").split(",") if x.strip()]
             if vector_store_ids:
-                hosted_tools.append({
-                    "type": "file_search",
-                    "vector_store_ids": vector_store_ids,
-                    "max_num_results": max(
-                        1,
-                        min(int(file_cfg.get("max_results") or 20), 50)
-                    )
-                })
-            else:
-                api_logger.warning(
-                    "[HOSTED TOOLS] File Search включён, но vector_store_ids не указаны"
-                )
+                hosted_tools.append({"type": "file_search", "vector_store_ids": vector_store_ids, "max_num_results": int(file_cfg.get("max_results", 20))})
 
         code_cfg = tools_config.get("code_interpreter") or {}
         if code_cfg.get("enabled"):
-            hosted_tools.append({
-                "type": "code_interpreter",
-                "container": {
-                    "type": "auto"
-                }
-            })
+            hosted_tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
 
-        active_set = set(active_cats)
-        local_tools = registry.get_definitions(active_set)
+        tools = mcp_tools + hosted_tools
 
-        params["tools"] = hosted_tools + mcp_tools + local_tools
+        local_tools = []
+        for category in active_cats:
+            try:
+                category_tools = registry.get_tools_by_category(category)
+                if category_tools:
+                    local_tools.extend(category_tools)
+            except Exception as e:
+                api_logger.error(f"[TOOLS] Ошибка категории {category}: {e}")
 
-        api_logger.info(
-            f"[ROUTER] Подключено инструментов: "
-            f"hosted={len(hosted_tools)}, "
-            f"mcp={len(mcp_tools)}, "
-            f"local={len(local_tools)}"
-        )
+        if local_tools:
+            tools.extend(local_tools)
 
-        trace = ExecutionTrace()
-        trace.set_request({
-            "model": model_key,
-            "conversation_id": conversation_id,
-            "message": message,
-            "params": params
-        })
+        ask_params = dict(params)
+        if tools:
+            ask_params["tools"] = tools
 
-        t0 = _t.perf_counter()
-        response = self.ask(message, model_key, conversation_id, params, execution_trace=trace, trace_step=1)
-        t1 = _t.perf_counter()
-        step_timings.append({"name": "LLM Router (поиск инструментов)", "duration_ms": round((t1 - t0) * 1000)})
-        trace.add_response(response, step_index=1)
+        trace = params.get("execution_trace")
+        if trace is not None and isinstance(trace, ExecutionTrace):
+            ask_params["execution_trace"] = trace
 
-        api_logger.debug(
-            "[ROUTER RESPONSE] response_id=%r status=%r output_count=%d",
-            response.get("id"),
-            response.get("status"),
-            len(response.get("output", []) or [])
-        )
-
-        for i, item in enumerate(response.get("output", []) or []):
-            if not isinstance(item, dict):
-                api_logger.debug("[OUTPUT %d] non-dict: %r", i, item)
-                continue
-
-            api_logger.debug(
-                "[OUTPUT %d] type=%r id=%r",
-                i,
-                item.get("type"),
-                item.get("id")
-            )
-
-            api_logger.debug(
-                "[OUTPUT %d BODY]\n%s",
-                i,
-                json.dumps(
-                    _sanitize_for_log(item),
-                    ensure_ascii=False,
-                    indent=2
-                )
-            )
-
-        output = response.get("output", [])
-        tool_calls = []
-        for item in output:
-            if not isinstance(item, dict): continue
-            item_type = item.get("type")
-            if item_type in ("function_call", "tool_call"):
-                tool_calls.append(item)
-            elif item_type == "message":
-                for part in item.get("content", []):
-                    if isinstance(part, dict) and part.get("type") in ("function_call", "tool_call"):
-                        tool_calls.append(part)
-
-        api_logger.debug(
-            "[TOOL CALLS] обнаружено=%d",
-            len(tool_calls)
-        )
-
-        for i, tc in enumerate(tool_calls):
-            api_logger.debug(
-                "[TOOL CALL %d]\n%s",
-                i,
-                json.dumps(
-                    _sanitize_for_log(tc),
-                    ensure_ascii=False,
-                    indent=2
-                )
-            )
-
-        if not tool_calls:
-            response["step_timings"] = step_timings
-            response["trace"] = trace.finalize()
-            return response
-
-        is_parallel = params.get("parallel_tool_calls", True)
-        max_workers = min(len(tool_calls), 8) if is_parallel else 1
-        raw_outputs_text = []
-        function_call_outputs = {}
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_tc = {
-                executor.submit(
-                    self._execute_single_tool,
-                    tc,
-                    all_servers
-                ): tc
-                for tc in tool_calls
-            }
-
-            for future in as_completed(future_to_tc):
-                tc_orig = future_to_tc[future]
-
-                call_id = (
-                    tc_orig.get("call_id")
-                    or tc_orig.get("id")
-                    or tc_orig.get("tool_call_id")
-                )
-
-                tool_name = (
-                    tc_orig.get("name")
-                    or tc_orig.get("function", {}).get("name")
-                    or "unknown_tool"
-                )
-
-                arguments = (
-                    tc_orig.get("arguments")
-                    or tc_orig.get("function", {}).get("arguments")
-                    or {}
-                )
-
-                try:
-                    res = future.result()
-
-                    timing = res.get("timing", {}) or {}
-                    duration_ms = timing.get("duration_ms", 0)
-
-                    step_timings.append(timing)
-
-                    result_content = res.get("content", "")
-                    raw_outputs_text.append(
-                        f"[{res.get('name', tool_name)}]: "
-                        f"{result_content}"
-                    )
-
-                    result_call_id = res.get("call_id") or call_id
-                    if result_call_id:
-                        function_call_outputs[str(result_call_id)] = {
-                            "type": "function_call_output",
-                            "call_id": str(result_call_id),
-                            "output": result_content if isinstance(result_content, str) else str(result_content)
-                        }
-
-                    tool_entry = {
-                        "name": res.get("name", tool_name),
-                        "arguments": arguments,
-                        "result": res.get("content"),
-                        "error": res.get("error"),
-                        "timing_ms": duration_ms,
-                        "timestamp": timing.get(
-                            "end_timestamp",
-                            _t.time()
-                        ),
-                        "start_timestamp": timing.get(
-                            "start_timestamp"
-                        ),
-                        "end_timestamp": timing.get(
-                            "end_timestamp"
-                        ),
-                        "server": timing.get("server_label"),
-                        "call_id": res.get("call_id") or call_id,
-                        "step": 1
-                    }
-
-                    trace.trace["tool_calls"].append(tool_entry)
-
-                    trace.add_event(
-                        "tool_executed",
-                        {
-                            "name": res.get("name", tool_name),
-                            "duration_ms": duration_ms,
-                            "success": res.get("error") is None,
-                            "call_id": res.get("call_id") or call_id,
-                            "step": 1,
-                            "start_timestamp": timing.get(
-                                "start_timestamp"
-                            ),
-                            "end_timestamp": timing.get(
-                                "end_timestamp"
-                            )
-                        }
-                    )
-
-                    if res.get("error"):
-                        trace.record_error(
-                            f"tool:{tool_name}",
-                            res["error"],
-                            call_id=res.get("call_id") or call_id,
-                            step=1,
-                            error_type="ToolExecutionError"
-                        )
-
-                except Exception as exc:
-                    error_message = str(exc)
-
-                    trace.record_error(
-                        f"tool:{tool_name}",
-                        error_message,
-                        call_id=call_id,
-                        step=1,
-                        error_type=type(exc).__name__
-                    )
-
-                    trace.trace["tool_calls"].append({
-                        "name": tool_name,
-                        "arguments": arguments,
-                        "result": None,
-                        "error": error_message,
-                        "timing_ms": 0,
-                        "timestamp": _t.time(),
-                        "start_timestamp": None,
-                        "end_timestamp": _t.time(),
-                        "server": "Local Registry",
-                        "call_id": call_id,
-                        "step": 1
-                    })
-
-                    raw_outputs_text.append(
-                        f"[{tool_name}]: ERROR: {error_message}"
-                    )
-
-                    if call_id:
-                        function_call_outputs[str(call_id)] = {
-                            "type": "function_call_output",
-                            "call_id": str(call_id),
-                            "output": f"ERROR: {error_message}"
-                        }
-
-        synth_input = list(response.get("output", []) or [])
-        for tc in tool_calls:
-            tc_call_id = (
-                tc.get("call_id")
-                or tc.get("id")
-                or tc.get("tool_call_id")
-            )
-            if tc_call_id and str(tc_call_id) in function_call_outputs:
-                synth_input.append(function_call_outputs[str(tc_call_id)])
-        synth_params = {k: v for k, v in params.items() if k not in ("tools", "parallel_tool_calls", "tool_choice", "input")}
-        synth_params["input"] = synth_input
-
-        t_synth_start = _t.perf_counter()
-        final_response = self.ask("", model_key, conversation_id, synth_params, execution_trace=trace, trace_step=2)
-
-        api_logger.debug(
-            "[SYNTHESIS RESPONSE]\n%s",
-            json.dumps(
-                _sanitize_for_log(final_response),
-                ensure_ascii=False,
-                indent=2
-            )
-        )
-        t_synth_end = _t.perf_counter()
-        step_timings.append({"name": "LLM Synthesis (финальный ответ)", "duration_ms": round((t_synth_end - t_synth_start) * 1000)})
-        trace.add_response(final_response, step_index=2)
-        final_response["step_timings"] = step_timings
-        final_response["trace"] = trace.finalize()
-        return final_response
+        return self.ask(message, model_key, conversation_id, ask_params, execution_trace=trace)
