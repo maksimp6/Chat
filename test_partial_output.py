@@ -190,9 +190,12 @@ class TestActiveChatRoute(unittest.TestCase):
         import mcp_routes
 
         captured = {}
+        test_conversation_metadata = {"test_request": "true"}
 
         class FakeClient:
             def ask_with_mcp(self, message, model_key, conversation_id, params):
+                self.params = params
+                self.metadata = params.get("conversation_metadata")
                 params["execution_trace"].add_response({
                     "output": [{"type": "message", "content": [{"type": "text", "text": "Generated before failure"}]}]
                 }, step_index=1)
@@ -202,10 +205,12 @@ class TestActiveChatRoute(unittest.TestCase):
             def extract_reasoning_and_text(_response):
                 raise RuntimeError("Failure after model response")
 
+        fake_client = FakeClient()
+
         def fake_add_message(conv_id, role, content, **kwargs):
             captured.update(conv_id=conv_id, role=role, content=content, trace=kwargs.get("trace"))
 
-        with patch.object(mcp_routes, "AliceClient", FakeClient), \
+        with patch.object(mcp_routes, "AliceClient", lambda _config: fake_client), \
              patch.object(mcp_routes, "get_conv_settings", return_value={}), \
              patch.object(mcp_routes, "add_message", side_effect=fake_add_message):
             app.config["TESTING"] = True
@@ -214,11 +219,12 @@ class TestActiveChatRoute(unittest.TestCase):
                     "conversation_id": "test-conv",
                     "message": "trigger failure",
                     "model": "aliceai-llm",
-                    "params": {}
+                    "params": {"conversation_metadata": test_conversation_metadata}
                 })
 
         self.assertEqual(response.status_code, 500)
         payload = response.get_json()
+        self.assertEqual(fake_client.metadata, test_conversation_metadata)
         self.assertEqual(payload["partial_output"], "Generated before failure")
         self.assertIn("Generated before failure", payload["reply"])
         self.assertIn("Failure after model response", payload["reply"])
