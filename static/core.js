@@ -20,7 +20,6 @@ document.documentElement.setAttribute("data-theme", savedTheme);
 
 // Глобальная функция смены модели
 window.changeModel = function(newModel, skipPatch) {
-    if (newModel === "alice-lite") newModel = "aliceai-llm";
     if (!modelsData.text[newModel] && !modelsData.voice[newModel]) {
         console.warn("[CORE] Unknown model:", newModel, "-> fallback to aliceai-llm");
         newModel = "aliceai-llm";
