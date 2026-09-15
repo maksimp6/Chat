@@ -63,6 +63,38 @@ def chat():
             trace=trace
         )
 
+        # The Responses API timer intentionally starts at the actual outbound
+        # request. Account for work before that request explicitly instead of
+        # leaving an unexplained gap between request_initialized and the first
+        # API span. Use the recorded backend timestamps, not event insertion
+        # time, because this marker is created after ask_with_mcp returns.
+        api_requests = trace.trace.get("api_requests", [])
+        if api_requests:
+            first_api_start = api_requests[0].get("timestamp")
+            request_init = next(
+                (event for event in trace.trace.get("events", [])
+                 if event.get("type") == "request_initialized"),
+                None
+            )
+            request_init_timestamp = request_init.get("timestamp") if request_init else None
+            if isinstance(request_init_timestamp, (int, float)) and isinstance(first_api_start, (int, float)):
+                pre_api_ms = round(max(0.0, first_api_start - request_init_timestamp) * 1000, 2)
+                trace.trace.setdefault("timings", {})["pre_api_pipeline"] = {
+                    "start_timestamp": request_init_timestamp,
+                    "end_timestamp": first_api_start,
+                    "duration_ms": pre_api_ms
+                }
+                trace.trace.setdefault("events", []).append({
+                    "type": "pre_api_pipeline_completed",
+                    "timestamp": first_api_start,
+                    "payload": {
+                        "start_timestamp": request_init_timestamp,
+                        "end_timestamp": first_api_start,
+                        "timing_ms": pre_api_ms,
+                        "step": api_requests[0].get("step", 1)
+                    }
+                })
+
         output = response.get("output", []) if isinstance(response, dict) else []
         for item in output:
             calls = []
