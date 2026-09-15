@@ -5,6 +5,7 @@ import uuid
 import json as _json
 from yandex_client import YandexResponsesClient, YandexMcpMixin
 from config import Config, calculate_full_cost
+from trace_manager import ExecutionTrace
 import mcp_storage
 from tool_registry import registry
 from db import (
@@ -22,6 +23,9 @@ class AliceClient(YandexMcpMixin, YandexResponsesClient):
 def chat():
     import time as _time
     t_start = _time.perf_counter()
+    trace = ExecutionTrace()
+    trace_data = {}
+
     try:
         data = request.get_json(silent=True) or {}
         conv_id = data.get('conversation_id')
@@ -32,11 +36,18 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
-        # Получаем сохраненные настройки инструментов диалога из БД
+        trace.set_request({
+            "conversation_id": conv_id,
+            "message": message,
+            "model": model_key,
+            "params": params
+        })
+
         conv_settings = get_conv_settings(conv_id) or {}
         active_tools = conv_settings.get("active_tool_categories")
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
+        params["execution_trace"] = trace
 
         add_message(conv_id, "user", message)
         client = AliceClient(Config)
@@ -66,9 +77,12 @@ def chat():
                 if tool_config and tool_config.get("requires_approval"):
                     raw_args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
                     if isinstance(raw_args, str):
-                        try: raw_args = _json.loads(raw_args)
-                        except Exception: raw_args = {}
+                        try:
+                            raw_args = _json.loads(raw_args)
+                        except Exception:
+                            raw_args = {}
 
+                    trace_data = trace.finalize()
                     return jsonify({
                         "requires_approval": True,
                         "tool_call": {
@@ -77,7 +91,8 @@ def chat():
                             "arguments": raw_args,
                             "call_id": tc.get("call_id") or tc.get("id") or func_name
                         },
-                        "original_message": message
+                        "original_message": message,
+                        "trace": trace_data
                     })
 
         reasoning, reply = client.extract_reasoning_and_text(response)
@@ -86,11 +101,9 @@ def chat():
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
-        trace_data = response.get("trace", {}) if isinstance(response, dict) else {}
+        trace_data = response.get("trace", {}) if isinstance(response, dict) else trace.finalize()
         total_ms = round((_time.perf_counter() - t_start) * 1000)
 
-        # Сохранение ответа и цепочки шагов в базу данных
-        # trace already finalized by ask_with_mcp, trace.finalize() was called
         add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
 
         return jsonify({
@@ -104,7 +117,21 @@ def chat():
         })
     except Exception as e:
         logger.exception(f"[CHAT] Ошибка: {e}")
-        return jsonify({"error": str(e)}), 500
+        try:
+            trace.record_error("chat_pipeline", str(e), exception=e)
+            trace_data = trace.finalize()
+            conv_id = locals().get("conv_id")
+            if conv_id:
+                add_message(
+                    conv_id,
+                    "assistant",
+                    f"Ошибка: {e}",
+                    trace=trace_data
+                )
+        except Exception:
+            logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
+
+        return jsonify({"error": str(e), "trace": trace_data}), 500
 
 @mcp_bp.route('/api/tools/categories', methods=['GET'])
 def list_tool_categories():
