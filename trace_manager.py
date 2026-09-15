@@ -13,7 +13,11 @@ class ExecutionTrace:
         "token", "access_token", "refresh_token", "cookie", "set-cookie"
     }
     _MAX_REPR = 4000
-    _MAX_DEPTH = 3
+    # Responses API payloads are legitimately nested several levels deep
+    # (output -> content -> annotations/details, etc.).  Three levels was
+    # shallow enough to turn content items into strings and break consumers
+    # that expect the original JSON structure.
+    _MAX_DEPTH = 12
     _MAX_ITEMS = 50
 
     def __init__(self, trace_id: Optional[str] = None):
