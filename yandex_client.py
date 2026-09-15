@@ -170,7 +170,7 @@ class YandexResponsesClient(YandexFileManagerMixin):
             api_logger.error(f"[CONV_MAP] Ошибка: {e}")
             return None
 
-    def ask(self, message, model_key, conversation_id=None, params=None, execution_trace=None):
+    def ask(self, message, model_key, conversation_id=None, params=None, execution_trace=None, trace_step=None):
         params = params or {}
         is_background = params.get("background", True)
         is_stream = params.get("stream", False)
@@ -183,7 +183,6 @@ class YandexResponsesClient(YandexFileManagerMixin):
             "store": params.get("store", True),
         }
         
-        # Add metadata from execution_trace if provided
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             payload["metadata"] = execution_trace.get_metadata()
         
@@ -224,17 +223,22 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if yandex_conv_id:
             payload["conversation"] = {"id": yandex_conv_id}
 
-        # Record the exact logical API request in the execution trace as well as
-        # the file logger. This keeps the trace viewer self-contained: every
-        # Responses API step can be inspected without reconstructing it from
-        # application logs.
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            step = trace_step
+            if step is None:
+                step = len(execution_trace.trace.get("api_requests", [])) + 1
+            execution_trace.add_api_request(
+                _sanitize_for_log(payload),
+                step_index=step,
+                start_timestamp=request_start_timestamp
+            )
             execution_trace.add_event("api_request_sent", {
                 "method": "POST",
                 "url": self.responses_url,
+                "step": step,
                 "payload": _sanitize_for_log(payload)
             })
 
@@ -253,9 +257,14 @@ class YandexResponsesClient(YandexFileManagerMixin):
         data = resp.json()
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            step = trace_step
+            if step is None:
+                api_requests = execution_trace.trace.get("api_requests", [])
+                step = api_requests[-1].get("step") if api_requests else 1
             execution_trace.add_event("api_request_completed", {
                 "method": "POST",
                 "url": self.responses_url,
+                "step": step,
                 "start_timestamp": request_start_timestamp,
                 "end_timestamp": request_end_timestamp,
                 "timing_ms": request_duration_ms,
@@ -465,14 +474,11 @@ class YandexMcpMixin:
         if active_cats is None:
             active_cats = ["git", "termux", "system", "filesystem", "wikipedia", "profiler"]
 
-        # Встроенные инструменты Yandex AI Studio.
-        # Они выполняются на стороне Yandex Responses API.
         hosted_tools = []
 
         conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
 
-        # Web Search
         web_cfg = tools_config.get("web_search") or {}
         if web_cfg.get("enabled"):
             web_tool = {
@@ -501,7 +507,6 @@ class YandexMcpMixin:
 
             hosted_tools.append(web_tool)
 
-        # File Search
         file_cfg = tools_config.get("file_search") or {}
         if file_cfg.get("enabled"):
             vector_ids = file_cfg.get("vector_store_ids") or ""
@@ -524,7 +529,6 @@ class YandexMcpMixin:
                     "[HOSTED TOOLS] File Search включён, но vector_store_ids не указаны"
                 )
 
-        # Code Interpreter
         code_cfg = tools_config.get("code_interpreter") or {}
         if code_cfg.get("enabled"):
             hosted_tools.append({
@@ -537,10 +541,6 @@ class YandexMcpMixin:
         active_set = set(active_cats)
         local_tools = registry.get_definitions(active_set)
 
-        # Порядок:
-        # 1. встроенные Yandex Tools
-        # 2. MCP
-        # 3. локальные Python tools
         params["tools"] = hosted_tools + mcp_tools + local_tools
 
         api_logger.info(
@@ -559,7 +559,7 @@ class YandexMcpMixin:
         })
 
         t0 = _t.perf_counter()
-        response = self.ask(message, model_key, conversation_id, params, execution_trace=trace)
+        response = self.ask(message, model_key, conversation_id, params, execution_trace=trace, trace_step=1)
         t1 = _t.perf_counter()
         step_timings.append({"name": "LLM Router (поиск инструментов)", "duration_ms": round((t1 - t0) * 1000)})
         trace.add_response(response, step_index=1)
@@ -676,10 +676,6 @@ class YandexMcpMixin:
                         f"{result_content}"
                     )
 
-                    # Responses API expects client-executed function results as
-                    # explicit function_call_output input items linked by call_id.
-                    # Keep the original model output item and return the result
-                    # to the model instead of hiding it inside a synthesis prompt.
                     result_call_id = res.get("call_id") or call_id
                     if result_call_id:
                         function_call_outputs[str(result_call_id)] = {
@@ -773,9 +769,6 @@ class YandexMcpMixin:
                             "output": f"ERROR: {error_message}"
                         }
 
-        # Send the model's function_call items followed by the matching
-        # function_call_output items. This is the native Responses API
-        # tool-result protocol and preserves the call/result relationship.
         synth_input = list(response.get("output", []) or [])
         for tc in tool_calls:
             tc_call_id = (
@@ -789,7 +782,7 @@ class YandexMcpMixin:
         synth_params["input"] = synth_input
 
         t_synth_start = _t.perf_counter()
-        final_response = self.ask("", model_key, conversation_id, synth_params, execution_trace=trace)
+        final_response = self.ask("", model_key, conversation_id, synth_params, execution_trace=trace, trace_step=2)
 
         api_logger.debug(
             "[SYNTHESIS RESPONSE]\n%s",
