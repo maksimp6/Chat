@@ -10,6 +10,7 @@ from db import (
 )
 from mcp_routes import mcp_bp
 from file_routes import file_bp
+from partial_output import extract_last_response_text, format_partial_output_message
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -124,6 +125,9 @@ from config import calculate_cost
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
+    import time as _time
+    t_start = _time.perf_counter()
+    
     data = request.get_json(silent=True) or {}
     message_text = data.get("message", "").strip()
     conv_id = data.get("conversation_id")
@@ -159,6 +163,8 @@ def api_chat():
     final_reply_text = ""
     total_cost = 0.0
     step = 1
+    partial_output = None
+    error_message = None
 
     try:
         # Шаг 1. Первый вызов Responses API с передачей trace
@@ -228,8 +234,48 @@ def api_chat():
 
     except Exception as exc:
         logger.exception("Ошибка при обработке /api/chat")
-        trace.record_error("chat_pipeline", str(exc))
-        final_reply_text = f"Произошла ошибка при генерации ответа: {str(exc)}"
+        error_message = str(exc)
+        
+        try:
+            # Finalize trace and record error
+            trace.record_error("chat_pipeline", error_message, exception=exc)
+            final_trace_dict = trace.finalize()
+            
+            # Extract any partial output from responses
+            responses = final_trace_dict.get("responses", [])
+            partial_output, _ = extract_last_response_text(responses)
+            
+            # Format reply message: partial output + error
+            final_reply_text = format_partial_output_message(partial_output, error_message)
+            
+            # Save message to DB with partial output
+            add_message(
+                conv_id=conv_id,
+                role="assistant",
+                content=final_reply_text,
+                cost=total_cost,
+                trace=final_trace_dict
+            )
+            
+            # Return error response with reply, partial_output, and trace
+            return jsonify({
+                "error": error_message,
+                "reply": final_reply_text,
+                "partial_output": partial_output if partial_output else None,
+                "conversation_id": conv_id,
+                "trace": final_trace_dict
+            }), 500
+            
+        except Exception as inner_e:
+            logger.exception("Не удалось сохранить ExecutionTrace после ошибки")
+            # Fallback: return minimal error response
+            return jsonify({
+                "error": error_message,
+                "reply": f"⚠️ Ошибка: {error_message}",
+                "partial_output": None,
+                "conversation_id": conv_id,
+                "trace": {}
+            }), 500
 
     # Финализируем trace на ВСЕХ ветках (нормальное завершение или ошибка)
     final_trace_dict = trace.finalize()
