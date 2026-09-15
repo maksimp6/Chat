@@ -291,7 +291,12 @@ html, body {
     width: 90%; max-width: 500px; max-height: 80vh;
     overflow-y: auto; position: relative;
 }
-.alice-pro-app .modal-content h3 { margin-top: 0; margin-bottom: 16px; color: var(--text-main); }
+.alice-pro-app .modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-right: 48px;
+    color: var(--text-main);
+}
 
 .alice-pro-app .model-option {
     padding: 12px; border-radius: 8px; cursor: pointer;
@@ -304,9 +309,23 @@ html, body {
 .alice-pro-app .model-price { font-size: 11px; color: var(--text-secondary); }
 
 .alice-pro-app #close-modal {
-    width: 100%; padding: 12px;
-    background: var(--btn-bg); border: none; border-radius: 8px;
-    color: var(--text-main); font-size: 16px; cursor: pointer; margin-top: 10px;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin: 0;
+    background: var(--btn-bg);
+    border: none;
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 24px;
+    line-height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Markdown */
