@@ -15,7 +15,7 @@ class ExecutionTrace:
     _MAX_REPR = 4000
     _MAX_DEPTH = 12
     _MAX_ITEMS = 50
-    _INTERNAL_EVENT_TYPES = {"api_request_completed", "api_poll_completed", "trace_finalized"}
+    _INTERNAL_EVENT_TYPES = {"trace_finalized"}
 
     def __init__(self, trace_id: Optional[str] = None):
         self.trace_id = trace_id or str(uuid.uuid4())
