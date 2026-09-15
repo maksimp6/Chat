@@ -1,4 +1,4 @@
-/* Bridges the existing trace <details> produced by chat.js to the full viewer. */
+/* Bridges trace metadata in chat messages to the full Execution Trace viewer. */
 (function () {
     "use strict";
 
@@ -9,17 +9,27 @@
             if (details.dataset.traceViewerBound === "1") return;
             var summary = details.querySelector("summary");
             var pre = details.querySelector("pre");
-            if (!summary || !pre || !/^🔍 Trace\b/.test(summary.textContent.trim())) return;
+            if (!summary || !pre) return;
+
+            var summaryText = summary.textContent.trim();
+            if (!/^🔍 Trace\b/.test(summaryText)) return;
+
             var raw = pre.textContent;
             try { raw = JSON.parse(raw); } catch (_) { return; }
             if (!raw || typeof raw !== "object") return;
 
             details.dataset.traceViewerBound = "1";
+            details.style.width = "auto";
+            details.style.display = "inline-block";
+            details.style.marginTop = "4px";
+
+            var message = details.closest(".msg");
+            var isError = !!(message && message.classList.contains("bot") && /(^|\s)⚠️\s*Ошибка/.test(message.textContent));
             var button = document.createElement("button");
             button.type = "button";
             button.style.cssText = "font-size:11px;background:transparent;border:0;padding:0;color:inherit;cursor:pointer;font-weight:600;";
-            button.textContent = summary.textContent;
-            button.title = "Открыть Execution Trace viewer";
+            button.textContent = isError ? "🔍 Трейс ошибки" : summaryText;
+            button.title = isError ? "Открыть Execution Trace ошибки" : "Открыть Execution Trace viewer";
             button.onclick = function (event) {
                 event.preventDefault();
                 event.stopPropagation();
