@@ -2,11 +2,19 @@
 import json
 import time
 import uuid
+import traceback
 from typing import Any, Dict, Optional
 
 
 class ExecutionTrace:
     SCHEMA_VERSION = 1
+    _SENSITIVE_KEYS = {
+        "api_key", "apikey", "authorization", "password", "passwd", "secret",
+        "token", "access_token", "refresh_token", "cookie", "set-cookie"
+    }
+    _MAX_REPR = 4000
+    _MAX_DEPTH = 3
+    _MAX_ITEMS = 50
 
     def __init__(self, trace_id: Optional[str] = None):
         self.trace_id = trace_id or str(uuid.uuid4())
@@ -33,6 +41,67 @@ class ExecutionTrace:
         self.add_event("request_initialized", {
             "keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []
         })
+
+    @classmethod
+    def _safe_repr(cls, value: Any, depth: int = 0) -> Any:
+        """Make exception locals JSON-safe without leaking common credentials."""
+        if depth > cls._MAX_DEPTH:
+            return "<max-depth>"
+        if value is None or isinstance(value, (bool, int, float, str)):
+            if isinstance(value, str) and len(value) > cls._MAX_REPR:
+                return value[:cls._MAX_REPR] + "... <truncated>"
+            return value
+        if isinstance(value, dict):
+            result = {}
+            for index, (key, item) in enumerate(value.items()):
+                if index >= cls._MAX_ITEMS:
+                    result["<truncated>"] = f"{len(value) - cls._MAX_ITEMS} more items"
+                    break
+                key_text = str(key)
+                if key_text.lower().replace("-", "_") in cls._SENSITIVE_KEYS:
+                    result[key_text] = "<redacted>"
+                else:
+                    result[key_text] = cls._safe_repr(item, depth + 1)
+            return result
+        if isinstance(value, (list, tuple, set)):
+            values = list(value)
+            result = [cls._safe_repr(item, depth + 1) for item in values[:cls._MAX_ITEMS]]
+            if len(values) > cls._MAX_ITEMS:
+                result.append(f"<truncated: {len(values) - cls._MAX_ITEMS} more items>")
+            return result
+        try:
+            text = repr(value)
+        except Exception:
+            text = f"<{type(value).__name__}: repr failed>"
+        if len(text) > cls._MAX_REPR:
+            text = text[:cls._MAX_REPR] + "... <truncated>"
+        return text
+
+    @classmethod
+    def _capture_exception_state(cls, exc: BaseException) -> Dict[str, Any]:
+        """Capture traceback frames and the local variables visible at the failure."""
+        frames = []
+        tb = exc.__traceback__
+        for frame, lineno in traceback.walk_tb(tb):
+            locals_snapshot = {}
+            for name, value in frame.f_locals.items():
+                if name.lower() in cls._SENSITIVE_KEYS or any(secret in name.lower() for secret in ("api_key", "password", "secret", "token")):
+                    locals_snapshot[name] = "<redacted>"
+                else:
+                    locals_snapshot[name] = cls._safe_repr(value)
+            frames.append({
+                "file": frame.f_code.co_filename,
+                "function": frame.f_code.co_name,
+                "line": lineno,
+                "locals": locals_snapshot
+            })
+
+        return {
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__),
+            "frames": frames
+        }
 
     def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
         """Return the real request start; the response end is captured when the final response is received."""
@@ -153,7 +222,8 @@ class ExecutionTrace:
             return result
         except Exception as exc:
             error = str(exc)
-            self.record_error(f"tool:{name}", error, call_id=call_id, parent_id=parent_id, step=step)
+            self.record_error(f"tool:{name}", error, call_id=call_id, parent_id=parent_id, step=step,
+                              exception=exc)
             raise
         finally:
             end_timestamp = time.time()
@@ -181,17 +251,22 @@ class ExecutionTrace:
 
     def record_error(self, source: str, message: str, call_id: Optional[str] = None,
                      parent_id: Optional[str] = None, step: Optional[int] = None,
-                     error_type: Optional[str] = None) -> None:
+                     error_type: Optional[str] = None, exception: Optional[BaseException] = None) -> None:
         entry = {"source": source, "error": message, "timestamp": time.time()}
         if error_type: entry["type"] = error_type
         if call_id is not None: entry["call_id"] = str(call_id)
         if parent_id is not None: entry["parent_id"] = str(parent_id)
         if step is not None: entry["step"] = step
+        if exception is not None:
+            entry["python_exception"] = self._capture_exception_state(exception)
         self.trace["errors"].append(entry)
         event_payload = {"source": source, "error": message}
         if call_id is not None: event_payload["call_id"] = str(call_id)
         if parent_id is not None: event_payload["parent_id"] = str(parent_id)
         if step is not None: event_payload["step"] = step
+        if exception is not None:
+            event_payload["exception_type"] = type(exception).__name__
+            event_payload["has_python_state"] = True
         self.add_event("error_occurred", event_payload)
 
     def finalize(self) -> Dict[str, Any]:
