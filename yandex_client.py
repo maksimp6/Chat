@@ -197,7 +197,8 @@ class YandexResponsesClient(YandexFileManagerMixin):
         cache_key = params.get("prompt_cache_key") or conversation_id
         if cache_key:
             payload["prompt_cache_key"] = str(cache_key)
-        if params.get("reasoning"): payload["reasoning"] = params["reasoning"]
+        if params.get("reasoning"):
+            payload["reasoning"] = params["reasoning"]
         elif params.get("reasoning_effort") and params.get("reasoning_effort") != "disabled":
             payload["reasoning"] = {"effort": params["reasoning_effort"]}
 
@@ -205,17 +206,22 @@ class YandexResponsesClient(YandexFileManagerMixin):
         cleaned_tools = _clean_tools(raw_tools) if raw_tools else []
         if cleaned_tools:
             payload["tools"] = cleaned_tools
-            if params.get("tool_choice"): payload["tool_choice"] = params["tool_choice"]
-            if params.get("max_tool_calls"): payload["max_tool_calls"] = int(params["max_tool_calls"])
+            if params.get("tool_choice"):
+                payload["tool_choice"] = params["tool_choice"]
+            if params.get("max_tool_calls"):
+                payload["max_tool_calls"] = int(params["max_tool_calls"])
+
             ptc = params.get("parallel_tool_calls")
             if ptc is not None:
-                if isinstance(ptc, str): ptc = ptc.lower() not in ("false", "0")
+                if isinstance(ptc, str):
+                    ptc = ptc.lower() not in ("false", "0")
                 payload["parallel_tool_calls"] = bool(ptc)
             else:
                 payload["parallel_tool_calls"] = True
         
         yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
-        if yandex_conv_id: payload["conversation"] = {"id": yandex_conv_id}
+        if yandex_conv_id:
+            payload["conversation"] = {"id": yandex_conv_id}
 
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
@@ -230,7 +236,9 @@ class YandexResponsesClient(YandexFileManagerMixin):
                 start_timestamp=request_start_timestamp
             )
             execution_trace.add_event("api_request_sent", {
-                "method": "POST", "url": self.responses_url, "step": trace_step_number,
+                "method": "POST",
+                "url": self.responses_url,
+                "step": trace_step_number,
                 "payload": _sanitize_for_log(payload)
             })
 
@@ -251,90 +259,75 @@ class YandexResponsesClient(YandexFileManagerMixin):
                     error_detail = resp.text[:4000]
 
             error_message = str(e)
-            if status_code is not None: error_message = f"HTTP {status_code}: {error_message}"
+            if status_code is not None:
+                error_message = f"HTTP {status_code}: {error_message}"
+
             if execution_trace and isinstance(execution_trace, ExecutionTrace):
                 execution_trace.add_event("api_request_error", {
-                    "method": "POST", "url": self.responses_url, "step": trace_step_number,
-                    "model": payload.get("model"), "status_code": status_code,
-                    "error": error_message, "detail": error_detail,
-                    "start_timestamp": request_start_timestamp, "end_timestamp": error_timestamp,
+                    "method": "POST",
+                    "url": self.responses_url,
+                    "step": trace_step_number,
+                    "model": payload.get("model"),
+                    "status_code": status_code,
+                    "error": error_message,
+                    "detail": error_detail,
+                    "start_timestamp": request_start_timestamp,
+                    "end_timestamp": error_timestamp,
                     "timing_ms": round((time.perf_counter() - request_start_perf) * 1000, 2)
                 })
+
             raise YandexClientError(error_message, status_code=status_code) from e
 
         request_end_timestamp = time.time()
-        request_duration_ms = round((time.perf_counter() - request_start_perf) * 1000, 2)
+        request_duration_ms = round(
+            (time.perf_counter() - request_start_perf) * 1000, 2
+        )
+
         data = resp.json()
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            execution_trace.add_response(
-                data,
-                step_index=trace_step_number or 1,
-                start_timestamp=request_start_timestamp,
-                end_timestamp=request_end_timestamp,
-                timing_ms=request_duration_ms,
-                kind="initial_response"
-            )
+            step = trace_step
+            if step is None:
+                api_requests = execution_trace.trace.get("api_requests", [])
+                step = api_requests[-1].get("step") if api_requests else 1
             execution_trace.add_event("api_request_completed", {
-                "method": "POST", "url": self.responses_url, "step": trace_step_number,
-                "start_timestamp": request_start_timestamp, "end_timestamp": request_end_timestamp,
-                "timing_ms": request_duration_ms, "response_id": data.get("id"), "status": data.get("status")
+                "method": "POST",
+                "url": self.responses_url,
+                "step": step,
+                "start_timestamp": request_start_timestamp,
+                "end_timestamp": request_end_timestamp,
+                "timing_ms": request_duration_ms,
+                "response_id": data.get("id"),
+                "status": data.get("status")
             })
-
         task_id = data.get("id")
         if not is_background:
             status = data.get("status")
             if status in ("completed", "incomplete"): return data
             if status in ("failed", "cancelled"): raise YandexClientError(f"Task status: {status}")
-        return self._wait(task_id, execution_trace=execution_trace, trace_step=trace_step_number)
+        return self._wait(task_id)
 
-    def _wait(self, task_id, timeout=180, execution_trace=None, trace_step=None):
+    def _wait(self, task_id, timeout=180):
         start = time.time()
         url = self.responses_url + "/" + task_id
         delay = 0.5
-        last_snapshot = None
         while time.time() - start < timeout:
             try:
-                poll_start = time.time()
                 self._log_request("GET", url)
                 resp = self._log_response(self.session.get(url, timeout=15))
                 if resp.status_code == 404:
-                    if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                        execution_trace.add_event("api_poll_error", {"step": trace_step, "response_id": task_id, "status_code": 404})
                     time.sleep(delay)
                     delay = min(delay * 1.5, 3)
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-            except requests.RequestException as e:
-                if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                    execution_trace.add_event("api_poll_error", {
-                        "step": trace_step, "response_id": task_id, "error": str(e)
-                    })
+            except requests.RequestException:
                 time.sleep(delay)
                 delay = min(delay * 1.5, 3)
                 continue
 
-            poll_end = time.time()
-            snapshot_key = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
-            if execution_trace and isinstance(execution_trace, ExecutionTrace) and snapshot_key != last_snapshot:
-                execution_trace.add_response(
-                    data,
-                    step_index=trace_step or 1,
-                    start_timestamp=poll_start,
-                    end_timestamp=poll_end,
-                    timing_ms=round((poll_end - poll_start) * 1000, 2),
-                    kind="poll_response",
-                    deduplicate=True
-                )
-                last_snapshot = snapshot_key
-
             status = data.get("status")
             if status in ("completed", "incomplete", "failed", "cancelled"):
-                if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                    execution_trace.add_event("api_poll_completed", {
-                        "step": trace_step, "response_id": task_id, "status": status
-                    })
                 if status == "failed":
                     err = data.get('error')
                     err_msg = err.get('message', 'unknown') if isinstance(err, dict) else str(err)
@@ -343,13 +336,12 @@ class YandexResponsesClient(YandexFileManagerMixin):
                 return data
             time.sleep(delay)
             delay = min(delay * 1.5, 3)
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            execution_trace.add_event("api_poll_timeout", {"step": trace_step, "response_id": task_id, "timeout": timeout})
         raise YandexClientError(f"Timeout ({timeout}s) waiting for task {task_id}")
 
     @staticmethod
     def extract_reasoning_and_text(data):
-        if not isinstance(data, dict): return "", str(data or "")
+        if not isinstance(data, dict):
+            return "", str(data or "")
         reasoning_parts = []
         text_parts = []
         for item in data.get("output", []):
@@ -360,10 +352,14 @@ class YandexResponsesClient(YandexFileManagerMixin):
                         if isinstance(part, dict):
                             p_type = part.get("type")
                             p_text = part.get("text", "")
-                            if p_type == "reasoning_text" and p_text: reasoning_parts.append(p_text)
-                            elif p_type in ("output_text", "text") and p_text: text_parts.append(p_text)
-                        elif isinstance(part, str): text_parts.append(part)
-                elif item.get("type") == "output_text" and item.get("text"): text_parts.append(str(item["text"]))
+                            if p_type == "reasoning_text" and p_text:
+                                reasoning_parts.append(p_text)
+                            elif p_type in ("output_text", "text") and p_text:
+                                text_parts.append(p_text)
+                        elif isinstance(part, str):
+                            text_parts.append(part)
+                elif item.get("type") == "output_text" and item.get("text"):
+                    text_parts.append(str(item["text"]))
         final_text = "".join(text_parts) or data.get("output_text") or data.get("text") or ""
         final_reasoning = "\n\n".join(reasoning_parts)
         return final_reasoning, str(final_text)
@@ -380,35 +376,251 @@ class YandexResponsesClient(YandexFileManagerMixin):
         in_det = u.get("input_tokens_details") or {}
         out_det = u.get("output_tokens_details") or {}
         return {
-            "input_tokens": u.get("input_tokens", 0), "output_tokens": u.get("output_tokens", 0),
-            "total_tokens": u.get("total_tokens", 0), "cached_tokens": in_det.get("cached_tokens", 0),
-            "tool_tokens": in_det.get("tool_tokens", 0), "reasoning_tokens": out_det.get("reasoning_tokens", 0),
-            "created_at": data.get("created_at"), "completed_at": data.get("completed_at"),
+            "input_tokens": u.get("input_tokens", 0),
+            "output_tokens": u.get("output_tokens", 0),
+            "total_tokens": u.get("total_tokens", 0),
+            "cached_tokens": in_det.get("cached_tokens", 0),
+            "tool_tokens": in_det.get("tool_tokens", 0),
+            "reasoning_tokens": out_det.get("reasoning_tokens", 0),
+            "created_at": data.get("created_at"),
+            "completed_at": data.get("completed_at"),
             "incomplete_details": data.get("incomplete_details")
         }
 
 class YandexMcpMixin:
     def _execute_single_tool(self, tc, all_servers):
         import time as _t
+
         name = tc.get("name") or tc.get("function", {}).get("name")
-        if name and "<|" in name: name = name.split("<|")[0].strip()
+        if name and "<|" in name:
+            name = name.split("<|")[0].strip()
+
         args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
         if isinstance(args, str):
-            try: args = json.loads(args)
-            except Exception: args = {}
-        call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
+
+        call_id = (
+            tc.get("call_id")
+            or tc.get("id")
+            or tc.get("tool_call_id")
+            or name
+        )
+
         start_timestamp = _t.time()
         t_start = _t.perf_counter()
+
         try:
             result = registry.execute(name, args, all_servers)
             error = None
-            api_logger.debug("[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s", name, call_id, json.dumps(_sanitize_for_log(result), ensure_ascii=False, indent=2, default=str))
-            return result
+
+            api_logger.debug(
+                "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
+                name,
+                call_id,
+                json.dumps(
+                    _sanitize_for_log(result),
+                    ensure_ascii=False,
+                    indent=2
+                ) if isinstance(result, (dict, list))
+                else str(result)
+            )
+
         except Exception as exc:
             result = None
             error = str(exc)
-            api_logger.exception("[LOCAL TOOL ERROR] name=%s call_id=%s", name, call_id)
-            raise
-        finally:
-            duration_ms = round((_t.perf_counter() - t_start) * 1000, 2)
-            api_logger.info("[LOCAL TOOL] name=%s call_id=%s duration_ms=%s success=%s", name, call_id, duration_ms, error is None)
+
+            api_logger.exception(
+                "[LOCAL TOOL ERROR] name=%s call_id=%s",
+                name,
+                call_id
+            )
+
+        t_end = _t.perf_counter()
+        end_timestamp = _t.time()
+
+        duration_ms = round((t_end - t_start) * 1000, 2)
+
+        content_str = (
+            json.dumps(result, ensure_ascii=False)
+            if isinstance(result, (dict, list))
+            else str(result)
+            if result is not None
+            else ""
+        )
+
+        timing = {
+            "name": f"Tool: {name}",
+            "duration_ms": duration_ms,
+            "server_type": "local",
+            "server_label": "Local Registry",
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "success": error is None
+        }
+
+        return {
+            "call_id": call_id,
+            "name": name,
+            "content": content_str,
+            "result": result,
+            "error": error,
+            "timing": timing
+        }
+
+    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
+        params = params or {}
+        step_timings = []
+        import time as _t
+
+        mcp_tools = []
+        all_servers = mcp_storage.list_servers()
+        enabled_servers = []
+        if conversation_id:
+            try: enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
+            except Exception: enabled_servers = []
+        
+        for s in enabled_servers:
+            if s.get("enabled", True):
+                tool = {
+                    "type": "mcp",
+                    "server_label": s.get("server_label") or s.get("name") or "MCP Server",
+                    "server_url": s.get("server_url") or s.get("url") or "",
+                    "connector_id": s.get("connector_id") or "",
+                    "require_approval": s.get("require_approval") or s.get("requireApproval") or "never",
+                }
+                if s.get("authorization"): tool["authorization"] = s["authorization"]
+                if s.get("headers"): tool["headers"] = s["headers"]
+                mcp_tools.append(tool)
+
+        local_tools_cfg = params.get("tools_config", {})
+        active_categories = params.get("active_tool_categories")
+        if active_categories is None:
+            active_categories = registry.get_available_categories()
+        active_category_names = set(active_categories.keys() if isinstance(active_categories, dict) else active_categories)
+        local_tools = [
+            {
+                "type": "function",
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "parameters": tool.get("parameters", {}),
+            }
+            for tool in registry.get_openai_tools()
+            if (tool.get("category") or "general") in active_category_names
+            and tool.get("name") not in local_tools_cfg.get("disabled", [])
+        ]
+
+        all_tools = mcp_tools + local_tools
+        params = dict(params)
+        params["tools"] = all_tools
+        
+        max_iterations = int(params.get("max_tool_iterations", 10))
+        accumulated_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cached_tokens": 0,
+                             "tool_tokens": 0, "reasoning_tokens": 0}
+        accumulated_cost = 0.0
+        input_payload = params.get("input") or [{"role": "user", "content": message}]
+        current_response = None
+        last_response_id = None
+
+        for iteration in range(max_iterations):
+            step = iteration + 1
+            iteration_start = _t.perf_counter()
+            step_response = self.ask(
+                message,
+                model_key,
+                conversation_id,
+                {**params, "input": input_payload, "previous_response_id": last_response_id},
+                execution_trace=trace,
+                trace_step=step
+            )
+            current_response = step_response
+            last_response_id = step_response.get("id") if isinstance(step_response, dict) else None
+
+            usage = self.extract_usage(step_response)
+            if usage:
+                for k in accumulated_usage:
+                    accumulated_usage[k] += usage.get(k, 0) or 0
+                try:
+                    from config import calculate_full_cost
+                    accumulated_cost += calculate_full_cost(model_key, usage)
+                except Exception:
+                    pass
+
+            tool_calls = []
+            for item in step_response.get("output", []) if isinstance(step_response, dict) else []:
+                if isinstance(item, dict) and item.get("type") in ("function_call", "tool_call"):
+                    tool_calls.append(item)
+                elif isinstance(item, dict) and item.get("type") == "message":
+                    for part in item.get("content", []):
+                        if isinstance(part, dict) and part.get("type") in ("function_call", "tool_call"):
+                            tool_calls.append(part)
+
+            if not tool_calls:
+                step_timings.append({
+                    "step": step,
+                    "type": "response",
+                    "duration_ms": round((_t.perf_counter() - iteration_start) * 1000, 2)
+                })
+                break
+
+            tool_outputs = []
+            for tc in tool_calls:
+                tool_name = tc.get("name") or tc.get("function", {}).get("name")
+                raw_args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
+                if isinstance(raw_args, str):
+                    try: arguments = json.loads(raw_args)
+                    except Exception: arguments = {}
+                else: arguments = raw_args
+
+                call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or tool_name
+                server_type = "mcp" if tool_name and any(
+                    str(tool.get("server_label")) == str(tc.get("server_label"))
+                    for tool in mcp_tools
+                ) else "local"
+
+                tool_start = _t.perf_counter()
+                result = self._execute_single_tool(tc, all_servers)
+                tool_duration = round((_t.perf_counter() - tool_start) * 1000, 2)
+
+                if trace:
+                    trace_tool_result = result.get("result") if isinstance(result, dict) else result
+                    trace_error = result.get("error") if isinstance(result, dict) else None
+                    trace.track_tool_execution(
+                        tool_name,
+                        arguments,
+                        lambda value=trace_tool_result, error=trace_error: (_raise_tool_error(error) if error else value),
+                        call_id=call_id,
+                        step=step,
+                        server=server_type
+                    )
+
+                content = result.get("content", "") if isinstance(result, dict) else str(result)
+                tool_outputs.append({
+                    "type": "function_call_output",
+                    "call_id": call_id,
+                    "output": content
+                })
+                step_timings.append({
+                    "step": step,
+                    "type": "tool",
+                    "name": tool_name,
+                    "duration_ms": tool_duration,
+                    "server_type": server_type
+                })
+
+            input_payload = tool_outputs
+
+        if current_response is None:
+            return {"output": [], "usage": accumulated_usage, "cost": accumulated_cost, "step_timings": step_timings}
+        if isinstance(current_response, dict):
+            current_response["usage"] = accumulated_usage
+            current_response["cost"] = accumulated_cost
+            current_response["step_timings"] = step_timings
+        return current_response
+
+def _raise_tool_error(error):
+    if error:
+        raise RuntimeError(error)
+    return None
