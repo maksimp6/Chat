@@ -12,7 +12,11 @@ def save_trace(trace_data: Dict[str, Any]) -> str:
         raise ValueError("trace_data.trace_id is required")
 
     trace_id = str(trace_data["trace_id"])
-    payload = json.dumps(trace_data, ensure_ascii=False)
+    try:
+        payload = json.dumps(trace_data, ensure_ascii=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError(f"trace_serialization_failed: {type(exc).__name__}") from exc
+
     conn = get_conn()
     try:
         conn.execute(
