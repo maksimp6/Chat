@@ -35,9 +35,8 @@ class ExecutionTrace:
         })
 
     def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
-        """Return real request start/end for a Responses API step when available."""
+        """Return the real request start; the response end is captured when the final response is received."""
         start = None
-        end = None
 
         api_requests = self.trace.get("api_requests", [])
         for request in reversed(api_requests):
@@ -56,12 +55,9 @@ class ExecutionTrace:
             value = payload.get("start_timestamp")
             if start is None and isinstance(value, (int, float)):
                 start = float(value)
-            value = payload.get("end_timestamp")
-            if isinstance(value, (int, float)):
-                end = float(value)
             break
 
-        return start, end
+        return start, None
 
     def _infer_response_start(self, step_index: int, end_timestamp: float) -> Optional[float]:
         """Fallback inference only. Prefer the real API request timestamp."""
@@ -104,16 +100,14 @@ class ExecutionTrace:
         timing_ms: Optional[float] = None,
         **kwargs
     ) -> None:
-        """Store a Yandex response using the actual API request interval."""
+        """Store the logical Responses API interval from request start to final response receipt."""
         idx = step_index or kwargs.get("call_index", 1)
         clean_raw = ({k: v for k, v in raw_json.items() if k not in ("trace", "step_timings")}
                      if isinstance(raw_json, dict) else raw_json)
 
-        request_start, request_end = self._request_timing_for_step(idx)
+        request_start, _ = self._request_timing_for_step(idx)
         if start_timestamp is None:
             start_timestamp = request_start
-        if end_timestamp is None:
-            end_timestamp = request_end
         if end_timestamp is None:
             end_timestamp = time.time()
         if start_timestamp is None:
