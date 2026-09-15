@@ -193,13 +193,20 @@ class TestActiveChatRoute(unittest.TestCase):
         test_conversation_metadata = {"test_request": "true"}
 
         class FakeClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params):
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
                 self.params = params
                 self.metadata = params.get("conversation_metadata")
-                params["execution_trace"].add_response({
+                self.trace = trace
+                self.assert_trace_is_present(trace)
+                trace.add_response({
                     "output": [{"type": "message", "content": [{"type": "text", "text": "Generated before failure"}]}]
                 }, step_index=1)
                 return {"output": []}
+
+            @staticmethod
+            def assert_trace_is_present(trace):
+                if not isinstance(trace, ExecutionTrace):
+                    raise AssertionError("ExecutionTrace must be passed explicitly")
 
             @staticmethod
             def extract_reasoning_and_text(_response):
