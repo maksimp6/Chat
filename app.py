@@ -10,6 +10,8 @@ from db import (
 )
 from mcp_routes import mcp_bp
 from file_routes import file_bp
+from runtime_api import runtime_bp
+from runtime_migrations import init_runtime_tables
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -24,9 +26,11 @@ client = AliceClient(Config)
 # Регистрация Blueprint модулей
 app.register_blueprint(mcp_bp)
 app.register_blueprint(file_bp)
+app.register_blueprint(runtime_bp)
 
 # Инициализация БД
 init_db()
+init_runtime_tables()
 
 @app.route("/")
 def index():
