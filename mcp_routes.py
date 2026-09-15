@@ -51,7 +51,6 @@ def chat():
         active_tools = conv_settings.get("active_tool_categories")
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
-        params["execution_trace"] = trace
 
         add_message(conv_id, "user", message)
         client = AliceClient(Config)
@@ -60,7 +59,8 @@ def chat():
             message=message,
             model_key=model_key,
             conversation_id=conv_id,
-            params=params
+            params=params,
+            trace=trace
         )
 
         output = response.get("output", []) if isinstance(response, dict) else []

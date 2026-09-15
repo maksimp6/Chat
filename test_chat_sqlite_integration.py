@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import db
 import mcp_routes
+from trace_manager import ExecutionTrace
 
 
 class TestChatSQLiteIntegration(unittest.TestCase):
@@ -15,8 +16,9 @@ class TestChatSQLiteIntegration(unittest.TestCase):
         conversation_id = "sqlite-integration-test"
 
         class FakeClient:
-            def ask_with_mcp(self, message, model_key, conversation_id, params):
-                trace = params["execution_trace"]
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+                if not isinstance(trace, ExecutionTrace):
+                    raise AssertionError("ExecutionTrace must be passed explicitly")
                 trace.add_response(
                     {
                         "output": [

@@ -470,7 +470,7 @@ class YandexMcpMixin:
             "timing": timing
         }
 
-    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None):
+    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
         params = params or {}
         step_timings = []
         import time as _t
@@ -551,7 +551,6 @@ class YandexMcpMixin:
         if tools:
             ask_params["tools"] = tools
 
-        trace = params.get("execution_trace")
         if trace is not None and isinstance(trace, ExecutionTrace):
             ask_params["execution_trace"] = trace
 
