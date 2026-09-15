@@ -1,9 +1,10 @@
-"""Small API helpers for session/invocation lifecycle endpoints."""
+"""Small API helpers for session/invocation/trace lifecycle endpoints."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 
 from invocation_manager import create_invocation, get_invocation
 from session_manager import create_session, get_session
+from trace_repository import load_trace, export_trace
 
 runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
 
@@ -45,3 +46,24 @@ def api_get_invocation(invocation_id):
     if not invocation:
         return jsonify({"error": "invocation_not_found"}), 404
     return jsonify(invocation)
+
+
+@runtime_bp.get("/traces/<trace_id>")
+def api_get_trace(trace_id):
+    trace = load_trace(trace_id)
+    if trace is None:
+        return jsonify({"error": "trace_not_found"}), 404
+    return jsonify(trace)
+
+
+@runtime_bp.get("/traces/<trace_id>/export")
+def api_export_trace(trace_id):
+    try:
+        payload = export_trace(trace_id)
+    except KeyError:
+        return jsonify({"error": "trace_not_found"}), 404
+    return Response(
+        payload,
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="trace-{trace_id}.json"'},
+    )
