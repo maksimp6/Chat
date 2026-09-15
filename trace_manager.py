@@ -36,7 +36,8 @@ class ExecutionTrace:
         return {"trace_id": str(self.trace_id)}
 
     def set_request(self, payload: Dict[str, Any]) -> None:
-        clean_payload = {k: v for k, v in payload.items() if k != "trace"} if isinstance(payload, dict) else payload
+        clean_payload = {k: v for k, v in payload.items()
+                         if k not in ("trace", "execution_trace")} if isinstance(payload, dict) else payload
         self.trace["request"] = clean_payload
         self.add_event("request_initialized", {
             "keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []
@@ -171,7 +172,8 @@ class ExecutionTrace:
     ) -> None:
         """Store the logical Responses API interval from request start to final response receipt."""
         idx = step_index or kwargs.get("call_index", 1)
-        clean_raw = ({k: v for k, v in raw_json.items() if k not in ("trace", "step_timings")}
+        clean_raw = ({k: v for k, v in raw_json.items()
+                      if k not in ("trace", "step_timings", "execution_trace")}
                      if isinstance(raw_json, dict) else raw_json)
 
         request_start, _ = self._request_timing_for_step(idx)
@@ -275,4 +277,22 @@ class ExecutionTrace:
             self.trace["timings"]["total_duration_ms"] = total_ms
             self.add_event("trace_finalized", {"total_duration_ms": total_ms})
             self._finalized = True
-        return json.loads(json.dumps(self.trace))
+
+        def _json_default(obj):
+            if isinstance(obj, ExecutionTrace):
+                return {"trace_id": obj.trace_id, "<circular_ref>": True}
+            try:
+                return self._safe_repr(obj)
+            except Exception:
+                return f"<{type(obj).__name__}: safe_repr failed>"
+
+        try:
+            return json.loads(json.dumps(self.trace, default=_json_default))
+        except Exception:
+            return {
+                "trace_id": self.trace_id,
+                "schema_version": self.SCHEMA_VERSION,
+                "error": "trace_serialization_failed",
+                "timings": self.trace.get("timings", {}),
+                "errors": [str(e) for e in self.trace.get("errors", [])],
+            }
