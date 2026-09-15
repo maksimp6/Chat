@@ -12,6 +12,7 @@ from db import (
     get_conversations, create_conversation, get_messages, add_message,
     get_conv_settings, save_conv_settings
 )
+from partial_output import extract_last_response_text, format_partial_output_message
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
@@ -25,6 +26,9 @@ def chat():
     t_start = _time.perf_counter()
     trace = ExecutionTrace()
     trace_data = {}
+    conv_id = None
+    partial_output = None
+    error_message = None
 
     try:
         data = request.get_json(silent=True) or {}
@@ -101,8 +105,8 @@ def chat():
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
-        trace_data = response.get("trace", {}) if isinstance(response, dict) else trace.finalize()
         total_ms = round((_time.perf_counter() - t_start) * 1000)
+        trace_data = trace.finalize()
 
         add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
 
@@ -117,21 +121,38 @@ def chat():
         })
     except Exception as e:
         logger.exception(f"[CHAT] Ошибка: {e}")
+        error_message = str(e)
+        
         try:
-            trace.record_error("chat_pipeline", str(e), exception=e)
+            trace.record_error("chat_pipeline", error_message, exception=e)
             trace_data = trace.finalize()
-            conv_id = locals().get("conv_id")
+            responses = trace_data.get("responses", [])
+            partial_output, _ = extract_last_response_text(responses)
+            reply = format_partial_output_message(partial_output, error_message)
+            
             if conv_id:
                 add_message(
                     conv_id,
                     "assistant",
-                    f"Ошибка: {e}",
+                    reply,
                     trace=trace_data
                 )
-        except Exception:
+            
+            return jsonify({
+                "error": error_message,
+                "reply": reply,
+                "partial_output": partial_output if partial_output else None,
+                "trace": trace_data
+            }), 500
+            
+        except Exception as inner_e:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
-
-        return jsonify({"error": str(e), "trace": trace_data}), 500
+            return jsonify({
+                "error": error_message,
+                "reply": f"⚠️ Ошибка: {error_message}",
+                "partial_output": None,
+                "trace": {}
+            }), 500
 
 @mcp_bp.route('/api/tools/categories', methods=['GET'])
 def list_tool_categories():
