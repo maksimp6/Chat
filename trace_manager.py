@@ -34,27 +34,51 @@ class ExecutionTrace:
             "keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []
         })
 
+    def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
+        """Return real request start/end for a Responses API step when available."""
+        start = None
+        end = None
+
+        api_requests = self.trace.get("api_requests", [])
+        for request in reversed(api_requests):
+            if request.get("step") == step_index:
+                value = request.get("timestamp")
+                if isinstance(value, (int, float)):
+                    start = float(value)
+                break
+
+        for event in reversed(self.trace.get("events", [])):
+            if event.get("type") != "api_request_completed":
+                continue
+            payload = event.get("payload") or {}
+            if payload.get("step") != step_index:
+                continue
+            value = payload.get("start_timestamp")
+            if start is None and isinstance(value, (int, float)):
+                start = float(value)
+            value = payload.get("end_timestamp")
+            if isinstance(value, (int, float)):
+                end = float(value)
+            break
+
+        return start, end
+
     def _infer_response_start(self, step_index: int, end_timestamp: float) -> Optional[float]:
-        """Infer an API step start without letting tool execution leak into its duration."""
-        candidates = []
+        """Fallback inference only. Prefer the real API request timestamp."""
+        request_start, _ = self._request_timing_for_step(step_index)
+        if request_start is not None:
+            return request_start
 
         if self.trace["responses"]:
             previous = self.trace["responses"][-1]
             previous_end = previous.get("end_timestamp", previous.get("timestamp"))
             if isinstance(previous_end, (int, float)):
-                candidates.append(float(previous_end))
-        else:
-            created = self.trace.get("created_at")
-            if isinstance(created, (int, float)):
-                candidates.append(float(created))
+                return float(previous_end)
 
-        if step_index > 1:
-            for tool in self.trace.get("tool_calls", []):
-                tool_end = tool.get("end_timestamp")
-                if isinstance(tool_end, (int, float)) and tool_end <= end_timestamp:
-                    candidates.append(float(tool_end))
-
-        return max(candidates) if candidates else None
+        created = self.trace.get("created_at")
+        if isinstance(created, (int, float)):
+            return float(created)
+        return None
 
     def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
                         start_timestamp: Optional[float] = None) -> int:
@@ -80,23 +104,29 @@ class ExecutionTrace:
         timing_ms: Optional[float] = None,
         **kwargs
     ) -> None:
-        """Store a Yandex response and its actual/inferred execution interval."""
+        """Store a Yandex response using the actual API request interval."""
         idx = step_index or kwargs.get("call_index", 1)
         clean_raw = ({k: v for k, v in raw_json.items() if k not in ("trace", "step_timings")}
                      if isinstance(raw_json, dict) else raw_json)
 
-        completed_at = end_timestamp if end_timestamp is not None else time.time()
+        request_start, request_end = self._request_timing_for_step(idx)
         if start_timestamp is None:
-            start_timestamp = self._infer_response_start(idx, completed_at)
+            start_timestamp = request_start
+        if end_timestamp is None:
+            end_timestamp = request_end
+        if end_timestamp is None:
+            end_timestamp = time.time()
+        if start_timestamp is None:
+            start_timestamp = self._infer_response_start(idx, end_timestamp)
         if timing_ms is None and start_timestamp is not None:
-            timing_ms = round(max(0.0, completed_at - start_timestamp) * 1000, 2)
+            timing_ms = round(max(0.0, end_timestamp - start_timestamp) * 1000, 2)
 
         response_entry = {
             "step": idx,
-            "timestamp": completed_at,
+            "timestamp": end_timestamp,
             "raw": clean_raw,
             "start_timestamp": start_timestamp,
-            "end_timestamp": completed_at,
+            "end_timestamp": end_timestamp,
             "timing_ms": timing_ms
         }
 
@@ -113,7 +143,7 @@ class ExecutionTrace:
             "status": raw_json.get("status") if isinstance(raw_json, dict) else None,
             "has_tool_calls": bool(raw_json.get("output")) if isinstance(raw_json, dict) else False,
             "start_timestamp": start_timestamp,
-            "end_timestamp": completed_at,
+            "end_timestamp": end_timestamp,
             "timing_ms": timing_ms
         })
 
