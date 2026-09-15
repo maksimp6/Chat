@@ -224,7 +224,7 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if yandex_conv_id:
             payload["conversation"] = {"id": yandex_conv_id}
 
-        # Record the outgoing Responses API request in the execution trace as well as
+        # Record the exact logical API request in the execution trace as well as
         # the file logger. This keeps the trace viewer self-contained: every
         # Responses API step can be inspected without reconstructing it from
         # application logs.
@@ -629,6 +629,7 @@ class YandexMcpMixin:
         is_parallel = params.get("parallel_tool_calls", True)
         max_workers = min(len(tool_calls), 8) if is_parallel else 1
         raw_outputs_text = []
+        function_call_outputs = {}
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_tc = {
@@ -669,10 +670,23 @@ class YandexMcpMixin:
 
                     step_timings.append(timing)
 
+                    result_content = res.get("content", "")
                     raw_outputs_text.append(
                         f"[{res.get('name', tool_name)}]: "
-                        f"{res.get('content', '')}"
+                        f"{result_content}"
                     )
+
+                    # Responses API expects client-executed function results as
+                    # explicit function_call_output input items linked by call_id.
+                    # Keep the original model output item and return the result
+                    # to the model instead of hiding it inside a synthesis prompt.
+                    result_call_id = res.get("call_id") or call_id
+                    if result_call_id:
+                        function_call_outputs[str(result_call_id)] = {
+                            "type": "function_call_output",
+                            "call_id": str(result_call_id),
+                            "output": result_content if isinstance(result_content, str) else str(result_content)
+                        }
 
                     tool_entry = {
                         "name": res.get("name", tool_name),
@@ -752,16 +766,30 @@ class YandexMcpMixin:
                         f"[{tool_name}]: ERROR: {error_message}"
                     )
 
-        tool_summary = "\n".join(raw_outputs_text)
-        prompt = (
-            f"Пользователь запросил: \"{message}\"\n"
-            f"Результат выполнения инструментов:\n{tool_summary}\n"
-            f"Дай полноценный и точный ответ на основе этих данных."
-        )
-        synth_params = {k: v for k, v in params.items() if k not in ("tools", "parallel_tool_calls", "tool_choice")}
+                    if call_id:
+                        function_call_outputs[str(call_id)] = {
+                            "type": "function_call_output",
+                            "call_id": str(call_id),
+                            "output": f"ERROR: {error_message}"
+                        }
+
+        # Send the model's function_call items followed by the matching
+        # function_call_output items. This is the native Responses API
+        # tool-result protocol and preserves the call/result relationship.
+        synth_input = list(response.get("output", []) or [])
+        for tc in tool_calls:
+            tc_call_id = (
+                tc.get("call_id")
+                or tc.get("id")
+                or tc.get("tool_call_id")
+            )
+            if tc_call_id and str(tc_call_id) in function_call_outputs:
+                synth_input.append(function_call_outputs[str(tc_call_id)])
+        synth_params = {k: v for k, v in params.items() if k not in ("tools", "parallel_tool_calls", "tool_choice", "input")}
+        synth_params["input"] = synth_input
 
         t_synth_start = _t.perf_counter()
-        final_response = self.ask(prompt, model_key, conversation_id, synth_params, execution_trace=trace)
+        final_response = self.ask("", model_key, conversation_id, synth_params, execution_trace=trace)
 
         api_logger.debug(
             "[SYNTHESIS RESPONSE]\n%s",
