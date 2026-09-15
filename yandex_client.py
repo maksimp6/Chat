@@ -224,6 +224,20 @@ class YandexResponsesClient(YandexFileManagerMixin):
         if yandex_conv_id:
             payload["conversation"] = {"id": yandex_conv_id}
 
+        # Record the outgoing Responses API request in the execution trace as well as
+        # the file logger. This keeps the trace viewer self-contained: every
+        # Responses API step can be inspected without reconstructing it from
+        # application logs.
+        request_start_timestamp = time.time()
+        request_start_perf = time.perf_counter()
+
+        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            execution_trace.add_event("api_request_sent", {
+                "method": "POST",
+                "url": self.responses_url,
+                "payload": _sanitize_for_log(payload)
+            })
+
         self._log_request("POST", self.responses_url, json=payload)
         try:
             resp = self._log_response(self.session.post(self.responses_url, json=payload, timeout=90))
@@ -231,7 +245,23 @@ class YandexResponsesClient(YandexFileManagerMixin):
         except requests.RequestException as e:
             raise YandexClientError(f"Ask Request Error: {e}")
 
+        request_end_timestamp = time.time()
+        request_duration_ms = round(
+            (time.perf_counter() - request_start_perf) * 1000, 2
+        )
+
         data = resp.json()
+
+        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            execution_trace.add_event("api_request_completed", {
+                "method": "POST",
+                "url": self.responses_url,
+                "start_timestamp": request_start_timestamp,
+                "end_timestamp": request_end_timestamp,
+                "timing_ms": request_duration_ms,
+                "response_id": data.get("id"),
+                "status": data.get("status")
+            })
         task_id = data.get("id")
         if not is_background:
             status = data.get("status")
