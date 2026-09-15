@@ -48,9 +48,6 @@ class ExecutionTrace:
             if isinstance(created, (int, float)):
                 candidates.append(float(created))
 
-        # When a tool was executed between two API calls, the next API request
-        # starts after the tool finishes. This prevents the response bar from
-        # visually and numerically including git/MCP execution time.
         if step_index > 1:
             for tool in self.trace.get("tool_calls", []):
                 tool_end = tool.get("end_timestamp")
@@ -58,6 +55,21 @@ class ExecutionTrace:
                     candidates.append(float(tool_end))
 
         return max(candidates) if candidates else None
+
+    def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
+                        start_timestamp: Optional[float] = None) -> int:
+        """Store the exact request payload for a Responses API step."""
+        request_entry = {
+            "step": step_index,
+            "timestamp": start_timestamp if start_timestamp is not None else time.time(),
+            "payload": json.loads(json.dumps(payload))
+        }
+        self.trace.setdefault("api_requests", []).append(request_entry)
+        self.add_event("api_request_registered", {
+            "step": step_index,
+            "timestamp": request_entry["timestamp"]
+        })
+        return len(self.trace["api_requests"]) - 1
 
     def add_response(
         self,
@@ -87,6 +99,13 @@ class ExecutionTrace:
             "end_timestamp": completed_at,
             "timing_ms": timing_ms
         }
+
+        api_requests = self.trace.get("api_requests", [])
+        for request_entry in reversed(api_requests):
+            if request_entry.get("step") == idx:
+                response_entry["request"] = request_entry.get("payload")
+                break
+
         self.trace["responses"].append(response_entry)
 
         self.add_event("api_response_received", {
