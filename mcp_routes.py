@@ -52,11 +52,6 @@ def chat():
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
-        # ExecutionTrace is request-scoped runtime state. Keep it in params for
-        # compatibility with YandexMcpMixin and test doubles, while trace_manager
-        # strips the object from persisted request/response payloads.
-        params["execution_trace"] = trace
-
         add_message(conv_id, "user", message)
         client = AliceClient(Config)
 
@@ -64,7 +59,8 @@ def chat():
             message=message,
             model_key=model_key,
             conversation_id=conv_id,
-            params=params
+            params=params,
+            trace=trace
         )
 
         output = response.get("output", []) if isinstance(response, dict) else []
