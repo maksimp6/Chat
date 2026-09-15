@@ -152,7 +152,7 @@ class ExecutionTrace:
         request_entry = {
             "step": step_index,
             "timestamp": start_timestamp if start_timestamp is not None else time.time(),
-            "payload": json.loads(json.dumps(payload))
+            "payload": self._sanitize_trace_value(payload)
         }
         self.trace.setdefault("api_requests", []).append(request_entry)
         self.add_event("api_request_registered", {
@@ -161,6 +161,35 @@ class ExecutionTrace:
         })
         return len(self.trace["api_requests"]) - 1
 
+    @classmethod
+    def _sanitize_trace_value(cls, value: Any, depth: int = 0) -> Any:
+        """Deep-copy trace payloads while removing credentials and cyclic references."""
+        if depth > cls._MAX_DEPTH:
+            return "<max-depth>"
+        if value is None or isinstance(value, (bool, int, float, str)):
+            if isinstance(value, str) and len(value) > cls._MAX_REPR:
+                return value[:cls._MAX_REPR] + "... <truncated>"
+            return value
+        if isinstance(value, dict):
+            result = {}
+            for key, item in list(value.items())[:cls._MAX_ITEMS]:
+                key_text = str(key)
+                normalized = key_text.lower().replace("-", "_")
+                if normalized in cls._SENSITIVE_KEYS:
+                    result[key_text] = "<redacted>"
+                else:
+                    result[key_text] = cls._sanitize_trace_value(item, depth + 1)
+            if len(value) > cls._MAX_ITEMS:
+                result["<truncated>"] = f"{len(value) - cls._MAX_ITEMS} more items"
+            return result
+        if isinstance(value, (list, tuple, set)):
+            items = list(value)
+            result = [cls._sanitize_trace_value(item, depth + 1) for item in items[:cls._MAX_ITEMS]]
+            if len(items) > cls._MAX_ITEMS:
+                result.append(f"<truncated: {len(items) - cls._MAX_ITEMS} more items>")
+            return result
+        return cls._safe_repr(value, depth)
+
     def add_response(
         self,
         raw_json: Dict[str, Any],
@@ -168,13 +197,13 @@ class ExecutionTrace:
         start_timestamp: Optional[float] = None,
         end_timestamp: Optional[float] = None,
         timing_ms: Optional[float] = None,
+        kind: str = "response",
+        deduplicate: bool = False,
         **kwargs
     ) -> None:
-        """Store the logical Responses API interval from request start to final response receipt."""
+        """Store a complete sanitized Responses API JSON response."""
         idx = step_index or kwargs.get("call_index", 1)
-        clean_raw = ({k: v for k, v in raw_json.items()
-                      if k not in ("trace", "step_timings", "execution_trace")}
-                     if isinstance(raw_json, dict) else raw_json)
+        clean_raw = self._sanitize_trace_value(raw_json)
 
         request_start, _ = self._request_timing_for_step(idx)
         if start_timestamp is None:
@@ -186,9 +215,16 @@ class ExecutionTrace:
         if timing_ms is None and start_timestamp is not None:
             timing_ms = round(max(0.0, end_timestamp - start_timestamp) * 1000, 2)
 
+        if deduplicate and self.trace["responses"]:
+            last = self.trace["responses"][-1]
+            if last.get("step") == idx and last.get("raw") == clean_raw and last.get("kind") == kind:
+                return
+
         response_entry = {
             "step": idx,
             "timestamp": end_timestamp,
+            "kind": kind,
+            "response_id": clean_raw.get("id") if isinstance(clean_raw, dict) else None,
             "raw": clean_raw,
             "start_timestamp": start_timestamp,
             "end_timestamp": end_timestamp,
@@ -205,8 +241,10 @@ class ExecutionTrace:
 
         self.add_event("api_response_received", {
             "step": idx,
-            "status": raw_json.get("status") if isinstance(raw_json, dict) else None,
-            "has_tool_calls": bool(raw_json.get("output")) if isinstance(raw_json, dict) else False,
+            "kind": kind,
+            "response_id": response_entry.get("response_id"),
+            "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
+            "has_output": bool(clean_raw.get("output")) if isinstance(clean_raw, dict) else False,
             "start_timestamp": start_timestamp,
             "end_timestamp": end_timestamp,
             "timing_ms": timing_ms
@@ -231,7 +269,8 @@ class ExecutionTrace:
             end_timestamp = time.time()
             elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
             entry = {
-                "name": name, "arguments": arguments, "result": result, "error": error,
+                "name": name, "arguments": self._sanitize_trace_value(arguments),
+                "result": self._sanitize_trace_value(result), "error": error,
                 "timing_ms": elapsed_ms, "timestamp": end_timestamp,
                 "start_timestamp": start_timestamp, "end_timestamp": end_timestamp
             }
