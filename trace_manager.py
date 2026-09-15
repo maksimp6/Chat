@@ -89,18 +89,10 @@ class ExecutionTrace:
                     locals_snapshot[name] = "<redacted>"
                 else:
                     locals_snapshot[name] = cls._safe_repr(value)
-            frames.append({
-                "file": frame.f_code.co_filename,
-                "function": frame.f_code.co_name,
-                "line": lineno,
-                "locals": locals_snapshot
-            })
-        return {
-            "exception_type": type(exc).__name__,
-            "exception_message": str(exc),
-            "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__),
-            "frames": frames
-        }
+            frames.append({"file": frame.f_code.co_filename, "function": frame.f_code.co_name,
+                           "line": lineno, "locals": locals_snapshot})
+        return {"exception_type": type(exc).__name__, "exception_message": str(exc),
+                "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__), "frames": frames}
 
     def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
         start = None
@@ -139,16 +131,11 @@ class ExecutionTrace:
 
     def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
                         start_timestamp: Optional[float] = None) -> int:
-        request_entry = {
-            "step": step_index,
-            "timestamp": start_timestamp if start_timestamp is not None else time.time(),
-            "payload": self._sanitize_trace_value(payload)
-        }
+        request_entry = {"step": step_index,
+                         "timestamp": start_timestamp if start_timestamp is not None else time.time(),
+                         "payload": self._sanitize_trace_value(payload)}
         self.trace.setdefault("api_requests", []).append(request_entry)
-        self.add_event("api_request_registered", {
-            "step": step_index,
-            "timestamp": request_entry["timestamp"]
-        })
+        self.add_event("api_request_registered", {"step": step_index, "timestamp": request_entry["timestamp"]})
         return len(self.trace["api_requests"]) - 1
 
     @classmethod
@@ -164,10 +151,7 @@ class ExecutionTrace:
             for key, item in list(value.items())[:cls._MAX_ITEMS]:
                 key_text = str(key)
                 normalized = key_text.lower().replace("-", "_")
-                if normalized in cls._SENSITIVE_KEYS:
-                    result[key_text] = "<redacted>"
-                else:
-                    result[key_text] = cls._sanitize_trace_value(item, depth + 1)
+                result[key_text] = "<redacted>" if normalized in cls._SENSITIVE_KEYS else cls._sanitize_trace_value(item, depth + 1)
             if len(value) > cls._MAX_ITEMS:
                 result["<truncated>"] = f"{len(value) - cls._MAX_ITEMS} more items"
             return result
@@ -184,11 +168,10 @@ class ExecutionTrace:
                      end_timestamp: Optional[float] = None,
                      timing_ms: Optional[float] = None,
                      kind: str = "response", deduplicate: bool = False, **kwargs) -> None:
-        """Store a logical Responses API operation; polling snapshots update its record."""
+        """Store one logical Responses API operation; polling snapshots stay nested in it."""
         idx = step_index or kwargs.get("call_index", 1)
         clean_raw = self._sanitize_trace_value(raw_json)
         response_id = clean_raw.get("id") if isinstance(clean_raw, dict) else None
-
         request_start, _ = self._request_timing_for_step(idx)
         if start_timestamp is None:
             start_timestamp = request_start
@@ -199,8 +182,6 @@ class ExecutionTrace:
         if timing_ms is None and start_timestamp is not None:
             timing_ms = round(max(0.0, end_timestamp - start_timestamp) * 1000, 2)
 
-        # A poll is a snapshot of the same logical response, identified by
-        # response id + step. Replace/update that record instead of appending.
         existing_index = None
         if response_id:
             for i in range(len(self.trace["responses"]) - 1, -1, -1):
@@ -216,47 +197,34 @@ class ExecutionTrace:
 
         if existing_index is not None:
             entry = self.trace["responses"][existing_index]
-            # Keep the original request interval start, but advance the end to
-            # the newest snapshot so the waterfall represents the full operation.
             if entry.get("start_timestamp") is not None:
                 start_timestamp = entry["start_timestamp"]
-            entry.update({
-                "timestamp": end_timestamp,
-                "raw": clean_raw,
-                "response_id": response_id or entry.get("response_id"),
-                "end_timestamp": end_timestamp,
-                "timing_ms": timing_ms,
-                "latest_kind": kind,
-            })
+            snapshots = entry.setdefault("poll_snapshots", [])
+            if not snapshots or snapshots[-1] != clean_raw:
+                snapshots.append(clean_raw)
+            entry.update({"timestamp": end_timestamp, "raw": clean_raw,
+                          "response_id": response_id or entry.get("response_id"),
+                          "end_timestamp": end_timestamp, "timing_ms": timing_ms,
+                          "latest_kind": kind})
             return
 
-        response_entry = {
-            "step": idx,
-            "timestamp": end_timestamp,
-            "kind": kind,
-            "response_id": response_id,
-            "raw": clean_raw,
-            "start_timestamp": start_timestamp,
-            "end_timestamp": end_timestamp,
-            "timing_ms": timing_ms
-        }
+        response_entry = {"step": idx, "timestamp": end_timestamp, "kind": kind,
+                          "response_id": response_id, "raw": clean_raw,
+                          "start_timestamp": start_timestamp, "end_timestamp": end_timestamp,
+                          "timing_ms": timing_ms}
+        if kind == "poll_response":
+            response_entry["poll_snapshots"] = [clean_raw]
         api_requests = self.trace.get("api_requests", [])
         for request_entry in reversed(api_requests):
             if request_entry.get("step") == idx:
                 response_entry["request"] = request_entry.get("payload")
                 break
         self.trace["responses"].append(response_entry)
-        # Only logical response creation is a user-facing timeline event.
         self.add_event("api_response_received", {
-            "step": idx,
-            "kind": kind,
-            "response_id": response_id,
+            "step": idx, "kind": kind, "response_id": response_id,
             "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
             "has_output": bool(clean_raw.get("output")) if isinstance(clean_raw, dict) else False,
-            "start_timestamp": start_timestamp,
-            "end_timestamp": end_timestamp,
-            "timing_ms": timing_ms
-        })
+            "start_timestamp": start_timestamp, "end_timestamp": end_timestamp, "timing_ms": timing_ms})
 
     def track_tool_execution(self, name: str, arguments: Dict[str, Any], executor_fn, *args,
                              call_id: Optional[str] = None, parent_id: Optional[str] = None,
@@ -275,27 +243,24 @@ class ExecutionTrace:
         finally:
             end_timestamp = time.time()
             elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-            entry = {
-                "name": name, "arguments": self._sanitize_trace_value(arguments),
-                "result": self._sanitize_trace_value(result), "error": error,
-                "timing_ms": elapsed_ms, "timestamp": end_timestamp,
-                "start_timestamp": start_timestamp, "end_timestamp": end_timestamp
-            }
+            entry = {"name": name, "arguments": self._sanitize_trace_value(arguments),
+                     "result": self._sanitize_trace_value(result), "error": error,
+                     "timing_ms": elapsed_ms, "timestamp": end_timestamp,
+                     "start_timestamp": start_timestamp, "end_timestamp": end_timestamp}
             if call_id is not None: entry["call_id"] = str(call_id)
             if parent_id is not None: entry["parent_id"] = str(parent_id)
             if step is not None: entry["step"] = step
             if server is not None: entry["server"] = server
             self.trace["tool_calls"].append(entry)
-            self.add_event("tool_executed", {
-                "name": name, "timing_ms": elapsed_ms, "success": error is None,
-                "start_timestamp": start_timestamp, "end_timestamp": end_timestamp,
-                **({"call_id": str(call_id)} if call_id is not None else {}),
-                **({"parent_id": str(parent_id)} if parent_id is not None else {}),
-                **({"step": step} if step is not None else {})
-            })
+            self.add_event("tool_executed", {"name": name, "timing_ms": elapsed_ms,
+                                              "success": error is None,
+                                              "start_timestamp": start_timestamp,
+                                              "end_timestamp": end_timestamp,
+                                              **({"call_id": str(call_id)} if call_id is not None else {}),
+                                              **({"parent_id": str(parent_id)} if parent_id is not None else {}),
+                                              **({"step": step} if step is not None else {})})
 
     def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        # Internal lifecycle markers remain out of the user-facing event list.
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
         self.trace["events"].append({"type": event_type, "timestamp": time.time(), "payload": payload or {}})
@@ -323,7 +288,6 @@ class ExecutionTrace:
         if not self._finalized:
             total_ms = round((time.perf_counter() - self.start_perf) * 1000, 2)
             self.trace["timings"]["total_duration_ms"] = total_ms
-            # Finalization is stored as trace state, not as a user-facing event.
             self._finalized = True
 
         def _json_default(obj):
@@ -336,10 +300,6 @@ class ExecutionTrace:
         try:
             return json.loads(json.dumps(self.trace, default=_json_default))
         except Exception:
-            return {
-                "trace_id": self.trace_id,
-                "schema_version": self.SCHEMA_VERSION,
-                "error": "trace_serialization_failed",
-                "timings": self.trace.get("timings", {}),
-                "errors": [str(e) for e in self.trace.get("errors", [])],
-            }
+            return {"trace_id": self.trace_id, "schema_version": self.SCHEMA_VERSION,
+                    "error": "trace_serialization_failed", "timings": self.trace.get("timings", {}),
+                    "errors": [str(e) for e in self.trace.get("errors", [])]}
