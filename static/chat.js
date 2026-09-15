@@ -33,15 +33,19 @@ function renderApprovalCard(toolCall, origMsg) {
                 original_message: origMsg
             })
         })
-        .then(r => r.json())
-        .then(data => {
+        .then(async r => {
+            const data = await r.json().catch(() => ({}));
+            return {ok: r.ok, status: r.status, data};
+        })
+        .then(result => {
+            const data = result.data || {};
             card.remove();
             if (data.requires_approval) {
                 renderApprovalCard(data.tool_call, origMsg);
-            } else if (data.error) {
-                addMessage("Ошибка выполнения: " + data.error, "bot", false, 0);
+            } else if (data.reply) {
+                addMessage(data.reply, "bot", false, data.cost || 0, data.timings, null, data.reasoning, data.usage, data.trace);
             } else {
-                addMessage(data.reply, "bot", false, data.cost || 0, null, null, null, null, data.trace);
+                addMessage("⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`), "bot", false, 0, null, null, null, null, data.trace);
             }
         })
         .catch(() => {
@@ -68,11 +72,9 @@ function parseMarkdown(text) {
         .replace(/>/g, "&gt;");
 
     var codeBlocks = [];
-    // Аккуратно вырезаем блоки кода вместе с языковой меткой
     safe = safe.replace(/```([\w\-\+\#]*)\n?([\s\S]*?)```/g, function(m, lang, code) {
         var ph = "\x00CB" + codeBlocks.length + "\x00";
-        code = code.replace(/^\n/, '').replace(/\n$/, ''); 
-        var langHeader = lang ? '<div style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px;">' + lang + '</div>' : '';
+        code = code.replace(/^\n/, '').replace(/\n$/, '');
         codeBlocks.push('<div style="margin:8px 0;"><pre style="margin:0;"><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre></div>');
         return ph;
     });
@@ -86,7 +88,6 @@ function parseMarkdown(text) {
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
         var nextLine = lines[i + 1] || '';
-
         var isTableStart = /^\s*\|.*\|\s*$/.test(line) && /^\s*\|?[\s:]*-+[\s:|-]*\|?\s*$/.test(nextLine);
 
         if (isTableStart && !inTable) {
@@ -104,9 +105,9 @@ function parseMarkdown(text) {
             if (/^\s*\|.*\|\s*$/.test(line)) {
                 var cells = line.split('|').filter(c => c.trim() !== '');
                 tableHtml += '<tr>';
-                cells.forEach(c => { 
+                cells.forEach(c => {
                     var cellContent = c.trim().replace(/&lt;ul&gt;/g, "<ul>").replace(/&lt;\/ul&gt;/g, "</ul>").replace(/&lt;li&gt;/g, "<li>").replace(/&lt;\/li&gt;/g, "</li>");
-                    tableHtml += "<td>" + formatInline(cellContent) + "</td>"; 
+                    tableHtml += "<td>" + formatInline(cellContent) + "</td>";
                 });
                 tableHtml += '</tr>';
                 continue;
@@ -148,37 +149,22 @@ function parseMarkdown(text) {
 
         if (line.trim() === '') {
             var nextLiMatch = nextLine.match(/^\s*([-*+]|\d+\.)\s+(.*)$/);
-            if (listType && nextLiMatch) {
-                continue;
-            }
-            if (listType) {
-                out.push('</' + listType + '>');
-                listType = null;
-            }
+            if (listType && nextLiMatch) continue;
+            if (listType) { out.push('</' + listType + '>'); listType = null; }
             out.push('<br>');
             continue;
         }
 
-        if (listType) {
-            out.push('</' + listType + '>');
-            listType = null;
-        }
-
-        if (line.trim().indexOf('\x00CB') === 0) {
-            out.push(line);
-        } else {
-            out.push('<p>' + formatInline(line) + '</p>');
-        }
+        if (listType) { out.push('</' + listType + '>'); listType = null; }
+        if (line.trim().indexOf('\x00CB') === 0) out.push(line);
+        else out.push('<p>' + formatInline(line) + '</p>');
     }
 
     if (listType) out.push('</' + listType + '>');
     if (inTable) { tableHtml += '</tbody></table>'; out.push(tableHtml); }
 
     var result = out.join('\n');
-    for (var j = 0; j < codeBlocks.length; j++) {
-        result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
-    }
-
+    for (var j = 0; j < codeBlocks.length; j++) result = result.replace("\x00CB" + j + "\x00", codeBlocks[j]);
     return result;
 }
 
@@ -190,17 +176,13 @@ function formatInline(text) {
 }
 
 function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning, usage, trace) {
-
-
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
-
     const emptyState = chatbox.querySelector(".empty-state");
     if (emptyState) emptyState.remove();
 
     const msg = document.createElement("div");
     msg.className = `msg ${role}`;
-    
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     let htmlContent = "";
@@ -235,37 +217,27 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
                           `<div>💾 Кэшированные: <strong>${usage.cached_tokens || 0}</strong></div>` +
                           `<div>🧰 Инструменты: <strong>${usage.tool_tokens || 0}</strong></div>` +
                           `<div>🧠 Рассуждения: <strong>${usage.reasoning_tokens || 0}</strong></div>`;
-        if (usage.incomplete_details) {
-            detailsHtml += `<div style="color:var(--danger);">⚠️ Прерывание: ${JSON.stringify(usage.incomplete_details)}</div>`;
-        }
+        if (usage.incomplete_details) detailsHtml += `<div style="color:var(--danger);">⚠️ Прерывание: ${JSON.stringify(usage.incomplete_details)}</div>`;
         detailsHtml += `</div>`;
         usageBadge.innerHTML = detailsHtml;
         metaWrap.appendChild(usageBadge);
     }
 
-
-
     if (cost && cost > 0) {
         const billing = document.createElement("div");
         billing.className = "billing-bubble";
         billing.textContent = `≈ ${cost.toFixed(2)} ₽`;
-        
-
-    metaWrap.appendChild(billing);
+        metaWrap.appendChild(billing);
     }
 
     if (timings && timings.length > 0) {
         const total = totalDurationMs ? `${totalDurationMs} мс` : "";
         const badge = document.createElement("details");
         badge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
-        
         let stepsHtml = `<summary style="font-weight:600;">⏱️ Выполнение: <strong>${total || (timings.length + ' этапов')}</strong></summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
         timings.forEach((t, idx) => {
             const dur = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
-            let srv = "";
-            if (t.server_label) {
-                srv = `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${t.server_label}</span>`;
-            }
+            let srv = t.server_label ? `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${t.server_label}</span>` : "";
             stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;"><span>${idx + 1}. ${t.name}${srv}</span><strong>${dur}</strong></div>`;
         });
         stepsHtml += "</div>";
@@ -273,7 +245,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
         metaWrap.appendChild(badge);
     }
 
-        if (trace) {
+    if (trace) {
         let traceObj = trace;
         if (typeof trace === "string") {
             try { traceObj = JSON.parse(trace); } catch (_) { traceObj = null; }
@@ -281,27 +253,21 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
         if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
             const traceEl = document.createElement("details");
             traceEl.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);width:100%;margin-top:4px;";
-
             const summary = document.createElement("summary");
             summary.style.fontWeight = "600";
             const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
             const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
             summary.textContent = `🔍 Trace [${traceId}...] (${eventsCount} соб.)`;
             traceEl.appendChild(summary);
-
             const pre = document.createElement("pre");
             pre.style.cssText = "margin-top:6px;max-height:250px;overflow-y:auto;background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;font-family:monospace;font-size:10px;white-space:pre-wrap;text-align:left;";
             pre.textContent = JSON.stringify(traceObj, null, 2);
             traceEl.appendChild(pre);
-
             metaWrap.appendChild(traceEl);
         }
     }
 
-    if (metaWrap.children.length > 0) {
-        msg.appendChild(metaWrap);
-    }
-
+    if (metaWrap.children.length > 0) msg.appendChild(metaWrap);
     chatbox.appendChild(msg);
     chatbox.scrollTop = chatbox.scrollHeight;
 }
@@ -310,7 +276,6 @@ function loadHistory(convId) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
     chatbox.innerHTML = "";
-    
     fetch(`/api/conversations/${convId}/messages`)
         .then(r => r.json())
         .then(data => {
@@ -336,13 +301,12 @@ function loadHistory(convId) {
 
 document.addEventListener("DOMContentLoaded", function() {
     const sendBtn = document.getElementById("send-btn");
-    const input = document.getElementById("msg-input"); 
+    const input = document.getElementById("msg-input");
 
     function sendMessage() {
-        if (!input) return; 
+        if (!input) return;
         const text = input.value.trim();
         if (!text) return;
-
         if (!currentConvId) {
             if (typeof renderModelModal === "function") renderModelModal();
             const modal = document.getElementById("model-modal");
@@ -352,47 +316,36 @@ document.addEventListener("DOMContentLoaded", function() {
 
         input.value = "";
         addMessage(text, "user", false, 0);
-
-        const params = (typeof window.getResponsesParams === "function") 
-            ? window.getResponsesParams() 
-            : {};
-
+        const params = (typeof window.getResponsesParams === "function") ? window.getResponsesParams() : {};
         const t0 = performance.now();
+
         fetch("/api/chat", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                message: text, 
-                conversation_id: currentConvId, 
-                model: currentModel,
-                params: params
-            })
+            body: JSON.stringify({message: text, conversation_id: currentConvId, model: currentModel, params: params})
         })
         .then(async r => {
             const data = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-            return data;
+            return {ok: r.ok, status: r.status, data};
         })
-        .then(data => {
-            if (data.error) {
-                addMessage("Ошибка: " + data.error, "bot", false, 0);
-            } else {
-                const clientTotalMs = Math.round(performance.now() - t0);
+        .then(result => {
+            const data = result.data || {};
+            const clientTotalMs = Math.round(performance.now() - t0);
+            if (data.reply) {
                 addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning, data.usage, data.trace);
+            } else if (data.error) {
+                addMessage("⚠️ Ошибка: " + data.error, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning, data.usage, data.trace);
+            } else {
+                addMessage(`⚠️ Ошибка HTTP ${result.status}`, "bot", false, 0, null, clientTotalMs, null, null, data.trace);
             }
         })
         .catch(e => {
-            addMessage("Ошибка: " + (e.message || "Сетевой сбой"), "bot", false, 0);
+            addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "bot", false, 0);
         });
     }
 
     if (sendBtn) sendBtn.addEventListener("click", sendMessage);
-    if (input) {
-        input.addEventListener("keydown", function(e) {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    }
+    if (input) input.addEventListener("keydown", function(e) {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
 });
