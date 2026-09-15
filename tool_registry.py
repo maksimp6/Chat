@@ -90,9 +90,6 @@ class ToolRegistry:
             result["required"] = list(normalized.keys())
             result["additionalProperties"] = False
 
-            # Preserve the old optional/required semantics by allowing an
-            # omitted value to be represented as JSON null. The key itself
-            # stays required, which is what strict constrained decoding needs.
             original_required = set(schema.get("required") or [])
             for name, prop in normalized.items():
                 if name not in original_required:
@@ -129,8 +126,29 @@ class ToolRegistry:
                 "description": cfg.get("description", ""),
                 "parameters": strict_parameters,
                 "strict": True,
-                # Local tools are small and always available. Deferred
-                # discovery is reserved for large MCP tool catalogs.
+                "defer_loading": False
+            })
+        return tools_list
+
+    def get_tools_by_category(self, category: str) -> list:
+        """Return Responses API function definitions for one local category."""
+        names = self._categories.get(category, [])
+        tools_list = []
+        for name in names:
+            cfg = self._tools.get(name)
+            if not cfg:
+                continue
+
+            parameters = cfg.get(
+                "parameters",
+                {"type": "object", "properties": {}}
+            )
+            tools_list.append({
+                "type": "function",
+                "name": name,
+                "description": cfg.get("description", ""),
+                "parameters": self._strict_schema(parameters),
+                "strict": True,
                 "defer_loading": False
             })
         return tools_list
