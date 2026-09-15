@@ -105,8 +105,8 @@ def chat():
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
-        trace_data = response.get("trace", {}) if isinstance(response, dict) else trace.finalize()
         total_ms = round((_time.perf_counter() - t_start) * 1000)
+        trace_data = trace.finalize()
 
         add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
 
@@ -124,18 +124,12 @@ def chat():
         error_message = str(e)
         
         try:
-            # Finalize trace and record error
             trace.record_error("chat_pipeline", error_message, exception=e)
             trace_data = trace.finalize()
-            
-            # Extract any partial output from responses
             responses = trace_data.get("responses", [])
             partial_output, _ = extract_last_response_text(responses)
-            
-            # Format reply message: partial output + error
             reply = format_partial_output_message(partial_output, error_message)
             
-            # Save message to DB with partial output
             if conv_id:
                 add_message(
                     conv_id,
@@ -144,7 +138,6 @@ def chat():
                     trace=trace_data
                 )
             
-            # Return error response with reply, partial_output, and trace
             return jsonify({
                 "error": error_message,
                 "reply": reply,
@@ -154,7 +147,6 @@ def chat():
             
         except Exception as inner_e:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
-            # Fallback: return minimal error response
             return jsonify({
                 "error": error_message,
                 "reply": f"⚠️ Ошибка: {error_message}",
