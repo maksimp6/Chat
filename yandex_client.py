@@ -70,3 +70,8 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
     def extract_text(data):
         from yandex_client_modules.parsers import extract_text
         return extract_text(data)
+
+    @staticmethod
+    def extract_usage(data):
+        from yandex_client_modules.parsers import extract_usage
+        return extract_usage(data)
