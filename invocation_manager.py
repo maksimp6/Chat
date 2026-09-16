@@ -1,6 +1,7 @@
 """Invocation lifecycle and persistence for serverless execution."""
 
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -11,14 +12,49 @@ from runtime_migrations import init_runtime_tables
 from session_manager import create_session, restore_session
 
 
+_SENSITIVE_KEY_RE = re.compile(r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)", re.IGNORECASE)
+
+
 def _now() -> int:
     return int(datetime.now(timezone.utc).timestamp())
+
+
+def _sanitize_metadata(value: Any) -> Any:
+    """Remove credential-like metadata before it reaches persistent storage."""
+    if isinstance(value, dict):
+        return {
+            str(key): _sanitize_metadata(item)
+            for key, item in value.items()
+            if not _SENSITIVE_KEY_RE.search(str(key))
+        }
+    if isinstance(value, list):
+        return [_sanitize_metadata(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_metadata(item) for item in value]
+    return value
+
+
+def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
+    """Honor an explicit /api/chat session while preserving legacy behavior."""
+    if session_id != conversation_id:
+        return session_id
+    try:
+        from flask import has_request_context, request
+        if has_request_context():
+            data = request.get_json(silent=True) or {}
+            explicit = data.get("session_id")
+            if explicit:
+                return str(explicit)
+    except Exception:
+        pass
+    return session_id
 
 
 def create_invocation(session_id: str, conversation_id: str, metadata: Optional[Dict[str, Any]] = None) -> InvocationContext:
     # /api/chat historically accepted only conversation_id. Ensure the runtime
     # schema exists and create a stable legacy session on first use so existing
     # conversations can participate in the new invocation lifecycle.
+    session_id = _resolve_request_session_id(session_id, conversation_id)
     init_runtime_tables()
     session = restore_session(session_id)
     if not session:
@@ -27,6 +63,7 @@ def create_invocation(session_id: str, conversation_id: str, metadata: Optional[
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
     now = _now()
+    persisted_metadata = _sanitize_metadata(metadata or {})
     conn = get_conn()
     try:
         conn.execute(
@@ -34,7 +71,7 @@ def create_invocation(session_id: str, conversation_id: str, metadata: Optional[
                (id, session_id, conversation_id, trace_id, status, metadata_json, created_at, started_at)
                VALUES (?, ?, ?, ?, 'created', ?, ?, NULL)""",
             (invocation_id, session_id, conversation_id, trace_id,
-             json.dumps(metadata or {}, ensure_ascii=False), now),
+             json.dumps(persisted_metadata, ensure_ascii=False), now),
         )
         conn.commit()
     finally:
@@ -45,7 +82,7 @@ def create_invocation(session_id: str, conversation_id: str, metadata: Optional[
         conversation_id=conversation_id,
         invocation_id=invocation_id,
         trace_id=trace_id,
-        metadata=metadata or {},
+        metadata=persisted_metadata,
     )
 
 
@@ -70,6 +107,10 @@ def fail_invocation(invocation_id: str, error: Any = None) -> bool:
     return _complete(invocation_id, "failed", error=error)
 
 
+def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
+    return _complete(invocation_id, "cancelled", error=reason)
+
+
 def _complete(invocation_id: str, status: str, result: Any = None, error: Any = None) -> bool:
     now = _now()
     conn = get_conn()
@@ -81,8 +122,8 @@ def _complete(invocation_id: str, status: str, result: Any = None, error: Any = 
             (
                 status,
                 now,
-                json.dumps(result, ensure_ascii=False) if result is not None else None,
-                json.dumps(error, ensure_ascii=False) if error is not None else None,
+                json.dumps(_sanitize_metadata(result), ensure_ascii=False) if result is not None else None,
+                json.dumps(_sanitize_metadata(error), ensure_ascii=False) if error is not None else None,
                 invocation_id,
             ),
         )
