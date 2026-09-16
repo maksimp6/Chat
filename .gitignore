@@ -6,6 +6,11 @@ project_files.txt
 analysis.txt
 alice_pro.zip
 *.db
-logs/
-__pycache__/
 iam_key.json
+.env
+.env.*
+!.env.example
+api_debug.txt
+debug_response.json
+history_debug.json
+app.log
