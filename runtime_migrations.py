@@ -12,9 +12,15 @@ def init_runtime_tables() -> None:
                 status TEXT NOT NULL DEFAULT 'active',
                 metadata_json TEXT NOT NULL DEFAULT '{}',
                 created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
+                updated_at INTEGER NOT NULL,
+                completed_at INTEGER
             )
         """)
+        # Existing installations created before completed_at need the additive migration.
+        try:
+            conn.execute("ALTER TABLE sessions ADD COLUMN completed_at INTEGER")
+        except Exception:
+            pass
         conn.execute("""
             CREATE TABLE IF NOT EXISTS invocations (
                 id TEXT PRIMARY KEY,
