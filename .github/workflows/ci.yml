@@ -12,16 +12,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Scan repository for secrets
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: docker://zricethezav/gitleaks:v8.24.3
+        with:
+          args: detect --no-git --redact --source=.
 
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
+    env:
+      # Tests instantiate the API client but must never receive a real credential.
+      YANDEX_API_KEY: ci-test-placeholder
     steps:
       - name: Checkout
         uses: actions/checkout@v4
