@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tool_registry import registry
 import mcp_storage
 from db import get_conv_settings
+from yandex_request_utils import sanitize_for_log as _sanitize_for_log
 
 os.makedirs('logs', exist_ok=True)
 api_logger = logging.getLogger("yandex_api_debug")
@@ -30,37 +31,6 @@ class YandexClientError(Exception):
     def __init__(self, message, status_code=None):
         super().__init__(message)
         self.status_code = status_code
-
-_BINARY_THRESHOLD = 100_000
-_BASE64_RE = re.compile(r'^[A-Za-z0-9+/]{200,}={0,2}$', re.DOTALL)
-_BINARY_KEYS = frozenset({
-    'audio', 'audio_bytes', 'audio_data',
-    'file_data', 'image_data', 'image_b64',
-    'attachment_data', 'screenshot',
-    'pcm', 'wav', 'ogg',
-})
-
-def _sanitize_for_log(obj):
-    if isinstance(obj, dict):
-        result = {}
-        for k, v in obj.items():
-            key_lower = k.lower() if isinstance(k, str) else str(k).lower()
-            if key_lower in _BINARY_KEYS and isinstance(v, str) and len(v) > 1000:
-                result[k] = f"<AUDIO/BINARY MASKED: {len(v)} chars>"
-            else:
-                result[k] = _sanitize_for_log(v)
-        return result
-    elif isinstance(obj, list):
-        return [_sanitize_for_log(item) for item in obj]
-    elif isinstance(obj, str):
-        if len(obj) > _BINARY_THRESHOLD:
-            if obj.startswith('data:'):
-                return f"<DATA_URI MASKED: {len(obj)} chars>"
-            if _BASE64_RE.match(obj):
-                return f"<BASE64 MASKED: {len(obj)} chars>"
-        return obj
-    else:
-        return obj
 
 def _clean_mcp_tool(tool):
     if not isinstance(tool, dict) or tool.get("type") != "mcp":
@@ -518,7 +488,7 @@ class YandexMcpMixin:
         if conversation_id:
             try: enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
             except Exception: enabled_servers = []
-        
+
         for s in enabled_servers:
             if s.get("server_url") or (s.get("connector_id") or "").startswith("connector_"):
                 mcp_tools.append({
