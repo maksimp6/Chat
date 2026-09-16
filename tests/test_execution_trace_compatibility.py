@@ -26,8 +26,16 @@ class ExecutionTraceCompatibilityTests(unittest.TestCase):
 
     def test_response_with_same_id_updates_existing_entry(self):
         trace = ExecutionTrace()
-        trace.add_response({"id": "resp-1", "status": "in_progress"}, step_index=1)
-        trace.add_response({"id": "resp-1", "status": "completed", "output": []}, step_index=1)
+        trace.add_response(
+            {"id": "resp-1", "status": "in_progress"},
+            step_index=1,
+            kind="poll_response",
+        )
+        trace.add_response(
+            {"id": "resp-1", "status": "completed", "output": []},
+            step_index=1,
+            kind="poll_response",
+        )
 
         result = trace.finalize()
 
