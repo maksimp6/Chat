@@ -55,12 +55,12 @@ class AliceClient(YandexMcpMixin, YandexResponsesClient):
                     continuation_params = dict(base_params)
                     continuation_params["input"] = input_items
                     continuation_params["background"] = base_params.get("background", True)
-                    return self.ask(
+                    return super(AliceClient, self).ask_with_mcp(
                         message="",
                         model_key=model_key,
                         conversation_id=conversation_id,
                         params=continuation_params,
-                        execution_trace=trace,
+                        trace=trace,
                     )
 
                 response = run_tool_loop(
