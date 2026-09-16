@@ -9,6 +9,9 @@ jobs:
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
+    env:
+      # Tests instantiate the API client but must never receive a real credential.
+      YANDEX_API_KEY: ci-test-placeholder
     steps:
       - name: Checkout
         uses: actions/checkout@v4
