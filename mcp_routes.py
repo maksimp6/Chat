@@ -32,6 +32,7 @@ def chat():
     conv_id = None
     partial_output = None
     error_message = None
+    model_key = None
 
     try:
         data = request.get_json(silent=True) or {}
@@ -43,28 +44,37 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
-        invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
+        # One request owns exactly one InvocationContext and one trace.
+        # Keep the existing conversation_id API contract for compatibility.
+        invocation = create_invocation(
+            session_id=conv_id,
+            conversation_id=conv_id,
+            metadata={"model": model_key},
+        )
         trace = create_invocation_trace(invocation)
         start_invocation(invocation.invocation_id)
         trace.set_request({
-            "conversation_id": conv_id,
+            "conversation_id": invocation.conversation_id,
             "message": message,
             "model": model_key,
-            "params": params
+            "params": params,
+            "invocation_id": invocation.invocation_id,
+            "session_id": invocation.session_id,
+            "trace_id": invocation.trace_id,
         })
 
-        conv_settings = get_conv_settings(conv_id) or {}
+        conv_settings = get_conv_settings(invocation.conversation_id) or {}
         active_tools = conv_settings.get("active_tool_categories")
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
-        add_message(conv_id, "user", message)
+        add_message(invocation.conversation_id, "user", message)
         client = AliceClient(Config)
 
         response = client.ask_with_mcp(
             message=message,
             model_key=model_key,
-            conversation_id=conv_id,
+            conversation_id=invocation.conversation_id,
             params=params,
             trace=trace
         )
@@ -142,7 +152,7 @@ def chat():
         total_ms = round((_time.perf_counter() - t_start) * 1000)
         trace_data = trace.finalize()
 
-        add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
+        add_message(invocation.conversation_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
         finish_invocation(invocation.invocation_id, result={"reply": reply, "usage": usage, "cost": cost})
 
         return jsonify({
@@ -165,9 +175,13 @@ def chat():
         try:
             if trace is None:
                 if conv_id:
-                    invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
-                    start_invocation(invocation.invocation_id)
+                    invocation = create_invocation(
+                        session_id=conv_id,
+                        conversation_id=conv_id,
+                        metadata={"model": model_key},
+                    )
                     trace = create_invocation_trace(invocation)
+                    start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
             trace.record_error("chat_pipeline", error_message, exception=e)
@@ -176,13 +190,12 @@ def chat():
             partial_output, _ = extract_last_response_text(responses)
             reply = format_partial_output_message(partial_output, error_message)
 
-            if conv_id:
-                add_message(
-                    conv_id,
-                    "assistant",
-                    reply,
-                    trace=trace_data
-                )
+            if invocation is not None:
+                target_conv_id = invocation.conversation_id
+            else:
+                target_conv_id = conv_id
+            if target_conv_id:
+                add_message(target_conv_id, "assistant", reply, trace=trace_data)
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
 
@@ -258,45 +271,3 @@ def conversations():
         client = AliceClient(Config)
         try:
             y_conv = client.create_conversation()
-            conv_id = y_conv.get('id') or str(uuid.uuid4())
-        except Exception:
-            conv_id = str(uuid.uuid4())
-        title = data.get('title', 'Новый диалог')
-        model = data.get('model', 'aliceai-llm')
-        create_conversation(conv_id, title, model)
-        return jsonify({"id": conv_id, "title": title, "model": model}), 201
-
-    return jsonify({"conversations": get_conversations()})
-
-@mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
-def get_conv_messages(conv_id):
-    return jsonify({"messages": get_messages(conv_id)})
-
-@mcp_bp.route('/api/mcp/execute-approved', methods=['POST'])
-def execute_approved():
-    try:
-        data = request.get_json(silent=True) or {}
-        conv_id = data.get("conversation_id")
-        func_name = data.get("name")
-        arguments = data.get("arguments", {})
-        model_key = data.get("model", "aliceai-llm")
-
-        tool_config = registry.get_tool_meta(func_name)
-        if not tool_config:
-            return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
-
-        exec_res = registry.execute(func_name, arguments)
-        client = AliceClient(Config)
-        prompt = (
-            f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
-            f"Результат: {exec_res}.\nДай краткий ответ о завершении."
-        )
-        synth_response = client.ask(prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."})
-        reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
-        usage = client.extract_usage(synth_response)
-        cost = calculate_full_cost(model_key, usage) if usage else 0.0
-
-        add_message(conv_id, "assistant", reply, cost=cost)
-        return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
