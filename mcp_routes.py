@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 import logging
 import uuid
 import json as _json
-from yandex_client import YandexResponsesClient, YandexMcpMixin
+from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
 from trace_manager import ExecutionTrace
 from invocation_manager import create_invocation, start_invocation, finish_invocation, fail_invocation
