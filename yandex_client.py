@@ -33,34 +33,6 @@ class YandexClientError(Exception):
         super().__init__(message)
         self.status_code = status_code
 
-def _clean_mcp_tool(tool):
-    if not isinstance(tool, dict) or tool.get("type") != "mcp":
-        return None
-    cid = tool.get("connector_id", "")
-    url = tool.get("server_url", "").strip()
-    if not url and not cid.startswith("connector_"):
-        return None
-    cleaned = {"type": "mcp", "server_label": tool.get("server_label", "mcp_server")}
-    if url: cleaned["server_url"] = url
-    if cid: cleaned["connector_id"] = cid
-    if tool.get("server_description"): cleaned["server_description"] = tool["server_description"]
-    if tool.get("require_approval"): cleaned["require_approval"] = tool["require_approval"]
-    if tool.get("authorization"): cleaned["authorization"] = tool["authorization"]
-    if tool.get("headers"): cleaned["headers"] = tool["headers"]
-    return cleaned
-
-def _clean_tools(tools):
-    if not isinstance(tools, list):
-        return tools
-    cleaned = []
-    for t in tools:
-        if isinstance(t, dict) and t.get("type") == "mcp":
-            res = _clean_mcp_tool(t)
-            if res is not None: cleaned.append(res)
-        else:
-            cleaned.append(t)
-    return cleaned
-
 from file_manager import YandexFileManagerMixin
 
 class YandexResponsesClient(YandexFileManagerMixin):
