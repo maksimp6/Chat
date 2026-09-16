@@ -7,6 +7,7 @@ import mcp_storage
 from db import get_conv_settings
 
 from yandex_request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_api_logger import api_logger
 
 
 class YandexMcpMixin:
@@ -130,10 +131,7 @@ class YandexMcpMixin:
 
         web_cfg = tools_config.get("web_search") or {}
         if web_cfg.get("enabled"):
-            web_tool = {
-                "type": "web_search",
-                "search_context_size": web_cfg.get("context_size") or "medium"
-            }
+            web_tool = {"type": "web_search", "search_context_size": web_cfg.get("context_size") or "medium"}
             allowed = web_cfg.get("allowed_domains") or ""
             blocked = web_cfg.get("blocked_domains") or ""
             allowed_domains = [x.strip() for x in allowed.replace("\\n", ",").split(",") if x.strip()]
