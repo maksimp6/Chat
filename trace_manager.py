@@ -196,6 +196,9 @@ class ExecutionTrace:
             if entry.get("start_timestamp") is not None:
                 start_timestamp = entry["start_timestamp"]
             snapshots = entry.setdefault("poll_snapshots", [])
+            previous_raw = entry.get("raw")
+            if not snapshots and previous_raw is not None:
+                snapshots.append(previous_raw)
             if not snapshots or snapshots[-1] != clean_raw:
                 snapshots.append(clean_raw)
             entry.update({"timestamp": end_timestamp, "raw": clean_raw,
@@ -257,53 +260,3 @@ class ExecutionTrace:
                                               **({"call_id": str(call_id)} if call_id is not None else {}),
                                               **({"parent_id": str(parent_id)} if parent_id is not None else {}),
                                               **({"step": step} if step is not None else {})})
-
-    def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        if event_type in self._INTERNAL_EVENT_TYPES:
-            return
-        self.trace["events"].append({"type": event_type, "timestamp": time.time(), "payload": payload or {}})
-
-    def record_error(self, source: str, message: str, call_id: Optional[str] = None,
-                     parent_id: Optional[str] = None, step: Optional[int] = None,
-                     error_type: Optional[str] = None, exception: Optional[BaseException] = None) -> None:
-        entry = {"source": source, "error": message, "timestamp": time.time()}
-        if error_type: entry["type"] = error_type
-        if call_id is not None: entry["call_id"] = str(call_id)
-        if parent_id is not None: entry["parent_id"] = str(parent_id)
-        if step is not None: entry["step"] = step
-        if exception is not None: entry["python_exception"] = self._capture_exception_state(exception)
-        self.trace["errors"].append(entry)
-        event_payload = {"source": source, "error": message}
-        if call_id is not None: event_payload["call_id"] = str(call_id)
-        if parent_id is not None: event_payload["parent_id"] = str(parent_id)
-        if step is not None: event_payload["step"] = step
-        if exception is not None:
-            event_payload["exception_type"] = type(exception).__name__
-            event_payload["has_python_state"] = True
-        self.add_event("error_occurred", event_payload)
-
-    def finalize(self) -> Dict[str, Any]:
-        if not self._finalized:
-            total_ms = round((time.perf_counter() - self.start_perf) * 1000, 2)
-            self.trace["timings"]["total_duration_ms"] = total_ms
-            self._finalized = True
-        try:
-            from billing import aggregate_billing
-            billing = self.trace.get("billing") or {}
-            self.trace["billing"] = aggregate_billing(billing.get("items", []), self.trace.get("context", {}))
-        except Exception as exc:
-            self.add_event("billing_error", {"error": str(exc)})
-
-        def _json_default(obj):
-            if isinstance(obj, ExecutionTrace):
-                return {"trace_id": obj.trace_id, "<circular_ref>": True}
-            try:
-                return self._safe_repr(obj)
-            except Exception:
-                return f"<{type(obj).__name__}: safe_repr failed>"
-        try:
-            return json.loads(json.dumps(self.trace, default=_json_default))
-        except Exception:
-            return {"trace_id": self.trace_id, "schema_version": self.SCHEMA_VERSION,
-                    "error": "trace_serialization_failed", "timings": self.trace.get("timings", {}),
-                    "errors": [str(e) for e in self.trace.get("errors", [])]}
