@@ -4,14 +4,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load the project's local .env file before reading configuration. Existing
-# process environment variables take precedence, which is important for CI
-# and production deployments.
 _ENV_FILE = Path(__file__).resolve().with_name(".env")
 load_dotenv(_ENV_FILE)
 
-# Keep compatibility with the legacy YC_API_KEY name while preferring the
-# canonical YANDEX_API_KEY variable. Never put credentials in source code.
 API_KEY = os.getenv("YANDEX_API_KEY") or os.getenv("YC_API_KEY")
 if not API_KEY:
     raise RuntimeError(
@@ -22,19 +17,14 @@ if not API_KEY:
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
 
-# Supabase settings are optional at startup. The backend can use these values
-# when trace-mirror integration is enabled, without requiring Supabase for the
-# existing chat flow.
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
 
 HOST = "0.0.0.0"
 PORT = 8080
 
-# Capability metadata is intentionally descriptive only. It does not change
-# request construction or enable/disable tools. Unknown capabilities stay
-# unknown until confirmed by Yandex documentation/API for the project.
 TEXT_MODELS = {
     "alice-lite": {"name": "Alice Lite", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.20, "cached": 0.05, "tool": 0.05, "output": 0.20},
     "aliceai-llm": {"name": "Alice AI LLM", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.50, "cached": 0.50, "tool": 0.13, "output": 1.20},
@@ -56,7 +46,6 @@ VOICE_MODELS = {
 }
 
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
-
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
 
@@ -67,6 +56,7 @@ class Config:
     BASE_URL = BASE_URL
     SUPABASE_URL = SUPABASE_URL
     SUPABASE_ANON_KEY = SUPABASE_ANON_KEY
+    SUPABASE_SERVICE_ROLE_KEY = SUPABASE_SERVICE_ROLE_KEY
     SUPABASE_DB_URL = SUPABASE_DB_URL
     HOST = HOST
     PORT = PORT
@@ -77,18 +67,12 @@ def get_model_info(model_key):
 
 
 def get_model_uri(model_key):
-    """Build the Yandex model URI without changing existing request behavior."""
     return "gpt://" + PROJECT_ID + "/" + model_key + "/latest"
 
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):
     m = get_model_info(model_key)
-    cost = (
-        input_tokens * m["input"] +
-        cached_tokens * m.get("cached", m["input"]) +
-        tool_tokens * m.get("tool", m["input"]) +
-        output_tokens * m.get("output", m["input"])
-    ) / 1000
+    cost = (input_tokens * m["input"] + cached_tokens * m.get("cached", m["input"]) + tool_tokens * m.get("tool", m["input"]) + output_tokens * m.get("output", m["input"])) / 1000
     return round(cost, 2)
 
 
@@ -96,18 +80,10 @@ def calculate_full_cost(model_key, usage):
     if not usage:
         return 0.0
     m = get_model_info(model_key)
-    token_cost = (
-        usage.get("input_tokens", 0) * m["input"] +
-        usage.get("output_tokens", 0) * m.get("output", m["input"])
-    ) / 1000
-    audio_cost = (
-        usage.get("audio_seconds_stt", 0) * AUDIO_STT_PRICE_PER_SEC +
-        usage.get("audio_seconds_tts", 0) * AUDIO_TTS_PRICE_PER_SEC
-    )
+    token_cost = (usage.get("input_tokens", 0) * m["input"] + usage.get("output_tokens", 0) * m.get("output", m["input"])) / 1000
+    audio_cost = usage.get("audio_seconds_stt", 0) * AUDIO_STT_PRICE_PER_SEC + usage.get("audio_seconds_tts", 0) * AUDIO_TTS_PRICE_PER_SEC
     return round(token_cost + audio_cost, 4)
 
 
-# Singleton instance for backward compatibility
 config = Config()
-
 REPO_DIR = "/sdcard/repo"
