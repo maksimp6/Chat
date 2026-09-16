@@ -17,16 +17,7 @@ import mcp_storage
 from db import get_conv_settings
 from yandex_request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_request_builder import build_response_payload
-
-os.makedirs('logs', exist_ok=True)
-api_logger = logging.getLogger("yandex_api_debug")
-api_logger.setLevel(logging.DEBUG)
-if not api_logger.handlers:
-    fh = logging.FileHandler("logs/api_debug.txt", encoding="utf-8", mode='a')
-    fh.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s | %(levelname)-7s | %(message)s')
-    fh.setFormatter(formatter)
-    api_logger.addHandler(fh)
+from yandex_api_logger import api_logger
 
 from yandex_client_modules.errors import YandexClientError
 from yandex_client_modules.conversations import YandexConversationMixin
@@ -79,8 +70,3 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
     def extract_text(data):
         from yandex_client_modules.parsers import extract_text
         return extract_text(data)
-
-    @staticmethod
-    def extract_usage(data):
-        from yandex_client_modules.parsers import extract_usage
-        return extract_usage(data)
