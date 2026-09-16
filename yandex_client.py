@@ -28,10 +28,7 @@ if not api_logger.handlers:
     fh.setFormatter(formatter)
     api_logger.addHandler(fh)
 
-class YandexClientError(Exception):
-    def __init__(self, message, status_code=None):
-        super().__init__(message)
-        self.status_code = status_code
+from yandex_client_modules.errors import YandexClientError
 
 from file_manager import YandexFileManagerMixin
 
