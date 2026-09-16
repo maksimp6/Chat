@@ -30,11 +30,30 @@ class ExecutionTrace:
             "tool_calls": [],
             "events": [],
             "timings": {},
-            "errors": []
+            "errors": [],
+            "billing": {
+                "currency": "RUB",
+                "provider": "yandex_ai_studio",
+                "pricing_version": "config-v1",
+                "items": []
+            }
         }
 
     def get_metadata(self) -> Dict[str, str]:
         return {"trace_id": str(self.trace_id)}
+
+    def set_context(self, invocation_id: Optional[str] = None,
+                    session_id: Optional[str] = None,
+                    conversation_id: Optional[str] = None) -> None:
+        context = self.trace.setdefault("context", {})
+        for key, value in (("invocation_id", invocation_id), ("session_id", session_id),
+                           ("conversation_id", conversation_id), ("trace_id", self.trace_id)):
+            if value is not None:
+                context[key] = str(value)
+        billing = self.trace.setdefault("billing", {})
+        for key in ("invocation_id", "session_id", "conversation_id", "trace_id"):
+            if key in context:
+                billing[key] = context[key]
 
     def set_request(self, payload: Dict[str, Any]) -> None:
         clean_payload = {k: v for k, v in payload.items()
@@ -163,6 +182,35 @@ class ExecutionTrace:
             return result
         return cls._safe_repr(value, depth)
 
+    def _update_billing_for_response(self, clean_raw: Dict[str, Any], step_index: int,
+                                     response_id: Optional[str]) -> None:
+        if not isinstance(clean_raw, dict) or not isinstance(clean_raw.get("usage"), dict):
+            return
+        try:
+            from billing import build_ai_billing_item, aggregate_billing
+            model = clean_raw.get("model")
+            if not model:
+                for request in reversed(self.trace.get("api_requests", [])):
+                    if request.get("step") == step_index:
+                        payload = request.get("payload") or {}
+                        model_uri = payload.get("model")
+                        if isinstance(model_uri, str):
+                            model = model_uri.rsplit("/", 2)[-2] if model_uri.count("/") >= 2 else model_uri
+                        break
+            item = build_ai_billing_item(model, clean_raw.get("usage"), step_index, response_id)
+            items = self.trace.setdefault("billing", {}).setdefault("items", [])
+            key = (item.get("step"), item.get("response_id"))
+            existing = next((i for i, old in enumerate(items)
+                             if (old.get("step"), old.get("response_id")) == key), None)
+            if existing is None:
+                items.append(item)
+            else:
+                items[existing] = item
+            context = self.trace.get("context", {})
+            self.trace["billing"] = aggregate_billing(items, context)
+        except Exception as exc:
+            self.add_event("billing_error", {"step": step_index, "error": str(exc)})
+
     def add_response(self, raw_json: Dict[str, Any], step_index: int = 1,
                      start_timestamp: Optional[float] = None,
                      end_timestamp: Optional[float] = None,
@@ -206,6 +254,7 @@ class ExecutionTrace:
                           "response_id": response_id or entry.get("response_id"),
                           "end_timestamp": end_timestamp, "timing_ms": timing_ms,
                           "latest_kind": kind})
+            self._update_billing_for_response(clean_raw, idx, response_id or entry.get("response_id"))
             return
 
         response_entry = {"step": idx, "timestamp": end_timestamp, "kind": kind,
@@ -225,6 +274,7 @@ class ExecutionTrace:
             "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
             "has_output": bool(clean_raw.get("output")) if isinstance(clean_raw, dict) else False,
             "start_timestamp": start_timestamp, "end_timestamp": end_timestamp, "timing_ms": timing_ms})
+        self._update_billing_for_response(clean_raw, idx, response_id)
 
     def track_tool_execution(self, name: str, arguments: Dict[str, Any], executor_fn, *args,
                              call_id: Optional[str] = None, parent_id: Optional[str] = None,
@@ -289,6 +339,12 @@ class ExecutionTrace:
             total_ms = round((time.perf_counter() - self.start_perf) * 1000, 2)
             self.trace["timings"]["total_duration_ms"] = total_ms
             self._finalized = True
+        try:
+            from billing import aggregate_billing
+            billing = self.trace.get("billing") or {}
+            self.trace["billing"] = aggregate_billing(billing.get("items", []), self.trace.get("context", {}))
+        except Exception as exc:
+            self.add_event("billing_error", {"error": str(exc)})
 
         def _json_default(obj):
             if isinstance(obj, ExecutionTrace):

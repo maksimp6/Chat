@@ -46,6 +46,65 @@ class TestExecutionTraceResponses(unittest.TestCase):
         data = trace.finalize()
         self.assertEqual(data["request"]["execution_trace"], {"trace_id": trace.trace_id, "<circular_ref>": True})
 
+    def test_two_ai_steps_aggregate_without_double_counting(self):
+        trace = ExecutionTrace()
+        trace.add_response({
+            "id": "resp-1", "model": "aliceai-llm", "status": "completed",
+            "usage": {"input_tokens": 1000, "output_tokens": 100, "total_tokens": 1100},
+        }, step_index=1)
+        trace.add_response({
+            "id": "resp-2", "model": "aliceai-llm", "status": "completed",
+            "usage": {"input_tokens": 500, "output_tokens": 50, "total_tokens": 550},
+        }, step_index=2)
+        first = trace.finalize()
+        second = trace.finalize()
+        billing = first["billing"]
+        self.assertEqual(len(billing["items"]), 2)
+        self.assertEqual(billing["input_tokens"], 1500)
+        self.assertEqual(billing["output_tokens"], 150)
+        self.assertEqual(billing["total_tokens"], 1650)
+        self.assertAlmostEqual(billing["total_cost"], sum(i["total_cost"] for i in billing["items"]), places=6)
+        self.assertEqual(second["billing"], billing)
+
+    def test_cached_tokens_and_savings_are_accounted_separately(self):
+        trace = ExecutionTrace()
+        trace.add_response({
+            "id": "resp-cache", "model": "aliceai-llm-flash", "status": "completed",
+            "usage": {
+                "input_tokens": 1000, "output_tokens": 100, "total_tokens": 1100,
+                "input_token_details": {"cached_tokens": 800},
+            },
+        }, step_index=1)
+        billing = trace.finalize()["billing"]
+        item = billing["items"][0]
+        self.assertEqual(item["cached_input_tokens"], 800)
+        self.assertGreater(item["cache_savings"], 0)
+        self.assertEqual(billing["cached_input_tokens"], 800)
+
+    def test_unknown_pricing_is_explicit_not_zero(self):
+        trace = ExecutionTrace()
+        trace.add_response({
+            "id": "resp-unknown", "model": "not-configured", "status": "completed",
+            "usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120},
+        }, step_index=1)
+        billing = trace.finalize()["billing"]
+        self.assertEqual(billing["cost_status"], "partial")
+        self.assertEqual(billing["unknown_cost_items"], 1)
+        self.assertIsNone(billing["items"][0]["total_cost"])
+
+    def test_billing_survives_json_persistence_roundtrip(self):
+        trace = ExecutionTrace()
+        trace.set_context(invocation_id="inv-1", session_id="sess-1", conversation_id="conv-1")
+        trace.add_response({
+            "id": "resp-persist", "model": "aliceai-llm", "status": "completed",
+            "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+        }, step_index=1)
+        persisted = json.loads(json.dumps(trace.finalize()))
+        self.assertEqual(persisted["billing"]["invocation_id"], "inv-1")
+        self.assertEqual(persisted["billing"]["session_id"], "sess-1")
+        self.assertEqual(persisted["billing"]["conversation_id"], "conv-1")
+        self.assertEqual(persisted["billing"]["items"][0]["total_tokens"], 15)
+
 
 class TestYandexResponsesPollingTrace(unittest.TestCase):
     def _client(self):
