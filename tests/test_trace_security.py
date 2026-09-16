@@ -15,8 +15,14 @@ class TraceSecurityTests(unittest.TestCase):
         self.assertEqual(value["<truncated>"], "1 more items")
 
     def test_sanitize_trace_value_limits_depth(self):
-        value = {"level": {"level": {"level": "value"}}}
-        self.assertEqual(sanitize_trace_value(value), value)
+        value = "value"
+        for _ in range(14):
+            value = {"level": value}
+        sanitized = sanitize_trace_value(value)
+        current = sanitized
+        for _ in range(12):
+            current = current["level"]
+        self.assertEqual(current, "<max-depth>")
 
     def test_safe_repr_truncates_long_strings(self):
         value = safe_repr("x" * 5000)
