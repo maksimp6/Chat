@@ -4,6 +4,8 @@ This module contains pure request-shaping logic extracted from yandex_client.py.
 It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
+from yandex_metadata_validator import validate_metadata
+
 
 def build_response_payload(project_id, model_key, message, params=None, metadata=None, conversation_id=None, yandex_conv_id=None):
     """Build a Yandex Responses API payload from client parameters."""
@@ -20,8 +22,9 @@ def build_response_payload(project_id, model_key, message, params=None, metadata
         "store": params.get("store", True),
     }
 
-    if metadata is not None:
-        payload["metadata"] = metadata
+    validated_metadata = validate_metadata(metadata)
+    if validated_metadata is not None:
+        payload["metadata"] = validated_metadata
 
     if params.get("instructions"):
         payload["instructions"] = params["instructions"]
