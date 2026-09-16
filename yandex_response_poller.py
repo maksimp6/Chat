@@ -17,26 +17,19 @@ def wait_for_response(
     trace_step=None,
     trace_type=None,
 ):
-    """Poll a background response until it reaches a terminal state.
-
-    HTTP, logging, error construction, and trace recording are injected so
-    this module remains independent of the client implementation.
-    """
+    """Poll a background response until it reaches a terminal state."""
     start = time.time()
     url = responses_url + "/" + task_id
     delay = 0.5
     last_snapshot = None
 
-    def trace_available():
-        return execution_trace is not None
-
     while time.time() - start < timeout:
+        poll_start = time.time()
         try:
-            poll_start = time.time()
             log_request("GET", url)
             resp = log_response(session.get(url, timeout=15))
             if resp.status_code == 404:
-                if trace_available():
+                if execution_trace is not None:
                     execution_trace.add_event("api_poll_error", {
                         "step": trace_step,
                         "response_id": task_id,
@@ -47,10 +40,10 @@ def wait_for_response(
                 continue
             resp.raise_for_status()
             data = resp.json()
-        except Exception as exc:
-            if isinstance(exc, error_cls):
-                raise
-            if trace_available():
+        except error_cls:
+            raise
+        except (OSError, ValueError) as exc:
+            if execution_trace is not None:
                 execution_trace.add_event("api_poll_error", {
                     "step": trace_step,
                     "response_id": task_id,
@@ -62,7 +55,7 @@ def wait_for_response(
 
         poll_end = time.time()
         snapshot_key = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
-        if trace_available() and snapshot_key != last_snapshot:
+        if execution_trace is not None and snapshot_key != last_snapshot:
             execution_trace.add_response(
                 data,
                 step_index=trace_step or 1,
@@ -75,7 +68,7 @@ def wait_for_response(
 
         status = data.get("status")
         if status in ("completed", "incomplete", "failed", "cancelled"):
-            if trace_available():
+            if execution_trace is not None:
                 execution_trace.add_event("api_poll_completed", {
                     "step": trace_step,
                     "response_id": task_id,
@@ -92,7 +85,7 @@ def wait_for_response(
         time.sleep(delay)
         delay = min(delay * 1.5, 3)
 
-    if trace_available():
+    if execution_trace is not None:
         execution_trace.add_event("api_poll_timeout", {
             "step": trace_step,
             "response_id": task_id,
