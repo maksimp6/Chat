@@ -1,5 +1,6 @@
 import unittest
 
+from yandex_metadata_validator import MetadataValidationError
 from yandex_request_builder import build_response_payload
 
 
@@ -74,6 +75,16 @@ class YandexRequestBuilderTests(unittest.TestCase):
         self.assertEqual(payload["metadata"], {"trace_id": "trace-1"})
         self.assertEqual(payload["conversation"], {"id": "conv-yandex"})
         self.assertEqual(payload["prompt_cache_key"], "conv-local")
+
+    def test_invalid_metadata_is_rejected_before_payload_is_returned(self):
+        with self.assertRaises(MetadataValidationError):
+            build_response_payload(
+                "project",
+                "model",
+                "hello",
+                params={"background": False},
+                metadata={"trace_id": 123},
+            )
 
 
 if __name__ == "__main__":
