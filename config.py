@@ -1,8 +1,11 @@
 """Alice Pro - Configuration & Pricing"""
+import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load the project's local .env file before reading configuration. Existing
 # process environment variables take precedence, which is important for CI
@@ -22,19 +25,16 @@ if not API_KEY:
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
 
-# Supabase settings are optional at startup. The backend can use these values
-# when trace-mirror integration is enabled, without requiring Supabase for the
-# existing chat flow.
+# Supabase settings are optional at startup. The service-role key is backend
+# only and must never be exposed to the frontend.
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
 
 HOST = "0.0.0.0"
 PORT = 8080
 
-# Capability metadata is intentionally descriptive only. It does not change
-# request construction or enable/disable tools. Unknown capabilities stay
-# unknown until confirmed by Yandex documentation/API for the project.
 TEXT_MODELS = {
     "alice-lite": {"name": "Alice Lite", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.20, "cached": 0.05, "tool": 0.05, "output": 0.20},
     "aliceai-llm": {"name": "Alice AI LLM", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.50, "cached": 0.50, "tool": 0.13, "output": 1.20},
@@ -56,7 +56,6 @@ VOICE_MODELS = {
 }
 
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
-
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
 
@@ -67,6 +66,7 @@ class Config:
     BASE_URL = BASE_URL
     SUPABASE_URL = SUPABASE_URL
     SUPABASE_ANON_KEY = SUPABASE_ANON_KEY
+    SUPABASE_SERVICE_ROLE_KEY = SUPABASE_SERVICE_ROLE_KEY
     SUPABASE_DB_URL = SUPABASE_DB_URL
     HOST = HOST
     PORT = PORT
@@ -107,7 +107,14 @@ def calculate_full_cost(model_key, usage):
     return round(token_cost + audio_cost, 4)
 
 
-# Singleton instance for backward compatibility
 config = Config()
-
 REPO_DIR = "/sdcard/repo"
+
+# Install the optional hook after configuration is fully initialized. Import
+# failures are visible in logs instead of being silently discarded.
+try:
+    import trace_mirror_integration  # noqa: F401,E402
+except ImportError:
+    logger.debug("Trace mirror integration is unavailable", exc_info=True)
+except Exception:
+    logger.warning("Failed to install trace mirror integration", exc_info=True)
