@@ -8,6 +8,7 @@ from config import Config, calculate_full_cost
 from trace_manager import ExecutionTrace
 from invocation_manager import create_invocation, start_invocation, finish_invocation, fail_invocation
 from invocation_trace import create_invocation_trace
+from mcp_trace import record_yandex_mcp_activity
 import mcp_storage
 from tool_registry import registry
 from db import (
@@ -20,7 +21,17 @@ logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
 
 class AliceClient(YandexMcpMixin, YandexResponsesClient):
-    pass
+    def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
+        response = super().ask_with_mcp(
+            message=message,
+            model_key=model_key,
+            conversation_id=conversation_id,
+            params=params,
+            trace=trace,
+        )
+        if trace is not None:
+            record_yandex_mcp_activity(trace)
+        return response
 
 @mcp_bp.route('/api/chat', methods=['POST'])
 def chat():
@@ -174,6 +185,7 @@ def chat():
                 else:
                     trace = ExecutionTrace()
             trace.record_error("chat_pipeline", error_message, exception=e)
+            record_yandex_mcp_activity(trace)
             trace_data = trace.finalize()
             responses = trace_data.get("responses", [])
             partial_output, _ = extract_last_response_text(responses)
