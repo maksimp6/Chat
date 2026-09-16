@@ -21,7 +21,7 @@ class YandexRequestBuilderTests(unittest.TestCase):
         self.assertEqual(payload["model"], "gpt://project/model/latest")
         self.assertEqual(payload["input"], [{"role": "user", "content": "hello"}])
         self.assertFalse(payload["background"])
-        self.assertFalse(payload["store"])
+        self.assertTrue(payload["store"])
         self.assertEqual(payload["temperature"], 0.2)
         self.assertEqual(payload["top_p"], 0.8)
         self.assertEqual(payload["max_output_tokens"], 100)
@@ -73,7 +73,7 @@ class YandexRequestBuilderTests(unittest.TestCase):
         )
         self.assertEqual(payload["metadata"], {"trace_id": "trace-1"})
         self.assertEqual(payload["conversation"], {"id": "conv-yandex"})
-        self.assertNotIn("conv-local", payload.values())
+        self.assertEqual(payload["prompt_cache_key"], "conv-local")
 
 
 if __name__ == "__main__":
