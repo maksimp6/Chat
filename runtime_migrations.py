@@ -1,5 +1,7 @@
 """Schema additions for serverless/sessioned execution."""
 
+import sqlite3
+
 from db import get_conn
 
 
@@ -12,9 +14,16 @@ def init_runtime_tables() -> None:
                 status TEXT NOT NULL DEFAULT 'active',
                 metadata_json TEXT NOT NULL DEFAULT '{}',
                 created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
+                updated_at INTEGER NOT NULL,
+                completed_at INTEGER
             )
         """)
+        # Existing installations created before completed_at need the additive migration.
+        try:
+            conn.execute("ALTER TABLE sessions ADD COLUMN completed_at INTEGER")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
         conn.execute("""
             CREATE TABLE IF NOT EXISTS invocations (
                 id TEXT PRIMARY KEY,
