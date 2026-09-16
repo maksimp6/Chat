@@ -56,3 +56,12 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();
 })();
+
+/* Load the optional trace export integration after the viewer is available. */
+(function () {
+    "use strict";
+    var script = document.createElement("script");
+    script.src = "/static/trace_download.js";
+    script.defer = false;
+    (document.head || document.documentElement).appendChild(script);
+})();
