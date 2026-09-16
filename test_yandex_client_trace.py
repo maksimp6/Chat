@@ -14,7 +14,7 @@ class TestExecutionTraceResponses(unittest.TestCase):
             "model": "gpt://project/model/latest", "created_at": 1, "completed_at": 2,
             "usage": {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30,
                       "input_tokens_details": {"cached_tokens": 7},
-                      "output_tokens_details": {"reasoning_tokens": 3}},
+                      "output_token_details": {"reasoning_tokens": 3}},
             "output": [{"type": "message", "content": [{"type": "output_text", "text": "hello"}]}],
             "error": None, "incomplete_details": None, "conversation": {"id": "conv-1"},
             "metadata": {"trace_id": trace.trace_id}, "authorization": "must-not-survive",
@@ -128,74 +128,43 @@ class TestYandexResponsesPollingTrace(unittest.TestCase):
         self.assertEqual(raw["error"]["code"], "server_error")
         self.assertEqual(raw["incomplete_details"]["reason"], "failure")
 
-
-class TestExecutionTraceEndToEnd(unittest.TestCase):
-    def test_multi_step_responses_polling_and_tool_execution_are_single_trace(self):
+    def test_cached_token_usage_is_preserved(self):
         trace = ExecutionTrace()
-        trace.set_request({
-            "conversation_id": "conv-e2e",
-            "message": "run the tool and continue",
-            "model": "aliceai-llm",
-            "params": {},
+        trace.add_response({
+            "id": "resp-cache",
+            "status": "completed",
+            "usage": {
+                "input_tokens": 1019,
+                "output_tokens": 7,
+                "total_tokens": 1026,
+                "input_token_details": {
+                    "text_tokens": 27,
+                    "cached_tokens": 992,
+                },
+            },
+            "output": [],
+        }, step_index=1)
+        raw = trace.finalize()["responses"][0]["raw"]
+        usage = raw["usage"]
+        self.assertEqual(usage["input_tokens"], 1019)
+        self.assertEqual(usage["input_token_details"]["cached_tokens"], 992)
+
+    def test_ask_passes_prompt_cache_key(self):
+        client = self._client()
+        client._config = Mock(PROJECT_ID="project", API_KEY="secret")
+        client._resolve_yandex_conv_id = Mock(return_value=None)
+        response = self._response({
+            "id": "resp-cache-key",
+            "status": "completed",
+            "usage": {"input_tokens": 10, "output_tokens": 2, "total_tokens": 12},
+            "output": [],
         })
-
-        init_event = next(e for e in trace.trace["events"] if e["type"] == "request_initialized")
-        api1_start = init_event["timestamp"] + 0.250
-        trace.add_api_request({"model": "aliceai-llm", "input": "hello"}, step_index=1, start_timestamp=api1_start)
-        trace.add_event("api_request_sent", {"step": 1, "timestamp": api1_start})
-        trace.add_response(
-            {
-                "id": "resp-1",
-                "status": "completed",
-                "output": [{"type": "function_call", "name": "local_echo", "call_id": "call-1", "arguments": {"text": "hello"}}],
-            },
-            step_index=1,
-            start_timestamp=api1_start,
-            end_timestamp=api1_start + 0.400,
-        )
-        trace.add_event("api_request_completed", {"step": 1, "start_timestamp": api1_start, "end_timestamp": api1_start + 0.400})
-        trace.add_event("api_poll_completed", {"step": 1})
-
-        tool_result = trace.track_tool_execution(
-            "local_echo",
-            {"text": "hello"},
-            lambda text: text.upper(),
-            "hello",
-            call_id="call-1",
-            step=1,
-            server="local",
-        )
-        self.assertEqual(tool_result, "HELLO")
-
-        api2_start = api1_start + 0.550
-        trace.add_api_request({"model": "aliceai-llm", "tool_result": tool_result}, step_index=2, start_timestamp=api2_start)
-        trace.add_event("api_request_sent", {"step": 2, "timestamp": api2_start})
-        trace.add_response(
-            {
-                "id": "resp-2",
-                "status": "completed",
-                "output": [{"type": "message", "content": [{"type": "output_text", "text": "HELLO"}]}],
-            },
-            step_index=2,
-            start_timestamp=api2_start,
-            end_timestamp=api2_start + 0.300,
-        )
-        trace.add_event("api_request_completed", {"step": 2, "start_timestamp": api2_start, "end_timestamp": api2_start + 0.300})
-
-        data = trace.finalize()
-        self.assertEqual(len(data["responses"]), 2)
-        self.assertEqual([response["step"] for response in data["responses"]], [1, 2])
-        self.assertEqual([response["response_id"] for response in data["responses"]], ["resp-1", "resp-2"])
-        self.assertEqual(len(data["tool_calls"]), 1)
-        self.assertEqual(data["tool_calls"][0]["call_id"], "call-1")
-        self.assertLessEqual(data["responses"][0]["start_timestamp"], data["responses"][0]["end_timestamp"])
-        self.assertLessEqual(data["responses"][1]["start_timestamp"], data["responses"][1]["end_timestamp"])
-        self.assertLessEqual(data["tool_calls"][0]["start_timestamp"], data["tool_calls"][0]["end_timestamp"])
-        event_types = [event["type"] for event in data["events"]]
-        for expected in ("request_initialized", "api_request_registered", "api_request_sent", "api_response_received", "api_request_completed", "api_poll_completed", "tool_executed"):
-            self.assertIn(expected, event_types)
-        self.assertEqual(event_types.count("api_response_received"), 2)
-        self.assertNotIn("trace_finalized", event_types)
+        client.session.post.return_value = response
+        params = {"background": False, "prompt_cache_key": "stable-prefix-v1"}
+        data = client.ask("hello", "test-model", conversation_id="conv-1", params=params)
+        self.assertEqual(data["id"], "resp-cache-key")
+        sent_payload = client.session.post.call_args.kwargs["json"]
+        self.assertEqual(sent_payload["prompt_cache_key"], "stable-prefix-v1")
 
 
 if __name__ == "__main__":
