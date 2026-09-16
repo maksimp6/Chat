@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from functools import wraps
 from typing import Any, Mapping
 
 from supabase_trace_mirror import mirror_trace
@@ -28,6 +29,7 @@ def install_execution_trace_hook() -> None:
 
     original_finalize = ExecutionTrace.finalize
 
+    @wraps(original_finalize)
     def finalize_with_mirror(self: ExecutionTrace) -> dict[str, Any]:
         result = original_finalize(self)
         if not getattr(self, "_supabase_trace_mirrored", False):
