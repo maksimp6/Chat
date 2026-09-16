@@ -23,6 +23,7 @@ def install_execution_trace_hook() -> None:
     from trace_manager import ExecutionTrace
 
     if getattr(ExecutionTrace, "_supabase_mirror_hook_installed", False):
+        logger.debug("Supabase execution trace mirror hook is already installed")
         return
 
     original_finalize = ExecutionTrace.finalize
@@ -36,6 +37,7 @@ def install_execution_trace_hook() -> None:
 
     ExecutionTrace.finalize = finalize_with_mirror
     ExecutionTrace._supabase_mirror_hook_installed = True
+    logger.info("Installed Supabase execution trace mirror hook")
 
 
 install_execution_trace_hook()
