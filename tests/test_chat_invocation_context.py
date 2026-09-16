@@ -38,7 +38,7 @@ def test_chat_uses_invocation_context_identifiers():
     assert isinstance(captured["trace"], ExecutionTrace)
     assert captured["conversation_id"] == payload["conversation_id"]
     assert captured["trace"].trace_id == payload["trace_id"]
-    assert captured["trace"].trace["invocation_id"] == payload["invocation_id"]
+    assert captured["trace"].trace["context"]["invocation_id"] == payload["invocation_id"]
 
 
 def test_chat_context_is_fresh_for_each_request():
