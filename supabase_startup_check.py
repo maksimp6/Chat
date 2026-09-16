@@ -3,10 +3,27 @@ from __future__ import annotations
 
 import logging
 import os
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger("alice_app.supabase")
+
+
+def _safe_detail(detail: str, secret: str) -> str:
+    """Remove credentials from diagnostic text before it reaches the logs."""
+    detail = detail.replace(secret, "[REDACTED]") if secret else detail
+    return " ".join(detail.split())[:1000]
+
+
+def _http_error_detail(exc: HTTPError, secret: str) -> str:
+    """Return a bounded, secret-free HTTP error description."""
+    try:
+        body = exc.read().decode("utf-8", errors="replace")
+    except Exception:
+        body = ""
+    body = _safe_detail(body, secret)
+    return f"HTTP {exc.code} {exc.reason}" + (f": {body}" if body else "")
 
 
 def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
@@ -44,14 +61,21 @@ def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
             if 200 <= response.status < 300:
                 logger.info("Supabase trace mirror: ready")
                 return "ready"
-            logger.warning("Supabase trace mirror: error (HTTP %s)", response.status)
+            logger.warning(
+                "Supabase trace mirror: error (HTTP %s)", response.status
+            )
+    except HTTPError as exc:
+        detail = _http_error_detail(exc, service_key)
+        logger.warning(
+            "Supabase trace mirror: error (HTTP failure; %s; exception=%s)",
+            detail,
+            type(exc).__name__,
+        )
     except Exception as exc:
-        status = getattr(exc, "code", None)
-        if status in (401, 403):
-            reason = "credentials rejected or table access denied"
-        elif status == 404:
-            reason = "execution_traces table or endpoint not found"
-        else:
-            reason = "endpoint unavailable"
-        logger.warning("Supabase trace mirror: error (%s)", reason)
+        detail = _safe_detail(str(exc) or "no additional details", service_key)
+        logger.warning(
+            "Supabase trace mirror: error (exception=%s; detail=%s)",
+            type(exc).__name__,
+            detail,
+        )
     return "error"
