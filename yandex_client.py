@@ -16,6 +16,7 @@ from tool_registry import registry
 import mcp_storage
 from db import get_conv_settings
 from yandex_request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_request_builder import build_response_payload
 
 os.makedirs('logs', exist_ok=True)
 api_logger = logging.getLogger("yandex_api_debug")
@@ -146,52 +147,23 @@ class YandexResponsesClient(YandexFileManagerMixin):
         is_stream = params.get("stream", False)
         if is_background: params["store"] = True
         
-        payload = {
-            "model": "gpt://" + self._config.PROJECT_ID + "/" + model_key + "/latest",
-            "input": params.get("input") or [{"role": "user", "content": message}],
-            "background": is_background,
-            "store": params.get("store", True),
-        }
-        
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            payload["metadata"] = execution_trace.get_metadata()
-        
-        if params.get("instructions"): payload["instructions"] = params["instructions"]
-        if params.get("temperature") is not None: payload["temperature"] = float(params["temperature"])
-        if params.get("top_p") is not None: payload["top_p"] = float(params["top_p"])
-        if params.get("max_output_tokens"): payload["max_output_tokens"] = int(params["max_output_tokens"])
-        if params.get("prompt"): payload["prompt"] = params["prompt"]
-        if params.get("text"): payload["text"] = params["text"]
-        if params.get("truncation"): payload["truncation"] = params["truncation"]
-        if params.get("service_tier"): payload["service_tier"] = params["service_tier"]
-        cache_key = params.get("prompt_cache_key") or conversation_id
-        if cache_key:
-            payload["prompt_cache_key"] = str(cache_key)
-        if params.get("reasoning"):
-            payload["reasoning"] = params["reasoning"]
-        elif params.get("reasoning_effort") and params.get("reasoning_effort") != "disabled":
-            payload["reasoning"] = {"effort": params["reasoning_effort"]}
-
-        raw_tools = params.get("tools")
-        cleaned_tools = _clean_tools(raw_tools) if raw_tools else []
-        if cleaned_tools:
-            payload["tools"] = cleaned_tools
-            if params.get("tool_choice"):
-                payload["tool_choice"] = params["tool_choice"]
-            if params.get("max_tool_calls"):
-                payload["max_tool_calls"] = int(params["max_tool_calls"])
-
-            ptc = params.get("parallel_tool_calls")
-            if ptc is not None:
-                if isinstance(ptc, str):
-                    ptc = ptc.lower() not in ("false", "0")
-                payload["parallel_tool_calls"] = bool(ptc)
-            else:
-                payload["parallel_tool_calls"] = True
-        
         yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
-        if yandex_conv_id:
-            payload["conversation"] = {"id": yandex_conv_id}
+
+        metadata = (
+            execution_trace.get_metadata()
+            if execution_trace and isinstance(execution_trace, ExecutionTrace)
+            else None
+        )
+
+        payload = build_response_payload(
+            project_id=self._config.PROJECT_ID,
+            model_key=model_key,
+            message=message,
+            params=params,
+            metadata=metadata,
+            conversation_id=conversation_id,
+            yandex_conv_id=yandex_conv_id,
+        )
 
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
