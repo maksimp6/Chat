@@ -32,7 +32,6 @@ def chat():
     conv_id = None
     partial_output = None
     error_message = None
-    model_key = None
 
     try:
         data = request.get_json(silent=True) or {}
@@ -44,13 +43,7 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
-        # One request owns exactly one InvocationContext and one trace.
-        # Keep the existing conversation_id API contract for compatibility.
-        invocation = create_invocation(
-            session_id=conv_id,
-            conversation_id=conv_id,
-            metadata={"model": model_key},
-        )
+        invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
         trace = create_invocation_trace(invocation)
         start_invocation(invocation.invocation_id)
         trace.set_request({
@@ -175,11 +168,7 @@ def chat():
         try:
             if trace is None:
                 if conv_id:
-                    invocation = create_invocation(
-                        session_id=conv_id,
-                        conversation_id=conv_id,
-                        metadata={"model": model_key},
-                    )
+                    invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
                     trace = create_invocation_trace(invocation)
                     start_invocation(invocation.invocation_id)
                 else:
@@ -190,9 +179,8 @@ def chat():
             partial_output, _ = extract_last_response_text(responses)
             reply = format_partial_output_message(partial_output, error_message)
 
-            target_conv_id = invocation.conversation_id if invocation is not None else conv_id
-            if target_conv_id:
-                add_message(target_conv_id, "assistant", reply, trace=trace_data)
+            if conv_id:
+                add_message(conv_id, "assistant", reply, trace=trace_data)
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
 
