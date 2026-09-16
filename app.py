@@ -12,6 +12,7 @@ from mcp_routes import mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime_migrations import init_runtime_tables
+from supabase_startup_check import check_supabase_trace_mirror
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +32,7 @@ app.register_blueprint(runtime_bp)
 # Инициализация БД
 init_db()
 init_runtime_tables()
+check_supabase_trace_mirror()
 
 @app.route("/")
 def index():
