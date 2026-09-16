@@ -16,9 +16,11 @@ from db import (
     get_conv_settings, save_conv_settings
 )
 from partial_output import extract_last_response_text, format_partial_output_message
+from responses_tool_loop import run_tool_loop, extract_function_calls
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
+
 
 class AliceClient(YandexMcpMixin, YandexResponsesClient):
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
@@ -29,9 +31,52 @@ class AliceClient(YandexMcpMixin, YandexResponsesClient):
             params=params,
             trace=trace,
         )
+
+        calls = extract_function_calls(response)
+        if calls:
+            approval_required = False
+            for call in calls:
+                func_name = call.get("name") or call.get("function", {}).get("name")
+                if func_name and "<|" in func_name:
+                    func_name = func_name.split("<|")[0].strip()
+                tool_config = registry.get_tool_meta(func_name)
+                if tool_config and tool_config.get("requires_approval"):
+                    approval_required = True
+                    break
+
+            if not approval_required:
+                tool_servers = mcp_storage.list_servers()
+                base_params = dict(params or {})
+
+                def execute_tool(call):
+                    result = self._execute_single_tool(call, tool_servers)
+                    if result.get("error"):
+                        return {"error": result["error"], "tool": result.get("name")}
+                    return result.get("result")
+
+                def continue_request(input_items, previous_response):
+                    continuation_params = dict(base_params)
+                    continuation_params["input"] = input_items
+                    continuation_params["background"] = base_params.get("background", True)
+                    return self.ask(
+                        message="",
+                        model_key=model_key,
+                        conversation_id=conversation_id,
+                        params=continuation_params,
+                        execution_trace=trace,
+                    )
+
+                response = run_tool_loop(
+                    response,
+                    execute_tool,
+                    continue_request,
+                    max_rounds=16,
+                )
+
         if trace is not None:
             record_yandex_mcp_activity(trace)
         return response
+
 
 @mcp_bp.route('/api/chat', methods=['POST'])
 def chat():
@@ -150,7 +195,7 @@ def chat():
 
         reasoning, reply = client.extract_reasoning_and_text(response)
         if not reply:
-            reply = "Команда выполнена успешно."
+            raise RuntimeError("Responses API завершил tool-call цепочку без текстового ответа")
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
@@ -218,96 +263,6 @@ def chat():
             }), 500
 
 @mcp_bp.route('/api/tools/categories', methods=['GET'])
-def list_tool_categories():
-    return jsonify({
-        "categories": registry.get_available_categories()
-    })
-
-@mcp_bp.route('/api/conversations/<conv_id>/tools', methods=['GET', 'PUT'])
-def conv_tools(conv_id):
-    if request.method == 'PUT':
-        data = request.get_json(silent=True) or {}
-        categories = data.get("active_tool_categories", [])
-        settings = get_conv_settings(conv_id) or {}
-        settings["active_tool_categories"] = categories
-        save_conv_settings(conv_id, settings)
-        return jsonify({"status": "ok", "active_tool_categories": categories})
-
-    settings = get_conv_settings(conv_id) or {}
-    cats = settings.get("active_tool_categories")
-    if cats is None:
-        cats = list(registry.get_available_categories().keys())
-    return jsonify({"active_tool_categories": cats})
-
-@mcp_bp.route('/api/mcp-servers', methods=['GET', 'POST'])
-def handle_mcp_servers():
-    if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
-        sid = mcp_storage.create_server(data)
-        return jsonify({"status": "ok", "id": sid}), 201
-    return jsonify({"data": mcp_storage.list_servers()})
-
-@mcp_bp.route('/api/mcp-servers/<server_id>', methods=['GET', 'PUT', 'DELETE'])
-def handle_mcp_server_item(server_id):
-    if request.method == 'DELETE':
-        mcp_storage.delete_server(server_id)
-        return jsonify({"status": "deleted"})
-    if request.method == 'PUT':
-        data = request.get_json(silent=True) or {}
-        mcp_storage.update_server(server_id, data)
-        return jsonify({"status": "updated"})
-
-    srv = mcp_storage.get_server(server_id)
-    if not srv:
-        return jsonify({"error": "Сервер не найден"}), 404
-    return jsonify(srv)
-
-@mcp_bp.route('/api/conversations', methods=['GET', 'POST'])
-def conversations():
-    if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
-        client = AliceClient(Config)
-        try:
-            y_conv = client.create_conversation()
-            conv_id = y_conv.get('id') or str(uuid.uuid4())
-        except Exception:
-            conv_id = str(uuid.uuid4())
-        title = data.get('title', 'Новый диалог')
-        model = data.get('model', 'aliceai-llm')
-        create_conversation(conv_id, title, model)
-        return jsonify({"id": conv_id, "title": title, "model": model}), 201
-
-    return jsonify({"conversations": get_conversations()})
-
-@mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
-def get_conv_messages(conv_id):
-    return jsonify({"messages": get_messages(conv_id)})
-
-@mcp_bp.route('/api/mcp/execute-approved', methods=['POST'])
-def execute_approved():
-    try:
-        data = request.get_json(silent=True) or {}
-        conv_id = data.get("conversation_id")
-        func_name = data.get("name")
-        arguments = data.get("arguments", {})
-        model_key = data.get("model", "aliceai-llm")
-
-        tool_config = registry.get_tool_meta(func_name)
-        if not tool_config:
-            return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
-
-        exec_res = registry.execute(func_name, arguments)
-        client = AliceClient(Config)
-        prompt = (
-            f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
-            f"Результат: {exec_res}.\nДай краткий ответ о завершении."
-        )
-        synth_response = client.ask(prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."})
-        reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
-        usage = client.extract_usage(synth_response)
-        cost = calculate_full_cost(model_key, usage) if usage else 0.0
-
-        add_message(conv_id, "assistant", reply, cost=cost)
-        return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+def tool_categories():
+    categories = registry.get_categories()
+    return jsonify(categories)
