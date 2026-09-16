@@ -1,9 +1,10 @@
-/* ExecutionTrace export action for the existing Trace Viewer. */
+/* ExecutionTrace export actions for the existing Trace Viewer. */
 (function () {
     "use strict";
 
     var currentTrace = null;
     var buttonId = "alice-trace-download-btn";
+    var uploadButtonId = "alice-trace-upload-btn";
 
     function safeName(value) {
         return String(value || "trace").replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80) || "trace";
@@ -28,23 +29,24 @@
         return result;
     }
 
+    function buildPayload() {
+        if (!currentTrace) throw new Error("Трейс недоступен");
+        return JSON.stringify(redact(currentTrace), null, 2);
+    }
+
+    function traceFilename() {
+        return safeName(currentTrace && (currentTrace.trace_id || currentTrace.id || currentTrace.invocation_id)) + ".json";
+    }
+
     function download() {
-        if (!currentTrace) {
-            window.alert("Трейс недоступен для скачивания");
-            return;
-        }
         var payload;
-        try { payload = JSON.stringify(redact(currentTrace), null, 2); }
-        catch (error) {
-            window.alert("Не удалось подготовить трейс для скачивания");
-            return;
-        }
-        var id = currentTrace.trace_id || currentTrace.id || currentTrace.invocation_id || "trace";
+        try { payload = buildPayload(); }
+        catch (error) { window.alert(error.message || "Не удалось подготовить трейс"); return; }
         var blob = new Blob([payload], { type: "application/json;charset=utf-8" });
         var url = URL.createObjectURL(blob);
         var link = document.createElement("a");
         link.href = url;
-        link.download = safeName(id) + ".json";
+        link.download = traceFilename();
         link.style.display = "none";
         document.body.appendChild(link);
         link.click();
@@ -52,19 +54,63 @@
         window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
 
+    function uploadToFileManager() {
+        var payload;
+        try { payload = buildPayload(); }
+        catch (error) { window.alert(error.message || "Не удалось подготовить трейс"); return; }
+
+        var form = new FormData();
+        form.append("file", new Blob([payload], { type: "application/json" }), traceFilename());
+        form.append("purpose", "assistants");
+
+        var button = document.getElementById(uploadButtonId);
+        if (button) { button.disabled = true; button.textContent = "⏳ Загрузка..."; }
+
+        fetch("/api/files", { method: "POST", body: form })
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) throw new Error(data.error || "Ошибка загрузки");
+                    return data;
+                });
+            })
+            .then(function () {
+                window.alert("Трейс загружен в файловый менеджер: " + traceFilename());
+            })
+            .catch(function (error) {
+                window.alert("Не удалось загрузить трейс: " + error.message);
+            })
+            .finally(function () {
+                var currentButton = document.getElementById(uploadButtonId);
+                if (currentButton) { currentButton.disabled = false; currentButton.textContent = "☁ Файлы"; }
+            });
+    }
+
     function installButton() {
         var header = document.querySelector(".alice-trace-header");
-        if (!header || header.querySelector("#" + buttonId)) return;
+        if (!header) return;
         var close = header.querySelector("button");
-        var button = document.createElement("button");
-        button.id = buttonId;
-        button.type = "button";
-        button.className = "alice-trace-btn";
-        button.title = "Скачать полный трейс в JSON";
-        button.setAttribute("aria-label", "Скачать трейс в JSON");
-        button.textContent = "⇩ JSON";
-        button.addEventListener("click", download);
-        if (close) header.insertBefore(button, close); else header.appendChild(button);
+        if (!header.querySelector("#" + buttonId)) {
+            var button = document.createElement("button");
+            button.id = buttonId;
+            button.type = "button";
+            button.className = "alice-trace-btn";
+            button.title = "Скачать полный трейс в JSON";
+            button.setAttribute("aria-label", "Скачать трейс в JSON");
+            button.textContent = "⇩ JSON";
+            button.addEventListener("click", download);
+            if (close) header.insertBefore(button, close); else header.appendChild(button);
+        }
+        if (!header.querySelector("#" + uploadButtonId)) {
+            var uploadButton = document.createElement("button");
+            uploadButton.id = uploadButtonId;
+            uploadButton.type = "button";
+            uploadButton.className = "alice-trace-btn";
+            uploadButton.title = "Загрузить трейс в файловый менеджер";
+            uploadButton.setAttribute("aria-label", "Загрузить трейс в файловый менеджер");
+            uploadButton.textContent = "☁ Файлы";
+            uploadButton.addEventListener("click", uploadToFileManager);
+            if (close) header.insertBefore(uploadButton, close); else header.appendChild(uploadButton);
+        }
     }
 
     function hook() {
