@@ -129,5 +129,74 @@ class TestYandexResponsesPollingTrace(unittest.TestCase):
         self.assertEqual(raw["incomplete_details"]["reason"], "failure")
 
 
+class TestExecutionTraceEndToEnd(unittest.TestCase):
+    def test_multi_step_responses_polling_and_tool_execution_are_single_trace(self):
+        trace = ExecutionTrace()
+        trace.set_request({
+            "conversation_id": "conv-e2e",
+            "message": "run the tool and continue",
+            "model": "aliceai-llm",
+            "params": {},
+        })
+
+        init_event = next(e for e in trace.trace["events"] if e["type"] == "request_initialized")
+        api1_start = init_event["timestamp"] + 0.250
+        trace.add_api_request({"model": "aliceai-llm", "input": "hello"}, step_index=1, start_timestamp=api1_start)
+        trace.add_event("api_request_sent", {"step": 1, "timestamp": api1_start})
+        trace.add_response(
+            {
+                "id": "resp-1",
+                "status": "completed",
+                "output": [{"type": "function_call", "name": "local_echo", "call_id": "call-1", "arguments": {"text": "hello"}}],
+            },
+            step_index=1,
+            start_timestamp=api1_start,
+            end_timestamp=api1_start + 0.400,
+        )
+        trace.add_event("api_request_completed", {"step": 1, "start_timestamp": api1_start, "end_timestamp": api1_start + 0.400})
+        trace.add_event("api_poll_completed", {"step": 1})
+
+        tool_result = trace.track_tool_execution(
+            "local_echo",
+            {"text": "hello"},
+            lambda text: text.upper(),
+            "hello",
+            call_id="call-1",
+            step=1,
+            server="local",
+        )
+        self.assertEqual(tool_result, "HELLO")
+
+        api2_start = api1_start + 0.550
+        trace.add_api_request({"model": "aliceai-llm", "tool_result": tool_result}, step_index=2, start_timestamp=api2_start)
+        trace.add_event("api_request_sent", {"step": 2, "timestamp": api2_start})
+        trace.add_response(
+            {
+                "id": "resp-2",
+                "status": "completed",
+                "output": [{"type": "message", "content": [{"type": "output_text", "text": "HELLO"}]}],
+            },
+            step_index=2,
+            start_timestamp=api2_start,
+            end_timestamp=api2_start + 0.300,
+        )
+        trace.add_event("api_request_completed", {"step": 2, "start_timestamp": api2_start, "end_timestamp": api2_start + 0.300})
+
+        data = trace.finalize()
+        self.assertEqual(len(data["responses"]), 2)
+        self.assertEqual([response["step"] for response in data["responses"]], [1, 2])
+        self.assertEqual([response["response_id"] for response in data["responses"]], ["resp-1", "resp-2"])
+        self.assertEqual(len(data["tool_calls"]), 1)
+        self.assertEqual(data["tool_calls"][0]["call_id"], "call-1")
+        self.assertLessEqual(data["responses"][0]["start_timestamp"], data["responses"][0]["end_timestamp"])
+        self.assertLessEqual(data["responses"][1]["start_timestamp"], data["responses"][1]["end_timestamp"])
+        self.assertLessEqual(data["tool_calls"][0]["start_timestamp"], data["tool_calls"][0]["end_timestamp"])
+        event_types = [event["type"] for event in data["events"]]
+        for expected in ("request_initialized", "api_request_registered", "api_request_sent", "api_response_received", "api_request_completed", "api_poll_completed", "tool_executed"):
+            self.assertIn(expected, event_types)
+        self.assertEqual(event_types.count("api_response_received"), 2)
+        self.assertNotIn("trace_finalized", event_types)
+
+
 if __name__ == "__main__":
     unittest.main()
