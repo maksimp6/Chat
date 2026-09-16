@@ -31,6 +31,14 @@ PORT=8080
 SECRET_KEY=<generate-a-random-secret>
 ```
 
+Для необязательного зеркала execution traces в Supabase добавьте на backend:
+```env
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` предназначен только для backend. Не передавайте его во frontend и не коммитьте реальное значение.
+
 **Никогда не коммитьте `.env`, API keys или другие credentials.**
 
 ### 4. Запуск приложения
@@ -48,7 +56,11 @@ python app.py
 - `YANDEX_API_KEY` — API-ключ Yandex Cloud.
 - `YANDEX_PROJECT_ID` — ID проекта Yandex Cloud.
 - `YANDEX_BASE_URL` — базовый URL API.
+- `SUPABASE_URL` — URL проекта Supabase для серверного зеркала трейсов.
+- `SUPABASE_SERVICE_ROLE_KEY` — backend-only credential для записи в закрытую таблицу трейсов.
 - `SECRET_KEY` — секрет Flask-сессий, если используется приложением.
+
+Зеркало Supabase является необязательным и должно быть best-effort: его сбои не должны ломать основной чатовый поток.
 
 Если credential когда-либо попал в Git, считайте его скомпрометированным: отзовите/ротируйте его в соответствующем сервисе. Удаление строки из текущего файла не удаляет её из Git history.
 
@@ -61,8 +73,12 @@ alice_pro/
 ├── app.py
 ├── config.py
 ├── yandex_client.py
+├── supabase_trace_mirror.py
+├── supabase/
+│   └── migrations/
 ├── templates/
 ├── static/
+├── tests/
 ├── docs/
 ├── .env.example
 ├── .gitignore
