@@ -5,16 +5,15 @@ import uuid
 import traceback
 from typing import Any, Dict, Optional
 
+from trace_security import MAX_DEPTH, MAX_ITEMS, MAX_REPR, SENSITIVE_KEYS, safe_repr, sanitize_trace_value
+
 
 class ExecutionTrace:
     SCHEMA_VERSION = 1
-    _SENSITIVE_KEYS = {
-        "api_key", "apikey", "authorization", "password", "passwd", "secret",
-        "token", "access_token", "refresh_token", "cookie", "set-cookie"
-    }
-    _MAX_REPR = 4000
-    _MAX_DEPTH = 12
-    _MAX_ITEMS = 50
+    _SENSITIVE_KEYS = SENSITIVE_KEYS
+    _MAX_REPR = MAX_REPR
+    _MAX_DEPTH = MAX_DEPTH
+    _MAX_ITEMS = MAX_ITEMS
     _INTERNAL_EVENT_TYPES = {"trace_finalized"}
 
     def __init__(self, trace_id: Optional[str] = None):
@@ -65,37 +64,7 @@ class ExecutionTrace:
 
     @classmethod
     def _safe_repr(cls, value: Any, depth: int = 0) -> Any:
-        if depth > cls._MAX_DEPTH:
-            return "<max-depth>"
-        if value is None or isinstance(value, (bool, int, float, str)):
-            if isinstance(value, str) and len(value) > cls._MAX_REPR:
-                return value[:cls._MAX_REPR] + "... <truncated>"
-            return value
-        if isinstance(value, dict):
-            result = {}
-            for index, (key, item) in enumerate(value.items()):
-                if index >= cls._MAX_ITEMS:
-                    result["<truncated>"] = f"{len(value) - cls._MAX_ITEMS} more items"
-                    break
-                key_text = str(key)
-                if key_text.lower().replace("-", "_") in cls._SENSITIVE_KEYS:
-                    result[key_text] = "<redacted>"
-                else:
-                    result[key_text] = cls._safe_repr(item, depth + 1)
-            return result
-        if isinstance(value, (list, tuple, set)):
-            values = list(value)
-            result = [cls._safe_repr(item, depth + 1) for item in values[:cls._MAX_ITEMS]]
-            if len(values) > cls._MAX_ITEMS:
-                result.append(f"<truncated: {len(values) - cls._MAX_ITEMS} more items>")
-            return result
-        try:
-            text = repr(value)
-        except Exception:
-            text = f"<{type(value).__name__}: repr failed>"
-        if len(text) > cls._MAX_REPR:
-            text = text[:cls._MAX_REPR] + "... <truncated>"
-        return text
+        return safe_repr(value, depth)
 
     @classmethod
     def _capture_exception_state(cls, exc: BaseException) -> Dict[str, Any]:
@@ -159,28 +128,7 @@ class ExecutionTrace:
 
     @classmethod
     def _sanitize_trace_value(cls, value: Any, depth: int = 0) -> Any:
-        if depth > cls._MAX_DEPTH:
-            return "<max-depth>"
-        if value is None or isinstance(value, (bool, int, float, str)):
-            if isinstance(value, str) and len(value) > cls._MAX_REPR:
-                return value[:cls._MAX_REPR] + "... <truncated>"
-            return value
-        if isinstance(value, dict):
-            result = {}
-            for key, item in list(value.items())[:cls._MAX_ITEMS]:
-                key_text = str(key)
-                normalized = key_text.lower().replace("-", "_")
-                result[key_text] = "<redacted>" if normalized in cls._SENSITIVE_KEYS else cls._sanitize_trace_value(item, depth + 1)
-            if len(value) > cls._MAX_ITEMS:
-                result["<truncated>"] = f"{len(value) - cls._MAX_ITEMS} more items"
-            return result
-        if isinstance(value, (list, tuple, set)):
-            items = list(value)
-            result = [cls._sanitize_trace_value(item, depth + 1) for item in items[:cls._MAX_ITEMS]]
-            if len(items) > cls._MAX_ITEMS:
-                result.append(f"<truncated: {len(items) - cls._MAX_ITEMS} more items>")
-            return result
-        return cls._safe_repr(value, depth)
+        return sanitize_trace_value(value, depth)
 
     def _update_billing_for_response(self, clean_raw: Dict[str, Any], step_index: int,
                                      response_id: Optional[str]) -> None:
@@ -248,6 +196,9 @@ class ExecutionTrace:
             if entry.get("start_timestamp") is not None:
                 start_timestamp = entry["start_timestamp"]
             snapshots = entry.setdefault("poll_snapshots", [])
+            previous_raw = entry.get("raw")
+            if not snapshots and previous_raw is not None:
+                snapshots.append(previous_raw)
             if not snapshots or snapshots[-1] != clean_raw:
                 snapshots.append(clean_raw)
             entry.update({"timestamp": end_timestamp, "raw": clean_raw,

@@ -15,6 +15,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tool_registry import registry
 import mcp_storage
 from db import get_conv_settings
+from yandex_request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_request_builder import build_response_payload
 
 os.makedirs('logs', exist_ok=True)
 api_logger = logging.getLogger("yandex_api_debug")
@@ -30,65 +32,6 @@ class YandexClientError(Exception):
     def __init__(self, message, status_code=None):
         super().__init__(message)
         self.status_code = status_code
-
-_BINARY_THRESHOLD = 100_000
-_BASE64_RE = re.compile(r'^[A-Za-z0-9+/]{200,}={0,2}$', re.DOTALL)
-_BINARY_KEYS = frozenset({
-    'audio', 'audio_bytes', 'audio_data',
-    'file_data', 'image_data', 'image_b64',
-    'attachment_data', 'screenshot',
-    'pcm', 'wav', 'ogg',
-})
-
-def _sanitize_for_log(obj):
-    if isinstance(obj, dict):
-        result = {}
-        for k, v in obj.items():
-            key_lower = k.lower() if isinstance(k, str) else str(k).lower()
-            if key_lower in _BINARY_KEYS and isinstance(v, str) and len(v) > 1000:
-                result[k] = f"<AUDIO/BINARY MASKED: {len(v)} chars>"
-            else:
-                result[k] = _sanitize_for_log(v)
-        return result
-    elif isinstance(obj, list):
-        return [_sanitize_for_log(item) for item in obj]
-    elif isinstance(obj, str):
-        if len(obj) > _BINARY_THRESHOLD:
-            if obj.startswith('data:'):
-                return f"<DATA_URI MASKED: {len(obj)} chars>"
-            if _BASE64_RE.match(obj):
-                return f"<BASE64 MASKED: {len(obj)} chars>"
-        return obj
-    else:
-        return obj
-
-def _clean_mcp_tool(tool):
-    if not isinstance(tool, dict) or tool.get("type") != "mcp":
-        return None
-    cid = tool.get("connector_id", "")
-    url = tool.get("server_url", "").strip()
-    if not url and not cid.startswith("connector_"):
-        return None
-    cleaned = {"type": "mcp", "server_label": tool.get("server_label", "mcp_server")}
-    if url: cleaned["server_url"] = url
-    if cid: cleaned["connector_id"] = cid
-    if tool.get("server_description"): cleaned["server_description"] = tool["server_description"]
-    if tool.get("require_approval"): cleaned["require_approval"] = tool["require_approval"]
-    if tool.get("authorization"): cleaned["authorization"] = tool["authorization"]
-    if tool.get("headers"): cleaned["headers"] = tool["headers"]
-    return cleaned
-
-def _clean_tools(tools):
-    if not isinstance(tools, list):
-        return tools
-    cleaned = []
-    for t in tools:
-        if isinstance(t, dict) and t.get("type") == "mcp":
-            res = _clean_mcp_tool(t)
-            if res is not None: cleaned.append(res)
-        else:
-            cleaned.append(t)
-    return cleaned
 
 from file_manager import YandexFileManagerMixin
 
@@ -176,52 +119,23 @@ class YandexResponsesClient(YandexFileManagerMixin):
         is_stream = params.get("stream", False)
         if is_background: params["store"] = True
         
-        payload = {
-            "model": "gpt://" + self._config.PROJECT_ID + "/" + model_key + "/latest",
-            "input": params.get("input") or [{"role": "user", "content": message}],
-            "background": is_background,
-            "store": params.get("store", True),
-        }
-        
-        if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            payload["metadata"] = execution_trace.get_metadata()
-        
-        if params.get("instructions"): payload["instructions"] = params["instructions"]
-        if params.get("temperature") is not None: payload["temperature"] = float(params["temperature"])
-        if params.get("top_p") is not None: payload["top_p"] = float(params["top_p"])
-        if params.get("max_output_tokens"): payload["max_output_tokens"] = int(params["max_output_tokens"])
-        if params.get("prompt"): payload["prompt"] = params["prompt"]
-        if params.get("text"): payload["text"] = params["text"]
-        if params.get("truncation"): payload["truncation"] = params["truncation"]
-        if params.get("service_tier"): payload["service_tier"] = params["service_tier"]
-        cache_key = params.get("prompt_cache_key") or conversation_id
-        if cache_key:
-            payload["prompt_cache_key"] = str(cache_key)
-        if params.get("reasoning"):
-            payload["reasoning"] = params["reasoning"]
-        elif params.get("reasoning_effort") and params.get("reasoning_effort") != "disabled":
-            payload["reasoning"] = {"effort": params["reasoning_effort"]}
-
-        raw_tools = params.get("tools")
-        cleaned_tools = _clean_tools(raw_tools) if raw_tools else []
-        if cleaned_tools:
-            payload["tools"] = cleaned_tools
-            if params.get("tool_choice"):
-                payload["tool_choice"] = params["tool_choice"]
-            if params.get("max_tool_calls"):
-                payload["max_tool_calls"] = int(params["max_tool_calls"])
-
-            ptc = params.get("parallel_tool_calls")
-            if ptc is not None:
-                if isinstance(ptc, str):
-                    ptc = ptc.lower() not in ("false", "0")
-                payload["parallel_tool_calls"] = bool(ptc)
-            else:
-                payload["parallel_tool_calls"] = True
-        
         yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
-        if yandex_conv_id:
-            payload["conversation"] = {"id": yandex_conv_id}
+
+        metadata = (
+            execution_trace.get_metadata()
+            if execution_trace and isinstance(execution_trace, ExecutionTrace)
+            else None
+        )
+
+        payload = build_response_payload(
+            project_id=self._config.PROJECT_ID,
+            model_key=model_key,
+            message=message,
+            params=params,
+            metadata=metadata,
+            conversation_id=conversation_id,
+            yandex_conv_id=yandex_conv_id,
+        )
 
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
@@ -518,7 +432,7 @@ class YandexMcpMixin:
         if conversation_id:
             try: enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
             except Exception: enabled_servers = []
-        
+
         for s in enabled_servers:
             if s.get("server_url") or (s.get("connector_id") or "").startswith("connector_"):
                 mcp_tools.append({
