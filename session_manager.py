@@ -65,6 +65,7 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
         "metadata": metadata,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+        "completed_at": row["completed_at"] if "completed_at" in row.keys() else None,
     }
 
 
@@ -100,6 +101,9 @@ def update_session(session_id: str, metadata: Optional[Dict[str, Any]] = None, s
             raise ValueError(f"Unsupported session status: {status}")
         fields.append("status = ?")
         values.append(status)
+        if status in {"completed", "failed", "cancelled"}:
+            fields.append("completed_at = ?")
+            values.append(_now())
     values.append(session_id)
     conn = get_conn()
     try:
