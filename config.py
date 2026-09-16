@@ -22,6 +22,13 @@ if not API_KEY:
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
 
+# Supabase settings are optional at startup. The backend can use these values
+# when trace-mirror integration is enabled, without requiring Supabase for the
+# existing chat flow.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
+
 HOST = "0.0.0.0"
 PORT = 8080
 
@@ -58,6 +65,9 @@ class Config:
     API_KEY = API_KEY
     PROJECT_ID = PROJECT_ID
     BASE_URL = BASE_URL
+    SUPABASE_URL = SUPABASE_URL
+    SUPABASE_ANON_KEY = SUPABASE_ANON_KEY
+    SUPABASE_DB_URL = SUPABASE_DB_URL
     HOST = HOST
     PORT = PORT
 
