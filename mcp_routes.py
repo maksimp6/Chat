@@ -47,24 +47,27 @@ def chat():
         trace = create_invocation_trace(invocation)
         start_invocation(invocation.invocation_id)
         trace.set_request({
-            "conversation_id": conv_id,
+            "conversation_id": invocation.conversation_id,
             "message": message,
             "model": model_key,
-            "params": params
+            "params": params,
+            "invocation_id": invocation.invocation_id,
+            "session_id": invocation.session_id,
+            "trace_id": invocation.trace_id,
         })
 
-        conv_settings = get_conv_settings(conv_id) or {}
+        conv_settings = get_conv_settings(invocation.conversation_id) or {}
         active_tools = conv_settings.get("active_tool_categories")
         if active_tools is not None:
             params["active_tool_categories"] = active_tools
 
-        add_message(conv_id, "user", message)
+        add_message(invocation.conversation_id, "user", message)
         client = AliceClient(Config)
 
         response = client.ask_with_mcp(
             message=message,
             model_key=model_key,
-            conversation_id=conv_id,
+            conversation_id=invocation.conversation_id,
             params=params,
             trace=trace
         )
@@ -142,7 +145,7 @@ def chat():
         total_ms = round((_time.perf_counter() - t_start) * 1000)
         trace_data = trace.finalize()
 
-        add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
+        add_message(invocation.conversation_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
         finish_invocation(invocation.invocation_id, result={"reply": reply, "usage": usage, "cost": cost})
 
         return jsonify({
@@ -166,8 +169,8 @@ def chat():
             if trace is None:
                 if conv_id:
                     invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
-                    start_invocation(invocation.invocation_id)
                     trace = create_invocation_trace(invocation)
+                    start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
             trace.record_error("chat_pipeline", error_message, exception=e)
@@ -177,12 +180,7 @@ def chat():
             reply = format_partial_output_message(partial_output, error_message)
 
             if conv_id:
-                add_message(
-                    conv_id,
-                    "assistant",
-                    reply,
-                    trace=trace_data
-                )
+                add_message(conv_id, "assistant", reply, trace=trace_data)
             if invocation is not None:
                 fail_invocation(invocation.invocation_id, error={"message": error_message})
 

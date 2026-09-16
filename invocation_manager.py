@@ -15,10 +15,27 @@ def _now() -> int:
     return int(datetime.now(timezone.utc).timestamp())
 
 
+def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
+    """Honor an explicit /api/chat session while preserving legacy behavior."""
+    if session_id != conversation_id:
+        return session_id
+    try:
+        from flask import has_request_context, request
+        if has_request_context():
+            data = request.get_json(silent=True) or {}
+            explicit = data.get("session_id")
+            if explicit:
+                return str(explicit)
+    except Exception:
+        pass
+    return session_id
+
+
 def create_invocation(session_id: str, conversation_id: str, metadata: Optional[Dict[str, Any]] = None) -> InvocationContext:
     # /api/chat historically accepted only conversation_id. Ensure the runtime
     # schema exists and create a stable legacy session on first use so existing
     # conversations can participate in the new invocation lifecycle.
+    session_id = _resolve_request_session_id(session_id, conversation_id)
     init_runtime_tables()
     session = restore_session(session_id)
     if not session:
