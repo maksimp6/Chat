@@ -3,7 +3,6 @@ logger.py - Централизованная система логировани
 """
 import logging
 import os
-import json
 from datetime import datetime
 from functools import wraps
 from logging.handlers import RotatingFileHandler
@@ -14,6 +13,7 @@ os.makedirs('logs', exist_ok=True)
 LOG_FORMAT = '%(asctime)s | %(levelname)-7s | %(name)s | %(message)s'
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
+
 class YCLoggingHandler(logging.Handler):
     def emit(self, record):
         try:
@@ -21,6 +21,7 @@ class YCLoggingHandler(logging.Handler):
             yc_logger.emit(record.levelname, msg, stream_name=record.name)
         except Exception:
             pass
+
 
 class AliceLogger:
     def __init__(self):
@@ -44,7 +45,12 @@ class AliceLogger:
         logger.setLevel(logging.DEBUG)
         if logger.handlers:
             logger.handlers.clear()
-        fh = RotatingFileHandler(filename, maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8')
+        fh = RotatingFileHandler(
+            filename,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+            encoding='utf-8',
+        )
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
         logger.addHandler(fh)
@@ -62,7 +68,9 @@ class AliceLogger:
     def get(self, name):
         return self.loggers.get(name, self.loggers['app'])
 
+
 alice_logger = AliceLogger()
+
 
 def log_function(logger_name='app'):
     def decorator(func):
@@ -80,6 +88,7 @@ def log_function(logger_name='app'):
         return wrapper
     return decorator
 
+
 def log_request(logger_name='app'):
     def decorator(func):
         @wraps(func)
@@ -87,9 +96,9 @@ def log_request(logger_name='app'):
             logger = alice_logger.get(logger_name)
             from flask import request
             logger.info(f"→ {request.method} {request.path}")
-            if request.json:
-                body = json.dumps(request.json, ensure_ascii=False).replace("\\r\\n", " ").replace("\\n", " ").replace("\\r", " ")
-                logger.debug(f"  Body: {body[:500]}")
+            if request.is_json:
+                keys = sorted(request.get_json(silent=True).keys()) if isinstance(request.get_json(silent=True), dict) else []
+                logger.debug(f"  JSON body received (fields={','.join(keys) if keys else 'none'})")
             start_time = datetime.now()
             try:
                 result = func(*args, **kwargs)
@@ -103,6 +112,7 @@ def log_request(logger_name='app'):
         return wrapper
     return decorator
 
+
 def log_error(error_type, context=None):
     logger = alice_logger.get('error')
     error_msg = f"[{error_type}]"
@@ -110,29 +120,36 @@ def log_error(error_type, context=None):
         error_msg += f" {context}"
     logger.error(error_msg, exc_info=True)
 
+
 def log_voice(message, level='info'):
     logger = alice_logger.get('voice')
     getattr(logger, level)(f"[VOICE] {message}")
+
 
 def log_chat(message, level='info'):
     logger = alice_logger.get('chat')
     getattr(logger, level)(f"[CHAT] {message}")
 
+
 def log_db(message, level='info'):
     logger = alice_logger.get('db')
     getattr(logger, level)(f"[DB] {message}")
+
 
 def log_search(message, level='info'):
     logger = alice_logger.get('search')
     getattr(logger, level)(f"[SEARCH] {message}")
 
+
 def log_prompt(message, level='info'):
     logger = alice_logger.get('prompts')
     getattr(logger, level)(f"[PROMPT] {message}")
 
+
 def log_export(message, level='info'):
     logger = alice_logger.get('export')
     getattr(logger, level)(f"[EXPORT] {message}")
+
 
 def log_stats(message, level='info'):
     logger = alice_logger.get('stats')
