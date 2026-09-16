@@ -16,9 +16,11 @@ from db import (
     get_conv_settings, save_conv_settings
 )
 from partial_output import extract_last_response_text, format_partial_output_message
+from responses_tool_loop import run_tool_loop, extract_function_calls
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
+
 
 class AliceClient(YandexMcpMixin, YandexResponsesClient):
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
@@ -29,9 +31,49 @@ class AliceClient(YandexMcpMixin, YandexResponsesClient):
             params=params,
             trace=trace,
         )
+
+        calls = extract_function_calls(response)
+        if calls:
+            approval_required = any(
+                (registry.get_tool_meta(
+                    (call.get("name") or call.get("function", {}).get("name") or "").split("<|", 1)[0].strip()
+                ) or {}).get("requires_approval")
+                for call in calls
+            )
+
+            if not approval_required:
+                tool_servers = mcp_storage.list_servers()
+                base_params = dict(params or {})
+
+                def execute_tool(call):
+                    result = self._execute_single_tool(call, tool_servers)
+                    if result.get("error"):
+                        return {"error": result["error"], "tool": result.get("name")}
+                    return result.get("result")
+
+                def continue_request(input_items, previous_response):
+                    continuation_params = dict(base_params)
+                    continuation_params["input"] = input_items
+                    continuation_params["background"] = base_params.get("background", True)
+                    return super(AliceClient, self).ask_with_mcp(
+                        message="",
+                        model_key=model_key,
+                        conversation_id=conversation_id,
+                        params=continuation_params,
+                        trace=trace,
+                    )
+
+                response = run_tool_loop(
+                    response,
+                    execute_tool,
+                    continue_request,
+                    max_rounds=16,
+                )
+
         if trace is not None:
             record_yandex_mcp_activity(trace)
         return response
+
 
 @mcp_bp.route('/api/chat', methods=['POST'])
 def chat():
@@ -150,7 +192,7 @@ def chat():
 
         reasoning, reply = client.extract_reasoning_and_text(response)
         if not reply:
-            reply = "Команда выполнена успешно."
+            raise RuntimeError("Responses API завершил tool-call цепочку без текстового ответа")
         usage = client.extract_usage(response)
         cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
