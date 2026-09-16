@@ -29,7 +29,7 @@ class TestExecutionTraceResponses(unittest.TestCase):
         self.assertEqual(raw["authorization"], "<redacted>")
         json.dumps(data)
 
-    def test_internal_lifecycle_events_are_not_user_events(self):
+    def test_lifecycle_events_are_preserved_but_trace_finalized_is_internal(self):
         trace = ExecutionTrace()
         trace.add_event("api_poll_completed", {"status": "completed"})
         trace.add_event("trace_finalized", {})
@@ -37,7 +37,8 @@ class TestExecutionTraceResponses(unittest.TestCase):
         trace.add_event("api_response_received", {"step": 1})
         data = trace.finalize()
         types = [event["type"] for event in data["events"]]
-        self.assertEqual(types, ["api_response_received"])
+        self.assertEqual(types, ["api_poll_completed", "api_request_completed", "api_response_received"])
+        self.assertNotIn("trace_finalized", types)
 
     def test_circular_trace_reference_is_not_serialized(self):
         trace = ExecutionTrace()
