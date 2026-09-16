@@ -6,6 +6,8 @@ import json as _json
 from yandex_client import YandexResponsesClient, YandexMcpMixin
 from config import Config, calculate_full_cost
 from trace_manager import ExecutionTrace
+from invocation_manager import create_invocation, start_invocation, finish_invocation, fail_invocation
+from invocation_trace import create_invocation_trace
 import mcp_storage
 from tool_registry import registry
 from db import (
@@ -24,7 +26,8 @@ class AliceClient(YandexMcpMixin, YandexResponsesClient):
 def chat():
     import time as _time
     t_start = _time.perf_counter()
-    trace = ExecutionTrace()
+    trace = None
+    invocation = None
     trace_data = {}
     conv_id = None
     partial_output = None
@@ -40,6 +43,9 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
+        invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
+        trace = create_invocation_trace(invocation)
+        start_invocation(invocation.invocation_id)
         trace.set_request({
             "conversation_id": conv_id,
             "message": message,
@@ -63,11 +69,6 @@ def chat():
             trace=trace
         )
 
-        # The Responses API timer intentionally starts at the actual outbound
-        # request. Account for work before that request explicitly instead of
-        # leaving an unexplained gap between request_initialized and the first
-        # API span. Use the recorded backend timestamps, not event insertion
-        # time, because this marker is created after ask_with_mcp returns.
         api_requests = trace.trace.get("api_requests", [])
         if api_requests:
             first_api_start = api_requests[0].get("timestamp")
@@ -128,6 +129,7 @@ def chat():
                             "call_id": tc.get("call_id") or tc.get("id") or func_name
                         },
                         "original_message": message,
+                        "invocation_id": invocation.invocation_id,
                         "trace": trace_data
                     })
 
@@ -141,6 +143,7 @@ def chat():
         trace_data = trace.finalize()
 
         add_message(conv_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
+        finish_invocation(invocation.invocation_id, result={"reply": reply, "usage": usage, "cost": cost})
 
         return jsonify({
             "reply": reply,
@@ -149,19 +152,30 @@ def chat():
             "timings": timings,
             "total_duration_ms": total_ms,
             "reasoning": reasoning,
+            "invocation_id": invocation.invocation_id,
+            "session_id": invocation.session_id,
+            "conversation_id": invocation.conversation_id,
+            "trace_id": invocation.trace_id,
             "trace": trace_data
         })
     except Exception as e:
         logger.exception(f"[CHAT] Ошибка: {e}")
         error_message = str(e)
-        
+
         try:
+            if trace is None:
+                if conv_id:
+                    invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
+                    start_invocation(invocation.invocation_id)
+                    trace = create_invocation_trace(invocation)
+                else:
+                    trace = ExecutionTrace()
             trace.record_error("chat_pipeline", error_message, exception=e)
             trace_data = trace.finalize()
             responses = trace_data.get("responses", [])
             partial_output, _ = extract_last_response_text(responses)
             reply = format_partial_output_message(partial_output, error_message)
-            
+
             if conv_id:
                 add_message(
                     conv_id,
@@ -169,14 +183,20 @@ def chat():
                     reply,
                     trace=trace_data
                 )
-            
+            if invocation is not None:
+                fail_invocation(invocation.invocation_id, error={"message": error_message})
+
             return jsonify({
                 "error": error_message,
                 "reply": reply,
                 "partial_output": partial_output if partial_output else None,
+                "invocation_id": invocation.invocation_id if invocation else None,
+                "session_id": invocation.session_id if invocation else None,
+                "conversation_id": invocation.conversation_id if invocation else conv_id,
+                "trace_id": invocation.trace_id if invocation else trace.trace_id,
                 "trace": trace_data
             }), 500
-            
+
         except Exception as inner_e:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
             return jsonify({
