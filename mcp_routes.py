@@ -190,10 +190,7 @@ def chat():
             partial_output, _ = extract_last_response_text(responses)
             reply = format_partial_output_message(partial_output, error_message)
 
-            if invocation is not None:
-                target_conv_id = invocation.conversation_id
-            else:
-                target_conv_id = conv_id
+            target_conv_id = invocation.conversation_id if invocation is not None else conv_id
             if target_conv_id:
                 add_message(target_conv_id, "assistant", reply, trace=trace_data)
             if invocation is not None:
@@ -271,3 +268,45 @@ def conversations():
         client = AliceClient(Config)
         try:
             y_conv = client.create_conversation()
+            conv_id = y_conv.get('id') or str(uuid.uuid4())
+        except Exception:
+            conv_id = str(uuid.uuid4())
+        title = data.get('title', 'Новый диалог')
+        model = data.get('model', 'aliceai-llm')
+        create_conversation(conv_id, title, model)
+        return jsonify({"id": conv_id, "title": title, "model": model}), 201
+
+    return jsonify({"conversations": get_conversations()})
+
+@mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
+def get_conv_messages(conv_id):
+    return jsonify({"messages": get_messages(conv_id)})
+
+@mcp_bp.route('/api/mcp/execute-approved', methods=['POST'])
+def execute_approved():
+    try:
+        data = request.get_json(silent=True) or {}
+        conv_id = data.get("conversation_id")
+        func_name = data.get("name")
+        arguments = data.get("arguments", {})
+        model_key = data.get("model", "aliceai-llm")
+
+        tool_config = registry.get_tool_meta(func_name)
+        if not tool_config:
+            return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
+
+        exec_res = registry.execute(func_name, arguments)
+        client = AliceClient(Config)
+        prompt = (
+            f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
+            f"Результат: {exec_res}.\nДай краткий ответ о завершении."
+        )
+        synth_response = client.ask(prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."})
+        reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
+        usage = client.extract_usage(synth_response)
+        cost = calculate_full_cost(model_key, usage) if usage else 0.0
+
+        add_message(conv_id, "assistant", reply, cost=cost)
+        return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
