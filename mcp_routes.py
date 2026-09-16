@@ -47,6 +47,7 @@ def chat():
     try:
         data = request.get_json(silent=True) or {}
         conv_id = data.get('conversation_id')
+        session_id = data.get('session_id') or conv_id
         message = data.get('message')
         params = data.get('params', {})
         model_key = data.get('model') or params.get('model', 'aliceai-llm')
@@ -54,7 +55,7 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
-        invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
+        invocation = create_invocation(session_id, conv_id, metadata={"model": model_key})
         trace = create_invocation_trace(invocation)
         start_invocation(invocation.invocation_id)
         trace.set_request({
@@ -179,7 +180,7 @@ def chat():
         try:
             if trace is None:
                 if conv_id:
-                    invocation = create_invocation(conv_id, conv_id, metadata={"model": model_key})
+                    invocation = create_invocation(session_id, conv_id, metadata={"model": model_key})
                     trace = create_invocation_trace(invocation)
                     start_invocation(invocation.invocation_id)
                 else:
