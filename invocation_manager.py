@@ -7,7 +7,8 @@ from typing import Any, Dict, Optional
 
 from db import get_conn
 from invocation_context import InvocationContext
-from session_manager import restore_session
+from runtime_migrations import init_runtime_tables
+from session_manager import create_session, restore_session
 
 
 def _now() -> int:
@@ -15,9 +16,13 @@ def _now() -> int:
 
 
 def create_invocation(session_id: str, conversation_id: str, metadata: Optional[Dict[str, Any]] = None) -> InvocationContext:
+    # /api/chat historically accepted only conversation_id. Ensure the runtime
+    # schema exists and create a stable legacy session on first use so existing
+    # conversations can participate in the new invocation lifecycle.
+    init_runtime_tables()
     session = restore_session(session_id)
     if not session:
-        raise ValueError(f"Session not found: {session_id}")
+        session = create_session(session_id, metadata={"conversation_id": conversation_id, "legacy": True})
 
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
