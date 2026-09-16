@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import logging
 import json
 from config import Config, TEXT_MODELS, VOICE_MODELS
-from yandex_client import YandexResponsesClient, YandexMcpMixin
+from yandex_client import YandexResponsesClient
 from db import (
     init_db, get_conversations, create_conversation, update_conversation_title,
     update_conversation_model, delete_conversation, get_messages, add_message,
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_app")
 
 # Инициализация единого клиента для file_routes и Responses API
-class AliceClient(YandexMcpMixin, YandexResponsesClient):
+class AliceClient(YandexResponsesClient):
     pass
 
 client = AliceClient(Config)
