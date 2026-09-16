@@ -20,7 +20,7 @@ class TraceSecurityTests(unittest.TestCase):
             value = {"level": value}
         sanitized = sanitize_trace_value(value)
         current = sanitized
-        for _ in range(12):
+        for _ in range(13):
             current = current["level"]
         self.assertEqual(current, "<max-depth>")
 
