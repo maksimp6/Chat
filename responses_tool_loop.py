@@ -1,13 +1,8 @@
-"""Helpers for continuing Yandex Responses API requests after tool calls.
-
-The API requires tool results to be sent as ``function_call_output`` items
-in a follow-up request.  Keeping this protocol handling isolated makes it
-possible to test it without making network requests.
-"""
+"""Helpers for continuing Yandex Responses API requests after tool calls."""
 from __future__ import annotations
 
 import json
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 def extract_function_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
@@ -18,8 +13,7 @@ def extract_function_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         if item.get("type") == "function_call":
             calls.append(item)
-            continue
-        if item.get("type") == "message":
+        elif item.get("type") == "message":
             calls.extend(
                 part
                 for part in item.get("content", []) or []
@@ -37,11 +31,7 @@ def make_function_call_output(call: dict[str, Any], result: Any) -> dict[str, An
         output = json.dumps(result, ensure_ascii=False)
     else:
         output = "" if result is None else str(result)
-    return {
-        "type": "function_call_output",
-        "call_id": call_id,
-        "output": output,
-    }
+    return {"type": "function_call_output", "call_id": call_id, "output": output}
 
 
 def build_continuation_input(
@@ -55,3 +45,28 @@ def build_continuation_input(
             f"tool call/result count mismatch: {len(calls)} != {len(values)}"
         )
     return [make_function_call_output(call, result) for call, result in zip(calls, values)]
+
+
+def run_tool_loop(
+    initial_response: dict[str, Any],
+    execute_tool: Callable[[dict[str, Any]], Any],
+    continue_request: Callable[[list[dict[str, Any]], dict[str, Any]], dict[str, Any]],
+    *,
+    max_rounds: int = 16,
+) -> dict[str, Any]:
+    """Execute function calls and continue until a response has no tool calls.
+
+    ``continue_request`` receives the complete previous ``output`` plus the
+    generated ``function_call_output`` items. This preserves reasoning and
+    other response items required by the Responses API protocol.
+    """
+    response = initial_response
+    for _ in range(max_rounds):
+        calls = extract_function_calls(response)
+        if not calls:
+            return response
+        results = [execute_tool(call) for call in calls]
+        tool_outputs = build_continuation_input(response, results)
+        continuation_input = list(response.get("output", []) or []) + tool_outputs
+        response = continue_request(continuation_input, response)
+    raise RuntimeError("Responses API tool loop exceeded max_rounds")
