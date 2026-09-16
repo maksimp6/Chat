@@ -22,7 +22,7 @@ logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
 
 
-class AliceClient(YandexMcpMixin, YandexResponsesClient):
+class AliceClient(YandexResponsesClient):
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
         response = super().ask_with_mcp(
             message=message,

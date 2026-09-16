@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_app")
 
 # Инициализация единого клиента для file_routes и Responses API
-class AliceClient(YandexMcpMixin, YandexResponsesClient):
+class AliceClient(YandexResponsesClient):
     pass
 
 client = AliceClient(Config)
