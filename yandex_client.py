@@ -72,49 +72,15 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
 
     @staticmethod
     def extract_reasoning_and_text(data):
-        if not isinstance(data, dict):
-            return "", str(data or "")
-        reasoning_parts = []
-        text_parts = []
-        for item in data.get("output", []):
-            if isinstance(item, dict):
-                content_list = item.get("content", [])
-                if isinstance(content_list, list):
-                    for part in content_list:
-                        if isinstance(part, dict):
-                            p_type = part.get("type")
-                            p_text = part.get("text", "")
-                            if p_type == "reasoning_text" and p_text:
-                                reasoning_parts.append(p_text)
-                            elif p_type in ("output_text", "text") and p_text:
-                                text_parts.append(p_text)
-                        elif isinstance(part, str):
-                            text_parts.append(part)
-                elif item.get("type") == "output_text" and item.get("text"):
-                    text_parts.append(str(item["text"]))
-        final_text = "".join(text_parts) or data.get("output_text") or data.get("text") or ""
-        final_reasoning = "\n\n".join(reasoning_parts)
-        return final_reasoning, str(final_text)
+        from yandex_client_modules.parsers import extract_reasoning_and_text
+        return extract_reasoning_and_text(data)
 
     @staticmethod
     def extract_text(data):
-        _, text = YandexResponsesClient.extract_reasoning_and_text(data)
-        return text
+        from yandex_client_modules.parsers import extract_text
+        return extract_text(data)
 
     @staticmethod
     def extract_usage(data):
-        if not isinstance(data, dict): return None
-        u = data.get("usage") or {}
-        in_det = u.get("input_tokens_details") or {}
-        out_det = u.get("output_tokens_details") or {}
-        return {
-            "input_tokens": u.get("input_tokens", 0),
-            "output_tokens": u.get("output_tokens", 0),
-            "total_tokens": u.get("total_tokens", 0),
-            "cached_tokens": in_det.get("cached_tokens", 0),
-            "tool_tokens": in_det.get("tool_tokens", 0),
-            "reasoning_tokens": out_det.get("reasoning_tokens", 0),
-            "created_at": data.get("created_at"),
-            "completed_at": data.get("completed_at"),
-            "incomplete_details": data.get("incomplete_details")
-        }
+        from yandex_client_modules.parsers import extract_usage
+        return extract_usage(data)
