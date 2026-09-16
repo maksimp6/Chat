@@ -7,21 +7,21 @@ from dotenv import load_dotenv
 _ENV_FILE = Path(__file__).resolve().with_name(".env")
 load_dotenv(_ENV_FILE)
 
+try:
+    import trace_mirror_integration  # noqa: F401
+except Exception:
+    pass
+
 API_KEY = os.getenv("YANDEX_API_KEY") or os.getenv("YC_API_KEY")
 if not API_KEY:
-    raise RuntimeError(
-        "Yandex API key is not configured. Set YANDEX_API_KEY (or legacy "
-        "YC_API_KEY) in the environment or in the project's .env file."
-    )
+    raise RuntimeError("Yandex API key is not configured. Set YANDEX_API_KEY (or legacy YC_API_KEY) in the environment or in the project's .env file.")
 
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
-
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
-
 HOST = "0.0.0.0"
 PORT = 8080
 
@@ -38,17 +38,14 @@ TEXT_MODELS = {
     "gpt-oss-20b": {"name": "GPT OSS 20B", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.10, "cached": 0.10, "tool": 0.10, "output": 0.10},
     "qwen3.6-35b-a3b": {"name": "Qwen3.6 35B A3B", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": True}, "input": 0.20, "cached": 0.05, "tool": 0.05, "output": 0.30},
 }
-
 VOICE_MODELS = {
     "speech-realtime-260528": {"name": "Speech Realtime 260528", "type": "voice", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.10, "cached": 0.025, "tool": 0.025, "output": 0.20},
     "speech-realtime-250923": {"name": "Speech Realtime 250923", "type": "voice", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.80, "cached": 0.20, "tool": 0.20, "output": 0.80},
     "speech-realtime-deepseek-v4-flash": {"name": "Speech Realtime DeepSeek V4 Flash", "type": "voice", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.30, "cached": 0.075, "tool": 0.075, "output": 0.50},
 }
-
 ALL_MODELS = {**TEXT_MODELS, **VOICE_MODELS}
 AUDIO_STT_PRICE_PER_SEC = 0.0264
 AUDIO_TTS_PRICE_PER_SEC = 0.0203
-
 
 class Config:
     API_KEY = API_KEY
@@ -61,20 +58,16 @@ class Config:
     HOST = HOST
     PORT = PORT
 
-
 def get_model_info(model_key):
     return ALL_MODELS.get(model_key, TEXT_MODELS["aliceai-llm"])
 
-
 def get_model_uri(model_key):
     return "gpt://" + PROJECT_ID + "/" + model_key + "/latest"
-
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):
     m = get_model_info(model_key)
     cost = (input_tokens * m["input"] + cached_tokens * m.get("cached", m["input"]) + tool_tokens * m.get("tool", m["input"]) + output_tokens * m.get("output", m["input"])) / 1000
     return round(cost, 2)
-
 
 def calculate_full_cost(model_key, usage):
     if not usage:
@@ -83,7 +76,6 @@ def calculate_full_cost(model_key, usage):
     token_cost = (usage.get("input_tokens", 0) * m["input"] + usage.get("output_tokens", 0) * m.get("output", m["input"])) / 1000
     audio_cost = usage.get("audio_seconds_stt", 0) * AUDIO_STT_PRICE_PER_SEC + usage.get("audio_seconds_tts", 0) * AUDIO_TTS_PRICE_PER_SEC
     return round(token_cost + audio_cost, 4)
-
 
 config = Config()
 REPO_DIR = "/sdcard/repo"
