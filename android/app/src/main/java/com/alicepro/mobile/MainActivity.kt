@@ -8,6 +8,10 @@ import android.widget.Toast
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.net.HttpURLConnection
@@ -21,11 +25,32 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Android 15+ enforces edge-to-edge for apps targeting SDK 35. Apply
+        // system-bar insets to the WebView so chat content is never hidden
+        // behind the status bar or navigation area.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
+
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+
+            view.updatePadding(
+                left = systemBars.left,
+                top = systemBars.top,
+                right = systemBars.right,
+                bottom = maxOf(systemBars.bottom, ime.bottom),
+            )
+
+            insets
+        }
+
         setContentView(webView)
+        ViewCompat.requestApplyInsets(webView)
 
         val storedKey = prefs.getString(KEY_YANDEX_API_KEY, "").orEmpty()
         if (storedKey.isBlank()) {
