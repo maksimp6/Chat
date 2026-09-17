@@ -34,6 +34,7 @@ def init_runtime_tables() -> None:
                 metadata_json TEXT NOT NULL DEFAULT '{}',
                 result_json TEXT,
                 error_json TEXT,
+                trace_json TEXT NOT NULL DEFAULT '{}',
                 created_at INTEGER NOT NULL,
                 started_at INTEGER,
                 completed_at INTEGER,
@@ -41,6 +42,12 @@ def init_runtime_tables() -> None:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
         """)
+        # Existing installations created before trace persistence need the additive migration.
+        try:
+            conn.execute("ALTER TABLE invocations ADD COLUMN trace_json TEXT NOT NULL DEFAULT '{}'")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
         conn.execute("CREATE INDEX IF NOT EXISTS idx_invocations_session ON invocations(session_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_invocations_conversation ON invocations(conversation_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_invocations_trace ON invocations(trace_id)")
