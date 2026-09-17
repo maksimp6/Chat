@@ -1,6 +1,3 @@
-import json
-import sqlite3
-
 import pytest
 
 
@@ -64,3 +61,33 @@ def test_invocation_result_is_json_persisted(runtime_db):
     loaded = get_invocation(context.invocation_id)
     assert loaded["result"] == payload
     assert loaded["metadata"] == {"source": "test"}
+
+
+def test_invocation_trace_is_persisted_independently_of_messages(runtime_db):
+    from invocation_manager import create_invocation, persist_invocation_trace, get_invocation
+    from session_manager import create_session
+    from invocation_trace import create_invocation_trace
+
+    session = create_session()
+    context = create_invocation(session["id"], "conversation-trace")
+    trace = create_invocation_trace(context)
+    trace.add_event("test_event", {"value": 42})
+    trace_data = trace.finalize()
+
+    assert persist_invocation_trace(context.invocation_id, trace_data)
+
+    loaded = get_invocation(context.invocation_id)
+    assert loaded["trace"]["trace_id"] == context.trace_id
+    assert loaded["trace"]["context"]["invocation_id"] == context.invocation_id
+    assert loaded["trace"]["events"][-1]["type"] == "test_event"
+
+
+def test_runtime_invocation_can_require_an_existing_session(runtime_db):
+    from invocation_manager import create_invocation
+
+    with pytest.raises(ValueError, match="Session not found"):
+        create_invocation(
+            "missing-session",
+            "conversation-a",
+            create_missing_session=False,
+        )
