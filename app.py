@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 import logging
 import json
-from config import Config, TEXT_MODELS, VOICE_MODELS
-from yandex_client import YandexResponsesClient
+from config import TEXT_MODELS, VOICE_MODELS
 from db import (
     init_db, get_conversations, create_conversation, update_conversation_title,
     update_conversation_model, delete_conversation, get_messages, add_message,
@@ -19,10 +18,6 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_app")
 
-class AliceClient(YandexResponsesClient):
-    pass
-
-client = AliceClient(Config)
 app.register_blueprint(mcp_bp)
 app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
