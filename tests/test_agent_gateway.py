@@ -10,6 +10,7 @@ from agent_gateway import (
     AgentAlreadyRegistered,
     AgentDescriptor,
     AgentGateway,
+    AgentInvocationError,
     AgentNotFound,
 )
 
@@ -75,7 +76,9 @@ def test_a2a_client_sends_json_rpc(monkeypatch):
     def fake_urlopen(request, timeout):
         captured["url"] = request.full_url
         captured["timeout"] = timeout
-        captured["headers"] = {key.lower(): value for key, value in request.header_items()}
+        captured["headers"] = {
+            key.lower(): value for key, value in request.header_items()
+        }
         captured["request"] = json.loads(request.data.decode("utf-8"))
         return FakeResponse()
 
@@ -115,7 +118,9 @@ def test_a2a_client_rejects_mismatched_response_id(monkeypatch):
         def read(self):
             return b'{"jsonrpc":"2.0","id":"wrong","result":{}}'
 
-    monkeypatch.setattr("agent_gateway.urlopen", lambda request, timeout: FakeResponse())
+    monkeypatch.setattr(
+        "agent_gateway.urlopen", lambda request, timeout: FakeResponse()
+    )
     client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
 
     with pytest.raises(A2AProtocolError, match="does not match"):
@@ -123,6 +128,8 @@ def test_a2a_client_rejects_mismatched_response_id(monkeypatch):
 
 
 def test_a2a_client_surfaces_json_rpc_errors(monkeypatch):
+    captured = {}
+
     class FakeResponse:
         def __enter__(self):
             return self
@@ -131,13 +138,22 @@ def test_a2a_client_surfaces_json_rpc_errors(monkeypatch):
             return False
 
         def read(self):
-            return b'{"jsonrpc":"2.0","id":"wrong","error":{"code":-1,"message":"denied"}}'
+            return json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": captured["request"]["id"],
+                    "error": {"code": -1, "message": "denied"},
+                }
+            ).encode("utf-8")
 
-    # Response id validation happens before surfacing the remote error.
-    monkeypatch.setattr("agent_gateway.urlopen", lambda request, timeout: FakeResponse())
+    def fake_urlopen(request, timeout):
+        captured["request"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr("agent_gateway.urlopen", fake_urlopen)
     client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
 
-    with pytest.raises(A2AProtocolError):
+    with pytest.raises(AgentInvocationError, match="denied"):
         client.send_message({"message": {"role": "user", "parts": []}})
 
 
