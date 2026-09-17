@@ -53,6 +53,10 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Stage Python runtime
+        working-directory: android
+        run: python scripts/stage_python.py
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
