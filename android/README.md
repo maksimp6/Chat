@@ -12,6 +12,14 @@ python scripts/stage_python.py
 gradle :app:assembleDebug
 ```
 
+To produce an updateable CI APK, pass a monotonically increasing build number:
+
+```bash
+gradle -PaliceBuildNumber=123 :app:assembleDebug
+```
+
+CI uses the GitHub Actions run number as the Android `versionCode`, so newer CI runs can be installed over older CI builds.
+
 The resulting APK is generated under:
 
 ```text
@@ -26,6 +34,16 @@ android/app/build/outputs/apk/debug/app-debug.apk
 - The Yandex AI Studio API key is entered on first launch and stored in app-private preferences. It is not bundled into the APK.
 - SQLite and the local repository are stored below the Python `HOME` directory supplied by Android.
 - Desktop behavior remains unchanged because `ALICE_LOCAL_REPO_DIR` defaults to `/sdcard/repo` outside Android.
+
+## CI APK updates
+
+The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk` artifact.
+
+The updater fetches public GitHub Actions metadata, validates the artifact SHA-256 digest, verifies package name and signing certificate, rejects APKs that are not newer than the installed build, and starts the Android package installer through a `FileProvider`.
+
+Artifact downloads use [nightly.link](https://nightly.link/) as an anonymous download proxy for GitHub Actions artifacts. GitHub's own artifact URLs are authentication-gated; nightly.link provides branch/run-specific links for public repositories. The source repository and selected workflow/run remain visible in the updater before installation.
+
+Automatic checking of the `master` branch is also performed periodically in the background. Development/CI builds still require explicit confirmation before installation.
 
 ## Scope
 
