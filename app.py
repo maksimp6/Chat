@@ -13,26 +13,24 @@ from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime_migrations import init_runtime_tables
 from supabase_startup_check import check_supabase_trace_mirror
+from treasury import init_treasury_tables, get_account, demo_top_up
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_app")
 
-# Инициализация единого клиента для file_routes и Responses API
 class AliceClient(YandexResponsesClient):
     pass
 
 client = AliceClient(Config)
-
-# Регистрация Blueprint модулей
 app.register_blueprint(mcp_bp)
 app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
 
-# Инициализация БД
 init_db()
 init_runtime_tables()
 check_supabase_trace_mirror()
+init_treasury_tables()
 
 @app.route("/")
 def index():
@@ -40,17 +38,10 @@ def index():
 
 @app.route("/api/models", methods=["GET"])
 def list_models():
-    """Отдает список моделей и тарифов для frontend (core.js, models.js)"""
-    return jsonify({
-        "text": TEXT_MODELS,
-        "voice": VOICE_MODELS
-    })
-
-# --- Управление диалогами ---
+    return jsonify({"text": TEXT_MODELS, "voice": VOICE_MODELS})
 
 @app.route("/api/conversations/<conv_id>", methods=["PATCH"])
 def patch_conversation(conv_id):
-    """Смена заголовка или модели из sidebar.js / core.js"""
     data = request.get_json(silent=True) or {}
     if "title" in data:
         update_conversation_title(conv_id, data["title"])
@@ -60,8 +51,7 @@ def patch_conversation(conv_id):
 
 @app.route("/api/conversations/<conv_id>/title", methods=["PUT"])
 def set_conv_title(conv_id):
-    data = request.get_json(silent=True) or {}
-    title = data.get("title")
+    title = (request.get_json(silent=True) or {}).get("title")
     if not title:
         return jsonify({"error": "Title is required"}), 400
     update_conversation_title(conv_id, title)
@@ -69,8 +59,7 @@ def set_conv_title(conv_id):
 
 @app.route("/api/conversations/<conv_id>/model", methods=["PUT"])
 def set_conv_model(conv_id):
-    data = request.get_json(silent=True) or {}
-    model = data.get("model")
+    model = (request.get_json(silent=True) or {}).get("model")
     if not model:
         return jsonify({"error": "Model is required"}), 400
     update_conversation_model(conv_id, model)
@@ -81,20 +70,15 @@ def remove_conv(conv_id):
     delete_conversation(conv_id)
     return jsonify({"status": "deleted"})
 
-# --- Настройки диалога ---
-
 @app.route("/api/conversations/<conv_id>/settings", methods=["GET"])
 def get_dialog_settings(conv_id):
-    settings = get_conv_settings(conv_id)
-    return jsonify(settings or {})
+    return jsonify(get_conv_settings(conv_id) or {})
 
 @app.route("/api/conversations/<conv_id>/settings", methods=["PUT"])
 def save_dialog_settings(conv_id):
-    data = request.get_json(silent=True) or {}
-    save_conv_settings(conv_id, data)
+    save_conv_settings(conv_id, request.get_json(silent=True) or {})
     return jsonify({"status": "ok"})
 
-# --- Подсистема глобальной памяти ---
 from memory_manager import load_memory_config, save_memory_config, clear_global_memory
 from db import get_conn
 import sqlite3
@@ -104,9 +88,7 @@ def api_memory_panel_data():
     cfg = load_memory_config()
     conn = get_conn()
     conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM global_memory ORDER BY updated_at DESC")
-    facts = [dict(r) for r in cur.fetchall()]
+    facts = [dict(r) for r in conn.execute("SELECT * FROM global_memory ORDER BY updated_at DESC").fetchall()]
     conn.close()
     return jsonify({"config": cfg, "facts": facts})
 
@@ -118,10 +100,22 @@ def api_update_memory_config():
 
 @app.route("/api/memory/clear", methods=["POST"])
 def api_clear_memory():
-    data = request.get_json(silent=True) or {}
-    category = data.get("category")
+    category = (request.get_json(silent=True) or {}).get("category")
     clear_global_memory(category)
     return jsonify({"status": "cleared", "category": category or "all"})
+
+@app.route("/api/treasury/account", methods=["GET"])
+def treasury_account():
+    return jsonify(get_account("default"))
+
+@app.route("/api/treasury/top-up", methods=["POST"])
+def treasury_top_up():
+    data = request.get_json(silent=True) or {}
+    try:
+        account = demo_top_up("default", data.get("amount"), data.get("description", "Demo top-up"))
+        return jsonify({"demo": True, "account": account}), 201
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
