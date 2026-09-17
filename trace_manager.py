@@ -20,6 +20,7 @@ class ExecutionTrace:
         self.trace_id = trace_id or str(uuid.uuid4())
         self.start_perf = time.perf_counter()
         self._finalized = False
+        self._treasury_settled = False
         self.trace: Dict[str, Any] = {
             "trace_id": self.trace_id,
             "schema_version": self.SCHEMA_VERSION,
@@ -43,14 +44,16 @@ class ExecutionTrace:
 
     def set_context(self, invocation_id: Optional[str] = None,
                     session_id: Optional[str] = None,
-                    conversation_id: Optional[str] = None) -> None:
+                    conversation_id: Optional[str] = None,
+                    owner_id: Optional[str] = None) -> None:
         context = self.trace.setdefault("context", {})
         for key, value in (("invocation_id", invocation_id), ("session_id", session_id),
-                           ("conversation_id", conversation_id), ("trace_id", self.trace_id)):
+                           ("conversation_id", conversation_id), ("owner_id", owner_id),
+                           ("trace_id", self.trace_id)):
             if value is not None:
                 context[key] = str(value)
         billing = self.trace.setdefault("billing", {})
-        for key in ("invocation_id", "session_id", "conversation_id", "trace_id"):
+        for key in ("invocation_id", "session_id", "conversation_id", "owner_id", "trace_id"):
             if key in context:
                 billing[key] = context[key]
 
@@ -285,6 +288,26 @@ class ExecutionTrace:
             event_payload["has_python_state"] = True
         self.add_event("error_occurred", event_payload)
 
+    def _settle_treasury(self) -> None:
+        if self._treasury_settled:
+            return
+        self._treasury_settled = True
+        try:
+            from billing import settle_billing_to_treasury
+            owner_id = (self.trace.get("context") or {}).get("owner_id")
+            result = settle_billing_to_treasury(self.trace.get("billing") or {}, owner_id)
+            self.trace["billing"]["treasury_settlement"] = result
+            self.add_event("treasury_settlement", {
+                "status": result.get("status"),
+                "reference": result.get("reference"),
+                "amount": result.get("amount"),
+            })
+        except Exception as exc:
+            self.trace.setdefault("billing", {})["treasury_settlement"] = {
+                "status": "failed", "error": str(exc)
+            }
+            self.record_error("treasury_settlement", str(exc), exception=exc)
+
     def finalize(self) -> Dict[str, Any]:
         if not self._finalized:
             total_ms = round((time.perf_counter() - self.start_perf) * 1000, 2)
@@ -296,6 +319,7 @@ class ExecutionTrace:
             self.trace["billing"] = aggregate_billing(billing.get("items", []), self.trace.get("context", {}))
         except Exception as exc:
             self.add_event("billing_error", {"error": str(exc)})
+        self._settle_treasury()
 
         def _json_default(obj):
             if isinstance(obj, ExecutionTrace):
