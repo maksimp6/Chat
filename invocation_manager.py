@@ -2,6 +2,7 @@
 
 import json
 import re
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -69,10 +70,17 @@ def create_invocation(
     if not session:
         if not create_missing_session:
             raise ValueError(f"Session not found: {session_id}")
-        session = create_session(
-            session_id,
-            metadata={"conversation_id": conversation_id, "legacy": True},
-        )
+        try:
+            session = create_session(
+                session_id,
+                metadata={"conversation_id": conversation_id, "legacy": True},
+            )
+        except sqlite3.IntegrityError:
+            # Another concurrent invocation won the first-use race. Reload the
+            # now-existing session rather than failing the request.
+            session = restore_session(session_id)
+            if not session:
+                raise
 
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
