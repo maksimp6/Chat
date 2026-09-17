@@ -64,7 +64,7 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} :app:assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
