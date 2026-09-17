@@ -34,38 +34,30 @@ def list_files():
 def upload_file():
     if 'file' not in request.files:
         return jsonify({"error": "No file part in request"}), 400
-    
     file = request.files['file']
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
-    
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         return jsonify({"error": f"File type not allowed. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"}), 400
-    
     content_length = request.content_length
     if content_length and content_length > MAX_FILE_SIZE:
         return jsonify({"error": "File too large (max 128 MB)"}), 413
-    
     file_stream = io.BytesIO()
     file.save(file_stream)
     file_stream.seek(0)
     file_content = file_stream.getvalue()
-    
     if len(file_content) == 0:
         return jsonify({"error": "File is empty (0 bytes)"}), 400
     if len(file_content) > MAX_FILE_SIZE:
         return jsonify({"error": "File too large (max 128 MB)"}), 413
-        
     try:
         client = get_client()
         purpose = request.form.get('purpose', 'assistants')
         logger.info(f"[FILES] Uploading '{file.filename}', size: {len(file_content)} bytes to Yandex API...")
-        
         result = client.upload_file(file_content, file.filename, purpose=purpose)
         logger.info(f"[FILES] Successfully uploaded: {result.get('id')}")
         return jsonify(result), 201
-        
     except YandexClientError as e:
         logger.error(f"[FILES] Yandex API error: {e}")
         return _err_response(e)
@@ -185,18 +177,16 @@ def remove_file_from_vs(vs_id, file_id):
         return _err_response(e)
 
 
-# === Local Files API (/sdcard/repo) ===
-LOCAL_REPO_DIR = "/sdcard/repo"
+# Local Files API. Desktop keeps the historical path; Android can override it.
+LOCAL_REPO_DIR = os.getenv("ALICE_LOCAL_REPO_DIR", "/sdcard/repo")
 
 @file_bp.route('/api/local-files', methods=['GET'])
 def list_local_files():
     try:
         subpath = request.args.get('path', '').strip('/')
         target_dir = os.path.join(LOCAL_REPO_DIR, subpath)
-        
         if not os.path.exists(target_dir):
             return jsonify({"error": f"Папка не найдена: {target_dir}"}), 404
-            
         items = []
         for entry in os.scandir(target_dir):
             items.append({
