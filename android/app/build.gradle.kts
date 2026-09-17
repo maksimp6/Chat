@@ -1,5 +1,3 @@
-import org.gradle.api.tasks.Sync
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -21,23 +19,6 @@ android {
     }
 }
 
-val stagedPythonSources = layout.buildDirectory.dir("generated/python")
-
-val stagePythonSources = tasks.register<Sync>("stagePythonSources") {
-    from(rootProject.projectDir) {
-        include("**/*.py")
-        include("templates/**")
-        include("static/**")
-        exclude("android/**")
-        exclude("frontend/node_modules/**")
-        exclude("node_modules/**")
-        exclude(".git/**")
-        exclude("**/__pycache__/**")
-        exclude("**/*.pyc")
-    }
-    into(stagedPythonSources)
-}
-
 chaquopy {
     defaultConfig {
         version = "3.13"
@@ -45,17 +26,6 @@ chaquopy {
             install("-r", "../../requirements.txt")
         }
     }
-    sourceSets {
-        getByName("main") {
-            srcDir(stagedPythonSources)
-        }
-    }
-}
-
-// Chaquopy creates its merge task after plugin configuration. Wire the staged
-// backend into that task lazily so the repository never becomes its own source.
-tasks.matching { it.name == "mergeDebugPythonSources" }.configureEach {
-    dependsOn(stagePythonSources)
 }
 
 dependencies {
