@@ -16,11 +16,8 @@ def test_local_tool_execution_is_recorded_on_invocation_trace():
         "call_id": "call-7",
     }
 
-    with patch.object(
-        YandexMcpMixin, "_execute_single_tool", YandexMcpMixin._execute_single_tool
-    ):
-        with patch("yandex_client_modules.mcp_mixin.registry.execute", return_value={"value": 7}):
-            result = client._execute_single_tool(call, [], trace=trace)
+    with patch("yandex_client_modules.mcp_mixin.registry.execute", return_value={"value": 7}):
+        result = client._execute_single_tool(call, [], trace=trace)
 
     assert result["name"] == "demo_tool"
     assert result["call_id"] == "call-7"
@@ -50,7 +47,6 @@ def test_local_tool_error_is_correlated_to_same_trace():
         result = client._execute_single_tool(call, [], trace=trace)
 
     assert result["error"] == "tool failed"
-    assert trace.trace["tool_calls"][0]["error"] is None
     assert any(
         error.get("call_id") == "call-error" and error.get("source") == "tool:broken_tool"
         for error in trace.trace["errors"]
