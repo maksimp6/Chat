@@ -11,7 +11,7 @@ from yandex_api_logger import api_logger
 
 
 class YandexMcpMixin:
-    def _execute_single_tool(self, tc, all_servers):
+    def _execute_single_tool(self, tc, all_servers, trace=None):
         import time as _t
 
         name = tc.get("name") or tc.get("function", {}).get("name")
@@ -35,9 +35,22 @@ class YandexMcpMixin:
         start_timestamp = _t.time()
         t_start = _t.perf_counter()
 
+        def execute():
+            return registry.execute(name, args, all_servers)
+
         try:
-            result = registry.execute(name, args, all_servers)
-            error = None
+            if isinstance(trace, ExecutionTrace):
+                result = trace.track_tool_execution(
+                    name,
+                    args,
+                    execute,
+                    call_id=call_id,
+                )
+            else:
+                result = execute()
+            error = result.get("error") if isinstance(result, dict) and result.get("error") else None
+            if error and isinstance(trace, ExecutionTrace):
+                trace.record_error(f"tool:{name}", str(error), call_id=call_id)
 
             api_logger.debug(
                 "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
@@ -54,6 +67,9 @@ class YandexMcpMixin:
         except Exception as exc:
             result = None
             error = str(exc)
+
+            if isinstance(trace, ExecutionTrace):
+                trace.record_error(f"tool:{name}", error, call_id=call_id, exception=exc)
 
             api_logger.exception(
                 "[LOCAL TOOL ERROR] name=%s call_id=%s",
