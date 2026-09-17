@@ -6,7 +6,13 @@ import json as _json
 from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
 from trace_manager import ExecutionTrace
-from invocation_manager import create_invocation, start_invocation, finish_invocation, fail_invocation
+from invocation_manager import (
+    create_invocation,
+    start_invocation,
+    finish_invocation,
+    fail_invocation,
+    persist_invocation_trace,
+)
 from invocation_trace import create_invocation_trace
 from mcp_trace import record_yandex_mcp_activity
 import mcp_storage
@@ -46,7 +52,7 @@ class AliceClient(YandexResponsesClient):
                 base_params = dict(params or {})
 
                 def execute_tool(call):
-                    result = self._execute_single_tool(call, tool_servers)
+                    result = self._execute_single_tool(call, tool_servers, trace=trace)
                     if result.get("error"):
                         return {"error": result["error"], "tool": result.get("name")}
                     return result.get("result")
@@ -83,6 +89,9 @@ def chat():
     invocation = None
     trace_data = {}
     conv_id = None
+    session_id = None
+    message = None
+    model_key = "aliceai-llm"
     partial_output = None
     error_message = None
 
@@ -177,6 +186,7 @@ def chat():
                             raw_args = {}
 
                     trace_data = trace.finalize()
+                    persist_invocation_trace(invocation.invocation_id, trace_data)
                     return jsonify({
                         "requires_approval": True,
                         "tool_call": {
@@ -187,6 +197,9 @@ def chat():
                         },
                         "original_message": message,
                         "invocation_id": invocation.invocation_id,
+                        "session_id": invocation.session_id,
+                        "conversation_id": invocation.conversation_id,
+                        "trace_id": invocation.trace_id,
                         "trace": trace_data
                     })
 
@@ -199,6 +212,7 @@ def chat():
         total_ms = round((_time.perf_counter() - t_start) * 1000)
         trace_data = trace.finalize()
 
+        persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(invocation.conversation_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
         finish_invocation(invocation.invocation_id, result={"reply": reply, "usage": usage, "cost": cost})
 
@@ -222,7 +236,7 @@ def chat():
         try:
             if trace is None:
                 if conv_id:
-                    invocation = create_invocation(session_id, conv_id, metadata={"model": model_key})
+                    invocation = create_invocation(session_id or conv_id, conv_id, metadata={"model": model_key})
                     trace = create_invocation_trace(invocation)
                     start_invocation(invocation.invocation_id)
                 else:
@@ -234,6 +248,8 @@ def chat():
             partial_output, _ = extract_last_response_text(responses)
             reply = format_partial_output_message(partial_output, error_message)
 
+            if invocation is not None:
+                persist_invocation_trace(invocation.invocation_id, trace_data)
             if conv_id:
                 add_message(conv_id, "assistant", reply, trace=trace_data)
             if invocation is not None:
