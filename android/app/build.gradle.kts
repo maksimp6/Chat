@@ -7,6 +7,12 @@ plugins {
 android {
     namespace = "com.alicepro.mobile"
     compileSdk = 35
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
     defaultConfig {
         applicationId = "com.alicepro.mobile"
         minSdk = 26
@@ -17,6 +23,10 @@ android {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 chaquopy {
