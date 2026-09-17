@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
 import android.widget.Toast
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
@@ -21,6 +22,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private val serverUrl = "http://127.0.0.1:5000"
     private val prefs by lazy { getSharedPreferences("alice_pro", MODE_PRIVATE) }
+    private val updateManager by lazy { UpdateManager(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
+        webView.addJavascriptInterface(AndroidBridge(), "AliceAndroid")
 
         ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -57,6 +60,13 @@ class MainActivity : AppCompatActivity() {
             promptForApiKey()
         } else {
             startPythonServer(storedKey)
+        }
+    }
+
+    private inner class AndroidBridge {
+        @JavascriptInterface
+        fun openUpdater() {
+            runOnUiThread { updateManager.openPicker() }
         }
     }
 
@@ -120,6 +130,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (ready) {
                     webView.loadUrl(serverUrl)
+                    updateManager.autoCheck()
                 } else {
                     Toast.makeText(this, "Alice Pro server did not start", Toast.LENGTH_LONG).show()
                 }
