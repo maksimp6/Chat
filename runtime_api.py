@@ -34,6 +34,7 @@ def api_create_invocation(session_id):
             session_id=session_id,
             conversation_id=conversation_id,
             metadata=data.get("metadata"),
+            create_missing_session=False,
         )
     except ValueError as exc:
         return jsonify({"error": "session_not_found", "message": str(exc)}), 404

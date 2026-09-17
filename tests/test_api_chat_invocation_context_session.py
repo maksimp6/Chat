@@ -21,6 +21,8 @@ class ApiChatSessionContextTests(unittest.TestCase):
         invocation = get_invocation(payload["invocation_id"])
         self.assertEqual(invocation["session_id"], "session-test")
         self.assertEqual(invocation["conversation_id"], "conv-session-test")
+        self.assertEqual(invocation["trace"]["trace_id"], payload["trace_id"])
+        self.assertEqual(invocation["trace"]["context"]["invocation_id"], payload["invocation_id"])
 
     def test_chat_without_session_id_preserves_legacy_contract(self):
         client = app.test_client()
@@ -36,6 +38,7 @@ class ApiChatSessionContextTests(unittest.TestCase):
         self.assertEqual(payload["session_id"], "conv-legacy-test")
         invocation = get_invocation(payload["invocation_id"])
         self.assertEqual(invocation["session_id"], "conv-legacy-test")
+        self.assertEqual(invocation["trace"]["context"]["conversation_id"], "conv-legacy-test")
 
 
 if __name__ == "__main__":
