@@ -50,15 +50,29 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
     return session_id
 
 
-def create_invocation(session_id: str, conversation_id: str, metadata: Optional[Dict[str, Any]] = None) -> InvocationContext:
-    # /api/chat historically accepted only conversation_id. Ensure the runtime
-    # schema exists and create a stable legacy session on first use so existing
-    # conversations can participate in the new invocation lifecycle.
+def create_invocation(
+    session_id: str,
+    conversation_id: str,
+    metadata: Optional[Dict[str, Any]] = None,
+    *,
+    create_missing_session: bool = True,
+) -> InvocationContext:
+    """Create a request-scoped invocation and persist its correlation IDs.
+
+    ``/api/chat`` keeps legacy behavior by creating a session on first use.
+    Explicit runtime APIs can disable that behavior so a missing session is a
+    real lifecycle error rather than an implicit side effect.
+    """
     session_id = _resolve_request_session_id(session_id, conversation_id)
     init_runtime_tables()
     session = restore_session(session_id)
     if not session:
-        session = create_session(session_id, metadata={"conversation_id": conversation_id, "legacy": True})
+        if not create_missing_session:
+            raise ValueError(f"Session not found: {session_id}")
+        session = create_session(
+            session_id,
+            metadata={"conversation_id": conversation_id, "legacy": True},
+        )
 
     invocation_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
@@ -68,10 +82,17 @@ def create_invocation(session_id: str, conversation_id: str, metadata: Optional[
     try:
         conn.execute(
             """INSERT INTO invocations
-               (id, session_id, conversation_id, trace_id, status, metadata_json, created_at, started_at)
-               VALUES (?, ?, ?, ?, 'created', ?, ?, NULL)""",
-            (invocation_id, session_id, conversation_id, trace_id,
-             json.dumps(persisted_metadata, ensure_ascii=False), now),
+               (id, session_id, conversation_id, trace_id, status, metadata_json,
+                trace_json, created_at, started_at)
+               VALUES (?, ?, ?, ?, 'created', ?, '{}', ?, NULL)""",
+            (
+                invocation_id,
+                session_id,
+                conversation_id,
+                trace_id,
+                json.dumps(persisted_metadata, ensure_ascii=False),
+                now,
+            ),
         )
         conn.commit()
     finally:
@@ -92,6 +113,23 @@ def start_invocation(invocation_id: str) -> bool:
         cur = conn.execute(
             "UPDATE invocations SET status = 'running', started_at = ? WHERE id = ? AND status = 'created'",
             (_now(), invocation_id),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
+def persist_invocation_trace(invocation_id: str, trace: Any) -> bool:
+    """Persist the complete invocation-owned trace independently of messages."""
+    if hasattr(trace, "finalize"):
+        trace = trace.finalize()
+    sanitized = _sanitize_metadata(trace or {})
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "UPDATE invocations SET trace_json = ? WHERE id = ?",
+            (json.dumps(sanitized, ensure_ascii=False), invocation_id),
         )
         conn.commit()
         return cur.rowcount == 1
@@ -159,6 +197,7 @@ def get_invocation(invocation_id: str) -> Optional[Dict[str, Any]]:
         "metadata": decode(row["metadata_json"], {}),
         "result": decode(row["result_json"], None),
         "error": decode(row["error_json"], None),
+        "trace": decode(row["trace_json"] if "trace_json" in row.keys() else None, {}),
         "created_at": row["created_at"],
         "started_at": row["started_at"],
         "completed_at": row["completed_at"],
