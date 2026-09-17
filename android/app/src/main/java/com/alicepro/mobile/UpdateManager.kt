@@ -31,7 +31,6 @@ import java.net.URL
 import java.security.MessageDigest
 import java.text.DateFormat
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipInputStream
 
@@ -46,6 +45,18 @@ class UpdateManager(private val activity: Activity) {
         private const val PREFS = "alice_pro_updates"
         private const val KEY_LAST_AUTO_CHECK = "last_auto_check"
         private const val AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+
+        private fun formatBytes(value: Long): String {
+            if (value <= 0) return "?"
+            val units = arrayOf("B", "KB", "MB", "GB")
+            var number = value.toDouble()
+            var index = 0
+            while (number >= 1024 && index < units.lastIndex) {
+                number /= 1024
+                index++
+            }
+            return String.format(Locale.US, "%.1f %s", number, units[index])
+        }
     }
 
     data class BuildInfo(
@@ -342,9 +353,9 @@ class UpdateManager(private val activity: Activity) {
     @Suppress("DEPRECATION")
     private fun signingDigest(info: PackageInfo): ByteArray {
         val signature = if (Build.VERSION.SDK_INT >= 28) {
-            info.signingInfo.apkContentsSigners.firstOrNull()
+            info.signingInfo?.apkContentsSigners?.firstOrNull()
         } else {
-            info.signatures.firstOrNull()
+            info.signatures?.firstOrNull()
         } ?: throw SecurityException("В APK отсутствует подпись")
         return MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
     }
@@ -463,17 +474,5 @@ class UpdateManager(private val activity: Activity) {
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun formatBytes(value: Long): String {
-        if (value <= 0) return "?"
-        val units = arrayOf("B", "KB", "MB", "GB")
-        var number = value.toDouble()
-        var index = 0
-        while (number >= 1024 && index < units.lastIndex) {
-            number /= 1024
-            index++
-        }
-        return String.format(Locale.US, "%.1f %s", number, units[index])
     }
 }
