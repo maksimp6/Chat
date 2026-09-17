@@ -8,15 +8,12 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.Settings
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -33,6 +30,7 @@ import java.net.URLEncoder
 import java.net.URL
 import java.security.MessageDigest
 import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipInputStream
@@ -63,8 +61,9 @@ class UpdateManager(private val activity: Activity) {
     ) {
         fun label(): String {
             val date = try {
-                DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                    .format(Date.parse(createdAt.replace("T", " ").replace("Z", " GMT")))
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX", Locale.US).parse(createdAt)?.let {
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it)
+                } ?: createdAt
             } catch (_: Exception) {
                 createdAt
             }
@@ -147,7 +146,7 @@ class UpdateManager(private val activity: Activity) {
                         list.addView(button)
                     }
                     scroll.addView(list)
-                    content.addView(scroll, ViewGroup.LayoutParams(-1, 0).apply { height = 900 })
+                    content.addView(scroll, ViewGroup.LayoutParams(-1, 900))
                 }
             } catch (error: Exception) {
                 activity.runOnUiThread {
@@ -199,7 +198,7 @@ class UpdateManager(private val activity: Activity) {
                         list.addView(button)
                     }
                     scroll.addView(list)
-                    content.addView(scroll, ViewGroup.LayoutParams(-1, 0).apply { height = 1000 })
+                    content.addView(scroll, ViewGroup.LayoutParams(-1, 1000))
                 }
             } catch (error: Exception) {
                 activity.runOnUiThread {
@@ -274,9 +273,7 @@ class UpdateManager(private val activity: Activity) {
         }
 
         connection.inputStream.use { input ->
-            FileOutputStream(zip).use { output ->
-                input.copyTo(output)
-            }
+            FileOutputStream(zip).use { output -> input.copyTo(output) }
         }
         connection.disconnect()
 
@@ -391,13 +388,14 @@ class UpdateManager(private val activity: Activity) {
         val runsJson = get(
             "$API_BASE/actions/workflows/$WORKFLOW/runs?branch=$encodedBranch&status=success&per_page=10"
         )
-        val runs = JSONArray(JSONObject(runsJson).getString("workflow_runs"))
+        val runs = JSONObject(runsJson).getJSONArray("workflow_runs")
         val result = mutableListOf<BuildInfo>()
         for (i in 0 until runs.length()) {
             val run = runs.getJSONObject(i)
             val artifacts = fetchArtifacts(run.getLong("id"))
-            val artifact = artifacts.firstOrNull { !it.getBoolean("expired") && it.getString("name") == ARTIFACT_NAME }
-                ?: continue
+            val artifact = artifacts.firstOrNull {
+                !it.optBoolean("expired", true) && it.optString("name") == ARTIFACT_NAME
+            } ?: continue
             result += BuildInfo(
                 runId = run.getLong("id"),
                 runNumber = run.getInt("run_number"),
@@ -417,7 +415,7 @@ class UpdateManager(private val activity: Activity) {
 
     private fun fetchArtifacts(runId: Long): List<JSONObject> {
         val json = get("$API_BASE/actions/runs/$runId/artifacts?per_page=30")
-        val array = JSONArray(JSONObject(json).getString("artifacts"))
+        val array = JSONObject(json).getJSONArray("artifacts")
         return (0 until array.length()).map { array.getJSONObject(it) }
     }
 
@@ -440,13 +438,11 @@ class UpdateManager(private val activity: Activity) {
     }
 
     private fun installedVersionCode(): Long {
-        val flags = if (Build.VERSION.SDK_INT >= 33) {
-            PackageManager.PackageInfoFlags.of(0)
-        } else {
-            @Suppress("DEPRECATION") 0L
-        }
         val info = if (Build.VERSION.SDK_INT >= 33) {
-            activity.packageManager.getPackageInfo(activity.packageName, flags)
+            activity.packageManager.getPackageInfo(
+                activity.packageName,
+                PackageManager.PackageInfoFlags.of(0),
+            )
         } else {
             @Suppress("DEPRECATION") activity.packageManager.getPackageInfo(activity.packageName, 0)
         }
