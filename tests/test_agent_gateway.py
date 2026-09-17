@@ -1,6 +1,12 @@
+import json
+from urllib.error import HTTPError
+
 import pytest
 
 from agent_gateway import (
+    A2AClient,
+    A2AClientConfig,
+    A2AProtocolError,
     AgentAlreadyRegistered,
     AgentDescriptor,
     AgentGateway,
@@ -45,3 +51,102 @@ def test_handler_errors_are_returned_in_envelope():
     result = gateway.invoke("broken", {})
     assert result.status == "error"
     assert "ZeroDivisionError" in (result.error or "")
+
+
+def test_a2a_client_sends_json_rpc(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": captured["request"]["id"],
+                    "result": {"task": {"id": "task-1"}},
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        captured["headers"] = {key.lower(): value for key, value in request.header_items()}
+        captured["request"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr("agent_gateway.urlopen", fake_urlopen)
+    client = A2AClient(
+        A2AClientConfig("https://agent.example/a2a", timeout_seconds=7),
+        token_provider=lambda: "secret-token",
+    )
+
+    result = client.send_message(
+        {
+            "message": {
+                "role": "user",
+                "parts": [{"kind": "text", "text": "hello"}],
+                "messageId": "message-1",
+            },
+            "metadata": {"source": "alice-pro"},
+        }
+    )
+
+    assert result == {"task": {"id": "task-1"}}
+    assert captured["url"] == "https://agent.example/a2a"
+    assert captured["timeout"] == 7
+    assert captured["headers"]["authorization"] == "Bearer secret-token"
+    assert captured["request"]["method"] == "message/send"
+    assert captured["request"]["params"]["message"]["messageId"] == "message-1"
+
+
+def test_a2a_client_rejects_mismatched_response_id(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"jsonrpc":"2.0","id":"wrong","result":{}}'
+
+    monkeypatch.setattr("agent_gateway.urlopen", lambda request, timeout: FakeResponse())
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+
+    with pytest.raises(A2AProtocolError, match="does not match"):
+        client.send_message({"message": {"role": "user", "parts": []}})
+
+
+def test_a2a_client_surfaces_json_rpc_errors(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"jsonrpc":"2.0","id":"wrong","error":{"code":-1,"message":"denied"}}'
+
+    # Response id validation happens before surfacing the remote error.
+    monkeypatch.setattr("agent_gateway.urlopen", lambda request, timeout: FakeResponse())
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+
+    with pytest.raises(A2AProtocolError):
+        client.send_message({"message": {"role": "user", "parts": []}})
+
+
+def test_a2a_client_converts_http_errors(monkeypatch):
+    def fake_urlopen(request, timeout):
+        raise HTTPError(request.full_url, 401, "Unauthorized", hdrs=None, fp=None)
+
+    monkeypatch.setattr("agent_gateway.urlopen", fake_urlopen)
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+
+    with pytest.raises(A2AProtocolError, match="401"):
+        client.send_message({"message": {"role": "user", "parts": []}})
