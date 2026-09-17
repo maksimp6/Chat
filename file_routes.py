@@ -3,7 +3,8 @@ import os
 import io
 import logging
 from flask import Blueprint, request, jsonify, Response
-from yandex_client import YandexClientError
+from config import Config
+from yandex_client import YandexResponsesClient, YandexClientError
 
 logger = logging.getLogger("alice_pro")
 file_bp = Blueprint('file_manager', __name__)
@@ -11,13 +12,16 @@ file_bp = Blueprint('file_manager', __name__)
 ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.xlsx', '.csv', '.md', '.html', '.json', '.jsonl', '.txt'}
 MAX_FILE_SIZE = 128 * 1024 * 1024  # 128 MB
 
+
 def get_client():
-    from app import client
-    return client
+    """Return a request-local Yandex client instead of a process-global Session."""
+    return YandexResponsesClient(Config)
+
 
 def _err_response(e):
     code = getattr(e, 'status_code', None) or (404 if "Not found" in str(e) else 500)
     return jsonify({"error": str(e)}), code
+
 
 @file_bp.route('/api/files', methods=['GET'])
 def list_files():
@@ -29,6 +33,7 @@ def list_files():
         return jsonify(data)
     except YandexClientError as e:
         return _err_response(e)
+
 
 @file_bp.route('/api/files', methods=['POST'])
 def upload_file():
@@ -65,6 +70,7 @@ def upload_file():
         logger.error(f"[FILES] Internal upload error: {e}", exc_info=True)
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
+
 @file_bp.route('/api/files/<file_id>', methods=['DELETE'])
 def delete_file(file_id):
     try:
@@ -74,6 +80,7 @@ def delete_file(file_id):
     except YandexClientError as e:
         return _err_response(e)
 
+
 @file_bp.route('/api/files/<file_id>', methods=['GET'])
 def get_file_info(file_id):
     try:
@@ -82,6 +89,7 @@ def get_file_info(file_id):
         return jsonify(result)
     except YandexClientError as e:
         return _err_response(e)
+
 
 @file_bp.route('/api/files/<file_id>/content', methods=['GET'])
 def download_file(file_id):
@@ -98,6 +106,7 @@ def download_file(file_id):
     except YandexClientError as e:
         return _err_response(e)
 
+
 @file_bp.route('/api/vector-stores', methods=['GET'])
 def list_vector_stores():
     try:
@@ -107,6 +116,7 @@ def list_vector_stores():
         return jsonify(data)
     except YandexClientError as e:
         return _err_response(e)
+
 
 @file_bp.route('/api/vector-stores', methods=['POST'])
 def create_vector_store():
@@ -124,6 +134,7 @@ def create_vector_store():
     except YandexClientError as e:
         return _err_response(e)
 
+
 @file_bp.route('/api/vector-stores/<vs_id>', methods=['DELETE'])
 def delete_vector_store(vs_id):
     try:
@@ -133,6 +144,7 @@ def delete_vector_store(vs_id):
     except YandexClientError as e:
         return _err_response(e)
 
+
 @file_bp.route('/api/vector-stores/<vs_id>', methods=['GET'])
 def get_vector_store(vs_id):
     try:
@@ -141,6 +153,7 @@ def get_vector_store(vs_id):
         return jsonify(result)
     except YandexClientError as e:
         return _err_response(e)
+
 
 @file_bp.route('/api/vector-stores/<vs_id>/files', methods=['GET'])
 def list_vs_files(vs_id):
@@ -152,6 +165,7 @@ def list_vs_files(vs_id):
         return jsonify(data)
     except YandexClientError as e:
         return _err_response(e)
+
 
 @file_bp.route('/api/vector-stores/<vs_id>/files', methods=['POST'])
 def add_file_to_vs(vs_id):
@@ -167,6 +181,7 @@ def add_file_to_vs(vs_id):
     except YandexClientError as e:
         return _err_response(e)
 
+
 @file_bp.route('/api/vector-stores/<vs_id>/files/<file_id>', methods=['DELETE'])
 def remove_file_from_vs(vs_id, file_id):
     try:
@@ -179,6 +194,7 @@ def remove_file_from_vs(vs_id, file_id):
 
 # Local Files API. Desktop keeps the historical path; Android can override it.
 LOCAL_REPO_DIR = os.getenv("ALICE_LOCAL_REPO_DIR", "/sdcard/repo")
+
 
 @file_bp.route('/api/local-files', methods=['GET'])
 def list_local_files():
