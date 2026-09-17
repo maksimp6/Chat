@@ -55,8 +55,11 @@ class ExecutionTrace:
                 billing[key] = context[key]
 
     def set_request(self, payload: Dict[str, Any]) -> None:
-        clean_payload = {k: v for k, v in payload.items()
-                         if k not in ("trace", "execution_trace")} if isinstance(payload, dict) else payload
+        clean_payload = {
+            k: v for k, v in payload.items()
+            if k not in ("trace", "execution_trace")
+        } if isinstance(payload, dict) else payload
+        clean_payload = self._sanitize_trace_value(clean_payload)
         self.trace["request"] = clean_payload
         self.add_event("request_initialized", {
             "keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []
