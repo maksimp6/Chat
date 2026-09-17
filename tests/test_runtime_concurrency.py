@@ -49,3 +49,28 @@ def test_parallel_invocations_keep_context_and_trace_isolated(runtime_db):
         assert loaded["conversation_id"] == context.conversation_id
         assert loaded["trace_id"] == context.trace_id
         assert loaded["result"]["index"] == loaded["metadata"]["index"]
+
+
+def test_parallel_first_use_reuses_one_session_without_losing_invocations(runtime_db):
+    from invocation_manager import create_invocation, finish_invocation, get_invocation
+
+    session_id = "first-use-session"
+
+    def create(index):
+        context = create_invocation(
+            session_id,
+            f"first-use-conversation-{index}",
+            metadata={"index": index},
+        )
+        assert finish_invocation(context.invocation_id, {"index": index})
+        return context
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        contexts = list(pool.map(create, range(16)))
+
+    assert len({c.invocation_id for c in contexts}) == 16
+    assert all(c.session_id == session_id for c in contexts)
+    for context in contexts:
+        loaded = get_invocation(context.invocation_id)
+        assert loaded["status"] == "completed"
+        assert loaded["result"]["index"] == loaded["metadata"]["index"]
