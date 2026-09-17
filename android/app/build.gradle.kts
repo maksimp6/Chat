@@ -33,9 +33,9 @@ chaquopy {
     }
 }
 
-// Gradle 8.9 validates task inputs across the repository-root Python source set.
-// Make the generated Python merge explicitly depend on Chaquopy/AGP outputs it reads.
-tasks.named("mergeDebugPythonSources") {
+// Chaquopy creates its Python merge task after plugin configuration. Configure
+// it lazily so Gradle 8.9 sees the real task and its generated-data dependencies.
+tasks.matching { it.name == "mergeDebugPythonSources" }.configureEach {
     dependsOn("mergeDebugNativeDebugMetadata")
     dependsOn("installDebugPythonRequirements")
 }
