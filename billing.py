@@ -29,33 +29,18 @@ def build_ai_billing_item(model_key: Optional[str], usage: Optional[Dict[str, An
     audio_tts = float(usage.get("audio_seconds_tts", 0) or 0)
 
     item: Dict[str, Any] = {
-        "type": "ai",
-        "step": step,
-        "provider": PROVIDER,
-        "model": model_key,
-        "currency": PRICING_CURRENCY,
-        "pricing_version": PRICING_VERSION,
-        "response_id": response_id,
-        "input_tokens": input_tokens,
-        "cached_input_tokens": cached_tokens,
-        "output_tokens": output_tokens,
+        "type": "ai", "step": step, "provider": PROVIDER, "model": model_key,
+        "currency": PRICING_CURRENCY, "pricing_version": PRICING_VERSION,
+        "response_id": response_id, "input_tokens": input_tokens,
+        "cached_input_tokens": cached_tokens, "output_tokens": output_tokens,
         "total_tokens": total_tokens,
     }
-
     pricing = ALL_MODELS.get(model_key) if model_key else None
     if pricing is None:
-        item.update({
-            "cost_status": "unknown",
-            "cost_reason": "pricing_not_configured",
-            "input_cost": None,
-            "output_cost": None,
-            "cached_input_cost": None,
-            "audio_cost": None,
-            "total_cost": None,
-            "cache_savings": None,
-        })
+        item.update({"cost_status": "unknown", "cost_reason": "pricing_not_configured",
+                     "input_cost": None, "output_cost": None, "cached_input_cost": None,
+                     "audio_cost": None, "total_cost": None, "cache_savings": None})
         return item
-
     billable_input = max(input_tokens - cached_tokens, 0)
     input_cost = billable_input * pricing["input"] / 1000
     cached_input_cost = cached_tokens * pricing.get("cached", pricing["input"]) / 1000
@@ -63,16 +48,10 @@ def build_ai_billing_item(model_key: Optional[str], usage: Optional[Dict[str, An
     audio_cost = audio_stt * AUDIO_STT_PRICE_PER_SEC + audio_tts * AUDIO_TTS_PRICE_PER_SEC
     cache_savings = cached_tokens * max(pricing["input"] - pricing.get("cached", pricing["input"]), 0) / 1000
     total_cost = input_cost + cached_input_cost + output_cost + audio_cost
-
-    item.update({
-        "cost_status": "calculated",
-        "input_cost": round(input_cost, 6),
-        "output_cost": round(output_cost, 6),
-        "cached_input_cost": round(cached_input_cost, 6),
-        "audio_cost": round(audio_cost, 6),
-        "cache_savings": round(cache_savings, 6),
-        "total_cost": round(total_cost, 6),
-    })
+    item.update({"cost_status": "calculated", "input_cost": round(input_cost, 6),
+                 "output_cost": round(output_cost, 6), "cached_input_cost": round(cached_input_cost, 6),
+                 "audio_cost": round(audio_cost, 6), "cache_savings": round(cache_savings, 6),
+                 "total_cost": round(total_cost, 6)})
     return item
 
 
@@ -84,26 +63,32 @@ def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[s
     cached_cost = round(sum(float(item.get("cached_input_cost") or 0) for item in known), 6)
     cache_savings = round(sum(float(item.get("cache_savings") or 0) for item in known), 6)
     unknown = sum(1 for item in items if item.get("cost_status") == "unknown")
-    result = {
-        "currency": PRICING_CURRENCY,
-        "provider": PROVIDER,
-        "pricing_version": PRICING_VERSION,
-        "input_tokens": sum(int(item.get("input_tokens") or 0) for item in items),
-        "output_tokens": sum(int(item.get("output_tokens") or 0) for item in items),
-        "cached_input_tokens": sum(int(item.get("cached_input_tokens") or 0) for item in items),
-        "total_tokens": sum(int(item.get("total_tokens") or 0) for item in items),
-        "input_cost": input_cost,
-        "output_cost": output_cost,
-        "cached_input_cost": cached_cost,
-        "tool_cost": 0.0,
-        "total_cost": total,
-        "cache_savings": cache_savings,
-        "cost_status": "partial" if unknown else "calculated",
-        "unknown_cost_items": unknown,
-        "items": items,
-    }
+    result = {"currency": PRICING_CURRENCY, "provider": PROVIDER, "pricing_version": PRICING_VERSION,
+              "input_tokens": sum(int(item.get("input_tokens") or 0) for item in items),
+              "output_tokens": sum(int(item.get("output_tokens") or 0) for item in items),
+              "cached_input_tokens": sum(int(item.get("cached_input_tokens") or 0) for item in items),
+              "total_tokens": sum(int(item.get("total_tokens") or 0) for item in items),
+              "input_cost": input_cost, "output_cost": output_cost, "cached_input_cost": cached_cost,
+              "tool_cost": 0.0, "total_cost": total, "cache_savings": cache_savings,
+              "cost_status": "partial" if unknown else "calculated", "unknown_cost_items": unknown,
+              "items": items}
     if context:
-        for key in ("invocation_id", "session_id", "conversation_id", "trace_id"):
+        for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
             if context.get(key) is not None:
                 result[key] = str(context[key])
     return result
+
+
+def settle_billing_to_treasury(billing: Dict[str, Any], owner_id: Optional[str]) -> Dict[str, Any]:
+    """Post calculated billing exactly once to the Paper Balance ledger."""
+    if not owner_id:
+        raise ValueError("owner identity is required")
+    if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":
+        return {"status": "skipped", "reason": "billing_not_fully_calculated"}
+    amount = float(billing.get("total_cost") or 0)
+    if amount <= 0:
+        return {"status": "skipped", "reason": "zero_cost"}
+    reference = "billing:" + str(billing.get("trace_id") or billing.get("invocation_id") or "unknown")
+    from treasury import record_expense
+    record_expense(owner_id, amount, "AI usage", reference=reference)
+    return {"status": "posted", "amount": amount, "reference": reference, "owner_id": str(owner_id)}
