@@ -38,10 +38,18 @@ def get_invocation_status(invocation_id: str) -> Optional[Dict[str, Any]]:
 
 
 def get_invocation_trace(invocation_id: str) -> Optional[Dict[str, Any]]:
-    """Return the persisted trace from the invocation's conversation message."""
+    """Return the trace persisted directly on the invocation.
+
+    Message-level trace storage remains a compatibility fallback for older
+    invocations created before the dedicated invocation trace column existed.
+    """
     invocation = get_invocation(invocation_id)
     if invocation is None:
         return None
+
+    persisted = invocation.get("trace") or {}
+    if persisted:
+        return _sanitize_trace(persisted)
 
     from db import get_messages
 
