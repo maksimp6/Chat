@@ -13,14 +13,23 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 }
 
 chaquopy {
     defaultConfig {
-        version = "3.11"
-        // Keep the backend's dependency set explicit for Android-compatible wheels.
-        // The full source tree must be staged in src/main/python before packaging.
+        version = "3.13"
+        pip {
+            install("-r", "../requirements.txt")
+        }
+    }
+    sourceSets {
+        getByName("main") {
+            srcDir("../..")
+        }
     }
 }
 
