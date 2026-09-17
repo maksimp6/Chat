@@ -1,13 +1,14 @@
 # Alice Pro Android wrapper
 
-This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is included directly in the Android Python source set.
+This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is staged into the Android Python source directory before packaging.
 
 ## Build
 
-The Android module is built with Android Gradle Plugin 8.7.3 and Gradle 8.9. CI builds the debug APK on every branch/PR change.
+CI stages the backend with `scripts/stage_python.py` and then builds the debug APK with Android Gradle Plugin 8.7.3 and Gradle 8.9.
 
 ```bash
 cd android
+python scripts/stage_python.py
 gradle :app:assembleDebug
 ```
 
