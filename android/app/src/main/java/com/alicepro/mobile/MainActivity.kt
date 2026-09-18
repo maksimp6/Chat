@@ -56,7 +56,7 @@ class MainActivity : AppCompatActivity() {
                 if (request?.isForMainFrame == true) {
                     AppLogger.error(
                         "WebView",
-                        "Main frame load error: \${error?.description ?: "unknown"}",
+                        "Main frame load error: ${error?.description ?: "unknown"}",
                         context = mapOf("url" to (request.url?.toString() ?: "")),
                     )
                 }
@@ -218,7 +218,7 @@ class MainActivity : AppCompatActivity() {
             setSingleLine(true)
         }
         val defaultAgentId = prefs.getString(KEY_LOCAL_AGENT_ID, "").orEmpty()
-            .ifBlank { "android-\${UUID.randomUUID().toString().replace("-", "").take(12)}" }
+            .ifBlank { "android-${UUID.randomUUID().toString().replace("-", "").take(12)}" }
         val agentIdInput = EditText(this).apply {
             hint = "Agent ID"
             setSingleLine(true)
@@ -312,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     Toast.makeText(
                         this,
-                        "Local agent failed: \${error.message}",
+                        "Local agent failed: ${error.message}",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -335,7 +335,7 @@ class MainActivity : AppCompatActivity() {
             } catch (error: Throwable) {
                 AppLogger.error("Python", "Embedded server failed to start", error)
                 runOnUiThread {
-                    Toast.makeText(this, "Python server failed: \${error.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Python server failed: ${error.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
