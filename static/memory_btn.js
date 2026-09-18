@@ -19,12 +19,13 @@
         button.textContent = "🧠";
         button.addEventListener("click", openMemoryModal);
 
+        const actionRow = document.getElementById("header-actions-2") || header;
         const themeButton = document.getElementById("theme-toggle");
 
-        if (themeButton) {
-            header.insertBefore(button, themeButton);
+        if (themeButton && themeButton.parentElement === actionRow) {
+            actionRow.insertBefore(button, themeButton);
         } else {
-            header.appendChild(button);
+            actionRow.appendChild(button);
         }
     }
 
