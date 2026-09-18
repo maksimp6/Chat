@@ -5,6 +5,9 @@ on:
     branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend tests
@@ -66,9 +69,16 @@ jobs:
         working-directory: android
         run: gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} :app:testDebugUnitTest :app:assembleDebug
 
+      - name: Verify debug APK
+        run: |
+          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum android/app/build/outputs/apk/debug/app-debug.apk
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: alice-pro-debug-apk
+          name: alice-pro-debug-apk-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
