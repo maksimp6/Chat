@@ -14,6 +14,7 @@ def get_conn():
 
 def init_db():
     from provider_credentials import create_schema as create_provider_credentials_schema
+    from key_manager import create_schema as create_key_manager_schema
     conn = get_conn()
     cur = conn.cursor()
 
@@ -62,6 +63,7 @@ def init_db():
     """)
 
     create_provider_credentials_schema(conn)
+    create_key_manager_schema(conn)
     conn.commit()
     conn.close()
 
