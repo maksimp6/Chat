@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock
+from types import SimpleNamespace
 
 import cloudru_iam_routes as routes
 
@@ -29,7 +29,7 @@ def test_api_key_creation_route_stores_secret_once(monkeypatch, tmp_path):
     captured = {}
     def fake_store_secret(**kwargs):
         captured.update(kwargs)
-        return Mock(key_ref="cloudru_key-1", name=kwargs["name"])
+        return SimpleNamespace(key_ref="cloudru_key-1", name=kwargs["name"])
     monkeypatch.setattr(routes, "store_secret", fake_store_secret)
 
     from flask import Flask
