@@ -293,10 +293,26 @@ class ExecutionTrace:
         result = None
         try:
             result = executor_fn(*args, **kwargs)
+            if isinstance(result, dict) and result.get("error"):
+                error = str(result.get("error"))
+                self.record_error(
+                    f"tool:{name}",
+                    error,
+                    call_id=call_id,
+                    parent_id=parent_id,
+                    step=step,
+                )
             return result
         except Exception as exc:
             error = str(exc)
-            self.record_error(f"tool:{name}", error, call_id=call_id, parent_id=parent_id, step=step, exception=exc)
+            self.record_error(
+                f"tool:{name}",
+                error,
+                call_id=call_id,
+                parent_id=parent_id,
+                step=step,
+                exception=exc,
+            )
             raise
         finally:
             end_timestamp = time.time()
