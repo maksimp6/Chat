@@ -35,6 +35,23 @@ android/app/build/outputs/apk/debug/app-debug.apk
 - SQLite and the local repository are stored below the Python `HOME` directory supplied by Android.
 - Desktop behavior remains unchanged because `ALICE_LOCAL_REPO_DIR` defaults to `/sdcard/repo` outside Android.
 
+## Diagnostics
+
+The Android shell provides a **Diagnostics** action in the web header. It opens a native log viewer backed by app-private JSONL logs.
+
+The logger records lifecycle, embedded-server, WebView and bridge events with levels `DEBUG`, `INFO`, `WARNING` and `ERROR`. Debug builds retain all levels; release builds retain only warnings and errors.
+
+Diagnostic records are redacted before they reach logcat or disk. Common API keys, bearer tokens, cookies, passwords, JWTs and email addresses are removed. Logs are size-limited and rotated, and the UI supports level/time filtering, text search, event details, safe copy, export and clearing.
+
+The exported file is generated in app cache and shared through the existing `FileProvider`. It contains the already-redacted JSONL records rather than credentials or the Yandex API key.
+
+Android unit tests cover redaction and diagnostic query filtering:
+
+```bash
+cd android
+gradle :app:testDebugUnitTest
+```
+
 ## CI APK updates
 
 The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk` artifact.
