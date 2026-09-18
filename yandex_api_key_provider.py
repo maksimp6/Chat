@@ -22,6 +22,9 @@ class YandexApiKeyProvider:
         service_account_id: Optional[str] = None,
         scopes: Optional[Iterable[str]] = None,
         endpoint: Optional[str] = None,
+        ai_endpoint: Optional[str] = None,
+        project_id: Optional[str] = None,
+        validation_model: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
         self.iam_token = iam_token or os.getenv("YANDEX_IAM_TOKEN")
@@ -45,6 +48,15 @@ class YandexApiKeyProvider:
             "YANDEX_IAM_ENDPOINT",
             "https://iam.api.cloud.yandex.net",
         )).rstrip("/")
+        self.ai_endpoint = (ai_endpoint or os.getenv(
+            "YANDEX_AI_ENDPOINT",
+            "https://ai.api.cloud.yandex.net/v1",
+        )).rstrip("/")
+        self.project_id = project_id or os.getenv("YANDEX_PROJECT_ID")
+        self.validation_model = validation_model or os.getenv(
+            "YANDEX_PROVIDER_VALIDATION_MODEL",
+            "alice-lite",
+        )
         self.timeout = timeout
 
         if not self.iam_token:
@@ -78,6 +90,27 @@ class YandexApiKeyProvider:
         if not resource_id or not secret:
             raise RuntimeError("Yandex API key response did not include id and secret")
         return str(resource_id), str(secret)
+
+    def validate_key(self, api_key: str) -> None:
+        """Verify the freshly created key can call the configured AI endpoint."""
+        if not self.project_id:
+            raise RuntimeError("YANDEX_PROJECT_ID is required for provider-key validation")
+        model = f"gpt://{self.project_id}/{self.validation_model}/latest"
+        response = requests.post(
+            f"{self.ai_endpoint}/responses",
+            headers={
+                "Authorization": f"Api-Key {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "input": "ping",
+                "max_output_tokens": 1,
+                "background": False,
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
