@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import base64
+
 import pytest
 
 from key_manager import (
@@ -18,7 +20,7 @@ from key_manager import (
 def setup_env(monkeypatch):
     monkeypatch.setenv(
         "ALICE_KEY_MANAGER_KEY",
-        "x" * 32 + "==",
+        base64.urlsafe_b64encode(b"0" * 32).decode("ascii"),
     )
 
 
