@@ -13,6 +13,7 @@ from key_manager import (
     read_secret,
     revoke_key,
     rotate_key,
+    delete_key,
     store_secret,
 )
 
@@ -112,3 +113,18 @@ def test_invalid_encryption_key_fails_closed(isolated_db, monkeypatch):
             purpose="api",
             provider="test",
         )
+
+
+def test_delete_requires_revocation_and_removes_key(isolated_db):
+    meta = store_secret(
+        secret="delete-me",
+        name="One",
+        purpose="api",
+        provider="test",
+    )
+    with pytest.raises(KeyManagerError):
+        delete_key(meta.key_ref)
+    revoke_key(meta.key_ref)
+    delete_key(meta.key_ref)
+    with pytest.raises(Exception):
+        get_metadata(meta.key_ref)
