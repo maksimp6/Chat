@@ -43,7 +43,6 @@ class ProviderCredential:
 
     @property
     def trace_key_id(self) -> str:
-        """Return the non-secret identifier stored in an execution trace."""
         if self.yandex_key_id:
             return str(self.yandex_key_id)
         if self.fingerprint:
@@ -68,12 +67,10 @@ def fingerprint_key(api_key: str) -> str:
 def _fetch_one(db: Any, query: str, params: tuple = ()):
     if hasattr(db, "fetch_one"):
         return db.fetch_one(query)
-    cursor = db.execute(query, params)
-    return cursor.fetchone()
+    return db.execute(query, params).fetchone()
 
 
 def create_schema(db: Any) -> None:
-    """Create the global credential table and supporting indexes."""
     db.execute("""
         CREATE TABLE IF NOT EXISTS provider_credentials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,7 +107,6 @@ def get_active_credential(
     decrypt: Callable[[str], str],
     now: Optional[datetime] = None,
 ) -> ProviderCredential:
-    """Resolve the single global active, non-expired credential."""
     row = _fetch_one(db, """
         SELECT id, api_key_encrypted, yandex_key_id, project_id, issued_at, expires_at
         FROM provider_credentials
@@ -138,7 +134,6 @@ def get_active_credential(
 
 
 def get_active_key(db: Any, decrypt: Callable[[str], str], now: Optional[datetime] = None) -> str:
-    """Backward-compatible secret-only resolver."""
     return get_active_credential(db, decrypt, now).api_key
 
 
@@ -148,20 +143,18 @@ def bootstrap_credential(
     project_id: str,
     encrypt: Callable[[str], str],
     now: Optional[datetime] = None,
+    decrypt: Optional[Callable[[str], str]] = None,
 ) -> ProviderCredential:
-    """Seed the global store from the deployment secret once.
-
-    The bootstrap credential receives the same 12-hour lifecycle as rotated
-    credentials. Its trace identifier is a SHA-256 fingerprint because an
-    environment bootstrap key has no Yandex resource ID yet.
-    """
+    """Seed the global store from the deployment secret once."""
     create_schema(db)
     existing = _fetch_one(
         db,
         "SELECT id FROM provider_credentials WHERE status = 'active' LIMIT 1",
     )
     if existing:
-        return get_active_credential(db, lambda value: value, now)
+        if decrypt is None:
+            raise NoActiveCredentialError("Another process already bootstrapped the provider key")
+        return get_active_credential(db, decrypt, now)
 
     issued_at, expires_at = issue_window(now)
     encrypted = encrypt(api_key)
@@ -192,25 +185,45 @@ def resolve_client_credential(
     encrypt: Optional[Callable[[str], str]] = None,
 ) -> ProviderCredential:
     """Resolve the deployment-wide key, bootstrapping from env when necessary."""
-    if db is not None and decrypt is not None:
-        try:
-            return get_active_credential(db, decrypt)
-        except NoActiveCredentialError:
-            bootstrap_key = getattr(config, "API_KEY", None)
-            if bootstrap_key and encrypt is not None:
-                return bootstrap_credential(
-                    db,
-                    bootstrap_key,
-                    str(getattr(config, "PROJECT_ID", "")),
-                    encrypt,
+    if db is not None:
+        if decrypt is None:
+            existing = _fetch_one(
+                db,
+                "SELECT id FROM provider_credentials WHERE status = 'active' LIMIT 1",
+            )
+            if existing:
+                raise CredentialError(
+                    "Active provider credential exists but encryption is not configured"
                 )
-            if bootstrap_key:
-                return ProviderCredential(
-                    api_key=bootstrap_key,
-                    project_id=str(getattr(config, "PROJECT_ID", "")),
-                    fingerprint=fingerprint_key(bootstrap_key),
-                )
-            raise
+        else:
+            try:
+                return get_active_credential(db, decrypt)
+            except NoActiveCredentialError:
+                bootstrap_key = getattr(config, "API_KEY", None)
+                if bootstrap_key and encrypt is not None:
+                    return bootstrap_credential(
+                        db,
+                        bootstrap_key,
+                        str(getattr(config, "PROJECT_ID", "")),
+                        encrypt,
+                        decrypt=decrypt,
+                    )
+                if bootstrap_key:
+                    return ProviderCredential(
+                        api_key=bootstrap_key,
+                        project_id=str(getattr(config, "PROJECT_ID", "")),
+                        fingerprint=fingerprint_key(bootstrap_key),
+                    )
+                raise
+
+        key = getattr(config, "API_KEY", None)
+        if not key:
+            raise NoActiveCredentialError("No global provider key configured")
+        return ProviderCredential(
+            api_key=key,
+            project_id=str(getattr(config, "PROJECT_ID", "")),
+            fingerprint=fingerprint_key(key),
+        )
 
     key = getattr(config, "API_KEY", None)
     if not key:
@@ -239,7 +252,6 @@ def promote_rotated_key(
     issued_at: datetime,
     expires_at: datetime,
 ) -> None:
-    """Replace the active key inside the caller's transaction."""
     db.execute(
         "UPDATE provider_credentials SET status = 'rotating' "
         "WHERE id = ? AND status = 'active'",
