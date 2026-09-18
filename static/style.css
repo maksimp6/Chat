@@ -440,3 +440,39 @@ html, body {
 }
 
 
+
+
+/* Header rows */
+.alice-pro-app #header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+}
+
+.alice-pro-app .header-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.alice-pro-app .header-row-secondary {
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 1px;
+}
+
+.alice-pro-app .header-row-secondary::-webkit-scrollbar {
+    display: none;
+}
+
+.alice-pro-app .header-row-secondary .header-btn {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+    .alice-pro-app #header { gap: 6px; padding-left: 10px; padding-right: 10px; }
+    .alice-pro-app .header-row { gap: 8px; }
+    .alice-pro-app .header-row-primary .model-btn { min-width: 0; }
+}
