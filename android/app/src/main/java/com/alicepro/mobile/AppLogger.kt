@@ -2,6 +2,7 @@ package com.alicepro.mobile
 
 import android.content.ClipData
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.Intent
 import android.os.Build
 import android.util.Log
@@ -44,14 +45,16 @@ object AppLogger {
 
     private val lock = Any()
     private var appContext: Context? = null
+    private var debugBuild = false
     private val recentEntries = ArrayDeque<LogEntry>()
 
     fun initialize(context: Context) {
         synchronized(lock) {
             appContext = context.applicationContext
+            debugBuild = (appContext!!.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
             ensureDirectory()
         }
-        log(LogLevel.INFO, "AppLogger", "Logger initialized", mapOf("debug" to BuildConfig.DEBUG.toString()))
+        log(LogLevel.INFO, "AppLogger", "Logger initialized", mapOf("debug" to debugBuild.toString()))
     }
 
     fun debug(tag: String, message: String, context: Map<String, String> = emptyMap()) =
@@ -80,7 +83,7 @@ object AppLogger {
         message: String,
         context: Map<String, String> = emptyMap(),
     ) {
-        if (!BuildConfig.DEBUG && level.priority < LogLevel.WARNING.priority) return
+        if (!debugBuild && level.priority < LogLevel.WARNING.priority) return
 
         val safeTag = LogRedactor.redact(tag).take(80)
         val safeMessage = LogRedactor.redact(message).take(12_000)
