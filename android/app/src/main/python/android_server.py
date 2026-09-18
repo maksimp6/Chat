@@ -87,10 +87,10 @@ def start_local_agent(
 
     with _LOCAL_AGENT_LOCK:
         if _LOCAL_AGENT_THREAD is not None and _LOCAL_AGENT_THREAD.is_alive():
-            return {
+            return json.dumps({
                 "status": "already_running",
                 "agent_id": getattr(_LOCAL_AGENT_WORKER, "agent_id", agent_id),
-            }
+            }, ensure_ascii=False)
 
         from local_tool_agent import start_agent
 
