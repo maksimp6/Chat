@@ -147,6 +147,6 @@ def test_duplicate_result_is_idempotent(client):
 def test_health_does_not_expose_runtime_tokens(client):
     register(client)
 
-    response = client.get("/api/local-agents/health")
+    response = client.get("/api/local-agents/health", headers=auth("bootstrap"))
     assert response.status_code == 200
     assert "token" not in json.dumps(response.get_json())
