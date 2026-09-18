@@ -9,6 +9,7 @@
 - [API](api/overview.md) — описание доступных API-интерфейсов
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
 - [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Alice Pro к ChatGPT через MCP
+- [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
 - [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
