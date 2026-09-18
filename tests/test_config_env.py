@@ -36,9 +36,10 @@ def test_canonical_key_takes_precedence(monkeypatch):
     assert module.API_KEY == "test-canonical-key"
 
 
-def test_missing_api_key_has_clear_error(monkeypatch):
+def test_missing_api_key_allows_database_backed_credentials(monkeypatch):
     monkeypatch.delenv("YANDEX_API_KEY", raising=False)
     monkeypatch.delenv("YC_API_KEY", raising=False)
 
-    with pytest.raises(RuntimeError, match="Yandex API key is not configured"):
-        reload_config()
+    module = reload_config()
+
+    assert module.API_KEY is None
