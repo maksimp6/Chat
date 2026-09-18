@@ -351,60 +351,60 @@ def _trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     return {"invocation_id": invocation_id, "trace": trace}
 
 
-_TOOLS = dict(
-    [
-        _tool(
-            "alice_get_system_status",
-            "System status",
-            "Read-only Alice Pro runtime, MCP, model and local-tool status.",
-            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-            _system_status,
-        ),
-        _tool(
-            "alice_list_agents",
-            "List agents",
-            "List AI agents currently registered in the Alice Pro Agent Gateway.",
-            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-            _agents,
-        ),
-        _tool(
-            "alice_get_session",
-            "Get session",
-            "Read-only lifecycle status for one Alice Pro runtime session.",
-            {
-                "type": "object",
-                "properties": {"session_id": {"type": "string", "minLength": 1}},
-                "required": ["session_id"],
-                "additionalProperties": False,
-            },
-            _session,
-        ),
-        _tool(
-            "alice_get_invocation",
-            "Get invocation",
-            "Read-only status and safe metadata for one Alice Pro invocation.",
-            {
-                "type": "object",
-                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
-                "required": ["invocation_id"],
-                "additionalProperties": False,
-            },
-            _invocation,
-        ),
-        _tool(
-            "alice_get_invocation_trace",
-            "Get invocation trace",
-            "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
-            {
-                "type": "object",
-                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
-                "required": ["invocation_id"],
-                "additionalProperties": False,
-            },
-            _trace,
-        ),
-    ]
-)
+_TOOL_DEFINITIONS = [
+    _tool(
+        "alice_get_system_status",
+        "System status",
+        "Read-only Alice Pro runtime, MCP, model and local-tool status.",
+        {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+        _system_status,
+    ),
+    _tool(
+        "alice_list_agents",
+        "List agents",
+        "List AI agents currently registered in the Alice Pro Agent Gateway.",
+        {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+        _agents,
+    ),
+    _tool(
+        "alice_get_session",
+        "Get session",
+        "Read-only lifecycle status for one Alice Pro runtime session.",
+        {
+            "type": "object",
+            "properties": {"session_id": {"type": "string", "minLength": 1}},
+            "required": ["session_id"],
+            "additionalProperties": False,
+        },
+        _session,
+    ),
+    _tool(
+        "alice_get_invocation",
+        "Get invocation",
+        "Read-only status and safe metadata for one Alice Pro invocation.",
+        {
+            "type": "object",
+            "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+            "required": ["invocation_id"],
+            "additionalProperties": False,
+        },
+        _invocation,
+    ),
+    _tool(
+        "alice_get_invocation_trace",
+        "Get invocation trace",
+        "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
+        {
+            "type": "object",
+            "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+            "required": ["invocation_id"],
+            "additionalProperties": False,
+        },
+        _trace,
+    ),
+]
+
+_TOOLS = {descriptor["name"]: (descriptor, handler) for descriptor, handler in _TOOL_DEFINITIONS}
 
 
 def _security_schemes() -> list[dict[str, Any]]:
