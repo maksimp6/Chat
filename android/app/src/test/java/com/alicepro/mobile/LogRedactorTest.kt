@@ -21,6 +21,6 @@ class LogRedactorTest {
         val jwt = "eyJhbGciOiJIUzI1NiJ9.payload-content.signature-content"
         val result = LogRedactor.redact("token=$jwt")
         assertFalse(result.contains(jwt))
-        assertTrue(result.contains("<redacted-jwt>"))
+        assertTrue(result.contains("<redacted>"))
     }
 }
