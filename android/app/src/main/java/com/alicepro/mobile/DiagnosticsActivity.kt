@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import android.view.Window
+import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -36,7 +37,7 @@ class DiagnosticsActivity : AppCompatActivity() {
         AppLogger.info("DiagnosticsActivity", "Diagnostics UI opened")
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.setSoftInputMode(Window.SOFT_INPUT_ADJUST_RESIZE)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
