@@ -153,7 +153,7 @@ class MainActivity : AppCompatActivity() {
                     startPythonServer(key)
                 }
             }
-            .setNegativeButton("Exit") {
+            .setNegativeButton("Exit") { _, _ ->
                 AppLogger.warning("Startup", "User exited API key setup")
                 finish()
             }
