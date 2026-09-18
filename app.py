@@ -8,6 +8,7 @@ from db import (
     save_conv_settings, get_conv_settings
 )
 from mcp_routes import mcp_bp
+from chatgpt_mcp import chatgpt_mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime_migrations import init_runtime_tables
@@ -20,6 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_app")
 
 app.register_blueprint(mcp_bp)
+app.register_blueprint(chatgpt_mcp_bp)
 app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
 
