@@ -43,8 +43,9 @@ class TestLocalToolExecutionContract(unittest.TestCase):
         self.assertEqual(result["error"], "backend exploded")
         self.assertFalse(result["timing"]["success"])
         self.assertEqual(trace["tool_calls"][0]["error"], "backend exploded")
-        self.assertEqual(trace["events"][-1]["type"], "tool_executed")
-        self.assertFalse(trace["events"][-1]["payload"]["success"])
+        tool_events = [event for event in trace["events"] if event["type"] == "tool_executed"]
+        self.assertEqual(len(tool_events), 1)
+        self.assertFalse(tool_events[0]["payload"]["success"])
 
         errors = [e for e in trace["errors"] if e["source"] == "tool:test_tool"]
         self.assertEqual(len(errors), 1)
