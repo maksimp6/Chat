@@ -19,6 +19,7 @@ from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
 from session_manager import get_session
 from tool_registry import registry
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 MCP_PATH = "/mcp"
@@ -351,60 +352,87 @@ def _trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     return {"invocation_id": invocation_id, "trace": trace}
 
 
-_TOOL_DEFINITIONS = [
-    _tool(
-        "alice_get_system_status",
-        "System status",
-        "Read-only Alice Pro runtime, MCP, model and local-tool status.",
-        {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-        _system_status,
-    ),
-    _tool(
-        "alice_list_agents",
-        "List agents",
-        "List AI agents currently registered in the Alice Pro Agent Gateway.",
-        {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-        _agents,
-    ),
-    _tool(
-        "alice_get_session",
-        "Get session",
-        "Read-only lifecycle status for one Alice Pro runtime session.",
-        {
-            "type": "object",
-            "properties": {"session_id": {"type": "string", "minLength": 1}},
-            "required": ["session_id"],
-            "additionalProperties": False,
-        },
-        _session,
-    ),
-    _tool(
-        "alice_get_invocation",
-        "Get invocation",
-        "Read-only status and safe metadata for one Alice Pro invocation.",
-        {
-            "type": "object",
-            "properties": {"invocation_id": {"type": "string", "minLength": 1}},
-            "required": ["invocation_id"],
-            "additionalProperties": False,
-        },
-        _invocation,
-    ),
-    _tool(
-        "alice_get_invocation_trace",
-        "Get invocation trace",
-        "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
-        {
-            "type": "object",
-            "properties": {"invocation_id": {"type": "string", "minLength": 1}},
-            "required": ["invocation_id"],
-            "additionalProperties": False,
-        },
-        _trace,
-    ),
-]
+def _bridge_wrapper(handler):
+    def wrapped(arguments: dict[str, Any], cfg: Optional[dict[str, Any]] = None):
+        context = (cfg or {}).get("_universal_context") or {}
+        return handler(arguments, context.get("user_id"))
+    return wrapped
 
-_TOOLS = {descriptor["name"]: (descriptor, handler) for descriptor, handler in _TOOL_DEFINITIONS}
+
+def _register_bridge_tools() -> None:
+    bridge_tools = [
+        (
+            "alice_get_system_status",
+            "System status",
+            "Read-only Alice Pro runtime, MCP, model and local-tool status.",
+            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            _system_status,
+        ),
+        (
+            "alice_list_agents",
+            "List agents",
+            "List AI agents currently registered in the Alice Pro Agent Gateway.",
+            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            _agents,
+        ),
+        (
+            "alice_get_session",
+            "Get session",
+            "Read-only lifecycle status for one Alice Pro runtime session.",
+            {
+                "type": "object",
+                "properties": {"session_id": {"type": "string", "minLength": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            _session,
+        ),
+        (
+            "alice_get_invocation",
+            "Get invocation",
+            "Read-only status and safe metadata for one Alice Pro invocation.",
+            {
+                "type": "object",
+                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _invocation,
+        ),
+        (
+            "alice_get_invocation_trace",
+            "Get invocation trace",
+            "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
+            {
+                "type": "object",
+                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _trace,
+        ),
+    ]
+    for name, title, description, input_schema, handler in bridge_tools:
+        registry.register(
+            "chatgpt_bridge",
+            name,
+            {
+                "title": title,
+                "description": description,
+                "inputSchema": input_schema,
+                "outputSchema": {"type": "object"},
+                "capabilities": ["read", "mcp"],
+                "risk_level": "low",
+                "read_only": True,
+                "requires_approval": False,
+                "supported_transports": ["mcp"],
+                "executor": {"type": "local"},
+                "func": _bridge_wrapper(handler),
+            },
+        )
+
+
+_register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
@@ -421,11 +449,25 @@ def _security_schemes() -> list[dict[str, Any]]:
 def _tools_list() -> list[dict[str, Any]]:
     schemes = _security_schemes()
     result = []
-    for descriptor, _handler in sorted(_TOOLS.values(), key=lambda item: item[0]["name"]):
-        item = dict(descriptor)
-        item["securitySchemes"] = schemes
-        meta = dict(item.get("_meta") or {})
-        meta["securitySchemes"] = schemes
+    for definition in registry.get_universal_definitions("mcp"):
+        item = {
+            "name": definition["name"],
+            "title": definition.get("title") or definition["name"],
+            "description": definition.get("description", ""),
+            "inputSchema": definition.get("inputSchema") or definition.get("input_schema") or {},
+            "outputSchema": definition.get("outputSchema") or definition.get("output_schema") or {"type": "object"},
+            "securitySchemes": schemes,
+        }
+        meta = dict(definition.get("metadata") or {})
+        meta.update({
+            "risk_level": definition.get("risk_level"),
+            "read_only": definition.get("read_only"),
+            "requires_approval": definition.get("requires_approval"),
+            "capabilities": definition.get("capabilities") or [],
+            "openai/toolInvocation/invoking": f"{item['title']}…",
+            "openai/toolInvocation/invoked": f"{item['title']}: готово",
+            "securitySchemes": schemes,
+        })
         item["_meta"] = meta
         result.append(item)
     return result
@@ -434,22 +476,37 @@ def _tools_list() -> list[dict[str, Any]]:
 def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise ValueError("arguments must be an object")
-    pair = _TOOLS.get(name)
-    if pair is None:
-        raise LookupError(f"Unknown tool: {name}")
-    descriptor, handler = pair
-    result = handler(arguments, user)
-    if not isinstance(result, dict):
-        result = {"value": result}
+    call = UniversalToolCall(
+        tool_name=name,
+        arguments=arguments,
+        transport="mcp",
+        user_id=user,
+        metadata={"source": "chatgpt_mcp"},
+    )
+    result = UniversalToolExecutor(registry).execute(call)
+    if not result.get("success"):
+        phase = (result.get("metadata") or {}).get("phase")
+        if phase == "transport":
+            raise LookupError(result.get("error") or "Tool transport is not supported")
+        if phase == "validation":
+            raise ValueError(result.get("error") or "Tool input validation failed")
+        if phase == "authorization":
+            raise PermissionError(result.get("error") or "Tool authorization denied")
+        if phase == "approval_required":
+            raise PermissionError(result.get("error") or "Tool approval required")
+        raise RuntimeError(result.get("error") or "Tool execution failed")
     return {
-        "structuredContent": result,
+        "structuredContent": result.get("data"),
         "content": [
             {
                 "type": "text",
-                "text": json.dumps(result, ensure_ascii=False),
+                "text": json.dumps(result.get("data"), ensure_ascii=False),
             }
         ],
-        "_meta": {"serverInfo": _server_info()},
+        "_meta": {
+            "serverInfo": _server_info(),
+            "toolResult": result,
+        },
     }
 
 
