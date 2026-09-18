@@ -44,7 +44,7 @@ jobs:
           # The remote project contains a dashboard-created migration that is
           # not present in this repository. Mark only that stale entry as
           # reverted so the repository migrations can be applied normally.
-          supabase migration repair --status reverted 20260916181503
+          supabase migration repair --status reverted 20260917171258
 
       - name: Apply migrations
         env:
