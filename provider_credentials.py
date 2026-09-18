@@ -86,6 +86,15 @@ def create_schema(db: Any) -> None:
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(provider_credentials)").fetchall()
+    }
+    if "project_id" not in columns:
+        db.execute(
+            "ALTER TABLE provider_credentials ADD COLUMN project_id TEXT NOT NULL DEFAULT ''"
+        )
+
     db.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS one_active_key
         ON provider_credentials (status) WHERE status = 'active'
