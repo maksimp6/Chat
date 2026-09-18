@@ -28,3 +28,21 @@ are not issued per user.
 The legacy environment `API_KEY` remains a bootstrap fallback when no
 credential store is supplied. Production deployments should use the global
 credential table and an encrypted secret store.
+
+## Trace attribution
+
+Каждая операция Responses API получает идентификатор реально использованного
+глобального ключа. В trace сохраняются Yandex API-key resource ID, fingerprint
+для bootstrap-ключа, время выпуска/истечения и project ID. Секрет ключа и
+IAM-токен не сохраняются.
+
+Идентификатор пишется в `provider_key`, историю `provider_keys`, а также в
+каждый элемент `api_requests[]` и `responses[]`. Поэтому trace сохраняет
+аудит даже при смене ключа между запросами одного долгого invocation.
+
+## Worker
+
+Запускайте `python3 scripts/rotate_provider_key.py` через cron/systemd
+каждый час. Worker ротирует ключ только в последнем часу его 12-часового
+срока. Yandex Cloud IAM API создаёт ключ через `POST /iam/v1/apiKeys` и
+удаляет старый через `DELETE /iam/v1/apiKeys/{apiKeyId}`.
