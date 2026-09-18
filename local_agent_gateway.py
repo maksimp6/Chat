@@ -407,6 +407,11 @@ def local_agent_result(agent_id: str, job_id: str):
 
 @local_agent_bp.get("/health")
 def local_agent_health():
+    try:
+        _require_bootstrap()
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 401
+
     conn = get_conn()
     try:
         cutoff = _now() - 90
