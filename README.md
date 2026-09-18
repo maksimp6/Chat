@@ -29,6 +29,7 @@ YANDEX_BASE_URL=https://ai.api.cloud.yandex.net/v1
 HOST=0.0.0.0
 PORT=8080
 SECRET_KEY=<generate-a-random-secret>
+ALICE_OWNER_ID=<stable-owner-id>
 ```
 
 Для необязательного зеркала execution traces в Supabase добавьте на backend:
