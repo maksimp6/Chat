@@ -49,9 +49,6 @@ class YandexMcpMixin:
             else:
                 result = execute()
             error = result.get("error") if isinstance(result, dict) and result.get("error") else None
-            if error and isinstance(trace, ExecutionTrace):
-                trace.record_error(f"tool:{name}", str(error), call_id=call_id)
-
             api_logger.debug(
                 "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
                 name,
@@ -67,9 +64,6 @@ class YandexMcpMixin:
         except Exception as exc:
             result = None
             error = str(exc)
-
-            if isinstance(trace, ExecutionTrace):
-                trace.record_error(f"tool:{name}", error, call_id=call_id, exception=exc)
 
             api_logger.exception(
                 "[LOCAL TOOL ERROR] name=%s call_id=%s",
