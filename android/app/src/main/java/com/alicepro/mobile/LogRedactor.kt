@@ -10,9 +10,9 @@ object LogRedactor {
 
     fun redact(value: String): String {
         var result = value
+        result = jwt.replace(result, "<redacted-jwt>")
         result = authorization.replace(result) { "${it.groupValues[1]}<redacted>" }
         result = sensitiveKey.replace(result) { "${it.groupValues[1]}<redacted>" }
-        result = jwt.replace(result, "<redacted-jwt>")
         result = email.replace(result, "<redacted-email>")
         return result
     }
