@@ -35,11 +35,49 @@ class ExecutionTrace:
                 "provider": "yandex_ai_studio",
                 "pricing_version": "config-v1",
                 "items": []
-            }
+            },
+            "provider_key": None,
+            "provider_keys": []
         }
 
     def get_metadata(self) -> Dict[str, str]:
         return {"trace_id": str(self.trace_id)}
+
+    def set_provider_key(
+        self,
+        key_id: str,
+        *,
+        fingerprint: Optional[str] = None,
+        issued_at: Optional[Any] = None,
+        expires_at: Optional[Any] = None,
+        project_id: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> None:
+        """Bind a non-secret provider-key identity to this trace."""
+        entry = {"key_id": str(key_id)}
+        for name, value in (
+            ("fingerprint", fingerprint),
+            ("issued_at", issued_at),
+            ("expires_at", expires_at),
+            ("project_id", project_id),
+            ("source", source),
+        ):
+            if value is not None:
+                entry[name] = str(value)
+
+        history = self.trace.setdefault("provider_keys", [])
+        if entry not in history:
+            history.append(entry)
+        self.trace["provider_key"] = entry
+
+        context = self.trace.setdefault("context", {})
+        context["provider_key_id"] = str(key_id)
+        billing = self.trace.setdefault("billing", {})
+        billing["provider_key_id"] = str(key_id)
+        self.add_event("provider_key_selected", {
+            "key_id": str(key_id),
+            **({"source": source} if source is not None else {}),
+        })
 
     def set_context(self, invocation_id: Optional[str] = None,
                     session_id: Optional[str] = None,
@@ -121,10 +159,16 @@ class ExecutionTrace:
         return None
 
     def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
-                        start_timestamp: Optional[float] = None) -> int:
+                        start_timestamp: Optional[float] = None,
+                        provider_key_id: Optional[str] = None) -> int:
+        provider_key_id = provider_key_id or (
+            self.trace.get("provider_key") or {}
+        ).get("key_id")
         request_entry = {"step": step_index,
                          "timestamp": start_timestamp if start_timestamp is not None else time.time(),
                          "payload": self._sanitize_trace_value(payload)}
+        if provider_key_id is not None:
+            request_entry["provider_key_id"] = str(provider_key_id)
         self.trace.setdefault("api_requests", []).append(request_entry)
         self.add_event("api_request_registered", {"step": step_index, "timestamp": request_entry["timestamp"]})
         return len(self.trace["api_requests"]) - 1
@@ -166,9 +210,13 @@ class ExecutionTrace:
                      start_timestamp: Optional[float] = None,
                      end_timestamp: Optional[float] = None,
                      timing_ms: Optional[float] = None,
-                     kind: str = "response", deduplicate: bool = False, **kwargs) -> None:
+                     kind: str = "response", deduplicate: bool = False,
+                     provider_key_id: Optional[str] = None, **kwargs) -> None:
         """Store one logical Responses API operation; polling snapshots stay nested in it."""
         idx = step_index or kwargs.get("call_index", 1)
+        provider_key_id = provider_key_id or (
+            self.trace.get("provider_key") or {}
+        ).get("key_id")
         clean_raw = self._sanitize_trace_value(raw_json)
         response_id = clean_raw.get("id") if isinstance(clean_raw, dict) else None
         request_start, _ = self._request_timing_for_step(idx)
@@ -208,6 +256,8 @@ class ExecutionTrace:
                           "response_id": response_id or entry.get("response_id"),
                           "end_timestamp": end_timestamp, "timing_ms": timing_ms,
                           "latest_kind": kind})
+            if provider_key_id is not None:
+                entry["provider_key_id"] = str(provider_key_id)
             self._update_billing_for_response(clean_raw, idx, response_id or entry.get("response_id"))
             return
 
@@ -215,6 +265,8 @@ class ExecutionTrace:
                           "response_id": response_id, "raw": clean_raw,
                           "start_timestamp": start_timestamp, "end_timestamp": end_timestamp,
                           "timing_ms": timing_ms}
+        if provider_key_id is not None:
+            response_entry["provider_key_id"] = str(provider_key_id)
         if kind == "poll_response":
             response_entry["poll_snapshots"] = [clean_raw]
         api_requests = self.trace.get("api_requests", [])
