@@ -278,6 +278,25 @@ def revoke_key(key_ref: str) -> None:
         conn.close()
 
 
+def delete_key(key_ref: str) -> None:
+    """Permanently remove a revoked key record.
+
+    Active keys must be revoked first so an accidental delete cannot bypass
+    the lifecycle and policy boundary.
+    """
+    row = _get_row(key_ref)
+    if row["status"] != "revoked":
+        raise KeyManagerError("Only revoked keys can be permanently deleted")
+    from db import get_conn
+
+    conn = get_conn()
+    try:
+        conn.execute("DELETE FROM managed_keys WHERE key_ref = ?", (key_ref,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def rotate_key(
     key_ref: str,
     *,
@@ -330,4 +349,5 @@ __all__ = [
     "list_keys",
     "revoke_key",
     "rotate_key",
+    "delete_key",
 ]
