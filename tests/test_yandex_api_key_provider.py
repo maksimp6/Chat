@@ -42,3 +42,17 @@ def test_revoke_key_calls_yandex_resource_endpoint(mock_delete):
     response.raise_for_status.assert_called_once()
     assert mock_delete.call_args.args[0].endswith("/iam/v1/apiKeys/aje-key-old")
     assert mock_delete.call_args.kwargs["headers"]["Authorization"] == "Bearer iam-secret"
+
+
+@patch("yandex_api_key_provider.requests.post")
+def test_validate_key_uses_provider_authentication(mock_post):
+    response = Mock()
+    mock_post.return_value = response
+
+    provider().validate_key("new-provider-secret")
+
+    response.raise_for_status.assert_called_once()
+    kwargs = mock_post.call_args.kwargs
+    assert kwargs["headers"]["Authorization"] == "Api-Key new-provider-secret"
+    assert kwargs["json"]["model"] == "gpt://"
+    assert "new-provider-secret" in kwargs["headers"]["Authorization"]
