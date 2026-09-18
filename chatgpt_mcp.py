@@ -258,12 +258,6 @@ def _tool(
     handler: Callable[[dict[str, Any], Optional[str]], dict[str, Any]],
 ) -> tuple[dict[str, Any], Callable[[dict[str, Any], Optional[str]], dict[str, Any]]]:
     meta = {
-        "securitySchemes": [
-            {"type": "noauth"} if _auth_mode() == "anonymous" else {
-                "type": "oauth2",
-                "scopes": [OAUTH_SCOPE],
-            }
-        ],
         "openai/toolInvocation/invoking": f"{title}…",
         "openai/toolInvocation/invoked": f"{title}: готово",
     }
@@ -272,7 +266,7 @@ def _tool(
         "title": title,
         "description": description,
         "inputSchema": input_schema,
-        "securitySchemes": meta["securitySchemes"],
+        "securitySchemes": [],
         "_meta": meta,
     }
     return descriptor, handler
@@ -413,8 +407,28 @@ _TOOLS = dict(
 )
 
 
+def _security_schemes() -> list[dict[str, Any]]:
+    mode = _auth_mode()
+    if mode == "anonymous":
+        return [{"type": "noauth"}]
+    if mode == "introspection":
+        return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
+    # A fixed bearer token is intentionally not advertised as OAuth. ChatGPT
+    # OAuth clients cannot be configured with arbitrary customer API keys.
+    return []
+
+
 def _tools_list() -> list[dict[str, Any]]:
-    return [descriptor for descriptor, _handler in sorted(_TOOLS.values(), key=lambda item: item[0]["name"])]
+    schemes = _security_schemes()
+    result = []
+    for descriptor, _handler in sorted(_TOOLS.values(), key=lambda item: item[0]["name"]):
+        item = dict(descriptor)
+        item["securitySchemes"] = schemes
+        meta = dict(item.get("_meta") or {})
+        meta["securitySchemes"] = schemes
+        item["_meta"] = meta
+        result.append(item)
+    return result
 
 
 def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, Any]:
