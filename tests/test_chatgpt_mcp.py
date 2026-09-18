@@ -92,7 +92,7 @@ def test_standard_headers_must_match_json_rpc(client):
 def test_authentication_is_required_when_anonymous_access_is_disabled(client, monkeypatch):
     monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "false")
     response = mcp_request(client, "tools/list")
-    assert response.status_code == 503
+    assert response.status_code == 401
 
 
 def test_bearer_authentication_accepts_only_configured_token(client, monkeypatch):
