@@ -14,6 +14,9 @@ class FakeProvider:
         self.created.append(expires_at)
         return "aje-new-key", "plaintext-secret"
 
+    def validate_key(self, api_key):
+        assert api_key == "plaintext-secret"
+
     def revoke_key(self, provider_key_id):
         self.revoked.append(provider_key_id)
 
