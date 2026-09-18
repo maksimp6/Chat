@@ -13,6 +13,7 @@ def get_conn():
     return conn
 
 def init_db():
+    from provider_credentials import create_schema as create_provider_credentials_schema
     conn = get_conn()
     cur = conn.cursor()
 
@@ -60,6 +61,7 @@ def init_db():
         )
     """)
 
+    create_provider_credentials_schema(conn)
     conn.commit()
     conn.close()
 

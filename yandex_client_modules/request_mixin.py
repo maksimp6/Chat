@@ -1,11 +1,53 @@
 import time
 
+import os
 import requests
 
 from trace_manager import ExecutionTrace
+from db import get_conn
+from provider_credentials import resolve_client_credential
+try:
+    from credential_crypto import decrypt_secret, encrypt_secret
+except ImportError:  # pragma: no cover
+    decrypt_secret = None
+    encrypt_secret = None
 from yandex_request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_request_builder import build_response_payload
 from yandex_client_modules.errors import YandexClientError
+
+
+def _resolve_global_provider_credential(client, execution_trace=None):
+    """Refresh auth from the deployment-wide credential store for each request."""
+    conn = get_conn()
+    try:
+        crypto_key = os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY")
+        if decrypt_secret is None or not crypto_key:
+            credential = resolve_client_credential(client._config)
+        else:
+            credential = resolve_client_credential(
+                client._config,
+                conn,
+                decrypt_secret,
+                encrypt_secret,
+            )
+    finally:
+        conn.close()
+
+    client.session.headers.update({
+        "Authorization": "Api-Key " + credential.api_key,
+        "OpenAI-Project": credential.project_id,
+    })
+
+    if execution_trace and isinstance(execution_trace, ExecutionTrace):
+        execution_trace.set_provider_key(
+            credential.trace_key_id,
+            fingerprint=credential.fingerprint,
+            issued_at=credential.issued_at,
+            expires_at=credential.expires_at,
+            project_id=credential.project_id,
+            source="global",
+        )
+    return credential
 
 
 class YandexRequestMixin:
@@ -16,6 +58,7 @@ class YandexRequestMixin:
         is_stream = params.get("stream", False)
         if is_background: params["store"] = True
         
+        credential = _resolve_global_provider_credential(self, execution_trace)
         yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
 
         metadata = (
@@ -44,7 +87,8 @@ class YandexRequestMixin:
             execution_trace.add_api_request(
                 _sanitize_for_log(payload),
                 step_index=trace_step_number,
-                start_timestamp=request_start_timestamp
+                start_timestamp=request_start_timestamp,
+                provider_key_id=credential.trace_key_id,
             )
             execution_trace.add_event("api_request_sent", {
                 "method": "POST",
@@ -103,7 +147,8 @@ class YandexRequestMixin:
                 start_timestamp=request_start_timestamp,
                 end_timestamp=request_end_timestamp,
                 timing_ms=request_duration_ms,
-                kind="initial_response"
+                kind="initial_response",
+                provider_key_id=credential.trace_key_id,
             )
             step = trace_step
             if step is None:

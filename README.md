@@ -61,6 +61,26 @@ python app.py
 - `SUPABASE_SERVICE_ROLE_KEY` — backend-only credential для записи в закрытую таблицу трейсов.
 - `SECRET_KEY` — секрет Flask-сессий, если используется приложением.
 
+### Глобальный Yandex API-ключ
+
+Alice Pro использует один backend-owned API-ключ Yandex Cloud для всего
+развёртывания. Новый ключ создаётся на 12 часов, а ротация выполняется в
+последний час действия текущего ключа.
+
+Для зашифрованного хранения задайте `ALICE_PROVIDER_CREDENTIAL_KEY` как
+Fernet-ключ. Для worker-ротации задайте `YANDEX_IAM_TOKEN` и
+`YANDEX_SERVICE_ACCOUNT_ID`; области действия можно настроить через
+`YANDEX_API_KEY_SCOPES`. Worker запускайте не реже одного раза в час:
+
+```bash
+python3 scripts/rotate_provider_key.py
+```
+
+Execution Trace подписывает каждый запрос безопасным идентификатором
+использованного ключа. Для ключа Yandex Cloud это resource ID, для bootstrap
+ключа без resource ID используется SHA-256 fingerprint. Сам API-ключ,
+IAM-токен и расшифрованный secret в trace не попадают.
+
 Зеркало Supabase является необязательным и должно быть best-effort: его сбои не должны ломать основной чатовый поток.
 
 Если credential когда-либо попал в Git, считайте его скомпрометированным: отзовите/ротируйте его в соответствующем сервисе. Удаление строки из текущего файла не удаляет её из Git history.

@@ -35,10 +35,11 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
         self.conversations_url = self.base_url + "/conversations"
         self.session = requests.Session()
         self.session.headers.update({
-            "Authorization": "Api-Key " + config.API_KEY,
             "Content-Type": "application/json",
             "OpenAI-Project": config.PROJECT_ID,
         })
+        if config.API_KEY:
+            self.session.headers["Authorization"] = "Api-Key " + config.API_KEY
 
     def _log_request(self, method, url, **kwargs):
         api_logger.info(f"[REQ] {method} {url}")
