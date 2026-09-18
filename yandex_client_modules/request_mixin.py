@@ -33,8 +33,10 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     finally:
         conn.close()
 
-    client.session.headers["Authorization"] = "Api-Key " + credential.api_key
-    client.session.headers["OpenAI-Project"] = credential.project_id
+    client.session.headers.update({
+        "Authorization": "Api-Key " + credential.api_key,
+        "OpenAI-Project": credential.project_id,
+    })
 
     if execution_trace and isinstance(execution_trace, ExecutionTrace):
         execution_trace.set_provider_key(
