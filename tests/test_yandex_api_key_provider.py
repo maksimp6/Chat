@@ -9,6 +9,7 @@ def provider():
         iam_token="iam-secret",
         service_account_id="sa-1",
         scopes=["yc.ai.languageModels.execute"],
+        project_id="project-1",
     )
 
 
@@ -54,5 +55,5 @@ def test_validate_key_uses_provider_authentication(mock_post):
     response.raise_for_status.assert_called_once()
     kwargs = mock_post.call_args.kwargs
     assert kwargs["headers"]["Authorization"] == "Api-Key new-provider-secret"
-    assert kwargs["json"]["model"] == "gpt://"
+    assert kwargs["json"]["model"] == "gpt://project-1/alice-lite/latest"
     assert "new-provider-secret" in kwargs["headers"]["Authorization"]
