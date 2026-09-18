@@ -52,6 +52,14 @@ cd android
 gradle :app:testDebugUnitTest
 ```
 
+## System insets
+
+The Android WebView runs in edge-to-edge mode. Safe content padding is resolved centrally from three inset sources: system bars, display cutout and IME. The resolver takes the largest value for each edge, so a keyboard cannot reduce the navigation-bar safe area and a display cutout cannot be hidden by the system-bar inset.
+
+Insets are requested again when the activity resumes and when the window regains focus. This covers transitions that can change system-bar or IME visibility without recreating the activity.
+
+The resolver is unit-tested independently from Android rendering code. UI verification should cover devices with gesture and three-button navigation, display cutouts, portrait/landscape rotation and the on-screen keyboard.
+
 ## CI APK updates
 
 The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk` artifact.
