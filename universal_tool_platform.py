@@ -321,6 +321,7 @@ class UniversalToolExecutor:
                     context={
                         "call": call,
                         "tool": definition,
+                        "user_id": call.user_id,
                     },
                 )
             result = self._normalize_result(raw_result, definition, call)
