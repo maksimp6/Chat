@@ -43,6 +43,7 @@ def rotate_active_key(
     project_id: str,
     old_provider_key_id: str | None = None,
     now: datetime | None = None,
+    commit_before_revoke: bool = False,
 ) -> tuple[str, datetime, datetime]:
     """Create a fresh 12-hour key and promote it in one DB transaction.
 
@@ -61,6 +62,8 @@ def rotate_active_key(
         issued_at,
         expires_at,
     )
+    if commit_before_revoke and hasattr(db, "commit"):
+        db.commit()
     if old_provider_key_id:
         provider.revoke_key(old_provider_key_id)
     return provider_key_id, issued_at, expires_at
