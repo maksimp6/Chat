@@ -17,6 +17,9 @@ class YandexKeyProvider(Protocol):
     def create_key(self, *, expires_at: datetime) -> tuple[str, str]:
         """Return (Yandex API-key resource ID, plaintext secret)."""
 
+    def validate_key(self, api_key: str) -> None:
+        """Raise when the freshly issued key cannot perform a provider request."""
+
     def revoke_key(self, provider_key_id: str) -> None:
         """Delete/revoke a previously issued Yandex API-key resource."""
 
@@ -52,6 +55,7 @@ def rotate_active_key(
     """
     issued_at, expires_at = issue_window(now)
     provider_key_id, plaintext = provider.create_key(expires_at=expires_at)
+    provider.validate_key(plaintext)
     encrypted = encrypt(plaintext)
     promote_rotated_key(
         db,
