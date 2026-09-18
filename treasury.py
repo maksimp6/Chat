@@ -59,7 +59,7 @@ def demo_top_up(owner_id, amount, description='Demo top-up'):
     return get_account(owner_id)
 
 
-def record_expense(owner_id, amount, description, reference=None):
+def record_expense(owner_id, amount, description, reference=None, *, return_status=False):
     amount = float(amount)
     if amount <= 0 or not description:
         raise ValueError('positive amount and description are required')
@@ -68,25 +68,44 @@ def record_expense(owner_id, amount, description, reference=None):
     init_treasury_tables()
     now = datetime.utcnow().isoformat()
     conn = get_conn()
+    created = True
     try:
         conn.execute("BEGIN IMMEDIATE")
         existing = None
         if reference:
-            existing = conn.execute("SELECT * FROM treasury_ledger WHERE owner_id = ? AND reference = ?", (owner_id, reference)).fetchone()
+            existing = conn.execute(
+                "SELECT id FROM treasury_ledger WHERE owner_id = ? AND reference = ?",
+                (owner_id, reference),
+            ).fetchone()
         if existing is not None:
-            conn.commit()
-            return get_account(owner_id)
-        account = conn.execute("SELECT balance FROM treasury_accounts WHERE owner_id = ?", (owner_id,)).fetchone()
-        balance = float(account["balance"]) if account else 0.0
-        if balance < amount:
-            raise ValueError('insufficient balance')
-        conn.execute("INSERT OR IGNORE INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)", (owner_id, now))
-        conn.execute("UPDATE treasury_accounts SET balance = balance - ?, updated_at = ? WHERE owner_id = ?", (amount, now, owner_id))
-        conn.execute("INSERT INTO treasury_ledger(owner_id, kind, amount, description, reference, created_at) VALUES (?, 'debit', ?, ?, ?, ?)", (owner_id, amount, description, reference, now))
+            created = False
+        else:
+            account = conn.execute(
+                "SELECT balance FROM treasury_accounts WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+            balance = float(account["balance"]) if account else 0.0
+            if balance < amount:
+                raise ValueError('insufficient balance')
+            conn.execute(
+                "INSERT OR IGNORE INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)",
+                (owner_id, now),
+            )
+            conn.execute(
+                "UPDATE treasury_accounts SET balance = balance - ?, updated_at = ? WHERE owner_id = ?",
+                (amount, now, owner_id),
+            )
+            conn.execute(
+                "INSERT INTO treasury_ledger(owner_id, kind, amount, description, reference, created_at) "
+                "VALUES (?, 'debit', ?, ?, ?, ?)",
+                (owner_id, amount, description, reference, now),
+            )
         conn.commit()
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
-    return get_account(owner_id)
+
+    account = get_account(owner_id)
+    return (account, created) if return_status else account

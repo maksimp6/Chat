@@ -80,15 +80,41 @@ def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[s
 
 
 def settle_billing_to_treasury(billing: Dict[str, Any], owner_id: Optional[str]) -> Dict[str, Any]:
-    """Post calculated billing exactly once to the Paper Balance ledger."""
-    if not owner_id:
-        raise ValueError("owner identity is required")
+    """Post a fully calculated trace billing aggregate exactly once."""
     if not isinstance(billing, dict) or billing.get("cost_status") != "calculated":
         return {"status": "skipped", "reason": "billing_not_fully_calculated"}
+
+    if not owner_id or not str(owner_id).strip():
+        return {"status": "skipped", "reason": "owner_identity_missing"}
+
+    billing_owner = billing.get("owner_id")
+    if billing_owner is not None and str(billing_owner) != str(owner_id):
+        raise ValueError("billing owner identity does not match the invocation owner")
+
     amount = float(billing.get("total_cost") or 0)
     if amount <= 0:
         return {"status": "skipped", "reason": "zero_cost"}
-    reference = "billing:" + str(billing.get("trace_id") or billing.get("invocation_id") or "unknown")
+
+    import math
+    if not math.isfinite(amount):
+        raise ValueError("billing amount must be finite")
+
+    trace_key = billing.get("trace_id") or billing.get("invocation_id")
+    if not trace_key:
+        return {"status": "skipped", "reason": "billing_reference_missing"}
+
+    reference = "billing:" + str(trace_key)
     from treasury import record_expense
-    record_expense(owner_id, amount, "AI usage", reference=reference)
-    return {"status": "posted", "amount": amount, "reference": reference, "owner_id": str(owner_id)}
+    _, created = record_expense(
+        str(owner_id),
+        amount,
+        "AI usage",
+        reference=reference,
+        return_status=True,
+    )
+    return {
+        "status": "posted" if created else "already_posted",
+        "amount": amount,
+        "reference": reference,
+        "owner_id": str(owner_id),
+    }

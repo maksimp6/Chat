@@ -13,6 +13,7 @@ from runtime_api import runtime_bp
 from runtime_migrations import init_runtime_tables
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
+from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -101,14 +102,20 @@ def api_clear_memory():
 
 @app.route("/api/treasury/account", methods=["GET"])
 def treasury_account():
-    return jsonify(get_account("default"))
+    try:
+        return jsonify(get_account(get_current_owner_id()))
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
 
 @app.route("/api/treasury/top-up", methods=["POST"])
 def treasury_top_up():
     data = request.get_json(silent=True) or {}
     try:
-        account = demo_top_up("default", data.get("amount"), data.get("description", "Demo top-up"))
+        owner_id = get_current_owner_id()
+        account = demo_top_up(owner_id, data.get("amount"), data.get("description", "Demo top-up"))
         return jsonify({"demo": True, "account": account}), 201
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
     except (TypeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
 

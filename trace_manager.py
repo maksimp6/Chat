@@ -43,14 +43,16 @@ class ExecutionTrace:
 
     def set_context(self, invocation_id: Optional[str] = None,
                     session_id: Optional[str] = None,
-                    conversation_id: Optional[str] = None) -> None:
+                    conversation_id: Optional[str] = None,
+                    user_id: Optional[str] = None) -> None:
         context = self.trace.setdefault("context", {})
         for key, value in (("invocation_id", invocation_id), ("session_id", session_id),
-                           ("conversation_id", conversation_id), ("trace_id", self.trace_id)):
+                           ("conversation_id", conversation_id), ("user_id", user_id),
+                           ("owner_id", user_id), ("trace_id", self.trace_id)):
             if value is not None:
                 context[key] = str(value)
         billing = self.trace.setdefault("billing", {})
-        for key in ("invocation_id", "session_id", "conversation_id", "trace_id"):
+        for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
             if key in context:
                 billing[key] = context[key]
 

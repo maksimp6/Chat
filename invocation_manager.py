@@ -55,6 +55,7 @@ def create_invocation(
     session_id: str,
     conversation_id: str,
     metadata: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
     *,
     create_missing_session: bool = True,
 ) -> InvocationContext:
@@ -86,6 +87,9 @@ def create_invocation(
     trace_id = str(uuid.uuid4())
     now = _now()
     persisted_metadata = _sanitize_metadata(metadata or {})
+    resolved_user_id = str(user_id).strip() if user_id is not None and str(user_id).strip() else None
+    if resolved_user_id is not None:
+        persisted_metadata["user_id"] = resolved_user_id
     conn = get_conn()
     try:
         conn.execute(
@@ -111,6 +115,7 @@ def create_invocation(
         conversation_id=conversation_id,
         invocation_id=invocation_id,
         trace_id=trace_id,
+        user_id=resolved_user_id,
         metadata=persisted_metadata,
     )
 
@@ -201,6 +206,7 @@ def get_invocation(invocation_id: str) -> Optional[Dict[str, Any]]:
         "session_id": row["session_id"],
         "conversation_id": row["conversation_id"],
         "trace_id": row["trace_id"],
+        "user_id": decode(row["metadata_json"], {}).get("user_id"),
         "status": row["status"],
         "metadata": decode(row["metadata_json"], {}),
         "result": decode(row["result_json"], None),
