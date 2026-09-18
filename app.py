@@ -12,6 +12,7 @@ from chatgpt_mcp import chatgpt_mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime_migrations import init_runtime_tables
+from local_agent_gateway import local_agent_bp, init_local_agent_tables
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
@@ -24,9 +25,11 @@ app.register_blueprint(mcp_bp)
 app.register_blueprint(chatgpt_mcp_bp)
 app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
+app.register_blueprint(local_agent_bp)
 
 init_db()
 init_runtime_tables()
+init_local_agent_tables()
 check_supabase_trace_mirror()
 init_treasury_tables()
 

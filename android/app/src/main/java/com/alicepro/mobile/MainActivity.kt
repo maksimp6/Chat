@@ -3,13 +3,15 @@ package com.alicepro.mobile
 import android.app.AlertDialog
 import android.os.Bundle
 import android.text.InputType
-import android.widget.EditText
-import android.widget.Toast
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -19,6 +21,7 @@ import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -31,8 +34,6 @@ class MainActivity : AppCompatActivity() {
         AppLogger.initialize(this)
         AppLogger.info("MainActivity", "Activity created")
 
-        // Android 15+ enforces edge-to-edge for apps targeting SDK 35.
-        // Apply system-bar, display-cutout and IME insets to the WebView.
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         webView = WebView(this)
@@ -93,13 +94,30 @@ class MainActivity : AppCompatActivity() {
         setContentView(webView)
         ViewCompat.requestApplyInsets(webView)
 
-        val storedKey = prefs.getString(KEY_YANDEX_API_KEY, "").orEmpty()
-        if (storedKey.isBlank()) {
-            AppLogger.info("Startup", "No stored API key; showing setup dialog")
-            promptForApiKey()
-        } else {
-            AppLogger.info("Startup", "Stored API key found; starting Python server")
-            startPythonServer(storedKey)
+        val localAgentMode = prefs.getBoolean(KEY_LOCAL_AGENT_MODE, false)
+        val localAgentGateway = prefs.getString(KEY_LOCAL_AGENT_GATEWAY, "").orEmpty()
+        val localAgentBootstrap = prefs.getString(KEY_LOCAL_AGENT_BOOTSTRAP, "").orEmpty()
+
+        when {
+            localAgentMode && localAgentGateway.isNotBlank() && localAgentBootstrap.isNotBlank() -> {
+                AppLogger.info("Startup", "Local agent mode enabled")
+                startLocalAgent(localAgentGateway, localAgentBootstrap)
+            }
+
+            localAgentMode -> {
+                AppLogger.warning("Startup", "Local agent mode is incomplete; opening setup")
+                promptForLocalAgent()
+            }
+
+            prefs.getString(KEY_YANDEX_API_KEY, "").orEmpty().isBlank() -> {
+                AppLogger.info("Startup", "No stored API key; showing setup dialog")
+                promptForApiKey()
+            }
+
+            else -> {
+                AppLogger.info("Startup", "Stored API key found; starting Python server")
+                startPythonServer(prefs.getString(KEY_YANDEX_API_KEY, "").orEmpty())
+            }
         }
     }
 
@@ -165,16 +183,141 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "API key is required", Toast.LENGTH_SHORT).show()
                     promptForApiKey()
                 } else {
-                    prefs.edit().putString(KEY_YANDEX_API_KEY, key).apply()
+                    prefs.edit()
+                        .putBoolean(KEY_LOCAL_AGENT_MODE, false)
+                        .putString(KEY_YANDEX_API_KEY, key)
+                        .apply()
                     AppLogger.info("Startup", "API key saved; starting Python server")
                     startPythonServer(key)
                 }
+            }
+            .setNeutralButton("Local agent") { _, _ ->
+                promptForLocalAgent()
             }
             .setNegativeButton("Exit") { _, _ ->
                 AppLogger.warning("Startup", "User exited API key setup")
                 finish()
             }
             .show()
+    }
+
+    private fun promptForLocalAgent() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 8, 48, 0)
+        }
+
+        val gatewayInput = EditText(this).apply {
+            hint = "https://your-cloud-host"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        val bootstrapInput = EditText(this).apply {
+            hint = "Bootstrap token"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine(true)
+        }
+        val defaultAgentId = prefs.getString(KEY_LOCAL_AGENT_ID, "").orEmpty()
+            .ifBlank { "android-${UUID.randomUUID().toString().replace("-", "").take(12)}" }
+        val agentIdInput = EditText(this).apply {
+            hint = "Agent ID"
+            setSingleLine(true)
+            setText(defaultAgentId)
+        }
+
+        container.addView(
+            gatewayInput,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        container.addView(
+            bootstrapInput,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        container.addView(
+            agentIdInput,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Run as Local Tool Agent")
+            .setMessage("The phone will make outbound HTTPS requests to Cloud.ru. No router port forwarding or public Android port is required.")
+            .setView(container)
+            .setCancelable(false)
+            .setPositiveButton("Connect") { _, _ ->
+                val gateway = gatewayInput.text.toString().trim().removeSuffix("/")
+                val bootstrap = bootstrapInput.text.toString().trim()
+                val agentId = agentIdInput.text.toString().trim()
+                if (gateway.isBlank() || bootstrap.isBlank() || agentId.isBlank()) {
+                    Toast.makeText(this, "Gateway URL, bootstrap token and agent ID are required", Toast.LENGTH_LONG).show()
+                    promptForLocalAgent()
+                    return@setPositiveButton
+                }
+
+                prefs.edit()
+                    .putBoolean(KEY_LOCAL_AGENT_MODE, true)
+                    .putString(KEY_LOCAL_AGENT_GATEWAY, gateway)
+                    .putString(KEY_LOCAL_AGENT_BOOTSTRAP, bootstrap)
+                    .putString(KEY_LOCAL_AGENT_ID, agentId)
+                    .remove(KEY_YANDEX_API_KEY)
+                    .apply()
+
+                startLocalAgent(gateway, bootstrap)
+            }
+            .setNegativeButton("Back") { _, _ ->
+                promptForApiKey()
+            }
+            .show()
+    }
+
+    private fun startLocalAgent(gatewayUrl: String, bootstrapToken: String) {
+        AppLogger.info(
+            "LocalAgent",
+            "Starting outbound local agent",
+            mapOf("gateway" to gatewayUrl),
+        )
+
+        if (!Python.isStarted()) {
+            Python.start(AndroidPlatform(this))
+        }
+
+        Thread {
+            try {
+                val agentId = prefs.getString(KEY_LOCAL_AGENT_ID, "").orEmpty()
+                val result = Python.getInstance()
+                    .getModule("android_server")
+                    .callAttr(
+                        "start_local_agent",
+                        gatewayUrl,
+                        bootstrapToken,
+                        agentId.ifBlank { null },
+                        listOf("local.tools"),
+                    )
+                    .toJava(String::class.java)
+
+                AppLogger.info("LocalAgent", "Local agent started", mapOf("result" to result))
+                runOnUiThread {
+                    Toast.makeText(this, "Local Tool Agent connected", Toast.LENGTH_LONG).show()
+                }
+            } catch (error: Throwable) {
+                AppLogger.error("LocalAgent", "Local agent failed", error)
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        "Local agent failed: ${error.message}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }.start()
     }
 
     private fun startPythonServer(apiKey: String) {
@@ -245,5 +388,9 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val KEY_YANDEX_API_KEY = "yandex_api_key"
+        private const val KEY_LOCAL_AGENT_MODE = "local_agent_mode"
+        private const val KEY_LOCAL_AGENT_GATEWAY = "local_agent_gateway"
+        private const val KEY_LOCAL_AGENT_BOOTSTRAP = "local_agent_bootstrap"
+        private const val KEY_LOCAL_AGENT_ID = "local_agent_id"
     }
 }

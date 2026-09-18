@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
+import threading
 import traceback
 from pathlib import Path
 from typing import Optional
@@ -11,6 +13,10 @@ from typing import Optional
 
 HOST = "127.0.0.1"
 PORT = 5000
+
+_LOCAL_AGENT_WORKER = None
+_LOCAL_AGENT_THREAD = None
+_LOCAL_AGENT_LOCK = threading.Lock()
 
 
 def _server_is_running() -> bool:
@@ -63,3 +69,60 @@ def start_server(api_key: Optional[str] = None):
     except BaseException as error:
         _write_startup_error(home, error)
         raise
+
+
+def start_local_agent(
+    gateway_url: str,
+    bootstrap_token: str,
+    agent_id: Optional[str] = None,
+    capabilities: Optional[list[str]] = None,
+) -> str:
+    """Register and start the outbound Local Tool Agent worker.
+
+    The runtime token returned by Cloud.ru is held only in the Python process.
+    The Android UI stores only the bootstrap credential needed for a future
+    re-registration.
+    """
+    global _LOCAL_AGENT_WORKER, _LOCAL_AGENT_THREAD
+
+    with _LOCAL_AGENT_LOCK:
+        if _LOCAL_AGENT_THREAD is not None and _LOCAL_AGENT_THREAD.is_alive():
+            return json.dumps({
+                "status": "already_running",
+                "agent_id": getattr(_LOCAL_AGENT_WORKER, "agent_id", agent_id),
+            }, ensure_ascii=False)
+
+        from local_tool_agent import start_agent
+
+        worker, _runtime_token = start_agent(
+            gateway_url,
+            bootstrap_token,
+            agent_id=agent_id,
+            name="Alice Pro Android Agent",
+            capabilities=capabilities or ["local.tools"],
+            version="1.0",
+        )
+        thread = threading.Thread(
+            target=worker.run_forever,
+            name="alice-local-tool-agent",
+            daemon=True,
+        )
+        _LOCAL_AGENT_WORKER = worker
+        _LOCAL_AGENT_THREAD = thread
+        thread.start()
+
+        return json.dumps({
+            "status": "started",
+            "agent_id": worker.agent_id,
+        }, ensure_ascii=False)
+
+
+def local_agent_status() -> dict:
+    with _LOCAL_AGENT_LOCK:
+        return {
+            "running": bool(
+                _LOCAL_AGENT_THREAD is not None
+                and _LOCAL_AGENT_THREAD.is_alive()
+            ),
+            "agent_id": getattr(_LOCAL_AGENT_WORKER, "agent_id", None),
+        }
