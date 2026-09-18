@@ -247,7 +247,6 @@ def register_local_agent():
                 now,
                 now,
                 now,
-                now,
             ),
         )
         conn.commit()
