@@ -159,9 +159,14 @@ def test_trace_tool_reads_persisted_trace_for_matching_user(client, monkeypatch)
         "started_at": 1,
         "completed_at": 2,
     }
-    trace = create_invocation_trace(InvocationContext.create(
-        "session-1", "conversation-1", invocation_id="invocation-1", trace_id="trace-1", user_id="user-a"
-    )).finalize()
+    context = InvocationContext(
+        session_id="session-1",
+        conversation_id="conversation-1",
+        invocation_id="invocation-1",
+        trace_id="trace-1",
+        user_id="user-a",
+    )
+    trace = create_invocation_trace(context).finalize()
 
     monkeypatch.setattr(chatgpt_mcp, "get_invocation_status", lambda _id: invocation)
     monkeypatch.setattr(chatgpt_mcp, "get_invocation_trace", lambda _id: trace)
