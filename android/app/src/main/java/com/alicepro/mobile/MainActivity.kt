@@ -64,18 +64,29 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(AndroidBridge(), "AliceAndroid")
 
         ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
-            )
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val resolved = WindowInsetsResolver.resolve(bars, cutout, ime)
 
             view.updatePadding(
-                left = bars.left,
-                top = bars.top,
-                right = bars.right,
-                bottom = maxOf(bars.bottom, ime.bottom),
+                left = resolved.left,
+                top = resolved.top,
+                right = resolved.right,
+                bottom = resolved.bottom,
             )
 
+            AppLogger.debug(
+                "Insets",
+                "Applied window insets",
+                mapOf(
+                    "left" to resolved.left.toString(),
+                    "top" to resolved.top.toString(),
+                    "right" to resolved.right.toString(),
+                    "bottom" to resolved.bottom.toString(),
+                    "ime_bottom" to ime.bottom.toString(),
+                ),
+            )
             insets
         }
 
@@ -94,7 +105,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        ViewCompat.requestApplyInsets(webView)
         AppLogger.debug("Lifecycle", "Activity resumed")
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) ViewCompat.requestApplyInsets(webView)
     }
 
     override fun onPause() {
