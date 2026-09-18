@@ -23,6 +23,8 @@ from db import (
 )
 from partial_output import extract_last_response_text, format_partial_output_message
 from responses_tool_loop import run_tool_loop, extract_function_calls
+from billing import settle_billing_to_treasury
+from treasury_identity import get_current_owner_id
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
@@ -106,7 +108,13 @@ def chat():
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
-        invocation = create_invocation(session_id, conv_id, metadata={"model": model_key})
+        owner_id = get_current_owner_id(required=False)
+        invocation = create_invocation(
+            session_id,
+            conv_id,
+            metadata={"model": model_key},
+            user_id=owner_id,
+        )
         trace = create_invocation_trace(invocation)
         start_invocation(invocation.invocation_id)
         trace.set_request({
@@ -207,14 +215,35 @@ def chat():
         if not reply:
             raise RuntimeError("Responses API завершил tool-call цепочку без текстового ответа")
         usage = client.extract_usage(response)
-        cost = calculate_full_cost(model_key, usage) if usage else 0.0
         timings = response.get("step_timings", []) if isinstance(response, dict) else []
         total_ms = round((_time.perf_counter() - t_start) * 1000)
         trace_data = trace.finalize()
 
+        try:
+            settlement = settle_billing_to_treasury(
+                trace_data.get("billing") or {},
+                invocation.user_id,
+            )
+        except Exception as settlement_error:
+            trace.record_error("treasury_settlement", str(settlement_error), exception=settlement_error)
+            settlement = {"status": "failed", "reason": str(settlement_error)}
+            trace_data = trace.finalize()
+
+        trace_data.setdefault("billing", {})["settlement"] = settlement
+        billing = trace_data.get("billing") or {}
+        cost = float(billing.get("total_cost") or 0) if billing.get("cost_status") in {"calculated", "partial"} else 0.0
+
         persist_invocation_trace(invocation.invocation_id, trace_data)
         add_message(invocation.conversation_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
-        finish_invocation(invocation.invocation_id, result={"reply": reply, "usage": usage, "cost": cost})
+        finish_invocation(
+            invocation.invocation_id,
+            result={
+                "reply": reply,
+                "usage": usage,
+                "cost": cost,
+                "settlement": settlement,
+            },
+        )
 
         return jsonify({
             "reply": reply,
