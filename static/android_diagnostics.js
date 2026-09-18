@@ -16,6 +16,7 @@
     function installDiagnosticsButton() {
         if (!bridge()) return;
         var header = document.getElementById("header");
+        var actionRow = document.getElementById("header-actions-2") || header;
         if (!header || document.getElementById("android-diagnostics-btn")) return;
 
         var button = document.createElement("button");
@@ -30,7 +31,7 @@
                 nativeLog("ERROR", "Diagnostics", error);
             }
         };
-        header.appendChild(button);
+        actionRow.appendChild(button);
     }
 
     window.addEventListener("error", function (event) {
