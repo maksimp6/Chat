@@ -58,9 +58,8 @@ def main() -> int:
             old_id=int(row["id"]),
             project_id=str(row["project_id"]),
             old_provider_key_id=row["yandex_key_id"],
+            commit_before_revoke=True,
         )
-        # rotate_active_key promotes the new key before returning. Commit here
-        # so the new credential remains usable even if old-key revocation fails.
         conn.commit()
         logger.info(
             "Rotated global Yandex provider key id=%s expires_at=%s",
