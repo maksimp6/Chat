@@ -16,11 +16,6 @@ load_dotenv(_ENV_FILE)
 # Keep compatibility with the legacy YC_API_KEY name while preferring the
 # canonical YANDEX_API_KEY variable. Never put credentials in source code.
 API_KEY = os.getenv("YANDEX_API_KEY") or os.getenv("YC_API_KEY")
-if not API_KEY:
-    raise RuntimeError(
-        "Yandex API key is not configured. Set YANDEX_API_KEY (or legacy "
-        "YC_API_KEY) in the environment or in the project's .env file."
-    )
 
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
