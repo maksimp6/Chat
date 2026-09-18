@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import threading
@@ -111,10 +112,10 @@ def start_local_agent(
         _LOCAL_AGENT_THREAD = thread
         thread.start()
 
-        return {
+        return json.dumps({
             "status": "started",
             "agent_id": worker.agent_id,
-        }
+        }, ensure_ascii=False)
 
 
 def local_agent_status() -> dict:
