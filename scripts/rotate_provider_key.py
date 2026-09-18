@@ -50,7 +50,7 @@ def main() -> int:
             conn.rollback()
             return 0
 
-        provider = YandexApiKeyProvider()
+        provider = YandexApiKeyProvider(project_id=str(row["project_id"]))
         new_id, issued_at, expires_at = rotate_active_key(
             db=conn,
             provider=provider,
