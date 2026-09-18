@@ -74,10 +74,9 @@ def start_server(api_key: Optional[str] = None):
 def start_local_agent(
     gateway_url: str,
     bootstrap_token: str,
-    *,
     agent_id: Optional[str] = None,
     capabilities: Optional[list[str]] = None,
-) -> dict:
+) -> str:
     """Register and start the outbound Local Tool Agent worker.
 
     The runtime token returned by Cloud.ru is held only in the Python process.
