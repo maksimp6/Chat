@@ -79,7 +79,7 @@ jobs:
           fi
       - name: Run Android unit tests and build debug APK
         working-directory: android
-        run: gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} :app:testDebugUnitTest :app:assembleDebug
+        run: gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} -PaliceCommitHash=${{ github.sha }} :app:testDebugUnitTest :app:assembleDebug
       - name: Verify debug APK
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
