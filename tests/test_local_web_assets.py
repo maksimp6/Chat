@@ -8,7 +8,7 @@ ERUDA = ROOT / "static" / "vendor" / "eruda.min.js"
 FAVICON = ROOT / "static" / "favicon.svg"
 
 EXTERNAL_TAG_ASSET = re.compile(
-    r"<(?:script|link|img|source|video|audio)[^>]+(?:src|href)\\s*=\\s*['\"]\\s*(?:https?:)?//",
+    r"<(?:script|link|img|source|video|audio)[^>]+(?:src|href)\s*=\s*['\"]\s*(?:https?:)?//",
     re.IGNORECASE,
 )
 
@@ -28,5 +28,5 @@ def test_local_debug_assets_exist():
 
 def test_css_does_not_load_remote_assets():
     css = CSS.read_text(encoding="utf-8")
-    assert not re.search(r"@import\\s+(?:url\\()?\\s*['\"]?(?:https?:)?//", css, re.IGNORECASE)
-    assert not re.search(r"url\\(\\s*['\"]?(?:https?:)?//", css, re.IGNORECASE)
+    assert not re.search(r"@import\s+(?:url\()?\s*['\"]?(?:https?:)?//", css, re.IGNORECASE)
+    assert not re.search(r"url\(\s*['\"]?(?:https?:)?//", css, re.IGNORECASE)
