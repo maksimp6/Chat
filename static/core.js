@@ -14,9 +14,46 @@ if (urlConvId) {
     currentConvId = localStorage.getItem("current_conv_id") || null;
 }
 
-// Инициализация темы
-const savedTheme = localStorage.getItem("theme") || "light";
-document.documentElement.setAttribute("data-theme", savedTheme);
+// Инициализация пользовательской цветовой схемы
+const ALICE_THEMES = {
+    light: "Светлая",
+    dark: "Тёмная",
+    dim: "Приглушённая",
+    "high-contrast": "Высокий контраст"
+};
+
+function normalizeAliceTheme(value) {
+    return Object.prototype.hasOwnProperty.call(ALICE_THEMES, value) ? value : "light";
+}
+
+window.AliceTheme = {
+    themes: ALICE_THEMES,
+    getStored: function() {
+        return normalizeAliceTheme(localStorage.getItem("theme") || "light");
+    },
+    apply: function(value, persist) {
+        var theme = normalizeAliceTheme(value);
+        document.documentElement.setAttribute("data-theme", theme);
+        if (persist !== false) localStorage.setItem("theme", theme);
+        var button = document.getElementById("theme-toggle");
+        if (button) {
+            var icon = theme === "dark" ? "☀️" : (theme === "light" ? "🌙" : "🎨");
+            button.textContent = icon;
+            button.title = "Цветовая схема: " + ALICE_THEMES[theme];
+            button.setAttribute("aria-label", "Цветовая схема: " + ALICE_THEMES[theme]);
+        }
+        return theme;
+    },
+    cycle: function() {
+        var themes = Object.keys(ALICE_THEMES);
+        var current = this.getStored();
+        var next = themes[(themes.indexOf(current) + 1) % themes.length];
+        return this.apply(next, true);
+    }
+};
+
+const savedTheme = window.AliceTheme.getStored();
+window.AliceTheme.apply(savedTheme, false);
 
 // Глобальная функция смены модели
 window.changeModel = function(newModel, skipPatch) {
@@ -46,16 +83,12 @@ window.changeModel = function(newModel, skipPatch) {
 document.addEventListener("DOMContentLoaded", async function() {
     console.log("[CORE] DOMContentLoaded. currentConvId:", currentConvId);
 
-    // Тема
+    // Цветовая схема
     var themeToggle = document.getElementById("theme-toggle");
     if (themeToggle) {
-        themeToggle.textContent = savedTheme === "dark" ? "☀️" : "🌙";
+        window.AliceTheme.apply(savedTheme, false);
         themeToggle.addEventListener("click", function() {
-            var cur = document.documentElement.getAttribute("data-theme");
-            var next = cur === "dark" ? "light" : "dark";
-            document.documentElement.setAttribute("data-theme", next);
-            localStorage.setItem("theme", next);
-            themeToggle.textContent = next === "dark" ? "☀️" : "🌙";
+            window.AliceTheme.cycle();
         });
     }
 
