@@ -37,11 +37,30 @@ android {
             keyPassword = System.getenv("ALICE_RELEASE_KEY_PASSWORD")
                 ?: providers.gradleProperty("aliceReleaseKeyPassword").orNull
         }
+
+        val debugKeystorePath = System.getenv("ALICE_DEBUG_KEYSTORE_PATH")
+            ?: "debug-signing.keystore"
+        val debugKeystore = file(debugKeystorePath)
+        val debugStorePassword = System.getenv("ALICE_DEBUG_STORE_PASSWORD")
+        val debugKeyAlias = System.getenv("ALICE_DEBUG_KEY_ALIAS")
+        val debugKeyPassword = System.getenv("ALICE_DEBUG_KEY_PASSWORD")
+        if (debugKeystore.isFile && !debugStorePassword.isNullOrBlank()
+            && !debugKeyAlias.isNullOrBlank() && !debugKeyPassword.isNullOrBlank()) {
+            create("customDebug") {
+                storeFile = debugKeystore
+                storePassword = debugStorePassword
+                keyAlias = debugKeyAlias
+                keyPassword = debugKeyPassword
+            }
+        }
     }
 
     buildTypes {
         getByName("debug") {
-            // Debug builds keep the standard debug signing configuration.
+            val customDebug = signingConfigs.findByName("customDebug")
+            if (customDebug != null) {
+                signingConfig = customDebug
+            }
         }
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
