@@ -28,6 +28,7 @@ app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
 app.register_blueprint(local_agent_bp)
 app.register_blueprint(cloudru_iam_bp)
+app.register_blueprint(departments_bp)
 
 init_db()
 init_runtime_tables()
