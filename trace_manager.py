@@ -6,6 +6,8 @@ import traceback
 from typing import Any, Dict, Optional
 
 from trace_security import MAX_DEPTH, MAX_ITEMS, MAX_REPR, SENSITIVE_KEYS, safe_repr, sanitize_trace_value
+from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
+from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
 
 
 class ExecutionTrace:
@@ -126,43 +128,14 @@ class ExecutionTrace:
                 "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__), "frames": frames}
 
     def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
-        start = None
-        api_requests = self.trace.get("api_requests", [])
-        for request in reversed(api_requests):
-            if request.get("step") == step_index:
-                value = request.get("timestamp")
-                if isinstance(value, (int, float)):
-                    start = float(value)
-                break
-        for event in reversed(self.trace.get("events", [])):
-            if event.get("type") != "api_request_completed":
-                continue
-            payload = event.get("payload") or {}
-            if payload.get("step") != step_index:
-                continue
-            value = payload.get("start_timestamp")
-            if start is None and isinstance(value, (int, float)):
-                start = float(value)
-            break
-        return start, None
+        return request_timing_for_step(self.trace, step_index)
 
     def _infer_response_start(self, step_index: int, end_timestamp: float) -> Optional[float]:
-        request_start, _ = self._request_timing_for_step(step_index)
-        if request_start is not None:
-            return request_start
-        if self.trace["responses"]:
-            previous = self.trace["responses"][-1]
-            previous_end = previous.get("end_timestamp", previous.get("timestamp"))
-            if isinstance(previous_end, (int, float)):
-                return float(previous_end)
-        created = self.trace.get("created_at")
-        if isinstance(created, (int, float)):
-            return float(created)
-        return None
+        return infer_response_start(self.trace, step_index, end_timestamp)
 
     def get_step_correlation_id(self, step_index: int) -> str:
         """Return a stable correlation identifier for one logical API step."""
-        return f"{self.trace_id}:step:{int(step_index)}"
+        return step_correlation_id(self.trace_id, step_index)
 
     def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
                         start_timestamp: Optional[float] = None,
