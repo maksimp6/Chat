@@ -71,7 +71,7 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose "$APK"
-          keytool -printcert -jarfile "$APK" | grep -E 'Owner:|SHA-256 fingerprint:'
+          keytool -printcert -jarfile "$APK" | grep -E 'Owner:|SHA256:'
           sha256sum "$APK"
 
       - name: Upload signed release APK
