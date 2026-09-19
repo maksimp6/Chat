@@ -359,7 +359,7 @@ def conversations():
             conv_id = y_conv.get('id') or str(uuid.uuid4())
         except Exception:
             conv_id = str(uuid.uuid4())
-        title = data.get('title', 'Новый диалог')
+        title = data.get('title') or 'Новый чат'
         model = data.get('model', 'aliceai-llm')
         create_conversation(conv_id, title, model)
         return jsonify({"id": conv_id, "title": title, "model": model}), 201
