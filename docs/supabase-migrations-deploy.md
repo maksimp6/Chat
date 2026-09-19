@@ -20,3 +20,9 @@ Do not commit tokens, database passwords, or connection strings.
 - Prints the resulting migration state.
 
 The workflow is intentionally limited to `master`, which is the current production branch. Review the workflow and environment protection rules before enabling it for a live database.
+
+## Recovery after a failed migration
+
+A failed migration must be investigated from the failed GitHub Actions run before another deployment. Do not rewrite or delete an already-applied migration. Create a new corrective migration, validate it in a non-production environment, and then merge it to `master`. The workflow serializes production runs, so a failed run does not start a second migration concurrently.
+
+For an unrecoverable schema change, restore the database from the configured Supabase backup/recovery mechanism and then reconcile migration history before resuming deployments. The repository intentionally uses forward corrective migrations rather than an automatic SQL rollback, because arbitrary database changes cannot safely be reversed generically.
