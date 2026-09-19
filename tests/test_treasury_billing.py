@@ -70,7 +70,9 @@ def test_partial_or_unknown_billing_is_never_posted(treasury_db):
 
 def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
     from billing import settle_billing_to_treasury
+    from treasury import demo_top_up
 
+    demo_top_up("trusted-owner", 1)
     billing = {
         "cost_status": "calculated",
         "total_cost": 1,
