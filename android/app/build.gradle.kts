@@ -24,6 +24,29 @@ android {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("ALICE_RELEASE_KEYSTORE_PATH")
+                ?: "release-signing.keystore"
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("ALICE_RELEASE_STORE_PASSWORD")
+                ?: providers.gradleProperty("aliceReleaseStorePassword").orNull
+            keyAlias = System.getenv("ALICE_RELEASE_KEY_ALIAS")
+                ?: providers.gradleProperty("aliceReleaseKeyAlias").orNull
+            keyPassword = System.getenv("ALICE_RELEASE_KEY_PASSWORD")
+                ?: providers.gradleProperty("aliceReleaseKeyPassword").orNull
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            // Debug builds keep the standard debug signing configuration.
+        }
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
 }
 
 kotlin {
