@@ -18,8 +18,9 @@ android {
         minSdk = 26
         targetSdk = 35
         val buildNumber = providers.gradleProperty("aliceBuildNumber").orElse("1").get().toIntOrNull() ?: 1
+        val commitHash = providers.gradleProperty("aliceCommitHash").orElse("unknown").get()
         versionCode = buildNumber
-        versionName = "0.1.0.${buildNumber}"
+        versionName = "0.1.0-${commitHash.take(7)}"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
