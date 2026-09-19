@@ -7,10 +7,18 @@ object WindowInsetsResolver {
         systemBars: Insets,
         displayCutout: Insets,
         ime: Insets,
+        waterfall: Insets = Insets.NONE,
+        mandatorySystemGestures: Insets = Insets.NONE,
     ): Insets = Insets.of(
-        maxOf(systemBars.left, displayCutout.left),
-        maxOf(systemBars.top, displayCutout.top),
-        maxOf(systemBars.right, displayCutout.right),
-        maxOf(systemBars.bottom, displayCutout.bottom, ime.bottom),
+        maxOf(systemBars.left, displayCutout.left, waterfall.left, mandatorySystemGestures.left),
+        maxOf(systemBars.top, displayCutout.top, waterfall.top),
+        maxOf(systemBars.right, displayCutout.right, waterfall.right, mandatorySystemGestures.right),
+        maxOf(
+            systemBars.bottom,
+            displayCutout.bottom,
+            waterfall.bottom,
+            mandatorySystemGestures.bottom,
+            ime.bottom,
+        ),
     )
 }
