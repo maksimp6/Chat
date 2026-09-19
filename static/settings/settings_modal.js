@@ -120,6 +120,7 @@
             '    <button class="llm-tab-btn" data-tab="tab-routing" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Маршрутизация вызовов</button>',
             '    <button class="llm-tab-btn" data-tab="tab-tools" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Встроенные тулы</button>',
             '    <button class="llm-tab-btn" data-tab="tab-adv" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Промпты & Кэш</button>',
+            '    <button class="llm-tab-btn" data-tab="tab-theme" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Оформление</button>',
             '</div>'
         ].join('');
 
@@ -294,14 +295,38 @@ var tabAdv = [
             '</div>'
         ].join('');
 
-        var footer = [
+                var activeTheme = window.AliceTheme ? window.AliceTheme.getStored() : 'light';
+        var themeOptions = Object.keys((window.AliceTheme && window.AliceTheme.themes) || {
+            light: 'Светлая',
+            dark: 'Тёмная',
+            dim: 'Приглушённая',
+            'high-contrast': 'Высокий контраст'
+        }).map(function(key) {
+            var label = (window.AliceTheme.themes || {})[key] || key;
+            return '<option value="' + UI.escapeHtml(key) + '"' +
+                (activeTheme === key ? ' selected' : '') + '>' +
+                UI.escapeHtml(label) + '</option>';
+        }).join('');
+
+        var tabTheme = [
+            '<div id="tab-theme" class="llm-tab-content" style="display:none;">',
+            UI.section("Цветовая схема"),
+            UI.lbl('Схема интерфейса'),
+            UI.sel('set-theme', themeOptions),
+            '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
+            'Выбор сохраняется локально на устройстве и не передаётся модели. Переключатель в шапке циклически меняет схемы.',
+            '</div>',
+            '</div>'
+        ].join('');
+
+var footer = [
             '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
             '    <button id="set-reset-btn" style="padding:8px 16px;background:var(--m-danger,#c33);color:#fff;border:none;border-radius:6px;cursor:pointer;">Сброс</button>',
             '    <button id="set-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить параметры</button>',
             '</div>'
         ].join('');
 
-        md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabTools + tabAdv + footer;
+        md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabTools + tabAdv + tabTheme + footer;
         ov.appendChild(md);
         document.body.appendChild(ov);
 
@@ -328,6 +353,13 @@ var tabAdv = [
                 if (target) target.style.display = 'block';
             });
         });
+
+        var themeSelect = document.getElementById('set-theme');
+        if (themeSelect) {
+            themeSelect.addEventListener('change', function() {
+                if (window.AliceTheme) window.AliceTheme.apply(this.value, true);
+            });
+        }
 
         document.getElementById('set-text-fmt').addEventListener('change', function() {
             document.getElementById('json-schema-wrap').style.display = this.value === 'json' ? 'block' : 'none';
