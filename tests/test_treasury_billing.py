@@ -68,6 +68,35 @@ def test_partial_or_unknown_billing_is_never_posted(treasury_db):
     assert [item for item in get_account(owner_id)["ledger"] if item["kind"] == "debit"] == []
 
 
+def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
+    from billing import settle_billing_to_treasury
+
+    billing = {
+        "cost_status": "calculated",
+        "total_cost": 1,
+        "trace_id": "trace-bind-owner",
+    }
+    result = settle_billing_to_treasury(billing, "trusted-owner")
+
+    assert result["status"] == "posted"
+    assert billing["owner_id"] == "trusted-owner"
+
+
+def test_mismatched_billing_owner_is_rejected(treasury_db):
+    from billing import settle_billing_to_treasury
+
+    with pytest.raises(ValueError, match="does not match"):
+        settle_billing_to_treasury(
+            {
+                "cost_status": "calculated",
+                "total_cost": 1,
+                "trace_id": "trace-wrong-owner",
+                "owner_id": "attacker-owner",
+            },
+            "trusted-owner",
+        )
+
+
 def test_missing_owner_identity_is_safe_skip(treasury_db):
     from billing import settle_billing_to_treasury
 
