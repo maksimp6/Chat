@@ -6,6 +6,7 @@ def test_legacy_default_conversation_title_is_migrated(tmp_path, monkeypatch):
 
     db.init_db()
     db.create_conversation("conv-old-title", "Новый диалог", "aliceai-llm")
+    db.init_db()
 
     conversations = db.get_conversations()
     assert conversations[0]["title"] == "Новый чат"
