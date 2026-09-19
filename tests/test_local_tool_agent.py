@@ -1,4 +1,18 @@
 import local_tool_agent
+from universal_tool_platform import UniversalToolDefinition
+
+
+def _definition(name, *, requires_approval=False):
+    return UniversalToolDefinition(
+        name=name,
+        description="test tool",
+        input_schema={"type": "object", "properties": {}, "required": []},
+        output_schema={"type": "object"},
+        read_only=True,
+        requires_approval=requires_approval,
+        supported_transports=("local_agent",),
+        executor={"type": "local"},
+    )
 
 
 def test_execute_job_normalizes_success(monkeypatch):
@@ -6,8 +20,13 @@ def test_execute_job_normalizes_success(monkeypatch):
 
     monkeypatch.setattr(
         local_tool_agent.registry,
+        "get_universal_definition",
+        lambda name: _definition(name),
+    )
+    monkeypatch.setattr(
+        local_tool_agent.registry,
         "execute",
-        lambda name, args: {"value": args["value"]},
+        lambda name, args, **_kwargs: {"value": args["value"]},
     )
 
     agent = local_tool_agent.LocalToolAgent(
@@ -46,8 +65,13 @@ def test_execute_job_turns_tool_errors_into_failed_result(monkeypatch):
 
     monkeypatch.setattr(
         local_tool_agent.registry,
+        "get_universal_definition",
+        lambda name: _definition(name),
+    )
+    monkeypatch.setattr(
+        local_tool_agent.registry,
         "execute",
-        lambda _name, _args: {"error": "permission denied"},
+        lambda _name, _args, **_kwargs: {"error": "permission denied"},
     )
 
     agent = local_tool_agent.LocalToolAgent(

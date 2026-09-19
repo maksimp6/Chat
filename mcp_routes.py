@@ -25,6 +25,7 @@ from partial_output import extract_last_response_text, format_partial_output_mes
 from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
 from treasury_identity import get_current_owner_id
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
@@ -383,11 +384,27 @@ def execute_approved():
         if not tool_config:
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
 
-        exec_res = registry.execute(func_name, arguments)
+        owner_id = get_current_owner_id(required=False)
+        call = UniversalToolCall(
+            tool_name=func_name,
+            arguments=arguments,
+            transport="internal",
+            user_id=owner_id,
+            approved=True,
+            metadata={"source": "approved_action"},
+        )
+        exec_res = UniversalToolExecutor(registry).execute(call)
+        if not exec_res.get("success"):
+            return jsonify({
+                "error": exec_res.get("error") or "Tool execution failed",
+                "execution_result": exec_res,
+            }), 403 if (exec_res.get("metadata") or {}).get("phase") in {"authorization", "approval_required"} else 400
+
+        execution_data = exec_res.get("data")
         client = AliceClient(Config)
         prompt = (
             f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
-            f"Результат: {exec_res}.\nДай краткий ответ о завершении."
+            f"Результат: {execution_data}.\nДай краткий ответ о завершении."
         )
         synth_response = client.ask(prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."})
         reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."

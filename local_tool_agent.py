@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from tool_registry import registry
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 logger = logging.getLogger("local_tool_agent")
 
@@ -148,21 +149,22 @@ class LocalToolAgent:
 
         started = time.monotonic()
         try:
-            raw_result = registry.execute(tool_name, dict(arguments))
-            if isinstance(raw_result, Mapping) and raw_result.get("error"):
-                result = {
-                    "success": False,
-                    "data": None,
-                    "error": str(raw_result.get("error")),
-                }
-                status = "failed"
-            else:
-                result = {
-                    "success": True,
-                    "data": raw_result,
-                    "error": None,
-                }
-                status = "completed"
+            call = UniversalToolCall(
+                tool_name=tool_name,
+                arguments=dict(arguments),
+                transport="local_agent",
+                call_id=job_id,
+                trace_id=job.get("trace_id"),
+                invocation_id=job.get("invocation_id"),
+                approved=True,
+                metadata={
+                    "source": "local_tool_agent",
+                    "agent_id": self.agent_id,
+                    **dict(job.get("metadata") or {}),
+                },
+            )
+            result = UniversalToolExecutor(registry).execute(call)
+            status = "completed" if result.get("success") else "failed"
         except Exception as exc:
             result = {
                 "success": False,
