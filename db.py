@@ -64,6 +64,13 @@ def init_db():
 
     create_provider_credentials_schema(conn)
     create_key_manager_schema(conn)
+
+    # Миграция названия: старый системный заголовок был «Новый диалог».
+    cur.execute(
+        "UPDATE conversations SET title = ? WHERE title = ?",
+        ("Новый чат", "Новый диалог"),
+    )
+
     conn.commit()
     conn.close()
 
