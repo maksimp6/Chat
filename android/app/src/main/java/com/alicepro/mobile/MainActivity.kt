@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -13,10 +14,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.net.HttpURLConnection
@@ -35,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         AppLogger.info("MainActivity", "Activity created")
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
@@ -64,35 +63,8 @@ class MainActivity : AppCompatActivity() {
         }
         webView.addJavascriptInterface(AndroidBridge(), "AliceAndroid")
 
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
-            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            val resolved = WindowInsetsResolver.resolve(bars, cutout, ime)
-
-            view.updatePadding(
-                left = resolved.left,
-                top = resolved.top,
-                right = resolved.right,
-                bottom = resolved.bottom,
-            )
-
-            AppLogger.debug(
-                "Insets",
-                "Applied window insets",
-                mapOf(
-                    "left" to resolved.left.toString(),
-                    "top" to resolved.top.toString(),
-                    "right" to resolved.right.toString(),
-                    "bottom" to resolved.bottom.toString(),
-                    "ime_bottom" to ime.bottom.toString(),
-                ),
-            )
-            insets
-        }
-
         setContentView(webView)
-        ViewCompat.requestApplyInsets(webView)
+        SystemInsets.applySafePadding(webView)
 
         val localAgentMode = prefs.getBoolean(KEY_LOCAL_AGENT_MODE, false)
         val localAgentGateway = prefs.getString(KEY_LOCAL_AGENT_GATEWAY, "").orEmpty()
@@ -123,13 +95,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        ViewCompat.requestApplyInsets(webView)
+        SystemInsets.applySafePadding(webView)
         AppLogger.debug("Lifecycle", "Activity resumed")
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) ViewCompat.requestApplyInsets(webView)
+        if (hasFocus) SystemInsets.applySafePadding(webView)
     }
 
     override fun onPause() {
@@ -382,6 +354,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         AppLogger.info("MainActivity", "Activity destroyed")
+        ViewCompat.setOnApplyWindowInsetsListener(webView, null)
         webView.destroy()
         super.onDestroy()
     }
