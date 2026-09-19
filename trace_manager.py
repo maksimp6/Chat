@@ -160,19 +160,29 @@ class ExecutionTrace:
             return float(created)
         return None
 
+    def get_step_correlation_id(self, step_index: int) -> str:
+        """Return a stable correlation identifier for one logical API step."""
+        return f"{self.trace_id}:step:{int(step_index)}"
+
     def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
                         start_timestamp: Optional[float] = None,
                         provider_key_id: Optional[str] = None) -> int:
         provider_key_id = provider_key_id or (
             self.trace.get("provider_key") or {}
         ).get("key_id")
+        correlation_id = self.get_step_correlation_id(step_index)
         request_entry = {"step": step_index,
+                         "correlation_id": correlation_id,
                          "timestamp": start_timestamp if start_timestamp is not None else time.time(),
                          "payload": self._sanitize_trace_value(payload)}
         if provider_key_id is not None:
             request_entry["provider_key_id"] = str(provider_key_id)
         self.trace.setdefault("api_requests", []).append(request_entry)
-        self.add_event("api_request_registered", {"step": step_index, "timestamp": request_entry["timestamp"]})
+        self.add_event("api_request_registered", {
+            "step": step_index,
+            "correlation_id": correlation_id,
+            "timestamp": request_entry["timestamp"],
+        })
         return len(self.trace["api_requests"]) - 1
 
     @classmethod
@@ -255,6 +265,7 @@ class ExecutionTrace:
             if not snapshots or snapshots[-1] != clean_raw:
                 snapshots.append(clean_raw)
             entry.update({"timestamp": end_timestamp, "raw": clean_raw,
+                          "correlation_id": self.get_step_correlation_id(idx),
                           "response_id": response_id or entry.get("response_id"),
                           "end_timestamp": end_timestamp, "timing_ms": timing_ms,
                           "latest_kind": kind})
@@ -263,7 +274,8 @@ class ExecutionTrace:
             self._update_billing_for_response(clean_raw, idx, response_id or entry.get("response_id"))
             return
 
-        response_entry = {"step": idx, "timestamp": end_timestamp, "kind": kind,
+        correlation_id = self.get_step_correlation_id(idx)
+        response_entry = {"step": idx, "correlation_id": correlation_id, "timestamp": end_timestamp, "kind": kind,
                           "response_id": response_id, "raw": clean_raw,
                           "start_timestamp": start_timestamp, "end_timestamp": end_timestamp,
                           "timing_ms": timing_ms}
@@ -278,7 +290,7 @@ class ExecutionTrace:
                 break
         self.trace["responses"].append(response_entry)
         self.add_event("api_response_received", {
-            "step": idx, "kind": kind, "response_id": response_id,
+            "step": idx, "correlation_id": correlation_id, "kind": kind, "response_id": response_id,
             "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
             "has_output": bool(clean_raw.get("output")) if isinstance(clean_raw, dict) else False,
             "start_timestamp": start_timestamp, "end_timestamp": end_timestamp, "timing_ms": timing_ms})
