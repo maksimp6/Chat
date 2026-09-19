@@ -94,6 +94,7 @@ class YandexRequestMixin:
                 "method": "POST",
                 "url": self.responses_url,
                 "step": trace_step_number,
+                "correlation_id": execution_trace.get_step_correlation_id(trace_step_number),
                 "payload": _sanitize_for_log(payload)
             })
 
@@ -122,6 +123,7 @@ class YandexRequestMixin:
                     "method": "POST",
                     "url": self.responses_url,
                     "step": trace_step_number,
+                    "correlation_id": execution_trace.get_step_correlation_id(trace_step_number),
                     "model": payload.get("model"),
                     "status_code": status_code,
                     "error": error_message,
@@ -158,6 +160,7 @@ class YandexRequestMixin:
                 "method": "POST",
                 "url": self.responses_url,
                 "step": step,
+                "correlation_id": execution_trace.get_step_correlation_id(step),
                 "start_timestamp": request_start_timestamp,
                 "end_timestamp": request_end_timestamp,
                 "timing_ms": request_duration_ms,
