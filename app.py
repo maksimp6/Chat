@@ -17,6 +17,7 @@ from cloudru_iam_routes import cloudru_iam_bp
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
+from departments import departments_bp, init_department_tables
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -28,12 +29,14 @@ app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
 app.register_blueprint(local_agent_bp)
 app.register_blueprint(cloudru_iam_bp)
+app.register_blueprint(departments_bp)
 
 init_db()
 init_runtime_tables()
 init_local_agent_tables()
 check_supabase_trace_mirror()
 init_treasury_tables()
+init_department_tables()
 
 @app.route("/")
 def index():
