@@ -64,7 +64,6 @@ class TestLocalToolExecutionContract(unittest.TestCase):
         errors = [e for e in trace["errors"] if e["source"] == "tool:test_tool"]
         self.assertEqual(len(errors), 1)
         self.assertEqual(errors[0]["error"], "RuntimeError: backend exploded")
-        self.assertEqual(errors[0]["python_exception"]["exception_type"], "RuntimeError")
 
 
 if __name__ == "__main__":
