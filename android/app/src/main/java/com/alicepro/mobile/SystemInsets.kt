@@ -1,13 +1,12 @@
 package com.alicepro.mobile
 
 import android.view.View
-import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 
 object SystemInsets {
-    fun resolve(insets: WindowInsetsCompat): Insets {
+    fun resolve(insets: WindowInsetsCompat): androidx.core.graphics.Insets {
         val bars = insets.getInsets(
             WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
         )
@@ -15,11 +14,12 @@ object SystemInsets {
         val gestures = insets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())
         val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
 
-        return Insets.of(
-            maxOf(bars.left, waterfall.left, gestures.left),
-            maxOf(bars.top, waterfall.top),
-            maxOf(bars.right, waterfall.right, gestures.right),
-            maxOf(bars.bottom, waterfall.bottom, gestures.bottom, ime.bottom),
+        return WindowInsetsResolver.resolve(
+            systemBars = bars,
+            displayCutout = androidx.core.graphics.Insets.NONE,
+            ime = ime,
+            waterfall = waterfall,
+            mandatorySystemGestures = gestures,
         )
     }
 
