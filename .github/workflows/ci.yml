@@ -57,7 +57,7 @@ jobs:
         working-directory: android
         run: python scripts/stage_python.py
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.9"
       - name: Materialize stable debug keystore
