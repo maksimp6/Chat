@@ -87,8 +87,12 @@ def settle_billing_to_treasury(billing: Dict[str, Any], owner_id: Optional[str])
     if not owner_id or not str(owner_id).strip():
         return {"status": "skipped", "reason": "owner_identity_missing"}
 
+    trusted_owner_id = str(owner_id).strip()
     billing_owner = billing.get("owner_id")
-    if billing_owner is not None and str(billing_owner) != str(owner_id):
+    if billing_owner is None or not str(billing_owner).strip():
+        billing["owner_id"] = trusted_owner_id
+        billing_owner = trusted_owner_id
+    if str(billing_owner).strip() != trusted_owner_id:
         raise ValueError("billing owner identity does not match the invocation owner")
 
     amount = float(billing.get("total_cost") or 0)
