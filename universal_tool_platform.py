@@ -417,7 +417,7 @@ class UniversalToolExecutor:
             success = False
             data = None
             error = str(raw_result.get("error"))
-            metadata = {}
+            metadata = {"phase": "execution"}
         else:
             success = True
             data = raw_result

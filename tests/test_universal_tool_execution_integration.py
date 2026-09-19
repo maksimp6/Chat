@@ -2,12 +2,24 @@ import unittest
 from unittest.mock import patch
 
 from trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolExecutor, UniversalToolCall
+from universal_tool_platform import UniversalToolExecutor, UniversalToolCall, UniversalToolDefinition
 from tool_registry import registry
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
 
 class TestUniversalToolExecutionIntegration(unittest.TestCase):
+    def _definition(self, name):
+        return UniversalToolDefinition(
+            name=name,
+            description="demo",
+            input_schema={"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"]},
+            output_schema={"type": "object"},
+            read_only=True,
+            requires_approval=False,
+            supported_transports=("responses_api",),
+            executor={"type": "local"},
+        )
+
     def test_responses_api_tool_goes_through_universal_executor(self):
         trace = ExecutionTrace()
         trace.set_context(
@@ -23,7 +35,7 @@ class TestUniversalToolExecutionIntegration(unittest.TestCase):
             "call_id": "call-7",
         }
 
-        with patch.object(registry, "execute", return_value={"value": 7}) as legacy_execute:
+        with patch.object(registry, "get_universal_definition", return_value=self._definition("demo_tool")),              patch.object(registry, "execute", return_value={"value": 7}) as legacy_execute:
             result = YandexMcpMixin()._execute_single_tool(call, [], trace=trace)
 
         self.assertEqual(result["result"], {"value": 7})
@@ -35,7 +47,6 @@ class TestUniversalToolExecutionIntegration(unittest.TestCase):
     def test_failed_universal_execution_is_not_reported_as_success(self):
         class FakeRegistry:
             def get_universal_definition(self, name):
-                from universal_tool_platform import UniversalToolDefinition
                 return UniversalToolDefinition(
                     name=name,
                     description="demo",
