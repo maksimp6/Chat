@@ -267,7 +267,7 @@
                 'set-fs-max',
                 'number',
                 fs.max_results || 20,
-                ' min="1" max="50"'
+                ' min="1"'
             ) +
         '</div>',
 
