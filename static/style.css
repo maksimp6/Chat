@@ -476,3 +476,8 @@ html, body {
     .alice-pro-app .header-row { gap: 8px; }
     .alice-pro-app .header-row-primary .model-btn { min-width: 0; }
 }
+
+
+/* Keep local Eruda above application overlays when debug mode is enabled. */
+.eruda-container,
+.eruda-entry-btn { z-index: 2147483647 !important; }
