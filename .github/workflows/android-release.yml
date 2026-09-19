@@ -1,0 +1,88 @@
+name: Android release APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Signed Android release APK
+    runs-on: ubuntu-latest
+    env:
+      ALICE_RELEASE_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release-signing.keystore
+      ALICE_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+      ALICE_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+      ALICE_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Stage Python runtime
+        working-directory: android
+        run: python scripts/stage_python.py
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Materialize release keystore
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_RELEASE_KEYSTORE_BASE64"
+          test -n "$ALICE_RELEASE_KEY_ALIAS"
+          test -n "$ALICE_RELEASE_STORE_PASSWORD"
+          test -n "$ALICE_RELEASE_KEY_PASSWORD"
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$ALICE_RELEASE_KEYSTORE_PATH"
+          chmod 600 "$ALICE_RELEASE_KEYSTORE_PATH"
+          test -s "$ALICE_RELEASE_KEYSTORE_PATH"
+          keytool -list             -keystore "$ALICE_RELEASE_KEYSTORE_PATH"             -storepass "$ALICE_RELEASE_STORE_PASSWORD"             -alias "$ALICE_RELEASE_KEY_ALIAS"             >/dev/null
+
+      - name: Build signed release APK
+        working-directory: android
+        run: gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} :app:assembleRelease
+
+      - name: Verify release APK signature
+        env:
+          APK: android/app/build/outputs/apk/release/app-release.apk
+        run: |
+          set -euo pipefail
+          test -s "$APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          keytool -printcert -jarfile "$APK" | grep -E 'Owner:|SHA256:'
+          sha256sum "$APK"
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: alice-pro-release-apk-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Remove release keystore
+        if: always()
+        run: rm -f "$ALICE_RELEASE_KEYSTORE_PATH"
