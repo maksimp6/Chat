@@ -19,12 +19,21 @@ import com.chaquo.python.android.AndroidPlatform
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private val serverUrl = "http://127.0.0.1:5000"
     private val prefs by lazy { getSharedPreferences("alice_pro", MODE_PRIVATE) }
     private val updateManager by lazy { UpdateManager(this) }
+    private val installationId: String
+        get() {
+            val existing = prefs.getString(KEY_INSTALLATION_ID, "").orEmpty()
+            if (existing.isNotBlank()) return existing
+            val created = "android-" + UUID.randomUUID().toString().replace("-", "")
+            prefs.edit().putString(KEY_INSTALLATION_ID, created).apply()
+            return created
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -284,12 +293,48 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (ready) {
                     AppLogger.info("Startup", "Local server is ready")
+                    bootstrapAnonymousUser()
                     webView.loadUrl(serverUrl)
                     updateManager.autoCheck()
                 } else {
                     AppLogger.error("Startup", "Local server did not become ready")
                     Toast.makeText(this, "Alice Pro server did not start", Toast.LENGTH_LONG).show()
                 }
+            }
+        }.start()
+    }
+
+    private fun bootstrapAnonymousUser() {
+        Thread {
+            try {
+                val connection = URL("$serverUrl/api/users/bootstrap").openConnection() as HttpURLConnection
+                connection.connectTimeout = 1500
+                connection.readTimeout = 3000
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                val payload = JSONObject().apply {
+                    put("installation_id", installationId)
+                    put("metadata", JSONObject().apply {
+                        put("platform", "android")
+                    })
+                }.toString()
+                connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+                if (connection.responseCode !in 200..299) {
+                    AppLogger.warning("Identity", "Anonymous bootstrap failed", mapOf("status" to connection.responseCode.toString()))
+                    return@Thread
+                }
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val userId = JSONObject(response).optString("user_id")
+                if (userId.isNotBlank()) {
+                    prefs.edit().putString(KEY_USER_ID, userId).apply()
+                    AppLogger.info("Identity", "Anonymous user registered")
+                    runOnUiThread {
+                        webView.evaluateJavascript("window.__ALICE_USER_ID=" + JSONObject.quote(userId) + ";", null)
+                    }
+                }
+            } catch (error: Throwable) {
+                AppLogger.warning("Identity", "Anonymous bootstrap unavailable: " + error.message)
             }
         }.start()
     }
@@ -315,6 +360,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val KEY_YANDEX_API_KEY = "yandex_api_key"
+        private const val KEY_INSTALLATION_ID = "installation_id"
+        private const val KEY_USER_ID = "user_id"
         private const val KEY_LOCAL_AGENT_MODE = "local_agent_mode"
         private const val KEY_LOCAL_AGENT_GATEWAY = "local_agent_gateway"
         private const val KEY_LOCAL_AGENT_BOOTSTRAP = "local_agent_bootstrap"
