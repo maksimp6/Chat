@@ -7,7 +7,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
-import android.view.Window
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -18,9 +17,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 
 class DiagnosticsActivity : AppCompatActivity() {
     private lateinit var list: ListView
@@ -42,20 +39,6 @@ class DiagnosticsActivity : AppCompatActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(16, 16, 16, 16)
-        }
-
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
-            )
-            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            view.setPadding(
-                16 + bars.left,
-                16 + bars.top,
-                16 + bars.right,
-                16 + maxOf(bars.bottom, ime.bottom),
-            )
-            insets
         }
 
         val header = LinearLayout(this).apply {
@@ -133,6 +116,7 @@ class DiagnosticsActivity : AppCompatActivity() {
         root.addView(buttons)
 
         setContentView(root)
+        SystemInsets.applySafePadding(root, baseLeft = 16, baseTop = 16, baseRight = 16, baseBottom = 16)
 
         search.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -146,7 +130,6 @@ class DiagnosticsActivity : AppCompatActivity() {
             showDetails(filtered[position])
         }
 
-        ViewCompat.requestApplyInsets(root)
         refresh()
     }
 
