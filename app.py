@@ -18,7 +18,6 @@ from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from departments import departments_bp, init_department_tables
-from user_identity import init_user_identity_table
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +36,6 @@ init_runtime_tables()
 init_local_agent_tables()
 check_supabase_trace_mirror()
 init_treasury_tables()
-init_user_identity_table()
 init_department_tables()
 
 @app.route("/")
