@@ -53,7 +53,7 @@ function createConversation(modelKey) {
         body: JSON.stringify({model: modelKey})
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.error) { alert("\u041E\u0448\u0438\u0431\u043A\u0430: " + data.error); return; }
-        conversations.unshift({id: data.id, title: "\u041D\u043E\u0432\u044B\u0439 \u0434\u0438\u0430\u043B\u043E\u0433", model: modelKey});
+        conversations.unshift({id: data.id, title: data.title || "\u041D\u043E\u0432\u044B\u0439 \u0447\u0430\u0442", model: modelKey});
         localStorage.setItem("conversations", JSON.stringify(conversations));
         selectConv(data.id);
     }).catch(function(e) { alert("\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0442\u0438: " + e); });
