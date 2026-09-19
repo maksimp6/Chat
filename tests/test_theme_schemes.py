@@ -13,7 +13,9 @@ def test_theme_presets_and_persistence_are_defined():
     style = _read("static/style.css")
     modal = _read("static/settings/settings_modal.js")
 
-    for theme in ("light", "dark", "dim", "high-contrast"):
+    assert "light" in core
+    assert ":root {" in style
+    for theme in ("dark", "dim", "high-contrast"):
         assert theme in core
         assert f'[data-theme="{theme}"]' in style
 
