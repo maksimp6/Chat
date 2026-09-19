@@ -267,7 +267,7 @@
                 'set-fs-max',
                 'number',
                 fs.max_results || 20,
-                ' min="1" max="50"'
+                ' min="1"'
             ) +
         '</div>',
 
@@ -386,10 +386,7 @@ var tabAdv = [
                 vector_store_ids: document.getElementById('set-fs-vids').value.trim(),
                 max_results: Math.max(
                     1,
-                    Math.min(
-                        parseInt(document.getElementById('set-fs-max').value, 10) || 20,
-                        50
-                    )
+                    parseInt(document.getElementById('set-fs-max').value, 10) || 20
                 )
             }
         };
