@@ -10,4 +10,4 @@ def test_file_search_no_local_50_item_cap():
     template = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert 'id="set-fs-max"' in template
     segment = template[template.find('id="set-fs-max"')-120:template.find('id="set-fs-max"')+160]
-    assert "max="50"" not in segment
+    assert 'max="50"' not in segment
