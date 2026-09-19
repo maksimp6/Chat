@@ -10,7 +10,6 @@ object SystemInsets {
         val bars = insets.getInsets(
             WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
         )
-        val waterfall = insets.getInsets(WindowInsetsCompat.Type.waterfall())
         val gestures = insets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())
         val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
 
@@ -18,7 +17,6 @@ object SystemInsets {
             systemBars = bars,
             displayCutout = androidx.core.graphics.Insets.NONE,
             ime = ime,
-            waterfall = waterfall,
             mandatorySystemGestures = gestures,
         )
     }
