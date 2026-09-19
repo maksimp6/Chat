@@ -14,8 +14,6 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.net.HttpURLConnection
@@ -33,7 +31,10 @@ class MainActivity : AppCompatActivity() {
         AppLogger.initialize(this)
         AppLogger.info("MainActivity", "Activity created")
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Use the platform's normal system-window fitting. The web UI already
+        // has its own bottom safe-area padding, so edge-to-edge here causes
+        // the WebView content to be laid out beneath system bars.
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         webView = WebView(this)
@@ -65,7 +66,6 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(AndroidBridge(), "AliceAndroid")
 
         setContentView(webView)
-        SystemInsets.applySafePadding(webView)
 
         val localAgentMode = prefs.getBoolean(KEY_LOCAL_AGENT_MODE, false)
         val localAgentGateway = prefs.getString(KEY_LOCAL_AGENT_GATEWAY, "").orEmpty()
@@ -96,13 +96,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        ViewCompat.requestApplyInsets(webView)
         AppLogger.debug("Lifecycle", "Activity resumed")
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) ViewCompat.requestApplyInsets(webView)
     }
 
     override fun onPause() {
@@ -198,27 +196,9 @@ class MainActivity : AppCompatActivity() {
             setText(defaultAgentId)
         }
 
-        container.addView(
-            gatewayInput,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        container.addView(
-            bootstrapInput,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        container.addView(
-            agentIdInput,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
+        container.addView(gatewayInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        container.addView(bootstrapInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        container.addView(agentIdInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         AlertDialog.Builder(this)
             .setTitle("Run as Local Tool Agent")
@@ -245,71 +225,42 @@ class MainActivity : AppCompatActivity() {
 
                 startLocalAgent(gateway, bootstrap)
             }
-            .setNegativeButton("Back") { _, _ ->
-                promptForApiKey()
-            }
+            .setNegativeButton("Back") { _, _ -> promptForApiKey() }
             .show()
     }
 
     private fun startLocalAgent(gatewayUrl: String, bootstrapToken: String) {
-        AppLogger.info(
-            "LocalAgent",
-            "Starting outbound local agent",
-            mapOf("gateway" to gatewayUrl),
-        )
+        AppLogger.info("LocalAgent", "Starting outbound local agent", mapOf("gateway" to gatewayUrl))
 
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-        }
+        if (!Python.isStarted()) Python.start(AndroidPlatform(this))
 
         Thread {
             try {
                 val agentId = prefs.getString(KEY_LOCAL_AGENT_ID, "").orEmpty()
-                val result = Python.getInstance()
-                    .getModule("android_server")
-                    .callAttr(
-                        "start_local_agent",
-                        gatewayUrl,
-                        bootstrapToken,
-                        agentId.ifBlank { null },
-                        listOf("local.tools"),
-                    )
+                val result = Python.getInstance().getModule("android_server")
+                    .callAttr("start_local_agent", gatewayUrl, bootstrapToken, agentId.ifBlank { null }, listOf("local.tools"))
                     .toJava(String::class.java)
 
                 AppLogger.info("LocalAgent", "Local agent started", mapOf("result" to result))
-                runOnUiThread {
-                    Toast.makeText(this, "Local Tool Agent connected", Toast.LENGTH_LONG).show()
-                }
+                runOnUiThread { Toast.makeText(this, "Local Tool Agent connected", Toast.LENGTH_LONG).show() }
             } catch (error: Throwable) {
                 AppLogger.error("LocalAgent", "Local agent failed", error)
-                runOnUiThread {
-                    Toast.makeText(
-                        this,
-                        "Local agent failed: ${error.message}",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
+                runOnUiThread { Toast.makeText(this, "Local agent failed: ${error.message}", Toast.LENGTH_LONG).show() }
             }
         }.start()
     }
 
     private fun startPythonServer(apiKey: String) {
         AppLogger.info("Python", "Starting embedded server")
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-        }
+        if (!Python.isStarted()) Python.start(AndroidPlatform(this))
 
         Thread {
             try {
-                Python.getInstance()
-                    .getModule("android_server")
-                    .callAttr("start_server", apiKey)
+                Python.getInstance().getModule("android_server").callAttr("start_server", apiKey)
                 AppLogger.info("Python", "Embedded server start requested")
             } catch (error: Throwable) {
                 AppLogger.error("Python", "Embedded server failed to start", error)
-                runOnUiThread {
-                    Toast.makeText(this, "Python server failed: ${error.message}", Toast.LENGTH_LONG).show()
-                }
+                runOnUiThread { Toast.makeText(this, "Python server failed: ${error.message}", Toast.LENGTH_LONG).show() }
             }
         }.start()
 
@@ -355,7 +306,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         AppLogger.info("MainActivity", "Activity destroyed")
-        ViewCompat.setOnApplyWindowInsetsListener(webView, null)
         webView.destroy()
         super.onDestroy()
     }
