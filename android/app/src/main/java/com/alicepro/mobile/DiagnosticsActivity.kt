@@ -7,7 +7,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
-import android.view.Window
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -131,7 +130,6 @@ class DiagnosticsActivity : AppCompatActivity() {
             showDetails(filtered[position])
         }
 
-        SystemInsets.applySafePadding(root, baseLeft = 16, baseTop = 16, baseRight = 16, baseBottom = 16)
         refresh()
     }
 
