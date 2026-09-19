@@ -20,7 +20,10 @@ class YandexPollingMixin:
                 if resp.status_code == 404:
                     if execution_trace and isinstance(execution_trace, ExecutionTrace):
                         execution_trace.add_event("api_poll_error", {
-                            "step": trace_step, "response_id": task_id, "status_code": 404
+                            "step": trace_step,
+                            "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                            "response_id": task_id,
+                            "status_code": 404
                         })
                     time.sleep(delay)
                     delay = min(delay * 1.5, 3)
@@ -30,7 +33,10 @@ class YandexPollingMixin:
             except requests.RequestException as e:
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
                     execution_trace.add_event("api_poll_error", {
-                        "step": trace_step, "response_id": task_id, "error": str(e)
+                        "step": trace_step,
+                        "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                        "response_id": task_id,
+                        "error": str(e)
                     })
                 time.sleep(delay)
                 delay = min(delay * 1.5, 3)
@@ -53,7 +59,10 @@ class YandexPollingMixin:
             if status in ("completed", "incomplete", "failed", "cancelled"):
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
                     execution_trace.add_event("api_poll_completed", {
-                        "step": trace_step, "response_id": task_id, "status": status
+                        "step": trace_step,
+                        "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                        "response_id": task_id,
+                        "status": status
                     })
                 if status == "failed":
                     err = data.get('error')
@@ -67,6 +76,9 @@ class YandexPollingMixin:
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             execution_trace.add_event("api_poll_timeout", {
-                "step": trace_step, "response_id": task_id, "timeout": timeout
+                "step": trace_step,
+                "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                "response_id": task_id,
+                "timeout": timeout
             })
         raise YandexClientError(f"Timeout ({timeout}s) waiting for task {task_id}")

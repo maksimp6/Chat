@@ -2,7 +2,7 @@
 (function () {
     "use strict";
 
-    var state = { trace:null, selected:null, modal:null, body:null, nav:null, list:null, detail:null, detailTitle:null, listScrollTop:0, jsonDepth:4 };
+    var state = { trace:null, items:null, selected:null, modal:null, body:null, nav:null, list:null, detail:null, detailTitle:null, listScrollTop:0, jsonDepth:4 };
     var ESC = String.fromCharCode(27);
 
     function el(tag, attrs, text) {
@@ -60,9 +60,9 @@
 
     function buildItems(trace){
         var items=[];
-        (trace.events||[]).forEach(function(ev,i){items.push({kind:"event",index:i,id:"event-"+i,name:ev.type||"event",timestamp:getTimestamp(ev),data:ev});});
+        (trace.events||[]).forEach(function(ev,i){var payload=ev.payload||{};items.push({kind:"event",index:i,id:"event-"+i,name:ev.type||"event",timestamp:getTimestamp(ev),correlation_id:payload.correlation_id||null,data:ev});});
         (trace.tool_calls||[]).forEach(function(t,i){var st=Number(t.start_timestamp),en=Number(t.end_timestamp),span=Number.isFinite(st)&&Number.isFinite(en)&&en>=st;items.push({kind:"tool",index:i,id:"tool-"+i,name:t.name||"tool",timestamp:span?en:getTimestamp(t),start:st,end:en,data:t});});
-        (trace.responses||[]).forEach(function(r,i){var st=Number(r.start_timestamp),en=Number(r.end_timestamp),ts=getTimestamp(r);if(!Number.isFinite(en))en=ts;items.push({kind:"response",index:i,id:"response-"+i,name:"Responses API #"+(r.step||i+1),timestamp:ts,start:Number.isFinite(st)?st:null,end:Number.isFinite(en)?en:null,data:r});});
+        (trace.responses||[]).forEach(function(r,i){var st=Number(r.start_timestamp),en=Number(r.end_timestamp),ts=getTimestamp(r);if(!Number.isFinite(en))en=ts;items.push({kind:"response",index:i,id:"response-"+i,name:"Responses API #"+(r.step||i+1),timestamp:ts,start:Number.isFinite(st)?st:null,end:Number.isFinite(en)?en:null,correlation_id:r.correlation_id||null,data:r});});
         var preApi=trace.timings&&trace.timings.pre_api_pipeline;
         if(preApi){
             var pst=Number(preApi.start_timestamp),pen=Number(preApi.end_timestamp);
@@ -110,7 +110,23 @@
         function pre(value){var wrap=el("div",{className:"alice-trace-json-wrap"});addJsonToolbar(wrap,function(){renderInspector(trace,item,selected,target);});wrap.appendChild(el("pre",{className:"alice-trace-pre"},jsonText(value)));content.appendChild(wrap);}
         if(selected==="Overview"){var grid=el("div",{className:"alice-trace-grid"}),pairs=[];if(item.kind==="tool")pairs=[["Name",item.data.name],["Server",item.data.server||"Local Registry"],["Duration",fmtMs(item.data.timing_ms)],["Status",item.data.error?"error":"success"],["Call ID",item.data.call_id||"—"],["Step",item.data.step||"—"]];else if(item.kind==="response")pairs=[["Step",item.data.step||"—"],["Timestamp",item.data.timestamp?new Date(item.data.timestamp*1000).toLocaleString("ru-RU"):"—"],["Model",item.data.raw&&item.data.raw.model||"—"],["Response ID",item.data.raw&&item.data.raw.id||"—"],["Output items",item.data.raw&&Array.isArray(item.data.raw.output)?item.data.raw.output.length:"—"],["Step interval",Number.isFinite(item.start)&&Number.isFinite(item.end)?fmtMs((item.end-item.start)*1000):"—"]];else if(item.kind==="pipeline")pairs=[["Start",item.data.start_timestamp?new Date(item.data.start_timestamp*1000).toLocaleString("ru-RU"):"—"],["End",item.data.end_timestamp?new Date(item.data.end_timestamp*1000).toLocaleString("ru-RU"):"—"],["Duration",fmtMs(item.data.duration_ms)]];else pairs=[["Type",item.data.type||"event"],["Timestamp",item.data.timestamp?new Date(item.data.timestamp*1000).toLocaleString("ru-RU"):"—"]];pairs.forEach(function(p){var c=el("div",{className:"alice-trace-card"});c.appendChild(el("div",{className:"alice-trace-card-label"},p[0]));c.appendChild(el("div",{className:"alice-trace-card-value"},String(p[1])));grid.appendChild(c);});content.appendChild(grid);if(item.kind==="tool"&&item.data.error)content.appendChild(el("div",{className:"alice-trace-notice"},"⚠ "+String(item.data.error)));if(item.kind==="event")pre(item.data.payload!==undefined?item.data.payload:item.data);}
         else if(selected==="Request")pre(item.kind==="response"?(item.data.request||trace.request||{}):trace.request||{});else if(selected==="Raw Response")pre(rawFor(item));else if(selected==="Payload")pre(item.data.payload!==undefined?item.data.payload:item.data);else if(selected==="Raw")pre(rawFor(item));else if(selected==="Arguments")pre(item.data.arguments||{});else if(selected==="Result")pre(item.data.error?{error:item.data.error,result:item.data.result}:item.data.result);else if(selected==="Metadata")pre(item.kind==="response"?(item.data.raw&&item.data.raw.metadata):{call_id:item.data.call_id,server:item.data.server,step:item.data.step,start_timestamp:item.data.start_timestamp,end_timestamp:item.data.end_timestamp});else if(selected==="Output")pre(item.data.raw&&item.data.raw.output||[]);else if(selected==="Usage")pre(item.data.raw&&item.data.raw.usage||{});else if(selected==="Tools")pre(item.data.raw&&item.data.raw.tools||trace.tool_calls||[]);else if(selected==="Reasoning")pre(item.data.raw&&item.data.raw.reasoning||null);
-        inner.appendChild(content);area.appendChild(inner);
+        inner.appendChild(content);
+        if(item.correlation_id && state.items){
+            var related = state.items.filter(function(other){
+                return other.id !== item.id && other.correlation_id === item.correlation_id;
+            });
+            if(related.length){
+                var relatedWrap = el("div",{className:"alice-trace-related",style:"margin-top:12px;padding:10px;border:1px solid var(--border-color,rgba(127,127,127,.14));border-radius:8px;"});
+                relatedWrap.appendChild(el("div",{style:"font-size:11px;font-weight:700;opacity:.7;margin-bottom:6px;"},"Связанные события"));
+                related.forEach(function(other){
+                    var link = el("button",{className:"alice-trace-tab",title:"Перейти к связанному событию"},other.name);
+                    link.onclick = function(){ selectItem(other); };
+                    relatedWrap.appendChild(link);
+                });
+                inner.appendChild(relatedWrap);
+            }
+        }
+        area.appendChild(inner);
     }
 
     function showMobileDetail(item){if(!state.detail)return;state.listScrollTop=state.list?state.list.scrollTop:0;state.selected=item;state.detail.classList.add("active");state.nav.classList.add("detail-active");state.detailTitle.textContent=item.name;renderInspector(state.trace,item,null,state.detail.querySelector(".alice-trace-inspector"));}
@@ -118,11 +134,11 @@
     function selectItem(item){state.selected=item;if(state.modal)state.modal.querySelectorAll(".alice-trace-item").forEach(function(b){b.classList.remove("active");});if(item._button)item._button.classList.add("active");if(item._mobileButton)item._mobileButton.classList.add("active");if(window.matchMedia&&window.matchMedia("(max-width:820px)").matches){showMobileDetail(item);return;}renderInspector(state.trace,item);}
     function copyTrace(){var text=JSON.stringify(state.trace,null,2);if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).catch(function(){fallbackCopy(text);});else fallbackCopy(text);}
     function fallbackCopy(text){var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");}catch(_){}ta.remove();}
-    function close(){if(state.modal){state.modal.remove();state.modal=null;state.trace=null;state.selected=null;state.body=null;state.nav=null;state.list=null;state.detail=null;state.detailTitle=null;}document.removeEventListener("keydown",onKey);}
+    function close(){if(state.modal){state.modal.remove();state.modal=null;state.trace=null;state.items=null;state.selected=null;state.body=null;state.nav=null;state.list=null;state.detail=null;state.detailTitle=null;}document.removeEventListener("keydown",onKey);}
     function onKey(e){if(e.key===ESC)close();}
 
     function open(input){
-        var trace=normalizeTrace(input);if(!trace)return;injectStyles();close();state.trace=trace;state.jsonDepth=4;var items=buildItems(trace),modal=el("div",{className:"alice-trace-modal"}),win=el("div",{className:"alice-trace-window",role:"dialog","aria-modal":"true","aria-label":"Execution Trace"});
+        var trace=normalizeTrace(input);if(!trace)return;injectStyles();close();state.trace=trace;state.jsonDepth=4;var items=buildItems(trace);state.items=items;var modal=el("div",{className:"alice-trace-modal"}),win=el("div",{className:"alice-trace-window",role:"dialog","aria-modal":"true","aria-label":"Execution Trace"});
         var header=el("div",{className:"alice-trace-header"});header.appendChild(el("span",{},"⚡"));header.appendChild(el("div",{className:"alice-trace-title"},"Execution Trace"));header.appendChild(el("div",{className:"alice-trace-sub"},trace.trace_id?String(trace.trace_id):"local"));header.appendChild(el("div",{className:"alice-trace-spacer"}));var copy=el("button",{className:"alice-trace-btn",title:"Copy raw JSON"},"Copy JSON");copy.onclick=copyTrace;header.appendChild(copy);var cb=el("button",{className:"alice-trace-btn",title:"Close"},"×");cb.onclick=close;header.appendChild(cb);win.appendChild(header);win.appendChild(renderMetricRow(trace));win.appendChild(renderWaterfall(trace,items));
         state.nav=renderMobileTabs(items);win.appendChild(state.nav);var main=el("div",{className:"alice-trace-main"});state.body=main;state.list=el("div",{className:"alice-trace-mobile-list"});main.appendChild(state.list);renderMobileList(items);main.appendChild(renderSidebar(items));main.appendChild(el("div",{className:"alice-trace-inspector"}));
         state.detail=el("div",{className:"alice-trace-mobile-detail"});var dh=el("div",{className:"alice-trace-mobile-detail-head"}),back=el("button",{className:"alice-trace-mobile-back"},"← Events");back.onclick=hideMobileDetail;state.detailTitle=el("div",{className:"alice-trace-mobile-detail-title"},"");dh.appendChild(back);dh.appendChild(state.detailTitle);state.detail.appendChild(dh);var dc=el("div",{className:"alice-trace-mobile-detail-content"});dc.appendChild(el("div",{className:"alice-trace-inspector"}));state.detail.appendChild(dc);main.appendChild(state.detail);win.appendChild(main);modal.appendChild(win);document.body.appendChild(modal);state.modal=modal;document.addEventListener("keydown",onKey);
