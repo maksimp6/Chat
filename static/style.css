@@ -166,13 +166,13 @@ html, body {
 }
 
 .alice-pro-app .model-btn {
-    width: auto; padding: 0 12px; font-size: 14px;
-    flex: 1; text-align: left;
+    width: 38px; height: 38px; padding: 0;
+    flex: 0 0 38px; font-size: 20px;
     background: rgba(255,255,255,0.2);
     border: none; border-radius: 8px;
     color: var(--text-header);
     cursor: pointer;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; justify-content: center;
 }
 
 /* Chatbox */
