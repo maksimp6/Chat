@@ -8,6 +8,7 @@ from db import get_conv_settings
 
 from yandex_request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_api_logger import api_logger
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 class YandexMcpMixin:
@@ -35,20 +36,34 @@ class YandexMcpMixin:
         start_timestamp = _t.time()
         t_start = _t.perf_counter()
 
-        def execute():
-            return registry.execute(name, args, all_servers)
+        trace_id = trace.trace_id if isinstance(trace, ExecutionTrace) else None
+        user_id = None
+        if isinstance(trace, ExecutionTrace):
+            user_id = (trace.trace.get("context") or {}).get("user_id")
+
+        call = UniversalToolCall(
+            tool_name=name,
+            arguments=args,
+            call_id=call_id,
+            transport="responses_api",
+            trace_id=trace_id,
+            user_id=user_id,
+            metadata={"source": "yandex_responses", "server_count": len(all_servers or [])},
+        )
 
         try:
+            executor = UniversalToolExecutor(registry)
             if isinstance(trace, ExecutionTrace):
-                result = trace.track_tool_execution(
-                    name,
-                    args,
-                    execute,
-                    call_id=call_id,
-                )
+                universal_result = executor.execute_with_trace(call, trace)
             else:
-                result = execute()
-            error = result.get("error") if isinstance(result, dict) and result.get("error") else None
+                universal_result = executor.execute(call)
+
+            if universal_result.get("success"):
+                result = universal_result.get("data")
+                error = None
+            else:
+                result = None
+                error = universal_result.get("error") or "Tool execution failed"
             api_logger.debug(
                 "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
                 name,
