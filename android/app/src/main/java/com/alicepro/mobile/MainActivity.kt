@@ -31,10 +31,13 @@ class MainActivity : AppCompatActivity() {
         AppLogger.initialize(this)
         AppLogger.info("MainActivity", "Activity created")
 
-        // Use the platform's normal system-window fitting. The web UI already
-        // has its own bottom safe-area padding, so edge-to-edge here causes
-        // the WebView content to be laid out beneath system bars.
+        // Keep the WebView in the platform-managed content area so it does not
+        // draw underneath the status or navigation bars.
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.statusBarColor = android.graphics.Color.rgb(30, 130, 240)
+        window.navigationBarColor = android.graphics.Color.WHITE
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = false
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightNavigationBars = true
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         webView = WebView(this)
