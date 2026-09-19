@@ -317,12 +317,11 @@ class MainActivity : AppCompatActivity() {
                     put("installation_id", installationId)
                     put("metadata", JSONObject().apply {
                         put("platform", "android")
-                        put("app_version", BuildConfig.VERSION_NAME)
                     })
                 }.toString()
                 connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
                 if (connection.responseCode !in 200..299) {
-                    AppLogger.warning("Identity", "Anonymous bootstrap failed", mapOf("status" to connection.responseCode))
+                    AppLogger.warning("Identity", "Anonymous bootstrap failed", mapOf("status" to connection.responseCode.toString()))
                     return@Thread
                 }
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
