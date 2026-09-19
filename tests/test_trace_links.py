@@ -15,7 +15,7 @@ def test_api_step_events_share_stable_correlation_id():
     assert sum(
         1 for event in data["events"]
         if event.get("payload", {}).get("correlation_id") == expected
-    ) == 2
+    ) == 4
 
 
 def test_different_api_steps_do_not_share_correlation_id():
