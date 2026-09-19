@@ -65,7 +65,8 @@ function updateModelButton() {
     var allModels = Object.assign({}, modelsData.text, modelsData.voice);
     var m = allModels[currentModel];
     if (m) {
-        var name = m.name.length > 22 ? m.name.substring(0, 22) + "..." : m.name;
-        btn.textContent = name;
+        btn.textContent = "🤖";
+        btn.title = "Выбор модели: " + m.name;
+        btn.setAttribute("aria-label", "Выбор модели: " + m.name);
     }
 }
