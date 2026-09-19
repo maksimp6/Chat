@@ -38,20 +38,35 @@
         return safeName(currentTrace && (currentTrace.trace_id || currentTrace.id || currentTrace.invocation_id)) + ".json";
     }
 
+    function setButtonState(button, text, disabled) {
+        if (!button) return;
+        button.disabled = !!disabled;
+        button.textContent = text;
+    }
+
     function download() {
+        var button = document.getElementById(buttonId);
+        setButtonState(button, "⏳", true);
         var payload;
-        try { payload = buildPayload(); }
-        catch (error) { window.alert(error.message || "Не удалось подготовить трейс"); return; }
-        var blob = new Blob([payload], { type: "application/json;charset=utf-8" });
-        var url = URL.createObjectURL(blob);
-        var link = document.createElement("a");
-        link.href = url;
-        link.download = traceFilename();
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        try {
+            payload = buildPayload();
+            var blob = new Blob([payload], { type: "application/json;charset=utf-8" });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement("a");
+            link.href = url;
+            link.download = traceFilename();
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            setButtonState(button, "✓ JSON", true);
+            window.setTimeout(function () { setButtonState(button, "⇩ JSON", false); }, 1200);
+        } catch (error) {
+            setButtonState(button, "⚠ JSON", true);
+            window.setTimeout(function () { setButtonState(button, "⇩ JSON", false); }, 1600);
+            window.alert(error.message || "Не удалось подготовить трейс");
+        }
     }
 
     function uploadToFileManager() {
