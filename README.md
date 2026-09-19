@@ -1,120 +1,245 @@
-# Alice Pro — AI-ассистент с MCP-инструментами
+# Alice Pro
 
-Веб-приложение чата с Yandex AI Studio, поддержкой MCP-инструментов (Git-репозитории), Conversations API и PWA.
+Alice Pro is a self-hosted AI assistant platform built around Yandex AI Studio, MCP/local tools, agent orchestration, Execution Trace, file handling, billing/treasury controls, and an Android WebView client.
 
-## 🚀 Быстрый старт
+The project is actively evolving. Some components are production-oriented, while agent, provider, runtime, and Android capabilities may still be experimental.
 
-### 1. Подготовка окружения
+## What it does
+
+- **AI chat** with Yandex AI Studio Responses API integration.
+- **MCP and local tools** with a unified execution boundary.
+- **Execution Trace** for provider requests, polling, tool execution, errors, timing, billing, and correlation.
+- **Agent Gateway and runtime** for isolated invocation/session workflows.
+- **Files and knowledge** through the file manager and vector-knowledge integrations.
+- **Treasury and billing** for internal usage accounting and demo balances.
+- **Departments** for domain-specific agent capabilities.
+- **Android client** with WebView integration, update handling, logging, and a stable debug-build workflow.
+- **Supabase trace mirror** as an optional operational/diagnostic integration.
+
+## Architecture
+
+The main execution path is deliberately explicit:
+
+```mermaid
+flowchart TD
+    U[User] --> C[Chat / Web UI]
+    C --> O[Invocation / Orchestrator]
+    O --> Y[Yandex AI Responses API]
+    O --> T[UniversalToolExecutor]
+    T --> M[MCP / Local Tools]
+    O --> A[Agent Gateway / Runtime]
+    O --> X[ExecutionTrace]
+    X --> B[Billing]
+    X --> S[Optional Supabase Trace Mirror]
+```
+
+Requests, tool calls, polling and continuations carry scoped correlation information through `InvocationContext` and `ExecutionTrace`. Secrets are sanitized before persistent traces and logs.
+
+## Current status
+
+The repository currently has a working backend/CI path and a buildable Android debug path.
+
+Core areas already integrated include:
+
+- unified tool execution through `UniversalToolExecutor`;
+- execution/session recovery tests;
+- correlated trace viewer events;
+- trace timing/correlation helpers;
+- global provider-key lifecycle and rotation;
+- anonymous first-launch identity bootstrap;
+- Departments registry/API/UI;
+- Agent Gateway with retry/rate/circuit controls;
+- Supabase production migration workflow.
+
+Treat advanced agent runtimes, branch environments, per-user provider credentials/quotas, Government workflows, Partner Relations, Kwork integration, and some AI-assisted UI features as roadmap/experimental work unless their corresponding issue is marked complete.
+
+## Quick start
+
+### Prerequisites
+
+For the current validated development path:
+
+- Python 3.12 for backend CI-compatible development.
+- Java 17 for Android builds.
+- Android SDK with API 37 installed for the current Android compile toolchain.
+- Git.
+- Optional: a Supabase project for trace mirroring and production migrations.
+
+### Backend
+
+Create a virtual environment:
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 2. Установка зависимостей
+Install the repository dependencies:
+
 ```bash
-pip install flask requests python-dotenv
+python -m pip install -r requirements.txt
 ```
 
-### 3. Настройка конфигурации
-Скопируйте `.env.example` в `.env` и заполните секреты локально:
+Create a local environment file:
+
 ```bash
 cp .env.example .env
 ```
 
-Минимальная конфигурация:
+At minimum, configure:
+
 ```env
 YANDEX_API_KEY=<your-yandex-api-key>
 YANDEX_PROJECT_ID=<your-yandex-project-id>
 YANDEX_BASE_URL=https://ai.api.cloud.yandex.net/v1
 HOST=0.0.0.0
 PORT=8080
-SECRET_KEY=<generate-a-random-secret>
+SECRET_KEY=<random-secret>
 ALICE_OWNER_ID=<stable-owner-id>
 ```
 
-Для необязательного зеркала execution traces в Supabase добавьте на backend:
-```env
-SUPABASE_URL=https://<your-project-ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
-```
+Start the application:
 
-`SUPABASE_SERVICE_ROLE_KEY` предназначен только для backend. Не передавайте его во frontend и не коммитьте реальное значение.
-
-**Никогда не коммитьте `.env`, API keys или другие credentials.**
-
-### 4. Запуск приложения
 ```bash
 python app.py
 ```
 
-### 5. Открытие в браузере
-Перейдите по адресу: http://localhost:8080
+Open:
 
-## 🔐 Безопасность конфигурации
+```
+http://localhost:8080
+```
 
-Секреты читаются из переменных окружения. В репозитории разрешены только placeholders из `.env.example`.
+### Optional Supabase trace mirror
 
-- `YANDEX_API_KEY` — API-ключ Yandex Cloud.
-- `YANDEX_PROJECT_ID` — ID проекта Yandex Cloud.
-- `YANDEX_BASE_URL` — базовый URL API.
-- `SUPABASE_URL` — URL проекта Supabase для серверного зеркала трейсов.
-- `SUPABASE_SERVICE_ROLE_KEY` — backend-only credential для записи в закрытую таблицу трейсов.
-- `SECRET_KEY` — секрет Flask-сессий, если используется приложением.
+Configure the backend only:
 
-### Глобальный Yandex API-ключ
+```env
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<backend-only-secret>
+```
 
-## 🌐 Веб-ресурсы
+The mirror is best-effort. A Supabase mirror failure must not become a failure of the main chat request.
 
-Все ресурсы пользовательского интерфейса должны храниться локально в репозитории. Не используйте CDN или удалённые asset URL для JavaScript, CSS, шрифтов, иконок и изображений.
+### Android
 
-Eruda и favicon подключаются только из `/static`. Правило проверяется регрессионным тестом `tests/test_local_web_assets.py`.
+The current Android module uses Java 17, compileSdk 37, targetSdk 35, and minSdk 26.
 
-Alice Pro использует один backend-owned API-ключ Yandex Cloud для всего
-развёртывания. Новый ключ создаётся на 12 часов, а ротация выполняется в
-последний час действия текущего ключа.
-
-Для зашифрованного хранения задайте `ALICE_PROVIDER_CREDENTIAL_KEY` как
-Fernet-ключ. Для worker-ротации задайте `YANDEX_IAM_TOKEN` и
-`YANDEX_SERVICE_ACCOUNT_ID`; области действия можно настроить через
-`YANDEX_API_KEY_SCOPES`. Worker запускайте не реже одного раза в час:
+From the Android project:
 
 ```bash
-python3 scripts/rotate_provider_key.py
+cd android
+./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Execution Trace подписывает каждый запрос безопасным идентификатором
-использованного ключа. Для ключа Yandex Cloud это resource ID, для bootstrap
-ключа без resource ID используется SHA-256 fingerprint. Сам API-ключ,
-IAM-токен и расшифрованный secret в trace не попадают.
+CI also accepts build metadata:
 
-Зеркало Supabase является необязательным и должно быть best-effort: его сбои не должны ломать основной чатовый поток.
-
-Если credential когда-либо попал в Git, считайте его скомпрометированным: отзовите/ротируйте его в соответствующем сервисе. Удаление строки из текущего файла не удаляет её из Git history.
-
-CI выполняет автоматическую проверку репозитория на секреты.
-
-## 📁 Структура проекта
-
-```text
-alice_pro/
-├── app.py
-├── config.py
-├── yandex_client.py
-├── supabase_trace_mirror.py
-├── supabase/
-│   └── migrations/
-├── templates/
-├── static/
-├── tests/
-├── docs/
-├── .env.example
-├── .gitignore
-└── README.md
+```bash
+./gradlew --no-daemon \
+  -PaliceBuildNumber=<build-number> \
+  -PaliceCommitHash=<commit-sha> \
+  :app:testDebugUnitTest :app:assembleDebug
 ```
 
-## 📄 Лицензия
+The debug APK produced by CI is intended for development/testing. Release signing keys must never be committed.
 
-MIT
+## Configuration and secrets
 
----
-*README актуализирован: 2026-09-16*
+Use `.env` or the deployment secret manager for credentials.
+
+Never commit:
+
+- Yandex API keys or IAM tokens;
+- Supabase service-role keys;
+- Cloud.ru credentials;
+- MCP bearer tokens;
+- signing keys/passwords;
+- user passwords or session secrets.
+
+Provider credentials are handled at the backend boundary. The current provider-key lifecycle is deployment-wide rather than per-user. See [provider key rotation](docs/provider-key-rotation.md).
+
+For security-sensitive reports, follow [SECURITY.md](SECURITY.md).
+
+## Development workflow
+
+Production changes use:
+
+```
+Issue → branch → implementation → tests → PR → CI → merge → post-merge verification
+```
+
+Keep changes small enough to validate independently. Use the repository's Definition of Ready / Definition of Done and sprint workflow in [docs/development/sprint-workflow.md](docs/development/sprint-workflow.md).
+
+See [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for repository conventions.
+
+## Testing
+
+Backend:
+
+```bash
+python -m compileall -q .
+pytest -q
+```
+
+Android:
+
+```bash
+cd android
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+```
+
+For database changes, use committed Supabase migrations and the production migration workflow. See [docs/supabase-migrations-deploy.md](docs/supabase-migrations-deploy.md).
+
+## Troubleshooting
+
+### Yandex returns 401/403
+
+Check the project ID, API key permissions, model availability, and backend environment variables. Do not put provider credentials into frontend configuration.
+
+### Supabase reports a migration or table error
+
+Check the migration history and the production migration workflow logs. Do not invent ad-hoc destructive rollbacks. Follow [docs/supabase-migrations-deploy.md](docs/supabase-migrations-deploy.md).
+
+### Android APK says the package conflicts
+
+Check the installed package name and version code. The current application ID is `com.alicepro.mobile`, and CI build numbers are propagated into `versionCode`.
+
+### Android UI is covered by system bars
+
+Check the current window/insets handling in `MainActivity.kt` and test the APK on the affected Android version before changing WebView padding or fullscreen flags.
+
+### Trace does not show a tool execution
+
+Inspect the complete trace, including tool calls, events, errors, and continuation steps. Tool execution should pass through `UniversalToolExecutor`. Do not use only the user-visible assistant message as evidence of whether a tool ran.
+
+## Documentation map
+
+- [API documentation](API_DOCS.md)
+- [Agent architecture](docs/agents/departments.md)
+- [Runtime/serverless](docs/runtime_serverless.md)
+- [MCP architecture](mcp_architecture_documentation.md)
+- [Provider key rotation](docs/provider-key-rotation.md)
+- [Supabase migrations](docs/supabase-migrations-deploy.md)
+- [Sprint workflow](docs/development/sprint-workflow.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Roadmap
+
+Major roadmap areas include:
+
+- branch-aware preview environments;
+- separate user agents and reusable AI sessions;
+- Government Department workflows;
+- Partner Relations;
+- per-user provider credentials, quotas and rate limits;
+- richer theme/voice assistance;
+- resilient backup/failover providers;
+- public release automation and versioned Android releases.
+
+GitHub Issues are the source of truth for scope and acceptance criteria.
+
+## License
+
+Alice Pro is licensed under the MIT License. See [LICENSE](LICENSE).
