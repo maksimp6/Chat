@@ -14,6 +14,19 @@
     <script src="/static/treasury.js" defer></script>
     <script src="/static/settings/ui_helpers.js" defer></script><script src="/static/settings/settings_storage.js" defer></script><script src="/static/settings/settings_mcp.js" defer></script><script src="/static/settings/settings_params.js" defer></script><script src="/static/settings/settings_modal.js" defer></script><script src="/static/settings.js" defer></script><script src="/static/core.js" defer></script><script src="/static/sidebar.js" defer></script><script src="/static/models.js" defer></script><script src="/static/chat.js" defer></script><script src="/static/trace_viewer.js" defer></script><script src="/static/trace_viewer_timing_fix.js?v=1" defer></script><script src="/static/trace_viewer_error_ui.js?v=1" defer></script><script src="/static/trace_viewer_auto.js" defer></script><script src="/static/voice.js" defer></script>
     <script src="/static/android_diagnostics.js" defer></script>
+<script>
+window.__ALICE_USER_ID = window.__ALICE_USER_ID || "";
+(function () {
+  var originalFetch = window.fetch;
+  window.fetch = function (input, init) {
+    init = init || {};
+    var headers = new Headers(init.headers || {});
+    if (window.__ALICE_USER_ID) headers.set("X-Alice-User-ID", window.__ALICE_USER_ID);
+    init.headers = headers;
+    return originalFetch.call(this, input, init);
+  };
+})();
+</script>
 </head>
 <body>
 <div id="app-root" class="alice-pro-app">
