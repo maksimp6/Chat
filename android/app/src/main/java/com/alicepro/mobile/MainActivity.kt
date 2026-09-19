@@ -14,6 +14,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
@@ -95,13 +96,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        SystemInsets.applySafePadding(webView)
+        ViewCompat.requestApplyInsets(webView)
         AppLogger.debug("Lifecycle", "Activity resumed")
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) SystemInsets.applySafePadding(webView)
+        if (hasFocus) ViewCompat.requestApplyInsets(webView)
     }
 
     override fun onPause() {
