@@ -17,6 +17,7 @@ from cloudru_iam_routes import cloudru_iam_bp
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
+from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 
 app = Flask(__name__)
@@ -36,11 +37,23 @@ init_runtime_tables()
 init_local_agent_tables()
 check_supabase_trace_mirror()
 init_treasury_tables()
+init_user_identity_table()
 init_department_tables()
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/api/users/bootstrap", methods=["POST"])
+def bootstrap_anonymous_user():
+    data = request.get_json(silent=True) or {}
+    metadata = data.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return jsonify({"error": "metadata must be an object"}), 400
+    try:
+        return jsonify(register_anonymous_user(data.get("installation_id"), metadata))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
 @app.route("/api/models", methods=["GET"])
 def list_models():
