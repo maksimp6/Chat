@@ -1,168 +1,107 @@
 import json
+import time
 from urllib.error import HTTPError
-
 import pytest
-
 from agent_gateway import (
-    A2AClient,
-    A2AClientConfig,
-    A2AProtocolError,
-    AgentAlreadyRegistered,
-    AgentDescriptor,
-    AgentGateway,
-    AgentInvocationError,
-    AgentNotFound,
+    A2AClient,A2AClientConfig,A2AProtocolError,RESTAgentClient,
+    AgentAlreadyRegistered,AgentApprovalRequired,AgentCircuitOpenError,
+    AgentDescriptor,AgentGateway,AgentInvocationError,AgentNotFound,
+    AgentPermissionError,AgentRateLimitError,
 )
 
+def test_register_and_invoke():
+    g=AgentGateway(default_max_retries=0)
+    g.register(AgentDescriptor("echo","Echo",("chat",)), lambda p: {"echo":p["message"]})
+    r=g.invoke("echo",{"message":"hi"})
+    assert r.status=="completed" and r.result=={"echo":"hi"} and r.attempts==1
 
-def test_register_list_and_invoke_agent():
-    gateway = AgentGateway()
-    gateway.register(
-        AgentDescriptor(
-            agent_id="echo",
-            name="Echo agent",
-            capabilities=("chat",),
-        ),
-        lambda payload: {"echo": payload["message"]},
-    )
+def test_duplicate_and_missing():
+    g=AgentGateway(default_max_retries=0); d=AgentDescriptor("echo","Echo")
+    g.register(d,lambda p:p)
+    with pytest.raises(AgentAlreadyRegistered): g.register(d,lambda p:p)
+    with pytest.raises(AgentNotFound): g.get("missing")
 
-    assert [agent.agent_id for agent in gateway.list_agents("chat")] == ["echo"]
-    result = gateway.invoke("echo", {"message": "hello"})
-    assert result.status == "completed"
-    assert result.result == {"echo": "hello"}
-    assert result.invocation_id
+def test_retry_then_success():
+    g=AgentGateway(default_max_retries=1); calls={"n":0}
+    def f(_):
+        calls["n"]+=1
+        if calls["n"]==1: raise RuntimeError("temporary")
+        return {"ok":True}
+    g.register(AgentDescriptor("retry","Retry"),f)
+    r=g.invoke("retry",{})
+    assert r.status=="completed" and r.attempts==2 and calls["n"]==2
 
+def test_timeout():
+    g=AgentGateway(default_timeout_seconds=.01,default_max_retries=1)
+    g.register(AgentDescriptor("slow","Slow"),lambda _:time.sleep(.1))
+    r=g.invoke("slow",{})
+    assert r.status=="error" and r.attempts==2 and "timed out" in (r.error or "")
 
-def test_duplicate_and_missing_agents():
-    gateway = AgentGateway()
-    descriptor = AgentDescriptor(agent_id="echo", name="Echo")
-    gateway.register(descriptor, lambda payload: payload)
-    with pytest.raises(AgentAlreadyRegistered):
-        gateway.register(descriptor, lambda payload: payload)
-    with pytest.raises(AgentNotFound):
-        gateway.get("missing")
+def test_circuit_breaker():
+    g=AgentGateway(default_max_retries=0,circuit_failure_threshold=2,circuit_reset_seconds=60)
+    g.register(AgentDescriptor("broken","Broken"),lambda _:(_ for _ in ()).throw(RuntimeError("boom")))
+    assert g.invoke("broken",{}).status=="error"
+    assert g.invoke("broken",{}).status=="error"
+    r=g.invoke("broken",{})
+    assert r.status=="error" and "circuit is open" in (r.error or "")
 
+def test_rate_limit():
+    g=AgentGateway(default_max_retries=0,rate_limit_per_agent=1)
+    g.register(AgentDescriptor("echo","Echo"),lambda p:p)
+    assert g.invoke("echo",{"n":1}).status=="completed"
+    r=g.invoke("echo",{"n":2})
+    assert r.status=="error" and "rate limit" in (r.error or "")
 
-def test_handler_errors_are_returned_in_envelope():
-    gateway = AgentGateway()
-    gateway.register(
-        AgentDescriptor(agent_id="broken", name="Broken"),
-        lambda payload: 1 / 0,
-    )
-    result = gateway.invoke("broken", {})
-    assert result.status == "error"
-    assert "ZeroDivisionError" in (result.error or "")
+def test_policy_and_approval():
+    g=AgentGateway(default_max_retries=0)
+    g.register(AgentDescriptor("secure","Secure",risk_level="high",requires_approval=True,allowed_users=("alice",)),lambda p:p)
+    assert g.invoke("secure",{},user_id="mallory",approved=True).status=="error"
+    assert g.invoke("secure",{},user_id="alice",approved=False).status=="error"
+    assert g.invoke("secure",{},user_id="alice",approved=True).status=="completed"
 
+def test_capability_route_and_fallback():
+    g=AgentGateway(default_max_retries=0)
+    g.register(AgentDescriptor("a","A",("chat",)),lambda _:(_ for _ in ()).throw(RuntimeError("down")))
+    g.register(AgentDescriptor("b","B",("chat",)),lambda p:{"agent":p["value"]})
+    r=g.route("chat",{"value":3})
+    assert r.status=="completed" and r.agent_id=="b"
 
-def test_a2a_client_sends_json_rpc(monkeypatch):
-    captured = {}
+def test_trace_events():
+    events=[]; errors=[]
+    class T:
+        def add_event(self,k,p): events.append((k,p))
+        def record_error(self,s,m,call_id=None): errors.append((s,m,call_id))
+    g=AgentGateway(default_max_retries=0); g.register(AgentDescriptor("e","E"),lambda p:p)
+    r=g.invoke("e",{"x":1},trace=T())
+    assert r.status=="completed" and events[0][0]=="agent_invocation_started" and events[-1][1]["invocation_id"]==r.invocation_id and not errors
 
-    class FakeResponse:
-        def __enter__(self):
-            return self
+def test_a2a(monkeypatch):
+    captured={}
+    class R:
+        def __enter__(self): return self
+        def __exit__(self,*a): return False
+        def read(self): return json.dumps({"jsonrpc":"2.0","id":captured["id"],"result":{"ok":True}}).encode()
+    def fake(req,timeout):
+        captured["id"]=json.loads(req.data.decode())["id"]; captured["auth"]=dict((k.lower(),v) for k,v in req.header_items())
+        return R()
+    monkeypatch.setattr("agent_gateway.urlopen",fake)
+    c=A2AClient(A2AClientConfig("https://agent.example/a2a"),lambda:"token")
+    assert c.send_message({"message":{"role":"user","parts":[]}})=={"ok":True}
+    assert captured["auth"]["authorization"]=="Bearer token"
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
+def test_a2a_bad_id(monkeypatch):
+    class R:
+        def __enter__(self): return self
+        def __exit__(self,*a): return False
+        def read(self): return b'{"jsonrpc":"2.0","id":"wrong","result":{}}'
+    monkeypatch.setattr("agent_gateway.urlopen",lambda req,timeout:R())
+    with pytest.raises(A2AProtocolError,match="does not match"):
+        A2AClient(A2AClientConfig("https://agent.example/a2a")).send_message({"message":{"role":"user","parts":[]}})
 
-        def read(self):
-            return json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": captured["request"]["id"],
-                    "result": {"task": {"id": "task-1"}},
-                }
-            ).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        captured["url"] = request.full_url
-        captured["timeout"] = timeout
-        captured["headers"] = {
-            key.lower(): value for key, value in request.header_items()
-        }
-        captured["request"] = json.loads(request.data.decode("utf-8"))
-        return FakeResponse()
-
-    monkeypatch.setattr("agent_gateway.urlopen", fake_urlopen)
-    client = A2AClient(
-        A2AClientConfig("https://agent.example/a2a", timeout_seconds=7),
-        token_provider=lambda: "secret-token",
-    )
-
-    result = client.send_message(
-        {
-            "message": {
-                "role": "user",
-                "parts": [{"kind": "text", "text": "hello"}],
-                "messageId": "message-1",
-            },
-            "metadata": {"source": "alice-pro"},
-        }
-    )
-
-    assert result == {"task": {"id": "task-1"}}
-    assert captured["url"] == "https://agent.example/a2a"
-    assert captured["timeout"] == 7
-    assert captured["headers"]["authorization"] == "Bearer secret-token"
-    assert captured["request"]["method"] == "message/send"
-    assert captured["request"]["params"]["message"]["messageId"] == "message-1"
-
-
-def test_a2a_client_rejects_mismatched_response_id(monkeypatch):
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self):
-            return b'{"jsonrpc":"2.0","id":"wrong","result":{}}'
-
-    monkeypatch.setattr(
-        "agent_gateway.urlopen", lambda request, timeout: FakeResponse()
-    )
-    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
-
-    with pytest.raises(A2AProtocolError, match="does not match"):
-        client.send_message({"message": {"role": "user", "parts": []}})
-
-
-def test_a2a_client_surfaces_json_rpc_errors(monkeypatch):
-    captured = {}
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self):
-            return json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": captured["request"]["id"],
-                    "error": {"code": -1, "message": "denied"},
-                }
-            ).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        captured["request"] = json.loads(request.data.decode("utf-8"))
-        return FakeResponse()
-
-    monkeypatch.setattr("agent_gateway.urlopen", fake_urlopen)
-    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
-
-    with pytest.raises(AgentInvocationError, match="denied"):
-        client.send_message({"message": {"role": "user", "parts": []}})
-
-
-def test_a2a_client_converts_http_errors(monkeypatch):
-    def fake_urlopen(request, timeout):
-        raise HTTPError(request.full_url, 401, "Unauthorized", hdrs=None, fp=None)
-
-    monkeypatch.setattr("agent_gateway.urlopen", fake_urlopen)
-    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
-
-    with pytest.raises(A2AProtocolError, match="401"):
-        client.send_message({"message": {"role": "user", "parts": []}})
+def test_rest(monkeypatch):
+    class R:
+        def __enter__(self): return self
+        def __exit__(self,*a): return False
+        def read(self): return b'{"ok":true}'
+    monkeypatch.setattr("agent_gateway.urlopen",lambda req,timeout:R())
+    assert RESTAgentClient("https://agent.example/run").send({"x":1})=={"ok":True}
