@@ -107,6 +107,10 @@ jobs:
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "curl --fail --silent --show-error --max-time 5 http://127.0.0.1/preview/$KEY/healthz >/dev/null"
+      - name: Diagnose public ingress
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "set +e; echo LISTENERS; ss -ltnp; echo UFW; if command -v ufw >/dev/null 2>&1; then sudo -n ufw status verbose; fi; echo NFT; if command -v nft >/dev/null 2>&1; then sudo -n nft list ruleset; fi; echo IPTABLES; if command -v iptables >/dev/null 2>&1; then sudo -n iptables -S; fi; echo PUBLIC_SELF_TEST; curl -I --connect-timeout 3 --max-time 5 http://88.218.66.166/preview/pr-218/; true"
       - name: Public health check
         env:
           KEY: ${{ steps.preview.outputs.key }}
