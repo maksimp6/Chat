@@ -116,7 +116,7 @@ jobs:
           exit 1
       - name: Verify critical web assets
         env:
-          KEY: \${{ steps.preview.outputs.key }}
+          KEY: ${{ steps.preview.outputs.key }}
         run: |
           base="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}"
           for asset in \
