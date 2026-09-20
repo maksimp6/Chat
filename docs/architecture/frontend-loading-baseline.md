@@ -69,19 +69,47 @@ The initial graph contains many independent feature modules. Later work must ide
 
 Visual continuity must be measured, including layout shift, stable header/input geometry, no FOUC, no blank frame, preserved scroll position, and graceful optional-module failure.
 
-## 6. Runtime measurements pending
+## 6. Runtime measurements
 
-| Metric | Baseline |
+### 6.1 Manual browser measurements
+
+Measurements were captured against the deployed PR preview with browser DevTools. They are manual, approximate observations and are not treated as a laboratory benchmark.
+
+| Metric | Cold reload, cache disabled | Slow 3G |
+|---|---:|---:|
+| Requests | 27 | 29 |
+| Transferred | 243,695 B (~237.9 KiB) | 246,629 B (~240.8 KiB) |
+| First visual content | not measured | ~0.9 s |
+| First usable UI | not measured | ~5.3 s |
+| Message input visible | not measured | ~5.3 s |
+| DOMContentLoaded | not measured | ~5.7 s |
+| Network almost idle | not measured | ~5.8 s |
+| JavaScript errors | none observed | none observed |
+| HTTP 4xx/5xx | none observed | none observed |
+| Visible layout shift | not numerically measured | none observed |
+| Horizontal overflow | none observed | none observed |
+
+The earlier ~18 KB Network observation was incomplete. The cold-load measurement above supersedes it for the runtime baseline.
+
+### 6.2 No-JS observation
+
+With JavaScript disabled, the server-rendered HTML shell remains visible: the main interface, header/buttons, and message input are present and the page is not blank.
+
+Full form submission and navigation without JavaScript were not separately validated.
+
+### 6.3 Remaining runtime measurements
+
+| Metric / scenario | Baseline |
 |---|---|
-| TTFB | pending live measurement |
-| FCP | pending live measurement |
-| LCP | pending live measurement |
-| INP / first interaction | pending live measurement |
-| CLS | pending live measurement |
-| Initial request count/bytes | pending live measurement |
-| Critical JS execution/long tasks | pending live measurement |
+| TTFB | pending numeric capture |
+| FCP | ~0.9 s on manual Slow 3G observation |
+| LCP | pending numeric capture |
+| INP / first interaction | pending numeric capture |
+| CLS | pending numeric capture; no visible shift observed |
+| Initial request count/bytes | cold: 27 / 243,695 B; Slow 3G: 29 / 246,629 B |
+| Critical JS execution/long tasks | pending Performance trace |
 | Offline behavior | pending scenario test |
-| Slow 3G behavior | pending scenario test |
+| 10 KiB/s throughput profile | runner support added; live measurement pending |
 | Critical/optional JS failure | pending scenario test |
 | Android WebView startup | pending device test |
 
@@ -101,15 +129,27 @@ Common Windows issues and recovery steps are documented in `tests/README-fronten
 
 ## 8. Measurement protocol
 
-Cold and warm loads, Slow 3G, API/asset failures, stale cache, offline transitions, and Android WebView startup must be tested against the preview. The automated probe does not by itself complete all of these scenarios.
+Cold and warm loads, Slow 3G, a very-low-throughput mobile profile, API/asset failures, stale cache, offline transitions, and Android WebView startup must be tested against the preview.
+
+For the low-throughput profile, the runner supports 10 KiB/s download and upload:
+
+```powershell
+py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 10 --timeout-ms 120000
+```
+
+This profile intentionally specifies throughput only. No extra latency is assumed unless `--latency-ms` is explicitly provided. The live 10 KiB/s measurement remains pending.
+
+The automated probe does not by itself complete Android WebView validation, failure injection, or real-device network validation.
 
 ## 9. Definition of done for Step 1
 
 - [x] Baseline commit, entrypoint, resource graph, byte sizes, candidates, and preview pipeline recorded.
 - [x] Windows setup and runner documented.
-- [ ] Live DevTools timing capture.
+- [x] Manual DevTools cold-load and Slow 3G measurements recorded.
 - [ ] Playwright execution against a real preview.
+- [ ] 10 KiB/s live measurement.
 - [ ] Failure-injection scenarios.
+- [ ] Performance trace / long-task capture.
 - [ ] Android WebView capture.
 
 The remaining items require execution in a real browser/device environment and are not fabricated.
