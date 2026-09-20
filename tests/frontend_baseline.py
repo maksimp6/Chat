@@ -21,6 +21,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 VIEWPORT = {"width": 1440, "height": 900}
+BYTES_PER_KB = 1024
 
 
 def write_json(path: Path, value: object) -> None:
@@ -33,7 +34,14 @@ def valid_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-def run(base_url: str, output: Path, timeout_ms: int) -> int:
+def run(
+    base_url: str,
+    output: Path,
+    timeout_ms: int,
+    download_bps: int | None = None,
+    upload_bps: int | None = None,
+    latency_ms: int = 0,
+) -> int:
     output.mkdir(parents=True, exist_ok=True)
     result: dict[str, object] = {
         "schema_version": 1,
@@ -45,6 +53,12 @@ def run(base_url: str, output: Path, timeout_ms: int) -> int:
         "console_errors": [],
         "page_errors": [],
         "warnings": [],
+        "network_emulation": {
+            "download_bytes_per_second": download_bps,
+            "upload_bytes_per_second": upload_bps,
+            "latency_ms": latency_ms,
+            "enabled": download_bps is not None or upload_bps is not None or latency_ms > 0,
+        },
     }
 
     def record_error(kind: str, value: object) -> None:
@@ -56,6 +70,16 @@ def run(base_url: str, output: Path, timeout_ms: int) -> int:
             browser = pw.chromium.launch(headless=True)
             context = browser.new_context(viewport=VIEWPORT)
             page = context.new_page()
+            if result["network_emulation"]["enabled"]:
+                cdp = context.new_cdp_session(page)
+                cdp.send("Network.enable")
+                cdp.send("Network.emulateNetworkConditions", {
+                    "offline": False,
+                    "latency": latency_ms,
+                    "downloadThroughput": download_bps if download_bps is not None else -1,
+                    "uploadThroughput": upload_bps if upload_bps is not None else -1,
+                    "connectionType": "cellular2g",
+                })
             page.on("console", lambda msg: record_error("console_errors", msg.text) if msg.type == "error" else None)
             page.on("pageerror", lambda exc: record_error("page_errors", exc))
             started = time.perf_counter()
@@ -68,6 +92,10 @@ def run(base_url: str, output: Path, timeout_ms: int) -> int:
                     "title": page.title(),
                     "body_text_bytes": len(page.locator("body").inner_text().encode("utf-8")),
                     "http_ok": bool(response and 200 <= response.status < 400),
+                    "resource_count": page.evaluate("() => performance.getEntriesByType('resource').length"),
+                    "resource_transfer_bytes": page.evaluate(
+                        "() => performance.getEntriesByType('resource').reduce((sum, e) => sum + (e.transferSize || 0), 0)"
+                    ),
                 })
                 page.screenshot(path=str(output / "desktop.png"), full_page=True)
                 result["performance"] = page.evaluate("""() => {
@@ -130,6 +158,19 @@ def main() -> int:
     parser.add_argument("--base-url", default=os.environ.get("BASE_URL"), help="Preview URL")
     parser.add_argument("--output", type=Path, default=Path("artifacts/frontend-baseline"))
     parser.add_argument("--timeout-ms", type=int, default=20_000)
+    parser.add_argument(
+        "--download-kbps",
+        type=float,
+        default=None,
+        help="Emulate download throughput in KiB/s (for example 10 for the 10 KiB/s mobile baseline).",
+    )
+    parser.add_argument(
+        "--upload-kbps",
+        type=float,
+        default=None,
+        help="Emulate upload throughput in KiB/s.",
+    )
+    parser.add_argument("--latency-ms", type=int, default=0, help="Additional network latency in milliseconds.")
     args = parser.parse_args()
     if not args.base_url:
         parser.error("--base-url or BASE_URL is required")
@@ -137,7 +178,23 @@ def main() -> int:
         parser.error("--base-url must be an absolute http(s) URL")
     if args.timeout_ms < 1000:
         parser.error("--timeout-ms must be at least 1000")
-    return run(args.base_url.rstrip("/") + "/", args.output, args.timeout_ms)
+    if args.download_kbps is not None and args.download_kbps <= 0:
+        parser.error("--download-kbps must be greater than 0")
+    if args.upload_kbps is not None and args.upload_kbps <= 0:
+        parser.error("--upload-kbps must be greater than 0")
+    if args.latency_ms < 0:
+        parser.error("--latency-ms must be at least 0")
+
+    download_bps = round(args.download_kbps * BYTES_PER_KB) if args.download_kbps is not None else None
+    upload_bps = round(args.upload_kbps * BYTES_PER_KB) if args.upload_kbps is not None else None
+    return run(
+        args.base_url.rstrip("/") + "/",
+        args.output,
+        args.timeout_ms,
+        download_bps=download_bps,
+        upload_bps=upload_bps,
+        latency_ms=args.latency_ms,
+    )
 
 
 if __name__ == "__main__":
