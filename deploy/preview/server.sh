@@ -111,7 +111,7 @@ deploy() {
     --label "alice.preview.expires_at=$expires_at" \
     --label "traefik.enable=true" \
     --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${container}.rule=Path(`$base_path`) || PathPrefix(`$base_path/`)" \
+    --label "traefik.http.routers.${container}.rule=Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" \
     --label "traefik.http.routers.${container}.entrypoints=web" \
     --label "traefik.http.routers.${container}.middlewares=${container}-strip" \
     --label "traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path" \
@@ -122,11 +122,11 @@ deploy() {
     -e ALICE_PREVIEW_BASE_PATH="$base_path" \
     "$image" >/dev/null
 
-  local health_url="http://127.0.0.1${base_path}/healthz"
   for attempt in $(seq 1 30); do
-    if curl --fail --silent --show-error --max-time 5 "$health_url" >/dev/null; then
+    health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
+    if [ "$health_status" = "healthy" ]; then
       rm -f -- "$archive_path"
-      log "preview healthy: $health_url"
+      log "preview container healthy"
       return 0
     fi
     sleep 2
@@ -134,7 +134,7 @@ deploy() {
 
   docker logs --tail 120 "$container" >&2 || true
   cleanup_key "$key"
-  die "preview failed health check: $health_url"
+  die "preview container failed Docker HEALTHCHECK"
 }
 
 cleanup_expired() {
