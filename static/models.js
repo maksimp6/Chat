@@ -21,7 +21,11 @@ function renderModelModal() {
     var modelModal = document.getElementById("model-modal");
     if (!modelList) return;
     modelList.innerHTML = "";
-    var allModels = Object.assign({}, modelsData.text, modelsData.voice);
+    var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
+    if (Object.keys(allModels).length === 0) {
+        modelList.innerHTML = '<div class="model-option" style="cursor:default;opacity:.7;">Модели временно недоступны. Интерфейс продолжает работать.</div>';
+        return;
+    }
     Object.keys(allModels).forEach(function(key) {
         var m = allModels[key];
         var div = document.createElement("div");
