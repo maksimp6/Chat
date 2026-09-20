@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 
 from app import app
 
@@ -80,3 +82,28 @@ def test_index_response_disables_shell_caching():
         response = client.get("/")
     assert response.status_code == 200
     assert response.headers.get("Cache-Control") == "no-store, max-age=0"
+
+
+def test_application_javascript_parses_when_node_is_available():
+    node = shutil.which("node")
+    if not node:
+        return
+    files = [
+        Path("static/boot.js"),
+        Path("static/core.js"),
+        Path("static/sidebar.js"),
+        Path("static/models.js"),
+        Path("static/settings.js"),
+        Path("static/settings/settings_storage.js"),
+        Path("static/settings/settings_mcp.js"),
+        Path("static/settings/settings_modal.js"),
+        Path("static/eruda_init.js"),
+    ]
+    for path in files:
+        result = subprocess.run(
+            [node, "--check", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"{path}: {result.stderr}"
