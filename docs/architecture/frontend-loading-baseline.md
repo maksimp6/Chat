@@ -109,7 +109,7 @@ Full form submission and navigation without JavaScript were not separately valid
 | Initial request count/bytes | cold: 27 / 243,695 B; Slow 3G: 29 / 246,629 B |
 | Critical JS execution/long tasks | pending Performance trace |
 | Offline behavior | pending scenario test |
-| 10 KiB/s throughput profile | runner support added; live measurement pending |
+| 10 KiB/s + 2500 ms latency profile | runner support added; live measurement pending |
 | Critical/optional JS failure | pending scenario test |
 | Android WebView startup | pending device test |
 
@@ -134,10 +134,10 @@ Cold and warm loads, Slow 3G, a very-low-throughput mobile profile, API/asset fa
 For the low-throughput profile, the runner supports 10 KiB/s download and upload:
 
 ```powershell
-py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 10 --timeout-ms 120000
+py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 10 --latency-ms 2500 --timeout-ms 180000
 ```
 
-This profile intentionally specifies throughput only. No extra latency is assumed unless `--latency-ms` is explicitly provided. The live 10 KiB/s measurement remains pending.
+This profile models an intentionally severe mobile/network condition: 10 KiB/s download, 10 KiB/s upload, and 2500 ms additional latency. The live measurement remains pending.
 
 The automated probe does not by itself complete Android WebView validation, failure injection, or real-device network validation.
 
