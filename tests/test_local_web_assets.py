@@ -42,7 +42,8 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
 
     assert response.status_code == 200
     assert 'href="/preview/pr-203/static/style.css?v=' in html
-    assert 'src="/preview/pr-203/static/eruda.js?v=' in html
+    assert 'src="/preview/pr-203/static/eruda_init.js?v=' in html
+    assert '/preview/pr-203/static/eruda.js?v={{' not in html
     assert 'window.__ALICE_BASE_PATH = "/preview/pr-203"' in html
     assert 'fetch("/api/memory/manage")' in html
 
