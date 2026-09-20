@@ -63,8 +63,17 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          write_secret() {
+            local value="$1"
+            local output="$2"
+            if [[ "$value" == *"\\n"* ]]; then
+              printf '%b' "$value" | tr -d '\r' > "$output"
+            else
+              printf '%s' "$value" | tr -d '\r' > "$output"
+            fi
+          }
+          write_secret "$PREVIEW_SSH_PRIVATE_KEY" "$HOME/.ssh/id_ed25519"
+          write_secret "$PREVIEW_SSH_KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve preview identity
@@ -130,9 +139,19 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          write_secret() {
+            local value="$1"
+            local output="$2"
+            if [[ "$value" == *"\\n"* ]]; then
+              printf '%b' "$value" | tr -d '\r' > "$output"
+            else
+              printf '%s' "$value" | tr -d '\r' > "$output"
+            fi
+          }
+          write_secret "$PREVIEW_SSH_PRIVATE_KEY" "$HOME/.ssh/id_ed25519"
+          write_secret "$PREVIEW_SSH_KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Remove preview
         run: ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'"
 
@@ -154,9 +173,19 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          write_secret() {
+            local value="$1"
+            local output="$2"
+            if [[ "$value" == *"\\n"* ]]; then
+              printf '%b' "$value" | tr -d '\r' > "$output"
+            else
+              printf '%s' "$value" | tr -d '\r' > "$output"
+            fi
+          }
+          write_secret "$PREVIEW_SSH_PRIVATE_KEY" "$HOME/.ssh/id_ed25519"
+          write_secret "$PREVIEW_SSH_KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Upload helper and clean
         run: |
           ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR'"
