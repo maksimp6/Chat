@@ -60,6 +60,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_PREVIEW_BASE_PATH="$base_path" "$image" >/dev/null
+  local health_status
   for attempt in $(seq 1 30); do
     health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
     if [ "$health_status" = "healthy" ]; then rm -f -- "$archive_path"; log "preview container healthy"; return 0; fi
