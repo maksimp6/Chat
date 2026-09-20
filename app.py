@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template
+import os
 import logging
 import json
 from config import TEXT_MODELS, VOICE_MODELS
@@ -22,6 +23,12 @@ from departments import departments_bp, init_department_tables
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
+
+
+def preview_base_path():
+    """Return the configured URL prefix used by a preview deployment."""
+    return os.environ.get("ALICE_PREVIEW_BASE_PATH", "").rstrip("/")
+
 logger = logging.getLogger("alice_app")
 
 app.register_blueprint(mcp_bp)
@@ -43,10 +50,10 @@ init_department_tables()
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", preview_base_path=preview_base_path())
 
 
-@app.route("/api/users/bootstrap", methods=["POST"])
+@app.route("/healthz", methods=["GET"])\ndef healthz():\n    return jsonify({"status": "ok"})\n\n\n@app.route("/api/users/bootstrap", methods=["POST"])
 def bootstrap_anonymous_user():
     data = request.get_json(silent=True) or {}
     metadata = data.get("metadata") or {}
@@ -170,4 +177,7 @@ def treasury_top_up():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "5000"))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host=host, port=port, debug=debug, use_reloader=False)
