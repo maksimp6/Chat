@@ -61,7 +61,7 @@
 (function () {
     "use strict";
     var script = document.createElement("script");
-    script.src = "/static/trace_download.js";
+    script.src = (window.__ALICE_STATIC_BASE || "/static") + "/trace_download.js";
     script.defer = false;
     (document.head || document.documentElement).appendChild(script);
 })();
