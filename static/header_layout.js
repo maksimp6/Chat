@@ -18,7 +18,7 @@
         if (!itemWidth) return;
 
         const columns = Math.max(1, Math.floor((actions.clientWidth + gap) / (itemWidth + gap)));
-        actions.style.setProperty("--header-columns", String(columns));
+        actions.style.gridTemplateColumns = `repeat(${columns}, ${itemWidth}px)`;
 
         const remainder = buttons.length % columns;
         if (buttons.length <= columns || remainder === 0) return;
