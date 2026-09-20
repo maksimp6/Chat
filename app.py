@@ -97,13 +97,13 @@ def _render_frontend_variant():
     variant = request.args.get("variant", "modular").lower()
     if variant == "modular":
         return html
-    if variant not in {"single", "packed"}:
+    if variant not in {"core", "single", "packed"}:
         return None
 
     static_dir = os.path.join(os.path.dirname(__file__), "static")
 
     def read_static(url):
-        match = re.match(r"^/static/(.+?)(?:\?[^/]*)?$", url)
+        match = re.match(r"^.*/static/(.+?)(?:\?[^/]*)?$", url)
         if not match:
             return None
         relative = os.path.normpath(match.group(1))
@@ -115,6 +115,51 @@ def _render_frontend_variant():
                 return source.read()
         except (OSError, UnicodeDecodeError):
             return None
+
+    if variant in {"core", "packed"}:
+        core_names = {"boot.js", "core.js", "sidebar.js", "models.js", "chat.js"}
+        module_urls = []
+
+        def keep_core_or_collect(match):
+            url, attrs = match.group(1), match.group(2)
+            filename = url.split("/", 3)[-1].split("?", 1)[0]
+            if filename in core_names:
+                content = read_static(url)
+                if content is not None:
+                    return "<script" + attrs + ">" + content + "</script>"
+            if "/static/" in url:
+                module_urls.append(url)
+                return ""
+            return match.group(0)
+
+        html = re.sub(
+            r'<script\s+src="([^"]+)"([^>]*)></script>',
+            keep_core_or_collect,
+            html,
+            flags=re.IGNORECASE,
+        )
+        module_loader = """
+<script data-loading-experiment-modules>
+(function () {
+  const modules = %s;
+  const load = (url) => new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.defer = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Failed to load ' + url));
+    document.head.appendChild(script);
+  });
+  window.__ALICE_OPTIONAL_MODULES = modules.slice();
+  window.__ALICE_LOAD_MODULES = () => modules.reduce((chain, url) =>
+    chain.then(() => load(url).catch(error => console.error(error))), Promise.resolve());
+  requestAnimationFrame(() => window.__ALICE_LOAD_MODULES());
+})();
+</script>
+""" % json.dumps(module_urls)
+        html = html.replace("</body>", module_loader + "</body>")
+        if variant == "core":
+            return html
 
     html = re.sub(
         r'<link\s+rel="stylesheet"\s+href="([^"]+)"\s*/?>',
@@ -168,7 +213,7 @@ def _render_frontend_variant():
 def loading_experiment():
     html = _render_frontend_variant()
     if html is None:
-        return jsonify({"error": "variant must be modular, single, or packed"}), 400
+        return jsonify({"error": "variant must be modular, core, single, or packed"}), 400
     response = make_response(html)
     response.headers["Cache-Control"] = "no-store, max-age=0"
     response.headers["X-Alice-Loading-Variant"] = request.args.get("variant", "modular").lower()
