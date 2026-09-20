@@ -23,13 +23,29 @@ ensure_traefik() {
   ensure_network
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
     local current_image
+    local published_http
     current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
-    if [ "$current_image" = "$TRAEFIK_IMAGE" ]; then docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"; return; fi
-    log "replacing incompatible Traefik image $current_image"
+    published_http="$(docker port "$TRAEFIK_NAME" 80/tcp 2>/dev/null || true)"
+    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http"; then
+      docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"
+      return
+    fi
+    log "replacing Traefik to enforce HTTP binding on 0.0.0.0:80"
     docker rm -f "$TRAEFIK_NAME" >/dev/null
   fi
-  log "starting Traefik $TRAEFIK_IMAGE"
-  docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 80:80 -v /var/run/docker.sock:/var/run/docker.sock:ro "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --entrypoints.web.address=:80 --api.dashboard=false --accesslog=false >/dev/null
+  log "starting Traefik $TRAEFIK_IMAGE on 0.0.0.0:80"
+  docker run -d \
+    --name "$TRAEFIK_NAME" \
+    --restart unless-stopped \
+    --network "$NETWORK_NAME" \
+    -p 0.0.0.0:80:80 \
+    -v /var/run/docker.sock:/var/run/docker.sock:ro \
+    "$TRAEFIK_IMAGE" \
+    --providers.docker=true \
+    --providers.docker.exposedbydefault=false \
+    --entrypoints.web.address=:80 \
+    --api.dashboard=false \
+    --accesslog=false >/dev/null
 }
 
 cleanup_key() {
