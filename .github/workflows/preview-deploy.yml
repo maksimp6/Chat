@@ -37,7 +37,7 @@ jobs:
   deploy:
     name: Deploy isolated preview
     environment: production
-    if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.action != 'closed') && (github.event_name != 'issue_comment' || contains(github.event.comment.body, '/preview-e2e'))
+    if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.action != 'closed')
     runs-on: ubuntu-latest
     env:
       PREVIEW_SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
