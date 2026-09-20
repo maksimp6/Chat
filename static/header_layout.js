@@ -7,7 +7,7 @@
         const style = document.createElement("style");
         style.id = "header-layout-overrides";
         style.textContent = `
-            .alice-pro-app #header { gap: 8px !important; }
+            .alice-pro-app #header { gap: 12px !important; }
             .alice-pro-app #header > .header-actions {
                 display: flex !important;
                 flex: 1 1 auto !important;
@@ -23,10 +23,10 @@
                 flex: 0 0 38px !important;
                 width: 38px !important;
                 height: 38px !important;
-                margin-right: 0;
+                margin-right: 0 !important;
             }
             .alice-pro-app #header > .header-actions > .header-btn.header-row-start {
-                margin-left: auto !important;
+                margin-left: 0 !important;
             }
             @media (max-width: 768px) {
                 .alice-pro-app #header { gap: 6px !important; }
@@ -49,15 +49,32 @@
             button.classList.remove("header-row-start");
             button.style.removeProperty("margin-left");
         });
+        if (buttons.length < 2) return;
 
-        let previousTop = null;
-        buttons.forEach((button, index) => {
-            const top = button.offsetTop;
-            if (index > 0 && previousTop !== null && top > previousTop) {
-                button.classList.add("header-row-start");
+        const firstRect = buttons[0].getBoundingClientRect();
+        const secondRect = buttons[1].getBoundingClientRect();
+        const buttonWidth = firstRect.width;
+        const columnGap = Math.max(0, secondRect.left - firstRect.right);
+        const pitch = buttonWidth + columnGap;
+        const columns = Math.max(1, Math.floor((actions.clientWidth + columnGap) / pitch));
+
+        let rowStart = 0;
+        let rowTop = buttons[0].offsetTop;
+
+        for (let index = 1; index <= buttons.length; index += 1) {
+            const top = index < buttons.length ? buttons[index].offsetTop : null;
+            if (top !== null && top === rowTop) continue;
+
+            const rowCount = index - rowStart;
+            if (rowStart > 0 && rowCount < columns) {
+                const offset = (columns - rowCount) * pitch;
+                buttons[rowStart].classList.add("header-row-start");
+                buttons[rowStart].style.marginLeft = offset + "px";
             }
-            previousTop = top;
-        });
+
+            rowStart = index;
+            if (top !== null) rowTop = top;
+        }
     }
 
     function scheduleAlignment() {
