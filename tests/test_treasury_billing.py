@@ -7,12 +7,14 @@ def treasury_db(tmp_path, monkeypatch):
     import invocation_manager
     import runtime_migrations
     import treasury
+    import user_identity
 
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
     monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
     monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
     monkeypatch.setattr(treasury, "get_conn", db.get_conn)
+    monkeypatch.setattr(user_identity, "get_conn", db.get_conn)
 
     db.init_db()
     runtime_migrations.init_runtime_tables()
@@ -159,3 +161,44 @@ def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
 
         with pytest.raises(TreasuryIdentityError):
             get_current_owner_id()
+
+
+def test_bootstrap_authenticates_treasury_owner(treasury_db):
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    bootstrap = client.post(
+        "/api/users/bootstrap",
+        json={
+            "installation_id": "android-installation-auth-owner-123456",
+            "metadata": {"platform": "android"},
+        },
+    )
+
+    assert bootstrap.status_code == 200
+    identity = bootstrap.get_json()
+    assert identity["user_id"]
+    assert identity["auth_token"]
+    assert "alice_user_token=" in bootstrap.headers.get("Set-Cookie", "")
+
+    account = client.get("/api/treasury/account")
+    assert account.status_code == 200
+    assert account.get_json()["owner_id"] == identity["user_id"]
+
+
+def test_invalid_owner_token_is_rejected(treasury_db, monkeypatch):
+    from app import app
+
+    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    response = client.get(
+        "/api/treasury/account",
+        headers={"X-Alice-User-Token": "not-a-valid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "invalid authenticated owner token"
