@@ -82,7 +82,7 @@ jobs:
           echo "base_path=/preview/$key" >> "$GITHUB_OUTPUT"
           echo "ttl_hours=$ttl" >> "$GITHUB_OUTPUT"
       - name: Build archive
-        run: tar --exclude=.git --exclude=.github --exclude=node_modules --exclude=preview.tar.gz -czf preview.tar.gz .
+        run: git archive --format=tar.gz --output=preview.tar.gz HEAD
       - name: Upload bundle
         env:
           KEY: ${{ steps.preview.outputs.key }}
