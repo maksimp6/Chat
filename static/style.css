@@ -680,3 +680,34 @@ html, body {
         width: 100%;
     }
 }
+/* Header icon wrapping */
+.alice-pro-app #header > .header-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 38px);
+    grid-auto-rows: 38px;
+    grid-auto-flow: row;
+    align-items: center;
+    justify-content: start;
+    gap: 8px 12px;
+    min-width: 0;
+    width: 100%;
+}
+
+.alice-pro-app #header > .header-actions > .header-btn {
+    width: 38px;
+    height: 38px;
+    flex: none;
+}
+
+@media (max-width: 768px) {
+    .alice-pro-app #header > .header-actions {
+        grid-template-columns: repeat(auto-fill, 36px);
+        grid-auto-rows: 36px;
+        gap: 6px 8px;
+    }
+
+    .alice-pro-app #header > .header-actions > .header-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
