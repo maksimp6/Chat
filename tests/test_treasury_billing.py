@@ -163,6 +163,30 @@ def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
             get_current_owner_id()
 
 
+def test_web_treasury_request_recovers_from_missing_identity(treasury_db):
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    unauthorized = client.get("/api/treasury/account")
+    assert unauthorized.status_code == 401
+    assert unauthorized.get_json()["error"] == "authenticated owner identity is required"
+
+    bootstrap = client.post(
+        "/api/users/bootstrap",
+        json={
+            "installation_id": "web-installation-treasury-recovery-123456",
+            "metadata": {"platform": "web"},
+        },
+    )
+    assert bootstrap.status_code == 200
+
+    account = client.get("/api/treasury/account")
+    assert account.status_code == 200
+    assert account.get_json()["owner_id"] == bootstrap.get_json()["user_id"]
+
+
 def test_bootstrap_authenticates_treasury_owner(treasury_db):
     from app import app
 
