@@ -10,7 +10,16 @@
 
 This baseline describes the current browser entrypoint and the resources referenced by the main HTML shell. It is the reference point for later performance changes.
 
-The audit intentionally does not modify the existing application shell. Runtime browser measurements that require a live browser session are marked as pending and must be captured with DevTools/Playwright against the deployed preview.
+The audit intentionally does not modify the existing application shell. Runtime browser measurements are treated as evidence only when they include the exact network profile, timing method, and known limitations.
+
+Two network profiles must not be conflated:
+
+- **Observed manual test:** 10 KB/s download, 10 KB/s upload, 200 ms latency.
+- **Planned reproducible stress test:** 10 KiB/s download, 0.065 KiB/s upload, 2500 ms additional latency.
+
+The distinction between **KB** and **KiB** is intentional. The automated runner accepts throughput in KiB/s and converts it to bytes/s using 1024 bytes per KiB.
+
+An observation that a browser looked blank, or that DevTools appeared to show an empty DOM, is not by itself proof that the server failed to deliver the HTML. Root-cause work must distinguish transport, parser, CSS/visibility, inline bootstrap, deferred script execution, and application initialization.
 
 ## 2. Current frontend architecture
 
@@ -109,25 +118,63 @@ With JavaScript disabled, the server-rendered HTML shell remains visible: the ma
 
 Full form submission and navigation without JavaScript were not separately validated.
 
-### 6.4 Remaining runtime measurements
+### 6.4 Automated probe: early-render instrumentation
+
+The Playwright probe now uses navigation `wait_until="commit"` before collecting early milestones. This is a deliberate correction to the earlier implementation, which waited for `DOMContentLoaded` first and could miss the exact failure window under severe throttling.
+
+After commit, the probe records milestones at approximately:
+
+- 250 ms
+- 1 s
+- 3 s
+- 5 s
+
+Each milestone captures:
+
+- document `readyState`;
+- presence of `html` and `body`;
+- body child count and body text size;
+- presence and visual visibility of `#app-root`;
+- presence and visual visibility of `#msg-input`;
+- whether the shell satisfies a conservative first-usable candidate condition.
+
+The report also records:
+
+- `blank_dom_observed`: at least one sampled milestone had no visible `#app-root` and zero body text bytes;
+- `first_usable_milestone_ms`: first sampled milestone where both the shell and message input were visible;
+- main-response status and commit time;
+- resource count and transfer bytes;
+- failed requests and HTTP responses with status >= 400;
+- console/page errors;
+- FCP/paint and navigation timings.
+
+`blank_dom_observed` is intentionally a DOM-level diagnostic signal. It is not a substitute for a screenshot or Performance trace when determining the visual root cause.
+
+### 6.5 Remaining runtime measurements
 
 | Metric / scenario | Status |
 |---|---|
 | TTFB | pending numeric capture |
-| FCP | ~0.9 s on manual Slow 3G observation |
+| FCP | ~0.9 s on manual Slow 3G observation; automated confirmation pending |
 | LCP | pending numeric capture |
 | INP / first interaction | pending numeric capture |
 | CLS | pending numeric capture; no visible shift observed |
 | Initial request count/bytes | cold: 27 / 243,695 B; Slow 3G: 29 / 246,629 B |
-| Critical JS execution/long tasks | pending Performance trace |
-| Offline behavior | pending scenario test |
-| 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency | runner support documented; live measurement pending |
+| Early 250 ms / 1 s / 3 s / 5 s milestones | runner implemented; live capture pending |
+| Critical JS execution / long tasks | trace support implemented; live capture pending |
+| Offline behavior | runner smoke check exists; interpretation/coverage pending |
+| 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency | runner support implemented; live measurement pending |
 | Critical/optional JS failure | pending scenario test |
+| Stale-cache behavior | pending scenario test |
+| API timeout / 500 behavior | pending scenario test |
 | Android WebView startup | pending device test |
+
 
 ## 7. Automated runner and Windows preparation
 
-The repository now includes a cross-platform Playwright probe and Windows PowerShell helpers:
+The repository includes a cross-platform Playwright probe and Windows PowerShell helpers.
+
+Basic Windows run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -135,25 +182,77 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\tests\run_frontend_baseline.ps1 -BaseUrl 'https://your-preview-url/'
 ```
 
-The probe writes `artifacts/frontend-baseline/report.json` and screenshots. It records partial failures instead of stopping at the first browser exception. It does not disable TLS validation or mutate application state.
+The Windows runner accepts the same network controls as the Python probe:
+
+```powershell
+.\tests\run_frontend_baseline.ps1 -BaseUrl 'http://88.218.66.166/preview/pr-228/' -DownloadKbps 10 -UploadKbps 0.065 -LatencyMs 2500 -TimeoutMs 180000 -Trace
+```
+
+The probe writes `artifacts/frontend-baseline/report.json` and screenshots. When `--trace` is supplied, it also writes `artifacts/frontend-baseline/trace.zip`.
+
+The report records partial failures instead of stopping at the first browser exception. It does not disable TLS validation or mutate application state.
 
 Common Windows issues and recovery steps are documented in `tests/README-frontend-baseline.md`.
 
+
 ## 8. Measurement protocol
 
-Cold and warm loads, Slow 3G, a very-low-throughput mobile profile, API/asset failures, stale cache, offline transitions, and Android WebView startup must be tested against the preview.
+### 8.1 Normal baseline
 
-For the planned severe low-throughput profile, the runner supports 10 KiB/s download, **0.065 KiB/s upload**, and 2500 ms additional latency:
+Capture at minimum:
+
+1. cold reload with cache disabled;
+2. warm reload;
+3. Slow 3G;
+4. no-JS load;
+5. offline load.
+
+Record exact request count, transferred bytes, TTFB, FCP, LCP, DOMContentLoaded, first usable interaction, errors, and layout stability where tooling permits.
+
+### 8.2 Severe network reproduction
+
+For the planned stress profile:
 
 ```powershell
-py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 0.065 --latency-ms 2500 --timeout-ms 180000
+py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 0.065 --latency-ms 2500 --timeout-ms 180000 --trace
 ```
 
-The upload value is calculated by dividing 0.26 KiB/s by 2 twice: `0.26 / 2 / 2 = 0.065 KiB/s`. This profile is intentionally severe and opt-in; it does not change normal baseline defaults. The live measurement remains pending.
+The upload value is calculated as:
 
-The previously observed 10 KB/s / 10 KB/s / 200 ms DevTools test is recorded separately and must not be conflated with the planned severe profile above.
+```text
+0.26 / 2 / 2 = 0.065 KiB/s
+```
 
-The automated probe does not by itself complete Android WebView validation, failure injection, or real-device network validation.
+This profile is intentionally severe and opt-in. It must not replace the normal baseline.
+
+### 8.3 Root-cause evidence gate
+
+If the 3-second or earlier milestone still reports a blank DOM/screen:
+
+1. keep application code unchanged;
+2. inspect `early_milestones` in `report.json`;
+3. inspect the screenshot and, when enabled, `trace.zip`;
+4. compare commit time, response start, FCP, resource timing, failed requests, and first visible shell state;
+5. inspect `templates/index.html`, critical CSS, inline bootstrap, and first deferred scripts;
+6. only then decide whether a code change is justified.
+
+Do not label the cause as “server did not send HTML” unless transport evidence supports it.
+
+### 8.4 Failure-injection matrix
+
+| Scenario | Expected property |
+|---|---|
+| Critical CSS delayed/failed | server HTML remains structurally available and recovery is deterministic |
+| One optional JS module fails | core interface remains usable |
+| API returns 500 | visible bounded error state; no global UI collapse |
+| API request times out | retry/recovery path; no permanent loading state |
+| Stale cache | old/new asset mismatch does not create a dead shell |
+| Offline transition | existing UI remains coherent and recovery is possible |
+| JS disabled | server-rendered shell remains useful |
+| Android WebView pause/resume | initialization remains idempotent |
+
+These are architecture tests, not merely CI-green requirements.
+
 
 ## 9. Definition of done for Step 1
 
@@ -161,11 +260,16 @@ The automated probe does not by itself complete Android WebView validation, fail
 - [x] Windows setup and runner documented.
 - [x] Manual DevTools cold-load and Slow 3G measurements recorded.
 - [x] Extreme-network blank-screen observation recorded with its actual parameters and limitations.
-- [ ] Playwright execution against a real preview.
+- [x] Runner accepts KiB/s download/upload and latency controls.
+- [x] Runner captures early post-commit milestones before waiting for DOMContentLoaded.
+- [x] Runner records explicit DOM-level blank and first-usable signals.
+- [x] Runner can optionally capture a Playwright trace.
+- [ ] Playwright execution against the real PR preview.
 - [ ] 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency live measurement.
-- [ ] Root-cause analysis of blank screen under extreme throttling.
+- [ ] Root-cause analysis of the blank-screen observation.
 - [ ] Failure-injection scenarios.
-- [ ] Performance trace / long-task capture.
+- [ ] Stale-cache/API-timeout/API-500 scenarios.
 - [ ] Android WebView capture.
+- [ ] Final normal cold/Slow 3G regression after the root cause is addressed.
 
 The remaining items require execution in a real browser/device environment and are not fabricated.
