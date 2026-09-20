@@ -46,7 +46,11 @@ deploy() {
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
   ensure_traefik; mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
-  local workdir="${ROOT_DIR}/previews/${key}" builddir="${workdir}/build" container="${CONTAINER_PREFIX}-${key}" image="${IMAGE_PREFIX}:${key}" expires_at="$(( $(date +%s) + ttl * 3600 ))"
+  local workdir="${ROOT_DIR}/previews/${key}"
+  local builddir="${workdir}/build"
+  local container="${CONTAINER_PREFIX}-${key}"
+  local image="${IMAGE_PREFIX}:${key}"
+  local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"
   log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
