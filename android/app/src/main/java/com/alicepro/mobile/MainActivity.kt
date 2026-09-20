@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -59,6 +60,13 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 AppLogger.info("WebView", "Page loaded", mapOf("url" to (url ?: "")))
+                val userId = prefs.getString(KEY_USER_ID, "").orEmpty()
+                if (userId.isNotBlank()) {
+                    webView.evaluateJavascript(
+                        "window.__ALICE_USER_ID=" + JSONObject.quote(userId) + ";",
+                        null,
+                    )
+                }
             }
 
             override fun onReceivedError(
@@ -293,9 +301,10 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (ready) {
                     AppLogger.info("Startup", "Local server is ready")
-                    bootstrapAnonymousUser()
-                    webView.loadUrl(serverUrl)
-                    updateManager.autoCheck()
+                    bootstrapAnonymousUser {
+                        webView.loadUrl(serverUrl)
+                        updateManager.autoCheck()
+                    }
                 } else {
                     AppLogger.error("Startup", "Local server did not become ready")
                     Toast.makeText(this, "Alice Pro server did not start", Toast.LENGTH_LONG).show()
@@ -304,7 +313,7 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun bootstrapAnonymousUser() {
+    private fun bootstrapAnonymousUser(onComplete: () -> Unit = {}) {
         Thread {
             try {
                 val connection = URL("$serverUrl/api/users/bootstrap").openConnection() as HttpURLConnection
@@ -321,22 +330,52 @@ class MainActivity : AppCompatActivity() {
                 }.toString()
                 connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
                 if (connection.responseCode !in 200..299) {
-                    AppLogger.warning("Identity", "Anonymous bootstrap failed", mapOf("status" to connection.responseCode.toString()))
+                    AppLogger.warning(
+                        "Identity",
+                        "Anonymous bootstrap failed",
+                        mapOf("status" to connection.responseCode.toString()),
+                    )
+                    installIdentityCookie(prefs.getString(KEY_AUTH_TOKEN, "").orEmpty())
+                    runOnUiThread { onComplete() }
                     return@Thread
                 }
+
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
-                val userId = JSONObject(response).optString("user_id")
+                val json = JSONObject(response)
+                val userId = json.optString("user_id")
+                val authToken = json.optString("auth_token")
+
                 if (userId.isNotBlank()) {
                     prefs.edit().putString(KEY_USER_ID, userId).apply()
-                    AppLogger.info("Identity", "Anonymous user registered")
-                    runOnUiThread {
-                        webView.evaluateJavascript("window.__ALICE_USER_ID=" + JSONObject.quote(userId) + ";", null)
-                    }
                 }
+                if (authToken.isNotBlank()) {
+                    prefs.edit().putString(KEY_AUTH_TOKEN, authToken).apply()
+                    installIdentityCookie(authToken)
+                }
+
+                if (userId.isNotBlank() && authToken.isNotBlank()) {
+                    AppLogger.info("Identity", "Authenticated owner identity bootstrapped")
+                } else {
+                    AppLogger.warning("Identity", "Bootstrap response did not contain complete identity")
+                    installIdentityCookie(prefs.getString(KEY_AUTH_TOKEN, "").orEmpty())
+                }
+                runOnUiThread { onComplete() }
             } catch (error: Throwable) {
                 AppLogger.warning("Identity", "Anonymous bootstrap unavailable: " + error.message)
+                installIdentityCookie(prefs.getString(KEY_AUTH_TOKEN, "").orEmpty())
+                runOnUiThread { onComplete() }
             }
         }.start()
+    }
+
+    private fun installIdentityCookie(authToken: String) {
+        if (authToken.isBlank()) return
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setCookie(
+            serverUrl,
+            "alice_user_token=$authToken; Path=/; HttpOnly; SameSite=Lax",
+        )
+        CookieManager.getInstance().flush()
     }
 
     private fun isServerReady(): Boolean {
@@ -362,6 +401,7 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_YANDEX_API_KEY = "yandex_api_key"
         private const val KEY_INSTALLATION_ID = "installation_id"
         private const val KEY_USER_ID = "user_id"
+        private const val KEY_AUTH_TOKEN = "auth_token"
         private const val KEY_LOCAL_AGENT_MODE = "local_agent_mode"
         private const val KEY_LOCAL_AGENT_GATEWAY = "local_agent_gateway"
         private const val KEY_LOCAL_AGENT_BOOTSTRAP = "local_agent_bootstrap"
