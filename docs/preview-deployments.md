@@ -19,7 +19,7 @@ Configure these in **Settings → Secrets and variables → Actions**:
 Optional repository variables:
 
 - `PREVIEW_SSH_PORT`: SSH port, default `22`.
-- `PREVIEW_SERVER_BASE_DIR`: server working directory, default `/opt/alice-preview`.
+- `PREVIEW_SERVER_BASE_DIR`: retained for compatibility, but preview jobs use the deployment user home at `$HOME/alice-preview` so the SSH account needs no `/opt` write permission.
 - `PREVIEW_TTL_HOURS`: preview lifetime, default `24`.
 
 Do not place Yandex, Supabase, production database, or Android signing credentials in this workflow.
@@ -55,7 +55,7 @@ Re-running the same ref replaces the previous preview for that key.
 
 ## VPS runtime
 
-The workflow installs a single Traefik container named `alice-preview-traefik` when it is not already present.
+The workflow installs a single Traefik v3.7.13 container named `alice-preview-traefik`. If an older incompatible preview Traefik container exists, the workflow replaces it so Docker provider discovery remains compatible with current Docker Engine APIs.
 
 Traefik uses:
 
@@ -95,9 +95,9 @@ No Nginx or Traefik installation is required beforehand. The workflow starts its
 
 The first deployment creates:
 
-`/opt/alice-preview/server.sh`
+`$HOME/alice-preview/server.sh`
 
-or the configured `PREVIEW_SERVER_BASE_DIR`, plus the `incoming/` and `previews/` directories.
+for the SSH deployment user, plus the `incoming/` and `previews/` directories. The preview workflow does not require write access to `/opt`.
 
 ## HTTPS
 
