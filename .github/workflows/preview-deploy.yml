@@ -29,7 +29,6 @@ permissions:
   pull-requests: write
 
 env:
-  PREVIEW_SERVER_BASE_DIR: ${{ vars.PREVIEW_SERVER_BASE_DIR || '/opt/alice-preview' }}
   PREVIEW_SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
   PREVIEW_DEFAULT_TTL_HOURS: ${{ vars.PREVIEW_TTL_HOURS || '24' }}
 
@@ -65,40 +64,24 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          python3 - <<'PY'
-import base64
-import os
-
-def write_secret(name, path):
-    value = os.environ[name]
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        value = value[1:-1]
-    value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
-    value = value.replace("\r\n", "\n").replace("\r", "\n")
-    stripped = value.lstrip()
-    if not stripped.startswith("-----BEGIN"):
-        try:
-            decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
-            if decoded.lstrip().startswith("-----BEGIN"):
-                value = decoded
-        except Exception:
-            pass
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(value)
-
-write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
-write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
-PY
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+      - name: Resolve remote preview directory
+        id: remote
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          test -n "$remote_dir"
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/previews\""
+          echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Resolve preview identity
         id: preview
-        env:
-          DEFAULT_TTL: ${{ env.PREVIEW_DEFAULT_TTL_HOURS }}
         run: |
           if [ -n "$PR_NUMBER" ]; then raw_key="pr-$PR_NUMBER"; else raw_key="branch-${INPUT_REF:-$GITHUB_REF_NAME}"; fi
           key="$(printf '%s' "$raw_key" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/--*/-/g; s/^-*//; s/-*$//' | cut -c1-50)"
-          ttl="${INPUT_TTL_HOURS:-$DEFAULT_TTL}"
+          ttl="${INPUT_TTL_HOURS:-$PREVIEW_DEFAULT_TTL_HOURS}"
           case "$ttl" in ''|*[!0-9]*) exit 1;; esac
           [ "$ttl" -gt 0 ] && [ "$ttl" -le 720 ] || exit 1
           echo "key=$key" >> "$GITHUB_OUTPUT"
@@ -106,48 +89,39 @@ PY
           echo "ttl_hours=$ttl" >> "$GITHUB_OUTPUT"
       - name: Build source archive
         run: git archive --format=tar.gz --output=preview.tar.gz HEAD
-      - name: Upload preview files
-        env:
-          KEY: ${{ steps.preview.outputs.key }}
-        run: |
-          SSH=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          SCP=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          "${SSH[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR/incoming' '$PREVIEW_SERVER_BASE_DIR/previews'"
-          "${SCP[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/server.sh"
-          "${SCP[@]}" preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/incoming/$KEY.tar.gz"
-      - name: Deploy preview
+      - name: Upload and deploy preview
         env:
           KEY: ${{ steps.preview.outputs.key }}
           BASE_PATH: ${{ steps.preview.outputs.base_path }}
           TTL_HOURS: ${{ steps.preview.outputs.ttl_hours }}
-        run: ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$PREVIEW_SERVER_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
+          "${scp_cmd[@]}" preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/$KEY.tar.gz"
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
+      - name: Verify VPS routing
+        env:
+          KEY: ${{ steps.preview.outputs.key }}
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "curl --fail --silent --show-error --max-time 5 http://127.0.0.1/preview/$KEY/healthz >/dev/null"
       - name: Public health check
         env:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
           url="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}/"
-          for attempt in $(seq 1 30); do curl --fail --silent --show-error --max-time 10 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 5; done
+          for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 2; done
           exit 1
-      - name: Report preview E2E smoke result
-        if: always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[preview-e2e]')
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          status="${{ job.status }}"
-          url="${PREVIEW_PUBLIC_BASE_URL%/}/preview/branch-${GITHUB_REF_NAME}/"
-          body="Preview E2E smoke result: ${status}\n\nCommit: ${GITHUB_SHA}\nURL: ${url}"
-          payload="$(jq -n --arg body "$body" '{body:$body}')"
-          curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/205/comments" -d "$payload"
-
       - name: Comment preview URL
-        if: github.event_name == 'pull_request'
+        if: success() && github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           BASE_PATH: ${{ steps.preview.outputs.base_path }}
         run: |
           url="${PREVIEW_PUBLIC_BASE_URL%/}${BASE_PATH}/"
-          body="Preview deployed: $url"
-          jq -n --arg body "$body" '{body:$body}' | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -d @-
+          jq -n --arg body "Preview deployed: $url" '{body:$body}' | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -d @-
 
   cleanup_pr:
     name: Cleanup closed pull request preview
@@ -165,34 +139,22 @@ PY
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          python3 - <<'PY'
-import base64
-import os
-
-def write_secret(name, path):
-    value = os.environ[name]
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        value = value[1:-1]
-    value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
-    value = value.replace("\r\n", "\n").replace("\r", "\n")
-    stripped = value.lstrip()
-    if not stripped.startswith("-----BEGIN"):
-        try:
-            decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
-            if decoded.lstrip().startswith("-----BEGIN"):
-                value = decoded
-        except Exception:
-            pass
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(value)
-
-write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
-write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
-PY
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+      - name: Resolve remote preview directory
+        id: remote
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          test -n "$remote_dir"
+          echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Remove preview
-        run: ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'"
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'; fi"
 
   cleanup_expired:
     name: Cleanup expired previews
@@ -206,40 +168,22 @@ PY
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: master
-          fetch-depth: 1
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          python3 - <<'PY'
-import base64
-import os
-
-def write_secret(name, path):
-    value = os.environ[name]
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        value = value[1:-1]
-    value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
-    value = value.replace("\r\n", "\n").replace("\r", "\n")
-    stripped = value.lstrip()
-    if not stripped.startswith("-----BEGIN"):
-        try:
-            decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
-            if decoded.lstrip().startswith("-----BEGIN"):
-                value = decoded
-        except Exception:
-            pass
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(value)
-
-write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
-write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
-PY
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
-      - name: Upload helper and clean
+      - name: Resolve remote preview directory
+        id: remote
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR'"
-          scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/server.sh"
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup-expired"
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          test -n "$remote_dir"
+          echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
+      - name: Cleanup expired previews
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup-expired; fi"

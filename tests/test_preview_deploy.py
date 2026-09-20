@@ -19,6 +19,7 @@ def test_preview_server_script_is_valid_bash():
 def test_preview_server_uses_path_prefix_routing_and_strip():
     source = SCRIPT.read_text(encoding="utf-8")
     assert r"Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" in source
+    assert 'TRAEFIK_IMAGE="traefik:v3.7.13"' in source
     assert 'traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path' in source
     assert 'ALICE_PREVIEW_BASE_PATH="$base_path"' in source
 
@@ -31,3 +32,5 @@ def test_preview_workflow_uses_vps_deployer():
     assert "PREVIEW_SSH_HOST" in workflow
     assert "PREVIEW_PUBLIC_BASE_URL" in workflow
     assert "Path-prefix" not in workflow
+    assert 'printf "%s/alice-preview" "$HOME"' in workflow
+    assert "Verify VPS routing" in workflow
