@@ -55,6 +55,15 @@ window.AliceTheme = {
 const savedTheme = window.AliceTheme.getStored();
 window.AliceTheme.apply(savedTheme, false);
 
+function fetchWithTimeout(input, init, timeoutMs) {
+    if (typeof AbortController === "undefined") return fetch(input, init);
+    var controller = new AbortController();
+    var options = Object.assign({}, init || {}, { signal: controller.signal });
+    var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+    return fetch(input, options).finally(function() { clearTimeout(timer); });
+}
+
+
 // Глобальная функция смены модели
 window.changeModel = function(newModel, skipPatch) {
     if (!modelsData.text[newModel] && !modelsData.voice[newModel]) {
@@ -95,7 +104,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     try {
         // 1. Загрузка диалогов
         console.log("[CORE] Загрузка диалогов...");
-        const conversationsRes = await fetch("/api/conversations");
+        const conversationsRes = await fetchWithTimeout("/api/conversations", { credentials: "same-origin", cache: "no-store" }, 10000);
         if (!conversationsRes.ok) throw new Error("Failed to load conversations: " + conversationsRes.status);
         const conversationsData = await conversationsRes.json();
         
@@ -107,7 +116,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
         // 2. Загрузка моделей
         console.log("[CORE] Загрузка моделей...");
-        const modelsRes = await fetch("/api/models");
+        const modelsRes = await fetchWithTimeout("/api/models", { credentials: "same-origin", cache: "no-store" }, 10000);
         if (!modelsRes.ok) throw new Error("Failed to load models: " + modelsRes.status);
         modelsData = await modelsRes.json();
         console.log("[CORE] Модели загружены");
@@ -130,9 +139,12 @@ document.addEventListener("DOMContentLoaded", async function() {
                     console.error("[CORE] Failed to load history:", e);
                 }
 
-// 👇 НОВОЕ: Синхронизация настроек с сервером при старте
+// Синхронизация настроек не должна блокировать загрузку интерфейса.
 if (typeof window.loadServerConvSettings === "function") {
-    await window.loadServerConvSettings(currentConvId);
+    await Promise.race([
+        window.loadServerConvSettings(currentConvId),
+        new Promise(function(resolve) { setTimeout(resolve, 5000); })
+    ]);
     console.log("[CORE] Настройки диалога синхронизированы с сервером");
 }
             }
@@ -150,6 +162,8 @@ if (typeof window.loadServerConvSettings === "function") {
             conversations = [];
         }
         if (typeof renderSidebar === "function") renderSidebar();
+        if (typeof updateUIForModel === "function") updateUIForModel();
+        if (typeof updateModelButton === "function") updateModelButton();
     }
 });
 
