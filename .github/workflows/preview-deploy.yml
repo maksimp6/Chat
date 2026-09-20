@@ -69,9 +69,10 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$PREVIEW_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$PREVIEW_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
 
       - name: Resolve preview identity
         id: preview
@@ -94,16 +95,16 @@ jobs:
       - name: Upload preview bundle and deploy script
         env: { KEY: ${{ steps.preview.outputs.key }} }
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR/incoming' '$PREVIEW_SERVER_BASE_DIR/previews'"
-          scp -P "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/server.sh"
-          scp -P "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/incoming/$KEY.tar.gz"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR/incoming' '$PREVIEW_SERVER_BASE_DIR/previews'"
+          scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/server.sh"
+          scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/incoming/$KEY.tar.gz"
 
       - name: Deploy preview container
         env:
           KEY: ${{ steps.preview.outputs.key }}
           BASE_PATH: ${{ steps.preview.outputs.base_path }}
           TTL_HOURS: ${{ steps.preview.outputs.ttl_hours }}
-        run: ssh -p "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$PREVIEW_SERVER_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
+        run: ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$PREVIEW_SERVER_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
 
       - name: Public health check
         env: { KEY: ${{ steps.preview.outputs.key }} }
@@ -157,11 +158,12 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$PREVIEW_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$PREVIEW_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Remove closed preview
-        run: ssh -p "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$PREVIEW_SERVER_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'; fi"
+        run: ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$PREVIEW_SERVER_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'; fi"
 
   cleanup_expired:
     name: Cleanup expired previews
@@ -183,15 +185,16 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$PREVIEW_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$PREVIEW_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Refresh server helper
         uses: actions/checkout@v4
         with: { ref: master, fetch-depth: 1 }
       - name: Upload server helper
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR'"
-          scp -P "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/server.sh"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p '$PREVIEW_SERVER_BASE_DIR'"
+          scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$PREVIEW_SERVER_BASE_DIR/server.sh"
       - name: Remove expired previews
-        run: ssh -p "$PREVIEW_SSH_PORT" -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup-expired"
+        run: ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$PREVIEW_SERVER_BASE_DIR' bash '$PREVIEW_SERVER_BASE_DIR/server.sh' cleanup-expired"
