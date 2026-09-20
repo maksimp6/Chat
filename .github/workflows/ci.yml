@@ -29,6 +29,8 @@ jobs:
           pip install pytest
       - name: Compile Python sources
         run: python -m compileall -q .
+      - name: Run frontend JavaScript regression tests
+        run: node tests/test_file_manager.js
       - name: Run tests
         run: pytest -q
 
