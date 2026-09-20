@@ -1,0 +1,23 @@
+# Source control and CI
+.git
+.github
+
+# Local/runtime state
+.env
+.env.*
+logs
+*.db
+*.sqlite
+*.sqlite3
+__pycache__
+*.pyc
+
+# Android/build caches
+android/.gradle
+android/build
+android/app/build
+
+# Frontend dependency/build caches
+node_modules
+frontend/node_modules
+frontend/dist
