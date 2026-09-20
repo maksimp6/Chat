@@ -17,6 +17,14 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ```powershell
 .\tests\setup_frontend_baseline.ps1
+.\tests\run_frontend_baseline.ps1
+```
+
+The runner will **ask for the preview URL** if `-BaseUrl` and `BASE_URL` are not set. It will then display the target URL and output directory and ask for confirmation before starting.
+
+You can also provide the URL explicitly:
+
+```powershell
 .\tests\run_frontend_baseline.ps1 -BaseUrl 'https://your-preview-url/'
 ```
 
@@ -38,6 +46,7 @@ The report is written to `artifacts/frontend-baseline/report.json`. Screenshots 
 
 - `0`: HTTP navigation succeeded and no page/console errors were recorded.
 - `1`: a navigation, browser, page, or console error was recorded.
+- `2`: the user cancelled the run.
 
 A failed run still produces `report.json` whenever the browser can be started. Attach the whole `artifacts/frontend-baseline` directory when reporting a failure.
 
