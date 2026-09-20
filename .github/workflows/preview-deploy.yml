@@ -109,7 +109,7 @@ jobs:
           for attempt in $(seq 1 30); do curl --fail --silent --show-error --max-time 10 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 5; done
           exit 1
       - name: Comment preview URL
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && steps.preview.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           BASE_PATH: ${{ steps.preview.outputs.base_path }}
