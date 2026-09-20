@@ -1,24 +1,18 @@
-.alice-dept-overlay{position:fixed;inset:0;z-index:100500;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}.alice-dept-card{width:min(640px,100%);max-height:80vh;overflow:auto;background:var(--bg,#fff);color:var(--text,#111);border-radius:16px;padding:16px;box-shadow:0 18px 60px rgba(0,0,0,.3)}.alice-dept-head{display:flex;align-items:center;justify-content:space-between}.alice-dept-head h3{margin:0}.alice-dept-head button{border:0;background:transparent;font-size:28px}.alice-dept-list{display:grid;gap:8px;margin-top:12px}.alice-dept-row{display:grid;gap:4px;text-align:left;padding:12px;border:1px solid rgba(127,127,127,.18);border-radius:12px;background:transparent;color:inherit}.alice-dept-row span{opacity:.7;font-size:12px;font-size:12px}
+.alice-dept-overlay{position:fixed;inset:0;z-index:100500;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}.alice-dept-card{width:min(640px,100%);max-height:80vh;overflow:auto;background:var(--bg,#fff);color:var(--text,#111);border-radius:16px;padding:16px;box-shadow:0 18px 60px rgba(0,0,0,.3)}.alice-dept-head{display:flex;align-items:center;justify-content:space-between}.alice-dept-head h3{margin:0}.alice-dept-head button{border:0;background:transparent;font-size:28px}.alice-dept-list{display:grid;gap:8px;margin-top:12px}.alice-dept-row{display:grid;gap:4px;text-align:left;padding:12px;border:1px solid rgba(127,127,127,.18);border-radius:12px;background:transparent;color:inherit}.alice-dept-row span{opacity:.7;font-size:12px}
 
-/* Header: sidebar/menu button stays left; all other actions form one right-aligned wrapping flow. */
+/* Keep the sidebar button in the same wrapping flow as every other header action. */
 .alice-pro-app #header{
-    display:flex;
-    align-items:flex-start;
-    justify-content:flex-start;
-    gap:8px;
+    display:block;
     overflow:hidden;
 }
-.alice-pro-app #header #menu-btn{
-    flex:0 0 38px;
-}
 .alice-pro-app #header .header-actions{
-    flex:1 1 auto;
-    min-width:0;
     display:flex;
     flex-wrap:wrap;
-    justify-content:flex-end;
+    justify-content:flex-start;
     align-items:center;
     gap:8px;
+    width:100%;
+    min-width:0;
 }
 .alice-pro-app #header .header-btn{
     box-sizing:border-box;
@@ -31,17 +25,7 @@
     justify-content:center;
 }
 @media (max-width:600px){
-    .alice-pro-app #header{
-        gap:6px;
-    }
-    .alice-pro-app #header #menu-btn{
-        flex-basis:36px;
-        width:36px;
-        min-width:36px;
-    }
-    .alice-pro-app #header .header-actions{
-        gap:6px;
-    }
+    .alice-pro-app #header .header-actions{gap:6px;}
     .alice-pro-app #header .header-btn{
         width:36px;
         height:36px;
