@@ -243,3 +243,5 @@ GitHub Issues are the source of truth for scope and acceptance criteria.
 ## License
 
 Alice Pro is licensed under the MIT License. See [LICENSE](LICENSE).
+
+<!-- Preview deployment E2E smoke validation. -->
