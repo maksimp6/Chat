@@ -4,14 +4,14 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // Инжект CSS-переменных для тёмной/светлой темы
-        window.SettingsUI.injectModalStyles();
+        if (window.SettingsUI && typeof window.SettingsUI.injectModalStyles === "function") {\n            window.SettingsUI.injectModalStyles();\n        }
 
         // Привязка кнопки настроек к открытию модалки
         var btn = document.getElementById('settings-btn');
         if (btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
-                window.openSettingsModal();
+                if (typeof window.openSettingsModal === "function") window.openSettingsModal();
             });
         }
     });
