@@ -28,6 +28,12 @@ You can also provide the URL explicitly:
 .\tests\run_frontend_baseline.ps1 -BaseUrl 'https://your-preview-url/'
 ```
 
+For the severe network baseline (10 KiB/s download + 10 KiB/s upload + 2500 ms additional latency), run the Python probe directly:
+
+```powershell
+py tests/frontend_baseline.py --base-url 'http://88.218.66.166/preview/pr-228/' --download-kbps 10 --upload-kbps 10 --latency-ms 2500 --timeout-ms 180000
+```
+
 The report is written to `artifacts/frontend-baseline/report.json`. Screenshots are written beside it.
 
 ## Common Windows issues
