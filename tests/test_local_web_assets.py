@@ -67,8 +67,9 @@ def test_web_boot_and_startup_guards_are_present():
     core = Path("static/core.js").read_text(encoding="utf-8")
     assert "getRegistrations" in boot
     assert "alice-pro-" in boot
-    assert "maxAttempts = 50" in eruda_loader
-    assert "setTimeout(initEruda, 100)" in eruda_loader
+    assert "maxAttempts = 5" in eruda_loader
+    assert "script.async = true" in eruda_loader
+    assert "script.src = (window.__ALICE_STATIC_BASE || "/static") + "/eruda.js" in eruda_loader
     assert "fetchWithTimeout" in core
     assert "AbortController" in core
     assert "setTimeout(resolve, 5000)" in core
