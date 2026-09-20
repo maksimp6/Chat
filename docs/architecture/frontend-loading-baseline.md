@@ -14,23 +14,13 @@ The audit intentionally does not modify the existing application shell. Runtime 
 
 ## 2. Current frontend architecture
 
-The current `master` branch is a server-rendered Flask application. The browser entrypoint is:
+The current `master` branch is a server-rendered Flask application. The browser entrypoint is `templates/index.html`.
 
-`templates/index.html`
+There is no root `frontend/` directory and no root `package.json` on `master`. The frontend is currently served as a collection of static JavaScript/CSS files rather than a Vite/Rollup application.
 
-There is no root `frontend/` directory and no root `package.json` on `master`. The frontend is therefore currently served as a collection of static JavaScript/CSS files rather than a Vite/Rollup application.
-
-The HTML shell references:
-
-- 23 deferred JavaScript files;
-- 2 CSS files;
-- the favicon twice.
-
-All application scripts use `defer`, while the two stylesheets are regular stylesheets and therefore remain part of the initial render path.
+The HTML shell references 23 deferred JavaScript files and 2 CSS files. All application scripts use `defer`, while the stylesheets remain part of the initial render path.
 
 ## 3. Static size baseline
-
-Repository blob sizes at the baseline commit:
 
 | Resource group | Count | Bytes |
 |---|---:|---:|
@@ -41,108 +31,45 @@ Repository blob sizes at the baseline commit:
 | JS directly referenced by the entrypoint | 23 | 197,535 |
 | Eruda bundle | 1 | 500,190 |
 
-The 500,190-byte Eruda bundle is not directly referenced by `index.html`. It is injected asynchronously by `static/eruda_init.js` after DOM startup and only needs to be considered when debugging is requested/initialization runs.
+The Eruda bundle is injected asynchronously by `static/eruda_init.js` and is not directly referenced by `index.html`.
 
 ## 4. Initial resource graph
-
-Current entrypoint order:
 
 ```text
 HTML
  ├─ style.css
- ├─ favicon.svg
- ├─ favicon.svg
  ├─ boot.js (defer)
  ├─ file_manager.js (defer)
  ├─ treasury.js (defer)
- ├─ settings/ui_helpers.js (defer)
- ├─ settings/settings_storage.js (defer)
- ├─ settings/settings_mcp.js (defer)
- ├─ settings/settings_params.js (defer)
- ├─ settings/settings_modal.js (defer)
- ├─ settings.js (defer)
+ ├─ settings/* (defer)
  ├─ core.js (defer)
  ├─ sidebar.js (defer)
  ├─ models.js (defer)
  ├─ chat.js (defer)
- ├─ trace_viewer.js (defer)
- ├─ trace_viewer_timing_fix.js (defer)
- ├─ trace_viewer_error_ui.js (defer)
- ├─ trace_viewer_auto.js (defer)
+ ├─ trace_viewer*.js (defer)
  ├─ voice.js (defer)
  ├─ android_diagnostics.js (defer)
  ├─ eruda_init.js (defer)
- ├─ departments.css
  ├─ departments.js (defer)
  ├─ memory_btn.js (defer)
  └─ cloudru_iam.js (defer)
 ```
 
-The shell also contains a substantial inline bootstrap block that:
-
-- establishes preview/static paths;
-- patches `fetch`;
-- patches `EventSource`;
-- injects the anonymous-user header when available.
-
-The current document also contains inline memory-management UI and inline memory-management JavaScript.
+The shell also contains inline bootstrap code that establishes preview/static paths, patches `fetch` and `EventSource`, and injects the anonymous-user header when available. Inline memory-management UI and JavaScript are also present.
 
 ## 5. Important observations
 
-### 5.1 JavaScript is split into many independent requests
+The initial graph contains many independent feature modules. Later work must identify the smallest set required for rendering the shell and accepting the first interaction; optional features should move out of the critical path only after dependency and failure analysis.
 
-There are 23 initial script tags. Although they are deferred, they still form a broad initial resource graph and must be evaluated together before the application is fully interactive.
+`eruda_init.js` dynamically injects `eruda.js` and retries after failure. Diagnostic tooling must remain optional.
 
-Later work should identify the smallest set required for:
+`app.py` currently uses conservative cache behavior: HTML is `no-store, max-age=0`, and static files default to `no-cache` unless another value exists. A static asset version token is calculated from mtimes unless `ALICE_STATIC_VERSION` is configured.
 
-1. rendering the shell;
-2. showing the main chat UI;
-3. accepting the first interaction.
+`.github/workflows/preview-deploy.yml` deploys isolated previews for pull requests and verifies health, public availability, and core assets.
 
-Everything else should be moved out of the critical path where safe.
-
-### 5.2 Debug tooling is already designed as optional
-
-`eruda_init.js` dynamically injects `eruda.js` and retries loading after a failure. This is a useful pattern to preserve: diagnostic tooling must not become a dependency of the application shell.
-
-### 5.3 Cache behavior is intentionally conservative
-
-`app.py` currently sets:
-
-- HTML `/` to `Cache-Control: no-store, max-age=0`;
-- `/static/*` to `Cache-Control: no-cache` unless another value already exists.
-
-The same file calculates a static asset version token from asset mtimes unless `ALICE_STATIC_VERSION` is configured.
-
-This is reliable for avoiding stale dependency graphs, but it is also a likely optimization target later because production assets currently cannot take full advantage of immutable caching.
-
-### 5.4 Preview deployment already exists
-
-`.github/workflows/preview-deploy.yml` deploys an isolated preview for pull requests and verifies:
-
-- preview health;
-- public preview availability;
-- core web assets.
-
-This gives Issue #227 a suitable place for repeatable browser profiling once instrumentation/tests are added.
-
-### 5.5 Visual continuity must be measured, not assumed
-
-The requirement for transitions from the primary shell to additional modules is part of the performance baseline.
-
-Later profiling must specifically check:
-
-- layout shift while modules load;
-- modal/panel insertion without size jumps;
-- preserved scroll position;
-- stable header/input geometry;
-- no flash of unstyled content;
-- no blank frame between shell and enhanced state;
-- graceful fallback when an optional module fails.
+Visual continuity must be measured, including layout shift, stable header/input geometry, no FOUC, no blank frame, preserved scroll position, and graceful optional-module failure.
 
 ## 6. Runtime measurements pending
-
-The repository audit cannot establish actual browser timings by itself. The following values must be captured from the preview with Chrome DevTools and Playwright:
 
 | Metric | Baseline |
 |---|---|
@@ -151,95 +78,38 @@ The repository audit cannot establish actual browser timings by itself. The foll
 | LCP | pending live measurement |
 | INP / first interaction | pending live measurement |
 | CLS | pending live measurement |
-| Initial request count | pending live measurement |
-| Initial transferred bytes | pending live measurement |
-| Critical JS execution time | pending live measurement |
-| Long tasks | pending live measurement |
+| Initial request count/bytes | pending live measurement |
+| Critical JS execution/long tasks | pending live measurement |
 | Offline behavior | pending scenario test |
 | Slow 3G behavior | pending scenario test |
-| Critical JS failure | pending scenario test |
-| Optional JS failure | pending scenario test |
+| Critical/optional JS failure | pending scenario test |
 | Android WebView startup | pending device test |
 
-## 7. Measurement protocol
+## 7. Automated runner and Windows preparation
 
-The baseline must be reproducible under the same conditions.
+The repository now includes a cross-platform Playwright probe and Windows PowerShell helpers:
 
-### Cold load
-
-- empty browser cache;
-- fresh navigation to the preview;
-- no extensions affecting the page;
-- record Network and Performance traces.
-
-### Warm load
-
-- reload with populated cache;
-- record differences from cold load.
-
-### Slow network
-
-- emulate Slow 3G;
-- repeat cold and warm loads;
-- record first usable render and first interaction.
-
-### Failure cases
-
-Test independently:
-
-- API unavailable;
-- one optional script returns an error;
-- critical JS fails;
-- stale cache;
-- offline after initial shell;
-- intermittent connection.
-
-### Mobile/WebView
-
-Repeat the critical scenarios in the Android WebView environment used by the application.
-
-## 8. Target architecture for the next steps
-
-The later implementation should converge toward:
-
-```text
-HTML shell
-  ↓
-critical CSS
-  ↓
-minimal bootstrap
-  ↓
-first usable chat
-  ↓
-optional enhancements
-  ├─ settings
-  ├─ file manager
-  ├─ treasury
-  ├─ departments
-  ├─ trace viewer
-  ├─ voice
-  └─ diagnostics/debug
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\tests\setup_frontend_baseline.ps1
+.\tests\run_frontend_baseline.ps1 -BaseUrl 'https://your-preview-url/'
 ```
 
-The transition between these states must be visually continuous. No enhancement is allowed to visibly destabilize the already usable shell.
+The probe writes `artifacts/frontend-baseline/report.json` and screenshots. It records partial failures instead of stopping at the first browser exception. It does not disable TLS validation or mutate application state.
 
-## 9. Baseline conclusion
+Common Windows issues and recovery steps are documented in `tests/README-frontend-baseline.md`.
 
-The largest immediately visible repository-level optimization opportunity is not a single slow function. It is the broad initial resource graph: 23 deferred scripts, inline startup code, and multiple feature modules entering the page at once.
+## 8. Measurement protocol
 
-The next implementation step should therefore be driven by measured browser timings and dependency analysis, not by simply concatenating files or blindly minifying everything.
+Cold and warm loads, Slow 3G, API/asset failures, stale cache, offline transitions, and Android WebView startup must be tested against the preview. The automated probe does not by itself complete all of these scenarios.
 
-## 10. Definition of done for Step 1
+## 9. Definition of done for Step 1
 
-- [x] Baseline commit recorded.
-- [x] Frontend entrypoint identified.
-- [x] Initial HTML/CSS/JS resource graph recorded.
-- [x] Static byte sizes recorded.
-- [x] Critical/optional candidates identified.
-- [x] Existing preview pipeline identified.
-- [x] Visual continuity requirements recorded.
+- [x] Baseline commit, entrypoint, resource graph, byte sizes, candidates, and preview pipeline recorded.
+- [x] Windows setup and runner documented.
 - [ ] Live DevTools timing capture.
-- [ ] Playwright network/failure capture.
+- [ ] Playwright execution against a real preview.
+- [ ] Failure-injection scenarios.
 - [ ] Android WebView capture.
 
-The final three items require executing the application in a real browser/device environment and are intentionally not fabricated.
+The remaining items require execution in a real browser/device environment and are not fabricated.
