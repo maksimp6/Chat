@@ -3,6 +3,9 @@ name: Preview deployment
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
+  push:
+    branches:
+      - fix/preview-deploy-validated
   workflow_dispatch:
     inputs:
       ref:
