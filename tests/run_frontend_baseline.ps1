@@ -7,13 +7,35 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Interactive fallback: do not make the user discover the required URL syntax.
 if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
-  throw 'Provide -BaseUrl or set BASE_URL to the preview URL.'
+  $BaseUrl = Read-Host 'Введите полный URL preview, который нужно проверить'
+}
+
+if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
+  throw 'URL preview не указан. Передайте -BaseUrl или задайте BASE_URL.'
+}
+
+try {
+  $parsed = [System.Uri]$BaseUrl
+  if ($parsed.Scheme -notin @('http', 'https') -or [string]::IsNullOrWhiteSpace($parsed.Host)) {
+    throw 'Ожидается полный URL с http:// или https://.'
+  }
+} catch {
+  throw "Некорректный URL preview: $BaseUrl"
 }
 
 $python = Get-Command py -ErrorAction SilentlyContinue
 if (-not $python) { $python = Get-Command python -ErrorAction SilentlyContinue }
-if (-not $python) { throw 'Python 3 was not found. Run tests/setup_frontend_baseline.ps1 first.' }
+if (-not $python) { throw 'Python 3 не найден. Сначала запустите tests/setup_frontend_baseline.ps1.' }
+
+Write-Host "Будет проверен URL: $BaseUrl"
+Write-Host "Отчёт будет сохранён в: $Output"
+$confirmation = Read-Host 'Продолжить? [Y/N]'
+if ($confirmation -notmatch '^(?i:y|yes|д|да)$') {
+  Write-Host 'Запуск отменён пользователем.'
+  exit 2
+}
 
 & $python.Source (Join-Path $PSScriptRoot 'frontend_baseline.py') --base-url $BaseUrl --timeout-ms $TimeoutMs --output $Output
 exit $LASTEXITCODE
