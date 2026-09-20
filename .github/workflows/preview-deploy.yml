@@ -114,6 +114,23 @@ jobs:
           url="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}/"
           for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 2; done
           exit 1
+      - name: Verify critical web assets
+        env:
+          KEY: \${{ steps.preview.outputs.key }}
+        run: |
+          base="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}"
+          for asset in \
+            "static/style.css" \
+            "static/boot.js" \
+            "static/core.js" \
+            "static/sidebar.js" \
+            "static/models.js" \
+            "static/chat.js" \
+            "static/eruda_init.js" \
+            "static/eruda.js"; do
+            curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$base/$asset" >/dev/null
+          done
+
       - name: Comment preview URL
         if: success() && github.event_name == 'pull_request'
         env:
