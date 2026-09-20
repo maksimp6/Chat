@@ -106,7 +106,7 @@ jobs:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
           url="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}/"
-          for attempt in $(seq 1 30); do curl --fail --silent --show-error --max-time 10 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 5; done
+          for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 2; done
           exit 1
       - name: Comment preview URL
         if: always() && github.event_name == 'pull_request' && steps.preview.outcome == 'success'
