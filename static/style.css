@@ -516,3 +516,167 @@ html, body {
     .alice-pro-app .header-row { gap: 8px; }
     .alice-pro-app .header-row-primary .model-btn { min-width: 0; }
 }
+/* Treasury modal */
+.alice-pro-app .treasury-modal {
+    z-index: 1100;
+    padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
+}
+
+.alice-pro-app .treasury-modal-content {
+    width: min(94vw, 520px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.alice-pro-app .treasury-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    font-size: 24px;
+    line-height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.alice-pro-app .treasury-balance-card {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--btn-bg);
+}
+
+.alice-pro-app .treasury-balance-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.alice-pro-app .treasury-balance-value {
+    color: var(--text-main);
+    font-size: 24px;
+    overflow-wrap: anywhere;
+}
+
+.alice-pro-app .treasury-action-section {
+    margin-bottom: 20px;
+}
+
+.alice-pro-app .treasury-action-section h4 {
+    margin: 0 0 10px;
+    color: var(--text-main);
+}
+
+.alice-pro-app .treasury-top-up-row {
+    display: flex;
+    gap: 10px;
+}
+
+.alice-pro-app .treasury-amount-input {
+    min-width: 0;
+    flex: 1;
+    padding: 11px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-input);
+    color: var(--text-main);
+    font: inherit;
+}
+
+.alice-pro-app .treasury-action-btn {
+    flex: 0 0 auto;
+    padding: 11px 14px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.alice-pro-app .treasury-action-btn:active {
+    transform: translateY(1px);
+}
+
+.alice-pro-app .treasury-expenses-list {
+    min-height: 40px;
+}
+
+.alice-pro-app .treasury-expense-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.alice-pro-app .treasury-expense-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--btn-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.alice-pro-app .treasury-expense-description {
+    color: var(--text-main);
+    font-size: 14px;
+}
+
+.alice-pro-app .treasury-expense-meta {
+    color: var(--text-secondary);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.alice-pro-app .treasury-empty-state,
+.alice-pro-app .treasury-status {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.alice-pro-app .treasury-status {
+    min-height: 18px;
+    margin-top: 8px;
+}
+
+.alice-pro-app .treasury-status.is-error {
+    color: var(--danger);
+}
+
+@media (max-width: 520px) {
+    .alice-pro-app .treasury-modal {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .alice-pro-app .treasury-modal-content {
+        width: 100%;
+        padding: 20px;
+        border-radius: 14px;
+    }
+
+    .alice-pro-app .treasury-top-up-row {
+        flex-direction: column;
+    }
+
+    .alice-pro-app .treasury-action-btn {
+        width: 100%;
+    }
+}
