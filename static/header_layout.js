@@ -7,31 +7,32 @@
         const style = document.createElement("style");
         style.id = "header-layout-overrides";
         style.textContent = `
-            .alice-pro-app #header { gap: 8px; }
+            .alice-pro-app #header { gap: 8px !important; }
             .alice-pro-app #header > .header-actions {
-                display: flex;
-                flex: 1 1 auto;
-                min-width: 0;
-                flex-wrap: wrap;
-                align-items: flex-start;
-                align-content: flex-start;
-                justify-content: flex-start;
-                column-gap: 12px;
-                row-gap: 8px;
+                display: flex !important;
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                flex-wrap: wrap !important;
+                align-items: flex-start !important;
+                align-content: flex-start !important;
+                justify-content: flex-start !important;
+                column-gap: 12px !important;
+                row-gap: 8px !important;
             }
             .alice-pro-app #header > .header-actions > .header-btn {
-                flex: 0 0 38px;
-                width: 38px;
-                height: 38px;
+                flex: 0 0 38px !important;
+                width: 38px !important;
+                height: 38px !important;
+                margin-right: 0;
             }
             .alice-pro-app #header > .header-actions > .header-btn.header-row-start {
-                margin-left: auto;
+                margin-left: auto !important;
             }
             @media (max-width: 768px) {
-                .alice-pro-app #header { gap: 6px; }
+                .alice-pro-app #header { gap: 6px !important; }
                 .alice-pro-app #header > .header-actions {
-                    column-gap: 8px;
-                    row-gap: 6px;
+                    column-gap: 8px !important;
+                    row-gap: 6px !important;
                 }
             }
         `;
@@ -54,7 +55,6 @@
             const top = button.offsetTop;
             if (index > 0 && previousTop !== null && top > previousTop) {
                 button.classList.add("header-row-start");
-                button.style.marginLeft = "auto";
             }
             previousTop = top;
         });
