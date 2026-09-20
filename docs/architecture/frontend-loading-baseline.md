@@ -91,15 +91,27 @@ Measurements were captured against the deployed PR preview with browser DevTools
 
 The earlier ~18 KB Network observation was incomplete. The cold-load measurement above supersedes it for the runtime baseline.
 
-### 6.2 No-JS observation
+### 6.2 Additional very-slow-network observation
+
+A manual DevTools CDP test was performed with:
+
+- Download: 10 KB/s
+- Upload: 10 KB/s
+- Latency: 200 ms
+
+The first 3 seconds showed a blank DOM/screen in the observation. The HTML shell was not visibly available during that interval. The page eventually loaded and the final UI was usable, but request count, transferred bytes, DOMContentLoaded, first usable render, and network-idle timing were not captured. No JavaScript or HTTP errors were observed.
+
+This is an observed finding, not a complete benchmark. It indicates that the early-render path requires investigation under extreme network constraints.
+
+### 6.3 No-JS observation
 
 With JavaScript disabled, the server-rendered HTML shell remains visible: the main interface, header/buttons, and message input are present and the page is not blank.
 
 Full form submission and navigation without JavaScript were not separately validated.
 
-### 6.3 Remaining runtime measurements
+### 6.4 Remaining runtime measurements
 
-| Metric / scenario | Baseline |
+| Metric / scenario | Status |
 |---|---|
 | TTFB | pending numeric capture |
 | FCP | ~0.9 s on manual Slow 3G observation |
@@ -109,7 +121,7 @@ Full form submission and navigation without JavaScript were not separately valid
 | Initial request count/bytes | cold: 27 / 243,695 B; Slow 3G: 29 / 246,629 B |
 | Critical JS execution/long tasks | pending Performance trace |
 | Offline behavior | pending scenario test |
-| 10 KiB/s + 2500 ms latency profile | runner support added; live measurement pending |
+| 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency | runner support documented; live measurement pending |
 | Critical/optional JS failure | pending scenario test |
 | Android WebView startup | pending device test |
 
@@ -131,13 +143,15 @@ Common Windows issues and recovery steps are documented in `tests/README-fronten
 
 Cold and warm loads, Slow 3G, a very-low-throughput mobile profile, API/asset failures, stale cache, offline transitions, and Android WebView startup must be tested against the preview.
 
-For the severe low-throughput profile, the runner supports 10 KiB/s download, **0.065 KiB/s upload**, and 2500 ms additional latency:
+For the planned severe low-throughput profile, the runner supports 10 KiB/s download, **0.065 KiB/s upload**, and 2500 ms additional latency:
 
 ```powershell
 py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 0.065 --latency-ms 2500 --timeout-ms 180000
 ```
 
 The upload value is calculated by dividing 0.26 KiB/s by 2 twice: `0.26 / 2 / 2 = 0.065 KiB/s`. This profile is intentionally severe and opt-in; it does not change normal baseline defaults. The live measurement remains pending.
+
+The previously observed 10 KB/s / 10 KB/s / 200 ms DevTools test is recorded separately and must not be conflated with the planned severe profile above.
 
 The automated probe does not by itself complete Android WebView validation, failure injection, or real-device network validation.
 
@@ -146,8 +160,10 @@ The automated probe does not by itself complete Android WebView validation, fail
 - [x] Baseline commit, entrypoint, resource graph, byte sizes, candidates, and preview pipeline recorded.
 - [x] Windows setup and runner documented.
 - [x] Manual DevTools cold-load and Slow 3G measurements recorded.
+- [x] Extreme-network blank-screen observation recorded with its actual parameters and limitations.
 - [ ] Playwright execution against a real preview.
 - [ ] 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency live measurement.
+- [ ] Root-cause analysis of blank screen under extreme throttling.
 - [ ] Failure-injection scenarios.
 - [ ] Performance trace / long-task capture.
 - [ ] Android WebView capture.
