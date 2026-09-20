@@ -9,15 +9,12 @@
         const buttons = Array.from(actions.querySelectorAll(".header-btn"));
         buttons.forEach((button) => button.classList.remove("header-row-start"));
 
-        let firstRowTop = null;
         let previousTop = null;
 
-        buttons.forEach((button) => {
+        buttons.forEach((button, index) => {
             const top = button.offsetTop;
 
-            if (firstRowTop === null) {
-                firstRowTop = top;
-            } else if (top > previousTop) {
+            if (index > 0 && top > previousTop) {
                 button.classList.add("header-row-start");
             }
 
