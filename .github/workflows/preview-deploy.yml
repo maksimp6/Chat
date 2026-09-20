@@ -1,0 +1,138 @@
+name: Preview deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to deploy
+        required: true
+        default: master
+        type: string
+      ttl_hours:
+        description: Preview lifetime in hours
+        required: false
+        default: '24'
+        type: string
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || inputs.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy isolated preview
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ secrets.FLY_ORG }}
+      PREVIEW_REF: ${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+      PREVIEW_KEY: ${{ github.event.pull_request.number || github.run_id }}
+      TTL_HOURS: ${{ inputs.ttl_hours || '24' }}
+    steps:
+      - name: Check required secrets
+        run: |
+          test -n "$FLY_API_TOKEN" || { echo 'Missing FLY_API_TOKEN'; exit 1; }
+          test -n "$FLY_ORG" || { echo 'Missing FLY_ORG'; exit 1; }
+
+      - name: Check out selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PREVIEW_REF }}
+          fetch-depth: 1
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create isolated app
+        id: app
+        run: |
+          APP_NAME="alice-preview-${PREVIEW_KEY}"
+          APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]_' '[:lower:]-' | cut -c1- fifty)"
+          APP_NAME="${APP_NAME//[^a-z0-9-]/-}"
+          echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
+          flyctl apps create "$APP_NAME" --org "$FLY_ORG" || true
+
+      - name: Generate preview config
+        run: |
+          cat > fly.preview.toml <<EOF
+          app = "${{ steps.app.outputs.app_name }}"
+          primary_region = "fra"
+
+          [build]
+            dockerfile = "Dockerfile"
+
+          [http_service]
+            internal_port = 8080
+            force_https = true
+            auto_stop_machines = "stop"
+            auto_start_machines = true
+            min_machines_running = 0
+
+          [env]
+            HOST = "0.0.0.0"
+            PORT = "8080"
+            ALICE_PREVIEW = "1"
+            ALICE_PREVIEW_TTL_HOURS = "${{ env.TTL_HOURS }}"
+          EOF
+
+      - name: Deploy preview
+        run: flyctl deploy --config fly.preview.toml --remote-only --ha=false
+
+      - name: Health check
+        env:
+          PREVIEW_URL: https://${{ steps.app.outputs.app_name }}.fly.dev
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 10 "$PREVIEW_URL/" >/dev/null; then
+              echo "Preview URL: $PREVIEW_URL"
+              echo "PREVIEW_URL=$PREVIEW_URL" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Preview failed health check: $PREVIEW_URL"
+          exit 1
+
+      - name: Publish preview summary
+        run: |
+          {
+            echo '## Preview deployment'
+            echo "- Ref: \`$PREVIEW_REF\`"
+            echo "- App: \`${{ steps.app.outputs.app_name }}\`"
+            echo "- URL: $PREVIEW_URL"
+            echo "- Lifetime: ${TTL_HOURS} hours (manual cleanup may be required)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = `https://${{ steps.app.outputs.app_name }}.fly.dev`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Preview deployed: ${url}\n\nCommit: \`${process.env.PREVIEW_REF}\``
+            });
+
+  cleanup:
+    name: Cleanup preview
+    if: github.event_name == 'pull_request' && (github.event.action == 'closed')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Destroy preview app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ secrets.FLY_ORG }}
+          APP_NAME: alice-preview-${{ github.event.pull_request.number }}
+        run: flyctl apps destroy "$APP_NAME" --yes || true
