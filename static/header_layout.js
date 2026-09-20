@@ -9,15 +9,30 @@
         style.textContent = `
             .alice-pro-app #header { gap: 8px; }
             .alice-pro-app #header > .header-actions {
-                gap: 12px;
+                display: flex;
+                flex: 1 1 auto;
+                min-width: 0;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                align-content: flex-start;
                 justify-content: flex-start;
+                column-gap: 12px;
+                row-gap: 8px;
+            }
+            .alice-pro-app #header > .header-actions > .header-btn {
+                flex: 0 0 38px;
+                width: 38px;
+                height: 38px;
             }
             .alice-pro-app #header > .header-actions > .header-btn.header-row-start {
                 margin-left: auto;
             }
             @media (max-width: 768px) {
                 .alice-pro-app #header { gap: 6px; }
-                .alice-pro-app #header > .header-actions { gap: 8px; }
+                .alice-pro-app #header > .header-actions {
+                    column-gap: 8px;
+                    row-gap: 6px;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -37,7 +52,7 @@
         let previousTop = null;
         buttons.forEach((button, index) => {
             const top = button.offsetTop;
-            if (index > 0 && top > previousTop) {
+            if (index > 0 && previousTop !== null && top > previousTop) {
                 button.classList.add("header-row-start");
                 button.style.marginLeft = "auto";
             }
