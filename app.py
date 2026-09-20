@@ -1,4 +1,7 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, make_response
+import base64
+import gzip
+import re
 import os
 import logging
 import json
@@ -82,6 +85,94 @@ init_department_tables()
 @app.route("/")
 def index():
     return render_template("index.html", preview_base_path=preview_base_path(), static_version=STATIC_ASSET_VERSION)
+
+
+def _render_frontend_variant():
+    """Render an opt-in loading experiment without changing the production shell."""
+    html = render_template(
+        "index.html",
+        preview_base_path=preview_base_path(),
+        static_version=STATIC_ASSET_VERSION,
+    )
+    variant = request.args.get("variant", "modular").lower()
+    if variant == "modular":
+        return html
+    if variant not in {"single", "packed"}:
+        return None
+
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+
+    def read_static(url):
+        match = re.match(r"^/static/(.+?)(?:\?[^/]*)?$", url)
+        if not match:
+            return None
+        relative = os.path.normpath(match.group(1))
+        if relative.startswith(".."):
+            return None
+        path = os.path.join(static_dir, relative)
+        try:
+            with open(path, "r", encoding="utf-8") as source:
+                return source.read()
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    html = re.sub(
+        r'<link\s+rel="stylesheet"\s+href="([^"]+)"\s*/?>',
+        lambda match: (
+            "<style data-loading-experiment-inline>" + content + "</style>"
+            if (content := read_static(match.group(1))) is not None
+            else match.group(0)
+        ),
+        html,
+        flags=re.IGNORECASE,
+    )
+    html = re.sub(
+        r'<script\s+src="([^"]+)"([^>]*)></script>',
+        lambda match: (
+            "<script" + match.group(2) + ">" + content + "</script>"
+            if (content := read_static(match.group(1))) is not None
+            else match.group(0)
+        ),
+        html,
+        flags=re.IGNORECASE,
+    )
+    if variant == "single":
+        return html
+
+    encoded = base64.b64encode(gzip.compress(html.encode("utf-8"), compresslevel=9)).decode("ascii")
+    fallback = """<main id=loading-fallback style="font:16px system-ui;padding:2rem">Alice Pro загружается…</main>"""
+    packed_script = f"""
+<script>
+(async function () {{
+  const started = performance.now();
+  const fallback = document.getElementById('loading-fallback');
+  try {{
+    const bytes = Uint8Array.from(atob({encoded!r}), c => c.charCodeAt(0));
+    if (!('DecompressionStream' in window)) throw new Error('DecompressionStream is unavailable');
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const text = await new Response(stream).text();
+    document.open();
+    document.write(text);
+    document.close();
+    window.dispatchEvent(new CustomEvent('alice-loading-experiment-ready', {{detail: {{decompressMs: performance.now() - started}}}}));
+  }} catch (error) {{
+    if (fallback) fallback.textContent = 'Не удалось загрузить интерфейс. Обновите страницу.';
+    console.error('Packed frontend variant failed', error);
+  }}
+}})();
+</script>"""
+    return f"<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Alice Pro loading experiment</title></head><body>{fallback}{packed_script}</body></html>"
+
+
+@app.route("/loading-experiment")
+def loading_experiment():
+    html = _render_frontend_variant()
+    if html is None:
+        return jsonify({"error": "variant must be modular, single, or packed"}), 400
+    response = make_response(html)
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["X-Alice-Loading-Variant"] = request.args.get("variant", "modular").lower()
+    return response
 
 
 @app.route("/healthz", methods=["GET"])
