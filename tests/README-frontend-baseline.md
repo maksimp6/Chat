@@ -28,7 +28,7 @@ You can also provide the URL explicitly:
 .\tests\run_frontend_baseline.ps1 -BaseUrl 'https://your-preview-url/'
 ```
 
-For the planned severe network baseline—10 KiB/s download, **0.065 KiB/s upload**, and 2500 ms additional latency—run:
+For the severe network baseline—10 KiB/s download, **0.065 KiB/s upload**, and 2500 ms additional latency—run:
 
 ```powershell
 .\tests\run_frontend_baseline.ps1 -BaseUrl 'http://88.218.66.166/preview/pr-228/' -DownloadKbps 10 -UploadKbps 0.065 -LatencyMs 2500 -TimeoutMs 180000 -Trace
@@ -73,6 +73,8 @@ If the report contains `blank_dom_observed: true`, this means that an early samp
 For a blank-screen result, inspect the early milestones and rerun with `--trace`/ `-Trace`. The root cause must be separated into transport, parsing, CSS/visibility, inline bootstrap, deferred-script execution, or application initialization before application code is changed.
 
 The manual observation already recorded in Issue #227 used a different profile: 10 KB/s download, 10 KB/s upload, 200 ms latency. Do not report it as a measurement of the planned 10 KiB/s / 0.065 KiB/s / 2500 ms profile.
+
+The automated severe-profile run against PR #228 recorded HTTP 200, DOMContentLoaded at 32984.3 ms, first paint/FCP at 10540 ms, 25 resources, 223,782 transferred bytes, no console/page errors, no failed requests, and `blank_dom_observed: true`. Its early milestones were sampled after the 5447.7 ms commit and were still blank, so the result confirms the condition but does not by itself prove the root cause.
 
 ## Scope limits
 

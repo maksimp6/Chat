@@ -15,7 +15,7 @@ The audit intentionally does not modify the existing application shell. Runtime 
 Two network profiles must not be conflated:
 
 - **Observed manual test:** 10 KB/s download, 10 KB/s upload, 200 ms latency.
-- **Planned reproducible stress test:** 10 KiB/s download, 0.065 KiB/s upload, 2500 ms additional latency.
+- **Automated severe stress test:** 10 KiB/s download, 0.065 KiB/s upload, 2500 ms additional latency.
 
 The distinction between **KB** and **KiB** is intentional. The automated runner accepts throughput in KiB/s and converts it to bytes/s using 1024 bytes per KiB.
 
@@ -150,20 +150,51 @@ The report also records:
 
 `blank_dom_observed` is intentionally a DOM-level diagnostic signal. It is not a substitute for a screenshot or Performance trace when determining the visual root cause.
 
-### 6.5 Remaining runtime measurements
+### 6.5 Automated severe-profile measurement
+
+The severe-profile Playwright probe was executed against `http://88.218.66.166/preview/pr-228/` with:
+
+- Download: 10 KiB/s
+- Upload: 0.065 KiB/s
+- Additional latency: 2500 ms
+- Timeout: 180000 ms
+- Trace capture: enabled
+
+Observed result:
+
+| Metric | Value |
+|---|---:|
+| Main response status | 200 |
+| Commit | 5447.7 ms |
+| DOMContentLoaded | 32984.3 ms |
+| First paint / FCP | 10540 ms |
+| Resource count | 25 |
+| Resource transfer bytes | 223,782 B |
+| Console/page errors | 0 |
+| Failed requests / HTTP >= 400 | 0 |
+| `blank_dom_observed` | true |
+| `first_usable_milestone_ms` | null |
+
+The early milestone samples targeted 250 ms, 1 s, 3 s, and 5 s after navigation start, but the main response did not commit until 5447.7 ms. All four recorded milestone samples therefore occurred immediately after commit, while the document was still `loading`; they had no visible `#app-root`, no visible `#msg-input`, and zero body text bytes.
+
+The same run confirmed that the no-JS shell remains present: HTTP 200, non-empty body, and `#app-root` present. The trace archive was captured as `artifacts/frontend-baseline-severe/trace.zip` in the local run artifacts.
+
+This result confirms the severe-profile early blank DOM condition. It still does not identify the root cause by itself; the next step is trace/resource-timing analysis across transport, parser, CSS visibility, inline bootstrap, deferred scripts, and app initialization.
+
+### 6.6 Remaining runtime measurements
 
 | Metric / scenario | Status |
 |---|---|
 | TTFB | pending numeric capture |
-| FCP | ~0.9 s on manual Slow 3G observation; automated confirmation pending |
+| FCP | ~0.9 s on manual Slow 3G observation; 10540 ms on automated severe profile |
 | LCP | pending numeric capture |
 | INP / first interaction | pending numeric capture |
 | CLS | pending numeric capture; no visible shift observed |
 | Initial request count/bytes | cold: 27 / 243,695 B; Slow 3G: 29 / 246,629 B |
-| Early 250 ms / 1 s / 3 s / 5 s milestones | runner implemented; live capture pending |
-| Critical JS execution / long tasks | trace support implemented; live capture pending |
+| Early 250 ms / 1 s / 3 s / 5 s milestones | captured for severe profile; all sampled after commit and blank |
+| Critical JS execution / long tasks | trace captured for severe profile; analysis pending |
 | Offline behavior | runner smoke check exists; interpretation/coverage pending |
-| 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency | runner support implemented; live measurement pending |
+| 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency | live measurement captured |
 | Critical/optional JS failure | pending scenario test |
 | Stale-cache behavior | pending scenario test |
 | API timeout / 500 behavior | pending scenario test |
@@ -211,7 +242,7 @@ Record exact request count, transferred bytes, TTFB, FCP, LCP, DOMContentLoaded,
 
 ### 8.2 Severe network reproduction
 
-For the planned stress profile:
+For the severe stress profile:
 
 ```powershell
 py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 0.065 --latency-ms 2500 --timeout-ms 180000 --trace
@@ -264,8 +295,8 @@ These are architecture tests, not merely CI-green requirements.
 - [x] Runner captures early post-commit milestones before waiting for DOMContentLoaded.
 - [x] Runner records explicit DOM-level blank and first-usable signals.
 - [x] Runner can optionally capture a Playwright trace.
-- [ ] Playwright execution against the real PR preview.
-- [ ] 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency live measurement.
+- [x] Playwright execution against the real PR preview.
+- [x] 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency live measurement.
 - [ ] Root-cause analysis of the blank-screen observation.
 - [ ] Failure-injection scenarios.
 - [ ] Stale-cache/API-timeout/API-500 scenarios.

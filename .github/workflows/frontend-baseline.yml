@@ -72,13 +72,13 @@ jobs:
           TIMEOUT_MS: ${{ inputs.timeout_ms }}
           TRACE: ${{ inputs.trace }}
         run: |
-          $args = @('--output', 'artifacts/frontend-baseline')
-          if ($env:DOWNLOAD_KBPS) { $args += @('--download-kbps', $env:DOWNLOAD_KBPS) }
-          if ($env:UPLOAD_KBPS) { $args += @('--upload-kbps', $env:UPLOAD_KBPS) }
-          if ($env:LATENCY_MS -and $env:LATENCY_MS -ne '0') { $args += @('--latency-ms', $env:LATENCY_MS) }
-          if ($env:TIMEOUT_MS) { $args += @('--timeout-ms', $env:TIMEOUT_MS) }
-          if ($env:TRACE -eq 'true') { $args += '--trace' }
-          python tests/frontend_baseline.py @args
+          $runnerArgs = @('--output', 'artifacts/frontend-baseline')
+          if ($env:DOWNLOAD_KBPS) { $runnerArgs += @('--download-kbps', $env:DOWNLOAD_KBPS) }
+          if ($env:UPLOAD_KBPS) { $runnerArgs += @('--upload-kbps', $env:UPLOAD_KBPS) }
+          if ($env:LATENCY_MS -and $env:LATENCY_MS -ne '0') { $runnerArgs += @('--latency-ms', $env:LATENCY_MS) }
+          if ($env:TIMEOUT_MS) { $runnerArgs += @('--timeout-ms', $env:TIMEOUT_MS) }
+          if ($env:TRACE -eq 'true') { $runnerArgs += '--trace' }
+          python tests/frontend_baseline.py @runnerArgs
       - name: Upload baseline evidence
         if: always()
         uses: actions/upload-artifact@v4

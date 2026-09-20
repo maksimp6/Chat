@@ -1,4 +1,6 @@
 logs/
+artifacts/
+work/
 __pycache__/
 *.pyc
 project_dump.txt
