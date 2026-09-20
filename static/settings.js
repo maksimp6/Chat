@@ -4,7 +4,9 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // Инжект CSS-переменных для тёмной/светлой темы
-        if (window.SettingsUI && typeof window.SettingsUI.injectModalStyles === "function") {\n            window.SettingsUI.injectModalStyles();\n        }
+        if (window.SettingsUI && typeof window.SettingsUI.injectModalStyles === "function") {
+            window.SettingsUI.injectModalStyles();
+        }
 
         // Привязка кнопки настроек к открытию модалки
         var btn = document.getElementById('settings-btn');
