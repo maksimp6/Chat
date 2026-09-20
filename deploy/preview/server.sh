@@ -10,7 +10,7 @@ TTL_HOURS="${5:-24}"
 ROOT_DIR="${PREVIEW_SERVER_BASE_DIR:-/opt/alice-preview}"
 NETWORK_NAME="alice-preview"
 TRAEFIK_NAME="alice-preview-traefik"
-TRAEFIK_IMAGE="traefik:v3.5"
+TRAEFIK_IMAGE="traefik:v3.7.13"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
 
@@ -36,11 +36,17 @@ ensure_network() {
 ensure_traefik() {
   ensure_network
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
-    docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || true
-    return
+    local current_image
+    current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
+    if [ "$current_image" = "$TRAEFIK_IMAGE" ]; then
+      docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"
+      return
+    fi
+    log "replacing incompatible Traefik image $current_image"
+    docker rm -f "$TRAEFIK_NAME" >/dev/null
   fi
 
-  log "starting Traefik"
+  log "starting Traefik $TRAEFIK_IMAGE"
   docker run -d \
     --name "$TRAEFIK_NAME" \
     --restart unless-stopped \
