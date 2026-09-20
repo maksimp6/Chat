@@ -61,9 +61,11 @@ Traefik uses:
 
 - Docker provider;
 - `alice-preview` Docker network;
-- port `80`;
+- an explicit host binding `0.0.0.0:80 -> 80`;
 - `Path(...)` / `PathPrefix(...)` routers per preview;
 - StripPrefix middleware so Flask continues receiving its normal `/` and `/api/*` routes.
+
+The deployment script also inspects an existing Traefik container before reusing it. If the HTTP port is not published on `0.0.0.0:80`, the container is recreated with the explicit binding instead of silently keeping a stale host-port configuration.
 
 Preview containers receive:
 
@@ -89,7 +91,7 @@ A preview is not production. Do not enter real user data or production secrets i
 
 ## First VPS setup
 
-The deployment account needs permission to run Docker commands. The VPS must have Docker installed and port 80 available.
+The deployment account needs permission to run Docker commands. The VPS must have Docker installed and port 80 available to the public network path (cloud security group, host firewall, and routing).
 
 No Nginx or Traefik installation is required beforehand. The workflow starts its own Traefik container automatically.
 
@@ -101,4 +103,4 @@ for the SSH deployment user, plus the `incoming/` and `previews/` directories. T
 
 ## HTTPS
 
-The initial path-based setup intentionally uses HTTP because it works directly with a VPS IP address. Add a domain and TLS configuration later when the public hostname is available. The preview routing itself does not need to change.
+The initial path-based setup intentionally uses HTTP because it works directly with a VPS IP address. Port 443 should not be published until a TLS entrypoint and certificate configuration are added. Add a domain and TLS configuration later when the public hostname is available. The preview routing itself does not need to change.
