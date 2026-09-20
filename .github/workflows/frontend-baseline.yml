@@ -15,6 +15,21 @@ on:
         options:
           - windows-latest
           - ubuntu-latest
+      download_kbps:
+        description: Optional download throughput in KiB/s (for example 10 for the 10 KiB/s baseline)
+        required: false
+        default: ''
+        type: string
+      upload_kbps:
+        description: Optional upload throughput in KiB/s
+        required: false
+        default: ''
+        type: string
+      latency_ms:
+        description: Optional additional network latency in milliseconds
+        required: false
+        default: '0'
+        type: string
 
 permissions:
   contents: read
@@ -41,7 +56,15 @@ jobs:
         shell: pwsh
         env:
           BASE_URL: ${{ inputs.base_url }}
-        run: python tests/frontend_baseline.py --output artifacts/frontend-baseline
+          DOWNLOAD_KBPS: ${{ inputs.download_kbps }}
+          UPLOAD_KBPS: ${{ inputs.upload_kbps }}
+          LATENCY_MS: ${{ inputs.latency_ms }}
+        run: |
+          $args = @('--output', 'artifacts/frontend-baseline')
+          if ($env:DOWNLOAD_KBPS) { $args += @('--download-kbps', $env:DOWNLOAD_KBPS) }
+          if ($env:UPLOAD_KBPS) { $args += @('--upload-kbps', $env:UPLOAD_KBPS) }
+          if ($env:LATENCY_MS -and $env:LATENCY_MS -ne '0') { $args += @('--latency-ms', $env:LATENCY_MS) }
+          python tests/frontend_baseline.py @args
       - name: Upload baseline evidence
         if: always()
         uses: actions/upload-artifact@v4
