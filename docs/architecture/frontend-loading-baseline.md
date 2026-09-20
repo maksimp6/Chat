@@ -131,13 +131,13 @@ Common Windows issues and recovery steps are documented in `tests/README-fronten
 
 Cold and warm loads, Slow 3G, a very-low-throughput mobile profile, API/asset failures, stale cache, offline transitions, and Android WebView startup must be tested against the preview.
 
-For the low-throughput profile, the runner supports 10 KiB/s download and upload:
+For the severe low-throughput profile, the runner supports 10 KiB/s download, **0.065 KiB/s upload**, and 2500 ms additional latency:
 
 ```powershell
-py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 10 --latency-ms 2500 --timeout-ms 180000
+py tests/frontend_baseline.py --base-url "http://88.218.66.166/preview/pr-228/" --download-kbps 10 --upload-kbps 0.065 --latency-ms 2500 --timeout-ms 180000
 ```
 
-This profile models an intentionally severe mobile/network condition: 10 KiB/s download, 10 KiB/s upload, and 2500 ms additional latency. The live measurement remains pending.
+The upload value is calculated by dividing 0.26 KiB/s by 2 twice: `0.26 / 2 / 2 = 0.065 KiB/s`. This profile is intentionally severe and opt-in; it does not change normal baseline defaults. The live measurement remains pending.
 
 The automated probe does not by itself complete Android WebView validation, failure injection, or real-device network validation.
 
@@ -147,7 +147,7 @@ The automated probe does not by itself complete Android WebView validation, fail
 - [x] Windows setup and runner documented.
 - [x] Manual DevTools cold-load and Slow 3G measurements recorded.
 - [ ] Playwright execution against a real preview.
-- [ ] 10 KiB/s live measurement.
+- [ ] 10 KiB/s + 0.065 KiB/s upload + 2500 ms latency live measurement.
 - [ ] Failure-injection scenarios.
 - [ ] Performance trace / long-task capture.
 - [ ] Android WebView capture.
