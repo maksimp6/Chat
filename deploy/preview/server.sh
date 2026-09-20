@@ -57,7 +57,7 @@ deploy() {
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" \
     --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${container}.rule=PathPrefix(\`$base_path\`)" \
+    --label "traefik.http.routers.${container}.rule=Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" \
     --label "traefik.http.routers.${container}.entrypoints=web" \
     --label "traefik.http.routers.${container}.priority=100" \
     --label "traefik.http.routers.${container}.middlewares=${container}-strip" \
