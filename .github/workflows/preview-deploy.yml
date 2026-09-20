@@ -64,8 +64,30 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+          import base64
+          import os
+
+          def write_secret(name, path):
+              value = os.environ[name]
+              if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\x27", '"'}:
+                  value = value[1:-1]
+              value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
+              value = value.replace("\r\n", "\n").replace("\r", "\n")
+              stripped = value.lstrip()
+              if not stripped.startswith("-----BEGIN"):
+                  try:
+                      decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
+                      if decoded.lstrip().startswith("-----BEGIN"):
+                          value = decoded
+                  except Exception:
+                      pass
+              with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(value)
+
+          write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+          write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+          PY
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote preview directory
@@ -133,8 +155,30 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+          import base64
+          import os
+
+          def write_secret(name, path):
+              value = os.environ[name]
+              if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\x27", '"'}:
+                  value = value[1:-1]
+              value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
+              value = value.replace("\r\n", "\n").replace("\r", "\n")
+              stripped = value.lstrip()
+              if not stripped.startswith("-----BEGIN"):
+                  try:
+                      decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
+                      if decoded.lstrip().startswith("-----BEGIN"):
+                          value = decoded
+                  except Exception:
+                      pass
+              with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(value)
+
+          write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+          write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+          PY
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote preview directory
@@ -148,7 +192,6 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          if "${ssh_cmd[@]}" >/dev/null 2>&1; then :; fi
           ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'; fi"
 
   cleanup_expired:
@@ -166,8 +209,30 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+          import base64
+          import os
+
+          def write_secret(name, path):
+              value = os.environ[name]
+              if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\x27", '"'}:
+                  value = value[1:-1]
+              value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
+              value = value.replace("\r\n", "\n").replace("\r", "\n")
+              stripped = value.lstrip()
+              if not stripped.startswith("-----BEGIN"):
+                  try:
+                      decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
+                      if decoded.lstrip().startswith("-----BEGIN"):
+                          value = decoded
+                  except Exception:
+                      pass
+              with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(value)
+
+          write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+          write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+          PY
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote preview directory
