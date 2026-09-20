@@ -14,7 +14,7 @@ on:
         default: '24'
         type: string
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 concurrency:
   group: preview-${{ github.event.pull_request.number || inputs.ref }}
@@ -28,6 +28,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy isolated preview
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -54,7 +55,7 @@ jobs:
         id: app
         run: |
           APP_NAME="alice-preview-${PREVIEW_KEY}"
-          APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]_' '[:lower:]-' | cut -c1- fifty)"
+          APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]_' '[:lower:]-' | cut -c1-63)"
           APP_NAME="${APP_NAME//[^a-z0-9-]/-}"
           echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
           flyctl apps create "$APP_NAME" --org "$FLY_ORG" || true
@@ -125,7 +126,7 @@ jobs:
 
   cleanup:
     name: Cleanup preview
-    if: github.event_name == 'pull_request' && (github.event.action == 'closed')
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Install flyctl
@@ -133,6 +134,5 @@ jobs:
       - name: Destroy preview app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          FLY_ORG: ${{ secrets.FLY_ORG }}
           APP_NAME: alice-preview-${{ github.event.pull_request.number }}
         run: flyctl apps destroy "$APP_NAME" --yes || true
