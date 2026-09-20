@@ -24,7 +24,7 @@
             
             const notification = new Notification(title, {
                 body: body,
-                icon: icon || '/static/icon-192.png',
+                icon: icon || ((window.__ALICE_STATIC_BASE || '/static') + '/icon-192.png'),
                 tag: 'alice-pro'
             });
             
