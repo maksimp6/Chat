@@ -40,9 +40,11 @@ init_treasury_tables()
 init_user_identity_table()
 init_department_tables()
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/api/users/bootstrap", methods=["POST"])
 def bootstrap_anonymous_user():
@@ -50,14 +52,27 @@ def bootstrap_anonymous_user():
     metadata = data.get("metadata") or {}
     if not isinstance(metadata, dict):
         return jsonify({"error": "metadata must be an object"}), 400
+
     try:
-        return jsonify(register_anonymous_user(data.get("installation_id"), metadata))
+        identity = register_anonymous_user(data.get("installation_id"), metadata)
+        response = jsonify(identity)
+        response.set_cookie(
+            "alice_user_token",
+            identity["auth_token"],
+            httponly=True,
+            secure=request.is_secure,
+            samesite="Lax",
+            path="/",
+        )
+        return response
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
 
 @app.route("/api/models", methods=["GET"])
 def list_models():
     return jsonify({"text": TEXT_MODELS, "voice": VOICE_MODELS})
+
 
 @app.route("/api/conversations/<conv_id>", methods=["PATCH"])
 def patch_conversation(conv_id):
@@ -68,6 +83,7 @@ def patch_conversation(conv_id):
         update_conversation_model(conv_id, data["model"])
     return jsonify({"status": "ok"})
 
+
 @app.route("/api/conversations/<conv_id>/title", methods=["PUT"])
 def set_conv_title(conv_id):
     title = (request.get_json(silent=True) or {}).get("title")
@@ -75,6 +91,7 @@ def set_conv_title(conv_id):
         return jsonify({"error": "Title is required"}), 400
     update_conversation_title(conv_id, title)
     return jsonify({"status": "ok", "title": title})
+
 
 @app.route("/api/conversations/<conv_id>/model", methods=["PUT"])
 def set_conv_model(conv_id):
@@ -84,23 +101,28 @@ def set_conv_model(conv_id):
     update_conversation_model(conv_id, model)
     return jsonify({"status": "ok", "model": model})
 
+
 @app.route("/api/conversations/<conv_id>", methods=["DELETE"])
 def remove_conv(conv_id):
     delete_conversation(conv_id)
     return jsonify({"status": "deleted"})
 
+
 @app.route("/api/conversations/<conv_id>/settings", methods=["GET"])
 def get_dialog_settings(conv_id):
     return jsonify(get_conv_settings(conv_id) or {})
+
 
 @app.route("/api/conversations/<conv_id>/settings", methods=["PUT"])
 def save_dialog_settings(conv_id):
     save_conv_settings(conv_id, request.get_json(silent=True) or {})
     return jsonify({"status": "ok"})
 
+
 from memory_manager import load_memory_config, save_memory_config, clear_global_memory
 from db import get_conn
 import sqlite3
+
 
 @app.route("/api/memory/manage", methods=["GET"])
 def api_memory_panel_data():
@@ -111,11 +133,13 @@ def api_memory_panel_data():
     conn.close()
     return jsonify({"config": cfg, "facts": facts})
 
+
 @app.route("/api/memory/config", methods=["PUT"])
 def api_update_memory_config():
     data = request.get_json(silent=True) or {}
     save_memory_config(data)
     return jsonify({"status": "ok", "config": load_memory_config()})
+
 
 @app.route("/api/memory/clear", methods=["POST"])
 def api_clear_memory():
@@ -123,12 +147,14 @@ def api_clear_memory():
     clear_global_memory(category)
     return jsonify({"status": "cleared", "category": category or "all"})
 
+
 @app.route("/api/treasury/account", methods=["GET"])
 def treasury_account():
     try:
         return jsonify(get_account(get_current_owner_id()))
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
+
 
 @app.route("/api/treasury/top-up", methods=["POST"])
 def treasury_top_up():
@@ -141,6 +167,7 @@ def treasury_top_up():
         return jsonify({"error": str(exc)}), 401
     except (TypeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
