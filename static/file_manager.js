@@ -1,8 +1,41 @@
 window.fetchVectorStores = function() {
     return fetch('/api/vector-stores')
-        .then(function(r) { return r.json(); })
-        .then(function(data) { return data.data || data || []; })
-        .catch(function() { return []; });
+        .then(function(r) {
+            return r.json().catch(function() { return {}; }).then(function(data) {
+                if (!r.ok) {
+                    var message = "HTTP " + r.status;
+                    if (data && typeof data === "object") {
+                        if (typeof data.error === "string") message = data.error;
+                        else if (data.error && typeof data.error.message === "string") message = data.error.message;
+                    }
+                    throw new Error("Vector Stores: " + message);
+                }
+                return data;
+            });
+        })
+        .then(function(data) {
+            var candidate = data;
+            for (var i = 0; i < 3; i++) {
+                if (Array.isArray(candidate)) return candidate;
+                if (!candidate || typeof candidate !== "object") break;
+
+                var next = null;
+                if (Array.isArray(candidate.data)) return candidate.data;
+                if (Array.isArray(candidate.vector_stores)) return candidate.vector_stores;
+                if (Array.isArray(candidate.stores)) return candidate.stores;
+                if (Array.isArray(candidate.items)) return candidate.items;
+
+                if (candidate.data && typeof candidate.data === "object") next = candidate.data;
+                else if (candidate.vector_stores && typeof candidate.vector_stores === "object") next = candidate.vector_stores;
+                else if (candidate.stores && typeof candidate.stores === "object") next = candidate.stores;
+                else if (candidate.items && typeof candidate.items === "object") next = candidate.items;
+
+                if (!next || next === candidate) break;
+                candidate = next;
+            }
+
+            throw new Error("Некорректный ответ Vector Stores: ожидался массив хранилищ.");
+        });
 };
 
 (function() {
@@ -70,7 +103,11 @@ window.fetchVectorStores = function() {
         function renderVsManagerList(stores) {
             var cont = document.getElementById('vs-manager-list');
             if (!cont) return;
-            if (!stores || stores.length === 0) {
+            if (!Array.isArray(stores)) {
+                cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-danger,#c33);font-size:12px;">Ошибка: список Vector Stores имеет неожиданный формат.</div>';
+                return;
+            }
+            if (stores.length === 0) {
                 cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);font-size:12px;">Нет векторных хранилищ. Создайте новое.</div>';
                 return;
             }
@@ -125,7 +162,21 @@ window.fetchVectorStores = function() {
         function loadVsList() {
             var cont = document.getElementById('vs-manager-list');
             if (cont) cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);font-size:12px;">Загрузка...</div>';
-            window.fetchVectorStores().then(function(list) { renderVsManagerList(list); });
+            window.fetchVectorStores()
+                .then(function(list) { renderVsManagerList(list); })
+                .catch(function(error) {
+                    console.error('[FILE MANAGER] Vector Stores load failed:', error);
+                    if (!cont) return;
+                    var message = error && error.message ? error.message : 'Не удалось загрузить Vector Stores.';
+                    cont.innerHTML =
+                        '<div style="padding:12px;color:var(--m-danger,#c33);font-size:12px;">' +
+                        '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить Vector Stores</div>' +
+                        '<div style="margin-bottom:8px;word-break:break-word;">' + window.SettingsUI.escapeHtml(message) + '</div>' +
+                        '<button id="btn-retry-vs" style="padding:6px 12px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:12px;color:var(--m-text,#222);">Повторить</button>' +
+                        '</div>';
+                    var retry = document.getElementById('btn-retry-vs');
+                    if (retry) retry.addEventListener('click', loadVsList);
+                });
         }
 
         // Создание нового Vector Store
