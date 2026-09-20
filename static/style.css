@@ -484,27 +484,35 @@ html, body {
 
 /* Header rows */
 .alice-pro-app #header {
-    display: grid;
-    grid-template-columns: repeat(6, 38px);
-    grid-auto-rows: 38px;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0;
-    align-items: center;
     padding-top: calc(12px + env(safe-area-inset-top, 0px));
 }
 
 .alice-pro-app #header > .header-actions {
-    display: contents;
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    min-width: 0;
+    width: 100%;
 }
 
 .alice-pro-app #header > .header-actions > .header-btn {
     width: 38px;
     height: 38px;
+    flex: 0 0 38px;
+}
+
+.alice-pro-app #header > .header-actions > .header-btn.header-row-start {
+    margin-left: auto;
 }
 
 @media (max-width: 768px) {
     .alice-pro-app #header {
-        grid-template-columns: repeat(6, 36px);
-        grid-auto-rows: 36px;
         gap: 0;
         padding-left: 10px;
         padding-right: 10px;
@@ -513,6 +521,7 @@ html, body {
     .alice-pro-app #header > .header-actions > .header-btn {
         width: 36px;
         height: 36px;
+        flex-basis: 36px;
     }
 }
 /* Treasury modal */
