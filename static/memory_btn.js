@@ -19,12 +19,7 @@
         button.textContent = "🧠";
         button.addEventListener("click", openMemoryModal);
 
-        const actionRow = header.querySelector(".header-actions");
-
-        if (!actionRow) {
-            console.error("[Memory] Header actions not found");
-            return;
-        }
+        const actionRow = document.getElementById("header-actions-2") || header;
         const themeButton = document.getElementById("theme-toggle");
 
         if (themeButton && themeButton.parentElement === actionRow) {
