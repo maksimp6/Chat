@@ -20,6 +20,8 @@ def test_preview_server_uses_path_prefix_routing_and_strip():
     source = SCRIPT.read_text(encoding="utf-8")
     assert r"Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" in source
     assert 'TRAEFIK_IMAGE="traefik:v3.7.13"' in source
+    assert '-p 0.0.0.0:80:80' in source
+    assert "grep -Fq '0.0.0.0:80'" in source
     assert 'traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path' in source
     assert 'ALICE_PREVIEW_BASE_PATH="$base_path"' in source
 
