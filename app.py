@@ -53,7 +53,12 @@ def index():
     return render_template("index.html", preview_base_path=preview_base_path())
 
 
-@app.route("/healthz", methods=["GET"])\ndef healthz():\n    return jsonify({"status": "ok"})\n\n\n@app.route("/api/users/bootstrap", methods=["POST"])
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/users/bootstrap", methods=["POST"])
 def bootstrap_anonymous_user():
     data = request.get_json(silent=True) or {}
     metadata = data.get("metadata") or {}
