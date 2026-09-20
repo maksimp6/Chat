@@ -91,7 +91,7 @@ jobs:
 
       - name: Build source archive
         run: |
-          tar --exclude=.git --exclude=.github --exclude=node_modules -czf preview.tar.gz .
+          tar --exclude=.git --exclude=.github --exclude=node_modules --exclude=preview.tar.gz -czf preview.tar.gz .
 
       - name: Upload preview bundle and deploy script
         env:
