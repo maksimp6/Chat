@@ -5,10 +5,26 @@ document.addEventListener("DOMContentLoaded", function() {
     var overlay = document.getElementById("overlay");
     var newChatBtn = document.getElementById("new-chat-btn");
 
-    function openSidebar() { sidebar.classList.add("open"); overlay.classList.add("visible"); }
-    function closeSidebar() { sidebar.classList.remove("open"); overlay.classList.remove("visible"); }
+    function openSidebar() {
+        if (!sidebar) return;
+        sidebar.classList.add("open");
+        if (overlay) overlay.classList.add("visible");
+        if (menuBtn) menuBtn.setAttribute("aria-expanded", "true");
+    }
+    function closeSidebar() {
+        if (sidebar) sidebar.classList.remove("open");
+        if (overlay) overlay.classList.remove("visible");
+        if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+    }
 
-    if (menuBtn) menuBtn.addEventListener("click", function() { sidebar.classList.contains("open") ? closeSidebar() : openSidebar(); });
+    if (menuBtn) {
+        menuBtn.setAttribute("aria-expanded", sidebar ? sidebar.classList.contains("open") ? "true" : "false" : "false");
+        menuBtn.setAttribute("aria-controls", "sidebar");
+        menuBtn.addEventListener("click", function() {
+            if (!sidebar) return;
+            sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
+        });
+    }
     if (closeBtn) closeBtn.addEventListener("click", closeSidebar);
     if (overlay) overlay.addEventListener("click", closeSidebar);
     if (newChatBtn) newChatBtn.addEventListener("click", function() {
@@ -24,11 +40,12 @@ function renderSidebar() {
     var list = document.getElementById("conv-list");
     if (!list) return;
     list.innerHTML = "";
-    if (!conversations.length) {
+    var items = Array.isArray(conversations) ? conversations : [];
+    if (!items.length) {
         list.innerHTML = '<div style="padding:20px;color:var(--text-secondary);text-align:center">Нет диалогов</div>';
         return;
     }
-    conversations.forEach(function(conv) {
+    items.forEach(function(conv) {
         var div = document.createElement("div");
         div.className = "conv-item" + (conv.id === currentConvId ? " active" : "");
         
@@ -107,8 +124,11 @@ function selectConv(id, updateHistory) {
         }
     }
 if (typeof window.loadServerConvSettings === "function") {
-    window.loadServerConvSettings(id).then(function() {
-        // Настройки для этого диалога загружены в кэш
+    Promise.race([
+        window.loadServerConvSettings(id),
+        new Promise(function(resolve) { setTimeout(resolve, 5000); })
+    ]).catch(function(error) {
+        console.warn("[SIDEBAR] Settings load failed:", error);
     });
 }
 

@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 
 from app import app
 
@@ -21,7 +23,8 @@ def test_index_uses_only_local_ui_resources():
     assert "{% set static_root" in html
     assert 'window.__ALICE_BASE_PATH' in html
     assert 'window.__ALICE_STATIC_BASE' in html
-    assert html.index('eruda.js') < html.index('eruda_init.js')
+    assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
+    assert '<script src="{{ static_root }}/eruda.js' not in html
 
 
 def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
@@ -38,8 +41,9 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
             os.environ["ALICE_PREVIEW_BASE_PATH"] = old
 
     assert response.status_code == 200
-    assert 'href="/preview/pr-203/static/style.css?v=13"' in html
-    assert 'src="/preview/pr-203/static/eruda.js" defer' in html
+    assert 'href="/preview/pr-203/static/style.css?v=' in html
+    assert 'src="/preview/pr-203/static/eruda_init.js?v=' in html
+    assert '/preview/pr-203/static/eruda.js?v={{' not in html
     assert 'window.__ALICE_BASE_PATH = "/preview/pr-203"' in html
     assert 'fetch("/api/memory/manage")' in html
 
@@ -59,3 +63,49 @@ def test_local_eruda_loader_initializes_the_bundled_library():
     assert loader.is_file()
     content = loader.read_text(encoding="utf-8")
     assert "window.eruda.init()" in content
+
+
+def test_web_boot_and_startup_guards_are_present():
+    boot = Path("static/boot.js").read_text(encoding="utf-8")
+    eruda_loader = Path("static/eruda_init.js").read_text(encoding="utf-8")
+    core = Path("static/core.js").read_text(encoding="utf-8")
+    assert "getRegistrations" in boot
+    assert "alice-pro-" in boot
+    assert "maxAttempts = 5" in eruda_loader
+    assert "script.async = true" in eruda_loader
+    assert 'script.src = (window.__ALICE_STATIC_BASE || "/static") + "/eruda.js' in eruda_loader
+    assert "fetchWithTimeout" in core
+    assert "AbortController" in core
+    assert "setTimeout(resolve, 5000)" in core
+
+
+def test_index_response_disables_shell_caching():
+    with app.test_client() as client:
+        response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers.get("Cache-Control") == "no-store, max-age=0"
+
+
+def test_application_javascript_parses_when_node_is_available():
+    node = shutil.which("node")
+    if not node:
+        return
+    files = [
+        Path("static/boot.js"),
+        Path("static/core.js"),
+        Path("static/sidebar.js"),
+        Path("static/models.js"),
+        Path("static/settings.js"),
+        Path("static/settings/settings_storage.js"),
+        Path("static/settings/settings_mcp.js"),
+        Path("static/settings/settings_modal.js"),
+        Path("static/eruda_init.js"),
+    ]
+    for path in files:
+        result = subprocess.run(
+            [node, "--check", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"{path}: {result.stderr}"

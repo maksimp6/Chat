@@ -29,6 +29,26 @@ def preview_base_path():
     """Return the configured URL prefix used by a preview deployment."""
     return os.environ.get("ALICE_PREVIEW_BASE_PATH", "").rstrip("/")
 
+
+def _static_asset_version():
+    """Return a stable version token that changes when the deployed assets change."""
+    configured = os.environ.get("ALICE_STATIC_VERSION")
+    if configured:
+        return configured
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    try:
+        mtimes = []
+        for root, _, files in os.walk(static_dir):
+            for name in files:
+                if name.endswith((".js", ".css", ".svg", ".png", ".woff", ".woff2")):
+                    mtimes.append(os.stat(os.path.join(root, name)).st_mtime_ns)
+        return str(max(mtimes)) if mtimes else "1"
+    except OSError:
+        return "1"
+
+
+STATIC_ASSET_VERSION = _static_asset_version()
+
 logger = logging.getLogger("alice_app")
 
 app.register_blueprint(mcp_bp)
@@ -38,6 +58,17 @@ app.register_blueprint(runtime_bp)
 app.register_blueprint(local_agent_bp)
 app.register_blueprint(cloudru_iam_bp)
 app.register_blueprint(departments_bp)
+
+@app.after_request
+
+def _set_web_cache_headers(response):
+    # The HTML shell must never pin an older JavaScript dependency graph across deploys.
+    if request.path == "/":
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+    elif request.path.startswith("/static/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
 
 init_db()
 init_runtime_tables()
@@ -50,7 +81,7 @@ init_department_tables()
 
 @app.route("/")
 def index():
-    return render_template("index.html", preview_base_path=preview_base_path())
+    return render_template("index.html", preview_base_path=preview_base_path(), static_version=STATIC_ASSET_VERSION)
 
 
 @app.route("/healthz", methods=["GET"])

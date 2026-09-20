@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
     <title>Alice Pro</title>
     {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
-    <link rel="stylesheet" href="{{ static_root }}/style.css?v=13">
-    <link rel="icon" type="image/svg+xml" href="{{ static_root }}/favicon.svg">
-    <link rel="shortcut icon" href="{{ static_root }}/favicon.svg">
+    <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}">
+    <link rel="icon" type="image/svg+xml" href="{{ static_root }}/favicon.svg?v={{ static_version }}">
+    <link rel="shortcut icon" href="{{ static_root }}/favicon.svg?v={{ static_version }}">
 
-    <script src="{{ static_root }}/eruda.js" defer></script>
-    <script src="{{ static_root }}/eruda_init.js" defer></script>
-    <script src="{{ static_root }}/file_manager.js" defer></script>
-    <script src="{{ static_root }}/treasury.js" defer></script>
-    <script src="{{ static_root }}/settings/ui_helpers.js" defer></script><script src="{{ static_root }}/settings/settings_storage.js" defer></script><script src="{{ static_root }}/settings/settings_mcp.js" defer></script><script src="{{ static_root }}/settings/settings_params.js" defer></script><script src="{{ static_root }}/settings/settings_modal.js" defer></script><script src="{{ static_root }}/settings.js" defer></script><script src="{{ static_root }}/core.js" defer></script><script src="{{ static_root }}/sidebar.js" defer></script><script src="{{ static_root }}/models.js" defer></script><script src="{{ static_root }}/chat.js" defer></script><script src="{{ static_root }}/trace_viewer.js" defer></script><script src="{{ static_root }}/trace_viewer_timing_fix.js?v=1" defer></script><script src="{{ static_root }}/trace_viewer_error_ui.js?v=1" defer></script><script src="{{ static_root }}/trace_viewer_auto.js" defer></script><script src="{{ static_root }}/voice.js" defer></script>
-    <script src="{{ static_root }}/android_diagnostics.js" defer></script>
-<link rel="stylesheet" href="{{ static_root }}/departments.css"><script src="{{ static_root }}/departments.js"></script><script>
+<script>
 window.__ALICE_USER_ID = window.__ALICE_USER_ID || "";
 window.__ALICE_BASE_PATH = {{ (preview_base_path or "")|tojson }};
 window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
+window.__ALICE_STATIC_VERSION = {{ static_version|tojson }};
 (function () {
   var basePath = window.__ALICE_BASE_PATH || "";
 
@@ -34,13 +29,13 @@ window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
     var target = input;
     if (typeof input === "string") target = prefixUrl(input);
     else if (input instanceof URL) target = prefixUrl(input.toString());
-    else if (input instanceof Request) {
+    else if (typeof Request !== "undefined" && input instanceof Request) {
       var url = prefixUrl(input.url);
       if (url !== input.url) target = new Request(url, input);
     }
 
     init = init || {};
-    var headers = new Headers(init.headers || (target instanceof Request ? target.headers : {}));
+    var headers = new Headers(init.headers || (typeof Request !== "undefined" && target instanceof Request ? target.headers : {}));
     if (window.__ALICE_USER_ID) headers.set("X-Alice-User-ID", window.__ALICE_USER_ID);
     init.headers = headers;
     return originalFetch(target, init);
@@ -59,6 +54,13 @@ window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
   }
 })();
 </script>
+    <script src="{{ static_root }}/boot.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/file_manager.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/treasury.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/settings/ui_helpers.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_storage.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_mcp.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_params.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_modal.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/core.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/sidebar.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/models.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/chat.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer_timing_fix.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer_error_ui.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer_auto.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/voice.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/android_diagnostics.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/eruda_init.js?v={{ static_version }}" defer></script>
+<link rel="stylesheet" href="{{ static_root }}/departments.css?v={{ static_version }}"><script src="{{ static_root }}/departments.js?v={{ static_version }}" defer></script>
 </head>
 <body>
 <div id="app-root" class="alice-pro-app">
@@ -71,5 +73,5 @@ window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
 <div id="memoryModal" style="display:none;position:fixed;z-index:100000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;"><div style="background:#1e1e1e;color:#fff;padding:20px;border-radius:8px;width:450px;max-height:80vh;overflow-y:auto;position:relative;font-family:sans-serif;box-shadow:0 4px 15px rgba(0,0,0,0.5);"><span onclick="closeMemoryModal()" style="position:absolute;right:15px;top:10px;font-size:24px;cursor:pointer;color:#aaa;">&times;</span><h2 style="margin-top:0;font-size:18px;border-bottom:1px solid #444;padding-bottom:8px;">Управление памятью</h2><div style="margin:15px 0;padding:10px;background:#2a2a2a;border-radius:5px;"><label style="display:block;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="memEnabled" onchange="updateMemoryConfig()"> Включить память</label><label style="display:block;cursor:pointer;">Макс. фактов: <input type="number" id="memLimit" style="width:60px;background:#333;color:#fff;border:1px solid #555;padding:3px;border-radius:4px;" min="1" max="50" onchange="updateMemoryConfig()"></label></div><div style="margin-bottom:15px;"><button onclick="clearMemory(null)" style="background:#d9534f;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Очистить всю память</button></div><h3 style="font-size:14px;margin-bottom:8px;">Факты (<span id="memCount">0</span>)</h3><div id="memoryFactsList" style="max-height:220px;overflow-y:auto;border-top:1px solid #444;padding-top:8px;"></div></div></div>
 <script>
 function openMemoryModal(){document.getElementById("memoryModal").style.display="flex";loadMemoryData();}function closeMemoryModal(){document.getElementById("memoryModal").style.display="none";}async function loadMemoryData(){try{let res=await fetch("/api/memory/manage");let data=await res.json();document.getElementById("memEnabled").checked=data.config.enabled;document.getElementById("memLimit").value=data.config.max_context_facts;document.getElementById("memCount").innerText=data.facts.length;let list=document.getElementById("memoryFactsList");list.innerHTML="";if(data.facts.length===0){list.innerHTML="<p style=\"color:#888;font-size:13px;\">Память пуста.</p>";return;}data.facts.forEach(f=>{let div=document.createElement("div");div.style.cssText="background:#2a2a2a;padding:8px;margin-bottom:6px;border-radius:4px;font-size:12px;";div.innerHTML=`<span style="color:#4da6ff;font-weight:bold;text-transform:uppercase;">[${f.category}]</span> ${f.fact}`;list.appendChild(div);});}catch(e){console.error(e);}}async function updateMemoryConfig(){let enabled=document.getElementById("memEnabled").checked;let limit=parseInt(document.getElementById("memLimit").value)||15;await fetch("/api/memory/config",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:enabled,max_context_facts:limit})});}async function clearMemory(cat){if(!confirm("Очистить память?"))return;await fetch("/api/memory/clear",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({category:cat})});loadMemoryData();}
-</script><script src="{{ static_root }}/memory_btn.js" defer></script><script src="{{ static_root }}/cloudru_iam.js" defer></script>
+</script><script src="{{ static_root }}/memory_btn.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/cloudru_iam.js?v={{ static_version }}" defer></script>
 </body></html>
