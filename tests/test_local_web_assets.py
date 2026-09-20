@@ -23,7 +23,8 @@ def test_index_uses_only_local_ui_resources():
     assert "{% set static_root" in html
     assert 'window.__ALICE_BASE_PATH' in html
     assert 'window.__ALICE_STATIC_BASE' in html
-    assert html.index('eruda.js') < html.index('eruda_init.js')
+    assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
+    assert '<script src="{{ static_root }}/eruda.js' not in html
 
 
 def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
@@ -71,7 +72,7 @@ def test_web_boot_and_startup_guards_are_present():
     assert "alice-pro-" in boot
     assert "maxAttempts = 5" in eruda_loader
     assert "script.async = true" in eruda_loader
-    assert "script.src = (window.__ALICE_STATIC_BASE || "/static") + "/eruda.js" in eruda_loader
+    assert 'script.src = (window.__ALICE_STATIC_BASE || "/static") + "/eruda.js' in eruda_loader
     assert "fetchWithTimeout" in core
     assert "AbortController" in core
     assert "setTimeout(resolve, 5000)" in core
