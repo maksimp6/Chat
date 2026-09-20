@@ -59,6 +59,17 @@ app.register_blueprint(local_agent_bp)
 app.register_blueprint(cloudru_iam_bp)
 app.register_blueprint(departments_bp)
 
+@app.after_request
+
+def _set_web_cache_headers(response):
+    # The HTML shell must never pin an older JavaScript dependency graph across deploys.
+    if request.path == "/":
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+    elif request.path.startswith("/static/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
 init_db()
 init_runtime_tables()
 init_local_agent_tables()
