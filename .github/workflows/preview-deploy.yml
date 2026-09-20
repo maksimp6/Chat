@@ -63,17 +63,30 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          write_secret() {
-            local value="$1"
-            local output="$2"
-            if [[ "$value" == *"\\n"* ]]; then
-              printf '%b' "$value" | tr -d '\r' > "$output"
-            else
-              printf '%s' "$value" | tr -d '\r' > "$output"
-            fi
-          }
-          write_secret "$PREVIEW_SSH_PRIVATE_KEY" "$HOME/.ssh/id_ed25519"
-          write_secret "$PREVIEW_SSH_KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+import base64
+import os
+
+def write_secret(name, path):
+    value = os.environ[name]
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    stripped = value.lstrip()
+    if not stripped.startswith("-----BEGIN"):
+        try:
+            decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
+            if decoded.lstrip().startswith("-----BEGIN"):
+                value = decoded
+        except Exception:
+            pass
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(value)
+
+write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+PY
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve preview identity
@@ -139,17 +152,30 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          write_secret() {
-            local value="$1"
-            local output="$2"
-            if [[ "$value" == *"\\n"* ]]; then
-              printf '%b' "$value" | tr -d '\r' > "$output"
-            else
-              printf '%s' "$value" | tr -d '\r' > "$output"
-            fi
-          }
-          write_secret "$PREVIEW_SSH_PRIVATE_KEY" "$HOME/.ssh/id_ed25519"
-          write_secret "$PREVIEW_SSH_KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+import base64
+import os
+
+def write_secret(name, path):
+    value = os.environ[name]
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    stripped = value.lstrip()
+    if not stripped.startswith("-----BEGIN"):
+        try:
+            decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
+            if decoded.lstrip().startswith("-----BEGIN"):
+                value = decoded
+        except Exception:
+            pass
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(value)
+
+write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+PY
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Remove preview
@@ -173,17 +199,30 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          write_secret() {
-            local value="$1"
-            local output="$2"
-            if [[ "$value" == *"\\n"* ]]; then
-              printf '%b' "$value" | tr -d '\r' > "$output"
-            else
-              printf '%s' "$value" | tr -d '\r' > "$output"
-            fi
-          }
-          write_secret "$PREVIEW_SSH_PRIVATE_KEY" "$HOME/.ssh/id_ed25519"
-          write_secret "$PREVIEW_SSH_KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+import base64
+import os
+
+def write_secret(name, path):
+    value = os.environ[name]
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    stripped = value.lstrip()
+    if not stripped.startswith("-----BEGIN"):
+        try:
+            decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
+            if decoded.lstrip().startswith("-----BEGIN"):
+                value = decoded
+        except Exception:
+            pass
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(value)
+
+write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
+write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+PY
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Upload helper and clean
