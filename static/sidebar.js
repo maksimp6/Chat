@@ -124,8 +124,11 @@ function selectConv(id, updateHistory) {
         }
     }
 if (typeof window.loadServerConvSettings === "function") {
-    window.loadServerConvSettings(id).then(function() {
-        // Настройки для этого диалога загружены в кэш
+    Promise.race([
+        window.loadServerConvSettings(id),
+        new Promise(function(resolve) { setTimeout(resolve, 5000); })
+    ]).catch(function(error) {
+        console.warn("[SIDEBAR] Settings load failed:", error);
     });
 }
 
