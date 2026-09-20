@@ -55,7 +55,7 @@ def _decode_escaped(value: str) -> str:
         if not changed:
             break
 
-    return current.replace("\r\n", "\n").replace("\r", "\n")
+    return current.lstrip("\ufeff").strip().replace("\r\n", "\n").replace("\r", "\n")
 
 
 def candidate_values(raw: str) -> list[str]:
@@ -97,7 +97,7 @@ def install_private_key(raw: str, path: Path) -> None:
     for candidate in candidates:
         if validate_private_key(candidate):
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(candidate, encoding="utf-8", newline="\n")
+            normalized = candidate.lstrip("\ufeff").strip() + "\n"\n            path.write_text(normalized, encoding="utf-8", newline="\n")
             os.chmod(path, 0o600)
             return
     raise RuntimeError(f"SSH private key could not be parsed from {len(candidates)} candidate format(s)")
