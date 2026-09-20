@@ -202,3 +202,25 @@ def test_invalid_owner_token_is_rejected(treasury_db, monkeypatch):
 
     assert response.status_code == 401
     assert response.get_json()["error"] == "invalid authenticated owner token"
+
+
+def test_authenticated_owner_ignores_client_owner_id(treasury_db):
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    bootstrap = client.post(
+        "/api/users/bootstrap",
+        json={"installation_id": "android-installation-owner-spoof-123456", "metadata": {}},
+    )
+    identity = bootstrap.get_json()
+    trusted_owner = identity["user_id"]
+
+    response = client.get(
+        "/api/treasury/account?owner_id=attacker-owner",
+        headers={"X-Alice-User-Token": identity["auth_token"]},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["owner_id"] == trusted_owner
