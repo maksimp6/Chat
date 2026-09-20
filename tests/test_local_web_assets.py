@@ -38,8 +38,8 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
             os.environ["ALICE_PREVIEW_BASE_PATH"] = old
 
     assert response.status_code == 200
-    assert 'href="/preview/pr-203/static/style.css?v=13"' in html
-    assert 'src="/preview/pr-203/static/eruda.js" defer' in html
+    assert 'href="/preview/pr-203/static/style.css?v=' in html
+    assert 'src="/preview/pr-203/static/eruda.js?v=' in html
     assert 'window.__ALICE_BASE_PATH = "/preview/pr-203"' in html
     assert 'fetch("/api/memory/manage")' in html
 
@@ -59,3 +59,23 @@ def test_local_eruda_loader_initializes_the_bundled_library():
     assert loader.is_file()
     content = loader.read_text(encoding="utf-8")
     assert "window.eruda.init()" in content
+
+
+def test_web_boot_and_startup_guards_are_present():
+    boot = Path("static/boot.js").read_text(encoding="utf-8")
+    eruda_loader = Path("static/eruda_init.js").read_text(encoding="utf-8")
+    core = Path("static/core.js").read_text(encoding="utf-8")
+    assert "getRegistrations" in boot
+    assert "alice-pro-" in boot
+    assert "maxAttempts = 50" in eruda_loader
+    assert "setTimeout(initEruda, 100)" in eruda_loader
+    assert "fetchWithTimeout" in core
+    assert "AbortController" in core
+    assert "setTimeout(resolve, 5000)" in core
+
+
+def test_index_response_disables_shell_caching():
+    with app.test_client() as client:
+        response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers.get("Cache-Control") == "no-store, max-age=0"
