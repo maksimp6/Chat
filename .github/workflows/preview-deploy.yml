@@ -64,46 +64,7 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          python3 - <<'PY'
-          import ast
-          import base64
-          import os
-
-          def normalize(value):
-              value = value.strip()
-              for _ in range(3):
-                  if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"' }:
-                      try:
-                          parsed = ast.literal_eval(value)
-                          if isinstance(parsed, str):
-                              value = parsed.strip()
-                              continue
-                      except Exception:
-                          pass
-                  new_value = value
-                  for old, new in ((r"\\r\\n", "\n"), (r"\\n", "\n"), (r"\\r", "\r"), (r"\r\n", "\n"), (r"\n", "\n"), (r"\r", "\r")):
-                      new_value = new_value.replace(old, new)
-                  if new_value == value:
-                      break
-                  value = new_value
-              if not value.lstrip().startswith("-----BEGIN"):
-                  compact = "".join(value.split())
-                  padded = compact + "=" * ((4 - len(compact) % 4) % 4)
-                  try:
-                      decoded = base64.b64decode(padded, validate=True).decode("utf-8")
-                      if decoded.lstrip().startswith("-----BEGIN"):
-                          value = decoded
-                  except Exception:
-                      pass
-              return value.replace("\r\n", "\n").replace("\r", "\n")
-
-          with open(os.path.expanduser("~/.ssh/id_ed25519"), "w", encoding="utf-8", newline="\n") as handle:
-              handle.write(normalize(os.environ["PREVIEW_SSH_PRIVATE_KEY"]))
-          with open(os.path.expanduser("~/.ssh/known_hosts"), "w", encoding="utf-8", newline="\n") as handle:
-              handle.write(normalize(os.environ["PREVIEW_SSH_KNOWN_HOSTS"]))
-          PY
-          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+          python3 deploy/preview/ssh_setup.py
       - name: Resolve remote preview directory
         id: remote
         run: |
@@ -169,32 +130,7 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          python3 - <<'PY'
-          import base64
-          import os
-
-          def write_secret(name, path):
-              value = os.environ[name]
-              if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\x27", '"'}:
-                  value = value[1:-1]
-              value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
-              value = value.replace("\r\n", "\n").replace("\r", "\n")
-              stripped = value.lstrip()
-              if not stripped.startswith("-----BEGIN"):
-                  try:
-                      decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
-                      if decoded.lstrip().startswith("-----BEGIN"):
-                          value = decoded
-                  except Exception:
-                      pass
-              with open(path, "w", encoding="utf-8", newline="\n") as handle:
-                  handle.write(value)
-
-          write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
-          write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
-          PY
-          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+          python3 deploy/preview/ssh_setup.py
       - name: Resolve remote preview directory
         id: remote
         run: |
@@ -223,32 +159,7 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          python3 - <<'PY'
-          import base64
-          import os
-
-          def write_secret(name, path):
-              value = os.environ[name]
-              if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\x27", '"'}:
-                  value = value[1:-1]
-              value = value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\r")
-              value = value.replace("\r\n", "\n").replace("\r", "\n")
-              stripped = value.lstrip()
-              if not stripped.startswith("-----BEGIN"):
-                  try:
-                      decoded = base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
-                      if decoded.lstrip().startswith("-----BEGIN"):
-                          value = decoded
-                  except Exception:
-                      pass
-              with open(path, "w", encoding="utf-8", newline="\n") as handle:
-                  handle.write(value)
-
-          write_secret("PREVIEW_SSH_PRIVATE_KEY", os.path.expanduser("~/.ssh/id_ed25519"))
-          write_secret("PREVIEW_SSH_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
-          PY
-          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+          python3 deploy/preview/ssh_setup.py
       - name: Resolve remote preview directory
         id: remote
         run: |
