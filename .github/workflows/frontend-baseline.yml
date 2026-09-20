@@ -16,7 +16,7 @@ on:
           - windows-latest
           - ubuntu-latest
       download_kbps:
-        description: Optional download throughput in KiB/s (for example 10 for the 10 KiB/s baseline)
+        description: Optional download throughput in KiB/s
         required: false
         default: ''
         type: string
@@ -30,6 +30,16 @@ on:
         required: false
         default: '0'
         type: string
+      timeout_ms:
+        description: Navigation timeout in milliseconds
+        required: false
+        default: '20000'
+        type: string
+      trace:
+        description: Capture a Playwright Performance trace
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -59,11 +69,15 @@ jobs:
           DOWNLOAD_KBPS: ${{ inputs.download_kbps }}
           UPLOAD_KBPS: ${{ inputs.upload_kbps }}
           LATENCY_MS: ${{ inputs.latency_ms }}
+          TIMEOUT_MS: ${{ inputs.timeout_ms }}
+          TRACE: ${{ inputs.trace }}
         run: |
           $args = @('--output', 'artifacts/frontend-baseline')
           if ($env:DOWNLOAD_KBPS) { $args += @('--download-kbps', $env:DOWNLOAD_KBPS) }
           if ($env:UPLOAD_KBPS) { $args += @('--upload-kbps', $env:UPLOAD_KBPS) }
           if ($env:LATENCY_MS -and $env:LATENCY_MS -ne '0') { $args += @('--latency-ms', $env:LATENCY_MS) }
+          if ($env:TIMEOUT_MS) { $args += @('--timeout-ms', $env:TIMEOUT_MS) }
+          if ($env:TRACE -eq 'true') { $args += '--trace' }
           python tests/frontend_baseline.py @args
       - name: Upload baseline evidence
         if: always()
