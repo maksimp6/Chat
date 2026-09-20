@@ -15,6 +15,8 @@ on:
         type: string
   pull_request:
     types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [master]
   schedule:
     - cron: "17 * * * *"
 
