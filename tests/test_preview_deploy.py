@@ -24,9 +24,9 @@ def test_preview_server_uses_tokenized_path_routing_and_strip():
     assert '-p 0.0.0.0:443:443' in source
     assert "grep -Fq '0.0.0.0:80'" in source
     assert "grep -Fq '0.0.0.0:443'" in source
-    assert "traefik.http.middlewares.${container}-token-strip.replacepathregex.regex=$tokenized_replace_regex" in source
-    assert "traefik.http.middlewares.${container}-token-strip.replacepathregex.replacement=\\$1\\$2" in source
-    assert 'traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path' in source
+    assert "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" in source
+    assert 'traefik.http.routers.${container}.entrypoints=web,websecure' in source
+    assert 'traefik.http.routers.${container}.tls=true' in source
     assert 'ALICE_REQUIRE_SHORT_TOKEN=1' in source
     assert 'ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN"' in source
     assert 'ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path"' in source
