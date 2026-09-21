@@ -13,6 +13,7 @@ TRAEFIK_NAME="alice-preview-traefik"
 TRAEFIK_IMAGE="traefik:v3.7.13"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
+CERT_SOURCE_DIR="${ALICE_TLS_CERT_DIR:-$ROOT_DIR/certs}"
 
 log() { printf '[preview] %s\n' "$*"; }
 die() { printf '[preview] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -21,21 +22,25 @@ ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; 
 
 ensure_traefik() {
   ensure_network
-  mkdir -p "$ROOT_DIR/traefik" "$ROOT_DIR/certs"
+  [[ "$CERT_SOURCE_DIR" = /* ]] || die "ALICE_TLS_CERT_DIR must be an absolute path"
+  mkdir -p "$ROOT_DIR/traefik" "$CERT_SOURCE_DIR"
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
     local current_image
     local published_http
     local published_https
     local current_cmd
+    local current_mounts
     current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
     published_http="$(docker port "$TRAEFIK_NAME" 80/tcp 2>/dev/null || true)"
     published_https="$(docker port "$TRAEFIK_NAME" 443/tcp 2>/dev/null || true)"
     current_cmd="$(docker inspect -f '{{join .Config.Cmd " "}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
+    current_mounts="$(docker inspect -f '{{range .Mounts}}{{println .Source}}{{end}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
     if [ "$current_image" = "$TRAEFIK_IMAGE" ] \
       && grep -Fq '0.0.0.0:80' <<<"$published_http" \
       && grep -Fq '0.0.0.0:443' <<<"$published_https" \
       && grep -Fq -- '--entrypoints.websecure.address=:443' <<<"$current_cmd" \
-      && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd"; then
+      && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd" \
+      && grep -Fqx -- "$CERT_SOURCE_DIR" <<<"$current_mounts"; then
       docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"
       return
     fi
@@ -51,7 +56,7 @@ ensure_traefik() {
     -p 0.0.0.0:443:443 \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
     -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" \
-    -v "$ROOT_DIR/certs:/etc/traefik/certs:ro" \
+    -v "$CERT_SOURCE_DIR:/etc/traefik/certs:ro" \
     "$TRAEFIK_IMAGE" \
     --providers.docker=true \
     --providers.docker.exposedbydefault=false \
