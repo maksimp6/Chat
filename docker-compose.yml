@@ -22,8 +22,8 @@ services:
     profiles: ["backup"]
     environment:
       ALICE_DATABASE_URL: postgresql://${POSTGRES_USER:-alice}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-alice_pro}
-      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL must be set for backup}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY must be set for backup}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       SUPABASE_BACKUP_BUCKET: ${SUPABASE_BACKUP_BUCKET:-alice-pro-backups}
       SUPABASE_BACKUP_PREFIX: ${SUPABASE_BACKUP_PREFIX:-database}
     depends_on:
