@@ -18,6 +18,12 @@ CERT_SOURCE_DIR="${ALICE_TLS_CERT_DIR:-$ROOT_DIR/certs}"
 log() { printf '[preview] %s\n' "$*"; }
 die() { printf '[preview] ERROR: %s\n' "$*" >&2; exit 1; }
 require_key() { [[ "$KEY" =~ ^[a-z0-9-]{1,50}$ ]] || die "invalid preview key: $KEY"; }
+require_short_token() {
+  if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then
+    IFS= read -r ALICE_SHORT_TOKEN || true
+  fi
+  [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
+}
 ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then docker network create "$NETWORK_NAME" >/dev/null; fi; }
 
 ensure_traefik() {
@@ -81,6 +87,7 @@ deploy() {
   [[ "$archive_path" == "$ROOT_DIR/incoming/"*.tar.gz ]] || die "archive must be inside $ROOT_DIR/incoming"
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
+  require_short_token
   ensure_traefik; mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
   local workdir="${ROOT_DIR}/previews/${key}"
   local builddir="${workdir}/build"
@@ -90,16 +97,22 @@ deploy() {
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"
   log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
+  local tokenized_rule="PathRegexp(\`^/[^/]+${base_path}(?:/.*)?$\`)"
+  local tokenized_replace_regex="^/[^/]+(${base_path})(/.*)?$"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" \
     --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${container}.rule=Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" \
+    --label "traefik.http.routers.${container}.rule=$tokenized_rule" \
     --label "traefik.http.routers.${container}.entrypoints=web" \
     --label "traefik.http.routers.${container}.priority=100" \
-    --label "traefik.http.routers.${container}.middlewares=${container}-strip" \
+    --label "traefik.http.routers.${container}.middlewares=${container}-token-strip,${container}-strip" \
+    --label "traefik.http.middlewares.${container}-token-strip.replacepathregex.regex=$tokenized_replace_regex" \
+    --label 'traefik.http.middlewares.${container}-token-strip.replacepathregex.replacement=$1$2' \
     --label "traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
-    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_PREVIEW_BASE_PATH="$base_path" "$image" >/dev/null
+    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_REQUIRE_SHORT_TOKEN=1 \
+    -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" \
+    -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" "$image" >/dev/null
   local health_status
   for attempt in $(seq 1 30); do
     health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
