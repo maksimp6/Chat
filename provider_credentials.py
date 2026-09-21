@@ -163,14 +163,17 @@ def bootstrap_credential(
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, project_id, issued_at, expires_at, status)
         VALUES (?, ?, ?, ?, ?, 'active')
+        RETURNING id
     """, (encrypted, key_id, project_id, issued_at, expires_at))
+    inserted_row = cursor.fetchone()
+    inserted_id = inserted_row[0] if inserted_row is not None else None
     if hasattr(db, "commit"):
         db.commit()
 
     return ProviderCredential(
         api_key=api_key,
         project_id=project_id,
-        id=getattr(cursor, "lastrowid", None),
+        id=inserted_id,
         yandex_key_id=key_id,
         issued_at=issued_at,
         expires_at=expires_at,
