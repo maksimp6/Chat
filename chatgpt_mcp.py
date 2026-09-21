@@ -1,10 +1,10 @@
 """ChatGPT Apps SDK / MCP endpoint for Alice Pro.
 
-This module exposes a small, deterministic, read-only MCP surface over
+This module exposes the audited Alice Pro control-plane surface over
 Streamable HTTP.  It deliberately sits beside the existing internal MCP
 routes: the existing local/external tool execution path is not exposed
-wholesale to ChatGPT.  Only the audited read-only bridge tools below are
-available through /mcp.
+wholesale to MCP clients.  The bridge exposes runtime status, lifecycle
+operations and ExecutionTrace access with authenticated user scoping.
 """
 
 from __future__ import annotations
@@ -17,7 +17,8 @@ from flask import Blueprint, Response, jsonify, request
 
 from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
-from session_manager import get_session
+from session_manager import create_session, get_session
+from invocation_manager import cancel_invocation, create_invocation
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
@@ -120,7 +121,11 @@ def _request_protocol_version(payload: Mapping[str, Any]) -> str:
     header = request.headers.get("MCP-Protocol-Version")
     if header:
         return header.strip()
-    meta = payload.get("params", {}).get("_meta", {})
+    params = payload.get("params") or {}
+    declared = params.get("protocolVersion")
+    if declared:
+        return str(declared).strip()
+    meta = params.get("_meta", {})
     if isinstance(meta, Mapping):
         return str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip()
     return ""
@@ -315,20 +320,97 @@ def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
     return {"agents": agents}
 
 
-def _session(arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
+def _authorize_session(session: Mapping[str, Any], authenticated_user: Optional[str]) -> None:
+    metadata = session.get("metadata") or {}
+    owner_id = str(metadata.get("user_id") or "").strip() if isinstance(metadata, Mapping) else ""
+    if owner_id and authenticated_user and owner_id == authenticated_user:
+        return
+    if not owner_id and _auth_mode() == "anonymous":
+        return
+    if owner_id and owner_id != authenticated_user:
+        raise PermissionError("Session is not accessible to this user")
+    if authenticated_user and not owner_id:
+        raise PermissionError("Session has no trusted user ownership")
+
+
+def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     session_id = str(arguments.get("session_id") or "").strip()
     session = get_session(session_id) if session_id else None
     if not session:
         raise LookupError("Session not found")
+    _authorize_session(session, user)
     return {
         "session": {
             "id": session["id"],
             "status": session["status"],
+            "metadata": session.get("metadata") or {},
             "created_at": session["created_at"],
             "updated_at": session["updated_at"],
             "completed_at": session.get("completed_at"),
         }
     }
+
+
+def _create_session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    metadata = arguments.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be an object")
+    metadata = dict(metadata)
+    if user:
+        metadata["user_id"] = user
+    session = create_session(metadata=metadata)
+    return {"session": {
+        "id": session["id"],
+        "status": session["status"],
+        "metadata": session.get("metadata") or {},
+        "created_at": session["created_at"],
+        "updated_at": session["updated_at"],
+        "completed_at": session.get("completed_at"),
+    }}
+
+
+def _create_invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    session_id = str(arguments.get("session_id") or "").strip()
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not session_id or not conversation_id:
+        raise ValueError("session_id and conversation_id are required")
+
+    session = get_session(session_id)
+    if not session:
+        raise LookupError("Session not found")
+    _authorize_session(session, user)
+
+    metadata = arguments.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be an object")
+    metadata = dict(metadata)
+    if user:
+        metadata["user_id"] = user
+
+    context = create_invocation(
+        session_id=session_id,
+        conversation_id=conversation_id,
+        metadata=metadata,
+        user_id=user,
+        create_missing_session=False,
+    )
+    return {"invocation": context.as_dict()}
+
+
+def _cancel_invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    invocation_id = str(arguments.get("invocation_id") or "").strip()
+    status = get_invocation_status(invocation_id) if invocation_id else None
+    if not status:
+        raise LookupError("Invocation not found")
+    _authorize_invocation(status, user)
+    cancelled = cancel_invocation(
+        invocation_id,
+        reason={"source": "alice_mcp", "reason": arguments.get("reason") or "cancelled by user"},
+    )
+    if not cancelled:
+        raise RuntimeError("Invocation is no longer cancellable")
+    updated = get_invocation_status(invocation_id)
+    return {"cancelled": True, "invocation": updated}
 
 
 def _invocation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
@@ -378,7 +460,7 @@ def _register_bridge_tools() -> None:
         (
             "alice_get_session",
             "Get session",
-            "Read-only lifecycle status for one Alice Pro runtime session.",
+            "Read-only lifecycle status for one Alice Pro runtime session owned by the authenticated user.",
             {
                 "type": "object",
                 "properties": {"session_id": {"type": "string", "minLength": 1}},
@@ -386,6 +468,36 @@ def _register_bridge_tools() -> None:
                 "additionalProperties": False,
             },
             _session,
+        ),
+        (
+            "alice_create_session",
+            "Create session",
+            "Create a new Alice Pro runtime session for the authenticated user.",
+            {
+                "type": "object",
+                "properties": {
+                    "metadata": {"type": "object", "additionalProperties": True},
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+            _create_session,
+        ),
+        (
+            "alice_create_invocation",
+            "Create invocation",
+            "Create a persisted runtime invocation bound to an existing session and conversation; this does not execute model work by itself.",
+            {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "minLength": 1},
+                    "conversation_id": {"type": "string", "minLength": 1},
+                    "metadata": {"type": "object", "additionalProperties": True},
+                },
+                "required": ["session_id", "conversation_id"],
+                "additionalProperties": False,
+            },
+            _create_invocation,
         ),
         (
             "alice_get_invocation",
@@ -402,7 +514,7 @@ def _register_bridge_tools() -> None:
         (
             "alice_get_invocation_trace",
             "Get invocation trace",
-            "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
+            "Read-only persisted ExecutionTrace for one Alice Pro invocation owned by the authenticated user.",
             {
                 "type": "object",
                 "properties": {"invocation_id": {"type": "string", "minLength": 1}},
@@ -410,6 +522,21 @@ def _register_bridge_tools() -> None:
                 "additionalProperties": False,
             },
             _trace,
+        ),
+        (
+            "alice_cancel_invocation",
+            "Cancel invocation",
+            "Cancel an active Alice Pro invocation owned by the authenticated user.",
+            {
+                "type": "object",
+                "properties": {
+                    "invocation_id": {"type": "string", "minLength": 1},
+                    "reason": {"type": "string", "maxLength": 500},
+                },
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _cancel_invocation,
         ),
     ]
     for name, title, description, input_schema, handler in bridge_tools:
@@ -511,16 +638,21 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
 
 
 def _validate_headers(payload: Mapping[str, Any]) -> Optional[str]:
-    method = payload.get("method")
-    body_method = str(method or "")
+    """Validate optional routing headers without requiring non-standard headers.
+
+    Modern MCP clients can send only the JSON-RPC envelope.  The existing
+    deployment may still include Mcp-Method/Mcp-Name for gateway routing, so
+    those headers remain supported and are checked when present.
+    """
+    method = str(payload.get("method") or "")
     header_method = request.headers.get("Mcp-Method", "")
-    if not header_method or header_method != body_method:
+    if header_method and header_method != method:
         return "Mcp-Method header must match the JSON-RPC method"
 
-    if body_method == "tools/call":
+    if method == "tools/call":
         expected = str((payload.get("params") or {}).get("name") or "")
         header_name = request.headers.get("Mcp-Name", "")
-        if not header_name or header_name != expected:
+        if header_name and header_name != expected:
             return "Mcp-Name header must match params.name"
     return None
 
@@ -580,7 +712,7 @@ def mcp_post() -> Response:
     if method.startswith("notifications/"):
         return Response(status=204)
 
-    protocol_version = _request_protocol_version(payload)
+    protocol_version = _request_protocol_version(payload) or DEFAULT_PROTOCOL_VERSION
     if protocol_version not in SUPPORTED_PROTOCOL_VERSIONS:
         return _error_response(
             request_id,
@@ -600,6 +732,21 @@ def mcp_post() -> Response:
     user, auth_error = _require_auth(request_id)
     if auth_error is not None:
         return auth_error
+
+    if method == "initialize":
+        return _jsonrpc_result(
+            request_id,
+            {
+                "protocolVersion": protocol_version,
+                "capabilities": {"tools": {}},
+                "serverInfo": _server_info(),
+                "instructions": (
+                    "Use Alice Pro as the control plane for agent runtime work. "
+                    "Read status/trace before acting; keep invocations scoped to "
+                    "the authenticated user; do not place secrets in arguments or logs."
+                ),
+            },
+        )
 
     if method == "ping":
         return _jsonrpc_result(
