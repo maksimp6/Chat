@@ -57,6 +57,7 @@ jobs:
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
           test -n "$PREVIEW_SSH_KNOWN_HOSTS"
           test -n "$PREVIEW_PUBLIC_BASE_URL"
+          test -n "$ALICE_SHORT_TOKEN"
       - name: Check out ref
         uses: actions/checkout@v4
         with:
