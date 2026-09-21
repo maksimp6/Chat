@@ -102,7 +102,7 @@ jobs:
           scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/$KEY.tar.gz"
-          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
+          printf '%s\n' "$ALICE_SHORT_TOKEN" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
       - name: Verify VPS routing
         env:
           KEY: ${{ steps.preview.outputs.key }}
