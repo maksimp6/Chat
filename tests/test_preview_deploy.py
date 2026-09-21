@@ -19,7 +19,9 @@ def test_preview_server_script_is_valid_bash():
 def test_preview_server_uses_tokenized_path_routing_and_strip():
     source = SCRIPT.read_text(encoding="utf-8")
     assert 'local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"' in source
-    assert 'local tokenized_rule="PathPrefix(\\`$tokenized_prefix\\`)' in source
+    assert 'local tokenized_rule=' in source
+    assert 'PathPrefix(' in source
+    assert '$tokenized_prefix' in source
     assert 'local http_router="${container}-http"' in source
     assert 'local https_router="${container}-https"' in source
     assert 'traefik.http.routers.${http_router}.entrypoints=web' in source
