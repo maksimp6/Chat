@@ -21,29 +21,44 @@ ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; 
 
 ensure_traefik() {
   ensure_network
+  mkdir -p "$ROOT_DIR/traefik" "$ROOT_DIR/certs"
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
     local current_image
     local published_http
+    local published_https
+    local current_cmd
     current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
     published_http="$(docker port "$TRAEFIK_NAME" 80/tcp 2>/dev/null || true)"
-    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http"; then
+    published_https="$(docker port "$TRAEFIK_NAME" 443/tcp 2>/dev/null || true)"
+    current_cmd="$(docker inspect -f '{{join .Config.Cmd " "}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
+    if [ "$current_image" = "$TRAEFIK_IMAGE" ] \
+      && grep -Fq '0.0.0.0:80' <<<"$published_http" \
+      && grep -Fq '0.0.0.0:443' <<<"$published_https" \
+      && grep -Fq -- '--entrypoints.websecure.address=:443' <<<"$current_cmd" \
+      && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd"; then
       docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"
       return
     fi
-    log "replacing Traefik to enforce HTTP binding on 0.0.0.0:80"
+    log "replacing Traefik to enforce HTTP/HTTPS and dynamic TLS configuration"
     docker rm -f "$TRAEFIK_NAME" >/dev/null
   fi
-  log "starting Traefik $TRAEFIK_IMAGE on 0.0.0.0:80"
+  log "starting Traefik $TRAEFIK_IMAGE on 0.0.0.0:80 and :443"
   docker run -d \
     --name "$TRAEFIK_NAME" \
     --restart unless-stopped \
     --network "$NETWORK_NAME" \
     -p 0.0.0.0:80:80 \
+    -p 0.0.0.0:443:443 \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
+    -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" \
+    -v "$ROOT_DIR/certs:/etc/traefik/certs:ro" \
     "$TRAEFIK_IMAGE" \
     --providers.docker=true \
     --providers.docker.exposedbydefault=false \
+    --providers.file.directory=/etc/traefik/dynamic \
+    --providers.file.watch=true \
     --entrypoints.web.address=:80 \
+    --entrypoints.websecure.address=:443 \
     --api.dashboard=false \
     --accesslog=false >/dev/null
 }
@@ -102,5 +117,6 @@ case "$ACTION" in
   deploy) [[ $# -eq 5 ]] || die "usage: server.sh deploy <key> <base_path> <archive> <ttl_hours>"; deploy "$KEY" "$BASE_PATH" "$ARCHIVE" "$TTL_HOURS" ;;
   cleanup) [[ $# -eq 2 ]] || die "usage: server.sh cleanup <key>"; require_key; cleanup_key "$KEY" ;;
   cleanup-expired) [[ $# -eq 1 ]] || die "usage: server.sh cleanup-expired"; cleanup_expired ;;
+  ensure-traefik) [[ $# -eq 1 ]] || die "usage: server.sh ensure-traefik"; ensure_traefik ;;
   *) die "unknown action: $ACTION" ;;
 esac
