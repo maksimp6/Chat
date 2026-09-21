@@ -86,7 +86,14 @@ def index():
 
 @app.route("/healthz", methods=["GET"])
 def healthz():
-    return jsonify({"status": "ok"})
+    try:
+        conn = get_conn()
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+    except Exception:
+        logger.exception("Database health check failed")
+        return jsonify({"status": "degraded", "database": "unavailable"}), 503
+    return jsonify({"status": "ok", "database": "ok"})
 
 
 @app.route("/api/users/bootstrap", methods=["POST"])
