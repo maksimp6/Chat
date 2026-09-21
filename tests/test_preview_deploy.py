@@ -28,6 +28,8 @@ def test_preview_server_uses_path_prefix_routing_and_strip():
     assert 'ALICE_PREVIEW_BASE_PATH="$base_path"' in source
     assert "--entrypoints.websecure.address=:443" in source
     assert "--providers.file.directory=/etc/traefik/dynamic" in source
+    assert 'CERT_SOURCE_DIR="${ALICE_TLS_CERT_DIR:-$ROOT_DIR/certs}"' in source
+    assert '"$CERT_SOURCE_DIR:/etc/traefik/certs:ro"' in source
     assert "ensure-traefik" in source
 
 
