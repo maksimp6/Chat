@@ -22,6 +22,10 @@ def _client(monkeypatch, token=None, require=True, preview=False):
     def index():
         return "ok"
 
+    @app.get("/preview/<path:preview_path>")
+    def preview(preview_path):
+        return f"preview:{preview_path}"
+
     @app.get("/healthz")
     def healthz():
         return {"status": "ok"}
@@ -53,6 +57,18 @@ def test_valid_token_sets_session_and_redirects(monkeypatch):
 
     response = client.get("/")
     assert response.status_code == 200
+
+
+def test_token_prefix_preserves_nested_preview_path(monkeypatch):
+    client = _client(monkeypatch, token="unit-test-token", require=True)
+    response = client.get("/unit-test-token/preview/pr-235")
+    assert response.status_code == 303
+    assert response.headers["Location"] == "/preview/pr-235"
+    assert "unit-test-token" not in response.headers["Location"]
+
+    response = client.get("/preview/pr-235")
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "preview:pr-235"
 
 
 def test_health_endpoint_remains_public_for_deployment_checks(monkeypatch):
