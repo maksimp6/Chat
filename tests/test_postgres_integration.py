@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 import db
 import runtime_migrations
 from departments import init_department_tables
@@ -8,8 +10,13 @@ from treasury import init_treasury_tables
 from user_identity import init_user_identity_table
 
 
+def _require_postgres():
+    if not os.environ.get("ALICE_DATABASE_URL"):
+        pytest.skip("PostgreSQL integration environment is not configured")
+
+
 def test_postgres_shared_schema_bootstraps():
-    assert os.environ.get("ALICE_DATABASE_URL")
+    _require_postgres()
     db.init_db()
     runtime_migrations.init_runtime_tables()
     init_local_agent_tables()
@@ -51,6 +58,7 @@ def test_postgres_shared_schema_bootstraps():
 
 
 def test_postgres_database_is_reused_by_all_modules():
+    _require_postgres()
     db.create_conversation("postgres-shared-test", "Shared DB", "test-model")
 
     conn = db.get_conn()
