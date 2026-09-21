@@ -73,6 +73,9 @@ deploy() {
     --label "traefik.http.routers.alice-production-https.entrypoints=websecure" \
     --label "traefik.http.routers.alice-production-https.priority=50" \
     --label "traefik.http.routers.alice-production-https.tls=true" \
+    --label "traefik.http.routers.alice-production-https.tls.certresolver=letsencrypt" \
+    --label "traefik.http.routers.alice-production-https.tls.domains[0].main=maxxxpavlov.ru" \
+    --label "traefik.http.routers.alice-production-https.tls.domains[0].sans[0]=maxxxpavlov.online" \
     --label "traefik.http.routers.alice-production-https.service=alice-production" \
     --label "traefik.http.middlewares.alice-production-https-redirect.redirectscheme.scheme=https" \
     --label "traefik.http.middlewares.alice-production-https-redirect.redirectscheme.permanent=true" \
