@@ -108,7 +108,7 @@ jobs:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "curl --fail --silent --show-error --max-time 5 http://127.0.0.1/preview/$KEY/healthz >/dev/null"
+          printf '%s\n' "$ALICE_SHORT_TOKEN" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'read -r token; curl --fail --silent --show-error --max-time 5 "http://127.0.0.1/$token/preview/${KEY}/healthz" >/dev/null'
       - name: Public health check
         env:
           KEY: ${{ steps.preview.outputs.key }}
@@ -119,14 +119,14 @@ jobs:
             public_base="http://$PREVIEW_SSH_HOST"
             echo "PREVIEW_PUBLIC_BASE_URL does not resolve yet; using the VPS host for the external smoke check."
           fi
-          url="${public_base%/}/preview/${KEY}/"
+          url="${public_base%/}/${ALICE_SHORT_TOKEN}/preview/${KEY}/"
           for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview URL: ${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}/"; exit 0; }; sleep 2; done
           exit 1
       - name: Verify critical web assets
         env:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
-          base="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}"
+          base="${PREVIEW_PUBLIC_BASE_URL%/}/${ALICE_SHORT_TOKEN}/preview/${KEY}"
           for asset in \
             "static/style.css" \
             "static/boot.js" \
@@ -146,7 +146,7 @@ jobs:
           BASE_PATH: ${{ steps.preview.outputs.base_path }}
         run: |
           url="${PREVIEW_PUBLIC_BASE_URL%/}${BASE_PATH}/"
-          jq -n --arg body "Preview deployed: $url" '{body:$body}' | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -d @-
+          jq -n --arg body "Preview deployed. The tokenized URL is intentionally omitted from the GitHub comment." '{body:$body}' | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -d @-
 
   cleanup_pr:
     name: Cleanup closed pull request preview
