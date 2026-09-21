@@ -40,7 +40,7 @@ ensure_traefik() {
     published_https="$(docker port "$TRAEFIK_NAME" 443/tcp 2>/dev/null || true)"
     current_cmd="$(docker inspect -f '{{join .Config.Cmd " "}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
     current_mounts="$(docker inspect -f '{{range .Mounts}}{{println .Source}}{{end}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
-    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http" && grep -Fq '0.0.0.0:443' <<<"$published_https" && grep -Fq -- '--entrypoints.websecure.address=:443' <<<"$current_cmd" && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd" && grep -Fq -- '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' <<<"$current_cmd" && grep -Fq -- "$ACME_EMAIL" <<<"$current_cmd" && grep -Fqx -- "$ACME_DIR" <<<"$current_mounts"; then
+    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http" && grep -Fq '0.0.0.0:443' <<<"$published_https" && grep -Fq -- '--entrypoints.websecure.address=:443' <<<"$current_cmd" && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd" && grep -Fq -- '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' <<<"$current_cmd" && grep -Fq -- '--certificatesresolvers.letsencrypt.acme.httpchallenge=true' <<<"$current_cmd" && grep -Fq -- '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web' <<<"$current_cmd" && grep -Fq -- "$ACME_EMAIL" <<<"$current_cmd" && grep -Fqx -- "$ACME_DIR" <<<"$current_mounts"; then
       docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"; return
     fi
     log "replacing Traefik to enforce HTTP/HTTPS and dynamic TLS configuration"
