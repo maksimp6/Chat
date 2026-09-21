@@ -18,13 +18,14 @@ def test_preview_server_script_is_valid_bash():
 
 def test_preview_server_uses_tokenized_path_routing_and_strip():
     source = SCRIPT.read_text(encoding="utf-8")
-    assert "PathRegexp(\\`^/[^/]+${base_path}(?:/.*)?$\\`)" in source
+    assert 'local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"' in source
+    assert 'local tokenized_rule="PathPrefix(\\`$tokenized_prefix\\`)' in source
+    assert 'traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}' in source
     assert 'TRAEFIK_IMAGE="traefik:v3.7.13"' in source
     assert '-p 0.0.0.0:80:80' in source
     assert '-p 0.0.0.0:443:443' in source
     assert "grep -Fq '0.0.0.0:80'" in source
     assert "grep -Fq '0.0.0.0:443'" in source
-    assert "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" in source
     assert 'traefik.http.routers.${container}.entrypoints=web,websecure' in source
     assert 'traefik.http.routers.${container}.tls=true' in source
     assert 'ALICE_REQUIRE_SHORT_TOKEN=1' in source
