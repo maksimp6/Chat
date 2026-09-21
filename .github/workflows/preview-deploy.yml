@@ -44,6 +44,7 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       PREVIEW_PUBLIC_BASE_URL: ${{ secrets.PREVIEW_PUBLIC_BASE_URL }}
+      ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
       INPUT_REF: ${{ inputs.ref || '' }}
       INPUT_TTL_HOURS: ${{ inputs.ttl_hours || '' }}
       PR_NUMBER: ${{ github.event.pull_request.number || '' }}
