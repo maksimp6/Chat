@@ -129,6 +129,13 @@ def install_short_token_auth(app: Flask) -> None:
         if not token:
             return jsonify({"error": "authentication is not configured"}), 503
 
+        # The WSGI middleware has already validated and stripped a token prefix.
+        # Flask now sees the rewritten path, so the original prefix must be
+        # recognized through the request-environment marker rather than by
+        # inspecting request.path again.
+        if request.environ.get(_TOKEN_PATH_MARKER):
+            return None
+
         remainder = _token_path_remainder(token)
         if remainder is not None:
             request.environ[_TOKEN_PATH_MARKER] = True
