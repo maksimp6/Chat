@@ -56,9 +56,14 @@ def _has_valid_session(token: str, value: Optional[str]) -> bool:
     return isinstance(payload, dict) and payload.get("authenticated") is True
 
 
-def _token_path_matches(token: str) -> bool:
-    candidate = request.path.strip("/")
-    return bool(candidate) and "/" not in candidate and hmac.compare_digest(candidate, token)
+def _token_path_remainder(token: str) -> Optional[str]:
+    """Return the path after an exact token prefix, or None if it does not match."""
+    path = request.path
+    prefix = f"/{token}"
+    if not path == prefix and not path.startswith(prefix + "/"):
+        return None
+    remainder = path[len(prefix):]
+    return remainder or "/"
 
 
 def install_short_token_auth(app: Flask) -> None:
@@ -82,9 +87,10 @@ def install_short_token_auth(app: Flask) -> None:
         if not token:
             return jsonify({"error": "authentication is not configured"}), 503
 
-        if _token_path_matches(token):
+        remainder = _token_path_remainder(token)
+        if remainder is not None:
             session_value = _serializer(token).dumps({"authenticated": True})
-            response = redirect("/", code=303)
+            response = redirect(remainder, code=303)
             response.set_cookie(
                 COOKIE_NAME,
                 session_value,
