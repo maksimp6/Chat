@@ -31,11 +31,7 @@ ensure_traefik() {
   [[ "$CERT_SOURCE_DIR" = /* ]] || die "ALICE_TLS_CERT_DIR must be an absolute path"
   mkdir -p "$ROOT_DIR/traefik" "$CERT_SOURCE_DIR"
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
-    local current_image
-    local published_http
-    local published_https
-    local current_cmd
-    local current_mounts
+    local current_image published_http published_https current_cmd current_mounts
     current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
     published_http="$(docker port "$TRAEFIK_NAME" 80/tcp 2>/dev/null || true)"
     published_https="$(docker port "$TRAEFIK_NAME" 443/tcp 2>/dev/null || true)"
@@ -54,24 +50,14 @@ ensure_traefik() {
     docker rm -f "$TRAEFIK_NAME" >/dev/null
   fi
   log "starting Traefik $TRAEFIK_IMAGE on 0.0.0.0:80 and :443"
-  docker run -d \
-    --name "$TRAEFIK_NAME" \
-    --restart unless-stopped \
-    --network "$NETWORK_NAME" \
-    -p 0.0.0.0:80:80 \
-    -p 0.0.0.0:443:443 \
+  docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" \
+    -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
     -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" \
-    -v "$CERT_SOURCE_DIR:/etc/traefik/certs:ro" \
-    "$TRAEFIK_IMAGE" \
-    --providers.docker=true \
-    --providers.docker.exposedbydefault=false \
-    --providers.file.directory=/etc/traefik/dynamic \
-    --providers.file.watch=true \
-    --entrypoints.web.address=:80 \
-    --entrypoints.websecure.address=:443 \
-    --api.dashboard=false \
-    --accesslog=false >/dev/null
+    -v "$CERT_SOURCE_DIR:/etc/traefik/certs:ro" "$TRAEFIK_IMAGE" \
+    --providers.docker=true --providers.docker.exposedbydefault=false \
+    --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true \
+    --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --api.dashboard=false --accesslog=false >/dev/null
 }
 
 cleanup_key() {
@@ -89,15 +75,15 @@ deploy() {
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
   require_short_token
   ensure_traefik; mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
-  local workdir="${ROOT_DIR}/previews/${key}"
-  local builddir="${workdir}/build"
-  local container="${CONTAINER_PREFIX}-${key}"
-  local image="${IMAGE_PREFIX}:${key}"
+  local workdir="${ROOT_DIR}/previews/${key}" builddir="${workdir}/build" container="${CONTAINER_PREFIX}-${key}" image="${IMAGE_PREFIX}:${key}"
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"
   log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
-  local tokenized_rule="PathRegexp(\`^/[^/]+${base_path}(?:/.*)?$\`)"
+  # Match the actual tokenized prefix explicitly. This avoids PathRegexp parsing
+  # differences between Traefik versions and keeps the public path unchanged.
+  local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
+  local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" \
     --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
@@ -109,8 +95,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_REQUIRE_SHORT_TOKEN=1 \
-    -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" \
-    -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" "$image" >/dev/null
+    -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="$tokenized_prefix" "$image" >/dev/null
   local health_status
   for attempt in $(seq 1 30); do
     health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
