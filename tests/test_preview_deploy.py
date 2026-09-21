@@ -43,6 +43,7 @@ def test_preview_server_uses_tokenized_path_routing_and_strip():
     assert 'ACME_DIR="$ROOT_DIR/keys/letsencrypt"' in source
     assert 'ACME_FILE="$ACME_DIR/acme.json"' in source
     assert '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' in source
+    assert '--certificatesresolvers.letsencrypt.acme.httpchallenge=true' in source
     assert '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web' in source
     assert '--certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL"' in source
     assert '"$ACME_DIR:/letsencrypt"' in source
