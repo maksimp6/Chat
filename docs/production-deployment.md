@@ -11,22 +11,21 @@ Point both domains to the Alice Pro VM public address:
 
 Use the required A/AAAA records for the VM. Do not put the production token into DNS, Git, Docker labels, or application configuration files.
 
-The production workflow is intentionally manual. Run it only after DNS resolves to the VM and the TLS certificate has been provisioned on the server.
+The production workflow is manually triggered, but certificate issuance itself is automatic. Before the first production deployment, DNS must resolve both domains to the VM and inbound TCP ports 80 and 443 must be reachable from the Internet.
 
 ## TLS certificate
 
-Provision the certificate separately on the VM. The deployment expects:
+The shared Traefik instance uses Let's Encrypt ACME with the HTTP-01 challenge. Traefik listens on port 80 for validation and port 443 for HTTPS. Each production HTTPS router references the `letsencrypt` resolver and requests a certificate covering both production domains. This is the standard Traefik ACME configuration. citeturn973846search0turn973846search5
 
-- `fullchain.pem`
-- `privkey.pem`
+ACME state is kept only on the VM at:
 
-Place them in the directory configured by the repository variable `ALICE_TLS_CERT_DIR`. When that variable is empty, the server-side default is:
+`/opt/alice-preview/keys/letsencrypt/acme.json`
 
-`$HOME/alice-preview/certs`
+The deployment creates the file if necessary and enforces mode `600`. The directory is mounted into Traefik as `/letsencrypt`; neither certificates nor ACME account state are committed to GitHub.
 
-The private key must be readable only by the deployment/runtime account. The files are mounted read-only into the shared Traefik container.
+No email activation code is required. The configured ACME email is `Maxxxxpavlov@yandex.ru` and is used for the Let's Encrypt account/notifications.
 
-The shared Traefik instance exposes port 443 and uses file-provider TLS configuration. No certificate bytes are committed to GitHub.
+Traefik renews certificates automatically using the persisted ACME state. citeturn973846search0
 
 ## Authentication
 
@@ -77,11 +76,11 @@ The workflow:
 1. validates the deployment secrets without printing them;
 2. checks out the selected ref;
 3. uploads the production deployment script and source archive;
-4. upgrades the shared Traefik container to HTTP + HTTPS with file-provider support;
-5. validates the server-side certificate files;
-6. passes `ALICE_SHORT_TOKEN` over SSH stdin;
-7. builds and starts the production container;
-8. checks both public `/healthz` endpoints;
+4. upgrades the shared Traefik container to HTTP + HTTPS, file-provider support, and persistent ACME storage;
+5. passes `ALICE_SHORT_TOKEN` over SSH stdin;
+6. builds and starts the production container;
+7. checks both public `/healthz` endpoints over HTTPS;
+8. inspects the live TLS certificates for both domains;
 9. verifies that `/` returns `401` without authentication.
 
 The workflow does not print the token, write it to the repository, or include it in Traefik labels. GitHub comments intentionally omit the tokenized URL because the URL itself is a bearer credential.
@@ -101,7 +100,6 @@ Secrets:
 Optional variables:
 
 - `PREVIEW_SSH_PORT` (default `22`)
-- `ALICE_TLS_CERT_DIR` (absolute path on the VPS)
 
 ## Rotation
 
@@ -117,7 +115,7 @@ For an immediate service stop, remove the `alice-production` container on the VP
 
 ## Troubleshooting
 
-If the workflow reports a missing certificate, verify `fullchain.pem` and `privkey.pem` under `ALICE_TLS_CERT_DIR` on the VM.
+If certificate issuance fails, verify that both DNS names resolve to the VM, TCP ports 80/443 are reachable, and `/opt/alice-preview/keys/letsencrypt/acme.json` exists with mode `600`. The Traefik container logs contain the ACME validation error without requiring the account key to be copied elsewhere.
 
 If `/healthz` succeeds but `/` returns anything other than `401` before authentication, inspect the production container environment and ensure `ALICE_REQUIRE_SHORT_TOKEN=1` is present.
 
