@@ -19,6 +19,7 @@ COOKIE_SALT = "alice-pro-short-token-v1"
 DEFAULT_MAX_AGE = 12 * 60 * 60
 _PUBLIC_PATHS = frozenset({"/healthz"})
 _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
+_PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
 
 
 def _enabled() -> bool:
@@ -129,11 +130,7 @@ def install_short_token_auth(app: Flask) -> None:
         if request.environ.get(_TOKEN_PATH_MARKER):
             return None
 
-        # Traefik may strip the token and the preview base path before the
-        # request reaches Flask. In preview mode, the external tokenized
-        # Traefik router is the authentication boundary; retain fail-closed
-        # behavior for non-preview requests.
-        if os.environ.get("ALICE_PREVIEW", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if request.headers.get(_PROXY_AUTH_HEADER, "").strip().lower() == "true":
             return None
 
         remainder = _token_path_remainder(token)
