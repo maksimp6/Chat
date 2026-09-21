@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: \${POSTGRES_DB:-alice_pro}
+      POSTGRES_USER: \${POSTGRES_USER:-alice}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - alice_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER:-alice} -d \${POSTGRES_DB:-alice_pro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - alice_internal
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      ALICE_DATABASE_URL: postgresql://\${POSTGRES_USER:-alice}:\${POSTGRES_PASSWORD}@db:5432/\${POSTGRES_DB:-alice_pro}
+      YANDEX_API_KEY: \${YANDEX_API_KEY:-}
+      YANDEX_PROJECT_ID: \${YANDEX_PROJECT_ID:-}
+      ALICE_PROVIDER_CREDENTIAL_KEY: \${ALICE_PROVIDER_CREDENTIAL_KEY:-}
+      ALICE_KEY_MANAGER_KEY: \${ALICE_KEY_MANAGER_KEY:-}
+      SECRET_KEY: \${SECRET_KEY:-}
+      ALICE_MCP_BEARER_TOKEN: \${ALICE_MCP_BEARER_TOKEN:-}
+      ALICE_MCP_USER_ID: \${ALICE_MCP_USER_ID:-}
+      SUPABASE_URL: \${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: \${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_DB_URL: \${SUPABASE_DB_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - alice_internal
+
+networks:
+  alice_internal:
+
+volumes:
+  alice_postgres_data:
