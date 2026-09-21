@@ -21,9 +21,14 @@ def test_preview_server_uses_path_prefix_routing_and_strip():
     assert r"Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" in source
     assert 'TRAEFIK_IMAGE="traefik:v3.7.13"' in source
     assert '-p 0.0.0.0:80:80' in source
+    assert '-p 0.0.0.0:443:443' in source
     assert "grep -Fq '0.0.0.0:80'" in source
+    assert "grep -Fq '0.0.0.0:443'" in source
     assert 'traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path' in source
     assert 'ALICE_PREVIEW_BASE_PATH="$base_path"' in source
+    assert "--entrypoints.websecure.address=:443" in source
+    assert "--providers.file.directory=/etc/traefik/dynamic" in source
+    assert "ensure-traefik" in source
 
 
 def test_preview_workflow_uses_vps_deployer():
