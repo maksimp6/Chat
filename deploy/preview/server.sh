@@ -53,17 +53,23 @@ ensure_traefik() {
   docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" \
     -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
-    -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" \
-    -v "$CERT_SOURCE_DIR:/etc/traefik/certs:ro" "$TRAEFIK_IMAGE" \
-    --providers.docker=true --providers.docker.exposedbydefault=false \
+    -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$CERT_SOURCE_DIR:/etc/traefik/certs:ro" \
+    "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false \
     --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true \
     --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --api.dashboard=false --accesslog=false >/dev/null
 }
 
 cleanup_key() {
-  local key="$1"; [[ "$key" =~ ^[a-z0-9-]{1,50}$ ]] || die "invalid cleanup key: $key"
-  local container="${CONTAINER_PREFIX}-${key}" image="${IMAGE_PREFIX}:${key}" workdir="${ROOT_DIR}/previews/${key}" archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
-  docker rm -f "$container" >/dev/null 2>&1 || true; docker image rm "$image" >/dev/null 2>&1 || true; rm -rf -- "$workdir"; rm -f -- "$archive_path"; log "cleaned $key"
+  local key="$1"
+  local container="${CONTAINER_PREFIX}-${key}"
+  local image="${IMAGE_PREFIX}:${key}"
+  local workdir="${ROOT_DIR}/previews/${key}"
+  local archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  docker image rm "$image" >/dev/null 2>&1 || true
+  rm -rf -- "$workdir"
+  rm -f -- "$archive_path"
+  log "cleaned $key"
 }
 
 deploy() {
@@ -74,14 +80,20 @@ deploy() {
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
   require_short_token
-  ensure_traefik; mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
-  local workdir="${ROOT_DIR}/previews/${key}" builddir="${workdir}/build" container="${CONTAINER_PREFIX}-${key}" image="${IMAGE_PREFIX}:${key}"
+  ensure_traefik
+  mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
+  local workdir="${ROOT_DIR}/previews/${key}"
+  local builddir="${workdir}/build"
+  local container="${CONTAINER_PREFIX}-${key}"
+  local image="${IMAGE_PREFIX}:${key}"
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
-  rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"
-  log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
+  rm -rf -- "$workdir"
+  mkdir -p "$builddir"
+  tar -xzf "$archive_path" -C "$builddir"
+  log "building $image"
+  docker build --pull -t "$image" "$builddir" >/dev/null
+  docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
-  # Match the actual tokenized prefix explicitly. This avoids PathRegexp parsing
-  # differences between Traefik versions and keeps the public path unchanged.
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
   local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
@@ -95,21 +107,27 @@ deploy() {
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_REQUIRE_SHORT_TOKEN=1 \
-    -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="$tokenized_prefix" "$image" >/dev/null
+    -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" \
+    -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" "$image" >/dev/null
   local health_status
   for attempt in $(seq 1 30); do
     health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
     if [ "$health_status" = "healthy" ]; then rm -f -- "$archive_path"; log "preview container healthy"; return 0; fi
     sleep 2
   done
-  docker logs --tail 120 "$container" >&2 || true; cleanup_key "$key"; die "preview container failed Docker HEALTHCHECK"
+  docker logs --tail 120 "$container" >&2 || true
+  cleanup_key "$key"
+  die "preview container failed Docker HEALTHCHECK"
 }
 
 cleanup_expired() {
-  local now="$(date +%s)"; ensure_network
+  local now="$(date +%s)"
+  ensure_network
   docker ps -aq --filter "label=alice.preview=true" | while read -r container_id; do
     [[ -n "$container_id" ]] || continue
-    local expires key; expires="$(docker inspect -f '{{ index .Config.Labels "alice.preview.expires_at" }}' "$container_id" 2>/dev/null || true)"; key="$(docker inspect -f '{{ index .Config.Labels "alice.preview.key" }}' "$container_id" 2>/dev/null || true)"
+    local expires key
+    expires="$(docker inspect -f '{{ index .Config.Labels "alice.preview.expires_at" }}' "$container_id" 2>/dev/null || true)"
+    key="$(docker inspect -f '{{ index .Config.Labels "alice.preview.key" }}' "$container_id" 2>/dev/null || true)"
     if [[ "$expires" =~ ^[0-9]+$ ]] && (( expires <= now )) && [[ "$key" =~ ^[a-z0-9-]{1,50}$ ]]; then cleanup_key "$key"; fi
   done
 }
