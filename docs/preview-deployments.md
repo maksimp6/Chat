@@ -43,7 +43,7 @@ The workflow:
 5. starts/replaces the PR container;
 6. registers the route with Traefik;
 7. checks `/healthz` locally through Traefik and then checks the public URL;
-8. posts the preview URL to the workflow summary and PR conversation.
+8. reports the deployment result; the bearer token is intentionally omitted from PR comments.
 
 When the pull request is closed, the corresponding container and image are removed.
 
