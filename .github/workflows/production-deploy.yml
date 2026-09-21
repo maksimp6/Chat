@@ -74,6 +74,24 @@ jobs:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
           ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
+      - name: Verify Traefik configuration before production deploy
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" '
+            set -e
+            docker inspect alice-preview-traefik >/dev/null
+            docker inspect -f "{{.State.Running}}" alice-preview-traefik | grep -qx true
+            docker port alice-preview-traefik 80/tcp
+            docker port alice-preview-traefik 443/tcp
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--entrypoints.web.address=:80"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--entrypoints.websecure.address=:443"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+            docker logs --tail 80 alice-preview-traefik 2>&1 | grep -Ei "error|acme|certificate" || true
+          '
       - name: Deploy production without exposing the token
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
