@@ -40,8 +40,13 @@ def test_preview_server_uses_tokenized_path_routing_and_strip():
     assert 'ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path"' in source
     assert "--entrypoints.websecure.address=:443" in source
     assert "--providers.file.directory=/etc/traefik/dynamic" in source
-    assert 'CERT_SOURCE_DIR="${ALICE_TLS_CERT_DIR:-$ROOT_DIR/certs}"' in source
-    assert '"$CERT_SOURCE_DIR:/etc/traefik/certs:ro"' in source
+    assert 'ACME_DIR="$ROOT_DIR/keys/letsencrypt"' in source
+    assert 'ACME_FILE="$ACME_DIR/acme.json"' in source
+    assert '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' in source
+    assert '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web' in source
+    assert '--certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL"' in source
+    assert '"$ACME_DIR:/letsencrypt"' in source
+    assert 'chmod 600 "$ACME_FILE"' in source
     assert "ensure-traefik" in source
 
 
