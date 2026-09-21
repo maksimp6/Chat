@@ -80,7 +80,7 @@ deploy() {
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
     --label "traefik.http.routers.${http_router}.rule=$tokenized_rule" --label "traefik.http.routers.${http_router}.entrypoints=web" --label "traefik.http.routers.${http_router}.priority=100" --label "traefik.http.routers.${http_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
-    --label "traefik.http.routers.${https_router}.rule=$tokenized_rule" --label "traefik.http.routers.${https_router}.entrypoints=websecure" --label "traefik.http.routers.${https_router}.tls=true" --label "traefik.http.routers.${https_router}.priority=100" --label "traefik.http.routers.${https_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
+    --label "traefik.http.routers.${https_router}.rule=$tokenized_rule" --label "traefik.http.routers.${https_router}.entrypoints=websecure" --label "traefik.http.routers.${https_router}.tls=true" --label "traefik.http.routers.${https_router}.tls.certresolver=letsencrypt" --label "traefik.http.routers.${https_router}.priority=100" --label "traefik.http.routers.${https_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
