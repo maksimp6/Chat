@@ -31,6 +31,7 @@ ensure_traefik() {
   [[ "$ACME_DIR" = /* ]] || die "ACME directory must be an absolute path"
   mkdir -p "$ROOT_DIR/traefik" "$ACME_DIR"
   touch "$ACME_FILE"
+  chmod 700 "$ACME_DIR"
   chmod 600 "$ACME_FILE"
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
     local current_image published_http published_https current_cmd current_mounts
