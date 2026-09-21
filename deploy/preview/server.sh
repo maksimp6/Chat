@@ -13,7 +13,9 @@ TRAEFIK_NAME="alice-preview-traefik"
 TRAEFIK_IMAGE="traefik:v3.7.13"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
-CERT_SOURCE_DIR="${ALICE_TLS_CERT_DIR:-$ROOT_DIR/certs}"
+ACME_DIR="$ROOT_DIR/keys/letsencrypt"
+ACME_FILE="$ACME_DIR/acme.json"
+ACME_EMAIL="${ALICE_ACME_EMAIL:-Maxxxxpavlov@yandex.ru}"
 
 log() { printf '[preview] %s\n' "$*"; }
 die() { printf '[preview] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -26,8 +28,10 @@ ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; 
 
 ensure_traefik() {
   ensure_network
-  [[ "$CERT_SOURCE_DIR" = /* ]] || die "ALICE_TLS_CERT_DIR must be an absolute path"
-  mkdir -p "$ROOT_DIR/traefik" "$CERT_SOURCE_DIR"
+  [[ "$ACME_DIR" = /* ]] || die "ACME directory must be an absolute path"
+  mkdir -p "$ROOT_DIR/traefik" "$ACME_DIR"
+  touch "$ACME_FILE"
+  chmod 600 "$ACME_FILE"
   if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
     local current_image published_http published_https current_cmd current_mounts
     current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
@@ -35,14 +39,14 @@ ensure_traefik() {
     published_https="$(docker port "$TRAEFIK_NAME" 443/tcp 2>/dev/null || true)"
     current_cmd="$(docker inspect -f '{{join .Config.Cmd " "}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
     current_mounts="$(docker inspect -f '{{range .Mounts}}{{println .Source}}{{end}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
-    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http" && grep -Fq '0.0.0.0:443' <<<"$published_https" && grep -Fq -- '--entrypoints.websecure.address=:443' <<<"$current_cmd" && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd" && grep -Fqx -- "$CERT_SOURCE_DIR" <<<"$current_mounts"; then
+    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http" && grep -Fq '0.0.0.0:443' <<<"$published_https" && grep -Fq -- '--entrypoints.websecure.address=:443' <<<"$current_cmd" && grep -Fq -- '--providers.file.directory=/etc/traefik/dynamic' <<<"$current_cmd" && grep -Fq -- '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' <<<"$current_cmd" && grep -Fq -- "$ACME_EMAIL" <<<"$current_cmd" && grep -Fqx -- "$ACME_DIR" <<<"$current_mounts"; then
       docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"; return
     fi
     log "replacing Traefik to enforce HTTP/HTTPS and dynamic TLS configuration"
     docker rm -f "$TRAEFIK_NAME" >/dev/null
   fi
   log "starting Traefik $TRAEFIK_IMAGE on 0.0.0.0:80 and :443"
-  docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$CERT_SOURCE_DIR:/etc/traefik/certs:ro" "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --api.dashboard=false --accesslog=false >/dev/null
+  docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$ACME_DIR:/letsencrypt" "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL" --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web --api.dashboard=false --accesslog=false >/dev/null
 }
 
 cleanup_key() {
