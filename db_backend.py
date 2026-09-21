@@ -122,22 +122,13 @@ class PGCursor:
 
         alter_match = _ALTER_ADD_COLUMN_RE.match(sql)
         if alter_match:
-            table, column, _definition = alter_match.groups()
-            self._raw.execute(
-                """
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = %s
-                  AND column_name = %s
-                """,
-                (table, column),
+            table, column, definition = alter_match.groups()
+            translated = (
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS "
+                f"{column} {definition}"
             )
-            if self._raw.fetchone():
-                self._columns = ()
-                return self
-
-        translated = translate_sql(sql)
+        else:
+            translated = translate_sql(sql)
 
         try:
             self._raw.execute(translated, tuple(params))
