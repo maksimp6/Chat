@@ -30,6 +30,8 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q .
       - name: Validate Docker Compose
+        env:
+          POSTGRES_PASSWORD: ci-postgres-password
         run: docker compose config >/dev/null
       - name: Run frontend JavaScript regression tests
         run: node tests/test_file_manager.js
