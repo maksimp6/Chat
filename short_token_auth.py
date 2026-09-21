@@ -1,16 +1,16 @@
-"""Runtime short-token authentication for production Alice Pro.
+"""Runtime short-token authentication for production and preview Alice Pro.
 
-The token is supplied only through ALICE_SHORT_TOKEN. Preview deployments bypass
-this guard so their existing path-based URLs keep working.
+The token is supplied only through ALICE_SHORT_TOKEN. A token may be used as a
+URL path prefix. The prefix is consumed internally; no HTTP redirect is used.
 """
 
 from __future__ import annotations
 
-import hmac
 import os
 from typing import Optional
+from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, jsonify, request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 
@@ -18,6 +18,7 @@ COOKIE_NAME = "alice_short_token_session"
 COOKIE_SALT = "alice-pro-short-token-v1"
 DEFAULT_MAX_AGE = 12 * 60 * 60
 _PUBLIC_PATHS = frozenset({"/healthz"})
+_TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
 
 
 def _enabled() -> bool:
@@ -56,9 +57,17 @@ def _has_valid_session(token: str, value: Optional[str]) -> bool:
     return isinstance(payload, dict) and payload.get("authenticated") is True
 
 
-def _token_path_remainder(token: str) -> Optional[str]:
+def _request_path() -> str:
+    """Use the original URI when a trusted reverse proxy supplied it."""
+    forwarded_uri = request.headers.get("X-Forwarded-Uri", "")
+    if forwarded_uri.startswith("/"):
+        return urlsplit(forwarded_uri).path or "/"
+    return request.path
+
+
+def _token_path_remainder(token: str, path: Optional[str] = None) -> Optional[str]:
     """Return the path after an exact token prefix, or None if it does not match."""
-    path = request.path
+    path = _request_path() if path is None else path
     prefix = f"/{token}"
     if not path == prefix and not path.startswith(prefix + "/"):
         return None
@@ -66,18 +75,51 @@ def _token_path_remainder(token: str) -> Optional[str]:
     return remainder or "/"
 
 
+class _TokenPathMiddleware:
+    """Rewrite token-prefixed URLs before Flask performs route matching."""
+
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        if _enabled():
+            token = _token()
+            path = environ.get("PATH_INFO") or "/"
+            if token:
+                prefix = f"/{token}"
+                if path == prefix or path.startswith(prefix + "/"):
+                    environ["PATH_INFO"] = path[len(prefix):] or "/"
+                    environ[_TOKEN_PATH_MARKER] = True
+        return self.app(environ, start_response)
+
+
 def install_short_token_auth(app: Flask) -> None:
-    """Install fail-closed production auth while leaving previews unchanged."""
+    """Install fail-closed short-token auth without redirecting token-prefixed URLs."""
+    app.wsgi_app = _TokenPathMiddleware(app.wsgi_app)
 
     @app.after_request
     def _short_token_headers(response):
-        if _enabled() and os.environ.get("ALICE_PREVIEW") != "1":
+        if _enabled():
             response.headers["Referrer-Policy"] = "no-referrer"
+        if _enabled() and request.environ.get(_TOKEN_PATH_MARKER):
+            token = _token()
+            if token:
+                session_value = _serializer(token).dumps({"authenticated": True})
+                response.set_cookie(
+                    COOKIE_NAME,
+                    session_value,
+                    max_age=_max_age(),
+                    httponly=True,
+                    secure=request.is_secure or _enabled(),
+                    samesite="Lax",
+                    path="/",
+                )
+                response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.before_request
     def _short_token_guard():
-        if not _enabled() or os.environ.get("ALICE_PREVIEW") == "1":
+        if not _enabled():
             return None
 
         if request.path in _PUBLIC_PATHS:
@@ -89,20 +131,8 @@ def install_short_token_auth(app: Flask) -> None:
 
         remainder = _token_path_remainder(token)
         if remainder is not None:
-            session_value = _serializer(token).dumps({"authenticated": True})
-            response = redirect(remainder, code=303)
-            response.set_cookie(
-                COOKIE_NAME,
-                session_value,
-                max_age=_max_age(),
-                httponly=True,
-                secure=request.is_secure or _enabled(),
-                samesite="Lax",
-                path="/",
-            )
-            response.headers["Referrer-Policy"] = "no-referrer"
-            response.headers["Cache-Control"] = "no-store"
-            return response
+            request.environ[_TOKEN_PATH_MARKER] = True
+            return None
 
         if _has_valid_session(token, request.cookies.get(COOKIE_NAME)):
             return None
