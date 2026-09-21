@@ -23,10 +23,7 @@ _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
 
 def _enabled() -> bool:
     return os.environ.get("ALICE_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
+        "1", "true", "yes", "on",
     }
 
 
@@ -129,11 +126,14 @@ def install_short_token_auth(app: Flask) -> None:
         if not token:
             return jsonify({"error": "authentication is not configured"}), 503
 
-        # The WSGI middleware has already validated and stripped a token prefix.
-        # Flask now sees the rewritten path, so the original prefix must be
-        # recognized through the request-environment marker rather than by
-        # inspecting request.path again.
         if request.environ.get(_TOKEN_PATH_MARKER):
+            return None
+
+        # Traefik may strip the token and the preview base path before the
+        # request reaches Flask. In preview mode, the external tokenized
+        # Traefik router is the authentication boundary; retain fail-closed
+        # behavior for non-preview requests.
+        if os.environ.get("ALICE_PREVIEW", "").strip().lower() in {"1", "true", "yes", "on"}:
             return None
 
         remainder = _token_path_remainder(token)
