@@ -18,7 +18,7 @@ def test_preview_server_script_is_valid_bash():
 
 def test_preview_server_uses_tokenized_path_routing_and_strip():
     source = SCRIPT.read_text(encoding="utf-8")
-    assert r"Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" in source
+    assert "PathRegexp(`^/[^/]+${base_path}(?:/.*)?$`)" in source
     assert 'TRAEFIK_IMAGE="traefik:v3.7.13"' in source
     assert '-p 0.0.0.0:80:80' in source
     assert '-p 0.0.0.0:443:443' in source
