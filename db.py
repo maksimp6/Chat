@@ -3,9 +3,15 @@ import os
 import json
 from datetime import datetime
 
-DB_PATH = "alice_pro.db"
+from db_backend import connect_postgres, postgres_url_from_env
+
+DB_PATH = os.getenv("ALICE_DB_PATH", "alice_pro.db")
 
 def get_conn():
+    database_url = postgres_url_from_env()
+    if database_url:
+        return connect_postgres(database_url)
+
     conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -96,7 +102,14 @@ def create_conversation(conv_id, title, model):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "INSERT OR REPLACE INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        """INSERT INTO conversations
+        (id, title, model, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            model = excluded.model,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at""",
         (conv_id, title, model, now, now)
     )
     conn.commit()
@@ -240,6 +253,11 @@ def set_config(key: str, value):
     val_str = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO configs (key, value) VALUES (?, ?)", (key, val_str))
+    cur.execute(
+        """INSERT INTO configs (key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+        (key, val_str),
+    )
     conn.commit()
     conn.close()
