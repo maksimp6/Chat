@@ -15,7 +15,7 @@ The production workflow is manually triggered, but certificate issuance itself i
 
 ## TLS certificate
 
-The shared Traefik instance uses Let's Encrypt ACME with the HTTP-01 challenge. Traefik listens on port 80 for validation and port 443 for HTTPS. Each production HTTPS router references the `letsencrypt` resolver and requests a certificate covering both production domains. This is the standard Traefik ACME configuration. citeturn973846search0turn973846search5
+The shared Traefik instance uses Let's Encrypt ACME with the HTTP-01 challenge. Traefik listens on port 80 for validation and port 443 for HTTPS. Each production HTTPS router references the `letsencrypt` resolver and requests a certificate covering both production domains. This is the standard Traefik ACME configuration.
 
 ACME state is kept only on the VM at:
 
@@ -25,7 +25,7 @@ The deployment creates the file if necessary and enforces mode `600`. The direct
 
 No email activation code is required. The configured ACME email is `Maxxxxpavlov@yandex.ru` and is used for the Let's Encrypt account/notifications.
 
-Traefik renews certificates automatically using the persisted ACME state. citeturn973846search0
+Traefik renews certificates automatically using the persisted ACME state.
 
 ## Authentication
 
