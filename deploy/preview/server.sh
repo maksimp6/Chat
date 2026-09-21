@@ -66,7 +66,12 @@ deploy() {
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
-  local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}" tokenized_rule="PathPrefix(\`$tokenized_prefix\`)" http_router="${container}-http" https_router="${container}-https" token_strip_middleware="${container}-token-strip" proxy_auth_middleware="${container}-proxy-auth"
+  local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
+  local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
+  local http_router="${container}-http"
+  local https_router="${container}-https"
+  local token_strip_middleware="${container}-token-strip"
+  local proxy_auth_middleware="${container}-proxy-auth"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
     --label "traefik.http.routers.${http_router}.rule=$tokenized_rule" --label "traefik.http.routers.${http_router}.entrypoints=web" --label "traefik.http.routers.${http_router}.priority=100" --label "traefik.http.routers.${http_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
