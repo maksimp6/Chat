@@ -1,7 +1,10 @@
 import sqlite3
+import os
 import json
 import hashlib
 import threading
+
+from db import get_conn
 from datetime import datetime, timedelta, timezone
 
 class DatabaseArchiver:
@@ -15,7 +18,9 @@ class DatabaseArchiver:
             print("⚠️ Archival task already running. Skipping.")
             return False
 
-        conn = sqlite3.connect(self.db_path)
+        conn = get_conn() if (
+            os.getenv("ALICE_DATABASE_URL") or os.getenv("DATABASE_URL")
+        ) else sqlite3.connect(self.db_path)
         try:
             cursor = conn.cursor()
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
