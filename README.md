@@ -14,7 +14,8 @@ The project is actively evolving. Some components are production-oriented, while
 - **Treasury and billing** for internal usage accounting and demo balances.
 - **Departments** for domain-specific agent capabilities.
 - **Android client** with WebView integration, update handling, logging, and a stable debug-build workflow.
-- **Supabase trace mirror** as an optional operational/diagnostic integration.
+- **Shared PostgreSQL** as the single primary server-side database in Docker.
+- **Supabase** for backup/recovery and optional execution-trace mirroring.
 
 ## Architecture
 
@@ -29,8 +30,9 @@ flowchart TD
     T --> M[MCP / Local Tools]
     O --> A[Agent Gateway / Runtime]
     O --> X[ExecutionTrace]
+    O --> D[(Shared PostgreSQL)]
     X --> B[Billing]
-    X --> S[Optional Supabase Trace Mirror]
+    X --> S[Optional Supabase Trace Mirror / Backup]
 ```
 
 Requests, tool calls, polling and continuations carry scoped correlation information through `InvocationContext` and `ExecutionTrace`. Secrets are sanitized before persistent traces and logs.
@@ -188,7 +190,20 @@ cd android
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-For database changes, use committed Supabase migrations and the production migration workflow. See [docs/supabase-migrations-deploy.md](docs/supabase-migrations-deploy.md).
+For database changes, validate the shared PostgreSQL Docker configuration and integration tests. See [database architecture](docs/database.md).
+
+Local/Preview Docker database:
+```bash
+export POSTGRES_PASSWORD='<random-password>'
+docker compose up -d db app
+```
+
+Create an explicit Supabase backup:
+```bash
+docker compose --profile backup run --rm db-backup
+```
+
+Restore is destructive and requires an explicit `CONFIRM_RESTORE=YES` guard; see [database architecture](docs/database.md).
 
 ## Troubleshooting
 
