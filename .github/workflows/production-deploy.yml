@@ -81,16 +81,10 @@ jobs:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
           printf '%s\n' "$ALICE_SHORT_TOKEN" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
-      - name: Verify public health endpoint
+      - name: Verify HTTPS certificate and health
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
             curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "https://$domain/healthz" >/dev/null
-          done
-      - name: Verify Let's Encrypt certificate
-        run: |
-          for domain in maxxxpavlov.ru maxxxpavlov.online; do
-            echo | openssl s_client -servername "$domain" -connect "$domain:443" 2>/dev/null |
-              openssl x509 -noout -issuer -subject -dates
           done
       - name: Verify route protection
         run: |
