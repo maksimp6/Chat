@@ -96,14 +96,21 @@ deploy() {
   log "starting $container at $base_path"
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
   local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
+  local http_router="${container}-http"
+  local https_router="${container}-https"
+  local token_strip_middleware="${container}-token-strip"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" \
     --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${container}.rule=$tokenized_rule" \
-    --label "traefik.http.routers.${container}.entrypoints=web,websecure" \
-    --label "traefik.http.routers.${container}.tls=true" \
-    --label "traefik.http.routers.${container}.priority=100" \
-    --label "traefik.http.routers.${container}.middlewares=${container}-token-strip" \
+    --label "traefik.http.routers.${http_router}.rule=$tokenized_rule" \
+    --label "traefik.http.routers.${http_router}.entrypoints=web" \
+    --label "traefik.http.routers.${http_router}.priority=100" \
+    --label "traefik.http.routers.${http_router}.middlewares=$token_strip_middleware" \
+    --label "traefik.http.routers.${https_router}.rule=$tokenized_rule" \
+    --label "traefik.http.routers.${https_router}.entrypoints=websecure" \
+    --label "traefik.http.routers.${https_router}.tls=true" \
+    --label "traefik.http.routers.${https_router}.priority=100" \
+    --label "traefik.http.routers.${https_router}.middlewares=$token_strip_middleware" \
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_REQUIRE_SHORT_TOKEN=1 \
