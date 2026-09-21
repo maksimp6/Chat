@@ -29,5 +29,8 @@ def test_production_deployment_uses_runtime_secret_not_traefik_labels():
     assert "traefik.http.routers.alice-production-https.tls=true" in source
     assert "traefik.http.middlewares.alice-production-https-redirect.redirectscheme.scheme=https" in source
     assert "traefik.http.routers.alice-production-https.tls.certresolver=letsencrypt" in source
+    assert 'ACME_DIR="$ROOT_DIR/keys/letsencrypt"' in source
+    assert 'ACME_FILE="$ACME_DIR/acme.json"' in source
+    assert "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json" in source
     docker_block = source.split('docker run -d', 1)[1].split('-e HOST=', 1)[0]
     assert 'ALICE_SHORT_TOKEN' not in docker_block
