@@ -1,6 +1,6 @@
-# Production Supabase migrations
+# Optional Supabase diagnostic-schema migrations
 
-The workflow `.github/workflows/supabase-migrations.yml` applies committed SQL migrations after pushes to `master` and can also be started manually.
+The workflow `.github/workflows/supabase-migrations.yml` applies committed SQL migrations to the Supabase project after pushes to `master`. This workflow is **not** the migration path for the Alice Pro primary database. It exists for optional Supabase-side diagnostic/mirror tables.
 
 ## Required configuration
 
@@ -25,4 +25,4 @@ The workflow is intentionally limited to `master`, which is the current producti
 
 A failed migration must be investigated from the failed GitHub Actions run before another deployment. Do not rewrite or delete an already-applied migration. Create a new corrective migration, validate it in a non-production environment, and then merge it to `master`. The workflow serializes production runs, so a failed run does not start a second migration concurrently.
 
-For an unrecoverable schema change, restore the database from the configured Supabase backup/recovery mechanism and then reconcile migration history before resuming deployments. The repository intentionally uses forward corrective migrations rather than an automatic SQL rollback, because arbitrary database changes cannot safely be reversed generically.
+For an unrecoverable primary-database incident, use the explicit PostgreSQL dump restore procedure in `scripts/restore_from_supabase.sh`, then validate application startup and schema state before resuming deployments. The repository intentionally uses forward corrective migrations rather than an automatic SQL rollback, because arbitrary database changes cannot safely be reversed generically.
