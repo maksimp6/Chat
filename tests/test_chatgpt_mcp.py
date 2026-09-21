@@ -48,6 +48,9 @@ def test_tools_list_is_deterministic_and_read_only(client):
 
     assert names == sorted(names)
     assert names == [
+        "alice_cancel_invocation",
+        "alice_create_invocation",
+        "alice_create_session",
         "alice_get_invocation",
         "alice_get_invocation_trace",
         "alice_get_session",
@@ -76,6 +79,46 @@ def test_tools_call_returns_structured_content(client):
     assert result["mcp"]["transport"] == "streamable-http"
     assert "local_tools" in result
     assert result["server"]["name"] == "Alice Pro"
+
+
+def test_standard_mcp_requests_do_not_require_auxiliary_headers(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {},
+    }
+    response = client.post(
+        "/mcp",
+        data=json.dumps(payload),
+        headers={
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": chatgpt_mcp.DEFAULT_PROTOCOL_VERSION,
+        },
+    )
+    assert response.status_code == 200
+
+
+def test_initialize_returns_server_instructions(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {"protocolVersion": chatgpt_mcp.DEFAULT_PROTOCOL_VERSION},
+    }
+    response = client.post(
+        "/mcp",
+        data=json.dumps(payload),
+        headers={
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": chatgpt_mcp.DEFAULT_PROTOCOL_VERSION,
+        },
+    )
+    assert response.status_code == 200
+    result = response.get_json()["result"]
+    assert result["protocolVersion"] == chatgpt_mcp.DEFAULT_PROTOCOL_VERSION
+    assert result["capabilities"]["tools"] == {}
+    assert "control plane" in result["instructions"]
 
 
 def test_standard_headers_must_match_json_rpc(client):
@@ -108,6 +151,97 @@ def test_bearer_authentication_accepts_only_configured_token(client, monkeypatch
         Authorization="Bearer test-token",
     )
     assert allowed.status_code == 200
+
+
+def test_session_access_is_scoped_to_authenticated_user(client, monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
+
+    session = {
+        "id": "session-1",
+        "status": "active",
+        "metadata": {"user_id": "user-b"},
+        "created_at": 1,
+        "updated_at": 1,
+        "completed_at": None,
+    }
+    monkeypatch.setattr(chatgpt_mcp, "get_session", lambda _id: session)
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_get_session", "arguments": {"session_id": "session-1"}},
+        name="alice_get_session",
+        Authorization="Bearer test-token",
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == -32003
+
+
+def test_create_session_attaches_authenticated_user(client, monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
+
+    captured = {}
+
+    def fake_create_session(metadata=None, session_id=None):
+        captured["metadata"] = metadata
+        return {
+            "id": "session-new",
+            "status": "active",
+            "metadata": metadata,
+            "created_at": 1,
+            "updated_at": 1,
+            "completed_at": None,
+        }
+
+    monkeypatch.setattr(chatgpt_mcp, "create_session", fake_create_session)
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_create_session",
+            "arguments": {"metadata": {"purpose": "agent-runtime"}},
+        },
+        name="alice_create_session",
+        Authorization="Bearer test-token",
+    )
+    assert response.status_code == 200
+    assert captured["metadata"]["user_id"] == "user-a"
+    assert response.get_json()["result"]["structuredContent"]["session"]["id"] == "session-new"
+
+
+def test_cancel_invocation_requires_matching_owner(client, monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
+
+    invocation = {
+        "id": "invocation-1",
+        "session_id": "session-1",
+        "conversation_id": "conversation-1",
+        "trace_id": "trace-1",
+        "status": "running",
+        "metadata": {"user_id": "user-b"},
+        "result": None,
+        "error": None,
+        "created_at": 1,
+        "started_at": 1,
+        "completed_at": None,
+    }
+    monkeypatch.setattr(chatgpt_mcp, "get_invocation_status", lambda _id: invocation)
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_cancel_invocation", "arguments": {"invocation_id": "invocation-1"}},
+        name="alice_cancel_invocation",
+        Authorization="Bearer test-token",
+    )
+    assert response.status_code == 403
 
 
 def test_invocation_data_is_scoped_to_authenticated_user(client, monkeypatch):
