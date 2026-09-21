@@ -8,7 +8,6 @@ TRAEFIK_NAME="alice-preview-traefik"
 NETWORK_NAME="alice-preview"
 CONTAINER_NAME="alice-production"
 IMAGE_NAME="alice-production:current"
-CERT_DIR="${ALICE_TLS_CERT_DIR:-$ROOT_DIR/certs}"
 TRAEFIK_DYNAMIC_DIR="$ROOT_DIR/traefik"
 
 log() { printf '[production] %s\n' "$*"; }
@@ -19,18 +18,6 @@ require_runtime_secret() {
     IFS= read -r ALICE_SHORT_TOKEN || true
   fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
-}
-
-write_tls_config() {
-  [[ -f "$CERT_DIR/fullchain.pem" ]] || die "TLS certificate not found: $CERT_DIR/fullchain.pem"
-  [[ -f "$CERT_DIR/privkey.pem" ]] || die "TLS private key not found: $CERT_DIR/privkey.pem"
-  mkdir -p "$TRAEFIK_DYNAMIC_DIR"
-  cat > "$TRAEFIK_DYNAMIC_DIR/alice-production-tls.yml" <<'YAML'
-tls:
-  certificates:
-    - certFile: /etc/traefik/certs/fullchain.pem
-      keyFile: /etc/traefik/certs/privkey.pem
-YAML
 }
 
 validate_traefik() {
@@ -47,7 +34,6 @@ deploy() {
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
   require_runtime_secret
   validate_traefik
-  write_tls_config
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/production"
 
   local workdir="$ROOT_DIR/production/build"
