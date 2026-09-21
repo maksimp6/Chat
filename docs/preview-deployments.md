@@ -60,10 +60,13 @@ The workflow installs a single Traefik v3.7.13 container named `alice-preview-tr
 Traefik uses:
 
 - Docker provider;
+- file provider for optional production TLS configuration;
 - `alice-preview` Docker network;
-- an explicit host binding `0.0.0.0:80 -> 80`;
+- explicit host bindings `0.0.0.0:80 -> 80` and `0.0.0.0:443 -> 443`;
 - `Path(...)` / `PathPrefix(...)` routers per preview;
 - StripPrefix middleware so Flask continues receiving its normal `/` and `/api/*` routes.
+
+The same Traefik instance serves production. Production Host routers explicitly exclude `/preview/`, so the domain route cannot capture Preview traffic.
 
 The deployment script also inspects an existing Traefik container before reusing it. If the HTTP port is not published on `0.0.0.0:80`, the container is recreated with the explicit binding instead of silently keeping a stale host-port configuration.
 
@@ -103,4 +106,8 @@ for the SSH deployment user, plus the `incoming/` and `previews/` directories. T
 
 ## HTTPS
 
-The initial path-based setup intentionally uses HTTP because it works directly with a VPS IP address. Port 443 should not be published until a TLS entrypoint and certificate configuration are added. Add a domain and TLS configuration later when the public hostname is available. The preview routing itself does not need to change.
+The shared Traefik instance publishes both HTTP and HTTPS. Preview routing remains path-based, while production uses domain-based HTTPS routing for `maxxxpavlov.ru` and `maxxxpavlov.online`.
+
+Production certificate files are provisioned separately on the VPS as `fullchain.pem` and `privkey.pem` under the configured certificate directory. They are mounted read-only into Traefik and referenced by dynamic configuration; certificate material is never committed to GitHub.
+
+HTTP requests to the production domains are redirected to HTTPS. The production domain router excludes `/preview/`, preserving the existing Preview URL scheme.
