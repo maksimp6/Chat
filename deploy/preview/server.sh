@@ -107,7 +107,7 @@ deploy() {
     --label "traefik.http.routers.${container}.priority=100" \
     --label "traefik.http.routers.${container}.middlewares=${container}-token-strip,${container}-strip" \
     --label "traefik.http.middlewares.${container}-token-strip.replacepathregex.regex=$tokenized_replace_regex" \
-    --label 'traefik.http.middlewares.${container}-token-strip.replacepathregex.replacement=$1$2' \
+    --label "traefik.http.middlewares.${container}-token-strip.replacepathregex.replacement=\$1\$2" \
     --label "traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_REQUIRE_SHORT_TOKEN=1 \
