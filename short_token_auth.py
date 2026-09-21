@@ -64,6 +64,12 @@ def _token_path_matches(token: str) -> bool:
 def install_short_token_auth(app: Flask) -> None:
     """Install fail-closed production auth while leaving previews unchanged."""
 
+    @app.after_request
+    def _short_token_headers(response):
+        if _enabled() and os.environ.get("ALICE_PREVIEW") != "1":
+            response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
     @app.before_request
     def _short_token_guard():
         if not _enabled() or os.environ.get("ALICE_PREVIEW") == "1":
@@ -84,7 +90,7 @@ def install_short_token_auth(app: Flask) -> None:
                 session_value,
                 max_age=_max_age(),
                 httponly=True,
-                secure=request.is_secure,
+                secure=request.is_secure or _enabled(),
                 samesite="Lax",
                 path="/",
             )
