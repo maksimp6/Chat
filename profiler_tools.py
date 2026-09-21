@@ -35,9 +35,11 @@ def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
 def inspect_app_internals(arguments: dict, cfg: dict = None) -> dict:
     """Возвращает полную карту модулей, путей и состояние окружения приложения."""
     loaded_modules = [m for m in sys.modules.keys() if not m.startswith('_')]
-    db_path = os.path.abspath("alice_pro.db")
-    db_exists = os.path.exists(db_path)
-    db_size = os.path.getsize(db_path) if db_exists else 0
+    database_url = os.getenv("ALICE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    db_path = os.path.abspath(os.getenv("ALICE_DB_PATH", "alice_pro.db"))
+    db_backend = "postgresql" if database_url else "sqlite"
+    db_exists = bool(database_url) or os.path.exists(db_path)
+    db_size = os.path.getsize(db_path) if not database_url and os.path.exists(db_path) else 0
     
     return {
         "success": True,
