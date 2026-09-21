@@ -40,7 +40,7 @@ The actual token is supplied through the production environment secret:
 
 The workflow sends the secret to the VPS over SSH stdin; it is not placed in the SSH command line, Git, Traefik labels, or a repository file.
 
-The public authentication flow is:
+The public authentication flow is a token-prefixed path with no redirect:
 
 `https://maxxxpavlov.ru/<short-token>`
 
@@ -48,11 +48,15 @@ or:
 
 `https://maxxxpavlov.online/<short-token>`
 
-A valid token creates an HttpOnly session cookie and redirects to `/`. The token itself is not returned in the response body. Sessions expire according to `ALICE_SHORT_TOKEN_TTL_SECONDS` (default: 12 hours).
+A valid token-prefixed request is served directly and creates an HttpOnly session cookie. The token prefix is removed internally before application routing. Sessions expire according to `ALICE_SHORT_TOKEN_TTL_SECONDS` (default: 12 hours).
 
 `GET /healthz` remains public so deployment checks can verify liveness without authenticating.
 
-Preview deployments set `ALICE_PREVIEW=1` and therefore do not use production short-token authentication.
+Preview deployments also require the same `ALICE_SHORT_TOKEN`. Their public path is token-prefixed, for example:
+
+`https://<preview-host>/<short-token>/preview/pr-123/`
+
+Traefik removes the token and preview base path before the application routes the request. The application authenticates the original URI and does not redirect. Direct `/preview/pr-123/` requests are no longer routed.
 
 ## Preview isolation
 
@@ -80,7 +84,7 @@ The workflow:
 8. checks both public `/healthz` endpoints;
 9. verifies that `/` returns `401` without authentication.
 
-The workflow does not print the token, write it to the repository, or include it in Traefik labels.
+The workflow does not print the token, write it to the repository, or include it in Traefik labels. GitHub comments intentionally omit the tokenized URL because the URL itself is a bearer credential.
 
 ## Required GitHub configuration
 
