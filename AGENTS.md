@@ -20,7 +20,8 @@ Use the smallest independent change that satisfies an issue or subtask.
 - Keep secrets out of logs, traces, issues, tests, and client-visible errors.
 - Prefer repository-local web UI assets. Do not introduce CDN-hosted UI dependencies without an explicit issue.
 - Android changes must preserve system-bar safety and stable debug/release signing boundaries.
-- Database changes go through committed Supabase migrations and the production migration workflow.
+- Primary database changes go through version-controlled PostgreSQL schema/bootstrap changes and the production Docker database workflow.
+- Supabase is backup/recovery storage (and may host optional diagnostic mirror tables); it is not the Alice Pro runtime primary database.
 
 ## Validation
 
