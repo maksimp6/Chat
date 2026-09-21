@@ -23,6 +23,8 @@ def test_production_deployment_uses_runtime_secret_not_traefik_labels():
     assert "maxxxpavlov.ru" in source
     assert "maxxxpavlov.online" in source
     assert "!PathPrefix" in source
+    assert "!PathRegexp" in source
+    assert "^/[^/]+/preview/" in source
     assert "/preview/" in source
     assert "traefik.http.routers.alice-production-https.tls=true" in source
     assert "traefik.http.middlewares.alice-production-https-redirect.redirectscheme.scheme=https" in source
