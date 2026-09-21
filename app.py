@@ -164,14 +164,12 @@ def save_dialog_settings(conv_id):
 
 from memory_manager import load_memory_config, save_memory_config, clear_global_memory
 from db import get_conn
-import sqlite3
 
 
 @app.route("/api/memory/manage", methods=["GET"])
 def api_memory_panel_data():
     cfg = load_memory_config()
     conn = get_conn()
-    conn.row_factory = sqlite3.Row
     facts = [dict(r) for r in conn.execute("SELECT * FROM global_memory ORDER BY updated_at DESC").fetchall()]
     conn.close()
     return jsonify({"config": cfg, "facts": facts})
