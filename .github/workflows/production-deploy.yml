@@ -82,7 +82,7 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "ALICE_TLS_CERT_DIR='$ALICE_TLS_CERT_DIR' PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
       - name: Deploy production without exposing the token
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
