@@ -18,7 +18,6 @@ permissions:
 
 env:
   PREVIEW_SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
-  ALICE_TLS_CERT_DIR: ${{ vars.ALICE_TLS_CERT_DIR || '' }}
 
 jobs:
   deploy:
@@ -40,12 +39,6 @@ jobs:
           test -n "$PREVIEW_SSH_USER"
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
           test -n "$PREVIEW_SSH_KNOWN_HOSTS"
-          if [ -n "$ALICE_TLS_CERT_DIR" ]; then
-            case "$ALICE_TLS_CERT_DIR" in
-              /*) ;;
-              *) echo "ALICE_TLS_CERT_DIR must be an absolute server path" >&2; exit 1 ;;
-            esac
-          fi
       - name: Check out ref
         uses: actions/checkout@v4
         with:
@@ -82,16 +75,22 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "ALICE_TLS_CERT_DIR='$ALICE_TLS_CERT_DIR' PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
       - name: Deploy production without exposing the token
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          printf '%s\n' "$ALICE_SHORT_TOKEN" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "ALICE_TLS_CERT_DIR='$ALICE_TLS_CERT_DIR' PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
+          printf '%s\n' "$ALICE_SHORT_TOKEN" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
       - name: Verify public health endpoint
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
             curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "https://$domain/healthz" >/dev/null
+          done
+      - name: Verify Let's Encrypt certificate
+        run: |
+          for domain in maxxxpavlov.ru maxxxpavlov.online; do
+            echo | openssl s_client -servername "$domain" -connect "$domain:443" 2>/dev/null |
+              openssl x509 -noout -issuer -subject -dates
           done
       - name: Verify route protection
         run: |
