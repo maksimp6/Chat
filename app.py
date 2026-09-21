@@ -20,9 +20,11 @@ from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
+from short_token_auth import install_short_token_auth
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
+install_short_token_auth(app)
 
 
 def preview_base_path():
