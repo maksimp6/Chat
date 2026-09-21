@@ -9,6 +9,8 @@ NETWORK_NAME="alice-preview"
 CONTAINER_NAME="alice-production"
 IMAGE_NAME="alice-production:current"
 TRAEFIK_DYNAMIC_DIR="$ROOT_DIR/traefik"
+ACME_DIR="$ROOT_DIR/keys/letsencrypt"
+ACME_FILE="$ACME_DIR/acme.json"
 
 log() { printf '[production] %s\n' "$*"; }
 die() { printf '[production] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -24,9 +26,14 @@ validate_traefik() {
   docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1 || die "shared Traefik container $TRAEFIK_NAME is missing"
   docker inspect -f '{{.State.Running}}' "$TRAEFIK_NAME" | grep -qx true || die "shared Traefik container is not running"
   docker network inspect "$NETWORK_NAME" >/dev/null 2>&1 || die "shared Docker network $NETWORK_NAME is missing"
-  local published_https
+  local published_https current_cmd current_mounts
   published_https="$(docker port "$TRAEFIK_NAME" 443/tcp 2>/dev/null || true)"
   [[ "$published_https" == *"0.0.0.0:"* ]] || die "shared Traefik does not publish HTTPS on 0.0.0.0:443"
+  current_cmd="$(docker inspect -f '{{join .Config.Cmd " "}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
+  current_mounts="$(docker inspect -f '{{range .Mounts}}{{println .Source}}{{end}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
+  grep -Fq -- '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' <<<"$current_cmd" || die "shared Traefik is not configured with the letsencrypt resolver"
+  grep -Fqx -- "$ACME_DIR" <<<"$current_mounts" || die "shared Traefik does not persist ACME storage at $ACME_DIR"
+  [[ -f "$ACME_FILE" ]] || die "ACME storage file is missing: $ACME_FILE"
 }
 
 deploy() {
@@ -73,6 +80,9 @@ deploy() {
     --label "traefik.http.routers.alice-production-https.entrypoints=websecure" \
     --label "traefik.http.routers.alice-production-https.priority=50" \
     --label "traefik.http.routers.alice-production-https.tls=true" \
+    --label "traefik.http.routers.alice-production-https.tls.certresolver=letsencrypt" \
+    --label "traefik.http.routers.alice-production-https.tls.domains[0].main=maxxxpavlov.ru" \
+    --label "traefik.http.routers.alice-production-https.tls.domains[0].sans[0]=maxxxpavlov.online" \
     --label "traefik.http.routers.alice-production-https.tls.certresolver=letsencrypt" \
     --label "traefik.http.routers.alice-production-https.tls.domains[0].main=maxxxpavlov.ru" \
     --label "traefik.http.routers.alice-production-https.tls.domains[0].sans[0]=maxxxpavlov.online" \
