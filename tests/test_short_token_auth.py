@@ -47,11 +47,13 @@ def test_invalid_token_is_rejected_without_disclosure(monkeypatch):
     assert "unit-test-token" not in response.get_data(as_text=True)
 
 
-def test_valid_token_sets_session_and_redirects(monkeypatch):
+def test_valid_token_path_is_served_without_redirect(monkeypatch):
     client = _client(monkeypatch, token="unit-test-token", require=True)
     response = client.get("/unit-test-token")
-    assert response.status_code == 303
-    assert response.headers["Location"] == "/"
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "ok"
+    assert response.headers.get("Location") is None
+    assert "Set-Cookie" in response.headers
     assert "Referrer-Policy" in response.headers
     assert "unit-test-token" not in response.get_data(as_text=True)
 
@@ -59,16 +61,23 @@ def test_valid_token_sets_session_and_redirects(monkeypatch):
     assert response.status_code == 200
 
 
-def test_token_prefix_preserves_nested_preview_path(monkeypatch):
+def test_token_prefix_preserves_nested_preview_path_without_redirect(monkeypatch):
     client = _client(monkeypatch, token="unit-test-token", require=True)
     response = client.get("/unit-test-token/preview/pr-235")
-    assert response.status_code == 303
-    assert response.headers["Location"] == "/preview/pr-235"
-    assert "unit-test-token" not in response.headers["Location"]
-
-    response = client.get("/preview/pr-235")
     assert response.status_code == 200
     assert response.get_data(as_text=True) == "preview:pr-235"
+    assert response.headers.get("Location") is None
+
+
+def test_forwarded_token_prefix_is_authenticated_after_proxy_rewrite(monkeypatch):
+    client = _client(monkeypatch, token="unit-test-token", require=True, preview=True)
+    response = client.get(
+        "/",
+        headers={"X-Forwarded-Uri": "/unit-test-token/preview/pr-235/"},
+    )
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "ok"
+    assert "Set-Cookie" in response.headers
 
 
 def test_health_endpoint_remains_public_for_deployment_checks(monkeypatch):
@@ -77,13 +86,13 @@ def test_health_endpoint_remains_public_for_deployment_checks(monkeypatch):
     assert response.status_code == 200
 
 
-def test_preview_bypasses_production_auth(monkeypatch):
-    client = _client(monkeypatch, token=None, require=True, preview=True)
+def test_preview_requires_token_when_auth_is_enabled(monkeypatch):
+    client = _client(monkeypatch, token="unit-test-token", require=True, preview=True)
     response = client.get("/")
-    assert response.status_code == 200
+    assert response.status_code == 401
 
 
 def test_auth_can_be_disabled_for_local_development(monkeypatch):
-    client = _client(monkeypatch, token=None, require=False)
+    client = _client(monkeypatch, token=None, require=False, preview=True)
     response = client.get("/")
     assert response.status_code == 200
