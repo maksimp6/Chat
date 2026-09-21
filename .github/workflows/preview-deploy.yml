@@ -120,7 +120,7 @@ jobs:
             echo "PREVIEW_PUBLIC_BASE_URL does not resolve yet; using the VPS host for the external smoke check."
           fi
           url="${public_base%/}/${ALICE_SHORT_TOKEN}/preview/${KEY}/"
-          for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview URL: ${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}/"; exit 0; }; sleep 2; done
+          for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview deployed (tokenized URL; token omitted from logs)."; exit 0; }; sleep 2; done
           exit 1
       - name: Verify critical web assets
         env:
