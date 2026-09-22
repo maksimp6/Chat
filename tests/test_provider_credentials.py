@@ -283,19 +283,32 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
 
 
 
-def test_provider_credentials_update_preserves_provider_permission_error(monkeypatch):
+def test_provider_credentials_update_accepts_yandex_static_key_without_remote_probe(monkeypatch):
     from flask import Flask
     import provider_credentials_routes as routes
-    from yandex_api_key_provider import YandexProviderPermissionError
+
+    calls = []
 
     class FakeClient:
         def validate_key(self, api_key):
-            raise YandexProviderPermissionError(
-                "Yandex API key is authenticated, but the key is not authorized to list AI Studio models (HTTP 403)"
-            )
+            calls.append(api_key)
 
     monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+
+    class FakeConn:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(routes, "get_conn", lambda: FakeConn())
+    monkeypatch.setattr(
+        routes,
+        "replace_active_credential",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(routes, "record_health_check", lambda *args, **kwargs: None)
+    monkeypatch.setattr(routes, "provider_credentials_status", lambda: ({"ok": True}, 200))
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
     app.testing = True
@@ -303,12 +316,8 @@ def test_provider_credentials_update_preserves_provider_permission_error(monkeyp
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "valid-but-unverified"},
+            json={"yandex_api_key": "static-yandex-key"},
         )
 
-    assert response.status_code == 403
-    body = response.get_json()
-    assert body["error"] == "provider_validation_permission_denied"
-    assert body["provider"] == "yandex"
-    assert body["status"] == "forbidden"
-    assert "HTTP 403" in body["detail"]
+    assert response.status_code == 200
+    assert calls == ["static-yandex-key"]
