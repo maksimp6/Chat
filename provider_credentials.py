@@ -392,7 +392,8 @@ def list_provider_credentials(
     if provider:
         rows = db.execute("""
             SELECT id, provider, provider_key_id, yandex_key_id,
-                   project_id, issued_at, expires_at, status, created_at
+                   project_id, issued_at, expires_at, status, created_at,
+                   fingerprint, last_checked_at, last_check_status, last_check_error
             FROM provider_credentials
             WHERE provider = ?
             ORDER BY id DESC
@@ -424,6 +425,7 @@ def promote_rotated_key(
     issued_at: datetime,
     expires_at: datetime,
     provider: str = YANDEX,
+    fingerprint: Optional[str] = None,
 ) -> None:
     db.execute(
         "UPDATE provider_credentials SET status = 'rotating' "
