@@ -13,6 +13,10 @@ import requests
 logger = logging.getLogger("alice.provider.yandex")
 
 
+class YandexProviderPermissionError(PermissionError):
+    """The API key is accepted, but lacks permission for the validation operation."""
+
+
 class YandexApiKeyProvider:
     """Create/revoke service-account API keys and validate runtime access.
 
@@ -30,7 +34,6 @@ class YandexApiKeyProvider:
         endpoint: Optional[str] = None,
         ai_endpoint: Optional[str] = None,
         project_id: Optional[str] = None,
-        validation_model: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
         self.iam_token = iam_token or os.getenv("YANDEX_IAM_TOKEN")
@@ -59,10 +62,6 @@ class YandexApiKeyProvider:
             "https://ai.api.cloud.yandex.net/v1",
         )).rstrip("/")
         self.project_id = project_id or os.getenv("YANDEX_PROJECT_ID")
-        self.validation_model = validation_model or os.getenv(
-            "YANDEX_PROVIDER_VALIDATION_MODEL",
-            "alice-lite",
-        )
         self.timeout = timeout
 
     def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
@@ -107,21 +106,19 @@ class YandexApiKeyProvider:
         return str(resource_id), str(secret)
 
     def validate_key(self, api_key: str) -> None:
+        """Validate API-key authentication without invoking a billable model."""
+        if not api_key:
+            raise ValueError("Yandex API key is empty")
         if not self.project_id:
             raise RuntimeError("YANDEX_PROJECT_ID is required for provider-key validation")
-        model = f"gpt://{self.project_id}/{self.validation_model}/latest"
+
         try:
-            response = requests.post(
-                f"{self.ai_endpoint}/responses",
+            response = requests.get(
+                f"{self.ai_endpoint}/models",
                 headers={
                     "Authorization": f"Api-Key {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "input": "ping",
-                    "max_output_tokens": 1,
-                    "background": False,
+                    "x-project": self.project_id,
+                    "Accept": "application/json",
                 },
                 timeout=self.timeout,
             )
@@ -132,18 +129,22 @@ class YandexApiKeyProvider:
             body = getattr(response, "text", "") if response is not None else ""
             logger.critical(
                 "Yandex provider validation failed: status=%s endpoint=%s "
-                "model=%s response=%s",
+                "operation=GET /models response=%s",
                 status,
                 self.ai_endpoint,
-                model,
                 body[:2000],
             )
-            if status in (401, 403):
+            if status == 401:
                 raise PermissionError(
-                    f"Yandex authorization failed (HTTP {status})"
+                    "Yandex API-key authentication failed (HTTP 401)"
+                ) from exc
+            if status == 403:
+                raise YandexProviderPermissionError(
+                    "Yandex API key is authenticated, but the key is not "
+                    "authorized to list AI Studio models (HTTP 403)"
                 ) from exc
             raise RuntimeError(
-                f"Yandex provider health check failed"
+                "Yandex provider authentication check failed"
                 + (f" (HTTP {status})" if status else "")
             ) from exc
 
