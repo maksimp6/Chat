@@ -26,6 +26,7 @@ from provider_credentials import (
 )
 from cloudru_api_key_provider import CloudRuApiKeyProvider
 from cloudru_iam import CloudRuIamClient
+from trace_manager import traced_operation
 from yandex_api_key_provider import YandexApiKeyProvider
 
 
@@ -274,6 +275,7 @@ def _perform_health_check(provider: str) -> dict:
 
 
 @provider_credentials_bp.post("/status/check")
+@traced_operation("provider_credentials.status_check")
 def provider_credentials_status_check():
     guard = _guard()
     if guard:
@@ -293,6 +295,7 @@ def provider_credentials_status_check():
 
 
 @provider_credentials_bp.get("/status")
+@traced_operation("provider_credentials.status")
 def provider_credentials_status():
     guard = _guard()
     if guard:
@@ -306,6 +309,7 @@ def provider_credentials_status():
 
 
 @provider_credentials_bp.post("/cloudru/service-accounts")
+@traced_operation("cloudru.service_accounts")
 def cloudru_service_accounts():
     guard = _guard()
     if guard:
@@ -348,6 +352,7 @@ def cloudru_service_accounts():
 
 
 @provider_credentials_bp.post("/cloudru/bootstrap")
+@traced_operation("cloudru.bootstrap")
 def bootstrap_cloudru():
     guard = _guard()
     if guard:
@@ -453,6 +458,7 @@ def bootstrap_cloudru():
 
 
 @provider_credentials_bp.put("")
+@traced_operation("provider_credentials.update")
 def update_provider_credentials():
     guard = _guard()
     if guard:
