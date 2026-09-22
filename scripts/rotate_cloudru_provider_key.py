@@ -28,7 +28,7 @@ logger = logging.getLogger("alice_cloudru_provider_key_rotation")
 
 def _ttl() -> timedelta:
     try:
-        days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "90"))
+        days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "1"))
     except ValueError as exc:
         raise RuntimeError("CLOUDRU_KEY_TTL_DAYS must be an integer") from exc
     if not 1 <= days <= 365:
