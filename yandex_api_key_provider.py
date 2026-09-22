@@ -5,24 +5,16 @@ from datetime import datetime
 import os
 from typing import Iterable, Optional
 
-import logging
-
 import requests
 
 
-logger = logging.getLogger("alice.provider.yandex")
-
-
-class YandexProviderPermissionError(PermissionError):
-    """The API key is accepted, but lacks permission for the validation operation."""
-
-
 class YandexApiKeyProvider:
-    """Create/revoke service-account API keys and validate runtime access.
+    """Create/revoke service-account API keys.
 
-    Management credentials are required only for create/revoke. A health check
-    needs only the provider API key, so the constructor is safe to use from the
-    credentials UI even when rotation management is not configured.
+    A static Yandex API key is an authentication credential for Yandex Cloud
+    APIs. Yandex does not document a non-billable AI Studio endpoint that can
+    universally validate the key without also imposing an API-specific
+    permission. Do not turn the credentials UI into a model or /models probe.
     """
 
     def __init__(
@@ -46,7 +38,6 @@ class YandexApiKeyProvider:
                 for item in os.getenv(
                     "YANDEX_API_KEY_SCOPES",
                     "yc.ai.languageModels.execute,"
-                    "yc.ai.models.viewer,"
                     "yc.ai.speechkitStt.execute,"
                     "yc.ai.speechkitTts.execute",
                 ).split(",")
@@ -107,47 +98,9 @@ class YandexApiKeyProvider:
         return str(resource_id), str(secret)
 
     def validate_key(self, api_key: str) -> None:
-        """Validate API-key authentication without invoking a billable model."""
-        if not api_key:
+        """Validate only local presence; never make a billable/probing request."""
+        if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("Yandex API key is empty")
-        if not self.project_id:
-            raise RuntimeError("YANDEX_PROJECT_ID is required for provider-key validation")
-
-        try:
-            response = requests.get(
-                f"{self.ai_endpoint}/models",
-                headers={
-                    "Authorization": f"Api-Key {api_key}",
-                    "x-project": self.project_id,
-                    "Accept": "application/json",
-                },
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            response = getattr(exc, "response", None)
-            status = getattr(response, "status_code", None)
-            body = getattr(response, "text", "") if response is not None else ""
-            logger.critical(
-                "Yandex provider validation failed: status=%s endpoint=%s "
-                "operation=GET /models response=%s",
-                status,
-                self.ai_endpoint,
-                body[:2000],
-            )
-            if status == 401:
-                raise PermissionError(
-                    "Yandex API-key authentication failed (HTTP 401)"
-                ) from exc
-            if status == 403:
-                raise YandexProviderPermissionError(
-                    "Yandex API key is authenticated, but the key is not "
-                    "authorized to list AI Studio models (HTTP 403)"
-                ) from exc
-            raise RuntimeError(
-                "Yandex provider authentication check failed"
-                + (f" (HTTP {status})" if status else "")
-            ) from exc
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
