@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import json
 import os
+import logging
 
 from flask import Blueprint, jsonify, request
 
@@ -28,6 +29,9 @@ from cloudru_api_key_provider import CloudRuApiKeyProvider
 from cloudru_iam import CloudRuIamClient
 from trace_manager import traced_operation
 from yandex_api_key_provider import YandexApiKeyProvider
+
+
+logger = logging.getLogger("alice.provider_credentials")
 
 
 provider_credentials_bp = Blueprint(
@@ -457,20 +461,31 @@ def update_provider_credentials():
     try:
         for provider, api_key in supplied:
             client = _provider_client(provider)
+            logger.info("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
-            except PermissionError:
+            except PermissionError as exc:
+                logger.warning(
+                    "provider credential validation rejected: provider=%s reason=%s",
+                    provider, str(exc),
+                )
                 return jsonify({
                     "error": "authorization_failed",
                     "provider": provider,
                     "status": "invalid",
                 }), 401
-            except Exception:
+            except Exception as exc:
+                logger.exception(
+                    "provider credential validation failed: provider=%s",
+                    provider,
+                )
                 return jsonify({
                     "error": "provider_health_check_failed",
                     "provider": provider,
                     "status": "invalid",
                 }), 502
+            else:
+                logger.info("provider credential validation succeeded: provider=%s", provider)
 
         conn = get_conn()
         try:
