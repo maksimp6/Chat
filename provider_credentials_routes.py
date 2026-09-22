@@ -193,8 +193,11 @@ def _status_for(provider: str) -> dict:
         authorization_ok = health_status == "connected"
         return {
             "provider": provider,
-            "status": "connected" if authorization_ok else (
-                "invalid" if health_status == "invalid" else "checking"
+            "status": (
+                "connected" if authorization_ok
+                else "invalid" if health_status == "invalid"
+                else "forbidden" if health_status == "forbidden"
+                else "checking"
             ),
             "authorization_ok": authorization_ok,
             "error": row["last_check_error"],
@@ -265,6 +268,9 @@ def _perform_health_check(provider: str) -> dict:
         return {"status": "not_configured", "error": None}
     try:
         _provider_client(provider).validate_key(credential.api_key)
+    except YandexProviderPermissionError:
+        error = "permission_denied"
+        status = "forbidden"
     except PermissionError:
         error = "unauthorized"
         status = "invalid"
