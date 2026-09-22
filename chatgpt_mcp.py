@@ -123,8 +123,8 @@ def _request_protocol_version(payload: Mapping[str, Any]) -> str:
         return header.strip()
     meta = payload.get("params", {}).get("_meta", {})
     if isinstance(meta, Mapping):
-        return str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip()
-    return ""
+        return str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip() or DEFAULT_PROTOCOL_VERSION
+    return DEFAULT_PROTOCOL_VERSION
 
 
 def _protected_resource_url() -> Optional[str]:
@@ -141,12 +141,13 @@ def _www_authenticate() -> Optional[str]:
 
 
 def _auth_user_from_request() -> Optional[str]:
-    """Authenticate the current request.
+    """Return the MCP user without requiring authentication.
 
-    External OAuth deployments should use token introspection.  A single
-    configured bearer token remains available for private/dev deployments,
-    while anonymous access must be explicitly opted into.
+    MCP is intentionally unauthenticated for the current Alice Pro preview.
+    Authorization can be added later as a separate, explicit feature.
     """
+    return None
+
     mode = _auth_mode()
     if mode == "anonymous":
         return os.getenv("ALICE_MCP_USER_ID") or None
