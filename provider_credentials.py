@@ -252,7 +252,7 @@ def bootstrap_credential(
         expires_at,
         fingerprint_key(api_key),
     ))
-    if commit and hasattr(db, "commit"):
+    if hasattr(db, "commit"):
         db.commit()
 
     return ProviderCredential(
