@@ -74,14 +74,18 @@ deploy() {
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
   local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
   local domain_rule="(Host(\`maxxxpavlov.ru\`) || Host(\`maxxxpavlov.online\`)) && $tokenized_rule"
-  local http_router="${container}-http"
-  local https_router="${container}-https"
+  local http_ru_router="${container}-http-ru"
+  local http_online_router="${container}-http-online"
+  local https_ru_router="${container}-https-ru"
+  local https_online_router="${container}-https-online"
   local token_strip_middleware="${container}-token-strip"
   local proxy_auth_middleware="${container}-proxy-auth"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${http_router}.rule=$domain_rule" --label "traefik.http.routers.${http_router}.entrypoints=web" --label "traefik.http.routers.${http_router}.priority=100" --label "traefik.http.routers.${http_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
-    --label "traefik.http.routers.${https_router}.rule=$domain_rule" --label "traefik.http.routers.${https_router}.entrypoints=websecure" --label "traefik.http.routers.${https_router}.tls=true" --label "traefik.http.routers.${https_router}.tls.certresolver=letsencrypt" --label "traefik.http.routers.${https_router}.tls.domains[0].main=maxxxpavlov.ru" --label "traefik.http.routers.${https_router}.tls.domains[0].sans[0]=maxxxpavlov.online" --label "traefik.http.routers.${https_router}.priority=100" --label "traefik.http.routers.${https_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
+    --label "traefik.http.routers.${http_ru_router}.rule=Host(\\`maxxxpavlov.ru\\`) && $tokenized_rule" --label "traefik.http.routers.${http_ru_router}.entrypoints=web" --label "traefik.http.routers.${http_ru_router}.priority=100" --label "traefik.http.routers.${http_ru_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
+    --label "traefik.http.routers.${http_online_router}.rule=Host(\\`maxxxpavlov.online\\`) && $tokenized_rule" --label "traefik.http.routers.${http_online_router}.entrypoints=web" --label "traefik.http.routers.${http_online_router}.priority=100" --label "traefik.http.routers.${http_online_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
+    --label "traefik.http.routers.${https_ru_router}.rule=Host(\\`maxxxpavlov.ru\\`) && $tokenized_rule" --label "traefik.http.routers.${https_ru_router}.entrypoints=websecure" --label "traefik.http.routers.${https_ru_router}.tls=true" --label "traefik.http.routers.${https_ru_router}.tls.certresolver=letsencrypt" --label "traefik.http.routers.${https_ru_router}.priority=100" --label "traefik.http.routers.${https_ru_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
+    --label "traefik.http.routers.${https_online_router}.rule=Host(\\`maxxxpavlov.online\\`) && $tokenized_rule" --label "traefik.http.routers.${https_online_router}.entrypoints=websecure" --label "traefik.http.routers.${https_online_router}.tls=true" --label "traefik.http.routers.${https_online_router}.tls.certresolver=letsencrypt" --label "traefik.http.routers.${https_online_router}.priority=100" --label "traefik.http.routers.${https_online_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
