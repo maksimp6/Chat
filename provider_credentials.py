@@ -250,6 +250,7 @@ def bootstrap_credential(
         project_id,
         issued_at,
         expires_at,
+        fingerprint_key(api_key),
     ))
     if hasattr(db, "commit"):
         db.commit()
@@ -297,8 +298,8 @@ def replace_active_credential(
     cursor = db.execute("""
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
-         project_id, issued_at, expires_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+         project_id, issued_at, expires_at, status, fingerprint)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
     """, (
         encrypted,
         key_id if provider == YANDEX else None,
@@ -307,6 +308,7 @@ def replace_active_credential(
         project_id,
         issued_at,
         expires_at,
+        fingerprint_key(api_key),
     ))
     if hasattr(db, "commit"):
         db.commit()
@@ -435,8 +437,8 @@ def promote_rotated_key(
     db.execute("""
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
-         project_id, issued_at, expires_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+         project_id, issued_at, expires_at, status, fingerprint)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
     """, (
         encrypted_key,
         provider_key_id if provider == YANDEX else None,
@@ -445,6 +447,7 @@ def promote_rotated_key(
         project_id,
         issued_at,
         expires_at,
+        fingerprint,
     ))
 
 
