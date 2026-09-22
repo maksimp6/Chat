@@ -535,7 +535,15 @@ def update_provider_credentials():
                 )
         finally:
             conn.close()
-    except Exception:
-        return jsonify({"error": "credential_storage_failed"}), 503
+    except Exception as exc:
+        logger.exception(
+            "Provider credential storage failed: providers=%s error=%s",
+            [provider for provider, _ in supplied],
+            exc,
+        )
+        return jsonify({
+            "error": "credential_storage_failed",
+            "detail": "Ключ проверен, но сервер не смог сохранить его. Подробности записаны в серверный лог.",
+        }), 503
 
     return provider_credentials_status()
