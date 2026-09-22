@@ -12,7 +12,7 @@ through metadata, traces, logs, or frontend responses.
 - A replacement key is created through Yandex IAM.
 - Alice Pro validates the replacement against the configured Yandex Responses endpoint.
 - After validation, the replacement is promoted and the old provider key is revoked.
-- The existing deployment lifecycle remains 12 hours with rotation in the final hour.
+- The existing Yandex deployment lifecycle remains 12 hours with rotation in the final hour.
 
 ### Cloud.ru Foundation Models
 
@@ -21,7 +21,7 @@ through metadata, traces, logs, or frontend responses.
 - The Foundation Models key is created for a service account with the
   Foundation Models service selected.
 - Cloud.ru supports key lifetimes from one day to one year. Alice Pro defaults
-  to 90 days via \`CLOUDRU_KEY_TTL_DAYS\`.
+  to a one-day lifetime via \`CLOUDRU_KEY_TTL_DAYS=1\`, so the key is rotated daily.
 - Cloud.ru documents API-key reissue: the Key Secret and expiry change while
   the key ID remains unchanged.
 - Alice Pro therefore uses in-place reissue for Cloud.ru. The new secret is
@@ -76,9 +76,9 @@ Cloud.ru:
 python3 scripts/rotate_cloudru_provider_key.py
 \`\`\`
 
-Run the appropriate worker at least hourly. Each worker checks the provider's
-rotation window, validates the new/reissued secret, and only then promotes it
-in the database.
+Run the appropriate worker at least hourly. The Cloud.ru worker uses a one-day
+key lifetime and rotates during the final hour of that daily lifetime. Each
+worker validates the new/reissued secret before promoting it in the database.
 
 ## Environment precedence
 
