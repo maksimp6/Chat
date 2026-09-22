@@ -133,6 +133,13 @@ def create_schema(db: Any) -> None:
           AND (provider_key_id IS NULL OR provider_key_id = '')
           AND yandex_key_id IS NOT NULL
     """)
+    # Never treat locally generated placeholder IDs as remotely managed key IDs.
+    db.execute("""
+        UPDATE provider_credentials
+        SET provider_key_id = NULL
+        WHERE provider_key_id LIKE 'bootstrap-%'
+           OR provider_key_id LIKE 'managed-%'
+    """)
 
     # Old schema allowed only one active key globally. Drop that constraint
     # before creating the provider-scoped equivalent.
@@ -236,7 +243,7 @@ def bootstrap_credential(
 
     issued_at, expires_at = issue_window(now, ttl=ttl)
     encrypted = encrypt(api_key)
-    key_id = provider_key_id or f"bootstrap-{fingerprint_key(api_key)[:16]}"
+    key_id = provider_key_id
     cursor = db.execute("""
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
@@ -294,7 +301,7 @@ def replace_active_credential(
         "WHERE provider = ? AND status = 'active'",
         (provider,),
     )
-    key_id = provider_key_id or f"managed-{fingerprint_key(api_key)[:16]}"
+    key_id = provider_key_id
     cursor = db.execute("""
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
