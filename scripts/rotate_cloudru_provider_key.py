@@ -62,6 +62,12 @@ def main() -> int:
         if not management:
             logger.error("Cloud.ru rotation unavailable: IAM credentials are not configured")
             return 2
+        if management.get("expires_at"):
+            from datetime import datetime, timezone
+            master_expires = datetime.fromisoformat(management["expires_at"].replace("Z", "+00:00"))
+            if master_expires <= datetime.now(timezone.utc):
+                logger.error("Cloud.ru rotation blocked: IAM master key is expired")
+                return 2
         provider = CloudRuApiKeyProvider(
             iam_client=CloudRuIamClient(
                 key_id=management["key_id"],
