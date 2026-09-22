@@ -494,8 +494,9 @@ def update_provider_credentials():
                 }), 401
             except Exception as exc:
                 logger.debug(
-                    "provider credential validation failed: provider=%s", exc_info=True,
+                    "provider credential validation failed: provider=%s",
                     provider,
+                    exc_info=True,
                 )
                 return jsonify({
                     "error": "provider_health_check_failed",
