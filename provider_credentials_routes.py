@@ -371,11 +371,13 @@ def bootstrap_cloudru():
     key_secret = pick("iam_key_secret", "secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
     project_id = request.form.get("project_id", "").strip() or pick("projectId", "project_id")
     requested_sa_id = request.form.get("service_account_id", "").strip() or pick("serviceAccountId", "service_account_id")
-    sa_name = request.form.get("service_account_name", "").strip() or "Alice Pro"
     if not key_id or not key_secret:
-        return jsonify({"error": "IAM JSON must contain Key ID and Key Secret"}), 400
-    if not project_id:
-        return jsonify({"error": "project_id is required"}), 400
+        return jsonify({"error": "Cloud.ru IAM Key ID and Key Secret are required"}), 400
+    if not requested_sa_id:
+        return jsonify({
+            "error": "service_account_id_required",
+            "detail": "Create or select an existing Cloud.ru service account with a project role, then provide its UUID.",
+        }), 400
 
     iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     iam_expires_at = None
@@ -388,30 +390,12 @@ def bootstrap_cloudru():
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
 
     try:
+        # Static API keys are issued directly for an existing service account.
+        # Do not enumerate or auto-create accounts here: the Cloud.ru API documents
+        # API-key creation as a separate operation and requires the caller to have
+        # the appropriate project role.
         management = CloudRuIamClient(key_id=key_id, key_secret=key_secret)
-        accounts = management.list_service_accounts()
-        account = None
-        if requested_sa_id:
-            account = next((item for item in accounts if str(item.get("id") or "") == requested_sa_id), None)
-            if account is None:
-                return jsonify({"error": "service_account_not_found"}), 404
-        else:
-            account = next(
-                (item for item in accounts
-                 if str(item.get("name") or "").strip().lower() == sa_name.lower()
-                 and str(item.get("project_id") or item.get("target", {}).get("project_id") or "") == project_id),
-                None,
-            )
-            if account is None:
-                account = management.create_service_account(
-                    project_id=project_id,
-                    name=sa_name,
-                    description="Alice Pro Foundation Models runtime",
-                )
-
-        service_account_id = str(account.get("id") or account.get("service_account_id") or "")
-        if not service_account_id:
-            return jsonify({"error": "Cloud.ru did not return service account ID"}), 502
+        service_account_id = requested_sa_id
 
         expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
         key = management.create_api_key(
