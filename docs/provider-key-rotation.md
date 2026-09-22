@@ -37,15 +37,18 @@ through metadata, traces, logs, or frontend responses.
 The provider credentials modal contains:
 
 - **Yandex Cloud API key**
-- **Cloud.ru IAM credentials JSON**
-- **Cloud.ru Project ID**
-- **Cloud.ru service account name**
+- **Cloud.ru IAM Key ID**
+- **Cloud.ru IAM Key Secret**
+- **Cloud.ru Service account ID**
 
-The Cloud.ru runtime API key is not entered manually. Alice Pro creates it for the service account, performs a real Foundation Models health check, and stores only encrypted server-side credentials.
+The Cloud.ru runtime API key is not entered manually. Alice Pro creates it for the
+existing service account, performs a real Foundation Models health check, and
+stores the IAM management credentials and runtime credential encrypted on the
+server.
 
-The existing Cloud.ru IAM wizard remains a separate administrative feature.
-Its Key ID + Key Secret -> IAM Bearer flow is not used for Foundation Models
-runtime requests.
+A service account must already exist and have an appropriate project role before
+the runtime key is created. Alice Pro does not enumerate or silently create
+service accounts during provider bootstrap.
 
 ## Security
 
