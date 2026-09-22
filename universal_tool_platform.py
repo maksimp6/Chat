@@ -410,7 +410,14 @@ class UniversalToolExecutor:
     ) -> dict[str, Any]:
         if isinstance(raw_result, Mapping) and "success" in raw_result:
             success = bool(raw_result.get("success"))
-            data = raw_result.get("data")
+            if success and "data" not in raw_result:
+                data = {
+                    key: value
+                    for key, value in raw_result.items()
+                    if key not in {"success", "error", "metadata"}
+                }
+            else:
+                data = raw_result.get("data")
             error = raw_result.get("error")
             metadata = dict(raw_result.get("metadata") or {})
         elif isinstance(raw_result, Mapping) and raw_result.get("error"):
