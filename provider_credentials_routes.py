@@ -65,7 +65,7 @@ def _guard():
 
 def _cloudru_ttl() -> timedelta:
     try:
-        days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "90"))
+        days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "1"))
     except ValueError as exc:
         raise ValueError("CLOUDRU_KEY_TTL_DAYS must be an integer") from exc
     if not 1 <= days <= 365:
