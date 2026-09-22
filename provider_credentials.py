@@ -98,7 +98,10 @@ def create_schema(db: Any) -> None:
             issued_at TIMESTAMP NOT NULL,
             expires_at TIMESTAMP NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_checked_at TIMESTAMP,
+            last_check_status TEXT,
+            last_check_error TEXT
         )
     """)
 
@@ -112,6 +115,9 @@ def create_schema(db: Any) -> None:
         ("provider", "ALTER TABLE provider_credentials ADD COLUMN provider TEXT NOT NULL DEFAULT 'yandex'"),
         ("provider_key_id", "ALTER TABLE provider_credentials ADD COLUMN provider_key_id TEXT"),
         ("yandex_key_id", "ALTER TABLE provider_credentials ADD COLUMN yandex_key_id TEXT"),
+        ("last_checked_at", "ALTER TABLE provider_credentials ADD COLUMN last_checked_at TIMESTAMP"),
+        ("last_check_status", "ALTER TABLE provider_credentials ADD COLUMN last_check_status TEXT"),
+        ("last_check_error", "ALTER TABLE provider_credentials ADD COLUMN last_check_error TEXT"),
     )
     for column, statement in migrations:
         if column not in columns:
@@ -446,3 +452,31 @@ def issue_window(
     if ttl <= timedelta(0):
         raise ValueError("ttl must be positive")
     return issued, issued + ttl
+
+
+def record_health_check(
+    db: Any,
+    provider: str,
+    *,
+    status: str,
+    error: Optional[str] = None,
+    checked_at: Optional[datetime] = None,
+) -> None:
+    """Persist only the result of a provider health check, never its secret."""
+    if provider not in SUPPORTED_PROVIDERS:
+        raise ValueError(f"Unsupported provider: {provider}")
+    if status not in {"connected", "invalid", "unavailable", "unknown"}:
+        raise ValueError(f"Unsupported health status: {status}")
+    db.execute(
+        """UPDATE provider_credentials
+           SET last_checked_at = ?, last_check_status = ?, last_check_error = ?
+           WHERE provider = ? AND status = 'active'""",
+        (
+            _as_utc(checked_at or utcnow()),
+            status,
+            error,
+            provider,
+        ),
+    )
+    if hasattr(db, "commit"):
+        db.commit()
