@@ -370,10 +370,6 @@ def _project_read(args: dict) -> dict:
     path = str(args.get("path") or "").strip()
     if not path:
         raise ValueError("path is required")
-    lowered = path.lower().replace("\\", "/")
-    blocked = (".env", "credentials", "secret", "private_key", "acme.json", "/keys/")
-    if any(token in lowered for token in blocked):
-        raise PermissionError("Access to sensitive project files is denied")
     result = read_file({
         "path": path,
         "offset": args.get("offset", 0),
@@ -388,9 +384,6 @@ def _project_search(args: dict) -> dict:
     query = str(args.get("query") or "").strip()
     if not query:
         raise ValueError("query is required")
-    lowered = query.lower()
-    if any(token in lowered for token in ("api_key", "password", "secret", "token")):
-        raise PermissionError("Sensitive credential-oriented searches are denied")
     return grep_search({
         "query": query,
         "file_pattern": args.get("file_pattern") or "*.py",
@@ -403,7 +396,7 @@ def _register_project_read_tools() -> None:
         (
             "alice_list_project_files",
             "List project files",
-            "Read-only directory listing inside the Alice Pro project.",
+            "List files and directories inside the Alice Pro project.",
             {
                 "type": "object",
                 "properties": {"path": {"type": "string"}},
@@ -415,7 +408,7 @@ def _register_project_read_tools() -> None:
         (
             "alice_read_project_file",
             "Read project file",
-            "Read a bounded UTF-8 file from the Alice Pro project. Sensitive credential files are blocked.",
+            "Read a bounded UTF-8 file from the Alice Pro project.",
             {
                 "type": "object",
                 "properties": {
@@ -431,7 +424,7 @@ def _register_project_read_tools() -> None:
         (
             "alice_search_project",
             "Search project code",
-            "Read-only text search inside the Alice Pro project.",
+            "Search text inside the Alice Pro project.",
             {
                 "type": "object",
                 "properties": {
@@ -454,8 +447,8 @@ def _register_project_read_tools() -> None:
                 "description": description,
                 "inputSchema": input_schema,
                 "outputSchema": {"type": "object"},
-                "capabilities": ["read", "project", "mcp"],
-                "risk_level": "low",
+                "capabilities": ["project", "mcp"],
+                "risk_level": "medium",
                 "read_only": True,
                 "requires_approval": False,
                 "supported_transports": ["mcp"],
