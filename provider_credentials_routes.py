@@ -18,6 +18,7 @@ from provider_credentials import (
     get_active_credential,
     replace_active_credential,
     rotation_needed,
+    fingerprint_key,
 )
 from cloudru_api_key_provider import CloudRuApiKeyProvider
 from yandex_api_key_provider import YandexApiKeyProvider
@@ -87,7 +88,7 @@ def _load_credential(provider: str) -> ProviderCredential | None:
                 provider=provider,
                 project_id=config.PROJECT_ID if provider == YANDEX else "",
                 provider_key_id=_provider_key_id_from_environment(provider),
-                fingerprint=None,
+                fingerprint=fingerprint_key(key),
             )
     finally:
         conn.close()
