@@ -16,6 +16,7 @@ from typing import Optional
 import requests
 
 from cloudru_iam import CloudRuIamClient, CloudRuIamError
+from trace_manager import get_current_trace
 
 
 class CloudRuApiKeyProvider:
@@ -40,6 +41,13 @@ class CloudRuApiKeyProvider:
         """Perform a real authenticated Foundation Models API request."""
         if not api_key:
             raise ValueError("Cloud.ru API key is empty")
+        trace = get_current_trace()
+        started = datetime.now()
+        if trace:
+            trace.add_event("provider_api_request", {
+                "provider": "cloudru", "service": "foundation_models",
+                "operation": "validate_key", "method": "GET", "path": "/models",
+            })
         try:
             response = requests.get(
                 f"{self.base_url}/models",
@@ -50,8 +58,25 @@ class CloudRuApiKeyProvider:
                 timeout=self.timeout,
             )
             response.raise_for_status()
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "foundation_models",
+                    "operation": "validate_key", "method": "GET", "path": "/models",
+                    "http_status": response.status_code,
+                    "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
+                    "success": True,
+                })
         except requests.RequestException as exc:
             status = getattr(exc.response, "status_code", None)
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "foundation_models",
+                    "operation": "validate_key", "method": "GET", "path": "/models",
+                    "http_status": status,
+                    "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
+                    "success": False,
+                })
+                trace.record_error("cloudru.foundation_models.validate_key", "Cloud.ru Foundation Models health check failed", exception=exc)
             if status in (401, 403):
                 raise PermissionError("Cloud.ru Foundation Models authorization failed") from exc
             raise RuntimeError("Cloud.ru Foundation Models health check failed") from exc
