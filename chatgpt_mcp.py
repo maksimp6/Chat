@@ -20,6 +20,7 @@ from invocation_api import get_invocation_status, get_invocation_trace
 from session_manager import get_session
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from filesystem_mcp_tools import grep_search, list_directory, read_file
 
 
 MCP_PATH = "/mcp"
@@ -122,8 +123,8 @@ def _request_protocol_version(payload: Mapping[str, Any]) -> str:
         return header.strip()
     meta = payload.get("params", {}).get("_meta", {})
     if isinstance(meta, Mapping):
-        return str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip()
-    return ""
+        return str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip() or DEFAULT_PROTOCOL_VERSION
+    return DEFAULT_PROTOCOL_VERSION
 
 
 def _protected_resource_url() -> Optional[str]:
@@ -140,12 +141,13 @@ def _www_authenticate() -> Optional[str]:
 
 
 def _auth_user_from_request() -> Optional[str]:
-    """Authenticate the current request.
+    """Return the MCP user without requiring authentication.
 
-    External OAuth deployments should use token introspection.  A single
-    configured bearer token remains available for private/dev deployments,
-    while anonymous access must be explicitly opted into.
+    MCP is intentionally unauthenticated for the current Alice Pro preview.
+    Authorization can be added later as a separate, explicit feature.
     """
+    return None
+
     mode = _auth_mode()
     if mode == "anonymous":
         return os.getenv("ALICE_MCP_USER_ID") or None
@@ -202,28 +204,9 @@ def _introspect_token(token: str) -> Optional[str]:
     return str(data.get("sub") or "") or None
 
 
-def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Response]]:
-    try:
-        return _auth_user_from_request(), None
-    except PermissionError as exc:
-        headers = {}
-        challenge = _www_authenticate()
-        if challenge:
-            headers["WWW-Authenticate"] = challenge
-        return None, _error_response(
-            request_id,
-            -32001,
-            str(exc),
-            status=401,
-            headers=headers,
-        )
-    except Exception:
-        return None, _error_response(
-            request_id,
-            -32001,
-            "Authentication service unavailable",
-            status=503,
-        )
+def _require_auth(_request_id: Any) -> tuple[Optional[str], Optional[Response]]:
+    """Authentication is intentionally disabled for the current MCP endpoint."""
+    return None, None
 
 
 def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
@@ -359,6 +342,106 @@ def _bridge_wrapper(handler):
     return wrapped
 
 
+
+
+def _project_list(args: dict, _user: Optional[str] = None) -> dict:
+    return list_directory({"path": args.get("path") or "."})
+
+
+def _project_read(args: dict, _user: Optional[str] = None) -> dict:
+    path = str(args.get("path") or "").strip()
+    if not path:
+        raise ValueError("path is required")
+    result = read_file({
+        "path": path,
+        "offset": args.get("offset", 0),
+        "length": min(int(args.get("length", 65536)), 65536),
+    })
+    if result.get("error"):
+        raise ValueError(result["error"])
+    return result
+
+
+def _project_search(args: dict, _user: Optional[str] = None) -> dict:
+    query = str(args.get("query") or "").strip()
+    if not query:
+        raise ValueError("query is required")
+    return grep_search({
+        "query": query,
+        "file_pattern": args.get("file_pattern") or "*.py",
+        "max_matches": min(int(args.get("max_matches", 50)), 50),
+    })
+
+
+def _register_project_read_tools() -> None:
+    tools = [
+        (
+            "alice_list_project_files",
+            "List project files",
+            "List files and directories inside the Alice Pro project.",
+            {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": [],
+                "additionalProperties": False,
+            },
+            _project_list,
+        ),
+        (
+            "alice_read_project_file",
+            "Read project file",
+            "Read a bounded UTF-8 file from the Alice Pro project.",
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "minLength": 1},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "length": {"type": "integer", "minimum": 1, "maximum": 65536},
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+            _project_read,
+        ),
+        (
+            "alice_search_project",
+            "Search project code",
+            "Search text inside the Alice Pro project.",
+            {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "minLength": 1},
+                    "file_pattern": {"type": "string"},
+                    "max_matches": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+            _project_search,
+        ),
+    ]
+    for name, title, description, input_schema, handler in tools:
+        registry.register(
+            "chatgpt_project",
+            name,
+            {
+                "title": title,
+                "description": description,
+                "inputSchema": input_schema,
+                "outputSchema": {"type": "object"},
+                "capabilities": ["project", "mcp"],
+                "risk_level": "medium",
+                "read_only": True,
+                "requires_approval": False,
+                "supported_transports": ["mcp"],
+                "executor": {"type": "local"},
+                "func": _bridge_wrapper(handler),
+            },
+        )
+
+
+_register_project_read_tools()
+
 def _register_bridge_tools() -> None:
     bridge_tools = [
         (
@@ -436,14 +519,8 @@ _register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
-    mode = _auth_mode()
-    if mode == "anonymous":
-        return [{"type": "noauth"}]
-    if mode == "introspection":
-        return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
-    # A fixed bearer token is intentionally not advertised as OAuth. ChatGPT
-    # OAuth clients cannot be configured with arbitrary customer API keys.
-    return []
+    # Authentication is intentionally disabled for the current preview.
+    return [{"type": "noauth"}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
@@ -597,9 +674,7 @@ def mcp_post() -> Response:
     if header_error:
         return _error_response(request_id, -32600, header_error)
 
-    user, auth_error = _require_auth(request_id)
-    if auth_error is not None:
-        return auth_error
+    user, _auth_error = _require_auth(request_id)
 
     if method == "ping":
         return _jsonrpc_result(

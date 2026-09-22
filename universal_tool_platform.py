@@ -343,6 +343,17 @@ class UniversalToolExecutor:
                     "duration_ms": round(max(0.0, self.clock() - started) * 1000, 2),
                 },
             ).to_mapping()
+        except ValueError as exc:
+            return UniversalToolResult(
+                False,
+                error=str(exc),
+                metadata={
+                    **base_meta,
+                    "phase": "validation",
+                    "executor": str((definition.executor or {}).get("type") or "local"),
+                    "duration_ms": round(max(0.0, self.clock() - started) * 1000, 2),
+                },
+            ).to_mapping()
         except Exception as exc:
             return UniversalToolResult(
                 False,
@@ -410,7 +421,14 @@ class UniversalToolExecutor:
     ) -> dict[str, Any]:
         if isinstance(raw_result, Mapping) and "success" in raw_result:
             success = bool(raw_result.get("success"))
-            data = raw_result.get("data")
+            if success and "data" not in raw_result:
+                data = {
+                    key: value
+                    for key, value in raw_result.items()
+                    if key not in {"success", "error", "metadata"}
+                }
+            else:
+                data = raw_result.get("data")
             error = raw_result.get("error")
             metadata = dict(raw_result.get("metadata") or {})
         elif isinstance(raw_result, Mapping) and raw_result.get("error"):

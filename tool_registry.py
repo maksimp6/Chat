@@ -43,10 +43,16 @@ class ToolRegistry:
             "requires_approval",
             bool(result.get("requires_approval", not result["read_only"])),
         )
-        result.setdefault(
-            "supported_transports",
-            list(result.get("supported_transports") or ("responses_api", "local_agent")),
+        # MCP is the universal external tool surface. Every registered tool
+        # must be callable through the MCP adapter; preserve any existing
+        # transport declarations while adding MCP rather than requiring every
+        # legacy tool implementation to be edited individually.
+        transports = list(
+            result.get("supported_transports") or ("responses_api", "local_agent")
         )
+        if "mcp" not in transports:
+            transports.append("mcp")
+        result["supported_transports"] = transports
         result.setdefault("executor", dict(result.get("executor") or {"type": "local"}))
         result.setdefault("metadata", dict(result.get("metadata") or {}))
         return result
@@ -70,7 +76,27 @@ class ToolRegistry:
     def _load_all(self):
         try:
             from git_mcp_tools import GIT_TOOLS
+            mcp_read_tools = {"git_status", "git_log", "git_diff", "git_branches"}
+            mcp_write_tools = {"git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"}
             for name, cfg in GIT_TOOLS.items():
+                if name in mcp_read_tools:
+                    cfg = {
+                        **cfg,
+                        "capabilities": ["git", "read", "mcp"],
+                        "risk_level": "low",
+                        "read_only": True,
+                        "requires_approval": False,
+                        "supported_transports": ["responses_api", "local_agent", "mcp"],
+                    }
+                elif name in mcp_write_tools:
+                    cfg = {
+                        **cfg,
+                        "capabilities": ["git", "write", "mcp"],
+                        "risk_level": "high",
+                        "read_only": False,
+                        "requires_approval": True,
+                        "supported_transports": ["responses_api", "local_agent", "mcp"],
+                    }
                 self._register("git", name, cfg)
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Git: {e}")
@@ -242,20 +268,15 @@ class ToolRegistry:
         except TypeError:
             try:
                 return func(arguments)
-            except PermissionError:
+            except Exception as e:
                 if context and "_universal_context" in cfg:
                     raise
-                raise
-            except Exception as e:
                 return {"error": str(e)}
-        except PermissionError:
-            # UniversalToolExecutor owns the authorization boundary and must
-            # be able to classify authorization failures instead of receiving
-            # a legacy {"error": ...} payload that looks like execution output.
+        except Exception as e:
+            # UniversalToolExecutor must classify real tool exceptions by phase
+            # instead of receiving a legacy error mapping that hides the cause.
             if context and "_universal_context" in cfg:
                 raise
-            raise
-        except Exception as e:
             logger.exception(f"[REGISTRY] Ошибка выполнения {tool_name}: {e}")
             return {"error": str(e)}
 

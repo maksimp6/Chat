@@ -101,15 +101,22 @@ The ChatGPT Apps SDK / MCP bridge now registers its read-only bridge tools in
 the same registry and calls UniversalToolExecutor. The bridge therefore owns
 protocol formatting only, not a second tool implementation.
 
-New tools should opt into MCP exposure explicitly with
-supported_transports=["mcp"]. This avoids accidentally publishing every
-legacy local tool while their metadata is still being audited.
+MCP is the complete external tool surface: every tool registered in the
+Universal Tool Registry is exposed through MCP. The registry preserves any
+existing transport declarations and automatically adds "mcp", so legacy tools
+do not need individual adapter implementations or duplicated handlers.
+
+MCP does not bypass the universal safety boundary. The same validation,
+authorization, policy and approval checks apply to MCP-originated calls.
+Tools marked read-only may execute directly; tools requiring approval remain
+blocked until the existing approval flow authorizes the call.
 
 ## Migration path
 
 1. Keep existing tool functions unchanged.
 2. Add metadata to the registry entry.
 3. Migrate callers from registry.execute to UniversalToolExecutor.
-4. Add transport support explicitly.
+4. Keep the tool registered in the Universal Tool Registry; MCP support is
+   added automatically.
 5. Add an agent target for tools that must execute on Android.
 6. Correlate the UniversalToolCall with ExecutionTrace in the caller.
