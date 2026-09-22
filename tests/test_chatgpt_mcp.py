@@ -197,9 +197,21 @@ def test_project_read_tools_are_exposed_and_read_only(client):
 
 
 def test_project_tools_execute_through_mcp(client, monkeypatch):
-    monkeypatch.setattr(chatgpt_mcp, "_project_list", lambda args: {"entries": ["README.md"]})
-    monkeypatch.setattr(chatgpt_mcp, "_project_read", lambda args: {"content": "hello"})
-    monkeypatch.setattr(chatgpt_mcp, "_project_search", lambda args: {"matches": [{"path": "chatgpt_mcp.py", "line": 1}]})
+    monkeypatch.setattr(
+        chatgpt_mcp,
+        "read_file",
+        lambda args: {"path": args.get("path"), "content": "hello"},
+    )
+    monkeypatch.setattr(
+        chatgpt_mcp,
+        "list_directory",
+        lambda args: {"path": args.get("path") or ".", "entries": ["README.md"]},
+    )
+    monkeypatch.setattr(
+        chatgpt_mcp,
+        "grep_search",
+        lambda args: {"matches": [{"path": "chatgpt_mcp.py", "line": 1}]},
+    )
 
     cases = [
         ("alice_list_project_files", {"path": "."}),
@@ -207,10 +219,14 @@ def test_project_tools_execute_through_mcp(client, monkeypatch):
         ("alice_search_project", {"query": "MCP"}),
     ]
     for name, arguments in cases:
-        response = mcp_request(client, "tools/call", {"name": name, "arguments": arguments}, name=name)
+        response = mcp_request(
+            client,
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            name=name,
+        )
         assert response.status_code == 200
         assert "structuredContent" in response.get_json()["result"]
-
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client, monkeypatch):
     def fail_if_called(_args):
