@@ -97,7 +97,8 @@ deploy() {
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" "$image" >/dev/null
   local dozzle_container="${container}-dozzle"
-  local dozzle_router="${dozzle_container}-logs"
+  local dozzle_ru_router="${dozzle_container}-logs-ru"
+  local dozzle_online_router="${dozzle_container}-logs-online"
   local dozzle_rule="${tokenized_prefix}/logs"
   local dozzle_data="${workdir}/dozzle"
   local dozzle_strip_middleware="${dozzle_container}-strip"
@@ -106,13 +107,20 @@ deploy() {
   docker run -d --name "$dozzle_container" --restart unless-stopped --network "$NETWORK_NAME" \
     --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.logger=true" \
     --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${dozzle_router}.rule=PathPrefix(\`$dozzle_rule\`)" \
-    --label "traefik.http.routers.${dozzle_router}.entrypoints=websecure" \
-    --label "traefik.http.routers.${dozzle_router}.tls=true" \
-    --label "traefik.http.routers.${dozzle_router}.tls.certresolver=letsencrypt" \
-    --label "traefik.http.routers.${dozzle_router}.tls.domains[0].main=maxxxpavlov.ru" \
-    --label "traefik.http.routers.${dozzle_router}.priority=110" \
-    --label "traefik.http.routers.${dozzle_router}.middlewares=${dozzle_strip_middleware},${proxy_auth_middleware}" \
+    --label "traefik.http.routers.${dozzle_ru_router}.rule=Host(\`maxxxpavlov.ru\`) && PathPrefix(\`$dozzle_rule\`)" \
+    --label "traefik.http.routers.${dozzle_ru_router}.entrypoints=websecure" \
+    --label "traefik.http.routers.${dozzle_ru_router}.tls=true" \
+    --label "traefik.http.routers.${dozzle_ru_router}.tls.certresolver=letsencrypt" \
+    --label "traefik.http.routers.${dozzle_ru_router}.tls.domains[0].main=maxxxpavlov.ru" \
+    --label "traefik.http.routers.${dozzle_ru_router}.priority=110" \
+    --label "traefik.http.routers.${dozzle_ru_router}.middlewares=${dozzle_strip_middleware},${proxy_auth_middleware}" \
+    --label "traefik.http.routers.${dozzle_online_router}.rule=Host(\`maxxxpavlov.online\`) && PathPrefix(\`$dozzle_rule\`)" \
+    --label "traefik.http.routers.${dozzle_online_router}.entrypoints=websecure" \
+    --label "traefik.http.routers.${dozzle_online_router}.tls=true" \
+    --label "traefik.http.routers.${dozzle_online_router}.tls.certresolver=letsencrypt" \
+    --label "traefik.http.routers.${dozzle_online_router}.tls.domains[0].main=maxxxpavlov.online" \
+    --label "traefik.http.routers.${dozzle_online_router}.priority=110" \
+    --label "traefik.http.routers.${dozzle_online_router}.middlewares=${dozzle_strip_middleware},${proxy_auth_middleware}" \
     --label "traefik.http.middlewares.${dozzle_strip_middleware}.stripprefix.prefixes=$tokenized_prefix" \
     --label "traefik.http.services.${dozzle_container}.loadbalancer.server.port=8080" \
     -e DOZZLE_BASE=/logs \
