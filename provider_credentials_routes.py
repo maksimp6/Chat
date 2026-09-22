@@ -28,7 +28,7 @@ from provider_credentials import (
 from cloudru_api_key_provider import CloudRuApiKeyProvider
 from cloudru_iam import CloudRuIamClient
 from trace_manager import traced_operation
-from yandex_api_key_provider import YandexApiKeyProvider
+from yandex_api_key_provider import YandexApiKeyProvider, YandexProviderPermissionError
 
 
 logger = logging.getLogger("alice.provider_credentials")
@@ -482,6 +482,17 @@ def update_provider_credentials():
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
+            except YandexProviderPermissionError as exc:
+                logger.debug(
+                    "provider credential validation permission denied: provider=%s reason=%s",
+                    provider, str(exc),
+                )
+                return jsonify({
+                    "error": "provider_validation_permission_denied",
+                    "provider": provider,
+                    "status": "forbidden",
+                    "detail": str(exc),
+                }), 403
             except PermissionError as exc:
                 logger.debug(
                     "provider credential validation rejected: provider=%s reason=%s",
