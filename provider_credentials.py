@@ -94,6 +94,7 @@ def create_schema(db: Any) -> None:
             key_secret_encrypted TEXT NOT NULL,
             project_id TEXT NOT NULL DEFAULT '',
             service_account_id TEXT,
+            expires_at TIMESTAMP,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -164,6 +165,68 @@ def create_schema(db: Any) -> None:
         ON provider_credentials (provider, status, expires_at)
     """)
 
+
+
+def _parse_expiry(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return _as_utc(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return _as_utc(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def get_cloudru_iam_credentials(db: Any, decrypt: Callable[[str], str]) -> Optional[dict[str, str]]:
+    create_schema(db)
+    row = db.execute(
+        "SELECT key_id, key_secret_encrypted, project_id, service_account_id, expires_at "
+        "FROM cloudru_iam_credentials WHERE id = 1"
+    ).fetchone()
+    if not row:
+        return None
+    expires_at = _parse_expiry(row["expires_at"])
+    return {
+        "key_id": str(row["key_id"]),
+        "key_secret": decrypt(row["key_secret_encrypted"]),
+        "project_id": str(row["project_id"] or ""),
+        "service_account_id": str(row["service_account_id"] or ""),
+        "expires_at": expires_at.isoformat() if expires_at else "",
+    }
+
+
+def save_cloudru_iam_credentials(
+    db: Any,
+    *,
+    key_id: str,
+    key_secret: str,
+    project_id: str,
+    service_account_id: Optional[str],
+    expires_at: Optional[datetime],
+    encrypt: Callable[[str], str],
+) -> None:
+    if not key_id.strip() or not key_secret:
+        raise ValueError("Cloud.ru IAM key_id and key_secret are required")
+    if expires_at is not None:
+        expires_at = _as_utc(expires_at)
+        if expires_at <= utcnow():
+            raise ValueError("Cloud.ru IAM master key is expired")
+    create_schema(db)
+    db.execute("""
+        INSERT INTO cloudru_iam_credentials
+        (id, key_id, key_secret_encrypted, project_id, service_account_id, expires_at)
+        VALUES (1, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            key_id = excluded.key_id,
+            key_secret_encrypted = excluded.key_secret_encrypted,
+            project_id = excluded.project_id,
+            service_account_id = excluded.service_account_id,
+            expires_at = excluded.expires_at
+    """, (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id, expires_at))
+    db.commit()
 
 
 def get_cloudru_iam_credentials(db: Any, decrypt: Callable[[str], str]) -> Optional[dict[str, str]]:
