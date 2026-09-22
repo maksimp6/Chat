@@ -43,10 +43,16 @@ class ToolRegistry:
             "requires_approval",
             bool(result.get("requires_approval", not result["read_only"])),
         )
-        result.setdefault(
-            "supported_transports",
-            list(result.get("supported_transports") or ("responses_api", "local_agent")),
+        # MCP is the universal external tool surface. Every registered tool
+        # must be callable through the MCP adapter; preserve any existing
+        # transport declarations while adding MCP rather than requiring every
+        # legacy tool implementation to be edited individually.
+        transports = list(
+            result.get("supported_transports") or ("responses_api", "local_agent")
         )
+        if "mcp" not in transports:
+            transports.append("mcp")
+        result["supported_transports"] = transports
         result.setdefault("executor", dict(result.get("executor") or {"type": "local"}))
         result.setdefault("metadata", dict(result.get("metadata") or {}))
         return result
