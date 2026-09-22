@@ -99,6 +99,7 @@ def create_schema(db: Any) -> None:
             expires_at TIMESTAMP NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            fingerprint TEXT,
             last_checked_at TIMESTAMP,
             last_check_status TEXT,
             last_check_error TEXT
@@ -115,6 +116,7 @@ def create_schema(db: Any) -> None:
         ("provider", "ALTER TABLE provider_credentials ADD COLUMN provider TEXT NOT NULL DEFAULT 'yandex'"),
         ("provider_key_id", "ALTER TABLE provider_credentials ADD COLUMN provider_key_id TEXT"),
         ("yandex_key_id", "ALTER TABLE provider_credentials ADD COLUMN yandex_key_id TEXT"),
+        ("fingerprint", "ALTER TABLE provider_credentials ADD COLUMN fingerprint TEXT"),
         ("last_checked_at", "ALTER TABLE provider_credentials ADD COLUMN last_checked_at TIMESTAMP"),
         ("last_check_status", "ALTER TABLE provider_credentials ADD COLUMN last_check_status TEXT"),
         ("last_check_error", "ALTER TABLE provider_credentials ADD COLUMN last_check_error TEXT"),
@@ -238,8 +240,8 @@ def bootstrap_credential(
     cursor = db.execute("""
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
-         project_id, issued_at, expires_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+         project_id, issued_at, expires_at, status, fingerprint)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
     """, (
         encrypted,
         key_id if provider == YANDEX else None,
