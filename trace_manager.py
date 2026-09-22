@@ -50,13 +50,20 @@ def traced_operation(operation: str, *, include_request: bool = True):
             try:
                 result = fn(*args, **kwargs)
                 try:
-                    from flask import make_response
-                    response = make_response(result)
-                    trace.add_event("operation_completed", {
-                        "operation": operation,
-                        "http_status": response.status_code,
-                        "success": response.status_code < 400,
-                    })
+                    from flask import has_request_context, make_response
+                    if has_request_context():
+                        response = make_response(result)
+                        trace.add_event("operation_completed", {
+                            "operation": operation,
+                            "http_status": response.status_code,
+                            "success": response.status_code < 400,
+                        })
+                    else:
+                        trace.add_event("operation_completed", {
+                            "operation": operation,
+                            "success": not isinstance(result, int) or result == 0,
+                            "result_type": type(result).__name__,
+                        })
                 except Exception as exc:
                     trace.record_error(operation, str(exc), exception=exc)
                 return result
