@@ -461,11 +461,11 @@ def update_provider_credentials():
     try:
         for provider, api_key in supplied:
             client = _provider_client(provider)
-            logger.info("provider credential validation started: provider=%s", provider)
+            logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
             except PermissionError as exc:
-                logger.warning(
+                logger.debug(
                     "provider credential validation rejected: provider=%s reason=%s",
                     provider, str(exc),
                 )
@@ -475,8 +475,8 @@ def update_provider_credentials():
                     "status": "invalid",
                 }), 401
             except Exception as exc:
-                logger.exception(
-                    "provider credential validation failed: provider=%s",
+                logger.debug(
+                    "provider credential validation failed: provider=%s", exc_info=True,
                     provider,
                 )
                 return jsonify({
@@ -485,7 +485,7 @@ def update_provider_credentials():
                     "status": "invalid",
                 }), 502
             else:
-                logger.info("provider credential validation succeeded: provider=%s", provider)
+                logger.debug("provider credential validation succeeded: provider=%s", provider)
 
         conn = get_conn()
         try:
