@@ -84,23 +84,8 @@ function build() {
     cloudru.style.cssText="margin:18px 0;padding:14px;border:1px solid #444;border-radius:9px;";
     var h=document.createElement("div"); h.textContent="Cloud.ru"; h.style.cssText="font-weight:700;margin-bottom:8px;";
     cloudru.appendChild(h);
-    cloudru.appendChild(makeField("cloudru-iam-json","IAM credentials JSON","Загрузите JSON с Key ID и Key Secret. Alice Pro использует его только для IAM управления.","","file"));
-    document.getElementById("cloudru-iam-json").accept=".json,application/json";
-document.getElementById("cloudru-iam-json").addEventListener("change", async function(){
-    var file=this.files[0]; if(!file) return;
-    var form=new FormData(); form.append("iam_json",file);
-    try{
-        var sr=await fetch("/api/provider-credentials/cloudru/service-accounts",{method:"POST",credentials:"same-origin",body:form});
-        var sd=await sr.json(); if(!sr.ok) throw new Error(sd.detail || sd.error || ("HTTP "+sr.status));
-        var sel=document.getElementById("cloudru-service-account-id");
-        sel.innerHTML='<option value="">Создать новый</option>';
-        (sd.service_accounts||[]).forEach(function(sa){
-            var opt=document.createElement("option"); opt.value=sa.id; opt.textContent=(sa.name||sa.id)+" • "+(sa.project_id||"");
-            sel.appendChild(opt);
-        });
-        output.textContent="IAM JSON проверен. Доступно сервисных аккаунтов: "+(sd.service_accounts||[]).length;
-    }catch(error){ output.textContent="Не удалось получить сервисные аккаунты: "+error.message; }
-});
+    cloudru.appendChild(makeField("cloudru-iam-key-id","IAM Key ID","Идентификатор ключа доступа Cloud.ru для IAM управления.","Введите IAM Key ID","text"));
+    cloudru.appendChild(makeField("cloudru-iam-key-secret","IAM Key Secret","Секрет ключа доступа Cloud.ru для IAM управления. Он используется только при подключении.","Введите IAM Key Secret","password"));
     cloudru.appendChild(makeField("cloudru-project-id","Project ID","Проект, в котором должен работать сервисный аккаунт.","Cloud.ru project ID","text"));
     var saWrap=document.createElement("div"); saWrap.style.cssText="margin:14px 0;";
 var saLabel=document.createElement("label"); saLabel.textContent="Service account"; saLabel.style.cssText="display:block;font-weight:600;margin-bottom:6px;";
