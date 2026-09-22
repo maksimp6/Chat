@@ -252,7 +252,7 @@ def bootstrap_credential(
         expires_at,
         fingerprint_key(api_key),
     ))
-    if hasattr(db, "commit"):
+    if commit and hasattr(db, "commit"):
         db.commit()
 
     return ProviderCredential(
@@ -468,6 +468,7 @@ def record_health_check(
     status: str,
     error: Optional[str] = None,
     checked_at: Optional[datetime] = None,
+    commit: bool = True,
 ) -> None:
     """Persist only the result of a provider health check, never its secret."""
     if provider not in SUPPORTED_PROVIDERS:
