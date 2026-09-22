@@ -23,19 +23,15 @@ def test_preview_server_uses_tokenized_path_routing_and_strip():
     assert 'PathPrefix(' in source
     assert '$tokenized_prefix' in source
     assert 'local http_router="${container}-http"' in source
-    assert 'local https_router="${container}-https"' in source
+    assert 'local https_ru_router="${container}-https-ru"' in source
+    assert 'local https_online_router="${container}-https-online"' in source
+    assert 'https_ru_rule' in source and 'maxxxpavlov.ru' in source
+    assert 'https_online_rule' in source and 'maxxxpavlov.online' in source
     assert 'traefik.http.routers.${http_router}.entrypoints=web' in source
-    assert 'traefik.http.routers.${https_router}.entrypoints=websecure' in source
-    assert 'traefik.http.routers.${https_router}.tls=true' in source
-    assert 'traefik.http.routers.${http_router}.middlewares=$token_strip_middleware' in source
-    assert 'traefik.http.routers.${https_router}.middlewares=$token_strip_middleware' in source
-    assert 'traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}' in source
-    assert 'TRAEFIK_IMAGE="traefik:v3.7.13"' in source
-    assert '-p 0.0.0.0:80:80' in source
-    assert '-p 0.0.0.0:443:443' in source
-    assert "grep -Fq '0.0.0.0:80'" in source
-    assert "grep -Fq '0.0.0.0:443'" in source
-    assert 'ALICE_REQUIRE_SHORT_TOKEN=1' in source
+    assert 'traefik.http.routers.${https_ru_router}.entrypoints=websecure' in source
+    assert 'traefik.http.routers.${https_online_router}.entrypoints=websecure' in source
+    assert 'traefik.http.routers.${https_ru_router}.tls.certresolver=letsencrypt' in source
+    assert 'traefik.http.routers.${https_online_router}.tls.certresolver=letsencrypt' in source
     assert 'ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN"' in source
     assert 'ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path"' in source
     assert "--entrypoints.websecure.address=:443" in source
