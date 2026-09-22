@@ -57,3 +57,19 @@ def test_validate_key_uses_provider_authentication(mock_post):
     assert kwargs["headers"]["Authorization"] == "Api-Key new-provider-secret"
     assert kwargs["json"]["model"] == "gpt://project-1/alice-lite/latest"
     assert "new-provider-secret" in kwargs["headers"]["Authorization"]
+
+
+@patch("yandex_api_key_provider.requests.post")
+def test_validate_key_reports_yandex_http_401_without_secret_in_error(mock_post):
+    response = Mock()
+    response.status_code = 401
+    response.text = '{"message":"Permission denied"}'
+    error = __import__("requests").HTTPError("401", response=response)
+    response.raise_for_status.side_effect = error
+    mock_post.return_value = response
+
+    import pytest
+    with pytest.raises(PermissionError, match="HTTP 401"):
+        provider().validate_key("secret-must-not-appear")
+
+    assert "secret-must-not-appear" not in str(response.text)
