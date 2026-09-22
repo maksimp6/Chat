@@ -13,10 +13,13 @@ function makeField(id, title, help, placeholder, type) {
     input.autocomplete = "new-password";
     input.placeholder = placeholder || "";
     input.style.cssText = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #555;border-radius:7px;background:var(--input-bg,#222);color:var(--text,#fff);";
-    var small = document.createElement("div");
-    small.textContent = help;
-    small.style.cssText = "margin-top:5px;font-size:12px;opacity:.7;line-height:1.35;";
-    wrap.appendChild(label); wrap.appendChild(input); wrap.appendChild(small);
+    if (help) {
+        var small = document.createElement("div");
+        small.textContent = help;
+        small.style.cssText = "margin-top:5px;font-size:12px;opacity:.7;line-height:1.35;";
+        wrap.appendChild(small);
+    }
+    wrap.appendChild(label); wrap.appendChild(input);
     return wrap;
 }
 
@@ -40,16 +43,12 @@ function renderStatus(container, providers) {
         var line = document.createElement("div");
         line.textContent = statusText(item);
         line.style.marginTop = "5px";
-        var rotation = document.createElement("div");
-        var r = item.rotation || {};
-        rotation.textContent = r.supported ? (r.due ? "Автоперевыпуск: требуется" : "Автоперевыпуск: настроен") : "Автоперевыпуск: недоступен";
-        rotation.style.cssText = "margin-top:4px;font-size:12px;opacity:.8;";
         var meta = document.createElement("div");
         meta.style.cssText = "margin-top:7px;font-size:11px;opacity:.65;";
         var fp = item.credential && item.credential.fingerprint;
         var exp = item.credential && item.credential.expires_at;
         meta.textContent = (fp ? "fp: " + fp.slice(0, 12) : "fingerprint: —") + (exp ? " • expires: " + exp : "");
-        card.appendChild(title); card.appendChild(line); card.appendChild(rotation); card.appendChild(meta);
+        card.appendChild(title); card.appendChild(line); card.appendChild(meta);
         container.appendChild(card);
     });
 }
@@ -82,11 +81,12 @@ function build() {
     box.appendChild(makeField("provider-cloudru-key","Cloud.ru API key","","Cloud.ru API key","password"));
 
     var actions=document.createElement("div"); actions.style.cssText="display:flex;gap:8px;margin-top:14px;";
-    var save=document.createElement("button"); save.textContent="Подключить Cloud.ru"; save.className="btn-primary";
+    var save=document.createElement("button"); save.textContent="Подключить"; save.className="btn-primary";
     save.onclick=async function(){
         var y=document.getElementById("provider-yandex-key").value.trim();
         var cloudru=document.getElementById("provider-cloudru-key").value.trim();
         if(!y && !cloudru){ output.textContent="Введите API key."; return; }
+        save.disabled=true;
         try{
             var body={};
             if(y) body.yandex_api_key=y;
@@ -98,6 +98,7 @@ function build() {
             document.getElementById("provider-cloudru-key").value="";
             await fetchStatus(output);
         }catch(error){ output.textContent="Подключение не выполнено: "+error.message; }
+        finally { save.disabled=false; }
     };
     actions.appendChild(save); box.appendChild(actions);
 
