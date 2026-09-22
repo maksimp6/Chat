@@ -176,19 +176,27 @@ def test_create_schema_migrates_legacy_global_index():
     assert row["provider_key_id"] == "old-yandex-id"
 
 
-def test_provider_health_metadata_has_no_secret(isolated_db):
-    from provider_credentials import record_health_check, replace_active_credential
+def test_provider_health_metadata_has_no_secret():
+    import sqlite3
 
-    conn = isolated_db.get_conn()
+    from cryptography.fernet import Fernet
+    from provider_credentials import create_schema, record_health_check, replace_active_credential
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    fernet = Fernet(Fernet.generate_key())
+
     meta = replace_active_credential(
         conn,
         "secret-health",
         "project-1",
-        __import__("provider_credentials_routes").encrypt_secret,
+        fernet.encrypt,
         "yandex",
         provider_key_id="yandex-health",
     )
     record_health_check(conn, "yandex", status="connected")
+
     row = conn.execute(
         """SELECT fingerprint, last_check_status, last_check_error
            FROM provider_credentials WHERE id = ?""",
