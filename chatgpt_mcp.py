@@ -204,28 +204,9 @@ def _introspect_token(token: str) -> Optional[str]:
     return str(data.get("sub") or "") or None
 
 
-def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Response]]:
-    try:
-        return _auth_user_from_request(), None
-    except PermissionError as exc:
-        headers = {}
-        challenge = _www_authenticate()
-        if challenge:
-            headers["WWW-Authenticate"] = challenge
-        return None, _error_response(
-            request_id,
-            -32001,
-            str(exc),
-            status=401,
-            headers=headers,
-        )
-    except Exception:
-        return None, _error_response(
-            request_id,
-            -32001,
-            "Authentication service unavailable",
-            status=503,
-        )
+def _require_auth(_request_id: Any) -> tuple[Optional[str], Optional[Response]]:
+    """Authentication is intentionally disabled for the current MCP endpoint."""
+    return None, None
 
 
 def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
@@ -538,14 +519,8 @@ _register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
-    mode = _auth_mode()
-    if mode == "anonymous":
-        return [{"type": "noauth"}]
-    if mode == "introspection":
-        return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
-    # A fixed bearer token is intentionally not advertised as OAuth. ChatGPT
-    # OAuth clients cannot be configured with arbitrary customer API keys.
-    return []
+    # Authentication is intentionally disabled for the current preview.
+    return [{"type": "noauth"}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
@@ -699,9 +674,7 @@ def mcp_post() -> Response:
     if header_error:
         return _error_response(request_id, -32600, header_error)
 
-    user, auth_error = _require_auth(request_id)
-    if auth_error is not None:
-        return auth_error
+    user, _auth_error = _require_auth(request_id)
 
     if method == "ping":
         return _jsonrpc_result(
