@@ -300,3 +300,96 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
     payload = response.get_json()
     assert payload["service_account_id"] == "sa-1"
     assert payload["status"] == "connected"
+
+
+def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "cloudru-direct.db")
+    db.init_db()
+    monkeypatch.setenv(
+        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        base64.urlsafe_b64encode(b"6" * 32).decode("ascii"),
+    )
+
+    calls = []
+
+    class CloudRuFake(FakeProvider):
+        def validate_key(self, api_key):
+            calls.append(api_key)
+            super().validate_key(api_key)
+
+    monkeypatch.setattr(routes, "_provider_client", lambda provider: CloudRuFake())
+    monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"cloudru_api_key": "cloudru-runtime-secret"},
+        )
+
+    assert response.status_code == 200
+    assert calls == ["cloudru-runtime-secret"]
+    payload = response.get_json()
+    assert "cloudru-runtime-secret" not in str(payload)
+    statuses = {item["provider"]: item for item in payload["providers"]}
+    assert statuses["cloudru"]["status"] == "connected"
+
+    conn = db.get_conn()
+    row = conn.execute(
+        "SELECT provider, project_id, status FROM provider_credentials WHERE provider = 'cloudru'"
+    ).fetchone()
+    conn.close()
+    assert row["provider"] == "cloudru"
+    assert row["project_id"] == ""
+    assert row["status"] == "active"
+
+
+def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "both-providers.db")
+    db.init_db()
+    monkeypatch.setenv(
+        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        base64.urlsafe_b64encode(b"7" * 32).decode("ascii"),
+    )
+    validated = []
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider: type(
+            "Provider",
+            (),
+            {"validate_key": lambda self, key: validated.append((provider, key)),
+             "rotation_supported": lambda self, key_id: False},
+        )(),
+    )
+    monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={
+                "yandex_api_key": "yandex-runtime-secret",
+                "cloudru_api_key": "cloudru-runtime-secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert validated == [
+        ("yandex", "yandex-runtime-secret"),
+        ("cloudru", "cloudru-runtime-secret"),
+    ]
+    payload = response.get_json()
+    serialized = str(payload)
+    assert "yandex-runtime-secret" not in serialized
+    assert "cloudru-runtime-secret" not in serialized
