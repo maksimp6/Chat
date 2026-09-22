@@ -1,6 +1,6 @@
 # ChatGPT Apps SDK / MCP
 
-Alice Pro exposes a separate, read-only MCP endpoint for connection from ChatGPT.
+Alice Pro exposes a separate MCP endpoint for connection from ChatGPT. The MCP surface includes read-only project/diagnostic tools and the existing Git tool set; Git write operations remain protected by the Universal Tool Executor approval boundary.
 
 ## Endpoint
 
@@ -14,17 +14,30 @@ No connection/session state is stored by the MCP transport. Alice Pro's existing
 
 ## Exposed tools
 
-Only audited read-only bridge tools are exposed:
+The MCP endpoint exposes the following audited tools through the Universal Tool Registry/Executor:
 
-| Tool | Purpose |
-| --- | --- |
-| `alice_get_system_status` | Runtime, MCP, model and local-tool status |
-| `alice_list_agents` | Registered Agent Gateway agents |
-| `alice_get_session` | Session lifecycle status |
-| `alice_get_invocation` | Invocation status and safe metadata |
-| `alice_get_invocation_trace` | Persisted ExecutionTrace |
+| Tool | Purpose | Permission |
+| --- | --- | --- |
+| `alice_get_system_status` | Runtime, MCP, model and local-tool status | read-only |
+| `alice_list_agents` | Registered Agent Gateway agents | read-only |
+| `alice_get_session` | Session lifecycle status | read-only |
+| `alice_get_invocation` | Invocation status and safe metadata | read-only |
+| `alice_get_invocation_trace` | Persisted ExecutionTrace | read-only |
+| `alice_list_project_files` | List project files/directories | read-only |
+| `alice_read_project_file` | Bounded file read | read-only |
+| `alice_search_project` | Code/text search | read-only |
+| `git_status` | Repository status | read-only |
+| `git_log` | Commit history | read-only |
+| `git_diff` | Current diff | read-only |
+| `git_branches` | Branch list | read-only |
+| `git_add` | Stage changes | approval required |
+| `git_commit` | Create commit | approval required |
+| `git_remote` | Read/change remotes | approval required |
+| `git_push` | Push changes | approval required |
+| `git_pull` | Pull and merge changes | approval required |
+| `git_fetch` | Fetch remote changes | approval required |
 
-The internal local tool registry is intentionally **not** exposed wholesale. Write/destructive tools remain behind Alice Pro's existing approval and policy flow.
+The Git functions are the existing implementations from `git_mcp_tools.py`; ChatGPT access adds no duplicate Git implementations. Any tool marked approval-required is rejected by `UniversalToolExecutor` until the existing Alice Pro approval flow supplies an approved call.
 
 Tool results use MCP `structuredContent` plus text `content`. No custom widget is required for the initial integration.
 
@@ -82,8 +95,11 @@ The contract is covered by `tests/test_chatgpt_mcp.py`, including:
 - structured `tools/call` results;
 - standard MCP header validation;
 - authentication failures and bearer authentication;
-- user isolation for invocation and trace reads.
+- user isolation for invocation and trace reads;
+- project tool execution through MCP;
+- all existing Git read tools through MCP;
+- approval enforcement for all existing Git write tools.
 
 ## Next expansion
 
-The next integration step is a production OAuth authorization server or trusted OAuth proxy, followed by additional explicitly approved tools and optional MCP Apps UI resources. This keeps the Android shell lightweight and keeps Governance/Policy inside Alice Pro.
+The next integration step is the production OAuth authorization server or trusted OAuth proxy, plus wiring the existing approval UI/API to approved MCP-originated write calls. This keeps Governance/Policy inside Alice Pro.
