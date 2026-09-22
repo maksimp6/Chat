@@ -1,0 +1,122 @@
+name: Production deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to deploy
+        required: true
+        default: master
+        type: string
+
+concurrency:
+  group: alice-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PREVIEW_SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
+
+jobs:
+  deploy:
+    name: Deploy Alice Pro production
+    environment: production
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
+      PREVIEW_SSH_USER: ${{ secrets.PREVIEW_SSH_USER }}
+      PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
+      PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
+      ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+      DEPLOY_REF: ${{ inputs.ref }}
+    steps:
+      - name: Validate deployment configuration
+        run: |
+          test -n "$ALICE_SHORT_TOKEN"
+          test -n "$PREVIEW_SSH_HOST"
+          test -n "$PREVIEW_SSH_USER"
+          test -n "$PREVIEW_SSH_PRIVATE_KEY"
+          test -n "$PREVIEW_SSH_KNOWN_HOSTS"
+      - name: Check out ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+          fetch-depth: 1
+      - name: Configure SSH
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | sed 's/\\r$//' | awk 'BEGIN {ORS="\n"} {gsub(/\\\\n/, "\n"); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | sed 's/\\r$//' | awk 'BEGIN {ORS="\n"} {gsub(/\\\\n/, "\n"); print}' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+      - name: Resolve remote deployment directory
+        id: remote
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          test -n "$remote_dir"
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/production\" \"$remote_dir/traefik\""
+          echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
+      - name: Build source archive
+        run: git archive --format=tar.gz --output=production.tar.gz HEAD
+      - name: Upload deployment files
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
+          "${scp_cmd[@]}" deploy/production/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/production-server.sh"
+          "${scp_cmd[@]}" production.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/production.tar.gz"
+      - name: Ensure shared Traefik HTTPS support
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
+      - name: Verify Traefik configuration before production deploy
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" '
+            set -e
+            docker inspect alice-preview-traefik >/dev/null
+            docker inspect -f "{{.State.Running}}" alice-preview-traefik | grep -qx true
+            docker port alice-preview-traefik 80/tcp
+            docker port alice-preview-traefik 443/tcp
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--entrypoints.web.address=:80"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--entrypoints.websecure.address=:443"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+            docker inspect -f "{{join .Config.Cmd \" \"}}" alice-preview-traefik | grep -F -- "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+            docker logs --tail 80 alice-preview-traefik 2>&1 | grep -Ei "error|acme|certificate" || true
+          '
+      - name: Deploy production without exposing the token
+        env:
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          printf '%s\n' "$ALICE_SHORT_TOKEN" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
+      - name: Wait for trusted HTTPS certificate and health
+        run: |
+          for domain in maxxxpavlov.ru maxxxpavlov.online; do
+            ok=0
+            for attempt in $(seq 1 24); do
+              if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "https://$domain/healthz" >/dev/null; then
+                ok=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "HTTPS certificate/health check did not become ready for $domain"
+              echo "Certificate currently served:"
+              openssl s_client -connect "$domain:443" -servername "$domain" </dev/null 2>/dev/null |
+                openssl x509 -noout -subject -issuer -dates -ext subjectAltName || true
+              exit 1
+            fi
+          done
+      - name: Verify route protection
+        run: |
+          code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 https://maxxxpavlov.ru/)"
+          test "$code" = "401"

@@ -1,8 +1,10 @@
 # Preview deployments
 
-Alice Pro previews run on the project VPS as isolated Docker containers behind one Traefik reverse proxy. Each pull request receives a path-based URL such as:
+Alice Pro previews run on the project VPS as isolated Docker containers behind one Traefik reverse proxy. Each pull request receives a token-prefixed path-based URL such as:
 
-`http://SERVER_IP/preview/pr-203/`
+`http://SERVER_IP/<short-token>/preview/pr-203/`
+
+The token is a bearer credential. GitHub workflow comments intentionally omit it.
 
 The application container never publishes a host port. Traefik is the only container bound to port 80.
 
@@ -26,9 +28,11 @@ Do not place Yandex, Supabase, production database, or Android signing credentia
 
 ## Pull requests
 
-Opening, reopening, or updating a pull request automatically deploys its head commit as:
+Opening, reopening, or updating a pull request automatically deploys its head commit under:
 
-`/preview/pr-<number>/`
+`/<short-token>/preview/pr-<number>/`
+
+The token is part of the URL and there is no HTTP redirect. Direct `/preview/pr-<number>/` requests are not routed.
 
 The workflow:
 
@@ -39,7 +43,7 @@ The workflow:
 5. starts/replaces the PR container;
 6. registers the route with Traefik;
 7. checks `/healthz` locally through Traefik and then checks the public URL;
-8. posts the preview URL to the workflow summary and PR conversation.
+8. reports the deployment result; the bearer token is intentionally omitted from PR comments.
 
 When the pull request is closed, the corresponding container and image are removed.
 
@@ -49,7 +53,7 @@ Run **Actions → Preview deployment → Run workflow** and set `ref` to a branc
 
 Manual previews use:
 
-`/preview/branch-<ref-slug>/`
+`/<short-token>/preview/branch-<ref-slug>/`
 
 Re-running the same ref replaces the previous preview for that key.
 
@@ -60,21 +64,26 @@ The workflow installs a single Traefik v3.7.13 container named `alice-preview-tr
 Traefik uses:
 
 - Docker provider;
+- file provider for optional production TLS configuration;
 - `alice-preview` Docker network;
-- an explicit host binding `0.0.0.0:80 -> 80`;
+- explicit host bindings `0.0.0.0:80 -> 80` and `0.0.0.0:443 -> 443`;
 - `Path(...)` / `PathPrefix(...)` routers per preview;
 - StripPrefix middleware so Flask continues receiving its normal `/` and `/api/*` routes.
+
+The same Traefik instance serves production. Production Host routers explicitly exclude `/preview/`, so the domain route cannot capture Preview traffic.
 
 The deployment script also inspects an existing Traefik container before reusing it. If the HTTP port is not published on `0.0.0.0:80`, the container is recreated with the explicit binding instead of silently keeping a stale host-port configuration.
 
 Preview containers receive:
 
 - `ALICE_PREVIEW=1`;
-- `ALICE_PREVIEW_BASE_PATH=/preview/<key>`;
+- `ALICE_REQUIRE_SHORT_TOKEN=1`;
+- `ALICE_SHORT_TOKEN` from the production environment secret;
+- `ALICE_PREVIEW_BASE_PATH=/<short-token>/preview/<key>`;
 - `HOST=0.0.0.0`;
 - `PORT=8080`.
 
-The frontend uses the configured base path for local static assets, API requests, and Server-Sent Events. The application also exposes `GET /healthz`.
+The frontend uses the token-prefixed base path for local static assets, API requests, and Server-Sent Events. The application also exposes `GET /healthz`.
 
 ## Isolation and safety
 
@@ -103,4 +112,8 @@ for the SSH deployment user, plus the `incoming/` and `previews/` directories. T
 
 ## HTTPS
 
-The initial path-based setup intentionally uses HTTP because it works directly with a VPS IP address. Port 443 should not be published until a TLS entrypoint and certificate configuration are added. Add a domain and TLS configuration later when the public hostname is available. The preview routing itself does not need to change.
+The shared Traefik instance publishes both HTTP and HTTPS. Preview routing remains path-based, while production uses domain-based HTTPS routing for `maxxxpavlov.ru` and `maxxxpavlov.online`.
+
+Production certificate files are provisioned separately on the VPS as `fullchain.pem` and `privkey.pem` under the configured certificate directory. They are mounted read-only into Traefik and referenced by dynamic configuration; certificate material is never committed to GitHub.
+
+HTTP requests to the production domains are redirected to HTTPS. The production domain router excludes both `/preview/` and token-prefixed `/.../preview/` paths, preserving Preview routing without allowing the production router to consume it.
