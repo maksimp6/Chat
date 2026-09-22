@@ -200,7 +200,7 @@ def test_project_tools_execute_through_mcp(client):
     cases = [
         ("alice_list_project_files", {"path": "."}),
         ("alice_read_project_file", {"path": "README.md"}),
-        ("alice_search_project", {"query": "MCP", "file_pattern": "*.py"}),
+        ("alice_search_project", {"query": "MCP", "file_pattern": "*.py", "max_matches": 5}),
     ]
     for name, arguments in cases:
         response = mcp_request(
@@ -210,10 +210,20 @@ def test_project_tools_execute_through_mcp(client):
             name=name,
         )
         assert response.status_code == 200
-        assert "structuredContent" in response.get_json()["result"]
+        result = response.get_json()["result"]["structuredContent"]
+        assert isinstance(result, dict)
 
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_read_project_file", "arguments": {"path": "../../etc/passwd"}},
+        name="alice_read_project_file",
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32602
+
     response = mcp_request(
         client,
         "tools/call",
