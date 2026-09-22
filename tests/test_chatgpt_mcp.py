@@ -56,16 +56,16 @@ def test_tools_list_is_deterministic_and_read_only(client):
         "alice_list_project_files",
         "alice_read_project_file",
         "alice_search_project",
-        "git_branches",
-        "git_diff",
-        "git_log",
-        "git_status",
         "git_add",
+        "git_branches",
         "git_commit",
+        "git_diff",
         "git_fetch",
+        "git_log",
         "git_pull",
         "git_push",
         "git_remote",
+        "git_status",
     ]
     assert body["result"]["cacheScope"] == "private"
     assert body["result"]["ttlMs"] > 0
