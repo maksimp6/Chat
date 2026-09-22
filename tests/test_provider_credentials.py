@@ -174,3 +174,29 @@ def test_create_schema_migrates_legacy_global_index():
     assert "one_active_key_per_provider" in indexes
     assert row["provider"] == "yandex"
     assert row["provider_key_id"] == "old-yandex-id"
+
+
+def test_provider_health_metadata_has_no_secret(isolated_db):
+    from provider_credentials import record_health_check, replace_active_credential
+
+    conn = isolated_db.get_conn()
+    meta = replace_active_credential(
+        conn,
+        "secret-health",
+        "project-1",
+        __import__("provider_credentials_routes").encrypt_secret,
+        "yandex",
+        provider_key_id="yandex-health",
+    )
+    record_health_check(conn, "yandex", status="connected")
+    row = conn.execute(
+        """SELECT fingerprint, last_check_status, last_check_error
+           FROM provider_credentials WHERE id = ?""",
+        (meta.id,),
+    ).fetchone()
+    conn.close()
+
+    assert row["fingerprint"]
+    assert row["last_check_status"] == "connected"
+    assert row["last_check_error"] is None
+    assert "secret-health" not in str(dict(row))
