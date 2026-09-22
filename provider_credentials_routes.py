@@ -28,7 +28,7 @@ from provider_credentials import (
 from cloudru_api_key_provider import CloudRuApiKeyProvider
 from cloudru_iam import CloudRuIamClient
 from trace_manager import traced_operation
-from yandex_api_key_provider import YandexApiKeyProvider, YandexProviderPermissionError
+from yandex_api_key_provider import YandexApiKeyProvider
 
 
 logger = logging.getLogger("alice.provider_credentials")
@@ -197,6 +197,7 @@ def _status_for(provider: str) -> dict:
                 "connected" if authorization_ok
                 else "invalid" if health_status == "invalid"
                 else "forbidden" if health_status == "forbidden"
+                else "configured" if health_status == "configured"
                 else "checking"
             ),
             "authorization_ok": authorization_ok,
@@ -266,20 +267,22 @@ def _perform_health_check(provider: str) -> dict:
     credential = _load_credential(provider)
     if credential is None:
         return {"status": "not_configured", "error": None}
-    try:
+    if provider == YANDEX:
         _provider_client(provider).validate_key(credential.api_key)
-    except YandexProviderPermissionError:
-        error = "permission_denied"
-        status = "forbidden"
-    except PermissionError:
-        error = "unauthorized"
-        status = "invalid"
-    except Exception:
-        error = "provider_unavailable"
-        status = "unavailable"
-    else:
         error = None
-        status = "connected"
+        status = "configured"
+    else:
+        try:
+            _provider_client(provider).validate_key(credential.api_key)
+        except PermissionError:
+            error = "unauthorized"
+            status = "invalid"
+        except Exception:
+            error = "provider_unavailable"
+            status = "unavailable"
+        else:
+            error = None
+            status = "connected"
 
     conn = get_conn()
     try:
@@ -488,17 +491,6 @@ def update_provider_credentials():
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
-            except YandexProviderPermissionError as exc:
-                logger.debug(
-                    "provider credential validation permission denied: provider=%s reason=%s",
-                    provider, str(exc),
-                )
-                return jsonify({
-                    "error": "provider_validation_permission_denied",
-                    "provider": provider,
-                    "status": "forbidden",
-                    "detail": str(exc),
-                }), 403
             except PermissionError as exc:
                 logger.debug(
                     "provider credential validation rejected: provider=%s reason=%s",
@@ -509,7 +501,7 @@ def update_provider_credentials():
                     "provider": provider,
                     "status": "invalid",
                 }), 401
-            except Exception as exc:
+            except Exception:
                 logger.debug(
                     "provider credential validation failed: provider=%s",
                     provider,
@@ -521,7 +513,7 @@ def update_provider_credentials():
                     "status": "invalid",
                 }), 502
             else:
-                logger.debug("provider credential validation succeeded: provider=%s", provider)
+                logger.debug("provider credential accepted for storage: provider=%s", provider)
 
         conn = get_conn()
         try:
@@ -538,7 +530,7 @@ def update_provider_credentials():
                 record_health_check(
                     conn,
                     provider,
-                    status="connected",
+                    status="configured" if provider == YANDEX else "connected",
                     error=None,
                 )
         finally:
