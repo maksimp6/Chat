@@ -11,6 +11,7 @@ ROOT_DIR="${PREVIEW_SERVER_BASE_DIR:-/opt/alice-preview}"
 NETWORK_NAME="alice-preview"
 TRAEFIK_NAME="alice-preview-traefik"
 TRAEFIK_IMAGE="traefik:v3.7.13"
+DOZZLE_IMAGE="amir20/dozzle:v11.1.0"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
 ACME_DIR="$ROOT_DIR/keys/letsencrypt"
@@ -52,7 +53,12 @@ ensure_traefik() {
 
 cleanup_key() {
   local key="$1"; local container="${CONTAINER_PREFIX}-${key}"; local image="${IMAGE_PREFIX}:${key}"; local workdir="${ROOT_DIR}/previews/${key}"; local archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
-  docker rm -f "$container" >/dev/null 2>&1 || true; docker image rm "$image" >/dev/null 2>&1 || true; rm -rf -- "$workdir"; rm -f -- "$archive_path"; log "cleaned $key"
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  docker rm -f "${container}-dozzle" >/dev/null 2>&1 || true
+  docker image rm "$image" >/dev/null 2>&1 || true
+  rm -rf -- "$workdir"
+  rm -f -- "$archive_path"
+  log "cleaned $key"
 }
 
 deploy() {
@@ -81,7 +87,7 @@ deploy() {
   local token_strip_middleware="${container}-token-strip"
   local proxy_auth_middleware="${container}-proxy-auth"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
-    --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
+    --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" --label "dev.dozzle.group=$key" --label "dev.dozzle.name=Alice Preview $key" --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
     --label "traefik.http.routers.${http_router}.rule=$tokenized_rule" --label "traefik.http.routers.${http_router}.entrypoints=web" --label "traefik.http.routers.${http_router}.priority=100" --label "traefik.http.routers.${http_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
     --label "traefik.http.routers.${http_router}.rule=$tokenized_rule" --label "traefik.http.routers.${http_router}.entrypoints=web" --label "traefik.http.routers.${http_router}.priority=100" --label "traefik.http.routers.${http_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
     --label "traefik.http.routers.${https_ru_router}.rule=$tokenized_rule" --label "traefik.http.routers.${https_ru_router}.entrypoints=websecure" --label "traefik.http.routers.${https_ru_router}.tls=true" --label "traefik.http.routers.${https_ru_router}.tls.certresolver=letsencrypt" --label "traefik.http.routers.${https_ru_router}.tls.domains[0].main=maxxxpavlov.ru" --label "traefik.http.routers.${https_ru_router}.priority=100" --label "traefik.http.routers.${https_ru_router}.middlewares=$token_strip_middleware,$proxy_auth_middleware" \
@@ -90,6 +96,34 @@ deploy() {
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" "$image" >/dev/null
+  local dozzle_container="${container}-dozzle"
+  local dozzle_router="${dozzle_container}-logs"
+  local dozzle_rule="${tokenized_prefix}/logs"
+  local dozzle_data="${workdir}/dozzle"
+  local dozzle_strip_middleware="${dozzle_container}-strip"
+  mkdir -p "$dozzle_data"
+  docker rm -f "$dozzle_container" >/dev/null 2>&1 || true
+  docker run -d --name "$dozzle_container" --restart unless-stopped --network "$NETWORK_NAME" \
+    --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.logger=true" \
+    --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
+    --label "traefik.http.routers.${dozzle_router}.rule=PathPrefix(\`$dozzle_rule\`)" \
+    --label "traefik.http.routers.${dozzle_router}.entrypoints=websecure" \
+    --label "traefik.http.routers.${dozzle_router}.tls=true" \
+    --label "traefik.http.routers.${dozzle_router}.tls.certresolver=letsencrypt" \
+    --label "traefik.http.routers.${dozzle_router}.tls.domains[0].main=maxxxpavlov.ru" \
+    --label "traefik.http.routers.${dozzle_router}.priority=110" \
+    --label "traefik.http.routers.${dozzle_router}.middlewares=${dozzle_strip_middleware},${proxy_auth_middleware}" \
+    --label "traefik.http.middlewares.${dozzle_strip_middleware}.stripprefix.prefixes=$tokenized_prefix" \
+    --label "traefik.http.services.${dozzle_container}.loadbalancer.server.port=8080" \
+    -e DOZZLE_BASE=/logs \
+    -e DOZZLE_FILTER="label=alice.preview.key=$key" \
+    -e DOZZLE_HOSTNAME="Alice Preview $key" \
+    -e DOZZLE_ENABLE_ACTIONS=false \
+    -e DOZZLE_ENABLE_SHELL=false \
+    -e DOZZLE_NO_ANALYTICS=true \
+    -v /var/run/docker.sock:/var/run/docker.sock:ro \
+    -v "$dozzle_data:/data" \
+    "$DOZZLE_IMAGE" >/dev/null
   local health_status
   for attempt in $(seq 1 30); do
     health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
