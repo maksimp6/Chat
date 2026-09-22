@@ -7,7 +7,7 @@ before promotion.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Protocol, Any
 
 from provider_credentials import issue_window, promote_rotated_key, rotation_needed, should_revoke
@@ -56,6 +56,7 @@ def rotate_active_key(
     commit_before_revoke: bool = False,
     provider_name: str = "yandex",
     reissue_existing: bool = False,
+    ttl: timedelta | None = None,
 ) -> tuple[str, datetime, datetime]:
     """Create/reissue, validate and promote one provider credential.
 
@@ -63,7 +64,7 @@ def rotate_active_key(
     Cloud.ru reissues the current key in place; its resource ID is intentionally
     unchanged, so revoking the old ID would also revoke the replacement.
     """
-    issued_at, expires_at = issue_window(now)
+    issued_at, expires_at = issue_window(now, ttl=ttl) if ttl is not None else issue_window(now)
 
     if reissue_existing:
         if not old_provider_key_id:
