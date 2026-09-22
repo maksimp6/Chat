@@ -141,18 +141,24 @@ class CloudRuIamClient:
                     "success": True,
                 })
         except (requests.RequestException, ValueError) as exc:
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
             if trace:
-                response = getattr(exc, "response", None)
                 trace.add_event("provider_api_response", {
                     "provider": "cloudru", "service": "iam", "operation": path,
                     "method": method, "path": path,
-                    "http_status": getattr(response, "status_code", None),
+                    "http_status": status_code,
                     "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
                     "success": False,
                 })
-                trace.record_error("cloudru.iam.request", f"Cloud.ru IAM request failed: {method} {path}", exception=exc)
+                trace.record_error(
+                    "cloudru.iam.request",
+                    f"Cloud.ru IAM request failed: {method} {path}",
+                    exception=exc,
+                )
+            suffix = f" (HTTP {status_code})" if status_code else ""
             raise CloudRuIamError(
-                f"Cloud.ru IAM request failed: {method} {path}"
+                f"Cloud.ru IAM request failed: {method} {path}{suffix}"
             ) from exc
         if not isinstance(body, dict):
             raise CloudRuIamError("Cloud.ru IAM returned an invalid response")
