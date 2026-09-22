@@ -13,6 +13,8 @@ from typing import Any, Optional
 
 import requests
 
+from trace_manager import get_current_trace
+
 
 API_KEYS_PATH = "/api/v1/service-accounts/credentials/api-keys"
 SERVICE_ACCOUNTS_PATH = "/api/v1/service-accounts"
@@ -55,6 +57,13 @@ class CloudRuIamClient:
                 "CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET are required"
             )
 
+        trace = get_current_trace()
+        started = datetime.now(timezone.utc)
+        if trace:
+            trace.add_event("provider_api_request", {
+                "provider": "cloudru", "service": "iam", "operation": "authenticate",
+                "method": "POST", "path": TOKEN_PATH,
+            })
         try:
             response = requests.post(
                 f"{self.endpoint}{TOKEN_PATH}",
@@ -64,7 +73,23 @@ class CloudRuIamClient:
             )
             response.raise_for_status()
             body = response.json()
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": "authenticate",
+                    "method": "POST", "path": TOKEN_PATH, "http_status": response.status_code,
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": True,
+                })
         except (requests.RequestException, ValueError) as exc:
+            if trace:
+                trace.record_error("cloudru.iam.authenticate", "Cloud.ru IAM authentication failed", exception=exc)
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": "authenticate",
+                    "method": "POST", "path": TOKEN_PATH,
+                    "http_status": getattr(getattr(exc, "response", None), "status_code", None),
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": False,
+                })
             raise CloudRuIamError("Cloud.ru IAM authentication failed") from exc
 
         token = body.get("token") or body.get("access_token")
@@ -84,6 +109,15 @@ class CloudRuIamClient:
         params: Optional[dict[str, Any]] = None,
         json_body: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
+        trace = get_current_trace()
+        started = datetime.now(timezone.utc)
+        if trace:
+            trace.add_event("provider_api_request", {
+                "provider": "cloudru", "service": "iam", "operation": path,
+                "method": method, "path": path,
+                "query_keys": sorted((params or {}).keys()),
+                "body_keys": sorted((json_body or {}).keys()),
+            })
         try:
             response = requests.request(
                 method,
@@ -99,7 +133,24 @@ class CloudRuIamClient:
             )
             response.raise_for_status()
             body = response.json() if response.content else {}
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": path,
+                    "method": method, "path": path, "http_status": response.status_code,
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": True,
+                })
         except (requests.RequestException, ValueError) as exc:
+            if trace:
+                response = getattr(exc, "response", None)
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": path,
+                    "method": method, "path": path,
+                    "http_status": getattr(response, "status_code", None),
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": False,
+                })
+                trace.record_error("cloudru.iam.request", f"Cloud.ru IAM request failed: {method} {path}", exception=exc)
             raise CloudRuIamError(
                 f"Cloud.ru IAM request failed: {method} {path}"
             ) from exc
