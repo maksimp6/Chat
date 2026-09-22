@@ -34,6 +34,31 @@ provider_credentials_bp = Blueprint(
 CLOUDRU_DEFAULT_TTL = timedelta(days=90)
 
 
+def _authorized() -> bool:
+    """Authorize provider-credential administration without exposing secrets publicly."""
+    configured = os.getenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "").strip()
+    if configured:
+        auth = request.headers.get("Authorization", "")
+        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        return bool(token) and token == configured
+
+    # When the application's short-token gate is enabled, its before_request
+    # middleware has already authenticated this request. Reuse that session
+    # rather than introducing a second browser credential.
+    if os.getenv("ALICE_REQUIRE_SHORT_TOKEN", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+
+    # Fail closed for remote deployments when no explicit admin token is set.
+    remote = request.remote_addr or ""
+    return remote in {"127.0.0.1", "::1"}
+
+
+def _guard():
+    if not _authorized():
+        return jsonify({"error": "provider credential administration authentication required"}), 401
+    return None
+
+
 def _cloudru_ttl() -> timedelta:
     try:
         days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "90"))
@@ -238,6 +263,9 @@ def _perform_health_check(provider: str) -> dict:
 
 @provider_credentials_bp.post("/status/check")
 def provider_credentials_status_check():
+    guard = _guard()
+    if guard:
+        return guard
     data = request.get_json(silent=True) or {}
     requested = data.get("provider")
     providers = [requested] if requested else [YANDEX, CLOUDRU]
@@ -254,6 +282,9 @@ def provider_credentials_status_check():
 
 @provider_credentials_bp.get("/status")
 def provider_credentials_status():
+    guard = _guard()
+    if guard:
+        return guard
     return jsonify({
         "providers": [
             _status_for(YANDEX),
@@ -264,6 +295,9 @@ def provider_credentials_status():
 
 @provider_credentials_bp.put("")
 def update_provider_credentials():
+    guard = _guard()
+    if guard:
+        return guard
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
