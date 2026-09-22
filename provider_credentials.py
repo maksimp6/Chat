@@ -603,7 +603,7 @@ def record_health_check(
     """Persist only the result of a provider health check, never its secret."""
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError(f"Unsupported provider: {provider}")
-    if status not in {"connected", "invalid", "unavailable", "unknown"}:
+    if status not in {"configured", "connected", "invalid", "unavailable", "unknown"}:
         raise ValueError(f"Unsupported health status: {status}")
     db.execute(
         """UPDATE provider_credentials
