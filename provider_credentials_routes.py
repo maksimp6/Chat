@@ -19,6 +19,7 @@ from provider_credentials import (
     replace_active_credential,
     rotation_needed,
     fingerprint_key,
+    record_health_check,
 )
 from cloudru_api_key_provider import CloudRuApiKeyProvider
 from yandex_api_key_provider import YandexApiKeyProvider
@@ -113,97 +114,142 @@ def _metadata(credential: ProviderCredential | None) -> dict:
 
 
 def _status_for(provider: str) -> dict:
+    """Return metadata and cached health. Never decrypt a secret here."""
+    conn = get_conn()
     try:
-        credential = _load_credential(provider)
-    except CredentialError as exc:
-        return {
-            "provider": provider,
-            "status": "invalid" if "expired" in str(exc).lower() else "storage_error",
-            "authorization_ok": False,
-            "error": "expired" if "expired" in str(exc).lower() else "storage_error",
-            "rotation": {
-                "supported": False,
-                "due": False,
-                "active_key_verified": False,
-            },
-            "credential": {
-                "configured": True,
-                "fingerprint": None,
-                "provider_key_id": None,
-                "issued_at": None,
-                "expires_at": None,
-            },
+        row = conn.execute(
+            """SELECT id, provider, provider_key_id, yandex_key_id,
+                      project_id, issued_at, expires_at, status,
+                      last_checked_at, last_check_status, last_check_error
+               FROM provider_credentials
+               WHERE provider = ? AND status = 'active'
+               LIMIT 1""",
+            (provider,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row:
+        credential = {
+            "configured": True,
+            "fingerprint": None,
+            "provider_key_id": row["provider_key_id"] or row["yandex_key_id"],
+            "issued_at": str(row["issued_at"]) if row["issued_at"] else None,
+            "expires_at": str(row["expires_at"]) if row["expires_at"] else None,
         }
-    except Exception:
+        health_status = row["last_check_status"] or "unknown"
+        authorization_ok = health_status == "connected"
         return {
             "provider": provider,
-            "status": "storage_error",
-            "authorization_ok": False,
-            "error": "storage_error",
+            "status": "connected" if authorization_ok else (
+                "invalid" if health_status == "invalid" else "checking"
+            ),
+            "authorization_ok": authorization_ok,
+            "error": row["last_check_error"],
+            "credential": credential,
             "rotation": {
-                "supported": False,
-                "due": False,
-                "active_key_verified": False,
+                "supported": bool(
+                    getattr(
+                        _provider_client(provider),
+                        "rotation_supported",
+                        lambda _key_id: False,
+                    )(credential["provider_key_id"])
+                ),
+                "due": bool(
+                    row["expires_at"] and rotation_needed(row["expires_at"])
+                ),
+                "active_key_verified": authorization_ok,
             },
-            "credential": {
-                "configured": True,
-                "fingerprint": None,
-                "provider_key_id": None,
-                "issued_at": None,
-                "expires_at": None,
-            },
+            "last_checked_at": str(row["last_checked_at"])
+                if row["last_checked_at"] else None,
         }
 
-    if credential is None:
+    env_key = _provider_key_from_environment(provider)
+    if not env_key:
         return {
             "provider": provider,
             "status": "not_configured",
             "authorization_ok": False,
+            "error": None,
+            "credential": _metadata(None),
             "rotation": {
                 "supported": False,
                 "due": False,
                 "active_key_verified": False,
             },
-            "credential": _metadata(None),
+            "last_checked_at": None,
         }
 
+    fingerprint = fingerprint_key(env_key)
+    key_id = _provider_key_id_from_environment(provider)
     client = _provider_client(provider)
-    try:
-        client.validate_key(credential.api_key)
-        authorization_ok = True
-        status = "connected"
-        error = None
-    except PermissionError:
-        authorization_ok = False
-        status = "invalid"
-        error = "unauthorized"
-    except Exception:
-        authorization_ok = False
-        status = "invalid"
-        error = "provider_unavailable"
-
-    expires_at = credential.expires_at
-    due = bool(expires_at and rotation_needed(expires_at))
     supported = bool(
-        getattr(client, "rotation_supported", lambda _key_id: False)(
-            credential.provider_key_id
-        )
+        getattr(client, "rotation_supported", lambda _key_id: False)(key_id)
     )
-
     return {
         "provider": provider,
-        "status": status,
-        "authorization_ok": authorization_ok,
-        "error": error,
-        "credential": _metadata(credential),
+        "status": "checking",
+        "authorization_ok": False,
+        "error": None,
+        "credential": {
+            "configured": True,
+            "fingerprint": fingerprint,
+            "provider_key_id": key_id,
+            "issued_at": None,
+            "expires_at": None,
+        },
         "rotation": {
             "supported": supported,
-            "due": due,
-            # The live health check is the verification that the active key
-            # currently works. Rotation itself also validates before promotion.
-            "active_key_verified": authorization_ok,
+            "due": False,
+            "active_key_verified": False,
         },
+        "last_checked_at": None,
     }
+
+
+def _perform_health_check(provider: str) -> dict:
+    credential = _load_credential(provider)
+    if credential is None:
+        return {"status": "not_configured", "error": None}
+    try:
+        _provider_client(provider).validate_key(credential.api_key)
+    except PermissionError:
+        error = "unauthorized"
+        status = "invalid"
+    except Exception:
+        error = "provider_unavailable"
+        status = "unavailable"
+    else:
+        error = None
+        status = "connected"
+
+    conn = get_conn()
+    try:
+        record_health_check(
+            conn,
+            provider,
+            status=status,
+            error=error,
+        )
+    finally:
+        conn.close()
+    return {"status": status, "error": error}
+
+
+@provider_credentials_bp.post("/status/check")
+def provider_credentials_status_check():
+    data = request.get_json(silent=True) or {}
+    requested = data.get("provider")
+    providers = [requested] if requested else [YANDEX, CLOUDRU]
+    results = {}
+    try:
+        for provider in providers:
+            if provider not in (YANDEX, CLOUDRU):
+                return jsonify({"error": "unsupported_provider"}), 400
+            results[provider] = _perform_health_check(provider)
+    except Exception:
+        return jsonify({"error": "health_check_failed"}), 503
+    return provider_credentials_status()
 
 
 @provider_credentials_bp.get("/status")
@@ -263,6 +309,12 @@ def update_provider_credentials():
                     provider,
                     provider_key_id=_provider_key_id_from_environment(provider),
                     ttl=ttl or timedelta(hours=12),
+                )
+                record_health_check(
+                    conn,
+                    provider,
+                    status="connected",
+                    error=None,
                 )
         finally:
             conn.close()
