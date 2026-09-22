@@ -123,6 +123,14 @@ def rotate_active_key(
         issued_at,
         expires_at,
         provider=provider_name,
+        fingerprint=fingerprint_key(plaintext),
+    )
+    record_health_check(
+        db,
+        provider_name,
+        status="connected",
+        error=None,
+        commit=False,
     )
     if commit_before_revoke and hasattr(db, "commit"):
         db.commit()
