@@ -362,11 +362,11 @@ def _bridge_wrapper(handler):
 
 
 
-def _project_list(args: dict) -> dict:
+def _project_list(args: dict, _user: Optional[str] = None) -> dict:
     return list_directory({"path": args.get("path") or "."})
 
 
-def _project_read(args: dict) -> dict:
+def _project_read(args: dict, _user: Optional[str] = None) -> dict:
     path = str(args.get("path") or "").strip()
     if not path:
         raise ValueError("path is required")
@@ -380,7 +380,7 @@ def _project_read(args: dict) -> dict:
     return result
 
 
-def _project_search(args: dict) -> dict:
+def _project_search(args: dict, _user: Optional[str] = None) -> dict:
     query = str(args.get("query") or "").strip()
     if not query:
         raise ValueError("query is required")
