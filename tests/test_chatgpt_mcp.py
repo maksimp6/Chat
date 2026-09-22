@@ -199,8 +199,8 @@ def test_project_read_tools_are_exposed_and_read_only(client):
 def test_project_tools_execute_through_mcp(client):
     cases = [
         ("alice_list_project_files", {"path": "."}),
-        ("alice_read_project_file", {"path": "README.md"}),
-        ("alice_search_project", {"query": "MCP", "file_pattern": "*.py", "max_matches": 5}),
+        ("alice_read_project_file", {"path": "chatgpt_mcp.py", "length": 1024}),
+        ("alice_search_project", {"query": "UniversalToolExecutor", "file_pattern": "*.py"}),
     ]
     for name, arguments in cases:
         response = mcp_request(
@@ -212,7 +212,6 @@ def test_project_tools_execute_through_mcp(client):
         assert response.status_code == 200
         result = response.get_json()["result"]["structuredContent"]
         assert isinstance(result, dict)
-
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     response = mcp_request(
