@@ -73,6 +73,25 @@ def test_tools_list_is_deterministic_and_read_only(client):
     assert all("securitySchemes" in tool for tool in tools)
 
 
+
+def test_every_registered_tool_is_exposed_through_mcp(client):
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+
+    mcp_names = {tool["name"] for tool in response.get_json()["result"]["tools"]}
+    registry_names = {
+        definition["name"]
+        for definition in chatgpt_mcp.registry.get_universal_definitions("mcp")
+    }
+
+    assert mcp_names == registry_names
+    assert registry_names
+    assert all(
+        "mcp" in definition["supported_transports"]
+        for definition in chatgpt_mcp.registry.get_universal_definitions()
+    )
+
+
 def test_tools_call_returns_structured_content(client):
     response = mcp_request(
         client,
