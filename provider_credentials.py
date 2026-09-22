@@ -118,6 +118,13 @@ def create_schema(db: Any) -> None:
         )
     """)
 
+    iam_columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(cloudru_iam_credentials)").fetchall()
+    }
+    if "expires_at" not in iam_columns:
+        db.execute("ALTER TABLE cloudru_iam_credentials ADD COLUMN expires_at TIMESTAMP")
+
     columns = {
         row["name"]
         for row in db.execute("PRAGMA table_info(provider_credentials)").fetchall()
