@@ -36,13 +36,12 @@ through metadata, traces, logs, or frontend responses.
 
 The provider credentials modal contains two independent fields:
 
-- **Yandex Cloud master API key**
-- **Cloud.ru master API key**
+- **Yandex Cloud API key**
+- **Cloud.ru IAM credentials JSON**
+- **Cloud.ru Project ID**
+- **Cloud.ru service account name**
 
-Each value is sent only to the backend. The backend performs a real provider
-health check before persisting the replacement. After save, the frontend
-receives metadata only: status, fingerprint, provider key ID, issue/expiry
-timestamps, and rotation capability.
+The Cloud.ru runtime API key is not entered manually. Alice Pro creates it for the service account, performs a real Foundation Models health check, and stores only encrypted server-side credentials.
 
 The existing Cloud.ru IAM wizard remains a separate administrative feature.
 Its Key ID + Key Secret -> IAM Bearer flow is not used for Foundation Models
