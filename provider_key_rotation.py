@@ -16,6 +16,7 @@ from provider_credentials import (
     promote_rotated_key,
     rotation_needed,
     should_revoke,
+    record_health_check,
 )
 
 
@@ -98,6 +99,13 @@ def rotate_active_key(
             expires_at,
             provider=provider_name,
             fingerprint=fingerprint_key(plaintext),
+        )
+        record_health_check(
+            db,
+            provider_name,
+            status="connected",
+            error=None,
+            commit=False,
         )
         if commit_before_revoke and hasattr(db, "commit"):
             db.commit()
