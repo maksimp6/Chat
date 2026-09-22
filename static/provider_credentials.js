@@ -78,28 +78,21 @@ function build() {
     var title=document.createElement("h3"); title.textContent="Провайдеры"; title.style.marginTop="0";
     box.appendChild(close); box.appendChild(title);
 
-    box.appendChild(makeField("provider-yandex-key","Yandex Cloud API key","Ключ Yandex Cloud. Он проверяется перед сохранением.","Введите Yandex API key"));
-
     var cloudru=document.createElement("div");
     cloudru.style.cssText="margin:18px 0;padding:14px;border:1px solid #444;border-radius:9px;";
     var h=document.createElement("div"); h.textContent="Cloud.ru"; h.style.cssText="font-weight:700;margin-bottom:8px;";
     cloudru.appendChild(h);
-    cloudru.appendChild(makeField("cloudru-iam-key-id","IAM Key ID","Идентификатор ключа доступа Cloud.ru для IAM управления.","Введите IAM Key ID","text"));
-    cloudru.appendChild(makeField("cloudru-iam-key-secret","IAM Key Secret","Секрет ключа доступа Cloud.ru для IAM управления. Он используется только при подключении.","Введите IAM Key Secret","password"));
-    cloudru.appendChild(makeField("cloudru-service-account-id","Service account ID","UUID существующего сервисного аккаунта Cloud.ru. Для него должна быть назначена роль на уровне проекта.","xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx","text"));
+    cloudru.appendChild(makeField("cloudru-iam-key-id","IAM Key ID","","IAM Key ID","text"));
+    cloudru.appendChild(makeField("cloudru-iam-key-secret","IAM Key Secret","","IAM Key Secret","password"));
+    cloudru.appendChild(makeField("cloudru-service-account-id","Service account ID","","Service account UUID","text"));
     box.appendChild(cloudru);
-
-    var note=document.createElement("div");
-    note.textContent="Введите IAM Key ID и IAM Key Secret с правами управления API-ключами, а также UUID существующего service account. Alice Pro создаст API-ключ Foundation Models, проверит его и сохранит секрет зашифрованным. Секрет IAM не хранится в браузере.";
-    note.style.cssText="padding:10px;border-radius:7px;background:rgba(127,127,127,.12);font-size:12px;line-height:1.4;";
-    box.appendChild(note);
 
     var actions=document.createElement("div"); actions.style.cssText="display:flex;gap:8px;margin-top:14px;";
     var save=document.createElement("button"); save.textContent="Подключить Cloud.ru"; save.className="btn-primary";
     save.onclick=async function(){
         
         var saId=document.getElementById("cloudru-service-account-id").value.trim();
-        var y=document.getElementById("provider-yandex-key").value.trim();
+        var y="";
         var keyId=document.getElementById("cloudru-iam-key-id").value.trim();
 var keySecret=document.getElementById("cloudru-iam-key-secret").value;
 if(!keyId && !y){ output.textContent="Введите Cloud.ru IAM Key ID или Yandex API key."; return; }
@@ -117,7 +110,6 @@ if(keyId && !keySecret){ output.textContent="Введите Cloud.ru IAM Key Sec
                 var cd=await cr.json(); if(!cr.ok) throw new Error(cd.detail || cd.error || ("HTTP "+cr.status));
                 output.textContent="Cloud.ru подключён. Service account: "+cd.service_account_id+" • API key: "+cd.provider_key_id+" • ротация: ежедневно.";
             }
-            document.getElementById("provider-yandex-key").value="";
             document.getElementById("cloudru-iam-key-id").value=""; document.getElementById("cloudru-iam-key-secret").value="";
             await fetchStatus(output);
         }catch(error){ output.textContent="Подключение не выполнено: "+error.message; }
