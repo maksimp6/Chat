@@ -188,3 +188,32 @@ def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
         )
 
     assert response.status_code == 401
+
+
+def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "expired-master.db")
+    db.init_db()
+    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    import io, json
+    payload = {
+        "keyId": "master-id",
+        "secret": "master-secret",
+        "projectId": "project-1",
+        "expiresAt": "2020-01-01T00:00:00Z",
+    }
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/bootstrap",
+            headers={"Authorization": "Bearer admin-test-token"},
+            data={"iam_json": (io.BytesIO(json.dumps(payload).encode()), "iam.json")},
+            content_type="multipart/form-data",
+        )
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "cloudru_iam_master_key_expired"
