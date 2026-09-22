@@ -114,12 +114,14 @@ jobs:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
+            url="https://$domain/${ALICE_SHORT_TOKEN}/preview/${KEY}/"
             for attempt in $(seq 1 24); do
-              if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "https://$domain/healthz" >/dev/null; then
+              if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "$url" >/dev/null; then
+                echo "HTTPS Preview OK: $domain"
                 break
               fi
               if [ "$attempt" -eq 24 ]; then
-                echo "HTTPS health/TLS check failed for $domain"
+                echo "HTTPS Preview/TLS check failed for $domain"
                 openssl s_client -connect "$domain:443" -servername "$domain" </dev/null 2>/dev/null |
                   openssl x509 -noout -subject -issuer -dates -ext subjectAltName || true
                 exit 1
@@ -127,10 +129,7 @@ jobs:
               sleep 5
             done
           done
-          url="https://maxxxpavlov.ru/${ALICE_SHORT_TOKEN}/preview/${KEY}/"
-          curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "$url" >/dev/null
           echo "Preview HTTPS and TLS checks passed (token omitted from logs)."
-
       - name: Verify critical web assets
         env:
           KEY: ${{ steps.preview.outputs.key }}
