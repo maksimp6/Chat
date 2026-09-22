@@ -8,7 +8,7 @@ The connector endpoint is:
 
 `https://<public-host>/mcp`
 
-The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests must include `MCP-Protocol-Version` and `Mcp-Method`; `tools/call` additionally requires `Mcp-Name` matching `params.name`.
+The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests may omit `MCP-Protocol-Version`; when absent, the server uses the latest supported version (`2026-07-28`). Requests must include `Mcp-Method`; `tools/call` additionally requires `Mcp-Name` matching `params.name`. The current preview endpoint is intentionally unauthenticated.
 
 No connection/session state is stored by the MCP transport. Alice Pro's existing runtime `Session`, `Invocation` and `ExecutionTrace` records remain the application-level state.
 
@@ -53,10 +53,7 @@ ALICE_MCP_ALLOW_ANONYMOUS=true
 
 For a private development deployment, a single bearer token can be configured:
 
-```env
-ALICE_MCP_BEARER_TOKEN=<secret>
-ALICE_MCP_USER_ID=<stable-user-id>
-```
+Authentication is not enabled for the current preview endpoint. No bearer token is required.
 
 This mode is intended for private/testing use and is **not** a replacement for ChatGPT OAuth.
 
