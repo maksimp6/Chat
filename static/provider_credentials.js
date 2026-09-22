@@ -27,6 +27,7 @@ function statusText(item) {
     if (item.status === "not_configured") return "Не настроен";
     if (item.status === "connected") return "Подключён • авторизация OK";
     if (item.status === "storage_error") return "Ошибка хранилища";
+    if (item.status === "checking") return "Проверка ещё не выполнена";
     if (item.error === "unauthorized") return "Неверный ключ / нет доступа";
     return "Провайдер недоступен";
 }
@@ -162,11 +163,24 @@ function build() {
     document.body.appendChild(modal);
 }
 
-window.openProviderCredentialsModal = function () {
+window.openProviderCredentialsModal = async function () {
     build();
     var modal = document.getElementById("provider-credentials-modal");
     modal.style.display = "flex";
-    fetchStatus(document.getElementById("provider-credentials-status"));
+    var output = document.getElementById("provider-credentials-status");
+    output.textContent = "Проверка авторизации…";
+    try {
+        var response = await fetch("/api/provider-credentials/status/check", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({})
+        });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+    } catch (error) {
+        output.textContent = "Проверка не выполнена: " + error.message;
+    }
+    await fetchStatus(output);
 };
 
 document.addEventListener("DOMContentLoaded", build);
