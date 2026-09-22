@@ -45,31 +45,18 @@ def test_revoke_key_calls_yandex_resource_endpoint(mock_delete):
     assert mock_delete.call_args.kwargs["headers"]["Authorization"] == "Bearer iam-secret"
 
 
-@patch("yandex_api_key_provider.requests.post")
-def test_validate_key_uses_provider_authentication(mock_post):
+@patch("yandex_api_key_provider.requests.get")
+def test_validate_key_lists_models_without_inference(mock_get):
     response = Mock()
-    mock_post.return_value = response
+    mock_get.return_value = response
 
     provider().validate_key("new-provider-secret")
 
     response.raise_for_status.assert_called_once()
-    kwargs = mock_post.call_args.kwargs
+    assert mock_get.call_args.args[0].endswith("/models")
+    kwargs = mock_get.call_args.kwargs
     assert kwargs["headers"]["Authorization"] == "Api-Key new-provider-secret"
-    assert kwargs["json"]["model"] == "gpt://project-1/alice-lite/latest"
-    assert "new-provider-secret" in kwargs["headers"]["Authorization"]
+    assert kwargs["headers"]["x-project"] == "project-1"
+    assert "json" not in kwargs
+    assert not hasattr(provider(), "validation_model")
 
-
-@patch("yandex_api_key_provider.requests.post")
-def test_validate_key_reports_yandex_http_401_without_secret_in_error(mock_post):
-    response = Mock()
-    response.status_code = 401
-    response.text = '{"message":"Permission denied"}'
-    error = __import__("requests").HTTPError("401", response=response)
-    response.raise_for_status.side_effect = error
-    mock_post.return_value = response
-
-    import pytest
-    with pytest.raises(PermissionError, match="HTTP 401"):
-        provider().validate_key("secret-must-not-appear")
-
-    assert "secret-must-not-appear" not in str(response.text)
