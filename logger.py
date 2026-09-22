@@ -84,6 +84,28 @@ class AliceLogger:
 alice_logger = AliceLogger()
 
 
+# Capture Flask/Werkzeug and other third-party records through the same
+# project handlers. Keep the source level at DEBUG so diagnostics are not
+# discarded, then normalize the rendered level to CRITICAL in the handlers.
+def _configure_global_logging():
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+
+    app_logger = alice_logger.get('app')
+    for handler in list(app_logger.handlers):
+        if handler not in root.handlers:
+            root.addHandler(handler)
+
+    for logger_name in ('werkzeug', 'flask.app'):
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.DEBUG)
+        logger.handlers.clear()
+        logger.propagate = True
+
+
+_configure_global_logging()
+
+
 def log_function(logger_name='app'):
     def decorator(func):
         @wraps(func)
