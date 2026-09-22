@@ -19,8 +19,43 @@ function makeField(id, title, help, placeholder, type) {
         small.style.cssText = "margin-top:5px;font-size:12px;opacity:.7;line-height:1.35;";
         wrap.appendChild(small);
     }
-    wrap.appendChild(label); wrap.appendChild(input);
+    var error = document.createElement("div");
+    error.className = "provider-field-error";
+    error.style.cssText = "display:none;margin-top:6px;font-size:12px;color:#ff6b6b;line-height:1.35;";
+    wrap.appendChild(label); wrap.appendChild(input); wrap.appendChild(error);
     return wrap;
+}
+
+function setFieldError(id, message) {
+    var field = document.getElementById(id);
+    if (!field) return;
+    var error = field.parentElement && field.parentElement.querySelector(".provider-field-error");
+    if (!error) return;
+    error.textContent = message || "";
+    error.style.display = message ? "block" : "none";
+    field.style.borderColor = message ? "#ff6b6b" : "#555";
+}
+
+function clearFieldErrors() {
+    setFieldError("provider-yandex-key", "");
+    setFieldError("provider-cloudru-key", "");
+}
+
+function providerErrorMessage(data, provider) {
+    if (data && data.error === "authorization_failed") {
+        return provider === "cloudru"
+            ? "Неверный Cloud.ru API key или ключ не имеет доступа к Foundation Models."
+            : "Неверный Yandex Cloud API key или ключ не имеет доступа к AI Studio.";
+    }
+    if (data && data.error === "provider_health_check_failed") {
+        return provider === "cloudru"
+            ? "Не удалось проверить Cloud.ru API key: сервис недоступен или вернул ошибку."
+            : "Не удалось проверить Yandex Cloud API key: сервис недоступен или вернул ошибку.";
+    }
+    if (data && data.error === "credential_storage_failed") {
+        return "Ключ проверен, но не удалось сохранить его на сервере.";
+    }
+    return (data && (data.detail || data.error)) || "Не удалось подключить провайдера.";
 }
 
 function statusText(item) {
@@ -85,7 +120,13 @@ function build() {
     save.onclick=async function(){
         var y=document.getElementById("provider-yandex-key").value.trim();
         var cloudru=document.getElementById("provider-cloudru-key").value.trim();
-        if(!y && !cloudru){ output.textContent="Введите API key."; return; }
+        clearFieldErrors();
+        output.textContent = "";
+        if(!y && !cloudru){
+            setFieldError("provider-yandex-key", "Введите API key.");
+            setFieldError("provider-cloudru-key", "Введите API key.");
+            return;
+        }
         save.disabled=true;
         try{
             var body={};
@@ -93,11 +134,18 @@ function build() {
             if(cloudru) body.cloudru_api_key=cloudru;
             var response=await fetch("/api/provider-credentials",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
             var data=await response.json();
-            if(!response.ok) throw new Error(data.detail || data.error || ("HTTP "+response.status));
+            if(!response.ok){
+                var provider = data && data.provider;
+                var fieldId = provider === "cloudru" ? "provider-cloudru-key" : provider === "yandex" ? "provider-yandex-key" : null;
+                var message = providerErrorMessage(data, provider);
+                if (fieldId) setFieldError(fieldId, message);
+                else output.textContent = message;
+                return;
+            }
             document.getElementById("provider-yandex-key").value="";
             document.getElementById("provider-cloudru-key").value="";
             await fetchStatus(output);
-        }catch(error){ output.textContent="Подключение не выполнено: "+error.message; }
+        }catch(error){ output.textContent="Ошибка подключения: "+error.message; }
         finally { save.disabled=false; }
     };
     actions.appendChild(save); box.appendChild(actions);
