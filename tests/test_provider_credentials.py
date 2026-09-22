@@ -280,3 +280,35 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
     body = response.get_json()
     assert body["error"] == "provider_credential_admin_authentication_required"
     assert "provider API-key validation" in body["detail"]
+
+
+
+def test_provider_credentials_update_preserves_provider_permission_error(monkeypatch):
+    from flask import Flask
+    import provider_credentials_routes as routes
+    from yandex_api_key_provider import YandexProviderPermissionError
+
+    class FakeClient:
+        def validate_key(self, api_key):
+            raise YandexProviderPermissionError(
+                "Yandex API key is authenticated, but the key is not authorized to list AI Studio models (HTTP 403)"
+            )
+
+    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+    app.testing = True
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"yandex_api_key": "valid-but-unverified"},
+        )
+
+    assert response.status_code == 403
+    body = response.get_json()
+    assert body["error"] == "provider_validation_permission_denied"
+    assert body["provider"] == "yandex"
+    assert body["status"] == "forbidden"
+    assert "HTTP 403" in body["detail"]
