@@ -3,11 +3,71 @@ import json
 import time
 import uuid
 import traceback
-from typing import Any, Dict, Optional
+from contextvars import ContextVar
+from functools import wraps
+from typing import Any, Dict, Optional, Callable
+
+_current_trace: ContextVar["ExecutionTrace | None"] = ContextVar("alice_execution_trace", default=None)
 
 from trace_security import MAX_DEPTH, MAX_ITEMS, MAX_REPR, SENSITIVE_KEYS, safe_repr, sanitize_trace_value
 from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
 from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
+
+
+
+def get_current_trace() -> Optional["ExecutionTrace"]:
+    """Return the trace active for the current request/task, if any."""
+    return _current_trace.get()
+
+
+def traced_operation(operation: str, *, include_request: bool = True):
+    """Trace an important non-chat operation, including its final HTTP outcome."""
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(fn)
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
+            trace = ExecutionTrace()
+            trace.set_context(invocation_id=trace.trace_id)
+            payload = {
+                "operation": operation,
+                "method": getattr(kwargs.get("request"), "method", None),
+            }
+            if include_request:
+                try:
+                    from flask import request as flask_request
+                    payload.update({
+                        "method": flask_request.method,
+                        "path": flask_request.path,
+                    })
+                    if flask_request.is_json:
+                        payload["body"] = flask_request.get_json(silent=True) or {}
+                    elif flask_request.form:
+                        payload["form_keys"] = sorted(flask_request.form.keys())
+                except Exception:
+                    pass
+            trace.set_request(payload)
+            trace.add_event("operation_started", {"operation": operation})
+            token = _current_trace.set(trace)
+            try:
+                result = fn(*args, **kwargs)
+                try:
+                    from flask import make_response
+                    response = make_response(result)
+                    trace.add_event("operation_completed", {
+                        "operation": operation,
+                        "http_status": response.status_code,
+                        "success": response.status_code < 400,
+                    })
+                except Exception as exc:
+                    trace.record_error(operation, str(exc), exception=exc)
+                return result
+            except Exception as exc:
+                trace.record_error(operation, str(exc), exception=exc)
+                raise
+            finally:
+                _current_trace.reset(token)
+                trace.finalize()
+        return wrapped
+    return decorator
 
 
 class ExecutionTrace:
