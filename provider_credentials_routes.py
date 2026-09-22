@@ -120,7 +120,7 @@ def _status_for(provider: str) -> dict:
         row = conn.execute(
             """SELECT id, provider, provider_key_id, yandex_key_id,
                       project_id, issued_at, expires_at, status,
-                      last_checked_at, last_check_status, last_check_error
+                      fingerprint, last_checked_at, last_check_status, last_check_error
                FROM provider_credentials
                WHERE provider = ? AND status = 'active'
                LIMIT 1""",
@@ -132,7 +132,7 @@ def _status_for(provider: str) -> dict:
     if row:
         credential = {
             "configured": True,
-            "fingerprint": None,
+            "fingerprint": row["fingerprint"],
             "provider_key_id": row["provider_key_id"] or row["yandex_key_id"],
             "issued_at": str(row["issued_at"]) if row["issued_at"] else None,
             "expires_at": str(row["expires_at"]) if row["expires_at"] else None,
