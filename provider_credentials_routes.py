@@ -97,15 +97,7 @@ def _provider_client(provider: str):
             ai_endpoint=config.BASE_URL,
         )
     if provider == CLOUDRU:
-        conn = get_conn()
-        try:
-            management = get_cloudru_iam_credentials(conn, decrypt_secret)
-        finally:
-            conn.close()
-        iam_client = None
-        if management:
-            iam_client = CloudRuIamClient(key_id=management["key_id"], key_secret=management["key_secret"])
-        return CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL, iam_client=iam_client)
+        return CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL)
     raise ValueError(f"Unsupported provider: {provider}")
 
 
@@ -453,11 +445,12 @@ def update_provider_credentials():
 
     values = (
         (YANDEX, data.get("yandex_api_key")),
+        (CLOUDRU, data.get("cloudru_api_key")),
     )
     supplied = [(provider, value.strip()) for provider, value in values
                 if isinstance(value, str) and value.strip()]
     if not supplied:
-        return jsonify({"error": "Use /cloudru/bootstrap for Cloud.ru; only Yandex API key can be entered here"}), 400
+        return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
     if any(len(value) > 4096 for _, value in supplied):
         return jsonify({"error": "API key is too long"}), 400
 
@@ -482,7 +475,6 @@ def update_provider_credentials():
         conn = get_conn()
         try:
             for provider, api_key in supplied:
-                ttl = _cloudru_ttl() if provider == CLOUDRU else None
                 replace_active_credential(
                     conn,
                     api_key,
@@ -490,7 +482,7 @@ def update_provider_credentials():
                     encrypt_secret,
                     provider,
                     provider_key_id=_provider_key_id_from_environment(provider),
-                    ttl=ttl or timedelta(hours=12),
+                    ttl=timedelta(hours=12),
                 )
                 record_health_check(
                     conn,
