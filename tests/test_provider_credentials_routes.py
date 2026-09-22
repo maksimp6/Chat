@@ -170,3 +170,25 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         )
 
     assert response.status_code == 200
+
+
+def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "check-auth.db")
+    db.init_db()
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "false")
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/status/check",
+            json={"provider": "cloudru"},
+            environ_base={"REMOTE_ADDR": "203.0.113.11"},
+        )
+
+    assert response.status_code == 401
