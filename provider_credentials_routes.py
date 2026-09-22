@@ -305,6 +305,56 @@ def provider_credentials_status():
     })
 
 
+@provider_credentials_bp.post("/cloudru/service-accounts")
+def cloudru_service_accounts():
+    guard = _guard()
+    if guard:
+        return guard
+    upload = request.files.get("iam_json")
+    if upload is None:
+        return jsonify({"error": "iam_json file is required"}), 400
+    try:
+        payload = json.load(upload.stream)
+    except (ValueError, UnicodeDecodeError):
+        return jsonify({"error": "invalid IAM JSON"}), 400
+    if not isinstance(payload, dict):
+        return jsonify({"error": "IAM JSON must be an object"}), 400
+
+    def pick(*names):
+        for name in names:
+            value = payload.get(name)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
+    key_id = pick("keyId", "key_id", "accessKeyId", "access_key_id")
+    key_secret = pick("secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
+    if not key_id or not key_secret:
+        return jsonify({"error": "IAM JSON must contain Key ID and Key Secret"}), 400
+    expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
+    if expires_raw:
+        try:
+            if datetime.fromisoformat(expires_raw.replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+                return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
+        except ValueError:
+            return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
+
+    try:
+        accounts = CloudRuIamClient(key_id=key_id, key_secret=key_secret).list_service_accounts()
+        return jsonify({
+            "service_accounts": [
+                {
+                    "id": str(item.get("id") or item.get("service_account_id") or ""),
+                    "name": str(item.get("name") or ""),
+                    "project_id": str(item.get("project_id") or item.get("target", {}).get("project_id") or ""),
+                }
+                for item in accounts
+            ]
+        })
+    except Exception as exc:
+        return jsonify({"error": "cloudru_service_accounts_failed", "detail": str(exc)}), 502
+
+
 @provider_credentials_bp.post("/cloudru/bootstrap")
 def bootstrap_cloudru():
     guard = _guard()
