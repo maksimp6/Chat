@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import pytest
+import requests
 
 from cloudru_api_key_provider import CloudRuApiKeyProvider
 
@@ -22,7 +23,7 @@ def test_validate_key_uses_foundation_models_api_key_auth():
 
 def test_validate_key_maps_401_to_unauthorized():
     response = Mock(status_code=401)
-    error = Exception("unauthorized")
+    error = requests.HTTPError("unauthorized")
     response.raise_for_status.side_effect = error
     error.response = response
 
