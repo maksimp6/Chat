@@ -164,12 +164,22 @@ def get_active_credential(
         raise ExpiredCredentialError(f"Active {provider} provider credential expired")
 
     secret = decrypt(row["api_key_encrypted"])
+    row_provider = (
+        row["provider"]
+        if (hasattr(row, "keys") and "provider" in row.keys())
+        else (row.get("provider") if isinstance(row, dict) else None)
+    ) or provider
+    row_provider_key_id = (
+        row["provider_key_id"]
+        if (hasattr(row, "keys") and "provider_key_id" in row.keys())
+        else (row.get("provider_key_id") if isinstance(row, dict) else None)
+    )
     return ProviderCredential(
         api_key=secret,
         project_id=str(row["project_id"] or ""),
-        provider=str(row["provider"] or provider),
+        provider=str(row_provider),
         id=int(row["id"]),
-        provider_key_id=row["provider_key_id"],
+        provider_key_id=row_provider_key_id or row["yandex_key_id"],
         yandex_key_id=row["yandex_key_id"],
         issued_at=_as_utc(row["issued_at"]),
         expires_at=expires_at,
