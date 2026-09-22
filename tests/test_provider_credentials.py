@@ -233,3 +233,50 @@ def test_manual_provider_credential_does_not_fabricate_remote_key_id():
 
     assert row["provider_key_id"] is None
     assert row["fingerprint"]
+
+
+
+def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
+    from flask import Flask
+    import provider_credentials_routes as routes
+
+    class FakeClient:
+        def validate_key(self, api_key):
+            raise PermissionError("Yandex authorization failed (HTTP 401)")
+
+    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+    app.testing = True
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"yandex_api_key": "invalid-key"},
+        )
+
+    assert response.status_code == 401
+    body = response.get_json()
+    assert body["error"] == "authorization_failed"
+    assert body["provider"] == "yandex"
+    assert body["status"] == "invalid"
+
+
+def test_provider_credentials_update_rejects_admin_auth_before_provider_validation(monkeypatch):
+    import provider_credentials_routes as routes
+
+    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "expected-token")
+    app = __import__("flask").Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+    app.testing = True
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"yandex_api_key": "invalid-key"},
+        )
+
+    assert response.status_code == 401
+    body = response.get_json()
+    assert body["error"] == "provider_credential_admin_authentication_required"
+    assert "provider API-key validation" in body["detail"]
