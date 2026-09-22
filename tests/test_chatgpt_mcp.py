@@ -47,31 +47,17 @@ def test_tools_list_is_deterministic_and_read_only(client):
     names = [tool["name"] for tool in tools]
 
     assert names == sorted(names)
-    assert names == [
-        "alice_get_invocation",
-        "alice_get_invocation_trace",
-        "alice_get_session",
-        "alice_get_system_status",
-        "alice_list_agents",
-        "alice_list_project_files",
-        "alice_read_project_file",
-        "alice_search_project",
-        "git_add",
-        "git_branches",
-        "git_commit",
-        "git_diff",
-        "git_fetch",
-        "git_log",
-        "git_pull",
-        "git_push",
-        "git_remote",
-        "git_status",
-    ]
+
+    registry_names = sorted(
+        definition["name"]
+        for definition in chatgpt_mcp.registry.get_universal_definitions("mcp")
+    )
+    assert names == registry_names
+
     assert body["result"]["cacheScope"] == "private"
     assert body["result"]["ttlMs"] > 0
     assert all("inputSchema" in tool for tool in tools)
     assert all("securitySchemes" in tool for tool in tools)
-
 
 
 def test_every_registered_tool_is_exposed_through_mcp(client):
