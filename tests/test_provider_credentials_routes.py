@@ -201,19 +201,101 @@ def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
-    import io, json
-    payload = {
-        "keyId": "master-id",
-        "secret": "master-secret",
-        "projectId": "project-1",
-        "expiresAt": "2020-01-01T00:00:00Z",
-    }
     with app.test_client() as client:
         response = client.post(
             "/api/provider-credentials/cloudru/bootstrap",
             headers={"Authorization": "Bearer admin-test-token"},
-            data={"iam_json": (io.BytesIO(json.dumps(payload).encode()), "iam.json")},
-            content_type="multipart/form-data",
+            data={
+                "iam_key_id": "master-id",
+                "iam_key_secret": "master-secret",
+                "project_id": "project-1",
+                "service_account_id": "sa-1",
+                "expires_at": "2020-01-01T00:00:00Z",
+            },
         )
     assert response.status_code == 401
     assert response.get_json()["error"] == "cloudru_iam_master_key_expired"
+
+
+def test_cloudru_bootstrap_requires_existing_service_account(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "service-account-required.db")
+    db.init_db()
+    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/bootstrap",
+            headers={"Authorization": "Bearer admin-test-token"},
+            data={
+                "iam_key_id": "master-id",
+                "iam_key_secret": "master-secret",
+                "project_id": "project-1",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "service_account_id_required"
+
+
+def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "bootstrap.db")
+    db.init_db()
+    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
+    monkeypatch.setenv(
+        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        base64.urlsafe_b64encode(b"5" * 32).decode("ascii"),
+    )
+
+    class FakeManagement:
+        key_id = "master-id"
+        key_secret = "master-secret"
+
+        def list_service_accounts(self):
+            raise AssertionError("bootstrap must not enumerate service accounts")
+
+        def create_api_key(self, **kwargs):
+            assert kwargs["service_account_id"] == "sa-1"
+            assert kwargs["products"] == ["foundation-models"]
+            return {"id": "key-1", "secret": "runtime-secret"}
+
+    class FakeProvider:
+        def __init__(self, **kwargs):
+            pass
+
+        def validate_key(self, secret):
+            assert secret == "runtime-secret"
+
+    monkeypatch.setattr(routes, "CloudRuIamClient", FakeManagement)
+    monkeypatch.setattr(routes, "CloudRuApiKeyProvider", FakeProvider)
+    monkeypatch.setattr(routes, "save_cloudru_iam_credentials", lambda *args, **kwargs: None)
+    monkeypatch.setattr(routes, "replace_active_credential", lambda *args, **kwargs: None)
+    monkeypatch.setattr(routes, "record_health_check", lambda *args, **kwargs: None)
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/bootstrap",
+            headers={"Authorization": "Bearer admin-test-token"},
+            data={
+                "iam_key_id": "master-id",
+                "iam_key_secret": "master-secret",
+                "project_id": "project-1",
+                "service_account_id": "sa-1",
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["service_account_id"] == "sa-1"
+    assert payload["status"] == "connected"
