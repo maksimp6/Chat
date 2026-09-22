@@ -12,6 +12,7 @@ import os
 from datetime import timedelta
 
 from cloudru_api_key_provider import CloudRuApiKeyProvider
+from cloudru_iam import CloudRuIamClient
 from credential_crypto import encrypt_secret
 from db import get_conn
 from provider_credentials import (
@@ -19,6 +20,7 @@ from provider_credentials import (
     _fetch_one,
     create_schema,
     rotation_needed,
+    get_cloudru_iam_credentials,
 )
 from provider_key_rotation import rotate_active_key
 
@@ -56,7 +58,16 @@ def main() -> int:
             logger.info("Cloud.ru provider key is not inside the rotation window")
             return 0
 
-        provider = CloudRuApiKeyProvider()
+        management = get_cloudru_iam_credentials(conn, __import__("credential_crypto").decrypt_secret)
+        if not management:
+            logger.error("Cloud.ru rotation unavailable: IAM credentials are not configured")
+            return 2
+        provider = CloudRuApiKeyProvider(
+            iam_client=CloudRuIamClient(
+                key_id=management["key_id"],
+                key_secret=management["key_secret"],
+            )
+        )
         if not provider.rotation_supported(row["provider_key_id"]):
             logger.error(
                 "Cloud.ru rotation unavailable: provider key ID or IAM management credentials are missing"
