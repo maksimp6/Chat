@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
+import pytest
+
 from yandex_api_key_provider import YandexApiKeyProvider
 
 
@@ -60,3 +62,22 @@ def test_validate_key_lists_models_without_inference(mock_get):
     assert "json" not in kwargs
     assert not hasattr(provider(), "validation_model")
 
+
+
+@patch("yandex_api_key_provider.requests.get")
+def test_validate_key_maps_models_permission_failure(mock_get):
+    from requests import HTTPError
+    from yandex_api_key_provider import YandexProviderPermissionError
+
+    response = Mock()
+    response.status_code = 403
+    response.text = '{"detail":"permission denied"}'
+    response.raise_for_status.side_effect = HTTPError("403", response=response)
+    mock_get.return_value = response
+
+    with pytest.raises(YandexProviderPermissionError, match="not authorized to list AI Studio models"):
+        provider().validate_key("provider-secret")
+
+    kwargs = mock_get.call_args.kwargs
+    assert kwargs["headers"]["Authorization"] == "Api-Key provider-secret"
+    assert kwargs["headers"]["x-project"] == "project-1"
