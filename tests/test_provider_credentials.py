@@ -208,3 +208,28 @@ def test_provider_health_metadata_has_no_secret():
     assert row["last_check_status"] == "connected"
     assert row["last_check_error"] is None
     assert "secret-health" not in str(dict(row))
+
+
+def test_manual_provider_credential_does_not_fabricate_remote_key_id():
+    import sqlite3
+
+    from provider_credentials import create_schema, replace_active_credential
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    credential = replace_active_credential(
+        conn,
+        "manual-cloudru-secret",
+        "",
+        lambda value: "encrypted:" + value,
+        "cloudru",
+    )
+    row = conn.execute(
+        "SELECT provider_key_id, fingerprint FROM provider_credentials WHERE id = ?",
+        (credential.id,),
+    ).fetchone()
+    conn.close()
+
+    assert row["provider_key_id"] is None
+    assert row["fingerprint"]
