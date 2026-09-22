@@ -426,6 +426,11 @@ def promote_rotated_key(
     ))
 
 
-def issue_window(now: Optional[datetime] = None) -> tuple[datetime, datetime]:
+def issue_window(
+    now: Optional[datetime] = None,
+    ttl: timedelta = KEY_TTL,
+) -> tuple[datetime, datetime]:
     issued = _as_utc(now or utcnow())
-    return issued, issued + KEY_TTL
+    if ttl <= timedelta(0):
+        raise ValueError("ttl must be positive")
+    return issued, issued + ttl
