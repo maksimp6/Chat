@@ -60,6 +60,12 @@ def test_tools_list_is_deterministic_and_read_only(client):
         "git_diff",
         "git_log",
         "git_status",
+        "git_add",
+        "git_commit",
+        "git_fetch",
+        "git_pull",
+        "git_push",
+        "git_remote",
     ]
     assert body["result"]["cacheScope"] == "private"
     assert body["result"]["ttlMs"] > 0
@@ -236,14 +242,44 @@ def test_existing_git_read_tools_execute_through_mcp(client):
         assert isinstance(result, dict)
 
 
-def test_existing_git_read_tools_are_read_only(client):
+def test_existing_git_tools_have_expected_mcp_permissions(client):
     response = mcp_request(client, "tools/list")
     assert response.status_code == 200
     tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
+
     for name in ("git_status", "git_log", "git_diff", "git_branches"):
         assert tools[name]["_meta"]["read_only"] is True
         assert tools[name]["_meta"]["requires_approval"] is False
+        assert tools[name]["_meta"]["risk_level"] == "low"
         assert "mcp" in tools[name]["_meta"]["capabilities"]
+
+    for name in ("git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"):
+        assert tools[name]["_meta"]["read_only"] is False
+        assert tools[name]["_meta"]["requires_approval"] is True
+        assert tools[name]["_meta"]["risk_level"] == "high"
+        assert "mcp" in tools[name]["_meta"]["capabilities"]
+
+
+def test_existing_git_write_tools_require_approval(client):
+    cases = [
+        ("git_add", {"path": "chatgpt_mcp.py"}),
+        ("git_commit", {"message": "test"}),
+        ("git_remote", {"action": "remove", "name": "nonexistent"}),
+        ("git_push", {}),
+        ("git_pull", {}),
+        ("git_fetch", {}),
+    ]
+    for name, arguments in cases:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            name=name,
+        )
+        assert response.status_code == 403, response.get_json()
+        body = response.get_json()
+        assert body["error"]["code"] == -32003
+        assert "approval" in body["error"]["message"].lower()
 
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
