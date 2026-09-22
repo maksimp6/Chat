@@ -71,6 +71,7 @@ class ToolRegistry:
         try:
             from git_mcp_tools import GIT_TOOLS
             mcp_read_tools = {"git_status", "git_log", "git_diff", "git_branches"}
+            mcp_write_tools = {"git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"}
             for name, cfg in GIT_TOOLS.items():
                 if name in mcp_read_tools:
                     cfg = {
@@ -79,6 +80,15 @@ class ToolRegistry:
                         "risk_level": "low",
                         "read_only": True,
                         "requires_approval": False,
+                        "supported_transports": ["responses_api", "local_agent", "mcp"],
+                    }
+                elif name in mcp_write_tools:
+                    cfg = {
+                        **cfg,
+                        "capabilities": ["git", "write", "mcp"],
+                        "risk_level": "high",
+                        "read_only": False,
+                        "requires_approval": True,
                         "supported_transports": ["responses_api", "local_agent", "mcp"],
                     }
                 self._register("git", name, cfg)
