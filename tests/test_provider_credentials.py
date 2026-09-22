@@ -70,3 +70,107 @@ def test_fingerprint_is_stable_and_non_secret():
     fingerprint = fingerprint_key(secret)
     assert len(fingerprint) == 64
     assert fingerprint != secret
+
+
+def test_provider_credentials_are_isolated():
+    import sqlite3
+
+    from provider_credentials import create_schema, get_active_credential
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    conn.execute(
+        """INSERT INTO provider_credentials
+           (api_key_encrypted, provider_key_id, provider, project_id,
+            issued_at, expires_at, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
+        (
+            "cipher-yandex",
+            "yandex-key",
+            "yandex",
+            "project-yandex",
+            "2026-01-01T00:00:00+00:00",
+            "2026-01-02T00:00:00+00:00",
+        ),
+    )
+    conn.execute(
+        """INSERT INTO provider_credentials
+           (api_key_encrypted, provider_key_id, provider, project_id,
+            issued_at, expires_at, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
+        (
+            "cipher-cloudru",
+            "cloudru-key",
+            "cloudru",
+            "",
+            "2026-01-01T00:00:00+00:00",
+            "2026-01-02T00:00:00+00:00",
+        ),
+    )
+    conn.commit()
+
+    yandex = get_active_credential(
+        conn,
+        lambda value: "yandex-secret" if value == "cipher-yandex" else "wrong",
+        provider="yandex",
+        now=datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
+    )
+    cloudru = get_active_credential(
+        conn,
+        lambda value: "cloudru-secret" if value == "cipher-cloudru" else "wrong",
+        provider="cloudru",
+        now=datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert yandex.api_key == "yandex-secret"
+    assert yandex.provider == "yandex"
+    assert yandex.provider_key_id == "yandex-key"
+    assert cloudru.api_key == "cloudru-secret"
+    assert cloudru.provider == "cloudru"
+    assert cloudru.provider_key_id == "cloudru-key"
+
+
+def test_create_schema_migrates_legacy_global_index():
+    import sqlite3
+
+    from provider_credentials import create_schema
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """CREATE TABLE provider_credentials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api_key_encrypted TEXT NOT NULL,
+            yandex_key_id TEXT,
+            project_id TEXT NOT NULL,
+            issued_at TIMESTAMP NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX one_active_key ON provider_credentials(status) WHERE status = 'active'"
+    )
+    conn.execute(
+        """INSERT INTO provider_credentials
+           (api_key_encrypted, yandex_key_id, project_id, issued_at, expires_at, status)
+           VALUES ('cipher', 'old-yandex-id', 'project-1',
+                   '2026-01-01T00:00:00+00:00', '2026-01-02T00:00:00+00:00', 'active')"""
+    )
+    create_schema(conn)
+    indexes = {
+        row["name"]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index'"
+        ).fetchall()
+    }
+    row = conn.execute(
+        "SELECT provider, provider_key_id FROM provider_credentials WHERE id=1"
+    ).fetchone()
+
+    assert "one_active_key" not in indexes
+    assert "one_active_key_per_provider" in indexes
+    assert row["provider"] == "yandex"
+    assert row["provider_key_id"] == "old-yandex-id"
