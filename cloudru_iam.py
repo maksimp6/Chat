@@ -1,7 +1,9 @@
-"""Cloud.ru IAM API-key client used by the admin wizard.
+"""Cloud.ru IAM API-key client used by administration and provider rotation.
 
 The client exchanges a service-account key pair for a short-lived IAM token,
-then calls the documented Cloud.ru static API-key endpoints.
+then calls Cloud.ru static API-key management endpoints. Runtime Foundation
+Models requests use the separate Api-Key authentication handled by
+cloudru_api_key_provider.py.
 """
 from __future__ import annotations
 
@@ -70,9 +72,7 @@ class CloudRuIamClient:
 
         expires_in = int(body.get("expires_in") or body.get("expiresIn") or 3600)
         self._access_token = str(token)
-        self._access_token_expires_at = now + timedelta(
-            seconds=max(60, expires_in - 60)
-        )
+        self._access_token_expires_at = now + timedelta(seconds=max(60, expires_in - 60))
         return self._access_token
 
     def _request(
@@ -167,6 +167,28 @@ class CloudRuIamClient:
             body["expires_at"] = expires_at
 
         return self._request("POST", API_KEYS_PATH, json_body=body)
+
+    def reissue_api_key(
+        self,
+        *,
+        api_key_id: str,
+        expires_at: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Reissue a static API key while retaining its resource ID.
+
+        Cloud.ru documents reissue as changing only the secret and expiry.
+        The API path is configurable for deployments where the public API
+        endpoint differs from the current documented route.
+        """
+        if not api_key_id.strip():
+            raise ValueError("api_key_id is required")
+        template = os.getenv(
+            "CLOUDRU_IAM_REISSUE_PATH",
+            f"{API_KEYS_PATH}/{{id}}/reissue",
+        )
+        path = template.format(id=api_key_id)
+        body = {"expires_at": expires_at} if expires_at else {}
+        return self._request("POST", path, json_body=body)
 
 
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]
