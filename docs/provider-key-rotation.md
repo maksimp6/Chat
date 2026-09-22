@@ -92,3 +92,7 @@ Use provider-specific names:
 - \`CLOUDRU_API_KEY\`
 
 Do not introduce a generic \`API_KEY\` for both providers.
+
+## Administration endpoint security
+
+The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Alice Pro short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.
