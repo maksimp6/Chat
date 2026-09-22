@@ -46,6 +46,7 @@ class YandexApiKeyProvider:
                 for item in os.getenv(
                     "YANDEX_API_KEY_SCOPES",
                     "yc.ai.languageModels.execute,"
+                    "yc.ai.models.viewer,"
                     "yc.ai.speechkitStt.execute,"
                     "yc.ai.speechkitTts.execute",
                 ).split(",")
