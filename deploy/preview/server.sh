@@ -75,6 +75,7 @@ deploy() {
   local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
   local domain_rule="(Host(\`maxxxpavlov.ru\`) || Host(\`maxxxpavlov.online\`)) && $tokenized_rule"
   local http_router="${container}-http"
+  local https_router="${container}-https"
   local https_ru_router="${container}-https-ru"
   local https_online_router="${container}-https-online"
   local token_strip_middleware="${container}-token-strip"
