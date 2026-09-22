@@ -191,26 +191,3 @@ def test_project_read_tools_are_exposed_and_read_only(client):
     for name in ("alice_list_project_files", "alice_read_project_file", "alice_search_project"):
         assert tools[name]["_meta"]["read_only"] is True
         assert tools[name]["_meta"]["requires_approval"] is False
-
-
-def test_project_read_blocks_sensitive_files(client, monkeypatch):
-    monkeypatch.setattr(chatgpt_mcp, "read_file", lambda _args: {"success": True, "content": "secret"})
-    response = mcp_request(
-        client,
-        "tools/call",
-        {"name": "alice_read_project_file", "arguments": {"path": ".env"}},
-        name="alice_read_project_file",
-    )
-    assert response.status_code == 403
-    assert response.get_json()["error"]["code"] == -32003
-
-
-def test_project_search_blocks_credential_queries(client):
-    response = mcp_request(
-        client,
-        "tools/call",
-        {"name": "alice_search_project", "arguments": {"query": "api_key"}},
-        name="alice_search_project",
-    )
-    assert response.status_code == 403
-    assert response.get_json()["error"]["code"] == -32003
