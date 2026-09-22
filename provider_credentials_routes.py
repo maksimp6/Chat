@@ -35,7 +35,7 @@ provider_credentials_bp = Blueprint(
     url_prefix="/api/provider-credentials",
 )
 
-CLOUDRU_DEFAULT_TTL = timedelta(days=90)
+CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
 
 def _authorized() -> bool:
