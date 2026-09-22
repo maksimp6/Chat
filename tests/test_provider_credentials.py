@@ -191,7 +191,7 @@ def test_provider_health_metadata_has_no_secret():
         conn,
         "secret-health",
         "project-1",
-        fernet.encrypt,
+        lambda value: fernet.encrypt(value.encode("utf-8")).decode("utf-8"),
         "yandex",
         provider_key_id="yandex-health",
     )
