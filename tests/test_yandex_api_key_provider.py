@@ -93,6 +93,6 @@ def test_create_key_defaults_to_model_view_scope(mock_post, monkeypatch):
     }
     mock_post.return_value = response
 
-    provider().create_key(expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc))
+    YandexApiKeyProvider(iam_token="iam-secret", service_account_id="sa-1", project_id="project-1").create_key(expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc))
 
     assert "yc.ai.models.viewer" in mock_post.call_args.kwargs["json"]["scopes"]
