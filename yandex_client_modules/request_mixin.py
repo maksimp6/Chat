@@ -22,13 +22,14 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     try:
         crypto_key = os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY")
         if decrypt_secret is None or not crypto_key:
-            credential = resolve_client_credential(client._config)
+            credential = resolve_client_credential(client._config, provider="yandex")
         else:
             credential = resolve_client_credential(
                 client._config,
                 conn,
                 decrypt_secret,
                 encrypt_secret,
+                provider="yandex",
             )
     finally:
         conn.close()
