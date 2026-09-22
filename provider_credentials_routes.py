@@ -339,6 +339,16 @@ def bootstrap_cloudru():
     if not project_id:
         return jsonify({"error": "project_id is required"}), 400
 
+    iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
+    iam_expires_at = None
+    if iam_expires_raw:
+        try:
+            iam_expires_at = datetime.fromisoformat(iam_expires_raw.replace("Z", "+00:00"))
+            if iam_expires_at <= datetime.now(timezone.utc):
+                return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
+        except ValueError:
+            return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
+
     try:
         management = CloudRuIamClient(key_id=key_id, key_secret=key_secret)
         accounts = management.list_service_accounts()
@@ -383,17 +393,7 @@ def bootstrap_cloudru():
 
         conn = get_conn()
         try:
-            iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
-        iam_expires_at = None
-        if iam_expires_raw:
-            try:
-                iam_expires_at = datetime.fromisoformat(iam_expires_raw.replace("Z", "+00:00"))
-                if iam_expires_at <= datetime.now(timezone.utc):
-                    return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
-            except ValueError:
-                return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
-
-        save_cloudru_iam_credentials(
+            save_cloudru_iam_credentials(
                 conn, key_id=key_id, key_secret=key_secret,
                 project_id=project_id, service_account_id=service_account_id,
                 encrypt=encrypt_secret,
