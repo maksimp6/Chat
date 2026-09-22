@@ -343,6 +343,17 @@ class UniversalToolExecutor:
                     "duration_ms": round(max(0.0, self.clock() - started) * 1000, 2),
                 },
             ).to_mapping()
+        except ValueError as exc:
+            return UniversalToolResult(
+                False,
+                error=str(exc),
+                metadata={
+                    **base_meta,
+                    "phase": "validation",
+                    "executor": str((definition.executor or {}).get("type") or "local"),
+                    "duration_ms": round(max(0.0, self.clock() - started) * 1000, 2),
+                },
+            ).to_mapping()
         except Exception as exc:
             return UniversalToolResult(
                 False,
