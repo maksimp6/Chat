@@ -124,7 +124,7 @@ deploy() {
     --label "traefik.http.middlewares.${dozzle_strip_middleware}.stripprefix.prefixes=$tokenized_prefix" \
     --label "traefik.http.services.${dozzle_container}.loadbalancer.server.port=8080" \
     -e DOZZLE_BASE=/logs \
-    -e DOZZLE_FILTER="label=alice.preview.key=$key" \
+    -e DOZZLE_FILTER="label=alice.preview.key=$key,label!=alice.preview.logger=true" \
     -e DOZZLE_HOSTNAME="Alice Preview $key" \
     -e DOZZLE_ENABLE_ACTIONS=false \
     -e DOZZLE_ENABLE_SHELL=false \
