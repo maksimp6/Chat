@@ -1,27 +1,34 @@
-"""Provider-key rotation orchestration."""
+"""Provider-agnostic API-key rotation orchestration.
+
+Providers may either create a replacement resource (Yandex) or reissue the
+existing resource in place (Cloud.ru). Both paths validate the new secret
+before promotion.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Protocol, Any
 
-from provider_credentials import (
-    issue_window,
-    promote_rotated_key,
-    rotation_needed,
-    should_revoke,
-)
+from provider_credentials import issue_window, promote_rotated_key, rotation_needed, should_revoke
 
 
-class YandexKeyProvider(Protocol):
+class ProviderKeyProvider(Protocol):
     def create_key(self, *, expires_at: datetime) -> tuple[str, str]:
-        """Return (Yandex API-key resource ID, plaintext secret)."""
+        """Return (provider resource ID, plaintext secret)."""
 
     def validate_key(self, api_key: str) -> None:
-        """Raise when the freshly issued key cannot perform a provider request."""
+        """Raise when the key cannot perform a real provider request."""
 
     def revoke_key(self, provider_key_id: str) -> None:
-        """Delete/revoke a previously issued Yandex API-key resource."""
+        """Revoke a previously issued provider key."""
+
+    def reissue_key(self, provider_key_id: str, *, expires_at: datetime) -> tuple[str, str]:
+        """Reissue an existing provider resource when supported."""
+
+
+# Backwards-compatible alias for existing Yandex integrations/tests.
+YandexKeyProvider = ProviderKeyProvider
 
 
 @dataclass(frozen=True)
@@ -40,20 +47,54 @@ def decide(expires_at: datetime, now: datetime | None = None) -> RotationDecisio
 def rotate_active_key(
     *,
     db: Any,
-    provider: YandexKeyProvider,
+    provider: ProviderKeyProvider,
     encrypt: Callable[[str], str],
     old_id: int,
     project_id: str,
     old_provider_key_id: str | None = None,
     now: datetime | None = None,
     commit_before_revoke: bool = False,
+    provider_name: str = "yandex",
+    reissue_existing: bool = False,
 ) -> tuple[str, datetime, datetime]:
-    """Create a fresh 12-hour key and promote it in one DB transaction.
+    """Create/reissue, validate and promote one provider credential.
 
-    The database transaction must be committed by the caller. The old provider
-    key is revoked only after the new database state has been promoted.
+    Yandex creates a new key and then revokes the old resource.
+    Cloud.ru reissues the current key in place; its resource ID is intentionally
+    unchanged, so revoking the old ID would also revoke the replacement.
     """
     issued_at, expires_at = issue_window(now)
+
+    if reissue_existing:
+        if not old_provider_key_id:
+            raise RuntimeError("Provider key ID is required for in-place reissue")
+        reissuer = getattr(provider, "reissue_key", None)
+        if not callable(reissuer):
+            raise RuntimeError(f"{provider_name} does not support key reissue")
+        provider_key_id, plaintext = reissuer(
+            old_provider_key_id,
+            expires_at=expires_at,
+        )
+        if str(provider_key_id) != str(old_provider_key_id):
+            raise RuntimeError(
+                f"{provider_name} reissue changed the provider key ID unexpectedly"
+            )
+        provider.validate_key(plaintext)
+        encrypted = encrypt(plaintext)
+        promote_rotated_key(
+            db,
+            old_id,
+            encrypted,
+            provider_key_id,
+            project_id,
+            issued_at,
+            expires_at,
+            provider=provider_name,
+        )
+        if commit_before_revoke and hasattr(db, "commit"):
+            db.commit()
+        return provider_key_id, issued_at, expires_at
+
     provider_key_id, plaintext = provider.create_key(expires_at=expires_at)
     provider.validate_key(plaintext)
     encrypted = encrypt(plaintext)
@@ -65,6 +106,7 @@ def rotate_active_key(
         project_id,
         issued_at,
         expires_at,
+        provider=provider_name,
     )
     if commit_before_revoke and hasattr(db, "commit"):
         db.commit()
