@@ -65,20 +65,18 @@ def _authorized() -> bool:
 def _guard():
     if not _authorized():
         logger.critical(
-            "Provider credentials request rejected by admin authentication: "
+            "Provider credentials request rejected: admin authentication failed "
             "method=%s path=%s remote=%s auth_header_present=%s",
-            request.method,
-            request.path,
-            request.remote_addr,
+            request.method, request.path, request.remote_addr,
             bool(request.headers.get("Authorization")),
         )
         return jsonify({
             "error": "provider_credential_admin_authentication_required",
             "detail": (
-                "Provider credentials API rejected the request before API-key "
-                "validation. Configure ALICE_PROVIDER_CREDENTIALS_TOKEN and send "
-                "Authorization: Bearer <token>, or enable the application's "
-                "authenticated short-token session."
+                "Request rejected before provider API-key validation. "
+                "Configure ALICE_PROVIDER_CREDENTIALS_TOKEN and send "
+                "Authorization: Bearer <token>, or enable the authenticated "
+                "short-token session."
             ),
         }), 401
     logger.critical(
