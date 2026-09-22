@@ -88,6 +88,17 @@ def _env_key(config: Any, provider: str) -> Optional[str]:
 
 def create_schema(db: Any) -> None:
     db.execute("""
+        CREATE TABLE IF NOT EXISTS cloudru_iam_credentials (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            key_id TEXT NOT NULL,
+            key_secret_encrypted TEXT NOT NULL,
+            project_id TEXT NOT NULL DEFAULT '',
+            service_account_id TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    db.execute("""
         CREATE TABLE IF NOT EXISTS provider_credentials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             api_key_encrypted TEXT NOT NULL,
@@ -152,6 +163,48 @@ def create_schema(db: Any) -> None:
         CREATE INDEX IF NOT EXISTS idx_provider_credentials_provider_status_expires
         ON provider_credentials (provider, status, expires_at)
     """)
+
+
+
+def get_cloudru_iam_credentials(db: Any, decrypt: Callable[[str], str]) -> Optional[dict[str, str]]:
+    create_schema(db)
+    row = db.execute(
+        "SELECT key_id, key_secret_encrypted, project_id, service_account_id "
+        "FROM cloudru_iam_credentials WHERE id = 1"
+    ).fetchone()
+    if not row:
+        return None
+    return {
+        "key_id": str(row["key_id"]),
+        "key_secret": decrypt(row["key_secret_encrypted"]),
+        "project_id": str(row["project_id"] or ""),
+        "service_account_id": str(row["service_account_id"] or ""),
+    }
+
+
+def save_cloudru_iam_credentials(
+    db: Any,
+    *,
+    key_id: str,
+    key_secret: str,
+    project_id: str,
+    service_account_id: Optional[str],
+    encrypt: Callable[[str], str],
+) -> None:
+    if not key_id.strip() or not key_secret:
+        raise ValueError("Cloud.ru IAM key_id and key_secret are required")
+    create_schema(db)
+    db.execute("""
+        INSERT INTO cloudru_iam_credentials
+        (id, key_id, key_secret_encrypted, project_id, service_account_id)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            key_id = excluded.key_id,
+            key_secret_encrypted = excluded.key_secret_encrypted,
+            project_id = excluded.project_id,
+            service_account_id = excluded.service_account_id
+    """, (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id))
+    db.commit()
 
 
 def get_active_credential(
