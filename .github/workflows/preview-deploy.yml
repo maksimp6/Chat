@@ -74,7 +74,7 @@ jobs:
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          remote_dir="$(("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
           test -n "$remote_dir"
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"\$remote_dir/incoming\" \"\$remote_dir/previews\""
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
@@ -175,7 +175,7 @@ jobs:
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          remote_dir="$(("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
           test -n "$remote_dir"
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Remove preview
@@ -207,7 +207,7 @@ jobs:
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          remote_dir="$(("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
+          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
           test -n "$remote_dir"
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Cleanup expired previews
