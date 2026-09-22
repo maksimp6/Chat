@@ -70,7 +70,17 @@ class ToolRegistry:
     def _load_all(self):
         try:
             from git_mcp_tools import GIT_TOOLS
+            mcp_read_tools = {"git_status", "git_log", "git_diff", "git_branches"}
             for name, cfg in GIT_TOOLS.items():
+                if name in mcp_read_tools:
+                    cfg = {
+                        **cfg,
+                        "capabilities": ["git", "read", "mcp"],
+                        "risk_level": "low",
+                        "read_only": True,
+                        "requires_approval": False,
+                        "supported_transports": ["responses_api", "local_agent", "mcp"],
+                    }
                 self._register("git", name, cfg)
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Git: {e}")
