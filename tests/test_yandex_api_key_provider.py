@@ -81,3 +81,18 @@ def test_validate_key_maps_models_permission_failure(mock_get):
     kwargs = mock_get.call_args.kwargs
     assert kwargs["headers"]["Authorization"] == "Api-Key provider-secret"
     assert kwargs["headers"]["x-project"] == "project-1"
+
+
+@patch("yandex_api_key_provider.requests.post")
+def test_create_key_defaults_to_model_view_scope(mock_post, monkeypatch):
+    monkeypatch.delenv("YANDEX_API_KEY_SCOPES", raising=False)
+    response = Mock()
+    response.json.return_value = {
+        "apiKey": {"id": "aje-key-2"},
+        "secret": "secret-value-2",
+    }
+    mock_post.return_value = response
+
+    provider().create_key(expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc))
+
+    assert "yc.ai.models.viewer" in mock_post.call_args.kwargs["json"]["scopes"]
