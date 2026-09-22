@@ -310,15 +310,7 @@ def cloudru_service_accounts():
     guard = _guard()
     if guard:
         return guard
-    upload = request.files.get("iam_json")
-    if upload is None:
-        return jsonify({"error": "iam_json file is required"}), 400
-    try:
-        payload = json.load(upload.stream)
-    except (ValueError, UnicodeDecodeError):
-        return jsonify({"error": "invalid IAM JSON"}), 400
-    if not isinstance(payload, dict):
-        return jsonify({"error": "IAM JSON must be an object"}), 400
+    payload = request.form.to_dict()
 
     def pick(*names):
         for name in names:
@@ -327,8 +319,8 @@ def cloudru_service_accounts():
                 return value.strip()
         return ""
 
-    key_id = pick("keyId", "key_id", "accessKeyId", "access_key_id")
-    key_secret = pick("secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
+    key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
+    key_secret = pick("iam_key_secret", "secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
     if not key_id or not key_secret:
         return jsonify({"error": "IAM JSON must contain Key ID and Key Secret"}), 400
     expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
@@ -361,16 +353,7 @@ def bootstrap_cloudru():
     if guard:
         return guard
 
-    upload = request.files.get("iam_json")
-    if upload is None:
-        return jsonify({"error": "iam_json file is required"}), 400
-
-    try:
-        payload = json.load(upload.stream)
-    except (ValueError, UnicodeDecodeError):
-        return jsonify({"error": "invalid IAM JSON"}), 400
-    if not isinstance(payload, dict):
-        return jsonify({"error": "IAM JSON must be an object"}), 400
+    payload = request.form.to_dict()
 
     def pick(*names):
         for name in names:
@@ -379,8 +362,8 @@ def bootstrap_cloudru():
                 return value.strip()
         return ""
 
-    key_id = pick("keyId", "key_id", "accessKeyId", "access_key_id")
-    key_secret = pick("secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
+    key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
+    key_secret = pick("iam_key_secret", "secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
     project_id = request.form.get("project_id", "").strip() or pick("projectId", "project_id")
     requested_sa_id = request.form.get("service_account_id", "").strip() or pick("serviceAccountId", "service_account_id")
     sa_name = request.form.get("service_account_name", "").strip() or "Alice Pro"
