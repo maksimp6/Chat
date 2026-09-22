@@ -74,9 +74,9 @@ jobs:
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          remote_dir="$(("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
           test -n "$remote_dir"
-          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/previews\""
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"\$remote_dir/incoming\" \"\$remote_dir/previews\""
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Resolve preview identity
         id: preview
@@ -136,7 +136,10 @@ jobs:
             "static/chat.js" \
             "static/eruda_init.js" \
             "static/eruda.js"; do
-            curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$base/$asset" >/dev/null
+            if ! curl --fail --silent --show-error --connect-timeout 5 --max-time 30 "$base/$asset" >/dev/null; then
+              echo "Asset check failed: $asset"
+              exit 1
+            fi
           done
 
       - name: Comment preview URL
@@ -172,7 +175,7 @@ jobs:
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          remote_dir="$(("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
           test -n "$remote_dir"
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Remove preview
@@ -204,7 +207,7 @@ jobs:
         id: remote
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
+          remote_dir="$(("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"'))"
           test -n "$remote_dir"
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Cleanup expired previews
