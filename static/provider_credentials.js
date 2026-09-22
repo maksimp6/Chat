@@ -86,7 +86,6 @@ function build() {
     cloudru.appendChild(h);
     cloudru.appendChild(makeField("cloudru-iam-key-id","IAM Key ID","Идентификатор ключа доступа Cloud.ru для IAM управления.","Введите IAM Key ID","text"));
     cloudru.appendChild(makeField("cloudru-iam-key-secret","IAM Key Secret","Секрет ключа доступа Cloud.ru для IAM управления. Он используется только при подключении.","Введите IAM Key Secret","password"));
-    cloudru.appendChild(makeField("cloudru-project-id","Project ID","Проект, в котором должен работать сервисный аккаунт.","Cloud.ru project ID","text"));
     cloudru.appendChild(makeField("cloudru-service-account-id","Service account ID","UUID существующего сервисного аккаунта Cloud.ru. Для него должна быть назначена роль на уровне проекта.","xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx","text"));
     box.appendChild(cloudru);
 
@@ -99,7 +98,6 @@ function build() {
     var save=document.createElement("button"); save.textContent="Подключить Cloud.ru"; save.className="btn-primary";
     save.onclick=async function(){
         
-        var project=document.getElementById("cloudru-project-id").value.trim();
         var saId=document.getElementById("cloudru-service-account-id").value.trim();
         var y=document.getElementById("provider-yandex-key").value.trim();
         var keyId=document.getElementById("cloudru-iam-key-id").value.trim();
@@ -114,7 +112,7 @@ if(keyId && !keySecret){ output.textContent="Введите Cloud.ru IAM Key Sec
             if(keyId){
                 output.textContent="Подключение Cloud.ru…";
                 if(!saId){ output.textContent="Укажите Service account ID. Автоматическое создание сервисного аккаунта отключено, потому что Cloud.ru требует отдельную проектную роль."; return; }
-                var form=new FormData(); form.append("iam_key_id",keyId); form.append("iam_key_secret",keySecret); if(project) form.append("project_id",project); form.append("service_account_id",saId);
+                var form=new FormData(); form.append("iam_key_id",keyId); form.append("iam_key_secret",keySecret); form.append("service_account_id",saId);
                 var cr=await fetch("/api/provider-credentials/cloudru/bootstrap",{method:"POST",credentials:"same-origin",body:form});
                 var cd=await cr.json(); if(!cr.ok) throw new Error(cd.detail || cd.error || ("HTTP "+cr.status));
                 output.textContent="Cloud.ru подключён. Service account: "+cd.service_account_id+" • API key: "+cd.provider_key_id+" • ротация: ежедневно.";
