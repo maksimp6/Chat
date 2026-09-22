@@ -5,7 +5,12 @@ from datetime import datetime
 import os
 from typing import Iterable, Optional
 
+import logging
+
 import requests
+
+
+logger = logging.getLogger("alice.provider.yandex")
 
 
 class YandexApiKeyProvider:
@@ -122,10 +127,25 @@ class YandexApiKeyProvider:
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            status = getattr(exc.response, "status_code", None)
+            response = getattr(exc, "response", None)
+            status = getattr(response, "status_code", None)
+            body = getattr(response, "text", "") if response is not None else ""
+            logger.critical(
+                "Yandex provider validation failed: status=%s endpoint=%s "
+                "model=%s response=%s",
+                status,
+                self.ai_endpoint,
+                model,
+                body[:2000],
+            )
             if status in (401, 403):
-                raise PermissionError("Yandex authorization failed") from exc
-            raise RuntimeError("Yandex provider health check failed") from exc
+                raise PermissionError(
+                    f"Yandex authorization failed (HTTP {status})"
+                ) from exc
+            raise RuntimeError(
+                f"Yandex provider health check failed"
+                + (f" (HTTP {status})" if status else "")
+            ) from exc
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
