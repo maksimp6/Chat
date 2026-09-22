@@ -115,11 +115,31 @@ def _metadata(credential: ProviderCredential | None) -> dict:
 def _status_for(provider: str) -> dict:
     try:
         credential = _load_credential(provider)
-    except CredentialError:
+    except CredentialError as exc:
+        return {
+            "provider": provider,
+            "status": "invalid" if "expired" in str(exc).lower() else "storage_error",
+            "authorization_ok": False,
+            "error": "expired" if "expired" in str(exc).lower() else "storage_error",
+            "rotation": {
+                "supported": False,
+                "due": False,
+                "active_key_verified": False,
+            },
+            "credential": {
+                "configured": True,
+                "fingerprint": None,
+                "provider_key_id": None,
+                "issued_at": None,
+                "expires_at": None,
+            },
+        }
+    except Exception:
         return {
             "provider": provider,
             "status": "storage_error",
             "authorization_ok": False,
+            "error": "storage_error",
             "rotation": {
                 "supported": False,
                 "due": False,
