@@ -78,6 +78,33 @@ def test_every_registered_tool_is_exposed_through_mcp(client):
     )
 
 
+def test_protocol_version_defaults_to_latest_when_header_is_absent(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {},
+    }
+    response = client.post(
+        "/mcp",
+        data=json.dumps(payload),
+        headers={
+            "Content-Type": "application/json",
+            "Mcp-Method": "tools/list",
+        },
+    )
+    assert response.status_code == 200
+    assert response.get_json()["result"]["tools"]
+
+
+def test_mcp_is_unauthenticated_even_when_auth_env_is_configured(client, monkeypatch):
+    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://auth.invalid/introspect")
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+    assert response.get_json()["result"]["tools"]
+
+
 def test_tools_call_returns_structured_content(client):
     response = mcp_request(
         client,
@@ -105,99 +132,6 @@ def test_standard_headers_must_match_json_rpc(client):
     )
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32600
-
-
-def test_authentication_is_required_when_anonymous_access_is_disabled(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "false")
-    response = mcp_request(client, "tools/list")
-    assert response.status_code == 401
-
-
-def test_bearer_authentication_accepts_only_configured_token(client, monkeypatch):
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
-
-    denied = mcp_request(client, "tools/list", Authorization="Bearer wrong")
-    assert denied.status_code == 401
-
-    allowed = mcp_request(
-        client,
-        "tools/list",
-        Authorization="Bearer test-token",
-    )
-    assert allowed.status_code == 200
-
-
-def test_invocation_data_is_scoped_to_authenticated_user(client, monkeypatch):
-    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
-
-    invocation = {
-        "id": "invocation-1",
-        "session_id": "session-1",
-        "conversation_id": "conversation-1",
-        "trace_id": "trace-1",
-        "status": "completed",
-        "metadata": {"user_id": "user-b"},
-        "result": None,
-        "error": None,
-        "created_at": 1,
-        "started_at": 1,
-        "completed_at": 2,
-    }
-    monkeypatch.setattr(chatgpt_mcp, "get_invocation_status", lambda _id: invocation)
-
-    response = mcp_request(
-        client,
-        "tools/call",
-        {"name": "alice_get_invocation", "arguments": {"invocation_id": "invocation-1"}},
-        name="alice_get_invocation",
-        Authorization="Bearer test-token",
-    )
-    assert response.status_code == 403
-    assert response.get_json()["error"]["code"] == -32003
-
-
-def test_trace_tool_reads_persisted_trace_for_matching_user(client, monkeypatch):
-    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
-    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
-
-    invocation = {
-        "id": "invocation-1",
-        "session_id": "session-1",
-        "conversation_id": "conversation-1",
-        "trace_id": "trace-1",
-        "status": "completed",
-        "metadata": {"user_id": "user-a"},
-        "result": None,
-        "error": None,
-        "created_at": 1,
-        "started_at": 1,
-        "completed_at": 2,
-    }
-    context = InvocationContext(
-        session_id="session-1",
-        conversation_id="conversation-1",
-        invocation_id="invocation-1",
-        trace_id="trace-1",
-        user_id="user-a",
-    )
-    trace = create_invocation_trace(context).finalize()
-
-    monkeypatch.setattr(chatgpt_mcp, "get_invocation_status", lambda _id: invocation)
-    monkeypatch.setattr(chatgpt_mcp, "get_invocation_trace", lambda _id: trace)
-
-    response = mcp_request(
-        client,
-        "tools/call",
-        {"name": "alice_get_invocation_trace", "arguments": {"invocation_id": "invocation-1"}},
-        name="alice_get_invocation_trace",
-        Authorization="Bearer test-token",
-    )
-    assert response.status_code == 200
-    assert response.get_json()["result"]["structuredContent"]["trace"]["trace_id"] == "trace-1"
 
 
 def test_project_read_tools_are_exposed_and_read_only(client):
