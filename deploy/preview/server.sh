@@ -72,7 +72,8 @@ deploy() {
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
-  local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)\n  local domain_rule="(Host(\`maxxxpavlov.ru\`) || Host(\`maxxxpavlov.online\`)) && $tokenized_rule"
+  local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
+  local domain_rule="(Host(\`maxxxpavlov.ru\`) || Host(\`maxxxpavlov.online\`)) && $tokenized_rule"
   local http_router="${container}-http"
   local https_router="${container}-https"
   local token_strip_middleware="${container}-token-strip"
