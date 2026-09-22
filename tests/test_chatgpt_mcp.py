@@ -56,6 +56,10 @@ def test_tools_list_is_deterministic_and_read_only(client):
         "alice_list_project_files",
         "alice_read_project_file",
         "alice_search_project",
+        "git_branches",
+        "git_diff",
+        "git_log",
+        "git_status",
     ]
     assert body["result"]["cacheScope"] == "private"
     assert body["result"]["ttlMs"] > 0
@@ -211,6 +215,35 @@ def test_project_tools_execute_through_mcp(client):
         assert response.status_code == 200, response.get_json()
         result = response.get_json()["result"]["structuredContent"]
         assert isinstance(result, dict)
+
+
+def test_existing_git_read_tools_execute_through_mcp(client):
+    cases = [
+        ("git_status", {"repo_path": "."}),
+        ("git_log", {"repo_path": ".", "limit": 2}),
+        ("git_diff", {"repo_path": "."}),
+        ("git_branches", {"repo_path": "."}),
+    ]
+    for name, arguments in cases:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            name=name,
+        )
+        assert response.status_code == 200, response.get_json()
+        result = response.get_json()["result"]["structuredContent"]
+        assert isinstance(result, dict)
+
+
+def test_existing_git_read_tools_are_read_only(client):
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+    tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
+    for name in ("git_status", "git_log", "git_diff", "git_branches"):
+        assert tools[name]["_meta"]["read_only"] is True
+        assert tools[name]["_meta"]["requires_approval"] is False
+        assert "mcp" in tools[name]["_meta"]["capabilities"]
 
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
