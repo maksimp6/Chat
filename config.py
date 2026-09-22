@@ -32,7 +32,6 @@ HOST = "0.0.0.0"
 PORT = 8080
 
 TEXT_MODELS = {
-    "alice-lite": {"name": "Alice Lite", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.20, "cached": 0.05, "tool": 0.05, "output": 0.20},
     "aliceai-llm": {"name": "Alice AI LLM", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.50, "cached": 0.50, "tool": 0.13, "output": 1.20},
     "yandexgpt-5.1": {"name": "YandexGPT 5.1 Pro", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.80, "cached": 0.80, "tool": 0.20, "output": 0.80},
     "yandexgpt-5-pro": {"name": "YandexGPT 5 Pro", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 1.20, "cached": 1.20, "tool": 1.20, "output": 1.20},
