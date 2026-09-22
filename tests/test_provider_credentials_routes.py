@@ -255,8 +255,9 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
     )
 
     class FakeManagement:
-        key_id = "master-id"
-        key_secret = "master-secret"
+        def __init__(self, *, key_id, key_secret):
+            self.key_id = key_id
+            self.key_secret = key_secret
 
         def list_service_accounts(self):
             raise AssertionError("bootstrap must not enumerate service accounts")
