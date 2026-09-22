@@ -486,5 +486,5 @@ def record_health_check(
             provider,
         ),
     )
-    if hasattr(db, "commit"):
+    if commit and hasattr(db, "commit"):
         db.commit()
