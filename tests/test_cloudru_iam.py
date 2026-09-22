@@ -66,3 +66,20 @@ def test_ip_validation_rejects_invalid_values():
         pass
     else:
         raise AssertionError("invalid IP should fail")
+
+
+def test_cloudru_reissue_api_key_uses_same_resource_endpoint():
+    client = CloudRuIamClient(key_id="id", key_secret="secret")
+    with patch.object(client, "_request", return_value={"id": "key-1", "secret": "new-secret"}) as req:
+        response = client.reissue_api_key(
+            api_key_id="key-1",
+            expires_at="2026-10-01T00:00:00Z",
+        )
+
+    assert response["id"] == "key-1"
+    req.assert_called_once()
+    assert req.call_args.args == (
+        "POST",
+        "/api/v1/service-accounts/credentials/api-keys/key-1/reissue",
+    )
+    assert req.call_args.kwargs["json_body"] == {"expires_at": "2026-10-01T00:00:00Z"}
