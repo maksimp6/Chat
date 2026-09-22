@@ -262,20 +262,15 @@ class ToolRegistry:
         except TypeError:
             try:
                 return func(arguments)
-            except PermissionError:
+            except Exception as e:
                 if context and "_universal_context" in cfg:
                     raise
-                raise
-            except Exception as e:
                 return {"error": str(e)}
-        except PermissionError:
-            # UniversalToolExecutor owns the authorization boundary and must
-            # be able to classify authorization failures instead of receiving
-            # a legacy {"error": ...} payload that looks like execution output.
+        except Exception as e:
+            # UniversalToolExecutor must classify real tool exceptions by phase
+            # instead of receiving a legacy error mapping that hides the cause.
             if context and "_universal_context" in cfg:
                 raise
-            raise
-        except Exception as e:
             logger.exception(f"[REGISTRY] Ошибка выполнения {tool_name}: {e}")
             return {"error": str(e)}
 
