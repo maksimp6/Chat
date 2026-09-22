@@ -120,26 +120,29 @@ cloudru.appendChild(makeField("cloudru-service-account-name","Имя новог�
     var actions=document.createElement("div"); actions.style.cssText="display:flex;gap:8px;margin-top:14px;";
     var save=document.createElement("button"); save.textContent="Подключить Cloud.ru"; save.className="btn-primary";
     save.onclick=async function(){
-        var file=document.getElementById("cloudru-iam-json").files[0];
+        
         var project=document.getElementById("cloudru-project-id").value.trim();
         var saId=document.getElementById("cloudru-service-account-id").value;
 var name=document.getElementById("cloudru-service-account-name").value.trim() || "Alice Pro";
         var y=document.getElementById("provider-yandex-key").value.trim();
-        if(!file && !y){ output.textContent="Загрузите Cloud.ru IAM JSON или введите Yandex API key."; return; }
+        var keyId=document.getElementById("cloudru-iam-key-id").value.trim();
+var keySecret=document.getElementById("cloudru-iam-key-secret").value;
+if(!keyId && !y){ output.textContent="Введите Cloud.ru IAM Key ID или Yandex API key."; return; }
+if(keyId && !keySecret){ output.textContent="Введите Cloud.ru IAM Key Secret."; return; }
         try{
             if(y){
                 var yr=await fetch("/api/provider-credentials",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({yandex_api_key:y})});
                 var yd=await yr.json(); if(!yr.ok) throw new Error(yd.error || ("HTTP "+yr.status));
             }
-            if(file){
+            if(keyId){
                 output.textContent="Подключение Cloud.ru…";
-                var form=new FormData(); form.append("iam_json",file); form.append("project_id",project); form.append("service_account_name",name); if(saId) form.append("service_account_id",saId);
+                var form=new FormData(); form.append("iam_key_id",keyId); form.append("iam_key_secret",keySecret); form.append("project_id",project); form.append("service_account_name",name); if(saId) form.append("service_account_id",saId);
                 var cr=await fetch("/api/provider-credentials/cloudru/bootstrap",{method:"POST",credentials:"same-origin",body:form});
                 var cd=await cr.json(); if(!cr.ok) throw new Error(cd.detail || cd.error || ("HTTP "+cr.status));
                 output.textContent="Cloud.ru подключён. Service account: "+cd.service_account_id+" • API key: "+cd.provider_key_id+" • ротация: ежедневно.";
             }
             document.getElementById("provider-yandex-key").value="";
-            document.getElementById("cloudru-iam-json").value="";
+            document.getElementById("cloudru-iam-key-id").value=""; document.getElementById("cloudru-iam-key-secret").value="";
             await fetchStatus(output);
         }catch(error){ output.textContent="Подключение не выполнено: "+error.message; }
     };
