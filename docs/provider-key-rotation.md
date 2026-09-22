@@ -34,7 +34,7 @@ through metadata, traces, logs, or frontend responses.
 
 ## Credential configuration UI
 
-The provider credentials modal contains two independent fields:
+The provider credentials modal contains:
 
 - **Yandex Cloud API key**
 - **Cloud.ru IAM credentials JSON**
