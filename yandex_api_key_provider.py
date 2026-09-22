@@ -9,10 +9,11 @@ import requests
 
 
 class YandexApiKeyProvider:
-    """Create/delete service-account API keys through the IAM REST API.
+    """Create/revoke service-account API keys and validate runtime access.
 
-    The IAM token is a deployment credential and must never be persisted in
-    traces, logs, or application responses.
+    Management credentials are required only for create/revoke. A health check
+    needs only the provider API key, so the constructor is safe to use from the
+    credentials UI even when rotation management is not configured.
     """
 
     def __init__(
@@ -59,12 +60,21 @@ class YandexApiKeyProvider:
         )
         self.timeout = timeout
 
+    def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
+        return bool(
+            provider_key_id
+            and self.iam_token
+            and self.service_account_id
+        )
+
+    def _require_management_credentials(self) -> None:
         if not self.iam_token:
             raise RuntimeError("YANDEX_IAM_TOKEN is not configured")
         if not self.service_account_id:
             raise RuntimeError("YANDEX_SERVICE_ACCOUNT_ID is not configured")
 
     def _headers(self) -> dict[str, str]:
+        self._require_management_credentials()
         return {
             "Authorization": f"Bearer {self.iam_token}",
             "Content-Type": "application/json",
@@ -92,25 +102,30 @@ class YandexApiKeyProvider:
         return str(resource_id), str(secret)
 
     def validate_key(self, api_key: str) -> None:
-        """Verify the freshly created key can call the configured AI endpoint."""
         if not self.project_id:
             raise RuntimeError("YANDEX_PROJECT_ID is required for provider-key validation")
         model = f"gpt://{self.project_id}/{self.validation_model}/latest"
-        response = requests.post(
-            f"{self.ai_endpoint}/responses",
-            headers={
-                "Authorization": f"Api-Key {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": "ping",
-                "max_output_tokens": 1,
-                "background": False,
-            },
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
+        try:
+            response = requests.post(
+                f"{self.ai_endpoint}/responses",
+                headers={
+                    "Authorization": f"Api-Key {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "input": "ping",
+                    "max_output_tokens": 1,
+                    "background": False,
+                },
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            status = getattr(exc.response, "status_code", None)
+            if status in (401, 403):
+                raise PermissionError("Yandex authorization failed") from exc
+            raise RuntimeError("Yandex provider health check failed") from exc
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
