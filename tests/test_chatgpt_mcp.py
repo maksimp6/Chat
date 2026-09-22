@@ -185,7 +185,6 @@ def test_trace_tool_reads_persisted_trace_for_matching_user(client, monkeypatch)
     assert response.get_json()["result"]["structuredContent"]["trace"]["trace_id"] == "trace-1"
 
 
-
 def test_project_read_tools_are_exposed_and_read_only(client):
     response = mcp_request(client, "tools/list")
     assert response.status_code == 200
@@ -209,9 +208,10 @@ def test_project_tools_execute_through_mcp(client):
             {"name": name, "arguments": arguments},
             name=name,
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.get_json()
         result = response.get_json()["result"]["structuredContent"]
         assert isinstance(result, dict)
+
 
 def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     response = mcp_request(
@@ -226,21 +226,8 @@ def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     response = mcp_request(
         client,
         "tools/call",
-        {"name": "alice_read_project_file", "arguments": {"path": "../../etc/passwd"}},
+        {"name": "alice_read_project_file", "arguments": {"path": "../outside.txt"}},
         name="alice_read_project_file",
     )
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32602
-
-def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client, monkeypatch):
-    def fail_if_called(_args):
-        raise AssertionError("filesystem reader must reject traversal")
-
-    monkeypatch.setattr(chatgpt_mcp, "read_file", fail_if_called)
-    response = mcp_request(
-        client,
-        "tools/call",
-        {"name": "alice_read_project_file", "arguments": {"path": "../../etc/passwd"}},
-        name="alice_read_project_file",
-    )
-    assert response.status_code == 500
