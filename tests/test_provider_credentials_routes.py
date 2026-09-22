@@ -25,7 +25,6 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
-    monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
     conn = db.get_conn()
     from provider_credentials import replace_active_credential
@@ -73,17 +72,14 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
             "/api/provider-credentials",
             json={
                 "yandex_api_key": "good-yandex-secret",
-                "cloudru_api_key": "good-cloudru-secret",
             },
         )
 
     assert response.status_code == 200
     payload = response.get_json()
     assert "good-yandex-secret" not in str(payload)
-    assert "good-cloudru-secret" not in str(payload)
     statuses = {item["provider"]: item for item in payload["providers"]}
     assert statuses["yandex"]["status"] == "connected"
-    assert statuses["cloudru"]["status"] == "connected"
 
 
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
@@ -106,13 +102,13 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"cloudru_api_key": "bad-cloudru-secret"},
+            json={"yandex_api_key": "bad-yandex-secret"},
         )
 
     assert response.status_code == 401
     conn = db.get_conn()
     rows = conn.execute(
-        "SELECT * FROM provider_credentials WHERE provider = 'cloudru'"
+        "SELECT * FROM provider_credentials WHERE provider = 'yandex'"
     ).fetchall()
     conn.close()
     assert rows == []
@@ -133,7 +129,7 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"cloudru_api_key": "secret"},
+            json={"yandex_api_key": "secret"},
             environ_base={"REMOTE_ADDR": "203.0.113.10"},
         )
 
@@ -166,7 +162,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         response = client.put(
             "/api/provider-credentials",
             headers={"Authorization": "Bearer admin-test-token"},
-            json={"cloudru_api_key": "good-cloudru-secret"},
+            json={"yandex_api_key": "good-yandex-secret"},
         )
 
     assert response.status_code == 200
