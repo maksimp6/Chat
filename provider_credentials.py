@@ -195,6 +195,7 @@ def bootstrap_credential(
     decrypt: Optional[Callable[[str], str]] = None,
     provider: str = YANDEX,
     provider_key_id: Optional[str] = None,
+    ttl: timedelta = KEY_TTL,
 ) -> ProviderCredential:
     """Seed one provider's active credential from an environment/UI secret."""
     if provider not in SUPPORTED_PROVIDERS:
@@ -215,7 +216,7 @@ def bootstrap_credential(
             )
         return get_active_credential(db, decrypt, now, provider=provider)
 
-    issued_at, expires_at = issue_window(now)
+    issued_at, expires_at = issue_window(now, ttl=ttl)
     encrypted = encrypt(api_key)
     key_id = provider_key_id or f"bootstrap-{fingerprint_key(api_key)[:16]}"
     cursor = db.execute("""
@@ -257,6 +258,7 @@ def replace_active_credential(
     *,
     provider_key_id: Optional[str] = None,
     now: Optional[datetime] = None,
+    ttl: timedelta = KEY_TTL,
 ) -> ProviderCredential:
     """Atomically replace the provider's active credential in local storage."""
     if provider not in SUPPORTED_PROVIDERS:
@@ -265,7 +267,7 @@ def replace_active_credential(
         raise ValueError("api_key must be non-empty")
 
     create_schema(db)
-    issued_at, expires_at = issue_window(now)
+    issued_at, expires_at = issue_window(now, ttl=ttl)
     encrypted = encrypt(api_key)
 
     db.execute(
