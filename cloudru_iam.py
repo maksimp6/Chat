@@ -174,21 +174,10 @@ class CloudRuIamClient:
         api_key_id: str,
         expires_at: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Reissue a static API key while retaining its resource ID.
-
-        Cloud.ru documents reissue as changing only the secret and expiry.
-        The API path is configurable for deployments where the public API
-        endpoint differs from the current documented route.
-        """
+        """Reissue a static API key while retaining its resource ID."""
         if not api_key_id.strip():
             raise ValueError("api_key_id is required")
-        template = os.getenv("CLOUDRU_IAM_REISSUE_PATH", "").strip()
-        if not template:
-            raise CloudRuIamError(
-                "CLOUDRU_IAM_REISSUE_PATH must be configured from the "
-                "current Cloud.ru API documentation"
-            )
-        path = template.format(id=api_key_id)
+        path = f"{API_KEYS_PATH}/{api_key_id}/reissue"
         body = {"expires_at": expires_at} if expires_at else {}
         return self._request("POST", path, json_body=body)
 
