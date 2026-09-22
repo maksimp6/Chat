@@ -321,3 +321,33 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
 
     assert response.status_code == 200
     assert calls == ["static-yandex-key"]
+
+
+def test_provider_credentials_update_logs_storage_error_and_returns_detail(monkeypatch, caplog):
+    from flask import Flask
+    import provider_credentials_routes as routes
+
+    class FakeClient:
+        def validate_key(self, api_key):
+            return None
+
+    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.setattr(routes, "get_conn", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded")))
+
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+    app.testing = True
+
+    with caplog.at_level("ERROR", logger="alice.provider_credentials"):
+        with app.test_client() as client:
+            response = client.put(
+                "/api/provider-credentials",
+                json={"yandex_api_key": "static-yandex-key"},
+            )
+
+    assert response.status_code == 503
+    body = response.get_json()
+    assert body["error"] == "credential_storage_failed"
+    assert "не смог сохранить" in body["detail"]
+    assert "sqlite exploded" in caplog.text
