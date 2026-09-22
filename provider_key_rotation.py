@@ -10,7 +10,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Protocol, Any
 
-from provider_credentials import issue_window, promote_rotated_key, rotation_needed, should_revoke
+from provider_credentials import (
+    fingerprint_key,
+    issue_window,
+    promote_rotated_key,
+    rotation_needed,
+    should_revoke,
+)
 
 
 class ProviderKeyProvider(Protocol):
@@ -91,6 +97,7 @@ def rotate_active_key(
             issued_at,
             expires_at,
             provider=provider_name,
+            fingerprint=fingerprint_key(plaintext),
         )
         if commit_before_revoke and hasattr(db, "commit"):
             db.commit()
