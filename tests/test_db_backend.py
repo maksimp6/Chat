@@ -32,3 +32,22 @@ def test_pg_row_supports_mapping_and_numeric_access():
     assert row[0] == 7
     assert row["name"] == "Alice"
     assert dict(row.items()) == {"id": 7, "name": "Alice"}
+
+
+def test_sqlite_is_the_default_backend_without_database_url(monkeypatch, tmp_path):
+    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("ALICE_DB_PATH", str(tmp_path / "termux.db"))
+
+    import importlib
+    import db
+
+    db = importlib.reload(db)
+    assert db.get_conn().__class__.__module__ == "sqlite3"
+
+    db.init_db()
+    db.create_conversation("termux-test", "Termux", "test-model")
+    db.add_message("termux-test", "user", "SQLite works", trace={"trace_id": "t1"})
+
+    assert db.get_conversations()[0]["id"] == "termux-test"
+    assert db.get_messages("termux-test")[0]["text"] == "SQLite works"
