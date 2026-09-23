@@ -4,4 +4,3 @@ websockets>=17.1
 python-dotenv>=1.2.3
 
 cryptography==42.0.8
-psycopg[binary]>=3.2,<4
