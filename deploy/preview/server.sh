@@ -100,8 +100,8 @@ deploy() {
   local dozzle_ru_router="${dozzle_container}-logs-ru"
   local dozzle_online_router="${dozzle_container}-logs-online"
   local dozzle_rule="${tokenized_prefix}/logs"
+  local dozzle_base="${dozzle_rule}"
   local dozzle_data="${workdir}/dozzle"
-  local dozzle_strip_middleware="${dozzle_container}-strip"
   mkdir -p "$dozzle_data"
   docker rm -f "$dozzle_container" >/dev/null 2>&1 || true
   docker run -d --name "$dozzle_container" --restart unless-stopped --network "$NETWORK_NAME" \
@@ -113,16 +113,16 @@ deploy() {
     --label "traefik.http.routers.${dozzle_ru_router}.tls.certresolver=letsencrypt" \
     --label "traefik.http.routers.${dozzle_ru_router}.tls.domains[0].main=maxxxpavlov.ru" \
     --label "traefik.http.routers.${dozzle_ru_router}.priority=110" \
-    --label "traefik.http.routers.${dozzle_ru_router}.middlewares=${dozzle_strip_middleware},${proxy_auth_middleware}" \
+    --label "traefik.http.routers.${dozzle_ru_router}.middlewares=${proxy_auth_middleware}" \
     --label "traefik.http.routers.${dozzle_online_router}.rule=Host(\`maxxxpavlov.online\`) && PathPrefix(\`${dozzle_rule}\`)" \
     --label "traefik.http.routers.${dozzle_online_router}.entrypoints=websecure" \
     --label "traefik.http.routers.${dozzle_online_router}.tls=true" \
     --label "traefik.http.routers.${dozzle_online_router}.tls.certresolver=letsencrypt" \
     --label "traefik.http.routers.${dozzle_online_router}.tls.domains[0].main=maxxxpavlov.online" \
     --label "traefik.http.routers.${dozzle_online_router}.priority=110" \
-    --label "traefik.http.routers.${dozzle_online_router}.middlewares=${dozzle_strip_middleware},${proxy_auth_middleware}" \
-    --label "traefik.http.middlewares.${dozzle_strip_middleware}.stripprefix.prefixes=${dozzle_rule}" \
+    --label "traefik.http.routers.${dozzle_online_router}.middlewares=${proxy_auth_middleware}" \
     --label "traefik.http.services.${dozzle_container}.loadbalancer.server.port=8080" \
+    -e DOZZLE_BASE="$dozzle_base" \
     -e DOZZLE_FILTER="label=alice.preview.key=$key" \
     -e DOZZLE_HOSTNAME="Alice Preview $key" \
     -e DOZZLE_ENABLE_ACTIONS=false \
