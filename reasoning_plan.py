@@ -93,20 +93,20 @@ class PlanValidator:
             errors.append("step ids must not be empty")
         duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
         if duplicates:
-            errors.append(f"duplicate step ids: {", ".join(duplicates)}")
+            errors.append("duplicate step ids: " + ", ".join(duplicates))
 
         known = set(step_ids)
         for step in plan.steps:
             missing = sorted(set(step.depends_on) - known)
             if missing:
-                errors.append(f"step {step.id!r} depends on unknown steps: {", ".join(missing)}")
+                errors.append("step " + repr(step.id) + " depends on unknown steps: " + ", ".join(missing))
             if step.id in step.depends_on:
                 errors.append(f"step {step.id!r} cannot depend on itself")
 
         if not errors:
             cycle = self._find_cycle(plan.steps)
             if cycle:
-                errors.append(f"dependency cycle detected: {" -> ".join(cycle)}")
+                errors.append("dependency cycle detected: " + " -> ".join(cycle))
 
         if not plan.context:
             warnings.append("plan has no collected context")
