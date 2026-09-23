@@ -1,7 +1,7 @@
 import unittest
 
 from yandex_metadata_validator import MetadataValidationError
-from yandex_request_builder import build_response_payload
+from yandex_request_builder import build_response_payload, validate_generation_params
 
 
 class YandexRequestBuilderTests(unittest.TestCase):
@@ -28,6 +28,22 @@ class YandexRequestBuilderTests(unittest.TestCase):
         self.assertEqual(payload["max_output_tokens"], 100)
         self.assertEqual(payload["prompt_cache_key"], "stable")
         self.assertEqual(payload["reasoning"], {"effort": "low"})
+
+    def test_temperature_boundaries_are_valid(self):
+        self.assertEqual(validate_generation_params({"temperature": 0})["temperature"], 0.0)
+        self.assertEqual(validate_generation_params({"temperature": 1})["temperature"], 1.0)
+
+    def test_temperature_above_maximum_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "between 0 and 1"):
+            validate_generation_params({"temperature": 1.1})
+
+    def test_temperature_below_minimum_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "between 0 and 1"):
+            validate_generation_params({"temperature": -0.1})
+
+    def test_temperature_non_numeric_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "must be a number"):
+            validate_generation_params({"temperature": "not-a-number"})
 
     def test_background_forces_store(self):
         payload = build_response_payload(

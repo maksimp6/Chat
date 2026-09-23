@@ -7,6 +7,27 @@ It deliberately has no HTTP, database, tracing, or MCP side effects.
 from yandex_metadata_validator import validate_metadata
 
 
+TEMPERATURE_MIN = 0.0
+TEMPERATURE_MAX = 1.0
+
+
+def validate_generation_params(params):
+    """Validate provider generation parameters before building an outbound request."""
+    params = params or {}
+    if params.get("temperature") is None:
+        return params
+    try:
+        temperature = float(params["temperature"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("temperature must be a number between 0 and 1") from exc
+    if not TEMPERATURE_MIN <= temperature <= TEMPERATURE_MAX:
+        raise ValueError(
+            f"temperature must be between {TEMPERATURE_MIN:g} and {TEMPERATURE_MAX:g}"
+        )
+    params["temperature"] = temperature
+    return params
+
+
 def build_response_payload(project_id, model_key, message, params=None, metadata=None, conversation_id=None, yandex_conv_id=None):
     """Build a Yandex Responses API payload from client parameters."""
     params = params or {}
