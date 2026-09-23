@@ -17,6 +17,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
+from filesystem_mcp_tools import grep_search, list_directory, read_file
 from session_manager import create_session, get_session
 from invocation_manager import cancel_invocation, create_invocation
 from tool_registry import registry
@@ -439,6 +440,105 @@ def _bridge_wrapper(handler):
         context = (cfg or {}).get("_universal_context") or {}
         return handler(arguments, context.get("user_id"))
     return wrapped
+
+
+def _project_list(args: dict, _user: Optional[str] = None) -> dict:
+    return list_directory({"path": args.get("path") or "."})
+
+
+def _project_read(args: dict, _user: Optional[str] = None) -> dict:
+    path = str(args.get("path") or "").strip()
+    if not path:
+        raise ValueError("path is required")
+    result = read_file({
+        "path": path,
+        "offset": args.get("offset", 0),
+        "length": min(int(args.get("length", 65536)), 65536),
+    })
+    if result.get("error"):
+        raise ValueError(result["error"])
+    return result
+
+
+def _project_search(args: dict, _user: Optional[str] = None) -> dict:
+    query = str(args.get("query") or "").strip()
+    if not query:
+        raise ValueError("query is required")
+    return grep_search({
+        "query": query,
+        "file_pattern": args.get("file_pattern") or "*.py",
+        "max_matches": min(int(args.get("max_matches", 50)), 50),
+    })
+
+
+def _register_project_read_tools() -> None:
+    tools = [
+        (
+            "alice_list_project_files",
+            "List project files",
+            "List files and directories inside the Alice Pro project.",
+            {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": [],
+                "additionalProperties": False,
+            },
+            _project_list,
+        ),
+        (
+            "alice_read_project_file",
+            "Read project file",
+            "Read a bounded UTF-8 file from the Alice Pro project.",
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "minLength": 1},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "length": {"type": "integer", "minimum": 1, "maximum": 65536},
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+            _project_read,
+        ),
+        (
+            "alice_search_project",
+            "Search project code",
+            "Search text inside the Alice Pro project.",
+            {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "minLength": 1},
+                    "file_pattern": {"type": "string"},
+                    "max_matches": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+            _project_search,
+        ),
+    ]
+    for name, title, description, input_schema, handler in tools:
+        registry.register(
+            "chatgpt_project",
+            name,
+            {
+                "title": title,
+                "description": description,
+                "inputSchema": input_schema,
+                "outputSchema": {"type": "object"},
+                "capabilities": ["project", "mcp"],
+                "risk_level": "medium",
+                "read_only": True,
+                "requires_approval": False,
+                "supported_transports": ["mcp"],
+                "executor": {"type": "local"},
+                "func": _bridge_wrapper(handler),
+            },
+        )
+
+
+_register_project_read_tools()
 
 
 def _register_bridge_tools() -> None:
