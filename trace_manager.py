@@ -3,6 +3,15 @@ import json
 import time
 import uuid
 import traceback
+from contextvars import ContextVar
+
+_current_trace: ContextVar["ExecutionTrace | None"] = ContextVar("alice_execution_trace", default=None)
+
+
+def get_current_trace() -> Optional["ExecutionTrace"]:
+    """Return the trace active for the current request/task, if any."""
+    return _current_trace.get()
+
 from typing import Any, Dict, Optional
 
 from trace_security import MAX_DEPTH, MAX_ITEMS, MAX_REPR, SENSITIVE_KEYS, safe_repr, sanitize_trace_value
