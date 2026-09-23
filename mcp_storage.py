@@ -1,9 +1,10 @@
 """Autonomous MCP servers storage — with per-conversation settings."""
-import sqlite3
 import os
 import uuid
 import json
 import logging
+
+import db as database
 
 logger = logging.getLogger("mcp_storage")
 
@@ -11,11 +12,7 @@ DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'mcp_servers.d
 
 def _get_conn():
     try:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        return conn
+        return database.get_conn()
     except Exception as e:
         logger.exception(f"CRITICAL: Cannot connect to DB {DB_PATH}: {e}")
         raise
