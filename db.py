@@ -3,14 +3,23 @@ import os
 import json
 from datetime import datetime
 
-DB_PATH = "alice_pro.db"
+from db_backend import connect_postgres, postgres_url_from_env
+
+# SQLite remains the default for local/Termux execution.
+DB_PATH = os.getenv("ALICE_DB_PATH", "alice_pro.db")
+
 
 def get_conn():
+    database_url = postgres_url_from_env()
+    if database_url:
+        return connect_postgres(database_url)
+
     conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
+
 
 def init_db():
     from provider_credentials import create_schema as create_provider_credentials_schema
@@ -42,13 +51,11 @@ def init_db():
         )
     """)
 
-    # Миграция: добавляем timings_json если таблица уже существовала
     try:
         cur.execute("ALTER TABLE messages ADD COLUMN timings_json TEXT DEFAULT '[]'")
     except sqlite3.OperationalError:
         pass
 
-    # Миграция: добавляем trace_json если таблица уже существовала
     try:
         cur.execute("ALTER TABLE messages ADD COLUMN trace_json TEXT DEFAULT '{}'")
     except sqlite3.OperationalError:
@@ -65,7 +72,6 @@ def init_db():
     create_provider_credentials_schema(conn)
     create_key_manager_schema(conn)
 
-    # Миграция названия: старый системный заголовок был «Новый диалог».
     cur.execute(
         "UPDATE conversations SET title = ? WHERE title = ?",
         ("Новый чат", "Новый диалог"),
@@ -73,6 +79,7 @@ def init_db():
 
     conn.commit()
     conn.close()
+
 
 def get_conversations():
     conn = get_conn()
@@ -91,16 +98,25 @@ def get_conversations():
         for r in rows
     ]
 
+
 def create_conversation(conv_id, title, model):
     now = int(datetime.utcnow().timestamp())
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "INSERT OR REPLACE INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        """INSERT INTO conversations
+        (id, title, model, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            model = excluded.model,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at""",
         (conv_id, title, model, now, now)
     )
     conn.commit()
     conn.close()
+
 
 def update_conversation_title(conv_id, title):
     conn = get_conn()
@@ -112,6 +128,7 @@ def update_conversation_title(conv_id, title):
     conn.commit()
     conn.close()
 
+
 def update_conversation_model(conv_id, model):
     conn = get_conn()
     cur = conn.cursor()
@@ -122,6 +139,7 @@ def update_conversation_model(conv_id, model):
     conn.commit()
     conn.close()
 
+
 def delete_conversation(conv_id):
     conn = get_conn()
     cur = conn.cursor()
@@ -130,6 +148,7 @@ def delete_conversation(conv_id):
     cur.execute("DELETE FROM conv_settings WHERE conversation_id = ?", (conv_id,))
     conn.commit()
     conn.close()
+
 
 def get_messages(conv_id):
     conn = get_conn()
@@ -159,6 +178,7 @@ def get_messages(conv_id):
         })
     return res
 
+
 def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, model=None, source=None, trace=None):
     now = int(datetime.utcnow().timestamp())
     if not isinstance(content, str):
@@ -178,6 +198,7 @@ def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, mode
     conn.commit()
     conn.close()
 
+
 def save_conv_settings(conv_id, settings_dict):
     now = datetime.utcnow()
     settings_json = json.dumps(settings_dict, ensure_ascii=False)
@@ -193,6 +214,7 @@ def save_conv_settings(conv_id, settings_dict):
     conn.commit()
     conn.close()
 
+
 def get_conv_settings(conv_id):
     conn = get_conn()
     cur = conn.cursor()
@@ -206,8 +228,6 @@ def get_conv_settings(conv_id):
     except Exception:
         return None
 
-# --- Подсистема конфигураций в SQLite ---
-import json
 
 def init_config_table():
     conn = get_conn()
@@ -220,6 +240,7 @@ def init_config_table():
     """)
     conn.commit()
     conn.close()
+
 
 def get_config(key: str, default=None):
     init_config_table()
@@ -235,11 +256,17 @@ def get_config(key: str, default=None):
     except Exception:
         return row[0]
 
+
 def set_config(key: str, value):
     init_config_table()
     val_str = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO configs (key, value) VALUES (?, ?)", (key, val_str))
+    cur.execute(
+        """INSERT INTO configs (key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+        (key, val_str),
+    )
     conn.commit()
     conn.close()
