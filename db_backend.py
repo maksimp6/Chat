@@ -18,25 +18,25 @@ except ImportError:  # pragma: no cover - only needed when PostgreSQL is enabled
     psycopg = None
 
 
-_QMARK_RE = re.compile(r"\\?")
+_QMARK_RE = re.compile(r"\?")
 _AUTOINCREMENT_RE = re.compile(
-    r"\\bINTEGER\\s+PRIMARY\\s+KEY\\s+AUTOINCREMENT\\b", re.IGNORECASE
+    r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", re.IGNORECASE
 )
-_BEGIN_IMMEDIATE_RE = re.compile(r"\\bBEGIN\\s+IMMEDIATE\\b", re.IGNORECASE)
+_BEGIN_IMMEDIATE_RE = re.compile(r"\bBEGIN\s+IMMEDIATE\b", re.IGNORECASE)
 _PRAGMA_TABLE_INFO_RE = re.compile(
-    r"^\\s*PRAGMA\\s+table_info\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)\\s*;?\\s*$",
+    r"^\s*PRAGMA\s+table_info\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*;?\s*$",
     re.IGNORECASE,
 )
 _ALTER_ADD_COLUMN_RE = re.compile(
-    r"^\\s*ALTER\\s+TABLE\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+ADD\\s+COLUMN\\s+"
-    r"([A-Za-z_][A-Za-z0-9_]*)\\s+(.+?)\\s*;?\\s*$",
+    r"^\s*ALTER\s+TABLE\s+([A-Za-z_][A-Za-z0-9_]*)\s+ADD\s+COLUMN\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)\s+(.+?)\s*;?\s*$",
     re.IGNORECASE | re.DOTALL,
 )
 _INSERT_OR_IGNORE_RE = re.compile(
-    r"^\\s*INSERT\\s+OR\\s+IGNORE\\s+INTO\\s+", re.IGNORECASE
+    r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", re.IGNORECASE
 )
 _INSERT_TABLE_RE = re.compile(
-    r"^\\s*INSERT\\s+INTO\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", re.IGNORECASE
+    r"^\s*INSERT\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.IGNORECASE
 )
 _UNIQUE_VIOLATION_NAMES = {"UniqueViolation", "UniqueViolationError"}
 
@@ -83,7 +83,7 @@ def translate_sql(sql: str) -> str:
 
     if _INSERT_OR_IGNORE_RE.match(text):
         text = _INSERT_OR_IGNORE_RE.sub("INSERT INTO ", text, count=1)
-        if not re.search(r"\\bON\\s+CONFLICT\\b", text, re.IGNORECASE):
+        if not re.search(r"\bON\s+CONFLICT\b", text, re.IGNORECASE):
             text = text.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
 
     return _QMARK_RE.sub("%s", text)
@@ -129,8 +129,7 @@ class PGCursor:
             self._columns = tuple(desc.name for desc in self._raw.description)
             return self
 
-        # SQLite-only connection pragmas are irrelevant to PostgreSQL.
-        if re.match(r"^\\s*PRAGMA\\s+(journal_mode|synchronous)\\b", sql, re.IGNORECASE):
+        if re.match(r"^\s*PRAGMA\s+(journal_mode|synchronous)\b", sql, re.IGNORECASE):
             self._columns = ()
             return self
 
@@ -164,8 +163,6 @@ class PGCursor:
                 self._lastrowid = int(row[0]) if row and row[0] is not None else None
                 self._columns = ()
             except Exception:
-                # Not every table uses a PostgreSQL sequence-backed integer id.
-                # Failure here must not make an otherwise successful INSERT fail.
                 self._lastrowid = None
         return self
 
@@ -209,7 +206,6 @@ class PGConnection:
 
     @property
     def row_factory(self):
-        # Kept for compatibility with existing SQLite-oriented callers.
         return self._row_factory
 
     @row_factory.setter
