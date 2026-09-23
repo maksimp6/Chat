@@ -150,6 +150,18 @@ jobs:
             fi
           done
 
+      - name: Verify preview Dozzle logs
+        env:
+          KEY: ${{ steps.preview.outputs.key }}
+        run: |
+          for domain in maxxxpavlov.ru maxxxpavlov.online; do
+            url="https://$domain/${ALICE_SHORT_TOKEN}/preview/${KEY}/logs/"
+            if ! curl --fail --silent --show-error --connect-timeout 5 --max-time 20 "$url" >/dev/null; then
+              echo "Dozzle logs check failed for $domain"
+              exit 1
+            fi
+            echo "Dozzle logs OK: $domain"
+          done
       - name: Comment preview URL
         if: success() && github.event_name == 'pull_request'
         env:
