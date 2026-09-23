@@ -278,10 +278,19 @@ def save_conv_settings(conv_id, settings_dict, user_id=None):
     conn.commit()
     conn.close()
 
-def get_conv_settings(conv_id):
+def get_conv_settings(conv_id, user_id=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT settings_json FROM conv_settings WHERE conversation_id = ?", (conv_id,))
+    if user_id:
+        cur.execute(
+            """SELECT s.settings_json
+               FROM conv_settings s
+               JOIN conversations c ON c.id = s.conversation_id
+               WHERE s.conversation_id = ? AND c.user_id = ?""",
+            (conv_id, str(user_id)),
+        )
+    else:
+        cur.execute("SELECT settings_json FROM conv_settings WHERE conversation_id = ?", (conv_id,))
     row = cur.fetchone()
     conn.close()
     if not row:
