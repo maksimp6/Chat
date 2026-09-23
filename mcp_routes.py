@@ -18,7 +18,7 @@ from mcp_trace import record_yandex_mcp_activity
 import mcp_storage
 from tool_registry import registry
 from db import (
-    get_conversations, create_conversation, get_messages, add_message,
+    get_conversations, get_conversation, create_conversation, get_messages, add_message,
     get_conv_settings, save_conv_settings
 )
 from partial_output import extract_last_response_text, format_partial_output_message
@@ -318,7 +318,7 @@ def conv_tools(conv_id):
         categories = data.get("active_tool_categories", [])
         settings = get_conv_settings(conv_id) or {}
         settings["active_tool_categories"] = categories
-        save_conv_settings(conv_id, settings)
+        save_conv_settings(conv_id, settings, get_current_owner_id(required=False))
         return jsonify({"status": "ok", "active_tool_categories": categories})
 
     settings = get_conv_settings(conv_id) or {}
@@ -373,10 +373,8 @@ def conversations():
 def get_conv_messages(conv_id):
     owner_id = get_current_owner_id(required=False)
     messages = get_messages(conv_id, owner_id)
-    if owner_id and messages == []:
-        conversation = db.get_conversation(conv_id, owner_id)
-        if conversation is None:
-            return jsonify({"error": "conversation_not_found"}), 404
+    if owner_id and get_conversation(conv_id, owner_id) is None:
+        return jsonify({"error": "conversation_not_found"}), 404
     return jsonify({"messages": messages})
 
 @mcp_bp.route('/api/mcp/execute-approved', methods=['POST'])
