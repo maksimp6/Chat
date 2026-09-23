@@ -14,7 +14,8 @@ The project is actively evolving. Some components are production-oriented, while
 - **Treasury and billing** for internal usage accounting and demo balances.
 - **Departments** for domain-specific agent capabilities.
 - **Android client** with WebView integration, update handling, logging, and a stable debug-build workflow.
-- **Optional PostgreSQL backend** for shared deployments; SQLite remains the default local/Termux database.\n- **Supabase trace mirror** as an optional operational/diagnostic integration.
+- **Optional PostgreSQL backend** for shared deployments; SQLite remains the default local/Termux database.
+- **Supabase trace mirror** as an optional operational/diagnostic integration.
 
 ## Architecture
 
@@ -63,7 +64,8 @@ For the current validated development path:
 - Java 17 for Android builds.
 - Android SDK with API 37 installed for the current Android compile toolchain.
 - Git.
-- Optional: PostgreSQL 17 for shared deployments. Omit ALICE_DATABASE_URL for the default SQLite/Termux mode.\n- Optional: a Supabase project for trace mirroring and production migrations.
+- Optional: PostgreSQL 17 for shared deployments. Omit ALICE_DATABASE_URL for the default SQLite/Termux mode.
+- Optional: a Supabase project for trace mirroring and production migrations.
 
 ### Backend
 
