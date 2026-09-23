@@ -22,6 +22,7 @@ def test_sql_translation_keeps_sqlite_semantics():
         "CREATE TABLE demo (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)"
     )
     assert translate_sql("BEGIN IMMEDIATE") == "BEGIN"
+    assert translate_sql("SELECT * FROM demo WHERE name LIKE 'bootstrap-%'") == "SELECT * FROM demo WHERE name LIKE 'bootstrap-%%'"
 
 
 def test_sqlite_is_the_default_backend(monkeypatch, tmp_path):
