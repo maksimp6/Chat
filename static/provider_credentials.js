@@ -61,10 +61,18 @@ function providerErrorMessage(data, provider) {
 function statusText(item) {
     if (!item) return "Не проверено";
     if (item.status === "not_configured") return "Не настроен";
+    if (item.status === "configured") {
+        return item.provider === "yandex"
+            ? "Настроен • ключ сохранён"
+            : "Настроен • требуется проверка";
+    }
     if (item.status === "connected") return "Подключён • авторизация OK";
     if (item.status === "checking") return "Проверка ещё не выполнена";
-    if (item.error === "unauthorized") return "Неверный ключ / нет доступа";
-    return "Провайдер недоступен";
+    if (item.status === "invalid" || item.status === "forbidden" || item.error === "unauthorized") {
+        return "Неверный ключ / нет доступа";
+    }
+    if (item.status === "unavailable") return "Провайдер недоступен";
+    return "Статус неизвестен";
 }
 
 function renderStatus(container, providers) {
