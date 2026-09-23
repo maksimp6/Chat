@@ -79,7 +79,7 @@ chaquopy {
     defaultConfig {
         version = "3.13"
         pip {
-            install("-r", "../../requirements.txt")
+            install("-r", "../../requirements-android.txt")
         }
     }
 }
