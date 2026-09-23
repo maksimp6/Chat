@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 from typing import Any, Callable, Mapping, Optional
 
 from flask import Blueprint, Response, jsonify, request
@@ -141,13 +142,7 @@ def _www_authenticate() -> Optional[str]:
 
 
 def _auth_user_from_request() -> Optional[str]:
-    """Return the MCP user without requiring authentication.
-
-    MCP is intentionally unauthenticated for the current Alice Pro preview.
-    Authorization can be added later as a separate, explicit feature.
-    """
-    return None
-
+    """Resolve the authenticated MCP principal."""
     mode = _auth_mode()
     if mode == "anonymous":
         return os.getenv("ALICE_MCP_USER_ID") or None
@@ -161,9 +156,12 @@ def _auth_user_from_request() -> Optional[str]:
 
     if mode == "bearer":
         expected = os.getenv("ALICE_MCP_BEARER_TOKEN", "")
-        if expected and token == expected:
-            return os.getenv("ALICE_MCP_USER_ID") or None
-        raise PermissionError("Invalid bearer token")
+        user_id = os.getenv("ALICE_MCP_USER_ID", "")
+        if not expected or not user_id:
+            raise PermissionError("MCP bearer authentication is not fully configured")
+        if not secrets.compare_digest(token, expected):
+            raise PermissionError("Invalid bearer token")
+        return user_id
 
     if mode == "introspection":
         return _introspect_token(token)
@@ -204,9 +202,17 @@ def _introspect_token(token: str) -> Optional[str]:
     return str(data.get("sub") or "") or None
 
 
-def _require_auth(_request_id: Any) -> tuple[Optional[str], Optional[Response]]:
-    """Authentication is intentionally disabled for the current MCP endpoint."""
-    return None, None
+def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Response]]:
+    try:
+        return _auth_user_from_request(), None
+    except PermissionError as exc:
+        return None, _jsonrpc_error(
+            request_id,
+            -32001,
+            str(exc),
+            status=401,
+            headers={"WWW-Authenticate": _www_authenticate()},
+        )
 
 
 def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
@@ -519,8 +525,10 @@ _register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
-    # Authentication is intentionally disabled for the current preview.
-    return [{"type": "noauth"}]
+    mode = _auth_mode()
+    if mode == "anonymous":
+        return [{"type": "noauth"}]
+    return [{"type": "http", "scheme": "bearer"}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
@@ -674,7 +682,9 @@ def mcp_post() -> Response:
     if header_error:
         return _error_response(request_id, -32600, header_error)
 
-    user, _auth_error = _require_auth(request_id)
+    user, auth_error = _require_auth(request_id)
+    if auth_error is not None:
+        return auth_error
 
     if method == "ping":
         return _jsonrpc_result(
