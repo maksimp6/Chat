@@ -386,6 +386,34 @@ class ExecutionTrace:
                                               **({"parent_id": str(parent_id)} if parent_id is not None else {}),
                                               **({"step": step} if step is not None else {})})
 
+    def set_reasoning_plan(self, plan: Dict[str, Any]) -> None:
+        """Attach a sanitized structured reasoning plan to this execution trace."""
+        clean_plan = self._sanitize_trace_value(plan)
+        self.trace["reasoning_plan"] = clean_plan
+        self.add_event("plan_created", {
+            "plan_id": clean_plan.get("plan_id") if isinstance(clean_plan, dict) else None,
+            "plan_type": clean_plan.get("plan_type") if isinstance(clean_plan, dict) else None,
+            "step_count": len(clean_plan.get("steps", [])) if isinstance(clean_plan, dict) else 0,
+        })
+
+    def record_reasoning_event(
+        self,
+        event_type: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record explicit planning state without storing private model reasoning."""
+        allowed = {
+            "reasoning_started",
+            "context_collected",
+            "plan_validated",
+            "plan_replanned",
+            "plan_completed",
+            "plan_failed",
+        }
+        if event_type not in allowed:
+            raise ValueError(f"unsupported reasoning event: {event_type}")
+        self.add_event(event_type, self._sanitize_trace_value(payload or {}))
+
     def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
