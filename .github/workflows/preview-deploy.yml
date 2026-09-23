@@ -44,6 +44,7 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       PREVIEW_PUBLIC_BASE_URL: ${{ secrets.PREVIEW_PUBLIC_BASE_URL }}
+      ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
       INPUT_REF: ${{ inputs.ref || '' }}
       INPUT_TTL_HOURS: ${{ inputs.ttl_hours || '' }}
       PR_NUMBER: ${{ github.event.pull_request.number || '' }}
@@ -56,6 +57,7 @@ jobs:
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
           test -n "$PREVIEW_SSH_KNOWN_HOSTS"
           test -n "$PREVIEW_PUBLIC_BASE_URL"
+          test -n "$ALICE_SHORT_TOKEN"
       - name: Check out ref
         uses: actions/checkout@v4
         with:
@@ -74,7 +76,7 @@ jobs:
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
           remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
           test -n "$remote_dir"
-          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/previews\""
+          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'mkdir -p "$HOME/alice-preview/incoming" "$HOME/alice-preview/previews"'
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
       - name: Resolve preview identity
         id: preview
@@ -100,25 +102,39 @@ jobs:
           scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/$KEY.tar.gz"
-          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
+          printf '%s\n' "$ALICE_SHORT_TOKEN" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
       - name: Verify VPS routing
         env:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
           ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "curl --fail --silent --show-error --max-time 5 http://127.0.0.1/preview/$KEY/healthz >/dev/null"
-      - name: Public health check
+          printf '%s\n' "$ALICE_SHORT_TOKEN" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; curl --fail --silent --show-error --max-time 5 -H \"Host: maxxxpavlov.ru\" \"http://127.0.0.1/\$token/preview/$KEY/\" >/dev/null"
+      - name: Public HTTPS health and TLS check
         env:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
-          url="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}/"
-          for attempt in $(seq 1 5); do curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null && { echo "Preview URL: $url"; exit 0; }; sleep 2; done
-          exit 1
+          for domain in maxxxpavlov.ru maxxxpavlov.online; do
+            url="https://$domain/${ALICE_SHORT_TOKEN}/preview/${KEY}/"
+            for attempt in $(seq 1 24); do
+              if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 "$url" >/dev/null; then
+                echo "HTTPS Preview OK: $domain"
+                break
+              fi
+              if [ "$attempt" -eq 24 ]; then
+                echo "HTTPS Preview/TLS check failed for $domain"
+                openssl s_client -connect "$domain:443" -servername "$domain" </dev/null 2>/dev/null |
+                  openssl x509 -noout -subject -issuer -dates -ext subjectAltName || true
+                exit 1
+              fi
+              sleep 5
+            done
+          done
+          echo "Preview HTTPS and TLS checks passed (token omitted from logs)."
       - name: Verify critical web assets
         env:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
-          base="${PREVIEW_PUBLIC_BASE_URL%/}/preview/${KEY}"
+          base="${PREVIEW_PUBLIC_BASE_URL%/}/${ALICE_SHORT_TOKEN}/preview/${KEY}"
           for asset in \
             "static/style.css" \
             "static/boot.js" \
@@ -128,7 +144,10 @@ jobs:
             "static/chat.js" \
             "static/eruda_init.js" \
             "static/eruda.js"; do
-            curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$base/$asset" >/dev/null
+            if ! curl --fail --silent --show-error --connect-timeout 5 --max-time 30 "$base/$asset" >/dev/null; then
+              echo "Asset check failed: $asset"
+              exit 1
+            fi
           done
 
       - name: Comment preview URL
@@ -138,7 +157,7 @@ jobs:
           BASE_PATH: ${{ steps.preview.outputs.base_path }}
         run: |
           url="${PREVIEW_PUBLIC_BASE_URL%/}${BASE_PATH}/"
-          jq -n --arg body "Preview deployed: $url" '{body:$body}' | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -d @-
+          jq -n --arg body "Preview deployed. The tokenized URL is intentionally omitted from the GitHub comment." '{body:$body}' | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -d @-
 
   cleanup_pr:
     name: Cleanup closed pull request preview
