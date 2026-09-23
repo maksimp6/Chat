@@ -1,6 +1,18 @@
 import sqlite3
 
 import db
+from db_backend import is_postgres_configured, postgres_url_from_env
+
+
+def test_postgres_backend_is_explicit_opt_in(monkeypatch):
+    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://must-not-enable")
+    assert postgres_url_from_env() == ""
+    assert is_postgres_configured() is False
+
+    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://explicit")
+    assert postgres_url_from_env() == "postgresql://explicit"
+    assert is_postgres_configured() is True
 
 
 def test_sql_translation_keeps_sqlite_semantics():
