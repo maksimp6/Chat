@@ -74,6 +74,21 @@ def init_db():
         )
     """)
 
+    # Shared tables that were historically created lazily by individual modules.
+    # Bootstrap them here so every selected backend starts with the same schema.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS configs (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS conv_yandex_map (
+            local_id TEXT PRIMARY KEY,
+            yandex_id TEXT NOT NULL
+        )
+    """)
+
     create_provider_credentials_schema(conn)
     create_key_manager_schema(conn)
 
