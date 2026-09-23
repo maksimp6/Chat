@@ -72,5 +72,30 @@ def test_create_key_defaults_to_runtime_ai_scopes(mock_post, monkeypatch):
     )
 
     scopes = mock_post.call_args.kwargs["json"]["scopes"]
+    assert "yc.ai.foundationModels.execute" in scopes
     assert "yc.ai.languageModels.execute" in scopes
     assert "yc.ai.models.viewer" not in scopes
+
+
+@patch("yandex_api_key_provider.requests.get")
+def test_validate_runtime_access_uses_api_key_and_models_endpoint(mock_get):
+    response = Mock()
+    response.status_code = 200
+    response.json.return_value = {"data": [{"id": "model-a"}]}
+    mock_get.return_value = response
+
+    provider().validate_runtime_access("runtime-secret")
+
+    assert mock_get.call_args.args[0].endswith("/v1/models")
+    assert mock_get.call_args.kwargs["headers"]["Authorization"] == "Api-Key runtime-secret"
+    response.raise_for_status.assert_called_once()
+
+
+@patch("yandex_api_key_provider.requests.get")
+def test_validate_runtime_access_rejects_forbidden_key(mock_get):
+    response = Mock()
+    response.status_code = 403
+    mock_get.return_value = response
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        provider().validate_runtime_access("runtime-secret")
