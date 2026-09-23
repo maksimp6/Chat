@@ -30,7 +30,6 @@ def mcp_request(client, method, params=None, request_id=1, name=None, **headers)
     http_headers = {
         "Content-Type": "application/json",
         "MCP-Protocol-Version": chatgpt_mcp.DEFAULT_PROTOCOL_VERSION,
-        "Mcp-Method": method,
         **headers,
     }
     if name is not None:
@@ -131,15 +130,20 @@ def test_tools_call_returns_structured_content(client):
     assert result["server"]["name"] == "Alice Pro"
 
 
-def test_standard_headers_must_match_json_rpc(client):
-    response = mcp_request(
-        client,
-        "tools/call",
-        {"name": "alice_get_system_status", "arguments": {}},
-        name="wrong-tool-name",
+def test_standard_mcp_request_does_not_require_nonstandard_headers(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {},
+    }
+    response = client.post(
+        "/mcp",
+        data=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
     )
-    assert response.status_code == 400
-    assert response.get_json()["error"]["code"] == -32600
+    assert response.status_code == 200
+    assert response.get_json()["result"]["tools"]
 
 
 def test_project_read_tools_are_exposed_and_read_only(client):
