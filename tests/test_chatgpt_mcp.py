@@ -314,3 +314,109 @@ def test_trace_tool_reads_persisted_trace_for_matching_user(client, monkeypatch)
     )
     assert response.status_code == 200
     assert response.get_json()["result"]["structuredContent"]["trace"]["trace_id"] == "trace-1"
+
+def test_project_read_tools_are_exposed_and_read_only(client):
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+    tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
+    assert {"alice_list_project_files", "alice_read_project_file", "alice_search_project"} <= set(tools)
+    for name in ("alice_list_project_files", "alice_read_project_file", "alice_search_project"):
+        assert tools[name]["_meta"]["read_only"] is True
+        assert tools[name]["_meta"]["requires_approval"] is False
+
+
+def test_project_tools_execute_through_mcp(client):
+    cases = [
+        ("alice_list_project_files", {"path": "."}),
+        ("alice_read_project_file", {"path": "chatgpt_mcp.py", "length": 1024}),
+        ("alice_search_project", {"query": "UniversalToolExecutor", "file_pattern": "*.py"}),
+    ]
+    for name, arguments in cases:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            name=name,
+        )
+        assert response.status_code == 200, response.get_json()
+        result = response.get_json()["result"]["structuredContent"]
+        assert isinstance(result, dict)
+
+
+def test_existing_git_read_tools_execute_through_mcp(client):
+    cases = [
+        ("git_status", {"repo_path": "."}),
+        ("git_log", {"repo_path": ".", "limit": 2}),
+        ("git_diff", {"repo_path": "."}),
+        ("git_branches", {"repo_path": "."}),
+    ]
+    for name, arguments in cases:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            name=name,
+        )
+        assert response.status_code == 200, response.get_json()
+        result = response.get_json()["result"]["structuredContent"]
+        assert isinstance(result, dict)
+
+
+def test_existing_git_tools_have_expected_mcp_permissions(client):
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+    tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
+
+    for name in ("git_status", "git_log", "git_diff", "git_branches"):
+        assert tools[name]["_meta"]["read_only"] is True
+        assert tools[name]["_meta"]["requires_approval"] is False
+        assert tools[name]["_meta"]["risk_level"] == "low"
+        assert "mcp" in tools[name]["_meta"]["capabilities"]
+
+    for name in ("git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"):
+        assert tools[name]["_meta"]["read_only"] is False
+        assert tools[name]["_meta"]["requires_approval"] is True
+        assert tools[name]["_meta"]["risk_level"] == "high"
+        assert "mcp" in tools[name]["_meta"]["capabilities"]
+
+
+def test_existing_git_write_tools_require_approval(client):
+    cases = [
+        ("git_add", {"path": "chatgpt_mcp.py"}),
+        ("git_commit", {"message": "test"}),
+        ("git_remote", {"action": "remove", "name": "nonexistent"}),
+        ("git_push", {}),
+        ("git_pull", {}),
+        ("git_fetch", {}),
+    ]
+    for name, arguments in cases:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            name=name,
+        )
+        assert response.status_code == 403, response.get_json()
+        body = response.get_json()
+        assert body["error"]["code"] == -32003
+        assert "approval" in body["error"]["message"].lower()
+
+
+def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_read_project_file", "arguments": {"path": "../../etc/passwd"}},
+        name="alice_read_project_file",
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32602
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_read_project_file", "arguments": {"path": "../outside.txt"}},
+        name="alice_read_project_file",
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32602
