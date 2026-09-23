@@ -12,11 +12,28 @@ from __future__ import annotations
 import json
 import os
 from typing import Any, Callable, Mapping, Optional
+import uuid
 
 from flask import Blueprint, Response, jsonify, request
 
 from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
+from invocation_manager import (
+    create_invocation,
+    start_invocation,
+    finish_invocation,
+    fail_invocation,
+    persist_invocation_trace,
+)
+from invocation_trace import create_invocation_trace
+from db import (
+    get_conn,
+    get_conversations,
+    get_messages,
+    create_conversation,
+    add_message,
+)
+from config import Config, calculate_full_cost
 from session_manager import get_session
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
@@ -141,13 +158,7 @@ def _www_authenticate() -> Optional[str]:
 
 
 def _auth_user_from_request() -> Optional[str]:
-    """Return the MCP user without requiring authentication.
-
-    MCP is intentionally unauthenticated for the current Alice Pro preview.
-    Authorization can be added later as a separate, explicit feature.
-    """
-    return None
-
+    """Resolve the authenticated MCP user from the configured auth mode."""
     mode = _auth_mode()
     if mode == "anonymous":
         return os.getenv("ALICE_MCP_USER_ID") or None
@@ -204,9 +215,17 @@ def _introspect_token(token: str) -> Optional[str]:
     return str(data.get("sub") or "") or None
 
 
-def _require_auth(_request_id: Any) -> tuple[Optional[str], Optional[Response]]:
-    """Authentication is intentionally disabled for the current MCP endpoint."""
-    return None, None
+def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Response]]:
+    try:
+        return _auth_user_from_request(), None
+    except PermissionError as exc:
+        return None, _error_response(
+            request_id,
+            -32001,
+            str(exc),
+            status=401,
+            headers={"WWW-Authenticate": _www_authenticate()},
+        )
 
 
 def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
@@ -296,6 +315,228 @@ def _agents(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
             }
         )
     return {"agents": agents}
+
+
+def _ensure_conversation_control_schema() -> None:
+    conn = get_conn()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS conversation_mcp_owners (
+                conversation_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversation_mcp_owners_user "
+            "ON conversation_mcp_owners(user_id)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _claim_conversation(conversation_id: str, user: Optional[str]) -> None:
+    _ensure_conversation_control_schema()
+    if not user:
+        return
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO conversation_mcp_owners (conversation_id, user_id)
+            VALUES (?, ?)
+            ON CONFLICT(conversation_id) DO NOTHING
+            """,
+            (conversation_id, user),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _conversation_visible(conversation_id: str, user: Optional[str]) -> bool:
+    _ensure_conversation_control_schema()
+    if not user and _auth_mode() == "anonymous":
+        return True
+    if not user:
+        return False
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT user_id FROM conversation_mcp_owners WHERE conversation_id = ?",
+            (conversation_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return bool(row and str(row["user_id"]) == str(user))
+
+
+def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    if not _conversation_visible(conversation_id, user):
+        raise PermissionError("Conversation is not accessible to this user")
+
+    conversations = [item for item in get_conversations() if item["id"] == conversation_id]
+    if not conversations:
+        raise LookupError("Conversation not found")
+    return {"conversation": conversations[0]}
+
+
+def _conversation_messages(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    if not _conversation_visible(conversation_id, user):
+        raise PermissionError("Conversation is not accessible to this user")
+    return {"conversation_id": conversation_id, "messages": get_messages(conversation_id)}
+
+
+def _conversations(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    _ensure_conversation_control_schema()
+    rows = get_conversations()
+    if user:
+        conn = get_conn()
+        try:
+            owned = {
+                str(row["conversation_id"])
+                for row in conn.execute(
+                    "SELECT conversation_id FROM conversation_mcp_owners WHERE user_id = ?",
+                    (user,),
+                ).fetchall()
+            }
+        finally:
+            conn.close()
+        rows = [row for row in rows if row["id"] in owned]
+    elif _auth_mode() != "anonymous":
+        rows = []
+    return {"conversations": rows}
+
+
+def _create_mcp_conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    title = str(arguments.get("title") or "Новый чат").strip() or "Новый чат"
+    model = str(arguments.get("model") or "aliceai-llm").strip() or "aliceai-llm"
+
+    conversation_id = str(uuid.uuid4())
+    try:
+        from mcp_routes import AliceClient
+        remote = AliceClient(Config).create_conversation()
+        conversation_id = str(remote.get("id") or conversation_id)
+    except Exception:
+        # Keep local chat creation available even when the provider is temporarily unavailable.
+        pass
+
+    create_conversation(conversation_id, title, model)
+    _claim_conversation(conversation_id, user)
+    return {
+        "conversation": {
+            "id": conversation_id,
+            "title": title,
+            "model": model,
+        }
+    }
+
+
+def _send_message(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    message = str(arguments.get("message") or "").strip()
+    model = str(arguments.get("model") or "").strip()
+    params = arguments.get("params") or {}
+
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    if not message:
+        raise ValueError("message is required")
+    if not isinstance(params, dict):
+        raise ValueError("params must be an object")
+    if not _conversation_visible(conversation_id, user):
+        raise PermissionError("Conversation is not accessible to this user")
+
+    conversations = [item for item in get_conversations() if item["id"] == conversation_id]
+    if not conversations:
+        raise LookupError("Conversation not found")
+    model_key = model or conversations[0]["model"] or "aliceai-llm"
+
+    add_message(conversation_id, "user", message)
+    invocation = create_invocation(
+        conversation_id,
+        conversation_id,
+        metadata={"source": "chatgpt_mcp"},
+        user_id=user,
+    )
+    trace = create_invocation_trace(invocation)
+    start_invocation(invocation.invocation_id)
+
+    try:
+        from mcp_routes import AliceClient
+        client = AliceClient(Config)
+        response = client.ask_with_mcp(
+            message,
+            model_key,
+            conversation_id,
+            params,
+            trace=trace,
+        )
+        reply = client.extract_text(response) or ""
+        usage = client.extract_usage(response)
+        cost = calculate_full_cost(model_key, usage) if usage else 0.0
+
+        trace_data = trace.finalize()
+        persist_invocation_trace(invocation.invocation_id, trace_data)
+        add_message(
+            conversation_id,
+            "assistant",
+            reply,
+            cost=cost,
+            trace=trace_data,
+        )
+        finish_invocation(
+            invocation.invocation_id,
+            result={"reply": reply, "usage": usage, "cost": cost},
+        )
+        return {
+            "reply": reply,
+            "usage": usage,
+            "cost": cost,
+            "conversation_id": conversation_id,
+            "execution_id": invocation.invocation_id,
+            "trace_id": invocation.trace_id,
+            "trace": trace_data,
+        }
+    except Exception as exc:
+        trace.record_error("chatgpt_mcp", str(exc), exception=exc)
+        trace_data = trace.finalize()
+        persist_invocation_trace(invocation.invocation_id, trace_data)
+        fail_invocation(invocation.invocation_id, error={"message": str(exc)})
+        raise RuntimeError(str(exc)) from exc
+
+
+def _execution(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    invocation_id = str(arguments.get("execution_id") or "").strip()
+    if not invocation_id:
+        raise ValueError("execution_id is required")
+    status = get_invocation_status(invocation_id)
+    if not status:
+        raise LookupError("Execution not found")
+    _authorize_invocation(status, user)
+    status["id"] = status.pop("id", invocation_id)
+    return {"execution": status}
+
+
+def _execution_trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    invocation_id = str(arguments.get("execution_id") or "").strip()
+    if not invocation_id:
+        raise ValueError("execution_id is required")
+    status = get_invocation_status(invocation_id)
+    if not status:
+        raise LookupError("Execution not found")
+    _authorize_invocation(status, user)
+    trace = get_invocation_trace(invocation_id)
+    if trace is None:
+        raise LookupError("Execution trace not found")
+    return {"execution_id": invocation_id, "trace": trace}
 
 
 def _session(arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
@@ -459,40 +700,91 @@ def _register_bridge_tools() -> None:
             _agents,
         ),
         (
-            "alice_get_session",
-            "Get session",
-            "Read-only lifecycle status for one Alice Pro runtime session.",
-            {
-                "type": "object",
-                "properties": {"session_id": {"type": "string", "minLength": 1}},
-                "required": ["session_id"],
-                "additionalProperties": False,
-            },
-            _session,
+            "alice_list_conversations",
+            "List conversations",
+            "List Alice Pro conversations owned by the authenticated MCP user.",
+            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            _conversations,
         ),
         (
-            "alice_get_invocation",
-            "Get invocation",
-            "Read-only status and safe metadata for one Alice Pro invocation.",
+            "alice_get_conversation",
+            "Get conversation",
+            "Read one Alice Pro conversation owned by the authenticated MCP user.",
             {
                 "type": "object",
-                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
-                "required": ["invocation_id"],
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
                 "additionalProperties": False,
             },
-            _invocation,
+            _conversation,
         ),
         (
-            "alice_get_invocation_trace",
-            "Get invocation trace",
-            "Read-only persisted ExecutionTrace for one Alice Pro invocation.",
+            "alice_get_messages",
+            "Get messages",
+            "Read persisted messages for an owned Alice Pro conversation.",
             {
                 "type": "object",
-                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
-                "required": ["invocation_id"],
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
                 "additionalProperties": False,
             },
-            _trace,
+            _conversation_messages,
+        ),
+        (
+            "alice_create_conversation",
+            "Create conversation",
+            "Create a new Alice Pro conversation and bind it to the authenticated MCP user.",
+            {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "model": {"type": "string"},
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+            _create_mcp_conversation,
+        ),
+        (
+            "alice_send_message",
+            "Send message",
+            "Send a message through the normal Alice Pro chat/tool pipeline and return its execution correlation IDs.",
+            {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {"type": "string", "minLength": 1},
+                    "message": {"type": "string", "minLength": 1},
+                    "model": {"type": "string"},
+                    "params": {"type": "object"},
+                },
+                "required": ["conversation_id", "message"],
+                "additionalProperties": False,
+            },
+            _send_message,
+        ),
+        (
+            "alice_get_execution",
+            "Get execution",
+            "Read-only status for the execution created by an Alice Pro conversation request.",
+            {
+                "type": "object",
+                "properties": {"execution_id": {"type": "string", "minLength": 1}},
+                "required": ["execution_id"],
+                "additionalProperties": False,
+            },
+            _execution,
+        ),
+        (
+            "alice_get_execution_trace",
+            "Get execution trace",
+            "Read-only ExecutionTrace for an Alice Pro conversation execution.",
+            {
+                "type": "object",
+                "properties": {"execution_id": {"type": "string", "minLength": 1}},
+                "required": ["execution_id"],
+                "additionalProperties": False,
+            },
+            _execution_trace,
         ),
     ]
     for name, title, description, input_schema, handler in bridge_tools:
@@ -504,7 +796,7 @@ def _register_bridge_tools() -> None:
                 "description": description,
                 "inputSchema": input_schema,
                 "outputSchema": {"type": "object"},
-                "capabilities": ["read", "mcp"],
+                "capabilities": ["control-plane", "mcp"],
                 "risk_level": "low",
                 "read_only": True,
                 "requires_approval": False,
@@ -519,8 +811,12 @@ _register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
-    # Authentication is intentionally disabled for the current preview.
-    return [{"type": "noauth"}]
+    mode = _auth_mode()
+    if mode == "anonymous":
+        return [{"type": "noauth"}]
+    if mode in {"bearer", "introspection"}:
+        return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
+    return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
