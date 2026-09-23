@@ -279,6 +279,11 @@ def chat():
                     start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
+            if isinstance(e, ValueError) and "temperature" in error_message.lower():
+                trace.add_event("validation_failed", {
+                    "field": "temperature",
+                    "error": error_message,
+                })
             trace.record_error("chat_pipeline", error_message, exception=e)
             record_yandex_mcp_activity(trace)
             trace_data = trace.finalize()
