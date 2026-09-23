@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 from typing import Any, Callable, Mapping, Optional
 
 from flask import Blueprint, Response, jsonify, request
@@ -18,6 +19,8 @@ from flask import Blueprint, Response, jsonify, request
 from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
 from session_manager import get_session
+from db import get_conversations, get_messages
+from conversation_ownership import list_owned_conversations, get_owned_conversation, check_access
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from filesystem_mcp_tools import grep_search, list_directory, read_file
@@ -141,13 +144,7 @@ def _www_authenticate() -> Optional[str]:
 
 
 def _auth_user_from_request() -> Optional[str]:
-    """Return the MCP user without requiring authentication.
-
-    MCP is intentionally unauthenticated for the current Alice Pro preview.
-    Authorization can be added later as a separate, explicit feature.
-    """
-    return None
-
+    """Resolve the authenticated MCP principal."""
     mode = _auth_mode()
     if mode == "anonymous":
         return os.getenv("ALICE_MCP_USER_ID") or None
@@ -161,9 +158,12 @@ def _auth_user_from_request() -> Optional[str]:
 
     if mode == "bearer":
         expected = os.getenv("ALICE_MCP_BEARER_TOKEN", "")
-        if expected and token == expected:
-            return os.getenv("ALICE_MCP_USER_ID") or None
-        raise PermissionError("Invalid bearer token")
+        user_id = os.getenv("ALICE_MCP_USER_ID", "")
+        if not expected or not user_id:
+            raise PermissionError("MCP bearer authentication is not fully configured")
+        if not secrets.compare_digest(token, expected):
+            raise PermissionError("Invalid bearer token")
+        return user_id
 
     if mode == "introspection":
         return _introspect_token(token)
@@ -204,9 +204,17 @@ def _introspect_token(token: str) -> Optional[str]:
     return str(data.get("sub") or "") or None
 
 
-def _require_auth(_request_id: Any) -> tuple[Optional[str], Optional[Response]]:
-    """Authentication is intentionally disabled for the current MCP endpoint."""
-    return None, None
+def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Response]]:
+    try:
+        return _auth_user_from_request(), None
+    except PermissionError as exc:
+        return None, _jsonrpc_error(
+            request_id,
+            -32001,
+            str(exc),
+            status=401,
+            headers={"WWW-Authenticate": _www_authenticate()},
+        )
 
 
 def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
@@ -342,6 +350,52 @@ def _bridge_wrapper(handler):
     return wrapped
 
 
+def _require_conversation_user(user: Optional[str]) -> str:
+    if not user:
+        raise PermissionError("Authenticated user identity is required")
+    return str(user)
+
+
+def _conversations(_arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    return {"conversations": list_owned_conversations(owner)}
+
+
+def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    conversation = get_owned_conversation(conversation_id, owner)
+    if conversation is None:
+        raise LookupError("Conversation not found")
+    return {"conversation": conversation}
+
+
+def _conversation_messages(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    if not check_access(conversation_id, owner):
+        raise LookupError("Conversation not found")
+    return {
+        "conversation_id": conversation_id,
+        "messages": get_messages(conversation_id),
+    }
+
+
+def _execution(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    result = _invocation(arguments, owner)
+    return {"execution": result["invocation"]}
+
+
+def _execution_trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    return _trace(arguments, owner)
+
+
 
 
 def _project_list(args: dict, _user: Optional[str] = None) -> dict:
@@ -442,6 +496,86 @@ def _register_project_read_tools() -> None:
 
 _register_project_read_tools()
 
+def _register_conversation_tools() -> None:
+    tools = [
+        (
+            "alice_list_conversations",
+            "List conversations",
+            "List conversations owned by the authenticated Alice Pro user.",
+            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            _conversations,
+        ),
+        (
+            "alice_get_conversation",
+            "Get conversation",
+            "Read one conversation owned by the authenticated Alice Pro user.",
+            {
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
+                "additionalProperties": False,
+            },
+            _conversation,
+        ),
+        (
+            "alice_get_conversation_messages",
+            "Get conversation messages",
+            "Read messages and persisted ExecutionTrace data for one owned conversation.",
+            {
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
+                "additionalProperties": False,
+            },
+            _conversation_messages,
+        ),
+        (
+            "alice_get_execution",
+            "Get execution",
+            "Read one authenticated execution through the user-facing execution abstraction.",
+            {
+                "type": "object",
+                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _execution,
+        ),
+        (
+            "alice_get_execution_trace",
+            "Get execution trace",
+            "Read sanitized ExecutionTrace for one authenticated execution.",
+            {
+                "type": "object",
+                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _execution_trace,
+        ),
+    ]
+    for name, title, description, input_schema, handler in tools:
+        registry.register(
+            "chatgpt_conversation",
+            name,
+            {
+                "title": title,
+                "description": description,
+                "inputSchema": input_schema,
+                "outputSchema": {"type": "object"},
+                "capabilities": ["conversation", "execution", "mcp"],
+                "risk_level": "low",
+                "read_only": True,
+                "requires_approval": False,
+                "supported_transports": ["mcp"],
+                "executor": {"type": "local"},
+                "func": _bridge_wrapper(handler),
+            },
+        )
+
+
+_register_conversation_tools()
+
 def _register_bridge_tools() -> None:
     bridge_tools = [
         (
@@ -519,8 +653,10 @@ _register_bridge_tools()
 
 
 def _security_schemes() -> list[dict[str, Any]]:
-    # Authentication is intentionally disabled for the current preview.
-    return [{"type": "noauth"}]
+    mode = _auth_mode()
+    if mode == "anonymous":
+        return [{"type": "noauth"}]
+    return [{"type": "http", "scheme": "bearer"}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
@@ -571,6 +707,10 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
             raise PermissionError(result.get("error") or "Tool authorization denied")
         if phase == "approval_required":
             raise PermissionError(result.get("error") or "Tool approval required")
+        if phase == "execution":
+            execution_error = str(result.get("error") or "Tool execution failed")
+            if execution_error.startswith("LookupError:"):
+                raise LookupError(execution_error.split(":", 1)[1].strip())
         raise RuntimeError(result.get("error") or "Tool execution failed")
     return {
         "structuredContent": result.get("data"),
@@ -674,7 +814,9 @@ def mcp_post() -> Response:
     if header_error:
         return _error_response(request_id, -32600, header_error)
 
-    user, _auth_error = _require_auth(request_id)
+    user, auth_error = _require_auth(request_id)
+    if auth_error is not None:
+        return auth_error
 
     if method == "ping":
         return _jsonrpc_result(

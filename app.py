@@ -22,6 +22,7 @@ from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from short_token_auth import install_short_token_auth
+from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +81,7 @@ init_local_agent_tables()
 check_supabase_trace_mirror()
 init_treasury_tables()
 init_user_identity_table()
+init_conversation_ownership_table()
 init_department_tables()
 
 
@@ -123,35 +125,48 @@ def list_models():
 
 @app.route("/api/conversations/<conv_id>", methods=["PATCH"])
 def patch_conversation(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if owner_id and not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     data = request.get_json(silent=True) or {}
     if "title" in data:
-        update_conversation_title(conv_id, data["title"])
+        update_conversation_title(conv_id, data["title"], owner_id)
     if "model" in data:
-        update_conversation_model(conv_id, data["model"])
+        update_conversation_model(conv_id, data["model"], owner_id)
     return jsonify({"status": "ok"})
 
 
 @app.route("/api/conversations/<conv_id>/title", methods=["PUT"])
 def set_conv_title(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if owner_id and not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     title = (request.get_json(silent=True) or {}).get("title")
     if not title:
         return jsonify({"error": "Title is required"}), 400
-    update_conversation_title(conv_id, title)
+    update_conversation_title(conv_id, title, owner_id)
     return jsonify({"status": "ok", "title": title})
 
 
 @app.route("/api/conversations/<conv_id>/model", methods=["PUT"])
 def set_conv_model(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if owner_id and not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     model = (request.get_json(silent=True) or {}).get("model")
     if not model:
         return jsonify({"error": "Model is required"}), 400
-    update_conversation_model(conv_id, model)
+    update_conversation_model(conv_id, model, owner_id)
     return jsonify({"status": "ok", "model": model})
 
 
 @app.route("/api/conversations/<conv_id>", methods=["DELETE"])
 def remove_conv(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if owner_id and not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     delete_conversation(conv_id)
+    delete_owner(conv_id, owner_id)
     return jsonify({"status": "deleted"})
 
 

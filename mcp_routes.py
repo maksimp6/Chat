@@ -26,6 +26,14 @@ from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
 from treasury_identity import get_current_owner_id
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from conversation_ownership import (
+    init_conversation_ownership_table,
+    set_owner,
+    check_access,
+    list_owned_conversations,
+    get_owned_conversation,
+    delete_owner,
+)
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint('mcp', __name__)
@@ -352,6 +360,7 @@ def handle_mcp_server_item(server_id):
 
 @mcp_bp.route('/api/conversations', methods=['GET', 'POST'])
 def conversations():
+    owner_id = get_current_owner_id(required=False)
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         client = AliceClient(Config)
@@ -363,12 +372,20 @@ def conversations():
         title = data.get('title') or 'Новый чат'
         model = data.get('model', 'aliceai-llm')
         create_conversation(conv_id, title, model)
+        if owner_id:
+            set_owner(conv_id, owner_id)
         return jsonify({"id": conv_id, "title": title, "model": model}), 201
 
+    if owner_id:
+        return jsonify({"conversations": list_owned_conversations(owner_id)})
     return jsonify({"conversations": get_conversations()})
+
 
 @mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
 def get_conv_messages(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if owner_id and not check_access(conv_id, owner_id):
+        return jsonify({"error": "conversation_not_found"}), 404
     return jsonify({"messages": get_messages(conv_id)})
 
 @mcp_bp.route('/api/mcp/execute-approved', methods=['POST'])
