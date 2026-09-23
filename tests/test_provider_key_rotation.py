@@ -65,3 +65,70 @@ def test_rotation_window_starts_one_hour_before_expiry():
     now = datetime(2026, 1, 1, 0, tzinfo=timezone.utc)
     assert rotation_needed(now + timedelta(hours=1), now)
     assert not rotation_needed(now + timedelta(hours=1, seconds=1), now)
+
+
+class FakeReissueProvider:
+    def __init__(self):
+        self.reissued = []
+
+    def reissue_key(self, provider_key_id, *, expires_at):
+        self.reissued.append((provider_key_id, expires_at))
+        return provider_key_id, "cloudru-new-secret"
+
+    def validate_key(self, api_key):
+        assert api_key == "cloudru-new-secret"
+
+    def create_key(self, *, expires_at):
+        raise AssertionError("Cloud.ru rotation must reissue the existing key")
+
+    def revoke_key(self, provider_key_id):
+        raise AssertionError("Cloud.ru reissue must not revoke the same resource")
+
+
+def test_reissue_rotation_keeps_cloudru_provider_key_id():
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    conn.execute(
+        """INSERT INTO provider_credentials
+           (api_key_encrypted, provider_key_id, provider, project_id,
+            issued_at, expires_at, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
+        (
+            "old-cipher",
+            "cloudru-key",
+            "cloudru",
+            "",
+            now - timedelta(days=89),
+            now + timedelta(hours=30),
+        ),
+    )
+    conn.commit()
+
+    provider = FakeReissueProvider()
+    new_id, _, new_expires = rotate_active_key(
+        db=conn,
+        provider=provider,
+        encrypt=lambda value: "enc:" + value,
+        old_id=1,
+        project_id="",
+        old_provider_key_id="cloudru-key",
+        now=now,
+        commit_before_revoke=True,
+        provider_name="cloudru",
+        reissue_existing=True,
+        ttl=timedelta(days=90),
+    )
+
+    rows = conn.execute(
+        "SELECT provider_key_id, provider, status FROM provider_credentials ORDER BY id"
+    ).fetchall()
+    active = [row for row in rows if row["status"] == "active"]
+
+    assert new_id == "cloudru-key"
+    assert new_expires - now == timedelta(days=90)
+    assert provider.reissued[0][0] == "cloudru-key"
+    assert len(active) == 1
+    assert active[0]["provider"] == "cloudru"
+    assert active[0]["provider_key_id"] == "cloudru-key"

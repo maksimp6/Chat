@@ -7,9 +7,6 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# Load the project's local .env file before reading configuration. Existing
-# process environment variables take precedence, which is important for CI
-# and production deployments.
 _ENV_FILE = Path(__file__).resolve().with_name(".env")
 load_dotenv(_ENV_FILE)
 
@@ -19,9 +16,13 @@ API_KEY = os.getenv("YANDEX_API_KEY") or os.getenv("YC_API_KEY")
 
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
+CLOUDRU_BASE_URL = os.getenv(
+    "CLOUDRU_BASE_URL",
+    "https://foundation-models.api.cloud.ru/v1",
+)
+YANDEX_PROVIDER_KEY_ID = os.getenv("YANDEX_PROVIDER_KEY_ID")
+CLOUDRU_API_KEY_ID = os.getenv("CLOUDRU_API_KEY_ID")
 
-# Supabase settings are optional at startup. The service-role key is backend
-# only and must never be exposed to the frontend.
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -31,7 +32,6 @@ HOST = "0.0.0.0"
 PORT = 8080
 
 TEXT_MODELS = {
-    "alice-lite": {"name": "Alice Lite", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.20, "cached": 0.05, "tool": 0.05, "output": 0.20},
     "aliceai-llm": {"name": "Alice AI LLM", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.50, "cached": 0.50, "tool": 0.13, "output": 1.20},
     "yandexgpt-5.1": {"name": "YandexGPT 5.1 Pro", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 0.80, "cached": 0.80, "tool": 0.20, "output": 0.80},
     "yandexgpt-5-pro": {"name": "YandexGPT 5 Pro", "type": "text", "capabilities": {"tools": None, "function_calling": None, "multimodal": None}, "input": 1.20, "cached": 1.20, "tool": 1.20, "output": 1.20},
@@ -59,6 +59,9 @@ class Config:
     API_KEY = API_KEY
     PROJECT_ID = PROJECT_ID
     BASE_URL = BASE_URL
+    CLOUDRU_BASE_URL = CLOUDRU_BASE_URL
+    YANDEX_PROVIDER_KEY_ID = YANDEX_PROVIDER_KEY_ID
+    CLOUDRU_API_KEY_ID = CLOUDRU_API_KEY_ID
     SUPABASE_URL = SUPABASE_URL
     SUPABASE_ANON_KEY = SUPABASE_ANON_KEY
     SUPABASE_SERVICE_ROLE_KEY = SUPABASE_SERVICE_ROLE_KEY
@@ -105,8 +108,6 @@ def calculate_full_cost(model_key, usage):
 config = Config()
 REPO_DIR = "/sdcard/repo"
 
-# Install the optional hook after configuration is fully initialized. Import
-# failures are visible in logs instead of being silently discarded.
 try:
     import trace_mirror_integration  # noqa: F401,E402
 except ImportError:

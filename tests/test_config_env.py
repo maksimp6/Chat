@@ -43,3 +43,11 @@ def test_missing_api_key_allows_database_backed_credentials(monkeypatch):
     module = reload_config()
 
     assert module.API_KEY is None
+
+
+def test_model_catalog_contains_only_verified_yandex_models():
+    assert "alice-lite" not in config.TEXT_MODELS
+    assert "aliceai-llm" in config.TEXT_MODELS
+    assert "yandexgpt-5.1" in config.TEXT_MODELS
+    assert "yandexgpt-5-lite" in config.TEXT_MODELS
+    assert "qwen3-235b-a22b-fp8" in config.TEXT_MODELS

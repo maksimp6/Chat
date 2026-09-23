@@ -1,48 +1,100 @@
-# Global Yandex API-key rotation
+# Provider API-key lifecycle and rotation
 
-Alice Pro uses one backend-owned Yandex provider key for the deployment. Keys
-are not issued per user.
+Alice Pro keeps one backend-owned runtime API key per provider. The credential
+store is provider-aware, encrypted at rest, and never exposes plaintext keys
+through metadata, traces, logs, or frontend responses.
 
-## Lifecycle
+## Providers
 
-- A newly issued key is valid for **12 hours** (`KEY_TTL`).
-- Rotation becomes due during the final hour (`ROTATE_BEFORE`).
-- The replacement is inserted and promoted inside the caller's database
-  transaction; the partial unique index permits only one `active` key.
-- The previous provider key must be revoked through the injected
-  `YandexKeyProvider` adapter after promotion.
-- Plaintext keys exist only during the provider/encryption boundary and must
-  not be logged, included in traces, or returned from HTTP endpoints.
+### Yandex Cloud
 
-## Deployment integration
+- Runtime authentication uses \`Authorization: Api-Key <API_KEY>\`.
+- A replacement key is created through Yandex IAM.
+- Alice Pro validates the replacement against the configured Yandex Responses endpoint.
+- After validation, the replacement is promoted and the old provider key is revoked.
+- The existing Yandex deployment lifecycle remains 12 hours with rotation in the final hour.
 
-`provider_key_rotation.rotate_active_key` requires:
+### Cloud.ru Foundation Models
 
-1. A database adapter and an explicit transaction.
-2. A deployment-specific `YandexKeyProvider` implementation backed by the
-   deployment's IAM credentials.
-3. An encryption implementation supplied through `encrypt`.
-4. A scheduler or worker that invokes rotation before expiry and alerts when
-   rotation fails.
+- Runtime authentication uses \`Authorization: Api-Key <API_KEY>\` against
+  \`https://foundation-models.api.cloud.ru/v1\`.
+- The Foundation Models key is created for a service account with the
+  Foundation Models service selected.
+- Cloud.ru supports key lifetimes from one day to one year. Alice Pro defaults
+  to a one-day lifetime via \`CLOUDRU_KEY_TTL_DAYS=1\`, so the key is rotated daily.
+- Cloud.ru documents API-key reissue: the Key Secret and expiry change while
+  the key ID remains unchanged.
+- Alice Pro therefore uses in-place reissue for Cloud.ru. The new secret is
+  validated against Foundation Models before the local credential is promoted.
+  The same Cloud.ru provider resource is not revoked after reissue.
+- Automated Cloud.ru rotation additionally requires a provider key ID and
+  server-side IAM management credentials (\`CLOUDRU_IAM_KEY_ID\` /
+  \`CLOUDRU_IAM_KEY_SECRET\`). Without them, the UI reports rotation as
+  unsupported rather than claiming that rotation works.
 
-The legacy environment `API_KEY` remains a bootstrap fallback when no
-credential store is supplied. Production deployments should use the global
-credential table and an encrypted secret store.
+## Credential configuration UI
 
-## Trace attribution
+The provider credentials modal contains:
 
-Каждая операция Responses API получает идентификатор реально использованного
-глобального ключа. В trace сохраняются Yandex API-key resource ID, fingerprint
-для bootstrap-ключа, время выпуска/истечения и project ID. Секрет ключа и
-IAM-токен не сохраняются.
+- **Yandex Cloud API key**
+- **Cloud.ru IAM Key ID**
+- **Cloud.ru IAM Key Secret**
+- **Cloud.ru Service account ID**
 
-Идентификатор пишется в `provider_key`, историю `provider_keys`, а также в
-каждый элемент `api_requests[]` и `responses[]`. Поэтому trace сохраняет
-аудит даже при смене ключа между запросами одного долгого invocation.
+The Cloud.ru runtime API key is not entered manually. Alice Pro creates it for the
+existing service account, performs a real Foundation Models health check, and
+stores the IAM management credentials and runtime credential encrypted on the
+server.
 
-## Worker
+A service account must already exist and have an appropriate project role before
+the runtime key is created. Alice Pro does not enumerate or silently create
+service accounts during provider bootstrap.
 
-Запускайте `python3 scripts/rotate_provider_key.py` через cron/systemd
-каждый час. Worker ротирует ключ только в последнем часу его 12-часового
-срока. Yandex Cloud IAM API создаёт ключ через `POST /iam/v1/apiKeys` и
-удаляет старый через `DELETE /iam/v1/apiKeys/{apiKeyId}`.
+## Security
+
+Plaintext API keys must never appear in:
+
+- frontend JSON responses;
+- Execution Trace;
+- normal application logs;
+- exception messages;
+- GitHub issues/PRs;
+- persistent metadata.
+
+Persistent records store encrypted secrets plus non-secret provider IDs and
+SHA-256 fingerprints.
+
+## Rotation worker
+
+Yandex:
+
+\`\`\`bash
+python3 scripts/rotate_provider_key.py
+\`\`\`
+
+Cloud.ru:
+
+\`\`\`bash
+python3 scripts/rotate_cloudru_provider_key.py
+\`\`\`
+
+Run the appropriate worker at least hourly. The Cloud.ru worker uses a one-day
+key lifetime and rotates during the final hour of that daily lifetime. Each
+worker validates the new/reissued secret before promoting it in the database.
+
+## Environment precedence
+
+Environment variables provide bootstrap values when the provider has no active
+database credential. Once an encrypted active credential exists, request-time
+resolution prefers the database record.
+
+Use provider-specific names:
+
+- \`YANDEX_API_KEY\` (legacy \`YC_API_KEY\` remains supported)
+- \`CLOUDRU_API_KEY\`
+
+Do not introduce a generic \`API_KEY\` for both providers.
+
+## Administration endpoint security
+
+The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Alice Pro short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.

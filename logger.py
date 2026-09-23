@@ -14,6 +14,14 @@ LOG_FORMAT = '%(asctime)s | %(levelname)-7s | %(name)s | %(message)s'
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 
+class ForceCriticalFilter(logging.Filter):
+    """Normalize every project log record to CRITICAL for unified visibility."""
+    def filter(self, record):
+        record.levelno = logging.CRITICAL
+        record.levelname = 'CRITICAL'
+        return True
+
+
 class YCLoggingHandler(logging.Handler):
     def emit(self, record):
         try:
@@ -52,15 +60,19 @@ class AliceLogger:
             encoding='utf-8',
         )
         fh.setLevel(logging.DEBUG)
+        fh.addFilter(ForceCriticalFilter())
         fh.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
         logger.addHandler(fh)
 
         ch = logging.StreamHandler()
-        ch.setLevel(logging.ERROR)
+        ch.setLevel(logging.CRITICAL)
+        ch.addFilter(ForceCriticalFilter())
         ch.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
         logger.addHandler(ch)
 
         yc_h = YCLoggingHandler()
+        yc_h.setLevel(logging.DEBUG)
+        yc_h.addFilter(ForceCriticalFilter())
         yc_h.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
         logger.addHandler(yc_h)
         return logger
@@ -70,6 +82,28 @@ class AliceLogger:
 
 
 alice_logger = AliceLogger()
+
+
+# Capture Flask/Werkzeug and other third-party records through the same
+# project handlers. Keep the source level at DEBUG so diagnostics are not
+# discarded, then normalize the rendered level to CRITICAL in the handlers.
+def _configure_global_logging():
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+
+    app_logger = alice_logger.get('app')
+    for handler in list(app_logger.handlers):
+        if handler not in root.handlers:
+            root.addHandler(handler)
+
+    for logger_name in ('werkzeug', 'flask.app'):
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.DEBUG)
+        logger.handlers.clear()
+        logger.propagate = True
+
+
+_configure_global_logging()
 
 
 def log_function(logger_name='app'):

@@ -1,7 +1,9 @@
-"""Cloud.ru IAM API-key client used by the admin wizard.
+"""Cloud.ru IAM API-key client used by administration and provider rotation.
 
 The client exchanges a service-account key pair for a short-lived IAM token,
-then calls the documented Cloud.ru static API-key endpoints.
+then calls Cloud.ru static API-key management endpoints. Runtime Foundation
+Models requests use the separate Api-Key authentication handled by
+cloudru_api_key_provider.py.
 """
 from __future__ import annotations
 
@@ -11,8 +13,11 @@ from typing import Any, Optional
 
 import requests
 
+from trace_manager import get_current_trace
+
 
 API_KEYS_PATH = "/api/v1/service-accounts/credentials/api-keys"
+SERVICE_ACCOUNTS_PATH = "/api/v1/service-accounts"
 TOKEN_PATH = "/api/v1/auth/token"
 
 
@@ -52,6 +57,13 @@ class CloudRuIamClient:
                 "CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET are required"
             )
 
+        trace = get_current_trace()
+        started = datetime.now(timezone.utc)
+        if trace:
+            trace.add_event("provider_api_request", {
+                "provider": "cloudru", "service": "iam", "operation": "authenticate",
+                "method": "POST", "path": TOKEN_PATH,
+            })
         try:
             response = requests.post(
                 f"{self.endpoint}{TOKEN_PATH}",
@@ -61,7 +73,23 @@ class CloudRuIamClient:
             )
             response.raise_for_status()
             body = response.json()
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": "authenticate",
+                    "method": "POST", "path": TOKEN_PATH, "http_status": response.status_code,
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": True,
+                })
         except (requests.RequestException, ValueError) as exc:
+            if trace:
+                trace.record_error("cloudru.iam.authenticate", "Cloud.ru IAM authentication failed", exception=exc)
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": "authenticate",
+                    "method": "POST", "path": TOKEN_PATH,
+                    "http_status": getattr(getattr(exc, "response", None), "status_code", None),
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": False,
+                })
             raise CloudRuIamError("Cloud.ru IAM authentication failed") from exc
 
         token = body.get("token") or body.get("access_token")
@@ -70,9 +98,7 @@ class CloudRuIamClient:
 
         expires_in = int(body.get("expires_in") or body.get("expiresIn") or 3600)
         self._access_token = str(token)
-        self._access_token_expires_at = now + timedelta(
-            seconds=max(60, expires_in - 60)
-        )
+        self._access_token_expires_at = now + timedelta(seconds=max(60, expires_in - 60))
         return self._access_token
 
     def _request(
@@ -83,6 +109,15 @@ class CloudRuIamClient:
         params: Optional[dict[str, Any]] = None,
         json_body: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
+        trace = get_current_trace()
+        started = datetime.now(timezone.utc)
+        if trace:
+            trace.add_event("provider_api_request", {
+                "provider": "cloudru", "service": "iam", "operation": path,
+                "method": method, "path": path,
+                "query_keys": sorted((params or {}).keys()),
+                "body_keys": sorted((json_body or {}).keys()),
+            })
         try:
             response = requests.request(
                 method,
@@ -98,13 +133,59 @@ class CloudRuIamClient:
             )
             response.raise_for_status()
             body = response.json() if response.content else {}
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": path,
+                    "method": method, "path": path, "http_status": response.status_code,
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": True,
+                })
         except (requests.RequestException, ValueError) as exc:
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+            if trace:
+                trace.add_event("provider_api_response", {
+                    "provider": "cloudru", "service": "iam", "operation": path,
+                    "method": method, "path": path,
+                    "http_status": status_code,
+                    "timing_ms": round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 2),
+                    "success": False,
+                })
+                trace.record_error(
+                    "cloudru.iam.request",
+                    f"Cloud.ru IAM request failed: {method} {path}",
+                    exception=exc,
+                )
+            suffix = f" (HTTP {status_code})" if status_code else ""
             raise CloudRuIamError(
-                f"Cloud.ru IAM request failed: {method} {path}"
+                f"Cloud.ru IAM request failed: {method} {path}{suffix}"
             ) from exc
         if not isinstance(body, dict):
             raise CloudRuIamError("Cloud.ru IAM returned an invalid response")
         return body
+
+    def list_service_accounts(self) -> list[dict[str, Any]]:
+        body = self._request("GET", SERVICE_ACCOUNTS_PATH)
+        accounts = body.get("service_accounts") or body.get("accounts") or body.get("items") or []
+        return [dict(item) for item in accounts] if isinstance(accounts, list) else []
+
+    def create_service_account(
+        self,
+        *,
+        project_id: str,
+        name: str,
+        description: str = "",
+    ) -> dict[str, Any]:
+        if not project_id.strip():
+            raise ValueError("project_id is required")
+        if not name.strip():
+            raise ValueError("name is required")
+        body = {
+            "name": name.strip(),
+            "description": description.strip(),
+            "target": {"project_id": project_id.strip()},
+        }
+        return self._request("POST", SERVICE_ACCOUNTS_PATH, json_body=body)
 
     def list_api_keys(
         self,
@@ -167,6 +248,19 @@ class CloudRuIamClient:
             body["expires_at"] = expires_at
 
         return self._request("POST", API_KEYS_PATH, json_body=body)
+
+    def reissue_api_key(
+        self,
+        *,
+        api_key_id: str,
+        expires_at: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Reissue a static API key while retaining its resource ID."""
+        if not api_key_id.strip():
+            raise ValueError("api_key_id is required")
+        path = f"{API_KEYS_PATH}/{api_key_id}/reissue"
+        body = {"expires_at": expires_at} if expires_at else {}
+        return self._request("POST", path, json_body=body)
 
 
 __all__ = ["CloudRuIamError", "CloudRuIamClient"]

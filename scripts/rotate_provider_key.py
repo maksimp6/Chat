@@ -24,9 +24,9 @@ def main() -> int:
         create_schema(conn)
         row = _fetch_one(
             conn,
-            """SELECT id, yandex_key_id, project_id, expires_at
+            """SELECT id, provider_key_id, yandex_key_id, project_id, expires_at
                FROM provider_credentials
-               WHERE status = 'active'
+               WHERE provider = 'yandex' AND status = 'active'
                LIMIT 1""",
         )
         if not row:
@@ -41,9 +41,9 @@ def main() -> int:
         # stale rotation metadata.
         row = _fetch_one(
             conn,
-            """SELECT id, yandex_key_id, project_id, expires_at
+            """SELECT id, provider_key_id, yandex_key_id, project_id, expires_at
                FROM provider_credentials
-               WHERE status = 'active'
+               WHERE provider = 'yandex' AND status = 'active'
                LIMIT 1""",
         )
         if not row or not rotation_needed(row["expires_at"]):
@@ -57,8 +57,9 @@ def main() -> int:
             encrypt=encrypt_secret,
             old_id=int(row["id"]),
             project_id=str(row["project_id"]),
-            old_provider_key_id=row["yandex_key_id"],
+            old_provider_key_id=row["provider_key_id"] or row["yandex_key_id"],
             commit_before_revoke=True,
+            provider_name="yandex",
         )
         conn.commit()
         logger.info(

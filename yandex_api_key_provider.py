@@ -9,10 +9,12 @@ import requests
 
 
 class YandexApiKeyProvider:
-    """Create/delete service-account API keys through the IAM REST API.
+    """Create/revoke service-account API keys.
 
-    The IAM token is a deployment credential and must never be persisted in
-    traces, logs, or application responses.
+    A static Yandex API key is an authentication credential for Yandex Cloud
+    APIs. Yandex does not document a non-billable AI Studio endpoint that can
+    universally validate the key without also imposing an API-specific
+    permission. Do not turn the credentials UI into a model or /models probe.
     """
 
     def __init__(
@@ -24,7 +26,6 @@ class YandexApiKeyProvider:
         endpoint: Optional[str] = None,
         ai_endpoint: Optional[str] = None,
         project_id: Optional[str] = None,
-        validation_model: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
         self.iam_token = iam_token or os.getenv("YANDEX_IAM_TOKEN")
@@ -53,18 +54,23 @@ class YandexApiKeyProvider:
             "https://ai.api.cloud.yandex.net/v1",
         )).rstrip("/")
         self.project_id = project_id or os.getenv("YANDEX_PROJECT_ID")
-        self.validation_model = validation_model or os.getenv(
-            "YANDEX_PROVIDER_VALIDATION_MODEL",
-            "alice-lite",
-        )
         self.timeout = timeout
 
+    def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
+        return bool(
+            provider_key_id
+            and self.iam_token
+            and self.service_account_id
+        )
+
+    def _require_management_credentials(self) -> None:
         if not self.iam_token:
             raise RuntimeError("YANDEX_IAM_TOKEN is not configured")
         if not self.service_account_id:
             raise RuntimeError("YANDEX_SERVICE_ACCOUNT_ID is not configured")
 
     def _headers(self) -> dict[str, str]:
+        self._require_management_credentials()
         return {
             "Authorization": f"Bearer {self.iam_token}",
             "Content-Type": "application/json",
@@ -92,25 +98,9 @@ class YandexApiKeyProvider:
         return str(resource_id), str(secret)
 
     def validate_key(self, api_key: str) -> None:
-        """Verify the freshly created key can call the configured AI endpoint."""
-        if not self.project_id:
-            raise RuntimeError("YANDEX_PROJECT_ID is required for provider-key validation")
-        model = f"gpt://{self.project_id}/{self.validation_model}/latest"
-        response = requests.post(
-            f"{self.ai_endpoint}/responses",
-            headers={
-                "Authorization": f"Api-Key {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": "ping",
-                "max_output_tokens": 1,
-                "background": False,
-            },
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
+        """Validate only local presence; never make a billable/probing request."""
+        if not isinstance(api_key, str) or not api_key.strip():
+            raise ValueError("Yandex API key is empty")
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
