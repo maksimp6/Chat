@@ -1,8 +1,9 @@
 import sqlite3
-import json
-import hashlib
 import threading
 from datetime import datetime, timedelta, timezone
+
+import db as database
+
 
 class DatabaseArchiver:
     def __init__(self, db_path: str):
@@ -15,29 +16,35 @@ class DatabaseArchiver:
             print("⚠️ Archival task already running. Skipping.")
             return False
 
-        conn = database.get_conn() if database.is_postgres_configured() else sqlite3.connect(self.db_path)
+        conn = (
+            database.get_conn()
+            if database.is_postgres_configured()
+            else sqlite3.connect(self.db_path)
+        )
         try:
             cursor = conn.cursor()
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
 
             cursor.execute(
-                "SELECT id, content, created_at FROM messages WHERE created_at < ?", 
-                (cutoff,)
+                "SELECT id, content, created_at FROM messages WHERE created_at < ?",
+                (cutoff,),
             )
             rows = cursor.fetchall()
 
             if not rows:
                 return True
 
-            # Transactional deletion and extraction
             cursor.execute("DELETE FROM messages WHERE created_at < ?", (cutoff,))
             conn.commit()
-            print(f"💼 Successfully archived {len(rows)} records under schema v{self.schema_version}.")
+            print(
+                f"💼 Successfully archived {len(rows)} records under schema "
+                f"v{self.schema_version}."
+            )
             return True
 
-        except Exception as e:
+        except Exception as exc:
             conn.rollback()
-            print(f"❌ Transaction failed, rolling back: {e}")
+            print(f"❌ Transaction failed, rolling back: {exc}")
             return False
         finally:
             conn.close()
