@@ -129,6 +129,7 @@ class PGCursor:
             self._columns = tuple(desc.name for desc in self._raw.description)
             return self
 
+        # SQLite connection-level tuning is irrelevant to PostgreSQL.
         if re.match(r"^\s*PRAGMA\s+(journal_mode|synchronous)\b", sql, re.IGNORECASE):
             self._columns = ()
             return self
@@ -152,17 +153,28 @@ class PGCursor:
 
         self._columns = tuple(desc.name for desc in (self._raw.description or ()))
 
-        if _INSERT_TABLE_RE.match(translated) and " RETURNING " not in translated.upper():
-            table = _INSERT_TABLE_RE.match(translated).group(1)
+        # Keep the sqlite3 cursor.lastrowid contract only for real sequence-backed
+        # integer id columns. Avoid currval() entirely for tables without a sequence.
+        match = _INSERT_TABLE_RE.match(translated)
+        if match and " RETURNING " not in translated.upper():
+            table = match.group(1)
             try:
                 self._raw.execute(
-                    "SELECT currval(pg_get_serial_sequence(%s, 'id'))",
+                    "SELECT pg_get_serial_sequence(%s, 'id')",
                     (table,),
                 )
-                row = self._raw.fetchone()
-                self._lastrowid = int(row[0]) if row and row[0] is not None else None
-                self._columns = ()
+                sequence_row = self._raw.fetchone()
+                sequence_name = sequence_row[0] if sequence_row else None
+                if sequence_name:
+                    self._raw.execute("SELECT currval(%s)", (sequence_name,))
+                    row = self._raw.fetchone()
+                    self._lastrowid = (
+                        int(row[0]) if row and row[0] is not None else None
+                    )
+                    self._columns = ()
             except Exception:
+                # Never turn a successful INSERT into a failed transaction merely
+                # because lastrowid emulation is unavailable.
                 self._lastrowid = None
         return self
 
