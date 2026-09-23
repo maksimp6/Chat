@@ -13,41 +13,22 @@ TRAEFIK_NAME="alice-preview-traefik"
 TRAEFIK_IMAGE="traefik:v3.7.13"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
+ACME_DIR="$ROOT_DIR/keys/letsencrypt"
+ACME_FILE="$ACME_DIR/acme.json"
+ACME_EMAIL="${ALICE_ACME_EMAIL:-preview@example.com}"
 
 log() { printf '[preview] %s\n' "$*"; }
 die() { printf '[preview] ERROR: %s\n' "$*" >&2; exit 1; }
 require_key() { [[ "$KEY" =~ ^[a-z0-9-]{1,50}$ ]] || die "invalid preview key: $KEY"; }
+require_short_token() { if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then IFS= read -r ALICE_SHORT_TOKEN || true; fi; [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"; }
 ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then docker network create "$NETWORK_NAME" >/dev/null; fi; }
 
 ensure_traefik() {
   ensure_network
-  if docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1; then
-    local current_image
-    local published_http
-    current_image="$(docker inspect -f '{{.Config.Image}}' "$TRAEFIK_NAME" 2>/dev/null || true)"
-    published_http="$(docker port "$TRAEFIK_NAME" 80/tcp 2>/dev/null || true)"
-    if [ "$current_image" = "$TRAEFIK_IMAGE" ] && grep -Fq '0.0.0.0:80' <<<"$published_http"; then
-      docker start "$TRAEFIK_NAME" >/dev/null 2>&1 || die "failed to start $TRAEFIK_NAME"
-      return
-    fi
-    log "replacing Traefik to enforce HTTP binding on 0.0.0.0:80"
-    docker rm -f "$TRAEFIK_NAME" >/dev/null
-  fi
-  log "starting Traefik $TRAEFIK_IMAGE on 0.0.0.0:80"
-  docker run -d \
-    --name "$TRAEFIK_NAME" \
-    --restart unless-stopped \
-    --network "$NETWORK_NAME" \
-    -p 0.0.0.0:80:80 \
-    -v /var/run/docker.sock:/var/run/docker.sock:ro \
-    "$TRAEFIK_IMAGE" \
-    --providers.docker=true \
-    --providers.docker.exposedbydefault=false \
-    --entrypoints.web.address=:80 \
-    --api.dashboard=false \
-    --accesslog=false >/dev/null
+  mkdir -p "$ROOT_DIR/traefik" "$ACME_DIR"; touch "$ACME_FILE"; chmod 700 "$ACME_DIR"; chmod 600 "$ACME_FILE"
+  docker rm -f "$TRAEFIK_NAME" >/dev/null 2>&1 || true
+  docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$ACME_DIR:/letsencrypt" "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL" --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json --certificatesresolvers.letsencrypt.acme.httpchallenge=true --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web --api.dashboard=false --accesslog=false >/dev/null
 }
-
 cleanup_key() {
   local key="$1"; [[ "$key" =~ ^[a-z0-9-]{1,50}$ ]] || die "invalid cleanup key: $key"
   local container="${CONTAINER_PREFIX}-${key}" image="${IMAGE_PREFIX}:${key}" workdir="${ROOT_DIR}/previews/${key}" archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
@@ -61,7 +42,7 @@ deploy() {
   [[ "$archive_path" == "$ROOT_DIR/incoming/"*.tar.gz ]] || die "archive must be inside $ROOT_DIR/incoming"
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
-  ensure_traefik; mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
+  require_short_token; ensure_traefik; mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
   local workdir="${ROOT_DIR}/previews/${key}"
   local builddir="${workdir}/build"
   local container="${CONTAINER_PREFIX}-${key}"
@@ -69,17 +50,15 @@ deploy() {
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"
   log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
-  log "starting $container at $base_path"
+  local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
+  local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"; local strip="${container}-strip"
   docker run -d --name "$container" --restart unless-stopped --network "$NETWORK_NAME" \
-    --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" \
-    --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
-    --label "traefik.http.routers.${container}.rule=Path(\`$base_path\`) || PathPrefix(\`$base_path/\`)" \
-    --label "traefik.http.routers.${container}.entrypoints=web" \
-    --label "traefik.http.routers.${container}.priority=100" \
-    --label "traefik.http.routers.${container}.middlewares=${container}-strip" \
-    --label "traefik.http.middlewares.${container}-strip.stripprefix.prefixes=$base_path" \
+    --label "alice.preview=true" --label "alice.preview.key=$key" --label "alice.preview.expires_at=$expires_at" --label "traefik.enable=true" --label "traefik.docker.network=$NETWORK_NAME" \
+    --label "traefik.http.routers.${container}-http.rule=$tokenized_rule" --label "traefik.http.routers.${container}-http.entrypoints=web" --label "traefik.http.routers.${container}-http.middlewares=$strip" \
+    --label "traefik.http.routers.${container}-https.rule=$tokenized_rule" --label "traefik.http.routers.${container}-https.entrypoints=websecure" --label "traefik.http.routers.${container}-https.tls=true" --label "traefik.http.routers.${container}-https.tls.certresolver=letsencrypt" --label "traefik.http.routers.${container}-https.middlewares=$strip" \
+    --label "traefik.http.middlewares.${strip}.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
-    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_PREVIEW=1 -e ALICE_PREVIEW_BASE_PATH="$base_path" "$image" >/dev/null
+    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" "$image" >/dev/null
   local health_status
   for attempt in $(seq 1 30); do
     health_status="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
