@@ -131,7 +131,7 @@ def update_server(server_id, data):
         conn.execute(
             '''UPDATE mcp_servers SET
                name=?, server_url=?, connector_id=?, transport=?, server_label=?, server_description=?,
-               authorization=?, headers=?, allowed_tools=?, allowed_tools_read_only=?,
+               "authorization"=?, headers=?, allowed_tools=?, allowed_tools_read_only=?,
                require_approval=?, require_approval_tools=?, require_approval_read_only=?,
                require_approval_never_tools=?, require_approval_never_read_only=?, defer_loading=?,
                config=?
