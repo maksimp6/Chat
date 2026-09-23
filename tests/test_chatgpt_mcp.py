@@ -97,10 +97,18 @@ def test_protocol_version_defaults_to_latest_when_header_is_absent(client):
     assert response.get_json()["result"]["tools"]
 
 
-def test_mcp_is_unauthenticated_even_when_auth_env_is_configured(client, monkeypatch):
+def test_mcp_bearer_auth_is_enforced_even_when_anonymous_mode_was_enabled(client, monkeypatch):
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://auth.invalid/introspect")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
     response = mcp_request(client, "tools/list")
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers
+
+    response = mcp_request(
+        client,
+        "tools/list",
+        Authorization="Bearer test-token",
+    )
     assert response.status_code == 200
     assert response.get_json()["result"]["tools"]
 
