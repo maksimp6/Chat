@@ -490,7 +490,10 @@ def update_provider_credentials():
             client = _provider_client(provider)
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
-                client.validate_key(api_key)
+                if provider == YANDEX:
+                    client.validate_runtime_access(api_key)
+                else:
+                    client.validate_key(api_key)
             except PermissionError as exc:
                 logger.debug(
                     "provider credential validation rejected: provider=%s reason=%s",
