@@ -29,6 +29,7 @@ from cloudru_api_key_provider import CloudRuApiKeyProvider
 from cloudru_iam import CloudRuIamClient
 from trace_manager import traced_operation
 from yandex_api_key_provider import YandexApiKeyProvider
+from model_discovery import invalidate_model_discovery_cache
 
 
 logger = logging.getLogger("alice.provider_credentials")
@@ -545,5 +546,8 @@ def update_provider_credentials():
             "error": "credential_storage_failed",
             "detail": "Ключ проверен, но сервер не смог сохранить его. Подробности записаны в серверный лог.",
         }), 503
+
+    if any(provider == YANDEX for provider, _ in supplied):
+        invalidate_model_discovery_cache()
 
     return provider_credentials_status()
