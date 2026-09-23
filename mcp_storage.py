@@ -8,7 +8,7 @@ import db as database
 
 logger = logging.getLogger("mcp_storage")
 
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'mcp_servers.db'))
+DB_PATH = database.DB_PATH
 
 def _get_conn():
     try:
@@ -18,7 +18,7 @@ def _get_conn():
         raise
 
 def init_db():
-    logger.info(f"Initializing MCP storage at: {DB_PATH}")
+    logger.info(f"Initializing MCP storage in selected database backend: {DB_PATH}")
     try:
         conn = _get_conn()
         conn.execute('''
