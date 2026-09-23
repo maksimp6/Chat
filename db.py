@@ -145,32 +145,52 @@ def get_conversation(conv_id, user_id=None):
         "updated_at": row["updated_at"],
     }
 
-def update_conversation_title(conv_id, title):
+def update_conversation_title(conv_id, title, user_id=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
-        (title, int(datetime.utcnow().timestamp()), conv_id)
-    )
+    query = "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?"
+    params = (title, int(datetime.utcnow().timestamp()), conv_id)
+    if user_id:
+        query += " AND user_id = ?"
+        params += (str(user_id),)
+    cur.execute(query, params)
     conn.commit()
     conn.close()
 
-def update_conversation_model(conv_id, model):
+def update_conversation_model(conv_id, model, user_id=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE conversations SET model = ?, updated_at = ? WHERE id = ?",
-        (model, int(datetime.utcnow().timestamp()), conv_id)
-    )
+    query = "UPDATE conversations SET model = ?, updated_at = ? WHERE id = ?"
+    params = (model, int(datetime.utcnow().timestamp()), conv_id)
+    if user_id:
+        query += " AND user_id = ?"
+        params += (str(user_id),)
+    cur.execute(query, params)
     conn.commit()
     conn.close()
 
-def delete_conversation(conv_id):
+def delete_conversation(conv_id, user_id=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
-    cur.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
-    cur.execute("DELETE FROM conv_settings WHERE conversation_id = ?", (conv_id,))
+    if user_id:
+        cur.execute(
+            "DELETE FROM messages WHERE conversation_id = ? AND conversation_id IN "
+            "(SELECT id FROM conversations WHERE id = ? AND user_id = ?)",
+            (conv_id, conv_id, str(user_id)),
+        )
+        cur.execute(
+            "DELETE FROM conv_settings WHERE conversation_id = ? AND conversation_id IN "
+            "(SELECT id FROM conversations WHERE id = ? AND user_id = ?)",
+            (conv_id, conv_id, str(user_id)),
+        )
+        cur.execute(
+            "DELETE FROM conversations WHERE id = ? AND user_id = ?",
+            (conv_id, str(user_id)),
+        )
+    else:
+        cur.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+        cur.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
+        cur.execute("DELETE FROM conv_settings WHERE conversation_id = ?", (conv_id,))
     conn.commit()
     conn.close()
 
