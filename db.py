@@ -240,6 +240,6 @@ def set_config(key: str, value):
     val_str = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO configs (key, value) VALUES (?, ?)", (key, val_str))
+    cur.execute(\n        """INSERT INTO configs (key, value)\n        VALUES (?, ?)\n        ON CONFLICT(key) DO UPDATE SET value = excluded.value""",\n        (key, val_str),\n    )
     conn.commit()
     conn.close()
