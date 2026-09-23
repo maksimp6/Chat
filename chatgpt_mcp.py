@@ -707,6 +707,10 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
             raise PermissionError(result.get("error") or "Tool authorization denied")
         if phase == "approval_required":
             raise PermissionError(result.get("error") or "Tool approval required")
+        if phase == "execution":
+            execution_error = str(result.get("error") or "Tool execution failed")
+            if execution_error.startswith("LookupError:"):
+                raise LookupError(execution_error.split(":", 1)[1].strip())
         raise RuntimeError(result.get("error") or "Tool execution failed")
     return {
         "structuredContent": result.get("data"),
