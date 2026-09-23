@@ -132,7 +132,7 @@ def patch_conversation(conv_id):
     if "title" in data:
         update_conversation_title(conv_id, data["title"], owner_id)
     if "model" in data:
-        update_conversation_model(conv_id, data["model"], owner_id)
+        update_conversation_model(conv_id, data["model"])
     return jsonify({"status": "ok"})
 
 
