@@ -10,6 +10,9 @@ class FakeProvider:
         if api_key.startswith("bad"):
             raise PermissionError("unauthorized")
 
+    def validate_runtime_access(self, api_key):
+        self.validate_key(api_key)
+
     def rotation_supported(self, provider_key_id):
         return bool(provider_key_id)
 
@@ -79,8 +82,8 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
     payload = response.get_json()
     assert "good-yandex-secret" not in str(payload)
     statuses = {item["provider"]: item for item in payload["providers"]}
-    assert statuses["yandex"]["status"] == "configured"
-    assert statuses["yandex"]["authorization_ok"] is False
+    assert statuses["yandex"]["status"] == "connected"
+    assert statuses["yandex"]["authorization_ok"] is True
 
 
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
@@ -367,6 +370,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
             "Provider",
             (),
             {"validate_key": lambda self, key: validated.append((provider, key)),
+             "validate_runtime_access": lambda self, key: validated.append((provider, key)),
              "rotation_supported": lambda self, key_id: False},
         )(),
     )
