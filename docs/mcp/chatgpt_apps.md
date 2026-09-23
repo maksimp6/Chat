@@ -1,6 +1,6 @@
 # ChatGPT Apps SDK / MCP
 
-Alice Pro exposes a separate MCP endpoint for connection from ChatGPT. The MCP surface includes read-only project/diagnostic tools and the existing Git tool set; Git write operations remain protected by the Universal Tool Executor approval boundary.
+Alice Pro exposes a separate MCP endpoint for connection from ChatGPT. The MCP surface is conversation-first: ChatGPT can discover owned conversations, read conversation messages, and inspect the execution trace associated with those conversations. Project/diagnostic tools and the existing Git tool set remain available; Git write operations stay protected by the Universal Tool Executor approval boundary.
 
 ## Endpoint
 
@@ -8,7 +8,9 @@ The connector endpoint is:
 
 `https://<public-host>/mcp`
 
-The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests may omit `MCP-Protocol-Version`; when absent, the server uses the latest supported version (`2026-07-28`). Requests must include `Mcp-Method`; `tools/call` additionally requires `Mcp-Name` matching `params.name`. The current preview endpoint is intentionally unauthenticated.
+The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests may omit `MCP-Protocol-Version`; when absent, the server uses the latest supported version (`2026-07-28`). Requests must include `Mcp-Method`; `tools/call` additionally requires `Mcp-Name` matching `params.name`.
+
+MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `ALICE_MCP_BEARER_TOKEN` plus `ALICE_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
 No connection/session state is stored by the MCP transport. Alice Pro's existing runtime `Session`, `Invocation` and `ExecutionTrace` records remain the application-level state.
 
@@ -18,6 +20,11 @@ The MCP endpoint exposes the following audited tools through the Universal Tool 
 
 | Tool | Purpose | Permission |
 | --- | --- | --- |
+| `alice_list_conversations` | List conversations owned by the authenticated user | read-only |
+| `alice_get_conversation` | Read one owned conversation | read-only |
+| `alice_get_conversation_messages` | Read messages and persisted trace data for one owned conversation | read-only |
+| `alice_get_execution` | Read one execution using the user-facing execution abstraction | read-only |
+| `alice_get_execution_trace` | Read sanitized ExecutionTrace for one authenticated execution | read-only |
 | `alice_get_system_status` | Runtime, MCP, model and local-tool status | read-only |
 | `alice_list_agents` | Registered Agent Gateway agents | read-only |
 | `alice_get_session` | Session lifecycle status | read-only |
@@ -53,8 +60,6 @@ ALICE_MCP_ALLOW_ANONYMOUS=true
 
 For a private development deployment, a single bearer token can be configured:
 
-Authentication is not enabled for the current preview endpoint. No bearer token is required.
-
 This mode is intended for private/testing use and is **not** a replacement for ChatGPT OAuth.
 
 For a production ChatGPT connection, configure an OAuth 2.1 resource-server flow backed by an external identity provider:
@@ -74,7 +79,13 @@ Alice Pro publishes:
 
 The endpoint points ChatGPT at the configured authorization server and advertises the required scope.
 
-Invocation and trace data are checked against the authenticated user ID when the invocation carries trusted ownership metadata. Legacy invocations without ownership are not exposed through authenticated mode.
+Conversation data is protected by a dedicated `conversation_owners` table. An authenticated MCP principal can only enumerate and read conversations mapped to that principal. Execution and trace reads additionally enforce the existing invocation ownership metadata. The transport session itself remains stateless.
+
+The application maintains the internal correlation chain:
+
+`conversation_id -> session_id -> invocation_id -> trace_id`
+
+External MCP clients should use conversation and execution identifiers; session identifiers remain an internal runtime detail.
 
 Secrets must never be included in MCP tool metadata, results, ordinary logs, or ExecutionTrace.
 
@@ -92,7 +103,7 @@ The contract is covered by `tests/test_chatgpt_mcp.py`, including:
 - structured `tools/call` results;
 - standard MCP header validation;
 - authentication failures and bearer authentication;
-- user isolation for invocation and trace reads;
+- user isolation for conversations, invocation and trace reads;
 - project tool execution through MCP;
 - all existing Git read tools through MCP;
 - approval enforcement for all existing Git write tools.
