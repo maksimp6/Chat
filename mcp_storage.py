@@ -30,7 +30,7 @@ def init_db():
                 transport TEXT DEFAULT 'streamable',
                 server_label TEXT DEFAULT '',
                 server_description TEXT DEFAULT '',
-                authorization TEXT DEFAULT '',
+                "authorization" TEXT DEFAULT '',
                 headers TEXT DEFAULT '',
                 allowed_tools TEXT DEFAULT '',
                 allowed_tools_read_only INTEGER DEFAULT 0,
@@ -94,7 +94,7 @@ def create_server(data):
         conn.execute(
             '''INSERT INTO mcp_servers
                (id, name, server_url, connector_id, transport, server_label, server_description,
-                authorization, headers, allowed_tools, allowed_tools_read_only,
+                "authorization", headers, allowed_tools, allowed_tools_read_only,
                 require_approval, require_approval_tools, require_approval_read_only,
                 require_approval_never_tools, require_approval_never_read_only, defer_loading, config)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
