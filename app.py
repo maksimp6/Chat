@@ -3,7 +3,7 @@ import os
 import logging
 import json
 from config import TEXT_MODELS, VOICE_MODELS
-from model_discovery import ModelDiscoveryError, build_model_discovery, static_model_catalog
+from model_discovery import ModelDiscoveryError, get_model_discovery, static_model_catalog
 from db import (
     init_db, get_conversations, create_conversation, update_conversation_title,
     update_conversation_model, delete_conversation, get_messages, add_message,
@@ -119,7 +119,7 @@ def bootstrap_anonymous_user():
         return jsonify({"error": str(exc)}), 400
 
 
-MODEL_DISCOVERY = build_model_discovery()
+MODEL_DISCOVERY = get_model_discovery()
 
 
 @app.route("/api/models", methods=["GET"])
