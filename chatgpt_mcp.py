@@ -539,11 +539,34 @@ def _execution_trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str
     return {"execution_id": invocation_id, "trace": trace}
 
 
-def _session(arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
+def _session(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
     session_id = str(arguments.get("session_id") or "").strip()
-    session = get_session(session_id) if session_id else None
+    if not session_id:
+        raise ValueError("session_id is required")
+    session = get_session(session_id)
     if not session:
         raise LookupError("Session not found")
+
+    if user and _auth_mode() != "anonymous":
+        conn = get_conn()
+        try:
+            row = conn.execute(
+                "SELECT metadata_json FROM invocations "
+                "WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        owner = None
+        if row:
+            try:
+                owner = json.loads(row["metadata_json"] or "{}").get("user_id")
+            except (TypeError, ValueError):
+                owner = None
+        if str(owner or "") != str(user):
+            raise PermissionError("Session is not accessible to this user")
+
     return {
         "session": {
             "id": session["id"],
@@ -797,8 +820,8 @@ def _register_bridge_tools() -> None:
                 "inputSchema": input_schema,
                 "outputSchema": {"type": "object"},
                 "capabilities": ["control-plane", "mcp"],
-                "risk_level": "low",
-                "read_only": True,
+                "risk_level": "medium" if name == "alice_send_message" else "low",
+                "read_only": name not in {"alice_create_conversation", "alice_send_message"},
                 "requires_approval": False,
                 "supported_transports": ["mcp"],
                 "executor": {"type": "local"},
@@ -970,7 +993,9 @@ def mcp_post() -> Response:
     if header_error:
         return _error_response(request_id, -32600, header_error)
 
-    user, _auth_error = _require_auth(request_id)
+    user, auth_error = _require_auth(request_id)
+    if auth_error is not None:
+        return auth_error
 
     if method == "ping":
         return _jsonrpc_result(
