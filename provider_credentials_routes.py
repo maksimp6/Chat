@@ -268,9 +268,9 @@ def _perform_health_check(provider: str) -> dict:
     if credential is None:
         return {"status": "not_configured", "error": None}
     if provider == YANDEX:
-        _provider_client(provider).validate_key(credential.api_key)
+        _provider_client(provider).validate_runtime_access(credential.api_key)
         error = None
-        status = "configured"
+        status = "connected"
     else:
         try:
             _provider_client(provider).validate_key(credential.api_key)
