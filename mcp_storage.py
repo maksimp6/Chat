@@ -1,27 +1,24 @@
 """Autonomous MCP servers storage — with per-conversation settings."""
-import sqlite3
 import os
 import uuid
 import json
 import logging
 
+import db as database
+
 logger = logging.getLogger("mcp_storage")
 
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'mcp_servers.db'))
+DB_PATH = database.DB_PATH
 
 def _get_conn():
     try:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        return conn
+        return database.get_conn()
     except Exception as e:
         logger.exception(f"CRITICAL: Cannot connect to DB {DB_PATH}: {e}")
         raise
 
 def init_db():
-    logger.info(f"Initializing MCP storage at: {DB_PATH}")
+    logger.info(f"Initializing MCP storage in selected database backend: {DB_PATH}")
     try:
         conn = _get_conn()
         conn.execute('''
@@ -33,7 +30,7 @@ def init_db():
                 transport TEXT DEFAULT 'streamable',
                 server_label TEXT DEFAULT '',
                 server_description TEXT DEFAULT '',
-                authorization TEXT DEFAULT '',
+                "authorization" TEXT DEFAULT '',
                 headers TEXT DEFAULT '',
                 allowed_tools TEXT DEFAULT '',
                 allowed_tools_read_only INTEGER DEFAULT 0,
@@ -97,7 +94,7 @@ def create_server(data):
         conn.execute(
             '''INSERT INTO mcp_servers
                (id, name, server_url, connector_id, transport, server_label, server_description,
-                authorization, headers, allowed_tools, allowed_tools_read_only,
+                "authorization", headers, allowed_tools, allowed_tools_read_only,
                 require_approval, require_approval_tools, require_approval_read_only,
                 require_approval_never_tools, require_approval_never_read_only, defer_loading, config)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
@@ -134,7 +131,7 @@ def update_server(server_id, data):
         conn.execute(
             '''UPDATE mcp_servers SET
                name=?, server_url=?, connector_id=?, transport=?, server_label=?, server_description=?,
-               authorization=?, headers=?, allowed_tools=?, allowed_tools_read_only=?,
+               "authorization"=?, headers=?, allowed_tools=?, allowed_tools_read_only=?,
                require_approval=?, require_approval_tools=?, require_approval_read_only=?,
                require_approval_never_tools=?, require_approval_never_read_only=?, defer_loading=?,
                config=?

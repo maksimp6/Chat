@@ -20,7 +20,8 @@ Use the smallest independent change that satisfies an issue or subtask.
 - Keep secrets out of logs, traces, issues, tests, and client-visible errors.
 - Prefer repository-local web UI assets. Do not introduce CDN-hosted UI dependencies without an explicit issue.
 - Android changes must preserve system-bar safety and stable debug/release signing boundaries.
-- Database changes go through committed Supabase migrations and the production migration workflow.
+- PostgreSQL is an optional runtime backend selected only by ALICE_DATABASE_URL; SQLite remains the default local/Termux backend.
+- Database schema changes must keep both SQLite and PostgreSQL paths working.
 
 ## Validation
 

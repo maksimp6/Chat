@@ -1,9 +1,10 @@
 import logging
-import sqlite3
 import uuid
 import requests
 
 from yandex_client_modules.errors import YandexClientError
+
+import db as database
 
 api_logger = logging.getLogger("yandex_api_debug")
 
@@ -31,9 +32,8 @@ class YandexConversationMixin:
         except (ValueError, TypeError, AttributeError):
             pass
 
-        db_path = "alice_pro.db"
         try:
-            conn = sqlite3.connect(db_path)
+            conn = database.get_conn()
             cur = conn.cursor()
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS conv_yandex_map (
@@ -53,8 +53,9 @@ class YandexConversationMixin:
             y_conv = self.create_conversation()
             y_id = y_conv.get("id")
             cur.execute(
-                "INSERT OR REPLACE INTO conv_yandex_map "
-                "(local_id, yandex_id) VALUES (?, ?)",
+                "INSERT INTO conv_yandex_map "
+                "(local_id, yandex_id) VALUES (?, ?) "
+                "ON CONFLICT(local_id) DO UPDATE SET yandex_id = excluded.yandex_id",
                 (conv_id, y_id),
             )
             conn.commit()
