@@ -112,7 +112,11 @@ def rotate_active_key(
         return provider_key_id, issued_at, expires_at
 
     provider_key_id, plaintext = provider.create_key(expires_at=expires_at)
-    provider.validate_key(plaintext)
+    runtime_validator = getattr(provider, "validate_runtime_access", None)
+    if callable(runtime_validator):
+        runtime_validator(plaintext)
+    else:
+        provider.validate_key(plaintext)
     encrypted = encrypt(plaintext)
     promote_rotated_key(
         db,
