@@ -97,10 +97,18 @@ def test_protocol_version_defaults_to_latest_when_header_is_absent(client):
     assert response.get_json()["result"]["tools"]
 
 
-def test_mcp_is_unauthenticated_even_when_auth_env_is_configured(client, monkeypatch):
+def test_mcp_bearer_auth_is_enforced_even_when_anonymous_mode_was_enabled(client, monkeypatch):
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
-    monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://auth.invalid/introspect")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
     response = mcp_request(client, "tools/list")
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers
+
+    response = mcp_request(
+        client,
+        "tools/list",
+        Authorization="Bearer test-token",
+    )
     assert response.status_code == 200
     assert response.get_json()["result"]["tools"]
 
@@ -239,3 +247,50 @@ def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     )
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32602
+
+
+def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
+    import db
+
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
+    db.init_db()
+    db.create_conversation("conversation-a", "A", "model", user_id="user-a")
+    db.create_conversation("conversation-b", "B", "model", user_id="user-b")
+    db.add_message("conversation-a", "user", "private A")
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_list_conversations", "arguments": {}},
+        name="alice_list_conversations",
+    )
+    assert response.status_code == 200
+    conversations = response.get_json()["result"]["structuredContent"]["conversations"]
+    assert [item["id"] for item in conversations] == ["conversation-a"]
+    assert "user_id" not in conversations[0]
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_conversation_messages",
+            "arguments": {"conversation_id": "conversation-b"},
+        },
+        name="alice_get_conversation_messages",
+    )
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == -32602
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_conversation_messages",
+            "arguments": {"conversation_id": "conversation-a"},
+        },
+        name="alice_get_conversation_messages",
+    )
+    assert response.status_code == 200
+    messages = response.get_json()["result"]["structuredContent"]["messages"]
+    assert messages[0]["text"] == "private A"
