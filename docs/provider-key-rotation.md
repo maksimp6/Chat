@@ -8,9 +8,9 @@ through metadata, traces, logs, or frontend responses.
 
 ### Yandex Cloud
 
-- Runtime authentication uses \`Authorization: Api-Key <API_KEY>\`.
+- Runtime authentication uses \`Authorization: Api-Key <API_KEY>\`.\n- Managed keys must include the \`yc.ai.foundationModels.execute\` scope for the AI Studio runtime path.
 - A replacement key is created through Yandex IAM.
-- Alice Pro validates the replacement against the configured Yandex Responses endpoint.
+- Alice Pro validates the replacement against the Yandex AI Studio `/models` catalog endpoint before promotion, so a key without AI Studio access is rejected without invoking a generation model.
 - After validation, the replacement is promoted and the old provider key is revoked.
 - The existing Yandex deployment lifecycle remains 12 hours with rotation in the final hour.
 
