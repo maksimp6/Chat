@@ -23,10 +23,15 @@ def init_db():
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             model TEXT NOT NULL,
+            user_id TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         )
     """)
+    try:
+        cur.execute("ALTER TABLE conversations ADD COLUMN user_id TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -74,10 +79,16 @@ def init_db():
     conn.commit()
     conn.close()
 
-def get_conversations():
+def get_conversations(user_id=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM conversations ORDER BY updated_at DESC")
+    if user_id:
+        cur.execute(
+            "SELECT * FROM conversations WHERE user_id = ? ORDER BY updated_at DESC",
+            (str(user_id),),
+        )
+    else:
+        cur.execute("SELECT * FROM conversations ORDER BY updated_at DESC")
     rows = cur.fetchall()
     conn.close()
     return [
@@ -85,22 +96,54 @@ def get_conversations():
             "id": r["id"],
             "title": r["title"],
             "model": r["model"],
+            "user_id": r["user_id"] if "user_id" in r.keys() else None,
             "created_at": r["created_at"],
             "updated_at": r["updated_at"]
         }
         for r in rows
     ]
 
-def create_conversation(conv_id, title, model):
+def create_conversation(conv_id, title, model, user_id=None):
     now = int(datetime.utcnow().timestamp())
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "INSERT OR REPLACE INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (conv_id, title, model, now, now)
+        """INSERT INTO conversations (id, title, model, user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            model = excluded.model,
+            user_id = COALESCE(excluded.user_id, conversations.user_id),
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at""",
+        (conv_id, title, model, str(user_id) if user_id else None, now, now)
     )
     conn.commit()
     conn.close()
+
+
+def get_conversation(conv_id, user_id=None):
+    conn = get_conn()
+    cur = conn.cursor()
+    if user_id:
+        cur.execute(
+            "SELECT * FROM conversations WHERE id = ? AND user_id = ?",
+            (conv_id, str(user_id)),
+        )
+    else:
+        cur.execute("SELECT * FROM conversations WHERE id = ?", (conv_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "model": row["model"],
+        "user_id": row["user_id"] if "user_id" in row.keys() else None,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
 
 def update_conversation_title(conv_id, title):
     conn = get_conn()
@@ -131,10 +174,19 @@ def delete_conversation(conv_id):
     conn.commit()
     conn.close()
 
-def get_messages(conv_id):
+def get_messages(conv_id, user_id=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC", (conv_id,))
+    if user_id:
+        cur.execute(
+            """SELECT m.* FROM messages m
+               JOIN conversations c ON c.id = m.conversation_id
+               WHERE m.conversation_id = ? AND c.user_id = ?
+               ORDER BY m.id ASC""",
+            (conv_id, str(user_id)),
+        )
+    else:
+        cur.execute("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC", (conv_id,))
     rows = cur.fetchall()
     conn.close()
     res = []
@@ -178,9 +230,11 @@ def add_message(conv_id, role, content, cost=0.0, timings=None, usage=None, mode
     conn.commit()
     conn.close()
 
-def save_conv_settings(conv_id, settings_dict):
+def save_conv_settings(conv_id, settings_dict, user_id=None):
     now = datetime.utcnow()
     settings_json = json.dumps(settings_dict, ensure_ascii=False)
+    if user_id and get_conversation(conv_id, user_id) is None:
+        raise PermissionError("conversation_not_owned")
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
