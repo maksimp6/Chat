@@ -727,21 +727,6 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
     }
 
 
-def _validate_headers(payload: Mapping[str, Any]) -> Optional[str]:
-    method = payload.get("method")
-    body_method = str(method or "")
-    header_method = request.headers.get("Mcp-Method", "")
-    if not header_method or header_method != body_method:
-        return "Mcp-Method header must match the JSON-RPC method"
-
-    if body_method == "tools/call":
-        expected = str((payload.get("params") or {}).get("name") or "")
-        header_name = request.headers.get("Mcp-Name", "")
-        if not header_name or header_name != expected:
-            return "Mcp-Name header must match params.name"
-    return None
-
-
 chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
 
 
@@ -809,10 +794,6 @@ def mcp_post() -> Response:
             },
             status=400,
         )
-
-    header_error = _validate_headers(payload)
-    if header_error:
-        return _error_response(request_id, -32600, header_error)
 
     user, auth_error = _require_auth(request_id)
     if auth_error is not None:
