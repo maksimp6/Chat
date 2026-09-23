@@ -32,7 +32,9 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q .
       - name: Run frontend JavaScript regression tests
-        run: node tests/test_file_manager.js
+        run: |
+          node tests/test_file_manager.js
+          node tests/test_dozzle_header.js
       - name: Run tests
         run: pytest -q
 
