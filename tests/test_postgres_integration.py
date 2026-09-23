@@ -38,6 +38,7 @@ def test_postgres_bootstraps_shared_application_schema():
                 WHERE schemaname = 'public'
                 """
             ).fetchall()
+        }
     finally:
         conn.close()
 
