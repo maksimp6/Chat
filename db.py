@@ -107,19 +107,30 @@ def create_conversation(conv_id, title, model, user_id=None):
     now = int(datetime.utcnow().timestamp())
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        """INSERT INTO conversations (id, title, model, user_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            title = excluded.title,
-            model = excluded.model,
-            user_id = COALESCE(excluded.user_id, conversations.user_id),
-            created_at = excluded.created_at,
-            updated_at = excluded.updated_at""",
-        (conv_id, title, model, str(user_id) if user_id else None, now, now)
-    )
-    conn.commit()
-    conn.close()
+    try:
+        if user_id:
+            existing = cur.execute(
+                "SELECT user_id FROM conversations WHERE id = ?",
+                (conv_id,),
+            ).fetchone()
+            existing_owner = existing["user_id"] if existing else None
+            if existing_owner and str(existing_owner) != str(user_id):
+                raise PermissionError("conversation_not_owned")
+
+        cur.execute(
+            """INSERT INTO conversations (id, title, model, user_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                model = excluded.model,
+                user_id = COALESCE(conversations.user_id, excluded.user_id),
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at""",
+            (conv_id, title, model, str(user_id) if user_id else None, now, now)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_conversation(conv_id, user_id=None):
