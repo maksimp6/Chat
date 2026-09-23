@@ -110,6 +110,8 @@ def chat():
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
         owner_id = get_current_owner_id(required=False)
+        if owner_id and get_conversation(conv_id, owner_id) is None:
+            return jsonify({"error": "conversation_not_found"}), 404
         invocation = create_invocation(
             session_id,
             conv_id,
@@ -313,15 +315,19 @@ def list_tool_categories():
 
 @mcp_bp.route('/api/conversations/<conv_id>/tools', methods=['GET', 'PUT'])
 def conv_tools(conv_id):
+    owner_id = get_current_owner_id(required=False)
+    if owner_id and get_conversation(conv_id, owner_id) is None:
+        return jsonify({"error": "conversation_not_found"}), 404
+
     if request.method == 'PUT':
         data = request.get_json(silent=True) or {}
         categories = data.get("active_tool_categories", [])
-        settings = get_conv_settings(conv_id) or {}
+        settings = get_conv_settings(conv_id, owner_id) or {}
         settings["active_tool_categories"] = categories
-        save_conv_settings(conv_id, settings, get_current_owner_id(required=False))
+        save_conv_settings(conv_id, settings, owner_id)
         return jsonify({"status": "ok", "active_tool_categories": categories})
 
-    settings = get_conv_settings(conv_id) or {}
+    settings = get_conv_settings(conv_id, owner_id) or {}
     cats = settings.get("active_tool_categories")
     if cats is None:
         cats = list(registry.get_available_categories().keys())
