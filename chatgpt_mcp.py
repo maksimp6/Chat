@@ -19,6 +19,8 @@ from flask import Blueprint, Response, jsonify, request
 from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
 from session_manager import get_session
+from db import get_conversations, get_messages
+from conversation_ownership import list_owned_conversations, get_owned_conversation, check_access
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from filesystem_mcp_tools import grep_search, list_directory, read_file
@@ -348,6 +350,52 @@ def _bridge_wrapper(handler):
     return wrapped
 
 
+def _require_conversation_user(user: Optional[str]) -> str:
+    if not user:
+        raise PermissionError("Authenticated user identity is required")
+    return str(user)
+
+
+def _conversations(_arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    return {"conversations": list_owned_conversations(owner)}
+
+
+def _conversation(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    conversation = get_owned_conversation(conversation_id, owner)
+    if conversation is None:
+        raise LookupError("Conversation not found")
+    return {"conversation": conversation}
+
+
+def _conversation_messages(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    conversation_id = str(arguments.get("conversation_id") or "").strip()
+    if not conversation_id:
+        raise ValueError("conversation_id is required")
+    if not check_access(conversation_id, owner):
+        raise LookupError("Conversation not found")
+    return {
+        "conversation_id": conversation_id,
+        "messages": get_messages(conversation_id),
+    }
+
+
+def _execution(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    result = _invocation(arguments, owner)
+    return {"execution": result["invocation"]}
+
+
+def _execution_trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str, Any]:
+    owner = _require_conversation_user(user)
+    return _trace(arguments, owner)
+
+
 
 
 def _project_list(args: dict, _user: Optional[str] = None) -> dict:
@@ -447,6 +495,86 @@ def _register_project_read_tools() -> None:
 
 
 _register_project_read_tools()
+
+def _register_conversation_tools() -> None:
+    tools = [
+        (
+            "alice_list_conversations",
+            "List conversations",
+            "List conversations owned by the authenticated Alice Pro user.",
+            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            _conversations,
+        ),
+        (
+            "alice_get_conversation",
+            "Get conversation",
+            "Read one conversation owned by the authenticated Alice Pro user.",
+            {
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
+                "additionalProperties": False,
+            },
+            _conversation,
+        ),
+        (
+            "alice_get_conversation_messages",
+            "Get conversation messages",
+            "Read messages and persisted ExecutionTrace data for one owned conversation.",
+            {
+                "type": "object",
+                "properties": {"conversation_id": {"type": "string", "minLength": 1}},
+                "required": ["conversation_id"],
+                "additionalProperties": False,
+            },
+            _conversation_messages,
+        ),
+        (
+            "alice_get_execution",
+            "Get execution",
+            "Read one authenticated execution through the user-facing execution abstraction.",
+            {
+                "type": "object",
+                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _execution,
+        ),
+        (
+            "alice_get_execution_trace",
+            "Get execution trace",
+            "Read sanitized ExecutionTrace for one authenticated execution.",
+            {
+                "type": "object",
+                "properties": {"invocation_id": {"type": "string", "minLength": 1}},
+                "required": ["invocation_id"],
+                "additionalProperties": False,
+            },
+            _execution_trace,
+        ),
+    ]
+    for name, title, description, input_schema, handler in tools:
+        registry.register(
+            "chatgpt_conversation",
+            name,
+            {
+                "title": title,
+                "description": description,
+                "inputSchema": input_schema,
+                "outputSchema": {"type": "object"},
+                "capabilities": ["conversation", "execution", "mcp"],
+                "risk_level": "low",
+                "read_only": True,
+                "requires_approval": False,
+                "supported_transports": ["mcp"],
+                "executor": {"type": "local"},
+                "func": _bridge_wrapper(handler),
+            },
+        )
+
+
+_register_conversation_tools()
 
 def _register_bridge_tools() -> None:
     bridge_tools = [
