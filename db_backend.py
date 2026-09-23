@@ -77,8 +77,7 @@ def translate_sql(sql: str) -> str:
         if not re.search(r"\bON\s+CONFLICT\b", text, re.IGNORECASE):
             text = text.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
 
-    return _QMARK_RE.sub("%s", text)
-
+    # Psycopg treats literal `%` as placeholder syntax. Escape percent signs\n    # that are not parameter placeholders before translating SQLite `?`.\n    text = re.sub(r"%(?![sbt%])", "%%", text)\n    return _QMARK_RE.sub("%s", text)\n
 
 class PGCursor:
     def __init__(self, connection: "PGConnection", raw_cursor) -> None:
