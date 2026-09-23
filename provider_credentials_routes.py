@@ -533,7 +533,7 @@ def update_provider_credentials():
                 record_health_check(
                     conn,
                     provider,
-                    status="configured" if provider == YANDEX else "connected",
+                    status="connected",
                     error=None,
                 )
         finally:
