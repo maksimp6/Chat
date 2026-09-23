@@ -9,6 +9,7 @@ class FakeProvider:
     def __init__(self):
         self.created = []
         self.revoked = []
+        self.runtime_validated = []
 
     def create_key(self, *, expires_at):
         self.created.append(expires_at)
@@ -16,6 +17,9 @@ class FakeProvider:
 
     def validate_key(self, api_key):
         assert api_key == "plaintext-secret"
+
+    def validate_runtime_access(self, api_key):
+        self.runtime_validated.append(api_key)
 
     def revoke_key(self, provider_key_id):
         self.revoked.append(provider_key_id)
@@ -59,6 +63,7 @@ def test_rotation_promotes_one_global_key_for_12_hours():
     assert len(active) == 1
     assert active[0]["yandex_key_id"] == "aje-new-key"
     assert provider.revoked == ["aje-old-key"]
+    assert provider.runtime_validated == ["plaintext-secret"]
 
 
 def test_rotation_window_starts_one_hour_before_expiry():
