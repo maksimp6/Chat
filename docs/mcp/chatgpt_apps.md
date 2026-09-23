@@ -8,7 +8,7 @@ The connector endpoint is:
 
 `https://<public-host>/mcp`
 
-The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests may omit `MCP-Protocol-Version`; when absent, the server uses the latest supported version (`2026-07-28`). Requests must include `Mcp-Method`; `tools/call` additionally requires `Mcp-Name` matching `params.name`.
+The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests may omit `MCP-Protocol-Version`; when absent, the server uses the latest supported version (`2026-07-28`). It does not require non-standard per-method or per-tool HTTP headers, so standard Streamable HTTP clients can connect directly.
 
 MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `ALICE_MCP_BEARER_TOKEN` plus `ALICE_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
