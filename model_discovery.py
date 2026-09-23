@@ -151,6 +151,27 @@ def build_model_discovery() -> ModelDiscovery:
     )
 
 
+
+
+_DEFAULT_DISCOVERY: ModelDiscovery | None = None
+_DEFAULT_LOCK = threading.Lock()
+
+
+def get_model_discovery() -> ModelDiscovery:
+    global _DEFAULT_DISCOVERY
+    with _DEFAULT_LOCK:
+        if _DEFAULT_DISCOVERY is None:
+            _DEFAULT_DISCOVERY = build_model_discovery()
+        return _DEFAULT_DISCOVERY
+
+
+def invalidate_model_discovery_cache() -> None:
+    discovery = get_model_discovery()
+    with discovery._lock:
+        discovery._cached = None
+        discovery._cached_at = 0.0
+
+
 def static_model_catalog() -> dict[str, Any]:
     return {
         "text": {key: dict(value) for key, value in TEXT_MODELS.items()},
