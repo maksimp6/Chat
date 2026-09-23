@@ -3,6 +3,7 @@ import os
 import logging
 import json
 from config import TEXT_MODELS, VOICE_MODELS
+from model_discovery import ModelDiscoveryError, build_model_discovery, static_model_catalog
 from db import (
     init_db, get_conversations, create_conversation, update_conversation_title,
     update_conversation_model, delete_conversation, get_messages, add_message,
@@ -118,9 +119,21 @@ def bootstrap_anonymous_user():
         return jsonify({"error": str(exc)}), 400
 
 
+MODEL_DISCOVERY = build_model_discovery()
+
+
 @app.route("/api/models", methods=["GET"])
 def list_models():
-    return jsonify({"text": TEXT_MODELS, "voice": VOICE_MODELS})
+    force_refresh = request.args.get("refresh", "").lower() in {"1", "true", "yes"}
+    try:
+        catalog = MODEL_DISCOVERY.get_models(force_refresh=force_refresh)
+        catalog["degraded"] = False
+        return jsonify(catalog)
+    except ModelDiscoveryError:
+        catalog = static_model_catalog()
+        catalog["degraded"] = True
+        catalog["error"] = "model_discovery_unavailable"
+        return jsonify(catalog)
 
 
 @app.route("/api/conversations/<conv_id>", methods=["PATCH"])
