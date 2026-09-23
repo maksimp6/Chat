@@ -37,6 +37,7 @@ class YandexApiKeyProvider:
                 item.strip()
                 for item in os.getenv(
                     "YANDEX_API_KEY_SCOPES",
+                    "yc.ai.foundationModels.execute,"
                     "yc.ai.languageModels.execute,"
                     "yc.ai.speechkitStt.execute,"
                     "yc.ai.speechkitTts.execute",
@@ -98,9 +99,24 @@ class YandexApiKeyProvider:
         return str(resource_id), str(secret)
 
     def validate_key(self, api_key: str) -> None:
-        """Validate only local presence; never make a billable/probing request."""
+        """Validate local presence without making a provider request."""
         if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("Yandex API key is empty")
+
+    def validate_runtime_access(self, api_key: str) -> None:
+        """Verify AI Studio access without invoking a generation model."""
+        self.validate_key(api_key)
+        response = requests.get(
+            f"{self.ai_endpoint}/models",
+            headers={"Authorization": f"Api-Key {api_key}"},
+            timeout=self.timeout,
+        )
+        if response.status_code in {401, 403}:
+            raise PermissionError("Yandex API key is not authorized for AI Studio")
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            raise RuntimeError("Yandex AI Studio returned an invalid model catalog")
 
     def revoke_key(self, provider_key_id: str) -> None:
         response = requests.delete(
