@@ -12,7 +12,8 @@ def test_reasoning_plan_is_sanitized_and_attached_to_trace():
 
     assert trace.trace["reasoning_plan"]["plan_id"] == "plan-1"
     assert trace.trace["reasoning_plan"]["steps"][0]["id"] == "inspect"
-    assert "token" not in trace.trace["reasoning_plan"]
+    assert trace.trace["reasoning_plan"]["token"] == "<redacted>"
+    assert trace.trace["reasoning_plan"]["token"] != "should-not-survive"
     assert any(event["type"] == "plan_created" for event in trace.trace["events"])
 
 
