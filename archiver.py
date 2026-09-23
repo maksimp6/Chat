@@ -15,7 +15,7 @@ class DatabaseArchiver:
             print("⚠️ Archival task already running. Skipping.")
             return False
 
-        conn = database.get_conn() if database.postgres_url_from_env() else __import__("sqlite3").connect(self.db_path)
+        conn = database.get_conn() if database.is_postgres_configured() else sqlite3.connect(self.db_path)
         try:
             cursor = conn.cursor()
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
