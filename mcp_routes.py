@@ -352,6 +352,7 @@ def handle_mcp_server_item(server_id):
 
 @mcp_bp.route('/api/conversations', methods=['GET', 'POST'])
 def conversations():
+    owner_id = get_current_owner_id(required=False)
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         client = AliceClient(Config)
@@ -362,14 +363,21 @@ def conversations():
             conv_id = str(uuid.uuid4())
         title = data.get('title') or 'Новый чат'
         model = data.get('model', 'aliceai-llm')
-        create_conversation(conv_id, title, model)
+        create_conversation(conv_id, title, model, user_id=owner_id)
         return jsonify({"id": conv_id, "title": title, "model": model}), 201
 
-    return jsonify({"conversations": get_conversations()})
+    return jsonify({"conversations": get_conversations(owner_id)})
+
 
 @mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
 def get_conv_messages(conv_id):
-    return jsonify({"messages": get_messages(conv_id)})
+    owner_id = get_current_owner_id(required=False)
+    messages = get_messages(conv_id, owner_id)
+    if owner_id and messages == []:
+        conversation = db.get_conversation(conv_id, owner_id)
+        if conversation is None:
+            return jsonify({"error": "conversation_not_found"}), 404
+    return jsonify({"messages": messages})
 
 @mcp_bp.route('/api/mcp/execute-approved', methods=['POST'])
 def execute_approved():
