@@ -48,4 +48,4 @@ def test_pg_row_supports_mapping_and_numeric_access():
     assert row["id"] == 7
     assert row[0] == 7
     assert row.get("missing") is None
-    assert dict(row) == {"id": 7, "name": "Alice"}
+    assert dict(row.items()) == {"id": 7, "name": "Alice"}
