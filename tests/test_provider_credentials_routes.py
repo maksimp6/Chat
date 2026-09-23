@@ -79,7 +79,8 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
     payload = response.get_json()
     assert "good-yandex-secret" not in str(payload)
     statuses = {item["provider"]: item for item in payload["providers"]}
-    assert statuses["yandex"]["status"] == "connected"
+    assert statuses["yandex"]["status"] == "configured"
+    assert statuses["yandex"]["authorization_ok"] is False
 
 
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
