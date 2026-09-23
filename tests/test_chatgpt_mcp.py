@@ -239,3 +239,103 @@ def test_project_read_path_traversal_is_rejected_by_filesystem_layer(client):
     )
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32602
+
+
+def test_mcp_requires_auth_when_not_configured(monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+
+    from flask import Flask
+
+    app = Flask(__name__)
+    app.register_blueprint(chatgpt_mcp.chatgpt_mcp_bp)
+    app.testing = True
+
+    with app.test_client() as test_client:
+        response = mcp_request(test_client, "tools/list")
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers
+
+
+def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
+    import db
+
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
+    db.init_db()
+
+    from conversation_ownership import init_conversation_ownership_table, set_owner
+
+    init_conversation_ownership_table()
+    db.create_conversation("conversation-a", "A", "model")
+    db.create_conversation("conversation-b", "B", "model")
+    set_owner("conversation-a", "user-a")
+    set_owner("conversation-b", "user-b")
+    db.add_message(
+        "conversation-a",
+        "user",
+        "private A",
+        trace={"trace_id": "trace-a"},
+    )
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_list_conversations", "arguments": {}},
+        name="alice_list_conversations",
+    )
+    assert response.status_code == 200
+    conversations = response.get_json()["result"]["structuredContent"]["conversations"]
+    assert [item["id"] for item in conversations] == ["conversation-a"]
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_conversation",
+            "arguments": {"conversation_id": "conversation-a"},
+        },
+        name="alice_get_conversation",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["result"]["structuredContent"]["conversation"]["title"] == "A"
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_conversation_messages",
+            "arguments": {"conversation_id": "conversation-b"},
+        },
+        name="alice_get_conversation_messages",
+    )
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == -32602
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_conversation_messages",
+            "arguments": {"conversation_id": "conversation-a"},
+        },
+        name="alice_get_conversation_messages",
+    )
+    assert response.status_code == 200
+    messages = response.get_json()["result"]["structuredContent"]["messages"]
+    assert messages[0]["text"] == "private A"
+    assert messages[0]["trace"]["trace_id"] == "trace-a"
+
+
+def test_mcp_conversation_tools_are_advertised(client):
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+    names = {item["name"] for item in response.get_json()["result"]["tools"]}
+    assert {
+        "alice_list_conversations",
+        "alice_get_conversation",
+        "alice_get_conversation_messages",
+        "alice_get_execution",
+        "alice_get_execution_trace",
+    }.issubset(names)
