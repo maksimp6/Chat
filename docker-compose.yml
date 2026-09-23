@@ -1,6 +1,9 @@
 services:
+  # Optional PostgreSQL backend. It is not started by the default stack.
+  # Termux/local runs use SQLite unless ALICE_DATABASE_URL is explicitly set.
   db:
     image: postgres:17-alpine
+    profiles: ["postgres"]
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-alice_pro}
@@ -43,7 +46,8 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8080
-      ALICE_DATABASE_URL: postgresql://${POSTGRES_USER:-alice}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-alice_pro}
+      # Empty by default: SQLite. Set ALICE_DATABASE_URL to opt into PostgreSQL.
+      ALICE_DATABASE_URL: ${ALICE_DATABASE_URL:-}
       YANDEX_API_KEY: ${YANDEX_API_KEY:-}
       YANDEX_PROJECT_ID: ${YANDEX_PROJECT_ID:-}
       ALICE_PROVIDER_CREDENTIAL_KEY: ${ALICE_PROVIDER_CREDENTIAL_KEY:-}
@@ -54,9 +58,7 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       SUPABASE_DB_URL: ${SUPABASE_DB_URL:-}
-    depends_on:
-      db:
-        condition: service_healthy
+    depends_on: []
     ports:
       - "8080:8080"
     networks:
