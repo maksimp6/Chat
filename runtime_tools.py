@@ -82,7 +82,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
             "runtime": "ssh",
             "operation": "read_file",
             "target": runtime_args["target"],
-            "linux_user": runtime_args["linux_user"],
+            "identity_id": runtime_args["identity_id"],
             "error": str(exc),
         })
         return {"success": False, "error": str(exc)}
