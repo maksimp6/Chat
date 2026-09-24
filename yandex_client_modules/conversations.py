@@ -44,6 +44,14 @@ class YandexConversationMixin:
             api_logger.error(f"[CONV_MAP] lookup failed for {conv_id}: {e}")
             return None
 
+        # Legacy conversations used the Yandex UUID directly as local ID.
+        # Keep that compatibility path, but never manufacture a new UUID.
+        if isinstance(conv_id, str) and conv_id.strip():
+            import re
+            if re.fullmatch(r"[0-9a-fA-F-]{36}", conv_id.strip()):
+                api_logger.info(f"[CONV_MAP] legacy direct Yandex conversation id: {conv_id}")
+                return conv_id
+
         try:
             conn = database.get_conn()
             cur = conn.cursor()
