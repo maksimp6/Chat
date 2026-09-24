@@ -19,6 +19,7 @@ Example configuration:
     "identity_map": {
       "<alice-owner-id>": "alice-agent"
     },
+    "workspace_root": "/srv/alice",
     "identity_file": "/srv/alice/keys/preview",
     "known_hosts": "/srv/alice/ssh/known_hosts"
   }
@@ -37,8 +38,10 @@ Set it through ALICE_SSH_TARGETS_JSON. Host-key verification requires known_host
 - No arbitrary SSH credentials are accepted from tool arguments.
 - StrictHostKeyChecking=yes is always used.
 - An explicit known_hosts file is required.
-- Linux username is validated and optionally constrained by allowed_users.
+- Linux username is validated and resolved from the trusted identity mapping.
+- File operations are confined to workspace_root when configured.
 - Tool execution never enables sudo implicitly.
+- Remote commands run under a minimal environment and a server-side timeout.
 - File writes use a remote temporary file and mv so failed transfers do not replace the destination.
 - Tool results contain host/user metadata but never private key contents.
 - Runtime operations emit lifecycle events into the active Execution Trace.
