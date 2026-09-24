@@ -39,6 +39,8 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     finally:
         conn.close()
 
+    if not isinstance(credential.project_id, str) or not credential.project_id.strip():
+        raise YandexClientError("Active Yandex credential has no project_id")
     client.session.headers.update({
         "Authorization": "Api-Key " + credential.api_key,
         "OpenAI-Project": credential.project_id,
@@ -74,7 +76,7 @@ class YandexRequestMixin:
         )
 
         payload = build_response_payload(
-            project_id=self._config.PROJECT_ID,
+            project_id=credential.project_id,
             model_key=model_key,
             message=message,
             params=params,
