@@ -20,6 +20,10 @@ require_runtime_secret() {
     IFS= read -r ALICE_SHORT_TOKEN || true
   fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then
+    IFS= read -r ALICE_PROVIDER_CREDENTIAL_KEY || true
+  fi
+  [[ -n "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]] || die "ALICE_PROVIDER_CREDENTIAL_KEY is required"
 }
 
 validate_traefik() {
@@ -55,6 +59,7 @@ deploy() {
     umask 077
     printf 'ALICE_REQUIRE_SHORT_TOKEN=1\n'
     printf 'ALICE_SHORT_TOKEN=%s\n' "$ALICE_SHORT_TOKEN"
+    printf 'ALICE_PROVIDER_CREDENTIAL_KEY=%s\n' "$ALICE_PROVIDER_CREDENTIAL_KEY"
   ) > "$runtime_env"
 
   log "building $IMAGE_NAME"
