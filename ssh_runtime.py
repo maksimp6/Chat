@@ -29,6 +29,7 @@ class SSHTarget:
     identity_file: Optional[str] = None
     known_hosts: Optional[str] = None
     identity_map: tuple[tuple[str, str], ...] = ()
+    workspace_root: Optional[str] = None
     connect_timeout_seconds: float = 10.0
     command_timeout_seconds: float = 30.0
 
@@ -104,6 +105,7 @@ class SSHRuntime:
                 identity_file=(str(cfg["identity_file"]).strip() if cfg.get("identity_file") else None),
                 known_hosts=(str(cfg["known_hosts"]).strip() if cfg.get("known_hosts") else None),
                 identity_map=tuple(normalized_identity_map),
+                workspace_root=(str(cfg["workspace_root"]).strip() if cfg.get("workspace_root") else None),
                 connect_timeout_seconds=float(cfg.get("connect_timeout_seconds", 10.0)),
                 command_timeout_seconds=float(cfg.get("command_timeout_seconds", 30.0)),
             )
@@ -156,6 +158,16 @@ class SSHRuntime:
         if not value.startswith("/"):
             raise SSHRuntimeError("Remote file path must be absolute")
         return value
+
+    @staticmethod
+    def _path_within_workspace(path: str, workspace_root: Optional[str]) -> str:
+        normalized = os.path.normpath(path)
+        if not workspace_root:
+            return normalized
+        root = os.path.normpath(workspace_root)
+        if root != "/" and not normalized.startswith(root.rstrip("/") + "/") and normalized != root:
+            raise SSHRuntimeError("Remote file path is outside the configured workspace")
+        return normalized
 
     @staticmethod
     def _wrap_remote_command(command: str, timeout: float, home: str) -> str:
@@ -260,6 +272,9 @@ class SSHRuntime:
         identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
+        target_config = self._targets.get(str(target))
+        workspace_root = target_config.workspace_root if target_config else None
+        remote_path = self._path_within_workspace(remote_path, workspace_root)
         result = self.execute(
             target=target,
             command=f"cat -- {shlex.quote(remote_path)}",
@@ -279,6 +294,9 @@ class SSHRuntime:
         identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
+        target_config = self._targets.get(str(target))
+        workspace_root = target_config.workspace_root if target_config else None
+        remote_path = self._path_within_workspace(remote_path, workspace_root)
         parent = str(PurePosixPath(remote_path).parent)
         quoted_parent = shlex.quote(parent)
         quoted_path = shlex.quote(remote_path)
