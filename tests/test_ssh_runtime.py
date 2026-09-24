@@ -91,8 +91,8 @@ class SSHRuntimeTests(unittest.TestCase):
                 identity_id="owner-2",
             )
 
-    def test_disallowed_linux_user_is_rejected(self):
-        with self.assertRaises(SSHRuntimeError):
+    def test_linux_user_cannot_be_selected_by_runtime_call(self):
+        with self.assertRaises(TypeError):
             self.runtime().execute(
                 target="preview",
                 command="id",
