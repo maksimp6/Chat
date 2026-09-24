@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import math
 import shlex
 import subprocess
 from dataclasses import dataclass
@@ -156,6 +157,20 @@ class SSHRuntime:
             raise SSHRuntimeError("Remote file path must be absolute")
         return value
 
+    @staticmethod
+    def _wrap_remote_command(command: str, timeout: float, home: str) -> str:
+        """Run the command with a server-side timeout and minimal environment."""
+        seconds = max(1, int(math.ceil(timeout)))
+        safe_path = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        inner = shlex.quote(command)
+        return (
+            "env -i "
+            f"HOME={shlex.quote(home)} "
+            f"PATH={shlex.quote(safe_path)} "
+            "timeout --foreground --signal=TERM --kill-after=5s "
+            f"{seconds}s sh -lc {inner}"
+        )
+
     def _ssh_command(
         self,
         target: SSHTarget,
@@ -203,7 +218,12 @@ class SSHRuntime:
         if timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
 
-        argv = self._ssh_command(resolved_target, user, command)
+        remote_command = self._wrap_remote_command(
+            command,
+            timeout,
+            home=f"/home/{user}",
+        )
+        argv = self._ssh_command(resolved_target, user, remote_command)
         try:
             completed = subprocess.run(
                 argv,
@@ -211,7 +231,7 @@ class SSHRuntime:
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=timeout,
+                timeout=timeout + 10,
             )
         except subprocess.TimeoutExpired as exc:
             raise SSHRuntimeError(
@@ -277,7 +297,12 @@ class SSHRuntime:
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
         if timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
-        argv = self._ssh_command(resolved_target, user, script)
+        remote_command = self._wrap_remote_command(
+            script,
+            timeout,
+            home=f"/home/{user}",
+        )
+        argv = self._ssh_command(resolved_target, user, remote_command)
 
         try:
             completed = subprocess.run(
@@ -287,7 +312,7 @@ class SSHRuntime:
                 input=str(content),
                 capture_output=True,
                 text=True,
-                timeout=timeout,
+                timeout=timeout + 10,
             )
         except subprocess.TimeoutExpired as exc:
             raise SSHRuntimeError(
