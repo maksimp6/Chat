@@ -67,7 +67,9 @@ ensure_traefik() {
 cleanup_key() {
   local key="$1"; local container="${CONTAINER_PREFIX}-${key}"; local image="${IMAGE_PREFIX}:${key}"; local workdir="${ROOT_DIR}/previews/${key}"; local archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
   docker rm -f "$container" >/dev/null 2>&1 || true
-  docker rm -f "${container}-dozzle" >/dev/null 2>&1 || true
+  local dozzle_container="${container}-dozzle"
+  docker exec "$dozzle_container" sh -c "rm -rf /data/* /data/.[!.]* /data/..?*" >/dev/null 2>&1 || true
+  docker rm -f "$dozzle_container" >/dev/null 2>&1 || true
   docker image rm "$image" >/dev/null 2>&1 || true
   rm -rf -- "$workdir"
   rm -f -- "$archive_path"
