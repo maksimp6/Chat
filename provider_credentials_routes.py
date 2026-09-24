@@ -99,7 +99,7 @@ def _cloudru_ttl() -> timedelta:
 
 def _provider_key_from_environment(provider: str) -> str | None:
     if provider == YANDEX:
-        return config.API_KEY
+        return getattr(config, "API_KEY", None)
     if provider == CLOUDRU:
         return None
     raise ValueError(f"Unsupported provider: {provider}")
@@ -107,7 +107,7 @@ def _provider_key_from_environment(provider: str) -> str | None:
 
 def _provider_key_id_from_environment(provider: str) -> str | None:
     if provider == YANDEX:
-        return config.YANDEX_PROVIDER_KEY_ID
+        return getattr(config, "YANDEX_PROVIDER_KEY_ID", None)
     if provider == CLOUDRU:
         return None
     raise ValueError(f"Unsupported provider: {provider}")
