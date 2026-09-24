@@ -156,6 +156,7 @@ class LocalToolAgent:
                 call_id=job_id,
                 trace_id=job.get("trace_id"),
                 invocation_id=job.get("invocation_id"),
+                user_id=(job.get("metadata") or {}).get("user_id"),
                 approved=True,
                 metadata={
                     "source": "local_tool_agent",
