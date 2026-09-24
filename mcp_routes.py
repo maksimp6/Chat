@@ -378,7 +378,6 @@ def conversations():
             conv_id = y_conv.get("id") if isinstance(y_conv, dict) else None
             if not conv_id:
                 raise RuntimeError("Yandex conversation creation returned no ID")
-            client.bind_conversation(conv_id, conv_id)
         except Exception as exc:
             creation_trace.record_error("conversation_create", str(exc), exception=exc)
             logger.exception("[CONVERSATION] Yandex conversation creation failed")
