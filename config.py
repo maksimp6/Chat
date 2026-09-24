@@ -15,7 +15,6 @@ load_dotenv(_ENV_FILE)
 # Provider credentials are resolved at runtime from provider_credentials.
 # No provider API key belongs in application configuration.
 
-PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
 CLOUDRU_BASE_URL = os.getenv(
     "CLOUDRU_BASE_URL",
@@ -57,7 +56,6 @@ AUDIO_TTS_PRICE_PER_SEC = 0.0203
 
 
 class Config:
-    PROJECT_ID = PROJECT_ID
     BASE_URL = BASE_URL
     CLOUDRU_BASE_URL = CLOUDRU_BASE_URL
     YANDEX_PROVIDER_KEY_ID = YANDEX_PROVIDER_KEY_ID
@@ -74,9 +72,11 @@ def get_model_info(model_key):
     return ALL_MODELS.get(model_key, TEXT_MODELS["aliceai-llm"])
 
 
-def get_model_uri(model_key):
-    """Build the Yandex model URI without changing existing request behavior."""
-    return "gpt://" + PROJECT_ID + "/" + model_key + "/latest"
+def get_model_uri(project_id, model_key):
+    """Build the Yandex model URI from the active provider credential."""
+    if not isinstance(project_id, str) or not project_id.strip():
+        raise ValueError("Yandex project_id is required")
+    return "gpt://" + project_id.strip() + "/" + model_key + "/latest"
 
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):
