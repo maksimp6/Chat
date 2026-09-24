@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import logging
+import uuid
 
 from flask import Blueprint, jsonify, request
 
@@ -260,8 +261,12 @@ def provider_credentials_status_check():
             if provider not in (YANDEX, CLOUDRU):
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
-    except Exception:
-        return jsonify({"error": "health_check_failed"}), 503
+    except Exception as exc:
+        logger.exception("Provider health check request failed")
+        return jsonify({
+            "error": "health_check_failed",
+            "detail": str(exc),
+        }), 503
     return provider_credentials_status()
 
 
@@ -348,6 +353,13 @@ def bootstrap_cloudru():
         return jsonify({
             "error": "service_account_id_required",
             "detail": "Create or select an existing Cloud.ru service account with a project role, then provide its UUID.",
+        }), 400
+    try:
+        service_account_id = str(uuid.UUID(requested_sa_id))
+    except (ValueError, AttributeError) as exc:
+        return jsonify({
+            "error": "invalid_service_account_id",
+            "detail": "Cloud.ru service_account_id must be a valid UUID.",
         }), 400
 
     iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
