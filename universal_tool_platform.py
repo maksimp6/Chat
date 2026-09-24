@@ -387,7 +387,7 @@ class UniversalToolExecutor:
                 "execution_trace": trace,
             },
         )
-        return trace.track_tool_execution(
+        result = trace.track_tool_execution(
             call.tool_name,
             dict(call.arguments),
             lambda: self.execute(traced_call, **hooks),
@@ -395,6 +395,19 @@ class UniversalToolExecutor:
             step=None,
             trace_arguments=trace_arguments,
         )
+        redact_result_fields = set(
+            dict(definition.metadata or {}).get("trace_redact_result_fields") or ()
+        ) if definition is not None else set()
+        if redact_result_fields:
+            for entry in reversed(trace.trace.get("tool_calls", [])):
+                if entry.get("call_id") == call.call_id:
+                    traced_result = entry.get("result")
+                    if isinstance(traced_result, dict):
+                        for key in redact_result_fields:
+                            if key in traced_result:
+                                traced_result[key] = "<redacted>"
+                    break
+        return result
 
     def _execute_remote(
         self,
