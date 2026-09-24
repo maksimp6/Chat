@@ -24,6 +24,8 @@ require_key() { [[ "$KEY" =~ ^[a-z0-9-]{1,50}$ ]] || die "invalid preview key: $
 require_short_token() {
   if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then IFS= read -r ALICE_SHORT_TOKEN || true; fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then IFS= read -r ALICE_PROVIDER_CREDENTIAL_KEY || true; fi
+  [[ -n "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]] || die "ALICE_PROVIDER_CREDENTIAL_KEY is required"
 }
 ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then docker network create "$NETWORK_NAME" >/dev/null; fi; }
 
@@ -95,7 +97,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
-    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
+    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
   local dozzle_container="${container}-dozzle"
   local dozzle_ru_router="${dozzle_container}-logs-ru"
   local dozzle_online_router="${dozzle_container}-logs-online"
