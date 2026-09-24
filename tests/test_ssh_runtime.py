@@ -96,6 +96,42 @@ class SSHRuntimeTests(unittest.TestCase):
         with self.assertRaises(SSHRuntimeError):
             runtime.execute(target="preview", command="id -un")
 
+    @patch("tests.test_ssh_runtime.subprocess.run")
+    def test_runtime_tool_trace_redacts_command(self, run):
+        from trace_manager import ExecutionTrace
+        from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+        from tool_registry import ToolRegistry
+        from runtime_tools import RUNTIME_TOOLS
+
+        registry = ToolRegistry()
+        registry._tools["ssh_runtime_exec"] = RUNTIME_TOOLS["ssh_runtime_exec"]
+        registry._categories["runtime"] = ["ssh_runtime_exec"]
+        executor = UniversalToolExecutor(registry)
+        trace = ExecutionTrace()
+        call = UniversalToolCall(
+            tool_name="ssh_runtime_exec",
+            arguments={"target": "preview", "linux_user": "alice-agent", "timeout_seconds": 10, "command": "echo secret"},
+            transport="responses_api",
+            call_id="call-1",
+        )
+        run.return_value.returncode = 0
+        run.return_value.stdout = "ok\\n"
+        run.return_value.stderr = ""
+        # Use the real executor, but point the runtime tool at a test-local runtime.
+        import runtime_tools
+        original = runtime_tools.runtime
+        runtime_tools.runtime = self.runtime()
+        try:
+            result = executor.execute_with_trace(call, trace)
+        finally:
+            runtime_tools.runtime = original
+
+        self.assertTrue(result["success"])
+        self.assertEqual(trace.trace["tool_calls"][0]["arguments"]["command"], "<redacted>")
+        self.assertEqual(
+            [event["type"] for event in trace.trace["events"] if event["type"].startswith("runtime_")],
+            ["runtime_started", "runtime_finished"],
+        )
 
 if __name__ == "__main__":
     unittest.main()
