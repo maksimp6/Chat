@@ -102,7 +102,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
         "runtime": "ssh",
         "operation": "write_file",
         "target": runtime_args["target"],
-        "linux_user": runtime_args["linux_user"],
+        "identity_id": runtime_args["identity_id"],
     })
     try:
         result = runtime.write_file(
@@ -115,7 +115,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
             "runtime": "ssh",
             "operation": "write_file",
             "target": runtime_args["target"],
-            "linux_user": runtime_args["linux_user"],
+            "identity_id": runtime_args["identity_id"],
             "error": str(exc),
         })
         return {"success": False, "error": str(exc)}
