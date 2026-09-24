@@ -12,6 +12,7 @@ NETWORK_NAME="alice-preview"
 TRAEFIK_NAME="alice-preview-traefik"
 TRAEFIK_IMAGE="traefik:v3.7.13"
 DOZZLE_IMAGE="amir20/dozzle:v11.1.0"
+DOZZLE_CLEANUP_IMAGE="amir20/dozzle:v11.1.0-alpine"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
 ACME_DIR="$ROOT_DIR/keys/letsencrypt"
@@ -67,7 +68,7 @@ ensure_traefik() {
 clear_dozzle_data() {
   local dozzle_data="$1"
   mkdir -p "$dozzle_data"
-  docker run --rm --user 0 -v "$dozzle_data:/data" --entrypoint sh "$DOZZLE_IMAGE" -c 'rm -rf /data/* /data/.[!.]* /data/..?*' >/dev/null 2>&1 || true
+  docker run --rm --user 0 -v "$dozzle_data:/data" --entrypoint sh "$DOZZLE_CLEANUP_IMAGE" -c 'rm -rf /data/* /data/.[!.]* /data/..?*' >/dev/null 2>&1 || true
 }
 
 cleanup_key() {
