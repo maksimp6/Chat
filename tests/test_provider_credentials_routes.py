@@ -96,7 +96,6 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
             json={
                 "yandex_api_key": "good-yandex-secret",
                 "yandex_project_id": "project-test",
-                "yandex_project_id": "project-test",
             },
         )
 
@@ -117,7 +116,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"3" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
@@ -188,7 +187,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         response = client.put(
             "/api/provider-credentials",
             headers={"Authorization": "Bearer admin-test-token"},
-            json={"yandex_api_key": "good-yandex-secret"},
+            json={"yandex_api_key": "good-yandex-secret", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 200
@@ -318,7 +317,7 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
                 "iam_key_id": "master-id",
                 "iam_key_secret": "master-secret",
                 "project_id": "project-1",
-                "service_account_id": "sa-1",
+                "service_account_id": "550e8400-e29b-41d4-a716-446655440000",
             },
         )
 
