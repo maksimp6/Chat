@@ -78,6 +78,15 @@ class YandexRequestMixin:
             yandex_conv_id=yandex_conv_id,
         )
 
+        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            config_project_id = str(getattr(self._config, "PROJECT_ID", "") or "")
+            credential_project_id = str(credential.project_id or "")
+            execution_trace.add_event("provider_project_alignment", {
+                "config_project_id": config_project_id,
+                "credential_project_id": credential_project_id,
+                "match": config_project_id == credential_project_id,
+            })
+
         request_start_timestamp = time.time()
         request_start_perf = time.perf_counter()
         trace_step_number = trace_step
