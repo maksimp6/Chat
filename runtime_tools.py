@@ -157,6 +157,7 @@ RUNTIME_TOOLS = {
         "requires_approval": True,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
+        "metadata": {"trace_redact_arguments": ["command"]},
         "func": ssh_runtime_exec,
     },
     "ssh_runtime_read_file": {
@@ -186,6 +187,7 @@ RUNTIME_TOOLS = {
         "requires_approval": True,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
+        "metadata": {"trace_redact_arguments": ["content"]},
         "func": ssh_runtime_write_file,
     },
 }
