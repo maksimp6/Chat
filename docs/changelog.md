@@ -3,3 +3,4 @@
 История изменений проекта в формате: версия, дата, описание изменений, новые функции, исправления и критические изменения.
 
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
+- 2026-09-24: force branch-master preview redeploy after provider credential runtime migration.
