@@ -125,6 +125,7 @@ RUN apt-get update && \
     chown -R alice-runtime:alice-runtime /home/alice-runtime
 COPY sshd_config /etc/ssh/sshd_config
 COPY ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+COPY ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
 COPY authorized_keys /home/alice-runtime/.ssh/authorized_keys
 RUN chown alice-runtime:alice-runtime /home/alice-runtime/.ssh/authorized_keys && \
     chmod 700 /home/alice-runtime/.ssh && \
