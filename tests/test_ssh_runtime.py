@@ -130,6 +130,27 @@ class SSHRuntimeTests(unittest.TestCase):
             self.assertTrue(result["success"])
             self.assertEqual(result["path"], "/srv/alice/config.py")
 
+    def test_file_tools_are_constrained_to_workspace(self):
+        with self.assertRaises(SSHRuntimeError):
+            self.runtime().read_file(
+                target="preview",
+                path="/etc/passwd",
+                identity_id="owner-1",
+            )
+
+    def test_workspace_path_is_normalized_without_escape(self):
+        with patch("ssh_runtime.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "ok\n"
+            run.return_value.stderr = ""
+            result = self.runtime().read_file(
+                target="preview",
+                path="/srv/alice/project/../config.py",
+                identity_id="owner-1",
+            )
+            self.assertTrue(result["success"])
+            self.assertEqual(result["path"], "/srv/alice/config.py")
+
     def test_missing_known_hosts_is_rejected(self):
         runtime = SSHRuntime(
             {"preview": {"host": "preview.example", "default_user": "alice-agent"}}
