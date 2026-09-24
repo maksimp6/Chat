@@ -6,7 +6,7 @@ Alice Pro Runtime executes commands and file operations on remote Linux hosts th
 
 The Runtime does not introduce a second permission system. A configured Alice Pro identity maps to a Linux username, and the SSH process runs as that account. Linux filesystem permissions, groups, sudo policy, capabilities, and service permissions remain authoritative.
 
-Targets are named server-side. The model receives a target name, not arbitrary SSH credentials or an arbitrary host.
+Targets are named server-side. The model receives a target name, not arbitrary SSH credentials or an arbitrary host. The Linux user is normally resolved from the trusted Alice identity; the tool does not ask the model to choose a Linux account.
 
 Example configuration:
 
@@ -16,6 +16,9 @@ Example configuration:
     "port": 22,
     "default_user": "alice-agent",
     "allowed_users": ["alice-agent", "deploy"],
+    "identity_map": {
+      "<alice-owner-id>": "alice-agent"
+    },
     "identity_file": "/srv/alice/keys/preview",
     "known_hosts": "/srv/alice/ssh/known_hosts"
   }
