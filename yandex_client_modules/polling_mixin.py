@@ -25,6 +25,12 @@ class YandexPollingMixin:
                             "response_id": task_id,
                             "status_code": 404
                         })
+                        execution_trace.record_error(
+                            "yandex_poll",
+                            "HTTP 404 while polling response",
+                            step=trace_step,
+                            error_type="PollNotFound",
+                        )
                     time.sleep(delay)
                     delay = min(delay * 1.5, 3)
                     continue
@@ -38,6 +44,12 @@ class YandexPollingMixin:
                         "response_id": task_id,
                         "error": str(e)
                     })
+                    execution_trace.record_error(
+                        "yandex_poll",
+                        str(e),
+                        step=trace_step,
+                        error_type=type(e).__name__,
+                    )
                 time.sleep(delay)
                 delay = min(delay * 1.5, 3)
                 continue
@@ -45,14 +57,24 @@ class YandexPollingMixin:
             poll_end = time.time()
             snapshot_key = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
             if execution_trace and isinstance(execution_trace, ExecutionTrace) and snapshot_key != last_snapshot:
+                poll_timing_ms = round((poll_end - poll_start) * 1000, 2)
                 execution_trace.add_response(
                     data,
                     step_index=trace_step or 1,
                     start_timestamp=poll_start,
                     end_timestamp=poll_end,
-                    timing_ms=round((poll_end - poll_start) * 1000, 2),
+                    timing_ms=poll_timing_ms,
                     kind="poll_response"
                 )
+                execution_trace.add_event("api_poll_response_received", {
+                    "step": trace_step,
+                    "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                    "response_id": task_id,
+                    "status": data.get("status"),
+                    "timing_ms": poll_timing_ms,
+                    "has_output": bool(data.get("output")),
+                    "snapshot_changed": True
+                })
                 last_snapshot = snapshot_key
 
             status = data.get("status")
@@ -67,8 +89,20 @@ class YandexPollingMixin:
                 if status == "failed":
                     err = data.get('error')
                     err_msg = err.get('message', 'unknown') if isinstance(err, dict) else str(err)
+                    execution_trace.record_error(
+                        "yandex_poll",
+                        err_msg,
+                        step=trace_step,
+                        error_type="ProviderTaskFailed",
+                    ) if execution_trace and isinstance(execution_trace, ExecutionTrace) else None
                     raise YandexClientError(f"Task failed: {err_msg}")
                 if status == "cancelled":
+                    execution_trace.record_error(
+                        "yandex_poll",
+                        "Task cancelled",
+                        step=trace_step,
+                        error_type="ProviderTaskCancelled",
+                    ) if execution_trace and isinstance(execution_trace, ExecutionTrace) else None
                     raise YandexClientError("Task cancelled")
                 return data
             time.sleep(delay)
@@ -81,4 +115,11 @@ class YandexPollingMixin:
                 "response_id": task_id,
                 "timeout": timeout
             })
+        if execution_trace and isinstance(execution_trace, ExecutionTrace):
+            execution_trace.record_error(
+                "yandex_poll",
+                f"Timeout ({timeout}s) waiting for task {task_id}",
+                step=trace_step,
+                error_type="PollTimeout",
+            )
         raise YandexClientError(f"Timeout ({timeout}s) waiting for task {task_id}")
