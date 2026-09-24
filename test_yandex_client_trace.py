@@ -1,6 +1,7 @@
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 from trace_manager import ExecutionTrace
 from yandex_client import YandexClientError, YandexResponsesClient
@@ -207,6 +208,35 @@ class TestYandexResponsesPollingTrace(unittest.TestCase):
         usage = raw["usage"]
         self.assertEqual(usage["input_tokens"], 1019)
         self.assertEqual(usage["input_token_details"]["cached_tokens"], 992)
+
+    @patch("yandex_client_modules.request_mixin._resolve_global_provider_credential")
+    def test_ask_uses_active_credential_project_for_model_uri(self, resolve_credential):
+        client = self._client()
+        client._config = Mock(PROJECT_ID="config-project", API_KEY="secret")
+        client._resolve_yandex_conv_id = Mock(return_value=None)
+        resolve_credential.return_value = SimpleNamespace(
+            api_key="runtime-secret",
+            project_id="credential-project",
+            trace_key_id="key-1",
+            fingerprint="fp",
+            issued_at=None,
+            expires_at=None,
+        )
+        client.session.post.return_value = self._response({
+            "id": "resp-project",
+            "status": "completed",
+            "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+            "output": [],
+        })
+        trace = ExecutionTrace()
+        client.ask("hello", "test-model", params={"background": False}, execution_trace=trace)
+        sent_payload = client.session.post.call_args.kwargs["json"]
+        self.assertEqual(sent_payload["model"], "gpt://credential-project/test-model/latest")
+        events = trace.finalize()["events"]
+        alignment = next(event for event in events if event["type"] == "provider_project_alignment")
+        self.assertFalse(alignment["payload"]["match"])
+        self.assertEqual(alignment["payload"]["config_project_id"], "config-project")
+        self.assertEqual(alignment["payload"]["credential_project_id"], "credential-project")
 
     def test_ask_passes_prompt_cache_key(self):
         client = self._client()
