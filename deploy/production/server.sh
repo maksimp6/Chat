@@ -20,10 +20,20 @@ require_runtime_secret() {
     IFS= read -r ALICE_SHORT_TOKEN || true
   fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
-  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then
-    IFS= read -r ALICE_PROVIDER_CREDENTIAL_KEY || true
+}
+
+en sure_provider_credential_key() {
+  local key_file="$ROOT_DIR/keys/provider-credentials.key"
+  mkdir -p "$(dirname "$key_file")"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" && -s "$key_file" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(cat "$key_file")"
   fi
-  [[ -n "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]] || die "ALICE_PROVIDER_CREDENTIAL_KEY is required"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(openssl rand -hex 32)"
+    umask 077
+    printf "%s\\n" "$ALICE_PROVIDER_CREDENTIAL_KEY" > "$key_file"
+  fi
+  [[ -n "$ALICE_PROVIDER_CREDENTIAL_KEY" ]] || die "failed to initialize provider credential key"
 }
 
 validate_traefik() {
@@ -44,6 +54,7 @@ deploy() {
   local archive_path="$1"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
   require_runtime_secret
+  ensure_provider_credential_key
   validate_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/production"
 
