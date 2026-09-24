@@ -29,3 +29,14 @@ def test_runtime_credential_resolution_has_no_environment_fallback_path():
     assert "get_conn()" in mixin
     assert "decrypt_secret" in mixin
     assert "provider_credentials" in provider
+
+
+def test_provider_credential_resolution_has_no_environment_fallback():
+    provider = (ROOT / "provider_credentials.py").read_text()
+    routes = (ROOT / "provider_credentials_routes.py").read_text()
+    assert "def _env_key(" not in provider
+    assert "getattr(config, \"API_KEY\"" not in provider
+    assert "CLOUDRU_API_KEY" not in provider
+    assert "_provider_key_from_environment" not in routes
+    assert "_provider_key_id_from_environment" not in routes
+    assert "getattr(config, \"API_KEY\"" not in routes
