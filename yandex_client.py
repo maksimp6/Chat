@@ -38,8 +38,6 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
             "Content-Type": "application/json",
             "OpenAI-Project": config.PROJECT_ID,
         })
-        if config.API_KEY:
-            self.session.headers["Authorization"] = "Api-Key " + config.API_KEY
 
     def _log_request(self, method, url, **kwargs):
         api_logger.info(f"[REQ] {method} {url}")

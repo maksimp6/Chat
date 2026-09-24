@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from trace_manager import ExecutionTrace
 from yandex_client import YandexClientError, YandexResponsesClient
@@ -210,7 +210,7 @@ class TestYandexResponsesPollingTrace(unittest.TestCase):
 
     def test_ask_passes_prompt_cache_key(self):
         client = self._client()
-        client._config = Mock(PROJECT_ID="project", API_KEY="secret")
+        client._config = Mock(PROJECT_ID="project")
         client._resolve_yandex_conv_id = Mock(return_value=None)
         response = self._response({
             "id": "resp-cache-key",
@@ -220,7 +220,13 @@ class TestYandexResponsesPollingTrace(unittest.TestCase):
         })
         client.session.post.return_value = response
         params = {"background": False, "prompt_cache_key": "stable-prefix-v1"}
-        data = client.ask("hello", "test-model", conversation_id="conv-1", params=params)
+        with patch("yandex_client_modules.request_mixin._resolve_global_provider_credential") as resolve_credential:
+            resolve_credential.return_value = Mock(
+                api_key="runtime-provider-secret",
+                project_id="project",
+                trace_key_id="key-1",
+            )
+            data = client.ask("hello", "test-model", conversation_id="conv-1", params=params)
         self.assertEqual(data["id"], "resp-cache-key")
         sent_payload = client.session.post.call_args.kwargs["json"]
         self.assertEqual(sent_payload["prompt_cache_key"], "stable-prefix-v1")
