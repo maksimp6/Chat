@@ -78,13 +78,6 @@ def _fetch_one(db: Any, query: str, params: tuple = ()):
     return db.execute(query, params).fetchone()
 
 
-def _env_key(config: Any, provider: str) -> Optional[str]:
-    if provider == YANDEX:
-        return getattr(config, "API_KEY", None)
-    if provider == CLOUDRU:
-        return getattr(config, "CLOUDRU_API_KEY", None)
-    raise ValueError(f"Unsupported provider: {provider}")
-
 
 def create_schema(db: Any) -> None:
     db.execute("""
@@ -463,57 +456,25 @@ def resolve_client_credential(
     encrypt: Optional[Callable[[str], str]] = None,
     provider: str = YANDEX,
 ) -> ProviderCredential:
-    """Resolve one provider's deployment credential.
-
-    This keeps the historical Yandex call signature intact while allowing
-    explicit provider selection for every new caller.
-    """
-    key = _env_key(config, provider)
-
-    if db is not None:
-        if decrypt is None:
-            existing = _fetch_one(
-                db,
-                "SELECT id FROM provider_credentials WHERE provider = ? AND status = 'active' LIMIT 1",
-                (provider,),
+    """Resolve a provider credential exclusively from persistent storage."""
+    if db is None:
+        raise NoActiveCredentialError(
+            f"No database configured for {provider} provider credential resolution"
+        )
+    if decrypt is None:
+        existing = _fetch_one(
+            db,
+            "SELECT id FROM provider_credentials WHERE provider = ? AND status = 'active' LIMIT 1",
+            (provider,),
+        )
+        if existing:
+            raise CredentialError(
+                f"Active {provider} provider credential exists but encryption is not configured"
             )
-            if existing:
-                raise CredentialError(
-                    f"Active {provider} provider credential exists but encryption is not configured"
-                )
-        else:
-            try:
-                return get_active_credential(db, decrypt, provider=provider)
-            except NoActiveCredentialError:
-                if key and encrypt is not None:
-                    return bootstrap_credential(
-                        db,
-                        key,
-                        str(getattr(config, "PROJECT_ID", "") if provider == YANDEX else ""),
-                        encrypt,
-                        decrypt=decrypt,
-                        provider=provider,
-                        provider_key_id=(
-                            getattr(config, "YANDEX_PROVIDER_KEY_ID", None)
-                            if provider == YANDEX
-                            else getattr(config, "CLOUDRU_API_KEY_ID", None)
-                        ),
-                    )
-
-    if not key:
-        raise NoActiveCredentialError(f"No global {provider} provider key configured")
-
-    return ProviderCredential(
-        api_key=key,
-        project_id=str(getattr(config, "PROJECT_ID", "") if provider == YANDEX else ""),
-        provider=provider,
-        provider_key_id=(
-            getattr(config, "YANDEX_PROVIDER_KEY_ID", None)
-            if provider == YANDEX
-            else getattr(config, "CLOUDRU_API_KEY_ID", None)
-        ),
-        fingerprint=fingerprint_key(key),
-    )
+        raise NoActiveCredentialError(
+            f"No global {provider} provider key configured"
+        )
+    return get_active_credential(db, decrypt, provider=provider)
 
 
 def list_provider_credentials(

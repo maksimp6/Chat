@@ -50,6 +50,29 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
     assert "yandex" in serialized
 
 
+def test_status_without_active_credentials_does_not_use_removed_config_key(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+    db.DB_PATH = str(tmp_path / "status-empty.db")
+    db.init_db()
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
+    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "true")
+    monkeypatch.delattr(routes.config, "API_KEY", raising=False)
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.get("/api/provider-credentials/status")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    statuses = {item["provider"]: item for item in payload["providers"]}
+    assert statuses["yandex"]["status"] == "not_configured"
+    assert statuses["cloudru"]["status"] == "not_configured"
+
+
 def test_update_validates_before_persisting_and_clears_frontend_contract(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
