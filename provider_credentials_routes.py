@@ -97,10 +97,10 @@ def _cloudru_ttl() -> timedelta:
     return timedelta(days=days)
 
 
-def _provider_client(provider: str):
+def _provider_client(provider: str, project_id: str | None = None):
     if provider == YANDEX:
         return YandexApiKeyProvider(
-            project_id=config.PROJECT_ID,
+            project_id=project_id or config.PROJECT_ID,
             ai_endpoint=config.BASE_URL,
         )
     if provider == CLOUDRU:
@@ -215,7 +215,7 @@ def _perform_health_check(provider: str) -> dict:
     if credential is None:
         return {"status": "not_configured", "error": None}
     if provider == YANDEX:
-        _provider_client(provider).validate_key(credential.api_key)
+        _provider_client(provider, credential.project_id).validate_key(credential.api_key)
         error = None
         status = "configured"
     else:
@@ -421,12 +421,22 @@ def update_provider_credentials():
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
 
+    yandex_api_key = data.get("yandex_api_key")
+    yandex_project_id = data.get("yandex_project_id")
     values = (
-        (YANDEX, data.get("yandex_api_key")),
+        (YANDEX, yandex_api_key),
         (CLOUDRU, data.get("cloudru_api_key")),
     )
     supplied = [(provider, value.strip()) for provider, value in values
                 if isinstance(value, str) and value.strip()]
+    if isinstance(yandex_api_key, str) and yandex_api_key.strip():
+        if not isinstance(yandex_project_id, str) or not yandex_project_id.strip():
+            return jsonify({"error": "yandex_project_id_required", "provider": YANDEX,
+                            "detail": "Yandex Cloud Project ID is required together with the API key."}), 400
+        yandex_project_id = yandex_project_id.strip()
+    elif isinstance(yandex_project_id, str) and yandex_project_id.strip():
+        return jsonify({"error": "yandex_api_key_required", "provider": YANDEX,
+                        "detail": "Yandex Cloud API key is required together with the Project ID."}), 400
     if not supplied:
         return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
     if any(len(value) > 4096 for _, value in supplied):
@@ -434,7 +444,7 @@ def update_provider_credentials():
 
     try:
         for provider, api_key in supplied:
-            client = _provider_client(provider)
+            client = _provider_client(provider, yandex_project_id if provider == YANDEX else None)
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
@@ -468,7 +478,7 @@ def update_provider_credentials():
                 replace_active_credential(
                     conn,
                     api_key,
-                    config.PROJECT_ID if provider == YANDEX else "",
+                    yandex_project_id if provider == YANDEX else "",
                     encrypt_secret,
                     provider,
                     provider_key_id=None,
