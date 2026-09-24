@@ -116,9 +116,11 @@ StrictModes yes
 EOF
 
   cat > "$dockerfile" <<'EOF'
-FROM alpine:3.22
-RUN apk add --no-cache openssh-server && \
-    adduser -D -h /home/alice-runtime alice-runtime && \
+FROM debian:bookworm-slim
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssh-server coreutils && \
+    rm -rf /var/lib/apt/lists/* && \
+    useradd --create-home --shell /bin/bash alice-runtime && \
     mkdir -p /home/alice-runtime/.ssh /run/sshd && \
     chown -R alice-runtime:alice-runtime /home/alice-runtime
 COPY sshd_config /etc/ssh/sshd_config
@@ -241,12 +243,12 @@ PY
   docker cp "$runtime_client_key" "$container:/tmp/alice-runtime-id_ed25519" >/dev/null
   docker cp "$runtime_known_hosts" "$container:/tmp/alice-runtime-known_hosts" >/dev/null
   docker cp "$smoke_script" "$container:/tmp/alice-runtime-smoke.py" >/dev/null
-  docker exec "$container" chmod 644 \
+  docker exec -u 0 "$container" chmod 600 \
     /tmp/alice-runtime-id_ed25519 \
     /tmp/alice-runtime-known_hosts
   local runtime_targets_json
   runtime_targets_json="{\"preview-runtime\":{\"host\":\"$runtime_container\",\"port\":22,\"default_user\":\"alice-runtime\",\"allowed_users\":[\"alice-runtime\"],\"identity_map\":{\"preview-runtime-owner\":\"alice-runtime\"},\"workspace_root\":\"/home/alice-runtime\",\"identity_file\":\"/tmp/alice-runtime-id_ed25519\",\"known_hosts\":\"/tmp/alice-runtime-known_hosts\",\"command_timeout_seconds\":30}}"
-  docker exec \
+  docker exec -u 0 \
     -e "ALICE_SSH_TARGETS_JSON=$runtime_targets_json" \
     -e "ALICE_SSH_KNOWN_HOSTS=/tmp/alice-runtime-known_hosts" \
     "$container" python /tmp/alice-runtime-smoke.py
