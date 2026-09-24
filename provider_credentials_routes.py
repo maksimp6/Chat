@@ -97,22 +97,6 @@ def _cloudru_ttl() -> timedelta:
     return timedelta(days=days)
 
 
-def _provider_key_from_environment(provider: str) -> str | None:
-    if provider == YANDEX:
-        return getattr(config, "API_KEY", None)
-    if provider == CLOUDRU:
-        return None
-    raise ValueError(f"Unsupported provider: {provider}")
-
-
-def _provider_key_id_from_environment(provider: str) -> str | None:
-    if provider == YANDEX:
-        return getattr(config, "YANDEX_PROVIDER_KEY_ID", None)
-    if provider == CLOUDRU:
-        return None
-    raise ValueError(f"Unsupported provider: {provider}")
-
-
 def _provider_client(provider: str):
     if provider == YANDEX:
         return YandexApiKeyProvider(
@@ -134,19 +118,9 @@ def _load_credential(provider: str) -> ProviderCredential | None:
                 provider=provider,
             )
         except NoActiveCredentialError:
-            key = _provider_key_from_environment(provider)
-            if not key:
-                return None
-            return ProviderCredential(
-                api_key=key,
-                provider=provider,
-                project_id=config.PROJECT_ID if provider == YANDEX else "",
-                provider_key_id=_provider_key_id_from_environment(provider),
-                fingerprint=fingerprint_key(key),
-            )
+            return None
     finally:
         conn.close()
-
 
 def _metadata(credential: ProviderCredential | None) -> dict:
     if credential is None:
@@ -221,42 +195,14 @@ def _status_for(provider: str) -> dict:
                 if row["last_checked_at"] else None,
         }
 
-    env_key = _provider_key_from_environment(provider)
-    if not env_key:
-        return {
-            "provider": provider,
-            "status": "not_configured",
-            "authorization_ok": False,
-            "error": None,
-            "credential": _metadata(None),
-            "rotation": {
-                "supported": False,
-                "due": False,
-                "active_key_verified": False,
-            },
-            "last_checked_at": None,
-        }
-
-    fingerprint = fingerprint_key(env_key)
-    key_id = _provider_key_id_from_environment(provider)
-    client = _provider_client(provider)
-    supported = bool(
-        getattr(client, "rotation_supported", lambda _key_id: False)(key_id)
-    )
     return {
         "provider": provider,
-        "status": "checking",
+        "status": "not_configured",
         "authorization_ok": False,
         "error": None,
-        "credential": {
-            "configured": True,
-            "fingerprint": fingerprint,
-            "provider_key_id": key_id,
-            "issued_at": None,
-            "expires_at": None,
-        },
+        "credential": _metadata(None),
         "rotation": {
-            "supported": supported,
+            "supported": False,
             "due": False,
             "active_key_verified": False,
         },
@@ -525,7 +471,7 @@ def update_provider_credentials():
                     config.PROJECT_ID if provider == YANDEX else "",
                     encrypt_secret,
                     provider,
-                    provider_key_id=_provider_key_id_from_environment(provider),
+                    provider_key_id=None,
                     ttl=timedelta(hours=12),
                 )
                 record_health_check(
