@@ -30,6 +30,8 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       DEPLOY_REF: ${{ inputs.ref }}
     steps:
       - name: Validate deployment configuration
@@ -39,6 +41,8 @@ jobs:
           test -n "$PREVIEW_SSH_USER"
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
           test -n "$PREVIEW_SSH_KNOWN_HOSTS"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
       - name: Check out ref
         uses: actions/checkout@v4
         with:
@@ -96,7 +100,11 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          printf '%s\n' "$ALICE_SHORT_TOKEN" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
+          {
+            printf '%s\n' "$ALICE_SHORT_TOKEN"
+            printf '%s\n' "$SUPABASE_URL"
+            printf '%s\n' "$SUPABASE_SERVICE_ROLE_KEY"
+          } | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; read -r supabase_url; read -r supabase_service_key; export ALICE_SHORT_TOKEN=\"\$token\" SUPABASE_URL=\"\$supabase_url\" SUPABASE_SERVICE_ROLE_KEY=\"\$supabase_service_key\"; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
       - name: Wait for trusted HTTPS certificate and health
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
