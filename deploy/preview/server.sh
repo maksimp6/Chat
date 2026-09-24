@@ -172,6 +172,8 @@ runtime_smoke() {
   }
   trap cleanup_runtime_smoke EXIT
 
+  prepare_runtime_smoke "$key" "$workdir"
+
   docker cp "$runtime_client_key" "$container:/tmp/alice-runtime-id_ed25519" >/dev/null
   docker cp "$runtime_known_hosts" "$container:/tmp/alice-runtime-known_hosts" >/dev/null
   docker cp "$smoke_script" "$container:/tmp/alice-runtime-smoke.py" >/dev/null
