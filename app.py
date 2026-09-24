@@ -26,7 +26,7 @@ from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 install_short_token_auth(app)
 
 
