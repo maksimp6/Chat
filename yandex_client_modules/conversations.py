@@ -42,6 +42,21 @@ class YandexConversationMixin:
                 )
             raise YandexClientError("Create conv: " + str(e))
 
+    def bind_conversation(self, local_id, yandex_id):
+        if not local_id or not yandex_id:
+            raise ValueError("local_id and yandex_id are required")
+        conn = database.get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO conv_yandex_map (local_id, yandex_id)
+                   VALUES (?, ?)
+                   ON CONFLICT(local_id) DO UPDATE SET yandex_id = excluded.yandex_id""",
+                (str(local_id), str(yandex_id)),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def _resolve_yandex_conv_id(self, conv_id):
         if not conv_id:
             return None
