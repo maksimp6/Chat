@@ -387,7 +387,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     monkeypatch.setattr(
         routes,
         "_provider_client",
-        lambda provider: type(
+        lambda provider, project_id=None: type(
             "Provider",
             (),
             {"validate_key": lambda self, key: validated.append((provider, key)),
