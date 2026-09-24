@@ -18,7 +18,7 @@ class _Response:
 
 class SupabaseTraceMirrorTests(unittest.TestCase):
     def tearDown(self):
-        for name in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_ANON_KEY"):
+        for name in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_ANON_KEY"):
             os.environ.pop(name, None)
 
     def test_disabled_without_secret_key(self):
