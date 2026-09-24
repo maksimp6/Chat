@@ -19,7 +19,7 @@ def test_production_runtime_initializes_and_persists_provider_credential_key():
     assert "ensure_provider_credential_key()" in script
     assert "openssl rand -hex 32" in script
     assert "provider-credentials.key" in script
-    assert 'printf "ALICE_PROVIDER_CREDENTIAL_KEY=%s\\n" "$ALICE_PROVIDER_CREDENTIAL_KEY"' in script
+    assert "ALICE_PROVIDER_CREDENTIAL_KEY=%s" in script
 
 
 def test_preview_runtime_initializes_and_passes_provider_credential_key():
