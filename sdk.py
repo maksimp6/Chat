@@ -46,8 +46,8 @@ class AliceSDK:
 
 # Пример использования
 if __name__ == "__main__":
-    from config import Config
-    sdk = AliceSDK(Config.API_KEY, Config.PROJECT_ID)
+    import os
+    sdk = AliceSDK(os.environ["YANDEX_API_KEY"], os.environ["YANDEX_PROJECT_ID"])
     
     # Создать диалог
     conv = sdk.create_conversation()
