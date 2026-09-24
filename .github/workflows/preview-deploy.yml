@@ -172,6 +172,14 @@ jobs:
             fi
             echo "Dozzle logs OK: $domain"
           done
+      - name: Verify SSH Runtime
+        env:
+          KEY: ${{ steps.preview.outputs.key }}
+          REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
+        run: |
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes \
+            "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" \
+            "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' runtime-smoke '$KEY'"
       - name: Comment preview URL
         if: success() && github.event_name == 'pull_request'
         env:
