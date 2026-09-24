@@ -83,8 +83,8 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote preview directory
@@ -204,8 +204,8 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote preview directory
@@ -236,8 +236,8 @@ jobs:
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
-          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
-          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
+          printf '%s' "$PREVIEW_SSH_PRIVATE_KEY" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$PREVIEW_SSH_KNOWN_HOSTS" | awk '{gsub(/\\\\n/, "\n"); gsub(/\\\\r/, ""); print}' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
       - name: Resolve remote preview directory
