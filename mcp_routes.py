@@ -1,7 +1,6 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 from flask import Blueprint, request, jsonify
 import logging
-import uuid
 import json as _json
 from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
@@ -369,17 +368,39 @@ def conversations():
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         client = AliceClient(Config)
+        creation_trace = ExecutionTrace()
+        creation_trace.set_request({
+            "operation": "create_conversation",
+            "model": data.get("model", "aliceai-llm"),
+        })
         try:
-            y_conv = client.create_conversation()
-            conv_id = y_conv.get('id') or str(uuid.uuid4())
-        except Exception:
-            conv_id = str(uuid.uuid4())
+            y_conv = client.create_conversation(execution_trace=creation_trace)
+            conv_id = y_conv.get("id") if isinstance(y_conv, dict) else None
+            if not conv_id:
+                raise RuntimeError("Yandex conversation creation returned no ID")
+        except Exception as exc:
+            creation_trace.record_error("conversation_create", str(exc), exception=exc)
+            logger.exception("[CONVERSATION] Yandex conversation creation failed")
+            return jsonify({
+                "error": "conversation_creation_failed",
+                "message": str(exc),
+                "trace": creation_trace.finalize(),
+            }), 502
         title = data.get('title') or 'Новый чат'
         model = data.get('model', 'aliceai-llm')
         create_conversation(conv_id, title, model)
         if owner_id:
             set_owner(conv_id, owner_id)
-        return jsonify({"id": conv_id, "title": title, "model": model}), 201
+        creation_trace.add_event("conversation_local_persisted", {
+            "conversation_id": conv_id,
+            "model": model,
+        })
+        return jsonify({
+            "id": conv_id,
+            "title": title,
+            "model": model,
+            "trace": creation_trace.finalize(),
+        }), 201
 
     if owner_id:
         return jsonify({"conversations": list_owned_conversations(owner_id)})
