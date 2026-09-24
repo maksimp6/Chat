@@ -27,6 +27,7 @@ class SSHTarget:
     allowed_users: tuple[str, ...] = ()
     identity_file: Optional[str] = None
     known_hosts: Optional[str] = None
+    identity_map: tuple[tuple[str, str], ...] = ()
     connect_timeout_seconds: float = 10.0
     command_timeout_seconds: float = 30.0
 
@@ -81,6 +82,18 @@ class SSHRuntime:
             if not isinstance(allowed, (list, tuple)):
                 raise SSHRuntimeError(f"SSH target '{name}' has invalid allowed_users")
 
+            identity_map = cfg.get("identity_map") or {}
+            if not isinstance(identity_map, Mapping):
+                raise SSHRuntimeError(f"SSH target '{name}' has invalid identity_map")
+            normalized_identity_map = []
+            for identity_id, linux_user in identity_map.items():
+                normalized_identity_map.append(
+                    (
+                        str(identity_id).strip(),
+                        SSHRuntime._validate_linux_user(str(linux_user).strip()),
+                    )
+                )
+
             result[str(name)] = SSHTarget(
                 name=str(name),
                 host=host,
@@ -89,6 +102,7 @@ class SSHRuntime:
                 allowed_users=tuple(str(user).strip() for user in allowed if str(user).strip()),
                 identity_file=(str(cfg["identity_file"]).strip() if cfg.get("identity_file") else None),
                 known_hosts=(str(cfg["known_hosts"]).strip() if cfg.get("known_hosts") else None),
+                identity_map=tuple(normalized_identity_map),
                 connect_timeout_seconds=float(cfg.get("connect_timeout_seconds", 10.0)),
                 command_timeout_seconds=float(cfg.get("command_timeout_seconds", 30.0)),
             )
@@ -103,12 +117,28 @@ class SSHRuntime:
             raise SSHRuntimeError("Linux user contains unsupported characters")
         return value
 
-    def _resolve_target(self, target_name: str, linux_user: Optional[str]) -> tuple[SSHTarget, str]:
+    def _resolve_target(
+        self,
+        target_name: str,
+        linux_user: Optional[str],
+        identity_id: Optional[str] = None,
+    ) -> tuple[SSHTarget, str]:
         target = self._targets.get(str(target_name))
         if target is None:
             raise SSHRuntimeError(f"Unknown SSH target: {target_name}")
 
-        user = self._validate_linux_user(linux_user or target.default_user or "")
+        mapped_users = dict(target.identity_map)
+        if linux_user:
+            user = self._validate_linux_user(linux_user)
+        elif identity_id and mapped_users:
+            user = self._validate_linux_user(mapped_users.get(str(identity_id), ""))
+        elif identity_id and target.identity_map:
+            raise SSHRuntimeError(
+                f"Identity '{identity_id}' has no Linux user mapping on target '{target.name}'"
+            )
+        else:
+            user = self._validate_linux_user(target.default_user or "")
+
         if target.allowed_users and user not in target.allowed_users:
             raise SSHRuntimeError(
                 f"Linux user '{user}' is not allowed on SSH target '{target.name}'"
@@ -161,12 +191,13 @@ class SSHRuntime:
         command: str,
         linux_user: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
+        identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
         command = str(command or "").strip()
         if not command:
             raise SSHRuntimeError("Command is required")
 
-        resolved_target, user = self._resolve_target(target, linux_user)
+        resolved_target, user = self._resolve_target(target, linux_user, identity_id)
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
         if timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
@@ -206,6 +237,7 @@ class SSHRuntime:
         path: str,
         linux_user: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
+        identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
         result = self.execute(
@@ -213,6 +245,7 @@ class SSHRuntime:
             linux_user=linux_user,
             command=f"cat -- {shlex.quote(remote_path)}",
             timeout_seconds=timeout_seconds,
+            identity_id=identity_id,
         )
         result.update({"path": remote_path, "operation": "read_file"})
         return result
@@ -225,6 +258,7 @@ class SSHRuntime:
         content: str,
         linux_user: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
+        identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
         parent = str(PurePosixPath(remote_path).parent)
@@ -241,7 +275,7 @@ class SSHRuntime:
             "trap - EXIT"
         )
 
-        resolved_target, user = self._resolve_target(target, linux_user)
+        resolved_target, user = self._resolve_target(target, linux_user, identity_id)
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
         if timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
