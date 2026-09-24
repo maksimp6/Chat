@@ -24,8 +24,19 @@ require_key() { [[ "$KEY" =~ ^[a-z0-9-]{1,50}$ ]] || die "invalid preview key: $
 require_short_token() {
   if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then IFS= read -r ALICE_SHORT_TOKEN || true; fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
-  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then IFS= read -r ALICE_PROVIDER_CREDENTIAL_KEY || true; fi
-  [[ -n "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]] || die "ALICE_PROVIDER_CREDENTIAL_KEY is required"
+}
+ensure_provider_credential_key() {
+  local key_file="$ROOT_DIR/keys/provider-credentials.key"
+  mkdir -p "$(dirname "$key_file")"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" && -s "$key_file" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(cat "$key_file")"
+  fi
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(openssl rand -hex 32)"
+    umask 077
+    printf "%s\\n" "$ALICE_PROVIDER_CREDENTIAL_KEY" > "$key_file"
+  fi
+  [[ -n "$ALICE_PROVIDER_CREDENTIAL_KEY" ]] || die "failed to initialize provider credential key"
 }
 ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then docker network create "$NETWORK_NAME" >/dev/null; fi; }
 
@@ -70,7 +81,7 @@ deploy() {
   [[ "$archive_path" == "$ROOT_DIR/incoming/"*.tar.gz ]] || die "archive must be inside $ROOT_DIR/incoming"
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
-  require_short_token; ensure_traefik
+  require_short_token; ensure_provider_credential_key; ensure_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
   local workdir="${ROOT_DIR}/previews/${key}"
   local builddir="${workdir}/build"
