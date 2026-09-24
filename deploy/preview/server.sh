@@ -268,6 +268,12 @@ PY
       break
     fi
     if [ "$attempt" -eq 20 ]; then
+      echo "SSH Runtime container state:" >&2
+      docker inspect --format '{{json .State}}' "$runtime_container" >&2 || true
+      echo "SSH Runtime container logs:" >&2
+      docker logs --tail 120 "$runtime_container" >&2 || true
+      echo "SSH Runtime sshd config validation:" >&2
+      docker exec -u 0 "$runtime_container" /usr/sbin/sshd -t >&2 || true
       die "isolated SSH Runtime target did not become ready"
     fi
     sleep 1
