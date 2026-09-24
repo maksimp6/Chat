@@ -64,11 +64,17 @@ ensure_traefik() {
   docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$ACME_DIR:/letsencrypt" "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL" --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json --certificatesresolvers.letsencrypt.acme.httpchallenge=true --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web --api.dashboard=false --accesslog=false >/dev/null
 }
 
+clear_dozzle_data() {
+  local dozzle_data="$1"
+  mkdir -p "$dozzle_data"
+  docker run --rm --user 0 -v "$dozzle_data:/data" --entrypoint sh "$DOZZLE_IMAGE" -c 'rm -rf /data/* /data/.[!.]* /data/..?*' >/dev/null 2>&1 || true
+}
+
 cleanup_key() {
   local key="$1"; local container="${CONTAINER_PREFIX}-${key}"; local image="${IMAGE_PREFIX}:${key}"; local workdir="${ROOT_DIR}/previews/${key}"; local archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
   docker rm -f "$container" >/dev/null 2>&1 || true
   local dozzle_container="${container}-dozzle"
-  docker exec -u 0 "$dozzle_container" sh -c "rm -rf /data/* /data/.[!.]* /data/..?*" >/dev/null 2>&1 || true
+  clear_dozzle_data "$workdir/dozzle"
   docker rm -f "$dozzle_container" >/dev/null 2>&1 || true
   docker image rm "$image" >/dev/null 2>&1 || true
   rm -rf -- "$workdir"
@@ -90,6 +96,7 @@ deploy() {
   local container="${CONTAINER_PREFIX}-${key}"
   local image="${IMAGE_PREFIX}:${key}"
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
+  clear_dozzle_data "$workdir/dozzle"
   rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
