@@ -34,6 +34,9 @@ def _resolve_global_provider_credential(client, execution_trace=None):
     finally:
         conn.close()
 
+    if not credential.api_key or not credential.project_id:
+        raise YandexClientError("Yandex API key and project_id must be configured together")
+
     client.session.headers.update({
         "Authorization": "Api-Key " + credential.api_key,
         "OpenAI-Project": credential.project_id,
