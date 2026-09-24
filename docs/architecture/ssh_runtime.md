@@ -27,6 +27,8 @@ Example configuration:
 
 Set it through ALICE_SSH_TARGETS_JSON. Host-key verification requires known_hosts either per target or through ALICE_SSH_KNOWN_HOSTS.
 
+The Alice Pro application image must provide the OpenSSH client. The remote Linux target must provide the POSIX tools used by Runtime plus GNU coreutils timeout.
+
 ## Tools
 
 - ssh_runtime_exec: execute a remote shell command. High risk and requires approval.
