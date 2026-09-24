@@ -130,16 +130,17 @@ class SSHRuntime:
         mapped_users = dict(target.identity_map)
         if linux_user:
             user = self._validate_linux_user(linux_user)
+        elif mapped_users:
+            if not identity_id:
+                raise SSHRuntimeError("Trusted Alice identity is required for this SSH target")
+            mapped = mapped_users.get(str(identity_id))
+            if not mapped:
+                raise SSHRuntimeError(
+                    f"Identity '{identity_id}' has no Linux user mapping on target '{target.name}'"
+                )
+            user = self._validate_linux_user(mapped)
         elif identity_id:
-            if mapped_users:
-                mapped = mapped_users.get(str(identity_id))
-                if not mapped:
-                    raise SSHRuntimeError(
-                        f"Identity '{identity_id}' has no Linux user mapping on target '{target.name}'"
-                    )
-                user = self._validate_linux_user(mapped)
-            else:
-                user = self._validate_linux_user(target.default_user or "")
+            user = self._validate_linux_user(target.default_user or "")
         else:
             user = self._validate_linux_user(target.default_user or "")
 
