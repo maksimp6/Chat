@@ -370,6 +370,16 @@ class UniversalToolExecutor:
         if trace is None:
             return self.execute(call, **hooks)
 
+        definition = self.registry.get_universal_definition(call.tool_name)
+        trace_arguments = dict(call.arguments)
+        if definition is not None:
+            redact = set(
+                dict(definition.metadata or {}).get("trace_redact_arguments") or ()
+            )
+            for key in redact:
+                if key in trace_arguments:
+                    trace_arguments[key] = "<redacted>"
+
         traced_call = replace(
             call,
             metadata={
@@ -383,6 +393,7 @@ class UniversalToolExecutor:
             lambda: self.execute(traced_call, **hooks),
             call_id=call.call_id,
             step=None,
+            trace_arguments=trace_arguments,
         )
 
     def _execute_remote(
