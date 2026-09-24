@@ -18,7 +18,7 @@ class _Response:
 
 class SupabaseTraceMirrorTests(unittest.TestCase):
     def tearDown(self):
-        for name in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY"):
+        for name in ("SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_ANON_KEY"):
             os.environ.pop(name, None)
 
     def test_disabled_without_secret_key(self):
@@ -43,7 +43,7 @@ class SupabaseTraceMirrorTests(unittest.TestCase):
     @patch("supabase_trace_mirror.urlopen", side_effect=OSError("offline"))
     def test_network_errors_are_swallowed(self, _urlopen):
         os.environ["SUPABASE_URL"] = "https://example.supabase.co"
-        os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "server-secret"
+        os.environ["SUPABASE_SECRET_KEY"] = "server-secret"
         self.assertFalse(supabase_trace_mirror.mirror_trace({"trace_id": "t1"}))
 
 
