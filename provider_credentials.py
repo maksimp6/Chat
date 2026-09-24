@@ -470,9 +470,6 @@ def resolve_client_credential(
     """
     key = _env_key(config, provider)
 
-    if provider == YANDEX and not str(getattr(config, "PROJECT_ID", "") or "").strip():
-        raise CredentialError("Yandex project_id is required together with the API key")
-
     if db is not None:
         if decrypt is None:
             existing = _fetch_one(
@@ -486,7 +483,10 @@ def resolve_client_credential(
                 )
         else:
             try:
-                return get_active_credential(db, decrypt, provider=provider)
+                credential = get_active_credential(db, decrypt, provider=provider)
+                if provider == YANDEX and not credential.project_id.strip():
+                    raise CredentialError("Yandex project_id is required together with the API key")
+                return credential
             except NoActiveCredentialError:
                 if key and encrypt is not None:
                     return bootstrap_credential(
@@ -506,7 +506,7 @@ def resolve_client_credential(
     if not key:
         raise NoActiveCredentialError(f"No global {provider} provider key configured")
 
-    return ProviderCredential(
+    credential = ProviderCredential(
         api_key=key,
         project_id=str(getattr(config, "PROJECT_ID", "") if provider == YANDEX else ""),
         provider=provider,
@@ -517,6 +517,9 @@ def resolve_client_credential(
         ),
         fingerprint=fingerprint_key(key),
     )
+    if provider == YANDEX and not credential.project_id.strip():
+        raise CredentialError("Yandex project_id is required together with the API key")
+    return credential
 
 
 def list_provider_credentials(
