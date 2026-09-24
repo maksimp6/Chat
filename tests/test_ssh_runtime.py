@@ -132,9 +132,10 @@ class SSHRuntimeTests(unittest.TestCase):
         trace = ExecutionTrace()
         call = UniversalToolCall(
             tool_name="ssh_runtime_exec",
-            arguments={"target": "preview", "linux_user": "alice-agent", "timeout_seconds": 10, "command": "echo secret"},
+            arguments={"target": "preview", "timeout_seconds": 10, "command": "echo secret"},
             transport="responses_api",
             call_id="call-1",
+            user_id="owner-1",
         )
         run.return_value.returncode = 0
         run.return_value.stdout = "ok\\n"
