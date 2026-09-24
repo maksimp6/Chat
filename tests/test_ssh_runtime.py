@@ -194,7 +194,7 @@ class SSHRuntimeTests(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertEqual(trace.trace["tool_calls"][0]["arguments"]["command"], "<redacted>")
-        self.assertEqual(trace.trace["tool_calls"][0]["result"]["stdout"], "<redacted>")
+        self.assertEqual(trace.trace["tool_calls"][0]["result"]["data"]["stdout"], "<redacted>")
         self.assertEqual(
             [event["type"] for event in trace.trace["events"] if event["type"].startswith("runtime_")],
             ["runtime_started", "runtime_finished"],
