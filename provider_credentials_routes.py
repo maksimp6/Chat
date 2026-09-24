@@ -99,8 +99,10 @@ def _cloudru_ttl() -> timedelta:
 
 def _provider_client(provider: str, project_id: str | None = None):
     if provider == YANDEX:
+        if not isinstance(project_id, str) or not project_id.strip():
+            raise CredentialError("Yandex project_id is required for provider client")
         return YandexApiKeyProvider(
-            project_id=project_id or config.PROJECT_ID,
+            project_id=project_id.strip(),
             ai_endpoint=config.BASE_URL,
         )
     if provider == CLOUDRU:
@@ -181,7 +183,7 @@ def _status_for(provider: str) -> dict:
             "rotation": {
                 "supported": bool(
                     getattr(
-                        _provider_client(provider),
+                        _provider_client(provider, row["project_id"]),
                         "rotation_supported",
                         lambda _key_id: False,
                     )(credential["provider_key_id"])
@@ -214,22 +216,21 @@ def _perform_health_check(provider: str) -> dict:
     credential = _load_credential(provider)
     if credential is None:
         return {"status": "not_configured", "error": None}
-    if provider == YANDEX:
-        _provider_client(provider, credential.project_id).validate_key(credential.api_key)
-        error = None
-        status = "configured"
-    else:
-        try:
-            _provider_client(provider).validate_key(credential.api_key)
-        except PermissionError:
-            error = "unauthorized"
-            status = "invalid"
-        except Exception:
-            error = "provider_unavailable"
-            status = "unavailable"
+    try:
+        if provider == YANDEX:
+            _provider_client(provider, credential.project_id).validate_key(credential.api_key)
         else:
-            error = None
-            status = "connected"
+            _provider_client(provider).validate_key(credential.api_key)
+        error = None
+        status = "connected"
+    except PermissionError as exc:
+        logger.exception("Provider health check authorization failed: provider=%s", provider)
+        error = str(exc)
+        status = "invalid"
+    except Exception as exc:
+        logger.exception("Provider health check failed: provider=%s", provider)
+        error = str(exc)
+        status = "unavailable"
 
     conn = get_conn()
     try:
@@ -417,7 +418,11 @@ def update_provider_credentials():
     guard = _guard()
     if guard:
         return guard
-    data = request.get_json(silent=True)
+    try:
+        data = request.get_json(silent=False)
+    except Exception as exc:
+        logger.exception("Invalid provider credentials JSON payload")
+        return jsonify({"error": "invalid_json", "detail": str(exc)}), 400
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
 
@@ -458,16 +463,13 @@ def update_provider_credentials():
                     "provider": provider,
                     "status": "invalid",
                 }), 401
-            except Exception:
-                logger.debug(
-                    "provider credential validation failed: provider=%s",
-                    provider,
-                    exc_info=True,
-                )
+            except Exception as exc:
+                logger.exception("provider credential validation failed: provider=%s", provider)
                 return jsonify({
                     "error": "provider_health_check_failed",
                     "provider": provider,
                     "status": "invalid",
+                    "detail": str(exc),
                 }), 502
             else:
                 logger.debug("provider credential accepted for storage: provider=%s", provider)
