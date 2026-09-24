@@ -12,7 +12,8 @@ load_dotenv(_ENV_FILE)
 
 # Keep compatibility with the legacy YC_API_KEY name while preferring the
 # canonical YANDEX_API_KEY variable. Never put credentials in source code.
-API_KEY = os.getenv("YANDEX_API_KEY") or os.getenv("YC_API_KEY")
+# Provider credentials are resolved at runtime from provider_credentials.
+# No provider API key belongs in application configuration.
 
 PROJECT_ID = os.getenv("YANDEX_PROJECT_ID", "b1g1fekh2198nuan1tnh")
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
@@ -56,7 +57,6 @@ AUDIO_TTS_PRICE_PER_SEC = 0.0203
 
 
 class Config:
-    API_KEY = API_KEY
     PROJECT_ID = PROJECT_ID
     BASE_URL = BASE_URL
     CLOUDRU_BASE_URL = CLOUDRU_BASE_URL
