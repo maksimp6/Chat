@@ -157,6 +157,15 @@ runtime_smoke() {
   local smoke_script="$runtime_dir/smoke.py"
 
   docker inspect "$container" >/dev/null 2>&1 || die "preview container not found: $container"
+
+  cleanup_runtime_smoke() {
+    docker exec "$container" rm -f       /tmp/alice-runtime-id_ed25519       /tmp/alice-runtime-known_hosts       /tmp/alice-runtime-smoke.py >/dev/null 2>&1 || true
+    rm -rf -- "$runtime_dir"
+    docker rm -f "$runtime_container" >/dev/null 2>&1 || true
+    docker image rm "$RUNTIME_IMAGE_PREFIX:$key" >/dev/null 2>&1 || true
+  }
+  trap cleanup_runtime_smoke EXIT
+
   prepare_runtime_smoke "$key" "$workdir"
 
   cat > "$smoke_script" <<'PY'
