@@ -244,7 +244,7 @@ def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
         def validate_key(self, api_key):
             raise PermissionError("Yandex authorization failed (HTTP 401)")
 
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
     app.testing = True
@@ -252,7 +252,7 @@ def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "invalid-key"},
+            json={"yandex_api_key": "invalid-key", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 401
@@ -316,7 +316,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "static-yandex-key"},
+            json={"yandex_api_key": "static-yandex-key", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 200
