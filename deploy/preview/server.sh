@@ -138,10 +138,13 @@ EOF
   log "building isolated SSH Runtime target $runtime_container"
   docker build --pull -q -t "$runtime_image" "$runtime_dir" >/dev/null
   log "starting isolated SSH Runtime target $runtime_container"
-  docker run -d --name "$runtime_container" --restart unless-stopped --network "$NETWORK_NAME" \
+  local expires_at
+  expires_at="$(docker inspect -f '{{ index .Config.Labels "alice.preview.expires_at" }}' "$CONTAINER_PREFIX-$key" 2>/dev/null || true)"
+  docker run -d --name "$runtime_container" --network "$NETWORK_NAME" \
     --label "alice.preview=true" \
     --label "alice.preview.key=$key" \
     --label "alice.preview.runtime=true" \
+    --label "alice.preview.expires_at=$expires_at" \
     "$runtime_image" >/dev/null
 }
 
@@ -157,86 +160,6 @@ runtime_smoke() {
   local smoke_script="$runtime_dir/smoke.py"
 
   docker inspect "$container" >/dev/null 2>&1 || die "preview container not found: $container"
-
-  cleanup_runtime_smoke() {
-    docker exec "$container" rm -f       /tmp/alice-runtime-id_ed25519       /tmp/alice-runtime-known_hosts       /tmp/alice-runtime-smoke.py >/dev/null 2>&1 || true
-    rm -rf -- "$runtime_dir"
-    docker rm -f "$runtime_container" >/dev/null 2>&1 || true
-    docker image rm "$RUNTIME_IMAGE_PREFIX:$key" >/dev/null 2>&1 || true
-  }
-  trap cleanup_runtime_smoke EXIT
-
-  prepare_runtime_smoke "$key" "$workdir"
-
-  cat > "$smoke_script" <<'PY'
-from trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
-from tool_registry import registry
-
-OWNER = "preview-runtime-owner"
-TARGET = "preview-runtime"
-PATH = "/home/alice-runtime/alice-runtime-smoke.txt"
-CONTENT = "ALICE_RUNTIME_SMOKE_OK\n"
-
-
-def invoke(name, arguments, approved):
-    trace = ExecutionTrace()
-    call = UniversalToolCall(
-        tool_name=name,
-        arguments=arguments,
-        transport="internal",
-        call_id=f"preview-smoke-{name}",
-        user_id=OWNER,
-        approved=approved,
-    )
-    result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
-    if not result.get("success"):
-        raise AssertionError(f"{name} failed: {result.get('error')}")
-    return result, trace
-
-
-exec_result, exec_trace = invoke(
-    "ssh_runtime_exec",
-    {"target": TARGET, "timeout_seconds": 10, "command": "id -un"},
-    True,
-)
-assert exec_result["data"]["linux_user"] == "alice-runtime"
-assert exec_result["data"]["stdout"].strip() == "alice-runtime"
-assert any(
-    event.get("type") == "runtime_finished"
-    and event.get("payload", {}).get("linux_user") == "alice-runtime"
-    for event in exec_trace.trace["events"]
-)
-assert exec_trace.trace["tool_calls"][0]["arguments"]["command"] == "<redacted>"
-assert exec_trace.trace["tool_calls"][0]["result"]["stdout"] == "<redacted>"
-
-write_result, write_trace = invoke(
-    "ssh_runtime_write_file",
-    {"target": TARGET, "timeout_seconds": 10, "path": PATH, "content": CONTENT},
-    True,
-)
-assert write_result["data"]["success"] is True
-assert write_result["data"]["linux_user"] == "alice-runtime"
-assert write_trace.trace["tool_calls"][0]["arguments"]["content"] == "<redacted>"
-assert write_trace.trace["tool_calls"][0]["result"]["stdout"] == "<redacted>"
-
-read_result, read_trace = invoke(
-    "ssh_runtime_read_file",
-    {"target": TARGET, "timeout_seconds": 10, "path": PATH},
-    False,
-)
-assert read_result["data"]["stdout"] == CONTENT
-assert read_result["data"]["linux_user"] == "alice-runtime"
-assert read_trace.trace["tool_calls"][0]["result"]["stdout"] == "<redacted>"
-
-cleanup_result, _ = invoke(
-    "ssh_runtime_exec",
-    {"target": TARGET, "timeout_seconds": 10, "command": f"rm -f -- {PATH}"},
-    True,
-)
-assert cleanup_result["data"]["exit_code"] == 0
-print("SSH Runtime Preview smoke passed")
-PY
 
   cleanup_runtime_smoke() {
     docker exec "$container" rm -f \
