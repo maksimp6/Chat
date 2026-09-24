@@ -39,7 +39,6 @@ jobs:
         run: |
           test -n "$ALICE_SHORT_TOKEN"
           test -n "$SUPABASE_URL"
-          test -n "$SUPABASE_ACCESS_TOKEN"
           test -n "$PREVIEW_SSH_HOST"
           test -n "$PREVIEW_SSH_USER"
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
