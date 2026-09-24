@@ -62,18 +62,12 @@ jobs:
           test -n "$PREVIEW_PUBLIC_BASE_URL"
           test -n "$ALICE_SHORT_TOKEN"
           test -n "$SUPABASE_URL"
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v3
-        with:
-          version: latest
       - name: Resolve Supabase runtime API key
         shell: bash
         run: |
-          keys="$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_ID" -o json)"
-          key="$(printf "%s" "$keys" | jq -r '[.[] | select(.type == "secret" and (.disabled != true)) | .api_key] | .[0] // empty')"
-          test -n "$key" || { echo "Supabase runtime API key is unavailable"; exit 1; }
-          echo "::add-mask::$key"
-          printf "SUPABASE_SECRET_KEY=%s\n" "$key" >> "$GITHUB_ENV"
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "Supabase runtime API key is unavailable"; exit 1; }
+          echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+          printf "SUPABASE_SECRET_KEY=%s\n" "$SUPABASE_ACCESS_TOKEN" >> "$GITHUB_ENV"
       - name: Check out ref
         uses: actions/checkout@v4
         with:
