@@ -131,6 +131,7 @@ class SSHRuntimeTests(unittest.TestCase):
             transport="responses_api",
             call_id="call-1",
             user_id="owner-1",
+            approved=True,
         )
         run.return_value.returncode = 0
         run.return_value.stdout = "ok\\n"
