@@ -8,8 +8,8 @@ from ssh_runtime import SSHRuntime, SSHRuntimeError
 runtime = SSHRuntime()
 
 
-def _trace_event(args: dict, event_type: str, payload: dict) -> None:
-    context = args.get("_universal_context")
+def _trace_event(cfg: dict | None, event_type: str, payload: dict) -> None:
+    context = cfg.get("_universal_context") if isinstance(cfg, dict) else None
     call = context.get("call") if isinstance(context, dict) else None
     metadata = getattr(call, "metadata", {}) if call is not None else {}
     trace = metadata.get("execution_trace") if isinstance(metadata, dict) else None
@@ -28,7 +28,7 @@ def _runtime_args(args: dict) -> dict:
 def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     runtime_args = _runtime_args(args)
     command = str(args.get("command") or "")
-    _trace_event(args, "runtime_started", {
+    _trace_event(cfg, "runtime_started", {
         "runtime": "ssh",
         "operation": "execute",
         "target": runtime_args["target"],
@@ -37,7 +37,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     try:
         result = runtime.execute(command=command, **runtime_args)
     except SSHRuntimeError as exc:
-        _trace_event(args, "runtime_failed", {
+        _trace_event(cfg, "runtime_failed", {
             "runtime": "ssh",
             "operation": "execute",
             "target": runtime_args["target"],
@@ -46,7 +46,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         })
         return {"success": False, "error": str(exc)}
 
-    _trace_event(args, "runtime_finished", {
+    _trace_event(cfg, "runtime_finished", {
         "runtime": "ssh",
         "operation": "execute",
         "target": runtime_args["target"],
@@ -59,7 +59,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
 def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     runtime_args = _runtime_args(args)
-    _trace_event(args, "runtime_started", {
+    _trace_event(cfg, "runtime_started", {
         "runtime": "ssh",
         "operation": "read_file",
         "target": runtime_args["target"],
@@ -68,7 +68,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
     try:
         result = runtime.read_file(path=str(args.get("path") or ""), **runtime_args)
     except SSHRuntimeError as exc:
-        _trace_event(args, "runtime_failed", {
+        _trace_event(cfg, "runtime_failed", {
             "runtime": "ssh",
             "operation": "read_file",
             "target": runtime_args["target"],
@@ -77,7 +77,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
         })
         return {"success": False, "error": str(exc)}
 
-    _trace_event(args, "runtime_finished", {
+    _trace_event(cfg, "runtime_finished", {
         "runtime": "ssh",
         "operation": "read_file",
         "target": runtime_args["target"],
@@ -89,7 +89,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
 
 def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any]:
     runtime_args = _runtime_args(args)
-    _trace_event(args, "runtime_started", {
+    _trace_event(cfg, "runtime_started", {
         "runtime": "ssh",
         "operation": "write_file",
         "target": runtime_args["target"],
@@ -102,7 +102,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
             **runtime_args,
         )
     except SSHRuntimeError as exc:
-        _trace_event(args, "runtime_failed", {
+        _trace_event(cfg, "runtime_failed", {
             "runtime": "ssh",
             "operation": "write_file",
             "target": runtime_args["target"],
@@ -111,7 +111,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
         })
         return {"success": False, "error": str(exc)}
 
-    _trace_event(args, "runtime_finished", {
+    _trace_event(cfg, "runtime_finished", {
         "runtime": "ssh",
         "operation": "write_file",
         "target": runtime_args["target"],
