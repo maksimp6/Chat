@@ -30,7 +30,6 @@ class SSHRuntimeTests(unittest.TestCase):
         result = self.runtime().execute(
             target="preview",
             command="id -un",
-            linux_user="alice-agent",
         )
         argv = run.call_args.args[0]
         self.assertEqual(result["linux_user"], "alice-agent")
@@ -48,7 +47,6 @@ class SSHRuntimeTests(unittest.TestCase):
             target="preview",
             path="/srv/alice/config.py",
             content="VALUE = 1\n",
-            linux_user="alice-agent",
         )
         self.assertTrue(result["success"])
         self.assertEqual(run.call_args.kwargs["input"], "VALUE = 1\n")
@@ -63,7 +61,6 @@ class SSHRuntimeTests(unittest.TestCase):
             self.runtime().execute(
                 target="preview",
                 command="sleep 60",
-                linux_user="alice-agent",
             )
 
     def test_unknown_target_is_rejected(self):
@@ -71,7 +68,6 @@ class SSHRuntimeTests(unittest.TestCase):
             self.runtime().execute(
                 target="production",
                 command="id",
-                linux_user="alice-agent",
             )
 
     def test_trusted_identity_maps_to_linux_user(self):
@@ -108,7 +104,6 @@ class SSHRuntimeTests(unittest.TestCase):
             self.runtime().read_file(
                 target="preview",
                 path="../config.py",
-                linux_user="alice-agent",
             )
 
     def test_missing_known_hosts_is_rejected(self):
@@ -118,7 +113,7 @@ class SSHRuntimeTests(unittest.TestCase):
         with self.assertRaises(SSHRuntimeError):
             runtime.execute(target="preview", command="id -un")
 
-    @patch("tests.test_ssh_runtime.subprocess.run")
+    @patch("ssh_runtime.subprocess.run")
     def test_runtime_tool_trace_redacts_command(self, run):
         from trace_manager import ExecutionTrace
         from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
