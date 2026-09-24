@@ -42,7 +42,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         "runtime": "ssh",
         "operation": "execute",
         "target": runtime_args["target"],
-        "linux_user": result.get("linux_user") if "result" in locals() else None,
+        "identity_id": runtime_args["identity_id"],
     })
     try:
         result = runtime.execute(command=command, **runtime_args)
@@ -51,7 +51,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
             "runtime": "ssh",
             "operation": "execute",
             "target": runtime_args["target"],
-            "linux_user": runtime_args["linux_user"],
+            "identity_id": runtime_args["identity_id"],
             "error": str(exc),
         })
         return {"success": False, "error": str(exc)}
@@ -68,7 +68,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
 
 
 def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]:
-    runtime_args = _runtime_args(args)
+    runtime_args = _runtime_args(args, cfg)
     _trace_event(cfg, "runtime_started", {
         "runtime": "ssh",
         "operation": "read_file",
@@ -135,7 +135,6 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
 
 _BASE_PROPERTIES = {
     "target": {"type": "string", "minLength": 1, "maxLength": 128},
-    "linux_user": {"anyOf": [{"type": "string"}, {"type": "null"}]},
     "timeout_seconds": {"anyOf": [{"type": "number"}, {"type": "null"}]},
 }
 
@@ -155,8 +154,8 @@ RUNTIME_TOOLS = {
     "ssh_runtime_exec": {
         "title": "SSH Runtime Execute",
         "description": (
-            "Execute a shell command on a configured SSH target as an allowed Linux user. "
-            "The SSH account and Linux permissions are the authorization boundary."
+            "Execute a shell command on a configured SSH target using the Linux user "
+            "mapped from the trusted Alice identity."
         ),
         "parameters": _schema({
             "command": {"type": "string", "minLength": 1, "maxLength": 20000},
@@ -172,7 +171,7 @@ RUNTIME_TOOLS = {
     },
     "ssh_runtime_read_file": {
         "title": "SSH Runtime Read File",
-        "description": "Read a remote absolute path from a configured SSH target as an allowed Linux user.",
+        "description": "Read a remote absolute path using the Linux user mapped from the trusted Alice identity.",
         "parameters": _schema({
             "path": {"type": "string", "minLength": 1, "maxLength": 4096},
         }),
@@ -186,7 +185,7 @@ RUNTIME_TOOLS = {
     },
     "ssh_runtime_write_file": {
         "title": "SSH Runtime Write File",
-        "description": "Atomically write a remote file on a configured SSH target as an allowed Linux user.",
+        "description": "Atomically write a remote file using the Linux user mapped from the trusted Alice identity.",
         "parameters": _schema({
             "path": {"type": "string", "minLength": 1, "maxLength": 4096},
             "content": {"type": "string", "maxLength": 2000000},
