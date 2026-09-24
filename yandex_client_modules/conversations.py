@@ -1,5 +1,4 @@
 import logging
-import uuid
 import requests
 
 from yandex_client_modules.errors import YandexClientError
@@ -18,7 +17,10 @@ class YandexConversationMixin:
             )
             resp.raise_for_status()
             data = resp.json()
-            api_logger.info(f"[CONV] Created: id={data.get('id')}")
+            yandex_id = data.get("id") if isinstance(data, dict) else None
+            if not yandex_id:
+                raise YandexClientError("Create conv: Yandex response has no conversation id")
+            api_logger.info(f"[CONV] Created: id={yandex_id}")
             return data
         except requests.RequestException as e:
             raise YandexClientError("Create conv: " + str(e))
@@ -28,28 +30,23 @@ class YandexConversationMixin:
             return None
 
         try:
-            return str(uuid.UUID(str(conv_id)))
-        except (ValueError, TypeError, AttributeError):
-            pass
+            conn = database.get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT yandex_id FROM conv_yandex_map WHERE local_id = ?",
+                (str(conv_id),),
+            )
+            row = cur.fetchone()
+            conn.close()
+            if row:
+                return row[0]
+        except Exception as e:
+            api_logger.error(f"[CONV_MAP] lookup failed for {conv_id}: {e}")
+            return None
 
         try:
             conn = database.get_conn()
             cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS conv_yandex_map (
-                    local_id TEXT PRIMARY KEY,
-                    yandex_id TEXT NOT NULL
-                )
-            """)
-            cur.execute(
-                "SELECT yandex_id FROM conv_yandex_map WHERE local_id = ?",
-                (conv_id,),
-            )
-            row = cur.fetchone()
-            if row:
-                conn.close()
-                return row[0]
-
             y_conv = self.create_conversation()
             y_id = y_conv.get("id")
             cur.execute(
