@@ -117,6 +117,7 @@ def chat():
             return jsonify({"error": "conversation_id и message обязательны"}), 400
 
         owner_id = get_current_owner_id(required=False)
+        logger.info("[CHAT] message received conversation_id=%s session_id=%s model=%s", conv_id, session_id, model_key)
         invocation = create_invocation(
             session_id,
             conv_id,
@@ -124,6 +125,7 @@ def chat():
             user_id=owner_id,
         )
         trace = create_invocation_trace(invocation)
+        logger.info("[CHAT] execution started invocation_id=%s trace_id=%s conversation_id=%s", invocation.invocation_id, invocation.trace_id, invocation.conversation_id)
         start_invocation(invocation.invocation_id)
         trace.set_request({
             "conversation_id": invocation.conversation_id,
@@ -143,6 +145,7 @@ def chat():
         add_message(invocation.conversation_id, "user", message)
         client = AliceClient(Config)
 
+        logger.info("[CHAT] provider request started invocation_id=%s trace_id=%s", invocation.invocation_id, invocation.trace_id)
         response = client.ask_with_mcp(
             message=message,
             model_key=model_key,
@@ -242,7 +245,9 @@ def chat():
         cost = float(billing.get("total_cost") or 0) if billing.get("cost_status") in {"calculated", "partial"} else 0.0
 
         persist_invocation_trace(invocation.invocation_id, trace_data)
+        logger.info("[CHAT] trace persisted invocation_id=%s trace_id=%s events=%d responses=%d tool_calls=%d", invocation.invocation_id, invocation.trace_id, len(trace_data.get("events", [])), len(trace_data.get("responses", [])), len(trace_data.get("tool_calls", [])))
         add_message(invocation.conversation_id, "assistant", str(reply), cost=cost, timings=timings, trace=trace_data)
+        logger.info("[CHAT] message completed invocation_id=%s trace_id=%s duration_ms=%s", invocation.invocation_id, invocation.trace_id, total_ms)
         finish_invocation(
             invocation.invocation_id,
             result={
