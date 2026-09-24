@@ -82,7 +82,7 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"2" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
@@ -95,6 +95,7 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
             "/api/provider-credentials",
             json={
                 "yandex_api_key": "good-yandex-secret",
+                "yandex_project_id": "project-test",
                 "yandex_project_id": "project-test",
             },
         )
@@ -127,7 +128,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "bad-yandex-secret"},
+            json={"yandex_api_key": "bad-yandex-secret", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 401
@@ -405,6 +406,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
             "/api/provider-credentials",
             json={
                 "yandex_api_key": "yandex-runtime-secret",
+                "yandex_project_id": "project-test",
                 "yandex_project_id": "project-test",
                 "cloudru_api_key": "cloudru-runtime-secret",
             },
