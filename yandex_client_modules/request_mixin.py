@@ -69,7 +69,7 @@ class YandexRequestMixin:
         )
 
         payload = build_response_payload(
-            project_id=self._config.PROJECT_ID,
+            project_id=credential.project_id,
             model_key=model_key,
             message=message,
             params=params,
