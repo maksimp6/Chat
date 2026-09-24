@@ -31,6 +31,7 @@ class SSHRuntimeTests(unittest.TestCase):
         result = self.runtime().execute(
             target="preview",
             command="id -un",
+            identity_id="owner-1",
         )
         argv = run.call_args.args[0]
         self.assertEqual(result["linux_user"], "alice-agent")
@@ -50,6 +51,7 @@ class SSHRuntimeTests(unittest.TestCase):
             target="preview",
             path="/srv/alice/config.py",
             content="VALUE = 1\n",
+            identity_id="owner-1",
         )
         self.assertTrue(result["success"])
         self.assertEqual(run.call_args.kwargs["input"], "VALUE = 1\n")
