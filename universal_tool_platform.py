@@ -6,7 +6,7 @@ Adapters create a UniversalToolCall and hand it to UniversalToolExecutor.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Optional
 import time
 
@@ -370,10 +370,17 @@ class UniversalToolExecutor:
         if trace is None:
             return self.execute(call, **hooks)
 
+        traced_call = replace(
+            call,
+            metadata={
+                **dict(call.metadata),
+                "execution_trace": trace,
+            },
+        )
         return trace.track_tool_execution(
             call.tool_name,
             dict(call.arguments),
-            lambda: self.execute(call, **hooks),
+            lambda: self.execute(traced_call, **hooks),
             call_id=call.call_id,
             step=None,
         )
