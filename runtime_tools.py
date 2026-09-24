@@ -180,6 +180,7 @@ RUNTIME_TOOLS = {
         "requires_approval": False,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
+        "metadata": {"trace_redact_result_fields": ["stdout", "stderr"]},
         "func": ssh_runtime_read_file,
     },
     "ssh_runtime_write_file": {
