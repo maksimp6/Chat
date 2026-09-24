@@ -30,11 +30,13 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+      ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
       DEPLOY_REF: ${{ inputs.ref }}
     steps:
       - name: Validate deployment configuration
         run: |
           test -n "$ALICE_SHORT_TOKEN"
+          test -n "$ALICE_PROVIDER_CREDENTIAL_KEY"
           test -n "$PREVIEW_SSH_HOST"
           test -n "$PREVIEW_SSH_USER"
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
@@ -96,7 +98,7 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          printf '%s\n' "$ALICE_SHORT_TOKEN" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
+          printf '%s\n%s\n' "$ALICE_SHORT_TOKEN" "$ALICE_PROVIDER_CREDENTIAL_KEY" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
       - name: Wait for trusted HTTPS certificate and health
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
