@@ -273,7 +273,7 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "invalid-key"},
+            json={"yandex_api_key": "invalid-key", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 401
@@ -293,7 +293,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
         def validate_key(self, api_key):
             calls.append(api_key)
 
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
 
     class FakeConn:
@@ -343,7 +343,7 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
         with app.test_client() as client:
             response = client.put(
                 "/api/provider-credentials",
-                json={"yandex_api_key": "static-yandex-key"},
+                json={"yandex_api_key": "static-yandex-key", "yandex_project_id": "project-test"},
             )
 
     assert response.status_code == 503
