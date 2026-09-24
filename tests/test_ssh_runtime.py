@@ -15,6 +15,7 @@ class SSHRuntimeTests(unittest.TestCase):
                     "default_user": "alice-agent",
                     "allowed_users": ["alice-agent", "deploy"],
                     "identity_map": {"owner-1": "alice-agent"},
+                    "workspace_root": "/srv/alice",
                     "identity_file": "/keys/alice",
                     "known_hosts": "/keys/known_hosts",
                     "command_timeout_seconds": 15,
@@ -36,6 +37,8 @@ class SSHRuntimeTests(unittest.TestCase):
         self.assertIn("alice-agent@preview.example", argv)
         self.assertIn("StrictHostKeyChecking=yes", argv)
         self.assertIn("UserKnownHostsFile=/keys/known_hosts", argv)
+        self.assertIn("timeout --foreground", argv[-1])
+        self.assertIn("env -i", argv[-1])
         self.assertFalse(run.call_args.kwargs["shell"])
 
     @patch("ssh_runtime.subprocess.run")
@@ -105,6 +108,27 @@ class SSHRuntimeTests(unittest.TestCase):
                 target="preview",
                 path="../config.py",
             )
+
+    def test_file_tools_are_constrained_to_workspace(self):
+        with self.assertRaises(SSHRuntimeError):
+            self.runtime().read_file(
+                target="preview",
+                path="/etc/passwd",
+                identity_id="owner-1",
+            )
+
+    def test_workspace_path_is_normalized_without_escape(self):
+        with patch("ssh_runtime.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "ok\n"
+            run.return_value.stderr = ""
+            result = self.runtime().read_file(
+                target="preview",
+                path="/srv/alice/project/../config.py",
+                identity_id="owner-1",
+            )
+            self.assertTrue(result["success"])
+            self.assertEqual(result["path"], "/srv/alice/config.py")
 
     def test_missing_known_hosts_is_rejected(self):
         runtime = SSHRuntime(
