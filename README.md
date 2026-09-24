@@ -118,7 +118,7 @@ Configure the backend only:
 
 ```env
 SUPABASE_URL=https://<your-project-ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<backend-only-secret>
+SUPABASE_SECRET_KEY=<runtime-key-resolved-by-ci>
 ```
 
 The mirror is best-effort. A Supabase mirror failure must not become a failure of the main chat request.

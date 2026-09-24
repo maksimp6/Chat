@@ -49,12 +49,12 @@ def mirror_trace(trace: Mapping[str, Any], *, timeout: float = 2.0) -> bool:
     """Insert a sanitized trace into Supabase when server credentials are configured.
 
     The operation is disabled unless ``SUPABASE_URL`` and the backend-only
-    ``SUPABASE_SERVICE_ROLE_KEY`` are present. A publishable/anon key must not be
-    used because the execution-traces table intentionally rejects public writes.
+    ``SUPABASE_SECRET_KEY`` are present. The secret key is supplied by CI from
+    the Supabase Management API and is never committed or exposed to the client.
     Returns ``False`` on configuration or network errors and never raises.
     """
     url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    key = os.getenv("SUPABASE_SECRET_KEY", "")
     if not url or not key:
         return False
 
