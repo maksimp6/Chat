@@ -30,11 +30,13 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       DEPLOY_REF: ${{ inputs.ref }}
     steps:
       - name: Validate deployment configuration
         run: |
           test -n "$ALICE_SHORT_TOKEN"
+          test -n "$SUPABASE_URL"
           test -n "$PREVIEW_SSH_HOST"
           test -n "$PREVIEW_SSH_USER"
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
