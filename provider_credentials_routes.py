@@ -65,7 +65,7 @@ def _authorized() -> bool:
 
 def _guard():
     if not _authorized():
-        logger.critical(
+        logger.warning(
             "Provider credentials request rejected: admin authentication failed "
             "method=%s path=%s remote=%s auth_header_present=%s",
             request.method, request.path, request.remote_addr,
@@ -80,7 +80,7 @@ def _guard():
                 "short-token session."
             ),
         }), 401
-    logger.critical(
+    logger.info(
         "Provider credentials admin authentication accepted: method=%s path=%s remote=%s",
         request.method, request.path, request.remote_addr,
     )
