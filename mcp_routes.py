@@ -1,7 +1,6 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 from flask import Blueprint, request, jsonify
 import logging
-import uuid
 import json as _json
 from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
