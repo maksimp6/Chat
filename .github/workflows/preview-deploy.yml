@@ -61,7 +61,19 @@ jobs:
           test -n "$PREVIEW_PUBLIC_BASE_URL"
           test -n "$ALICE_SHORT_TOKEN"
           test -n "$SUPABASE_URL"
-      - name: Check out ref
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+      - name: Resolve Supabase runtime API key
+        shell: bash
+        run: |
+          keys="$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_ID" -o json)"
+          key="$(printf "%s" "$keys" | jq -r '[.[] | select(.type == "secret" and (.disabled != true)) | .api_key] | .[0] // empty')"
+          test -n "$key" || { echo "Supabase runtime API key is unavailable"; exit 1; }
+          echo "::add-mask::$key"
+          printf "SUPABASE_SECRET_KEY=%s\n" "$key" >> "$GITHUB_ENV"
+      - name: Check out ref/
         uses: actions/checkout@v4
         with:
           ref: ${{ env.PREVIEW_REF }}
@@ -105,7 +117,7 @@ jobs:
           scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/$KEY.tar.gz"
-          printf '%s\\n%s\\n' "$ALICE_SHORT_TOKEN" "$SUPABASE_URL" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; read -r supabase_url; export ALICE_SHORT_TOKEN=\"$token\" SUPABASE_URL=\"$supabase_url\"; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
+          printf '%s\\n%s\\n%s\\n' "$ALICE_SHORT_TOKEN" "$SUPABASE_URL" "$SUPABASE_SECRET_KEY" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; read -r supabase_url; read -r supabase_secret_key; export ALICE_SHORT_TOKEN="$token" SUPABASE_URL="$supabase_url" SUPABASE_SECRET_KEY="$supabase_secret_key"; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
       - name: Verify VPS routing
         env:
           KEY: ${{ steps.preview.outputs.key }}
