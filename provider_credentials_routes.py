@@ -378,8 +378,6 @@ def bootstrap_cloudru():
         # API-key creation as a separate operation and requires the caller to have
         # the appropriate project role.
         management = CloudRuIamClient(key_id=key_id, key_secret=key_secret)
-        service_account_id = requested_sa_id
-
         expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
         key = management.create_api_key(
             service_account_id=service_account_id,
