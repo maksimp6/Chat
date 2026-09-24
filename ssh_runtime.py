@@ -120,7 +120,6 @@ class SSHRuntime:
     def _resolve_target(
         self,
         target_name: str,
-        linux_user: Optional[str],
         identity_id: Optional[str] = None,
     ) -> tuple[SSHTarget, str]:
         target = self._targets.get(str(target_name))
@@ -128,9 +127,7 @@ class SSHRuntime:
             raise SSHRuntimeError(f"Unknown SSH target: {target_name}")
 
         mapped_users = dict(target.identity_map)
-        if linux_user:
-            user = self._validate_linux_user(linux_user)
-        elif mapped_users:
+        if mapped_users:
             if not identity_id:
                 raise SSHRuntimeError("Trusted Alice identity is required for this SSH target")
             mapped = mapped_users.get(str(identity_id))
@@ -194,7 +191,6 @@ class SSHRuntime:
         *,
         target: str,
         command: str,
-        linux_user: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
         identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
@@ -202,7 +198,7 @@ class SSHRuntime:
         if not command:
             raise SSHRuntimeError("Command is required")
 
-        resolved_target, user = self._resolve_target(target, linux_user, identity_id)
+        resolved_target, user = self._resolve_target(target, identity_id)
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
         if timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
@@ -240,14 +236,12 @@ class SSHRuntime:
         *,
         target: str,
         path: str,
-        linux_user: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
         identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
         remote_path = self._validate_remote_path(path)
         result = self.execute(
             target=target,
-            linux_user=linux_user,
             command=f"cat -- {shlex.quote(remote_path)}",
             timeout_seconds=timeout_seconds,
             identity_id=identity_id,
@@ -280,7 +274,7 @@ class SSHRuntime:
             "trap - EXIT"
         )
 
-        resolved_target, user = self._resolve_target(target, linux_user, identity_id)
+        resolved_target, user = self._resolve_target(target, identity_id)
         timeout = float(timeout_seconds or resolved_target.command_timeout_seconds)
         if timeout <= 0 or timeout > 3600:
             raise SSHRuntimeError("timeout_seconds must be > 0 and <= 3600")
