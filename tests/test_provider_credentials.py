@@ -331,7 +331,7 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
         def validate_key(self, api_key):
             return None
 
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeClient())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
     monkeypatch.setattr(routes, "get_conn", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded")))
 
