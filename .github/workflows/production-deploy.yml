@@ -42,7 +42,19 @@ jobs:
           test -n "$PREVIEW_SSH_USER"
           test -n "$PREVIEW_SSH_PRIVATE_KEY"
           test -n "$PREVIEW_SSH_KNOWN_HOSTS"
-      - name: Check out ref
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+      - name: Resolve Supabase runtime API key
+        shell: bash
+        run: |
+          keys="$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_ID" -o json)"
+          key="$(printf "%s" "$keys" | jq -r '[.[] | select(.type == "secret" and (.disabled != true)) | .api_key] | .[0] // empty')"
+          test -n "$key" || { echo "Supabase runtime API key is unavailable"; exit 1; }
+          echo "::add-mask::$key"
+          printf "SUPABASE_SECRET_KEY=%s\n" "$key" >> "$GITHUB_ENV"
+      - name: Check out ref/
         uses: actions/checkout@v4
         with:
           ref: ${{ env.DEPLOY_REF }}
