@@ -73,7 +73,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
         "runtime": "ssh",
         "operation": "read_file",
         "target": runtime_args["target"],
-        "linux_user": runtime_args["linux_user"],
+        "identity_id": runtime_args["identity_id"],
     })
     try:
         result = runtime.read_file(path=str(args.get("path") or ""), **runtime_args)
@@ -98,7 +98,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
 
 
 def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any]:
-    runtime_args = _runtime_args(args)
+    runtime_args = _runtime_args(args, cfg)
     _trace_event(cfg, "runtime_started", {
         "runtime": "ssh",
         "operation": "write_file",
