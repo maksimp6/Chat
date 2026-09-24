@@ -29,7 +29,6 @@ def _trusted_identity(cfg: dict | None) -> str | None:
 def _runtime_args(args: dict, cfg: dict | None) -> dict:
     return {
         "target": str(args.get("target") or ""),
-        "linux_user": None,
         "identity_id": _trusted_identity(cfg),
         "timeout_seconds": args.get("timeout_seconds"),
     }
