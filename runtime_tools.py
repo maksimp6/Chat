@@ -9,7 +9,7 @@ runtime = SSHRuntime()
 
 
 def _trace_event(cfg: dict | None, event_type: str, payload: dict) -> None:
-    context = cfg.get("_universal_context") if isinstance(cfg, dict) else None
+    context = _universal_context(cfg)
     call = context.get("call") if isinstance(context, dict) else None
     metadata = getattr(call, "metadata", {}) if call is not None else {}
     trace = metadata.get("execution_trace") if isinstance(metadata, dict) else None
@@ -17,22 +17,32 @@ def _trace_event(cfg: dict | None, event_type: str, payload: dict) -> None:
         trace.add_event(event_type, payload)
 
 
-def _runtime_args(args: dict) -> dict:
+def _universal_context(cfg: dict | None) -> dict:
+    return cfg.get("_universal_context") if isinstance(cfg, dict) else {}
+
+def _trusted_identity(cfg: dict | None) -> str | None:
+    context = _universal_context(cfg)
+    call = context.get("call") if isinstance(context, dict) else None
+    identity = getattr(call, "user_id", None) if call is not None else None
+    return str(identity).strip() if identity is not None and str(identity).strip() else None
+
+def _runtime_args(args: dict, cfg: dict | None) -> dict:
     return {
         "target": str(args.get("target") or ""),
-        "linux_user": args.get("linux_user"),
+        "linux_user": None,
+        "identity_id": _trusted_identity(cfg),
         "timeout_seconds": args.get("timeout_seconds"),
     }
 
 
 def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
-    runtime_args = _runtime_args(args)
+    runtime_args = _runtime_args(args, cfg)
     command = str(args.get("command") or "")
     _trace_event(cfg, "runtime_started", {
         "runtime": "ssh",
         "operation": "execute",
         "target": runtime_args["target"],
-        "linux_user": runtime_args["linux_user"],
+        "linux_user": result.get("linux_user") if "result" in locals() else None,
     })
     try:
         result = runtime.execute(command=command, **runtime_args)
