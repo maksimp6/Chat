@@ -53,7 +53,9 @@ class YandexApiKeyProvider:
             "YANDEX_AI_ENDPOINT",
             "https://ai.api.cloud.yandex.net/v1",
         )).rstrip("/")
-        self.project_id = project_id or os.getenv("YANDEX_PROJECT_ID")
+        self.project_id = project_id.strip() if isinstance(project_id, str) else ""
+        if not self.project_id:
+            raise ValueError("Yandex project_id is required")
         self.timeout = timeout
 
     def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
