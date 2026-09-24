@@ -33,9 +33,9 @@ def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
     Secrets are never included in log messages. A failed check is non-fatal.
     """
     base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    secret_key = os.getenv("SUPABASE_SECRET_KEY", "").strip()
 
-    if not base_url or not service_key:
+    if not base_url or not secret_key:
         logger.info("Supabase trace mirror: disabled (credentials are not configured)")
         return "disabled"
 
@@ -49,8 +49,8 @@ def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
     request = Request(
         endpoint,
         headers={
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+            "apikey": secret_key,
+            "Authorization": f"Bearer {secret_key}",
             "Accept": "application/json",
         },
         method="GET",
@@ -65,14 +65,14 @@ def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
                 "Supabase trace mirror: error (HTTP %s)", response.status
             )
     except HTTPError as exc:
-        detail = _http_error_detail(exc, service_key)
+        detail = _http_error_detail(exc, secret_key)
         logger.warning(
             "Supabase trace mirror: error (HTTP failure; %s; exception=%s)",
             detail,
             type(exc).__name__,
         )
     except Exception as exc:
-        detail = _safe_detail(str(exc) or "no additional details", service_key)
+        detail = _safe_detail(str(exc) or "no additional details", secret_key)
         logger.warning(
             "Supabase trace mirror: error (exception=%s; detail=%s)",
             type(exc).__name__,
