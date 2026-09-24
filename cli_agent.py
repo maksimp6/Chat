@@ -3,7 +3,6 @@ import sys
 import json
 import subprocess
 import requests
-from config import Config
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
@@ -20,13 +19,13 @@ history = [{"role": "system", "text": SYSTEM_PROMPT}]
 
 def query_llm(messages):
     payload = {
-        "modelUri": f"gpt://{Config.PROJECT_ID}/yandexgpt/latest",
+        "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {"temperature": 0.2, "maxTokens": "2000"},
         "messages": messages
     }
     resp = requests.post(
         API_URL,
-        headers={"Authorization": f"Api-Key {Config.API_KEY}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}", "Content-Type": "application/json"},
         json=payload,
         timeout=60
     )

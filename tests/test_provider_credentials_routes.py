@@ -23,7 +23,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"1" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
     conn = db.get_conn()
@@ -82,7 +82,7 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"2" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
@@ -95,6 +95,7 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
             "/api/provider-credentials",
             json={
                 "yandex_api_key": "good-yandex-secret",
+                "yandex_project_id": "project-test",
             },
         )
 
@@ -102,8 +103,8 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
     payload = response.get_json()
     assert "good-yandex-secret" not in str(payload)
     statuses = {item["provider"]: item for item in payload["providers"]}
-    assert statuses["yandex"]["status"] == "configured"
-    assert statuses["yandex"]["authorization_ok"] is False
+    assert statuses["yandex"]["status"] == "connected"
+    assert statuses["yandex"]["authorization_ok"] is True
 
 
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
@@ -115,7 +116,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"3" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
@@ -126,7 +127,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "bad-yandex-secret"},
+            json={"yandex_api_key": "bad-yandex-secret", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 401
@@ -153,7 +154,7 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
     with app.test_client() as client:
         response = client.put(
             "/api/provider-credentials",
-            json={"yandex_api_key": "secret"},
+            json={"yandex_api_key": "secret", "yandex_project_id": "project-test"},
             environ_base={"REMOTE_ADDR": "203.0.113.10"},
         )
 
@@ -170,7 +171,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         "ALICE_PROVIDER_CREDENTIALS_KEY",
         base64.urlsafe_b64encode(b"4" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
     monkeypatch.setenv(
@@ -186,7 +187,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         response = client.put(
             "/api/provider-credentials",
             headers={"Authorization": "Bearer admin-test-token"},
-            json={"yandex_api_key": "good-yandex-secret"},
+            json={"yandex_api_key": "good-yandex-secret", "yandex_project_id": "project-test"},
         )
 
     assert response.status_code == 200
@@ -233,7 +234,7 @@ def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
                 "iam_key_id": "master-id",
                 "iam_key_secret": "master-secret",
                 "project_id": "project-1",
-                "service_account_id": "sa-1",
+                "service_account_id": "550e8400-e29b-41d4-a716-446655440000",
                 "expires_at": "2020-01-01T00:00:00Z",
             },
         )
@@ -287,7 +288,7 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
             raise AssertionError("bootstrap must not enumerate service accounts")
 
         def create_api_key(self, **kwargs):
-            assert kwargs["service_account_id"] == "sa-1"
+            assert kwargs["service_account_id"] == "550e8400-e29b-41d4-a716-446655440000"
             assert kwargs["products"] == ["foundation-models"]
             return {"id": "key-1", "secret": "runtime-secret"}
 
@@ -316,13 +317,13 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
                 "iam_key_id": "master-id",
                 "iam_key_secret": "master-secret",
                 "project_id": "project-1",
-                "service_account_id": "sa-1",
+                "service_account_id": "550e8400-e29b-41d4-a716-446655440000",
             },
         )
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["service_account_id"] == "sa-1"
+    assert payload["service_account_id"] == "550e8400-e29b-41d4-a716-446655440000"
     assert payload["status"] == "connected"
 
 
@@ -343,7 +344,7 @@ def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
             calls.append(api_key)
             super().validate_key(api_key)
 
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: CloudRuFake())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: CloudRuFake())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
     from flask import Flask
@@ -386,7 +387,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     monkeypatch.setattr(
         routes,
         "_provider_client",
-        lambda provider: type(
+        lambda provider, project_id=None: type(
             "Provider",
             (),
             {"validate_key": lambda self, key: validated.append((provider, key)),
@@ -404,6 +405,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
             "/api/provider-credentials",
             json={
                 "yandex_api_key": "yandex-runtime-secret",
+                "yandex_project_id": "project-test",
                 "cloudru_api_key": "cloudru-runtime-secret",
             },
         )

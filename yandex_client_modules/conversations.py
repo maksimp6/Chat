@@ -4,63 +4,43 @@ import requests
 
 from yandex_client_modules.errors import YandexClientError
 
-import db as database
-
 api_logger = logging.getLogger("yandex_api_debug")
 
 
 class YandexConversationMixin:
-    def create_conversation(self):
+    def create_conversation(self, execution_trace=None):
         try:
+            if execution_trace is not None:
+                from yandex_client_modules.request_mixin import _resolve_global_provider_credential
+                _resolve_global_provider_credential(self, execution_trace)
+
             self._log_request("POST", self.conversations_url, json={})
             resp = self._log_response(
                 self.session.post(self.conversations_url, json={}, timeout=10)
             )
             resp.raise_for_status()
             data = resp.json()
-            api_logger.info(f"[CONV] Created: id={data.get('id')}")
+            provider_id = data.get("id") if isinstance(data, dict) else None
+            if not isinstance(provider_id, str) or not provider_id.strip():
+                raise YandexClientError("Yandex conversation creation returned no provider ID")
+            try:
+                provider_id = str(uuid.UUID(provider_id))
+            except (ValueError, AttributeError) as exc:
+                raise YandexClientError("Yandex conversation ID is not a valid UUID") from exc
+            data["id"] = provider_id
+            if execution_trace is not None:
+                execution_trace.add_event("conversation_created", {
+                    "provider_conversation_id": provider_id,
+                })
+            api_logger.info("[CONV] Created: id=%s", provider_id)
             return data
-        except requests.RequestException as e:
-            raise YandexClientError("Create conv: " + str(e))
+        except requests.RequestException as exc:
+            raise YandexClientError("Create conversation: " + str(exc)) from exc
 
     def _resolve_yandex_conv_id(self, conv_id):
         if not conv_id:
             return None
-
         try:
             return str(uuid.UUID(str(conv_id)))
-        except (ValueError, TypeError, AttributeError):
-            pass
-
-        try:
-            conn = database.get_conn()
-            cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS conv_yandex_map (
-                    local_id TEXT PRIMARY KEY,
-                    yandex_id TEXT NOT NULL
-                )
-            """)
-            cur.execute(
-                "SELECT yandex_id FROM conv_yandex_map WHERE local_id = ?",
-                (conv_id,),
-            )
-            row = cur.fetchone()
-            if row:
-                conn.close()
-                return row[0]
-
-            y_conv = self.create_conversation()
-            y_id = y_conv.get("id")
-            cur.execute(
-                "INSERT INTO conv_yandex_map "
-                "(local_id, yandex_id) VALUES (?, ?) "
-                "ON CONFLICT(local_id) DO UPDATE SET yandex_id = excluded.yandex_id",
-                (conv_id, y_id),
-            )
-            conn.commit()
-            conn.close()
-            return y_id
-        except Exception as e:
-            api_logger.error(f"[CONV_MAP] Ошибка: {e}")
-            return None
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise YandexClientError("Conversation ID must be the Yandex provider UUID") from exc

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import logging
+import uuid
 
 from flask import Blueprint, jsonify, request
 
@@ -97,10 +98,12 @@ def _cloudru_ttl() -> timedelta:
     return timedelta(days=days)
 
 
-def _provider_client(provider: str):
+def _provider_client(provider: str, project_id: str | None = None):
     if provider == YANDEX:
+        if not isinstance(project_id, str) or not project_id.strip():
+            raise CredentialError("Yandex project_id is required for provider client")
         return YandexApiKeyProvider(
-            project_id=config.PROJECT_ID,
+            project_id=project_id.strip(),
             ai_endpoint=config.BASE_URL,
         )
     if provider == CLOUDRU:
@@ -181,7 +184,7 @@ def _status_for(provider: str) -> dict:
             "rotation": {
                 "supported": bool(
                     getattr(
-                        _provider_client(provider),
+                        _provider_client(provider, row["project_id"]),
                         "rotation_supported",
                         lambda _key_id: False,
                     )(credential["provider_key_id"])
@@ -214,22 +217,21 @@ def _perform_health_check(provider: str) -> dict:
     credential = _load_credential(provider)
     if credential is None:
         return {"status": "not_configured", "error": None}
-    if provider == YANDEX:
-        _provider_client(provider).validate_key(credential.api_key)
-        error = None
-        status = "configured"
-    else:
-        try:
-            _provider_client(provider).validate_key(credential.api_key)
-        except PermissionError:
-            error = "unauthorized"
-            status = "invalid"
-        except Exception:
-            error = "provider_unavailable"
-            status = "unavailable"
+    try:
+        if provider == YANDEX:
+            _provider_client(provider, credential.project_id).validate_key(credential.api_key)
         else:
-            error = None
-            status = "connected"
+            _provider_client(provider).validate_key(credential.api_key)
+        error = None
+        status = "connected"
+    except PermissionError as exc:
+        logger.exception("Provider health check authorization failed: provider=%s", provider)
+        error = str(exc)
+        status = "invalid"
+    except Exception as exc:
+        logger.exception("Provider health check failed: provider=%s", provider)
+        error = str(exc)
+        status = "unavailable"
 
     conn = get_conn()
     try:
@@ -259,8 +261,12 @@ def provider_credentials_status_check():
             if provider not in (YANDEX, CLOUDRU):
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
-    except Exception:
-        return jsonify({"error": "health_check_failed"}), 503
+    except Exception as exc:
+        logger.exception("Provider health check request failed")
+        return jsonify({
+            "error": "health_check_failed",
+            "detail": str(exc),
+        }), 503
     return provider_credentials_status()
 
 
@@ -348,6 +354,13 @@ def bootstrap_cloudru():
             "error": "service_account_id_required",
             "detail": "Create or select an existing Cloud.ru service account with a project role, then provide its UUID.",
         }), 400
+    try:
+        service_account_id = str(uuid.UUID(requested_sa_id))
+    except (ValueError, AttributeError) as exc:
+        return jsonify({
+            "error": "invalid_service_account_id",
+            "detail": "Cloud.ru service_account_id must be a valid UUID.",
+        }), 400
 
     iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     iam_expires_at = None
@@ -365,8 +378,6 @@ def bootstrap_cloudru():
         # API-key creation as a separate operation and requires the caller to have
         # the appropriate project role.
         management = CloudRuIamClient(key_id=key_id, key_secret=key_secret)
-        service_account_id = requested_sa_id
-
         expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
         key = management.create_api_key(
             service_account_id=service_account_id,
@@ -417,16 +428,30 @@ def update_provider_credentials():
     guard = _guard()
     if guard:
         return guard
-    data = request.get_json(silent=True)
+    try:
+        data = request.get_json(silent=False)
+    except Exception as exc:
+        logger.exception("Invalid provider credentials JSON payload")
+        return jsonify({"error": "invalid_json", "detail": str(exc)}), 400
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
 
+    yandex_api_key = data.get("yandex_api_key")
+    yandex_project_id = data.get("yandex_project_id")
     values = (
-        (YANDEX, data.get("yandex_api_key")),
+        (YANDEX, yandex_api_key),
         (CLOUDRU, data.get("cloudru_api_key")),
     )
     supplied = [(provider, value.strip()) for provider, value in values
                 if isinstance(value, str) and value.strip()]
+    if isinstance(yandex_api_key, str) and yandex_api_key.strip():
+        if not isinstance(yandex_project_id, str) or not yandex_project_id.strip():
+            return jsonify({"error": "yandex_project_id_required", "provider": YANDEX,
+                            "detail": "Yandex Cloud Project ID is required together with the API key."}), 400
+        yandex_project_id = yandex_project_id.strip()
+    elif isinstance(yandex_project_id, str) and yandex_project_id.strip():
+        return jsonify({"error": "yandex_api_key_required", "provider": YANDEX,
+                        "detail": "Yandex Cloud API key is required together with the Project ID."}), 400
     if not supplied:
         return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
     if any(len(value) > 4096 for _, value in supplied):
@@ -434,7 +459,7 @@ def update_provider_credentials():
 
     try:
         for provider, api_key in supplied:
-            client = _provider_client(provider)
+            client = _provider_client(provider, yandex_project_id if provider == YANDEX else None)
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
@@ -448,16 +473,13 @@ def update_provider_credentials():
                     "provider": provider,
                     "status": "invalid",
                 }), 401
-            except Exception:
-                logger.debug(
-                    "provider credential validation failed: provider=%s",
-                    provider,
-                    exc_info=True,
-                )
+            except Exception as exc:
+                logger.exception("provider credential validation failed: provider=%s", provider)
                 return jsonify({
                     "error": "provider_health_check_failed",
                     "provider": provider,
                     "status": "invalid",
+                    "detail": str(exc),
                 }), 502
             else:
                 logger.debug("provider credential accepted for storage: provider=%s", provider)
@@ -468,7 +490,7 @@ def update_provider_credentials():
                 replace_active_credential(
                     conn,
                     api_key,
-                    config.PROJECT_ID if provider == YANDEX else "",
+                    yandex_project_id if provider == YANDEX else "",
                     encrypt_secret,
                     provider,
                     provider_key_id=None,
@@ -477,7 +499,7 @@ def update_provider_credentials():
                 record_health_check(
                     conn,
                     provider,
-                    status="configured" if provider == YANDEX else "connected",
+                    status="connected",
                     error=None,
                 )
         finally:

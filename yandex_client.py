@@ -36,7 +36,6 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
         self.session = requests.Session()
         self.session.headers.update({
             "Content-Type": "application/json",
-            "OpenAI-Project": config.PROJECT_ID,
         })
 
     def _log_request(self, method, url, **kwargs):
