@@ -38,6 +38,7 @@ jobs:
         run: |
           node tests/test_file_manager.js
           node tests/test_dozzle_header.js
+          node tests/test_trace_viewer_copy.js
       - name: Run tests
         run: pytest -q
 
