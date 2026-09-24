@@ -1,7 +1,7 @@
 import json
 import sqlite3
 import requests
-from config import Config
+import os
 from db import get_conn, DB_PATH
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
@@ -54,7 +54,7 @@ def extract_and_save_facts(dialog_messages: list):
     formatted_chat = "\n".join([f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]])
 
     payload = {
-        "modelUri": f"gpt://{Config.PROJECT_ID}/yandexgpt/latest",
+        "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {
             "temperature": 0.1,
             "maxTokens": "1000",
@@ -78,7 +78,7 @@ def extract_and_save_facts(dialog_messages: list):
     try:
         resp = requests.post(
             API_URL,
-            headers={"Authorization": f"Api-Key {Config.API_KEY}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}", "Content-Type": "application/json"},
             json=payload,
             timeout=30
         )
