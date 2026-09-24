@@ -62,7 +62,6 @@ jobs:
           test -n "$PREVIEW_PUBLIC_BASE_URL"
           test -n "$ALICE_SHORT_TOKEN"
           test -n "$SUPABASE_URL"
-          test -n "$SUPABASE_ACCESS_TOKEN"
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
         with:
