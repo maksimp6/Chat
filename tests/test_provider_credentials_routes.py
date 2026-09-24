@@ -171,7 +171,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         "ALICE_PROVIDER_CREDENTIALS_KEY",
         base64.urlsafe_b64encode(b"4" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider: FakeProvider())
+    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
     monkeypatch.setenv(
@@ -405,7 +405,6 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
             "/api/provider-credentials",
             json={
                 "yandex_api_key": "yandex-runtime-secret",
-                "yandex_project_id": "project-test",
                 "yandex_project_id": "project-test",
                 "cloudru_api_key": "cloudru-runtime-secret",
             },
