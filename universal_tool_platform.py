@@ -430,6 +430,7 @@ class UniversalToolExecutor:
                 **dict(call.metadata),
                 "transport": call.transport,
                 "risk_level": definition.risk_level,
+                "user_id": call.user_id,
             },
             trace_id=call.trace_id,
             invocation_id=call.invocation_id,
