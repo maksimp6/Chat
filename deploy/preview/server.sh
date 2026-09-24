@@ -227,6 +227,17 @@ assert cleanup_result["data"]["exit_code"] == 0
 print("SSH Runtime Preview smoke passed")
 PY
 
+  cleanup_runtime_smoke() {
+    docker exec "$container" rm -f \
+      /tmp/alice-runtime-id_ed25519 \
+      /tmp/alice-runtime-known_hosts \
+      /tmp/alice-runtime-smoke.py >/dev/null 2>&1 || true
+    rm -rf -- "$runtime_dir"
+    docker rm -f "$runtime_container" >/dev/null 2>&1 || true
+    docker image rm "$RUNTIME_IMAGE_PREFIX:$key" >/dev/null 2>&1 || true
+  }
+  trap cleanup_runtime_smoke EXIT
+
   docker cp "$runtime_client_key" "$container:/tmp/alice-runtime-id_ed25519" >/dev/null
   docker cp "$runtime_known_hosts" "$container:/tmp/alice-runtime-known_hosts" >/dev/null
   docker cp "$smoke_script" "$container:/tmp/alice-runtime-smoke.py" >/dev/null
@@ -239,19 +250,18 @@ PY
     -e "ALICE_SSH_TARGETS_JSON=$runtime_targets_json" \
     -e "ALICE_SSH_KNOWN_HOSTS=/tmp/alice-runtime-known_hosts" \
     "$container" python /tmp/alice-runtime-smoke.py
-  docker exec "$container" rm -f \
-    /tmp/alice-runtime-id_ed25519 \
-    /tmp/alice-runtime-known_hosts \
-    /tmp/alice-runtime-smoke.py
-  rm -rf -- "$runtime_dir"
-  docker rm -f "$runtime_container" >/dev/null 2>&1 || true
-  docker image rm "$RUNTIME_IMAGE_PREFIX:$key" >/dev/null 2>&1 || true
   log "SSH Runtime smoke passed for $key"
+  trap - EXIT
+  cleanup_runtime_smoke
 }
 
 cleanup_key() {
   local key="$1"; local container="${CONTAINER_PREFIX}-${key}"; local image="${IMAGE_PREFIX}:${key}"; local workdir="${ROOT_DIR}/previews/${key}"; local archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
   docker rm -f "$container" >/dev/null 2>&1 || true
+  local runtime_container="$CONTAINER_PREFIX-$key-runtime-ssh"
+  local runtime_image="$RUNTIME_IMAGE_PREFIX:$key"
+  docker rm -f "$runtime_container" >/dev/null 2>&1 || true
+  docker image rm "$runtime_image" >/dev/null 2>&1 || true
   local dozzle_container="${container}-dozzle"
   clear_dozzle_data "$workdir/dozzle"
   docker rm -f "$dozzle_container" >/dev/null 2>&1 || true
