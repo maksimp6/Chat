@@ -255,7 +255,6 @@ class SSHRuntime:
         target: str,
         path: str,
         content: str,
-        linux_user: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
         identity_id: Optional[str] = None,
     ) -> dict[str, Any]:
