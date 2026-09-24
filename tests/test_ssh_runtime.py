@@ -14,6 +14,7 @@ class SSHRuntimeTests(unittest.TestCase):
                     "port": 2222,
                     "default_user": "alice-agent",
                     "allowed_users": ["alice-agent", "deploy"],
+                    "identity_map": {"owner-1": "alice-agent"},
                     "identity_file": "/keys/alice",
                     "known_hosts": "/keys/known_hosts",
                     "command_timeout_seconds": 15,
@@ -71,6 +72,27 @@ class SSHRuntimeTests(unittest.TestCase):
                 target="production",
                 command="id",
                 linux_user="alice-agent",
+            )
+
+    def test_trusted_identity_maps_to_linux_user(self):
+        with patch("ssh_runtime.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "alice-agent\\n"
+            run.return_value.stderr = ""
+            result = self.runtime().execute(
+                target="preview",
+                command="id -un",
+                identity_id="owner-1",
+            )
+            self.assertEqual(result["linux_user"], "alice-agent")
+            self.assertIn("alice-agent@preview.example", run.call_args.args[0])
+
+    def test_unmapped_trusted_identity_is_rejected(self):
+        with self.assertRaises(SSHRuntimeError):
+            self.runtime().execute(
+                target="preview",
+                command="id -un",
+                identity_id="owner-2",
             )
 
     def test_disallowed_linux_user_is_rejected(self):
