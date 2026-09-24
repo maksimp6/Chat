@@ -136,6 +136,13 @@ class ToolRegistry:
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Profiler: {e}")
 
+        try:
+            from runtime_tools import RUNTIME_TOOLS
+            for name, cfg in RUNTIME_TOOLS.items():
+                self._register("runtime", name, cfg)
+        except Exception as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки Runtime: {e}")
+
     @staticmethod
     def _strict_schema(schema: dict) -> dict:
         """Normalize a JSON Schema for strict function calling."""
