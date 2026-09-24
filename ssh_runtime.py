@@ -130,12 +130,16 @@ class SSHRuntime:
         mapped_users = dict(target.identity_map)
         if linux_user:
             user = self._validate_linux_user(linux_user)
-        elif identity_id and mapped_users:
-            user = self._validate_linux_user(mapped_users.get(str(identity_id), ""))
-        elif identity_id and target.identity_map:
-            raise SSHRuntimeError(
-                f"Identity '{identity_id}' has no Linux user mapping on target '{target.name}'"
-            )
+        elif identity_id:
+            if mapped_users:
+                mapped = mapped_users.get(str(identity_id))
+                if not mapped:
+                    raise SSHRuntimeError(
+                        f"Identity '{identity_id}' has no Linux user mapping on target '{target.name}'"
+                    )
+                user = self._validate_linux_user(mapped)
+            else:
+                user = self._validate_linux_user(target.default_user or "")
         else:
             user = self._validate_linux_user(target.default_user or "")
 
@@ -269,7 +273,7 @@ class SSHRuntime:
             "set -eu; "
             f"mkdir -p -- {quoted_parent}; "
             f"tmp=$(mktemp -- {template}); "
-            'trap 'rm -f -- "$tmp"' EXIT; '
+            "trap 'rm -f -- \"$tmp\"' EXIT; "
             'cat > "$tmp"; '
             f"mv -f -- \"$tmp\" {quoted_path}; "
             "trap - EXIT"
