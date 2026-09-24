@@ -31,6 +31,7 @@ jobs:
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       DEPLOY_REF: ${{ inputs.ref }}
     steps:
       - name: Validate deployment configuration
