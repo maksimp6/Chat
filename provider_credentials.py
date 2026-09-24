@@ -470,6 +470,9 @@ def resolve_client_credential(
     """
     key = _env_key(config, provider)
 
+    if provider == YANDEX and not str(getattr(config, "PROJECT_ID", "") or "").strip():
+        raise CredentialError("Yandex project_id is required together with the API key")
+
     if db is not None:
         if decrypt is None:
             existing = _fetch_one(
