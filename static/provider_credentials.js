@@ -38,6 +38,7 @@ function setFieldError(id, message) {
 
 function clearFieldErrors() {
     setFieldError("provider-yandex-key", "");
+    setFieldError("provider-yandex-project", "");
     setFieldError("provider-cloudru-key", "");
 }
 
@@ -121,15 +122,19 @@ function build() {
     box.appendChild(close); box.appendChild(title);
 
     box.appendChild(makeField("provider-yandex-key","Yandex Cloud API key","","Yandex API key","password"));
+    box.appendChild(makeField("provider-yandex-project","Yandex Cloud Project ID","Обязателен вместе с Yandex API key.","например: b1g1fekh2198nuan1tnh","text"));
     box.appendChild(makeField("provider-cloudru-key","Cloud.ru API key","","Cloud.ru API key","password"));
 
     var actions=document.createElement("div"); actions.style.cssText="display:flex;gap:8px;margin-top:14px;";
     var save=document.createElement("button"); save.textContent="Подключить"; save.className="btn-primary";
     save.onclick=async function(){
         var y=document.getElementById("provider-yandex-key").value.trim();
+        var project=document.getElementById("provider-yandex-project").value.trim();
         var cloudru=document.getElementById("provider-cloudru-key").value.trim();
         clearFieldErrors();
         output.textContent = "";
+        if(y && !project){ setFieldError("provider-yandex-project", "Project ID обязателен вместе с Yandex API key."); return; }
+        if(!y && project){ setFieldError("provider-yandex-key", "Введите Yandex Cloud API key."); return; }
         if(!y && !cloudru){
             setFieldError("provider-yandex-key", "Введите API key.");
             setFieldError("provider-cloudru-key", "Введите API key.");
@@ -138,7 +143,7 @@ function build() {
         save.disabled=true;
         try{
             var body={};
-            if(y) body.yandex_api_key=y;
+            if(y) { body.yandex_api_key=y; body.yandex_project_id=project; }
             if(cloudru) body.cloudru_api_key=cloudru;
             var response=await fetch("/api/provider-credentials",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
             var data=await response.json();
@@ -151,6 +156,7 @@ function build() {
                 return;
             }
             document.getElementById("provider-yandex-key").value="";
+            document.getElementById("provider-yandex-project").value="";
             document.getElementById("provider-cloudru-key").value="";
             await fetchStatus(output);
         }catch(error){ output.textContent="Ошибка подключения: "+error.message; }
