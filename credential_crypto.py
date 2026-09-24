@@ -41,6 +41,11 @@ def decrypt_secret(value: str) -> str:
     fernet, InvalidToken = _fernet()
     if fernet is None:
         return value
+    # Older deployments could persist credentials before the encryption key
+    # was configured. Keep those records readable so a deployment can migrate
+    # them to encrypted storage without forcing the operator to re-enter the key.
+    if not value.startswith("gAAAA"):
+        return value
     try:
         return fernet.decrypt(value.encode("ascii")).decode("utf-8")
     except InvalidToken as exc:

@@ -25,6 +25,19 @@ require_short_token() {
   if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then IFS= read -r ALICE_SHORT_TOKEN || true; fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
+ensure_provider_credential_key() {
+  local key_file="$ROOT_DIR/keys/provider-credentials.key"
+  mkdir -p "$(dirname "$key_file")"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" && -s "$key_file" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(cat "$key_file")"
+  fi
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(openssl rand -hex 32)"
+    umask 077
+    printf "%s\\n" "$ALICE_PROVIDER_CREDENTIAL_KEY" > "$key_file"
+  fi
+  [[ -n "$ALICE_PROVIDER_CREDENTIAL_KEY" ]] || die "failed to initialize provider credential key"
+}
 ensure_network() { if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then docker network create "$NETWORK_NAME" >/dev/null; fi; }
 
 ensure_traefik() {
@@ -68,7 +81,7 @@ deploy() {
   [[ "$archive_path" == "$ROOT_DIR/incoming/"*.tar.gz ]] || die "archive must be inside $ROOT_DIR/incoming"
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
-  require_short_token; ensure_traefik
+  require_short_token; ensure_provider_credential_key; ensure_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
   local workdir="${ROOT_DIR}/previews/${key}"
   local builddir="${workdir}/build"
@@ -95,7 +108,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
-    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
+    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
   local dozzle_container="${container}-dozzle"
   local dozzle_ru_router="${dozzle_container}-logs-ru"
   local dozzle_online_router="${dozzle_container}-logs-online"

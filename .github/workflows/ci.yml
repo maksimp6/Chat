@@ -30,6 +30,7 @@ jobs:
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
+          bash -n deploy/production/server.sh
           bash tests/test_dozzle_preview.sh
       - name: Compile Python sources
         run: python -m compileall -q .

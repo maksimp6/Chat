@@ -22,6 +22,20 @@ require_runtime_secret() {
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
 
+ensure_provider_credential_key() {
+  local key_file="$ROOT_DIR/keys/provider-credentials.key"
+  mkdir -p "$(dirname "$key_file")"
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" && -s "$key_file" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(cat "$key_file")"
+  fi
+  if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" ]]; then
+    ALICE_PROVIDER_CREDENTIAL_KEY="$(openssl rand -hex 32)"
+    umask 077
+    printf "%s\\n" "$ALICE_PROVIDER_CREDENTIAL_KEY" > "$key_file"
+  fi
+  [[ -n "$ALICE_PROVIDER_CREDENTIAL_KEY" ]] || die "failed to initialize provider credential key"
+}
+
 validate_traefik() {
   docker inspect "$TRAEFIK_NAME" >/dev/null 2>&1 || die "shared Traefik container $TRAEFIK_NAME is missing"
   docker inspect -f '{{.State.Running}}' "$TRAEFIK_NAME" | grep -qx true || die "shared Traefik container is not running"
@@ -40,6 +54,7 @@ deploy() {
   local archive_path="$1"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
   require_runtime_secret
+  ensure_provider_credential_key
   validate_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/production"
 
@@ -55,6 +70,7 @@ deploy() {
     umask 077
     printf 'ALICE_REQUIRE_SHORT_TOKEN=1\n'
     printf 'ALICE_SHORT_TOKEN=%s\n' "$ALICE_SHORT_TOKEN"
+    printf 'ALICE_PROVIDER_CREDENTIAL_KEY=%s\n' "$ALICE_PROVIDER_CREDENTIAL_KEY"
   ) > "$runtime_env"
 
   log "building $IMAGE_NAME"
