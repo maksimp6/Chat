@@ -72,6 +72,7 @@ deploy() {
     printf 'ALICE_SHORT_TOKEN=%s\n' "$ALICE_SHORT_TOKEN"
     printf 'ALICE_PROVIDER_CREDENTIAL_KEY=%s\n' "$ALICE_PROVIDER_CREDENTIAL_KEY"
     printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL"
+    printf 'SUPABASE_SECRET_KEY=%s\n' "$SUPABASE_SECRET_KEY"
   ) > "$runtime_env"
 
   log "building $IMAGE_NAME"
