@@ -1,6 +1,6 @@
 import json
 import requests
-from config import Config
+import os
 from git_mcp_tools import execute_tool as execute_git_tool, TOOL_REGISTRY as GIT_TOOLS
 from filesystem_mcp_tools import execute_fs_tool, TOOL_REGISTRY as FS_TOOLS
 
@@ -25,13 +25,13 @@ def dispatch_any_tool(tool_name: str, args: dict):
 
 def query_yandex(messages):
     payload = {
-        "modelUri": f"gpt://{Config.PROJECT_ID}/yandexgpt/latest",
+        "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {"temperature": 0.1, "maxTokens": "2000"},
         "messages": messages
     }
     resp = requests.post(
         API_URL,
-        headers={"Authorization": f"Api-Key {Config.API_KEY}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}", "Content-Type": "application/json"},
         json=payload,
         timeout=45
     )
