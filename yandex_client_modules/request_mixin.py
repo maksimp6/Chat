@@ -18,19 +18,24 @@ from yandex_client_modules.errors import YandexClientError
 
 def _resolve_global_provider_credential(client, execution_trace=None):
     """Refresh auth from the deployment-wide credential store for each request."""
+    if decrypt_secret is None or encrypt_secret is None:
+        raise YandexClientError(
+            "Provider credential encryption is unavailable"
+        )
+    if not os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY", "").strip():
+        raise YandexClientError(
+            "ALICE_PROVIDER_CREDENTIAL_KEY is required for provider credentials"
+        )
+
     conn = get_conn()
     try:
-        crypto_key = os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY")
-        if decrypt_secret is None or not crypto_key:
-            credential = resolve_client_credential(client._config, provider="yandex")
-        else:
-            credential = resolve_client_credential(
-                client._config,
-                conn,
-                decrypt_secret,
-                encrypt_secret,
-                provider="yandex",
-            )
+        credential = resolve_client_credential(
+            client._config,
+            conn,
+            decrypt_secret,
+            encrypt_secret,
+            provider="yandex",
+        )
     finally:
         conn.close()
 
