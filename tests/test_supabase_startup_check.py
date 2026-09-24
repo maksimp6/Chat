@@ -5,19 +5,19 @@ import supabase_startup_check as checker
 
 def test_missing_credentials_is_disabled(monkeypatch):
     monkeypatch.delenv("SUPABASE_URL", raising=False)
-    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_SECRET_KEY", raising=False)
     assert checker.check_supabase_trace_mirror() == "disabled"
 
 
 def test_invalid_url_is_error(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "http://example.com")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "secret")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
     assert checker.check_supabase_trace_mirror() == "error"
 
 
 def test_reachable_endpoint_is_ready(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "secret")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
 
     class Response:
         status = 200
@@ -34,7 +34,7 @@ def test_reachable_endpoint_is_ready(monkeypatch):
 
 def test_missing_table_is_error(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "secret")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
 
     def fail(request, timeout):
         raise HTTPError(request.full_url, 404, "not found", {}, None)
@@ -46,7 +46,7 @@ def test_missing_table_is_error(monkeypatch):
 def test_http_error_logs_status_and_safe_body(monkeypatch, caplog):
     secret = "secret-value"
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", secret)
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", secret)
 
     def fail(request, timeout):
         response = None
@@ -72,7 +72,7 @@ def test_http_error_logs_status_and_safe_body(monkeypatch, caplog):
 
 def test_generic_error_logs_exception_details(monkeypatch, caplog):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "secret")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
     monkeypatch.setattr(
         checker,
         "urlopen",
