@@ -22,7 +22,7 @@ require_runtime_secret() {
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
 
-en sure_provider_credential_key() {
+ensure_provider_credential_key() {
   local key_file="$ROOT_DIR/keys/provider-credentials.key"
   mkdir -p "$(dirname "$key_file")"
   if [[ -z "${ALICE_PROVIDER_CREDENTIAL_KEY:-}" && -s "$key_file" ]]; then
