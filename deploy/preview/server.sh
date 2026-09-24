@@ -74,82 +74,6 @@ clear_dozzle_data() {
 
 prepare_runtime_smoke() {
   local key="$1"
-  local workdir="$2"
-  local runtime_dir="$workdir/runtime"
-  local runtime_container="$CONTAINER_PREFIX-$key-runtime-ssh"
-  local runtime_image="$RUNTIME_IMAGE_PREFIX:$key"
-  local client_key="$runtime_dir/id_ed25519"
-  local client_pub="$client_key.pub"
-  local host_key="$runtime_dir/ssh_host_ed25519_key"
-  local host_pub="$host_key.pub"
-  local authorized_keys="$runtime_dir/authorized_keys"
-  local known_hosts="$runtime_dir/known_hosts"
-  local dockerfile="$runtime_dir/Dockerfile"
-  local sshd_config="$runtime_dir/sshd_config"
-
-  rm -rf -- "$runtime_dir"
-  mkdir -p "$runtime_dir"
-  umask 077
-
-  ssh-keygen -q -t ed25519 -N "" -f "$client_key"
-  ssh-keygen -q -t ed25519 -N "" -f "$host_key"
-  cp "$client_pub" "$authorized_keys"
-  printf '%s %s\n' "$runtime_container" "$(cut -d' ' -f1-2 "$host_pub")" > "$known_hosts"
-
-  cat > "$sshd_config" <<'EOF'
-Port 22
-ListenAddress 0.0.0.0
-HostKey /etc/ssh/ssh_host_ed25519_key
-PubkeyAuthentication yes
-PasswordAuthentication no
-KbdInteractiveAuthentication no
-ChallengeResponseAuthentication no
-PermitRootLogin no
-AllowUsers alice-runtime
-AuthorizedKeysFile .ssh/authorized_keys
-UsePAM no
-UseDNS no
-X11Forwarding no
-AllowTcpForwarding no
-PermitTunnel no
-StrictModes yes
-EOF
-
-  cat > "$dockerfile" <<'EOF'
-FROM debian:bookworm-slim
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends openssh-server coreutils && \
-    rm -rf /var/lib/apt/lists/* && \
-    useradd --create-home --shell /bin/bash alice-runtime && \
-    mkdir -p /home/alice-runtime/.ssh /run/sshd && \
-    chown -R alice-runtime:alice-runtime /home/alice-runtime
-COPY sshd_config /etc/ssh/sshd_config
-COPY ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
-COPY authorized_keys /home/alice-runtime/.ssh/authorized_keys
-RUN chown alice-runtime:alice-runtime /home/alice-runtime/.ssh/authorized_keys && \
-    chmod 700 /home/alice-runtime/.ssh && \
-    chmod 600 /home/alice-runtime/.ssh/authorized_keys && \
-    chmod 600 /etc/ssh/ssh_host_ed25519_key
-CMD ["/usr/sbin/sshd", "-D", "-e"]
-EOF
-
-  docker rm -f "$runtime_container" >/dev/null 2>&1 || true
-  docker image rm "$runtime_image" >/dev/null 2>&1 || true
-  log "building isolated SSH Runtime target $runtime_container"
-  docker build --pull -q -t "$runtime_image" "$runtime_dir" >/dev/null
-  log "starting isolated SSH Runtime target $runtime_container"
-  local expires_at
-  expires_at="$(docker inspect -f '{{ index .Config.Labels "alice.preview.expires_at" }}' "$CONTAINER_PREFIX-$key" 2>/dev/null || true)"
-  docker run -d --name "$runtime_container" --network "$NETWORK_NAME" \
-    --label "alice.preview=true" \
-    --label "alice.preview.key=$key" \
-    --label "alice.preview.runtime=true" \
-    --label "alice.preview.expires_at=$expires_at" \
-    "$runtime_image" >/dev/null
-}
-
-runtime_smoke() {
-  local key="$1"
   require_key
   local container="$CONTAINER_PREFIX-$key"
   local workdir="$ROOT_DIR/previews/$key"
@@ -162,17 +86,90 @@ runtime_smoke() {
   docker inspect "$container" >/dev/null 2>&1 || die "preview container not found: $container"
 
   cleanup_runtime_smoke() {
-    docker exec "$container" rm -f \
+    local app_container="$1"
+    local cleanup_runtime_dir="$2"
+    local cleanup_runtime_container="$3"
+    local cleanup_key="$4"
+    docker exec "$app_container" rm -f \
       /tmp/alice-runtime-id_ed25519 \
       /tmp/alice-runtime-known_hosts \
       /tmp/alice-runtime-smoke.py >/dev/null 2>&1 || true
-    rm -rf -- "$runtime_dir"
-    docker rm -f "$runtime_container" >/dev/null 2>&1 || true
-    docker image rm "$RUNTIME_IMAGE_PREFIX:$key" >/dev/null 2>&1 || true
+    rm -rf -- "$cleanup_runtime_dir"
+    docker rm -f "$cleanup_runtime_container" >/dev/null 2>&1 || true
+    docker image rm "$RUNTIME_IMAGE_PREFIX:$cleanup_key" >/dev/null 2>&1 || true
   }
-  trap cleanup_runtime_smoke EXIT
+  trap 'cleanup_runtime_smoke "$container" "$runtime_dir" "$runtime_container" "$key"' EXIT
 
   prepare_runtime_smoke "$key" "$workdir"
+
+  cat > "$smoke_script" <<'PY'
+from trace_manager import ExecutionTrace
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_registry import registry
+
+OWNER = "preview-runtime-owner"
+TARGET = "preview-runtime"
+PATH = "/home/alice-runtime/alice-runtime-smoke.txt"
+CONTENT = "ALICE_RUNTIME_SMOKE_OK\n"
+
+
+def invoke(name, arguments, approved):
+    trace = ExecutionTrace()
+    call = UniversalToolCall(
+        tool_name=name,
+        arguments=arguments,
+        transport="internal",
+        call_id=f"preview-smoke-{name}",
+        user_id=OWNER,
+        approved=approved,
+    )
+    result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
+    if not result.get("success"):
+        raise AssertionError(f"{name} failed: {result.get('error')}")
+    return result, trace
+
+
+exec_result, exec_trace = invoke(
+    "ssh_runtime_exec",
+    {"target": TARGET, "timeout_seconds": 10, "command": "id -un"},
+    True,
+)
+assert exec_result["data"]["linux_user"] == "alice-runtime"
+assert exec_result["data"]["stdout"].strip() == "alice-runtime"
+assert any(
+    event.get("type") == "runtime_finished"
+    and event.get("payload", {}).get("linux_user") == "alice-runtime"
+    for event in exec_trace.trace["events"]
+)
+assert exec_trace.trace["tool_calls"][0]["arguments"]["command"] == "<redacted>"
+assert exec_trace.trace["tool_calls"][0]["result"]["data"]["stdout"] == "<redacted>"
+
+write_result, write_trace = invoke(
+    "ssh_runtime_write_file",
+    {"target": TARGET, "timeout_seconds": 10, "path": PATH, "content": CONTENT},
+    True,
+)
+assert write_result["data"]["success"] is True
+assert write_result["data"]["linux_user"] == "alice-runtime"
+assert write_trace.trace["tool_calls"][0]["arguments"]["content"] == "<redacted>"
+
+read_result, read_trace = invoke(
+    "ssh_runtime_read_file",
+    {"target": TARGET, "timeout_seconds": 10, "path": PATH},
+    False,
+)
+assert read_result["data"]["stdout"] == CONTENT
+assert read_result["data"]["linux_user"] == "alice-runtime"
+assert read_trace.trace["tool_calls"][0]["result"]["data"]["stdout"] == "<redacted>"
+
+cleanup_result, _ = invoke(
+    "ssh_runtime_exec",
+    {"target": TARGET, "timeout_seconds": 10, "command": f"rm -f -- {PATH}"},
+    True,
+)
+assert cleanup_result["data"]["exit_code"] == 0
+print("SSH Runtime Preview smoke passed")
+PY
 
   docker cp "$runtime_client_key" "$container:/tmp/alice-runtime-id_ed25519" >/dev/null
   docker cp "$runtime_known_hosts" "$container:/tmp/alice-runtime-known_hosts" >/dev/null
@@ -180,15 +177,18 @@ runtime_smoke() {
   docker exec -u 0 "$container" chmod 600 \
     /tmp/alice-runtime-id_ed25519 \
     /tmp/alice-runtime-known_hosts
+
   local runtime_targets_json
   runtime_targets_json="{\"preview-runtime\":{\"host\":\"$runtime_container\",\"port\":22,\"default_user\":\"alice-runtime\",\"allowed_users\":[\"alice-runtime\"],\"identity_map\":{\"preview-runtime-owner\":\"alice-runtime\"},\"workspace_root\":\"/home/alice-runtime\",\"identity_file\":\"/tmp/alice-runtime-id_ed25519\",\"known_hosts\":\"/tmp/alice-runtime-known_hosts\",\"command_timeout_seconds\":30}}"
+
   docker exec -u 0 \
     -e "ALICE_SSH_TARGETS_JSON=$runtime_targets_json" \
     -e "ALICE_SSH_KNOWN_HOSTS=/tmp/alice-runtime-known_hosts" \
     "$container" python /tmp/alice-runtime-smoke.py
+
   log "SSH Runtime smoke passed for $key"
   trap - EXIT
-  cleanup_runtime_smoke
+  cleanup_runtime_smoke "$container" "$runtime_dir" "$runtime_container" "$key"
 }
 
 cleanup_key() {
