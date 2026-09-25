@@ -36,10 +36,17 @@ function initSidebar() {
         if (modal) modal.classList.add("visible");
     });
     if (typeof renderSidebar === "function") renderSidebar();
-    window.addEventListener("popstate", handleHistoryNavigation);
+    if (window.__aliceSidebarHistoryBound !== true) {
+        window.addEventListener("popstate", handleHistoryNavigation);
+        window.__aliceSidebarHistoryBound = true;
+    }
 }
 
-document.addEventListener("DOMContentLoaded", initSidebar);
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initSidebar, { once: true });
+} else {
+    initSidebar();
+}
 
 function renderSidebar() {
     var list = document.getElementById("conv-list");
@@ -63,6 +70,7 @@ function renderSidebar() {
         
         // Двойной клик для переименования
         titleSpan.addEventListener("dblclick", function(e) {
+            e.preventDefault();
             e.stopPropagation();
             var newName = prompt("Новое имя диалога:", conv.title);
             if (newName && newName.trim() !== "") {
