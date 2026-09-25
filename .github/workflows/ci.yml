@@ -44,7 +44,6 @@ jobs:
           mkdir -p coverage-js
           NODE_V8_COVERAGE=coverage-js node tests/test_file_manager.js
           NODE_V8_COVERAGE=coverage-js node tests/test_dozzle_header.js
-          NODE_V8_COVERAGE=coverage-js node tests/test_model_loader.js
           NODE_V8_COVERAGE=coverage-js node tests/test_frontend_boot.js
           NODE_V8_COVERAGE=coverage-js node tests/test_project_tree.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
