@@ -27,10 +27,6 @@ require_short_token() {
   if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then IFS= read -r ALICE_SHORT_TOKEN || true; fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
-
-require_owner_id() {
-  [[ -n "${ALICE_OWNER_ID:-}" ]] || die "ALICE_OWNER_ID is required for preview MCP"
-}
 ensure_provider_credential_key() {
   local key_file="$ROOT_DIR/keys/provider-credentials.key"
   mkdir -p "$(dirname "$key_file")"
@@ -318,13 +314,7 @@ deploy() {
   [[ "$archive_path" == "$ROOT_DIR/incoming/"*.tar.gz ]] || die "archive must be inside $ROOT_DIR/incoming"
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
-  require_short_token
-  # Preview deployments are isolated single-user environments. If CI has not
-  # supplied a dedicated owner id, derive a stable non-user-controlled owner
-  # from the preview key so MCP conversation scoping still works.
-  ALICE_OWNER_ID="${ALICE_OWNER_ID:-preview-${key}}"
-  export ALICE_OWNER_ID
-  require_owner_id; ensure_provider_credential_key; ensure_traefik
+  require_short_token; ensure_provider_credential_key; ensure_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
   local workdir="${ROOT_DIR}/previews/${key}"
   local builddir="${workdir}/build"
@@ -355,7 +345,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
     -v "$data_dir:/app/data" \
-    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_DB_PATH=/app/data/alice_pro.db -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e SUPABASE_URL="$SUPABASE_URL" -e SUPABASE_SECRET_KEY="$SUPABASE_SECRET_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true -e ALICE_OWNER_ID="$ALICE_OWNER_ID" "$image" >/dev/null
+    -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_DB_PATH=/app/data/alice_pro.db -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e SUPABASE_URL="$SUPABASE_URL" -e SUPABASE_SECRET_KEY="$SUPABASE_SECRET_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
   local dozzle_container="${container}-dozzle"
   local dozzle_ru_router="${dozzle_container}-logs-ru"
   local dozzle_online_router="${dozzle_container}-logs-online"

@@ -1,7 +1,6 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 from flask import Blueprint, request, jsonify
 import logging
-import os
 import json as _json
 from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
@@ -25,7 +24,7 @@ from db import (
 from partial_output import extract_last_response_text, format_partial_output_message
 from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
-from treasury_identity import get_current_owner_id
+from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_quotas import ProviderQuotaExceeded
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from conversation_ownership import (
@@ -391,10 +390,12 @@ def handle_mcp_server_item(server_id):
 
 @mcp_bp.route('/api/conversations', methods=['GET', 'POST'])
 def conversations():
-    # Conversations are ordinary Chat state, not Treasury operations.
-    # Preview/single-user deployments may scope them to the configured server
-    # owner, but an invalid Treasury token must never block this endpoint.
-    owner_id = os.getenv("ALICE_OWNER_ID") or None
+    try:
+        owner_id = get_current_owner_id(required=False)
+    except TreasuryIdentityError as exc:
+        logger.warning("[CONVERSATION] Invalid owner identity: %s", exc)
+        return jsonify({"error": str(exc)}), 401
+
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         client = AliceClient(Config)
@@ -439,9 +440,7 @@ def conversations():
 
 @mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
 def get_conv_messages(conv_id):
-    # Conversation history is ordinary Chat state. Treasury identity is not
-    # required here, including in single-user preview deployments.
-    owner_id = os.getenv("ALICE_OWNER_ID") or None
+    owner_id = get_current_owner_id(required=False)
     if owner_id and not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     return jsonify({"messages": get_messages(conv_id)})
