@@ -1,4 +1,3 @@
-document.addEventListener("DOMContentLoaded", function() {
     var modelBtn = document.getElementById("model-btn");
     var closeModalBtn = document.getElementById("close-modal");
 
@@ -14,7 +13,6 @@ document.addEventListener("DOMContentLoaded", function() {
         var modal = document.getElementById("model-modal");
         if (modal) modal.classList.add("visible");
     });
-});
 
 function renderModelModal() {
     var modelList = document.getElementById("model-list");
