@@ -41,7 +41,7 @@ jobs:
 
       - name: Repair stale remote migration history
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MANAGEMENT_TOKEN }}
         run: |
           # The remote project contains a dashboard-created migration that is
           # not present in this repository. Mark only that stale entry as
@@ -50,10 +50,10 @@ jobs:
 
       - name: Apply migrations
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MANAGEMENT_TOKEN }}
         run: supabase db push --yes
 
       - name: Verify migration state
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MANAGEMENT_TOKEN }}
         run: supabase migration list
