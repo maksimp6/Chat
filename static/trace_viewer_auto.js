@@ -19,15 +19,13 @@
             if (!raw || typeof raw !== "object") return;
 
             details.dataset.traceViewerBound = "1";
-            details.style.width = "auto";
-            details.style.display = "inline-block";
-            details.style.marginTop = "4px";
+            details.classList.add("trace-viewer-auto-details");
 
             var message = details.closest(".msg");
             var isError = !!(message && message.classList.contains("bot") && /(^|\s)⚠️\s*Ошибка/.test(message.textContent));
             var button = document.createElement("button");
             button.type = "button";
-            button.style.cssText = "font-size:11px;background:transparent;border:0;padding:0;color:inherit;cursor:pointer;font-weight:600;";
+            button.className = "trace-viewer-auto-button";
             button.textContent = isError ? "🔍 Трейс ошибки" : summaryText;
             button.title = isError ? "Открыть Execution Trace ошибки" : "Открыть Execution Trace viewer";
             button.onclick = function (event) {
@@ -41,16 +39,19 @@
         });
     }
 
+    var observer = null;
+
     function init() {
+        if (observer) return;
         enhance(document);
-        var observer = new MutationObserver(function (mutations) {
+        observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
                 mutation.addedNodes.forEach(function (node) {
                     if (node.nodeType === 1) enhance(node);
                 });
             });
         });
-        observer.observe(document.body, { childList: true, subtree: true });
+        if (document.body) observer.observe(document.body, { childList: true, subtree: true });
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

@@ -1,4 +1,6 @@
-document.addEventListener("DOMContentLoaded", function() {
+function initSidebar() {
+    if (document.documentElement.dataset.sidebarInitialized === "true") return;
+    document.documentElement.dataset.sidebarInitialized = "true";
     var sidebar = document.getElementById("sidebar");
     var menuBtn = document.getElementById("menu-btn");
     var closeBtn = document.getElementById("close-sidebar-btn");
@@ -34,15 +36,28 @@ document.addEventListener("DOMContentLoaded", function() {
         if (modal) modal.classList.add("visible");
     });
     if (typeof renderSidebar === "function") renderSidebar();
-});
+    if (window.__aliceSidebarHistoryBound !== true) {
+        window.addEventListener("popstate", handleHistoryNavigation);
+        window.__aliceSidebarHistoryBound = true;
+    }
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initSidebar, { once: true });
+} else {
+    initSidebar();
+}
 
 function renderSidebar() {
     var list = document.getElementById("conv-list");
     if (!list) return;
-    list.innerHTML = "";
+    list.replaceChildren();
     var items = Array.isArray(conversations) ? conversations : [];
     if (!items.length) {
-        list.innerHTML = '<div style="padding:20px;color:var(--text-secondary);text-align:center">Нет диалогов</div>';
+        var empty = document.createElement("div");
+        empty.className = "conv-empty";
+        empty.textContent = "Нет диалогов";
+        list.appendChild(empty);
         return;
     }
     items.forEach(function(conv) {
@@ -55,6 +70,7 @@ function renderSidebar() {
         
         // Двойной клик для переименования
         titleSpan.addEventListener("dblclick", function(e) {
+            e.preventDefault();
             e.stopPropagation();
             var newName = prompt("Новое имя диалога:", conv.title);
             if (newName && newName.trim() !== "") {
@@ -101,9 +117,21 @@ function renderSidebar() {
             }
         });
         
-        div.appendChild(titleSpan);
+        var link = document.createElement("a");
+        link.className = "conv-link";
+        link.href = "?conversation_id=" + encodeURIComponent(conv.id);
+        link.setAttribute("aria-current", conv.id === currentConvId ? "page" : "false");
+        link.appendChild(titleSpan);
+        div.appendChild(link);
         div.appendChild(delBtn);
-        div.addEventListener("click", function() { selectConv(conv.id); });
+        div.addEventListener("click", function(e) {
+            if (e.target === delBtn || e.target.closest(".conv-link")) return;
+            selectConv(conv.id);
+        });
+        link.addEventListener("click", function(e) {
+            e.preventDefault();
+            selectConv(conv.id);
+        });
         list.appendChild(div);
     });
 }
@@ -152,7 +180,13 @@ function deleteConv(id) {
             selectConv(currentConvId);
         } else {
             var chatbox = document.getElementById("chatbox");
-            if (chatbox) chatbox.innerHTML = '<div class="empty-state">Нажмите + Новый чат</div>';
+            if (chatbox) {
+                chatbox.replaceChildren();
+                var empty = document.createElement("div");
+                empty.className = "empty-state";
+                empty.textContent = "Нажмите + Новый чат";
+                chatbox.appendChild(empty);
+            }
             if (typeof window.changeModel === "function") {
                 window.changeModel("aliceai-llm", true);
             }
@@ -161,7 +195,7 @@ function deleteConv(id) {
     if (typeof renderSidebar === "function") renderSidebar();
 }
 
-window.addEventListener('popstate', function(event) {
+function handleHistoryNavigation(event) {
     var params = new URLSearchParams(window.location.search);
     var convId = params.get('conversation_id');
     if (convId && convId !== currentConvId) {
@@ -170,7 +204,13 @@ window.addEventListener('popstate', function(event) {
         currentConvId = null;
         localStorage.removeItem("current_conv_id");
         var chatbox = document.getElementById("chatbox");
-        if (chatbox) chatbox.innerHTML = '<div class="empty-state">Нажмите + Новый чат</div>';
+        if (chatbox) {
+            chatbox.replaceChildren();
+            var empty = document.createElement("div");
+            empty.className = "empty-state";
+            empty.textContent = "Нажмите + Новый чат";
+            chatbox.appendChild(empty);
+        }
         if (typeof renderSidebar === "function") renderSidebar();
     }
-});
+}

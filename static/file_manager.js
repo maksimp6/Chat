@@ -48,10 +48,10 @@ window.fetchVectorStores = function() {
 
         var ov = document.createElement("div");
         ov.id = "file-manager-modal";
-        ov.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:var(--m-overlay,rgba(0,0,0,0.6));z-index:10001;display:flex;align-items:center;justify-content:center;";
+        ov.className = "modal file-manager-modal";
 
         var md = document.createElement("div");
-        md.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:24px;max-width:800px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
+        md.className = "file-manager-box";
 
         md.innerHTML = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">',
@@ -82,7 +82,7 @@ window.fetchVectorStores = function() {
         ].join('');
 
         ov.appendChild(md);
-        document.body.appendChild(ov);
+        (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
 
         function closeModal() { ov.remove(); }
         document.getElementById('close-fm-btn').addEventListener('click', closeModal);
@@ -103,58 +103,103 @@ window.fetchVectorStores = function() {
         function renderVsManagerList(stores) {
             var cont = document.getElementById('vs-manager-list');
             if (!cont) return;
+            cont.replaceChildren();
+
             if (!Array.isArray(stores)) {
-                cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-danger,#c33);font-size:12px;">Ошибка: список Vector Stores имеет неожиданный формат.</div>';
+                var invalid = document.createElement('div');
+                invalid.className = 'file-manager-state file-manager-state-error';
+                invalid.textContent = 'Ошибка: список Vector Stores имеет неожиданный формат.';
+                cont.appendChild(invalid);
                 return;
             }
             if (stores.length === 0) {
-                cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);font-size:12px;">Нет векторных хранилищ. Создайте новое.</div>';
+                var empty = document.createElement('div');
+                empty.className = 'file-manager-state';
+                empty.textContent = 'Нет векторных хранилищ. Создайте новое.';
+                cont.appendChild(empty);
                 return;
             }
-            cont.innerHTML = stores.map(function(vs) {
-                var idShort = vs.id.substring(0, 12) + '...';
-                var fileCount = vs.file_counts ? (vs.file_counts.completed || 0) : 0;
-                return '<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--m-section-border,#eee);font-size:12px;">' +
-                    '<div style="flex:1;min-width:0;">' +
-                    '    <div style="font-weight:bold;color:var(--m-text,#222);">' + UI.escapeHtml(vs.name || '(без названия)') + '</div>' +
-                    '    <div style="font-size:11px;color:var(--m-muted,#666);">ID: <code style="cursor:pointer;color:var(--m-accent,#4a90d9);" class="vs-id-copy" data-id="' + UI.escapeHtml(vs.id) + '">' + UI.escapeHtml(idShort) + '</code> · Файлов: ' + fileCount + '</div>' +
-                    '</div>' +
-                    '<button class="vs-add-files-btn" data-id="' + UI.escapeHtml(vs.id) + '" data-name="' + UI.escapeHtml(vs.name || '') + '" style="padding:4px 8px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:11px;color:var(--m-text,#222);">+ Файлы</button>' +
-                    '<button class="vs-delete-btn" data-id="' + UI.escapeHtml(vs.id) + '" style="padding:4px 8px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:11px;color:var(--m-danger,#c33);">Удалить</button>' +
-                    '</div>';
-            }).join('');
 
-            // Копирование ID по клику
+            stores.forEach(function(vs) {
+                var row = document.createElement('div');
+                row.className = 'file-manager-vs-row';
+
+                var details = document.createElement('div');
+                details.className = 'file-manager-vs-details';
+
+                var name = document.createElement('div');
+                name.className = 'file-manager-vs-name';
+                name.textContent = vs.name || '(без названия)';
+
+                var meta = document.createElement('div');
+                meta.className = 'file-manager-vs-meta';
+                var idLabel = document.createTextNode('ID: ');
+                var idCode = document.createElement('code');
+                idCode.className = 'vs-id-copy file-manager-copy-id';
+                idCode.dataset.id = vs.id || '';
+                idCode.textContent = (vs.id || '').substring(0, 12) + '...';
+                var fileCount = vs.file_counts ? (vs.file_counts.completed || 0) : 0;
+                meta.appendChild(idLabel);
+                meta.appendChild(idCode);
+                meta.appendChild(document.createTextNode(' · Файлов: ' + fileCount));
+
+                details.appendChild(name);
+                details.appendChild(meta);
+
+                var addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'vs-add-files-btn file-manager-secondary-btn';
+                addBtn.dataset.id = vs.id || '';
+                addBtn.dataset.name = vs.name || '';
+                addBtn.textContent = '+ Файлы';
+
+                var deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'vs-delete-btn file-manager-danger-btn';
+                deleteBtn.dataset.id = vs.id || '';
+                deleteBtn.textContent = 'Удалить';
+
+                row.appendChild(details);
+                row.appendChild(addBtn);
+                row.appendChild(deleteBtn);
+                cont.appendChild(row);
+            });
+
             cont.querySelectorAll('.vs-id-copy').forEach(function(code) {
                 code.addEventListener('click', function() {
-                    var id = this.getAttribute('data-id');
+                    var id = this.dataset.id || '';
                     copyToClipboard(id);
-                    var orig = this.textContent;
+                    var original = this.textContent;
                     this.textContent = 'скопировано!';
                     var self = this;
-                    setTimeout(function() { self.textContent = orig; }, 1500);
+                    setTimeout(function() { self.textContent = original; }, 1500);
                 });
             });
 
-            // Кнопка "Добавить файлы"
             cont.querySelectorAll('.vs-add-files-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
-                    var vsId = this.getAttribute('data-id');
-                    var vsName = this.getAttribute('data-name');
-                    openAddFilesToVsModal(vsId, vsName);
+                    openAddFilesToVsModal(this.dataset.id || '', this.dataset.name || '');
                 });
             });
 
-            // Кнопка "Удалить"
             cont.querySelectorAll('.vs-delete-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
-                    var vsId = this.getAttribute('data-id');
+                    var button = this;
+                    var vsId = button.dataset.id || '';
                     if (!confirm('Удалить векторное хранилище?')) return;
-                    this.disabled = true;
-                    this.innerText = '...';
-                    fetch('/api/vector-stores/' + vsId, { method: 'DELETE' })
+                    button.disabled = true;
+                    button.textContent = '...';
+                    fetch('/api/vector-stores/' + encodeURIComponent(vsId), { method: 'DELETE' })
+                        .then(function(response) {
+                            if (!response.ok) throw new Error('HTTP ' + response.status);
+                            return response.json().catch(function() { return {}; });
+                        })
                         .then(function() { loadVsList(); })
-                        .catch(function(e) { alert('Ошибка: ' + e.message); });
+                        .catch(function(error) {
+                            button.disabled = false;
+                            button.textContent = 'Удалить';
+                            alert('Ошибка: ' + error.message);
+                        });
                 });
             });
         }
@@ -212,79 +257,130 @@ window.fetchVectorStores = function() {
 
             var bg = document.createElement('div');
             bg.id = 'vs-add-files-modal';
-            bg.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10002;display:flex;align-items:center;justify-content:center;";
+            bg.className = "modal file-manager-add-modal";
 
             var panel = document.createElement('div');
-            panel.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:500px;width:85%;max-height:70vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+            panel.className = "file-manager-add-box";
 
-            panel.innerHTML = [
-                '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">',
-                '    <h3 style="margin:0;font-size:14px;color:var(--m-text,#222);">Файлы → ' + UI.escapeHtml(vsName || vsId.substring(0,8)) + '</h3>',
-                '    <button id="vs-add-close" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
-                '</div>',
-                '<div id="vs-add-filelist" style="max-height:300px;overflow-y:auto;margin-bottom:12px;"></div>',
-                '<button id="vs-add-confirm" style="width:100%;padding:8px;background:var(--m-accent,#4a90d9);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">Добавить выбранные файлы</button>'
-            ].join('');
+            var header = document.createElement('div');
+            header.className = 'file-manager-add-header';
+            var title = document.createElement('h3');
+            title.className = 'file-manager-add-title';
+            title.textContent = 'Файлы → ' + (vsName || vsId.substring(0, 8));
+            var close = document.createElement('button');
+            close.type = 'button';
+            close.id = 'vs-add-close';
+            close.className = 'file-manager-close-btn';
+            close.setAttribute('aria-label', 'Закрыть');
+            close.textContent = '×';
+            header.appendChild(title);
+            header.appendChild(close);
 
+            var fileListEl = document.createElement('div');
+            fileListEl.id = 'vs-add-filelist';
+            fileListEl.className = 'file-manager-add-list';
+
+            var confirm = document.createElement('button');
+            confirm.type = 'button';
+            confirm.id = 'vs-add-confirm';
+            confirm.className = 'file-manager-primary-btn';
+            confirm.textContent = 'Добавить выбранные файлы';
+
+            panel.appendChild(header);
+            panel.appendChild(fileListEl);
+            panel.appendChild(confirm);
             bg.appendChild(panel);
-            document.body.appendChild(bg);
+            (document.querySelector(".alice-pro-app") || document.body).appendChild(bg);
 
             function closeAddModal() { bg.remove(); }
-            document.getElementById('vs-add-close').addEventListener('click', closeAddModal);
+            close.addEventListener('click', closeAddModal);
             bg.addEventListener('click', function(e) { if (e.target === bg) closeAddModal(); });
 
-            // Загружаем список файлов
-            var fileListEl = document.getElementById('vs-add-filelist');
-            fileListEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);">Загрузка...</div>';
+            function renderAddFilesState(message, isError) {
+                fileListEl.replaceChildren();
+                var state = document.createElement('div');
+                state.className = 'file-manager-state' + (isError ? ' file-manager-state-error' : '');
+                state.textContent = message;
+                fileListEl.appendChild(state);
+            }
+
+            renderAddFilesState('Загрузка...', false);
 
             fetch('/api/files')
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    return r.json().then(function(data) {
+                        if (!r.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
+                        return data;
+                    });
+                })
                 .then(function(data) {
-                    var files = data.data || [];
+                    var files = Array.isArray(data.data) ? data.data : [];
                     if (files.length === 0) {
-                        fileListEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);">Нет файлов. Загрузите их в менеджере.</div>';
+                        renderAddFilesState('Нет файлов. Загрузите их в менеджере.', false);
                         return;
                     }
-                    fileListEl.innerHTML = files.map(function(f) {
-                        return '<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--m-section-border,#eee);font-size:12px;">' +
-                            '<input type="checkbox" class="vs-add-file-chk" value="' + UI.escapeHtml(f.id) + '" style="cursor:pointer;">' +
-                            '<span style="color:var(--m-text,#222);">' + UI.escapeHtml(f.filename) + '</span>' +
-                            '<span style="margin-left:auto;color:var(--m-muted,#666);font-size:11px;">' + formatBytes(f.bytes) + '</span>' +
-                            '</div>';
-                    }).join('');
+                    fileListEl.replaceChildren();
+                    files.forEach(function(f) {
+                        var row = document.createElement('label');
+                        row.className = 'file-manager-add-row';
+
+                        var checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'vs-add-file-chk';
+                        checkbox.value = f.id || '';
+
+                        var filename = document.createElement('span');
+                        filename.className = 'file-manager-add-name';
+                        filename.textContent = f.filename || '';
+
+                        var size = document.createElement('span');
+                        size.className = 'file-manager-add-size';
+                        size.textContent = formatBytes(f.bytes);
+
+                        row.appendChild(checkbox);
+                        row.appendChild(filename);
+                        row.appendChild(size);
+                        fileListEl.appendChild(row);
+                    });
                 })
                 .catch(function(e) {
-                    fileListEl.innerHTML = '<div style="padding:10px;color:var(--m-danger,#c33);">Ошибка: ' + e.message + '</div>';
+                    renderAddFilesState('Ошибка: ' + e.message, true);
                 });
 
-            // Подтверждение добавления
-            document.getElementById('vs-add-confirm').addEventListener('click', function() {
+            confirm.addEventListener('click', function() {
                 var checked = [];
                 fileListEl.querySelectorAll('.vs-add-file-chk:checked').forEach(function(chk) {
                     checked.push(chk.value);
                 });
                 if (checked.length === 0) { alert('Выберите файлы'); return; }
 
-                this.disabled = true;
-                this.innerText = 'Добавление...';
+                confirm.disabled = true;
+                confirm.textContent = 'Добавление...';
 
-                fetch('/api/vector-stores/' + vsId + '/files', {
+                fetch('/api/vector-stores/' + encodeURIComponent(vsId) + '/files', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ file_ids: checked })
                 })
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    return r.json().then(function(data) {
+                        if (!r.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
+                        return data;
+                    });
+                })
                 .then(function() {
                     closeAddModal();
                     loadVsList();
                 })
                 .catch(function(e) { alert('Ошибка: ' + e.message); })
                 .finally(function() {
-                    var btn = document.getElementById('vs-add-confirm');
-                    if (btn) { btn.disabled = false; btn.innerText = 'Добавить выбранные файлы'; }
+                    if (!document.getElementById('vs-add-confirm')) return;
+                    confirm.disabled = false;
+                    confirm.textContent = 'Добавить выбранные файлы';
                 });
             });
         }
+
 
         // === Рендер файлов ===
         function renderFile(file) {

@@ -1,7 +1,30 @@
 (function () {
   function bindHeaderActions() {
+    if (window.__aliceHeaderActionsBound === true) return;
+    window.__aliceHeaderActionsBound = true;
+
+    document.addEventListener("click", function (event) {
+      var target = event.target && event.target.closest
+        ? event.target.closest("#memory-btn")
+        : null;
+      if (!target) return;
+      event.preventDefault();
+      if (typeof window.openMemoryModal === "function") {
+        window.openMemoryModal();
+      } else {
+        console.error("[Memory] Modal script is unavailable");
+      }
+    }, true);
+
     var bindings = [
       ["tools-btn", "click", function () { window.openToolsModal(); }],
+      ["ssh-runtime-btn", "click", function () {
+        if (typeof window.openSshRuntimeModal === "function") {
+          window.openSshRuntimeModal();
+        } else {
+          console.error("[SSH Runtime] Modal script is unavailable");
+        }
+      }],
       ["mcp-btn", "click", function () { window.openMcpManagerModal(); }],
       ["settings-btn", "click", function () { window.openSettingsModal(); }],
       ["file-manager-btn", "click", function () { window.openFileManagerModal(); }],

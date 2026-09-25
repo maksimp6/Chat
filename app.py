@@ -25,7 +25,7 @@ from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from short_token_auth import install_short_token_auth
-from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner
+from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
 from ssh_runtime_settings import public_settings, save_settings, test_connection
 
 app = Flask(__name__)
@@ -100,7 +100,28 @@ ensure_partner_department()
 
 @app.route("/")
 def index():
-    return render_template("index.html", preview_base_path=preview_base_path(), static_version=STATIC_ASSET_VERSION)
+    selected_conversation = None
+    selected_messages = []
+    conversation_id = (request.args.get("conversation_id") or "").strip()
+    if conversation_id:
+        owner_id = get_current_owner_id(required=False)
+        if owner_id:
+            selected_conversation = get_owned_conversation(conversation_id, owner_id)
+        else:
+            selected_conversation = next(
+                (conv for conv in get_conversations() if conv["id"] == conversation_id),
+                None,
+            )
+        if selected_conversation:
+            selected_messages = get_messages(conversation_id)
+
+    return render_template(
+        "index.html",
+        preview_base_path=preview_base_path(),
+        static_version=STATIC_ASSET_VERSION,
+        selected_conversation=selected_conversation,
+        selected_messages=selected_messages,
+    )
 
 
 @app.route("/healthz", methods=["GET"])
@@ -207,6 +228,7 @@ def save_dialog_settings(conv_id):
 
 
 from memory_manager import load_memory_config, save_memory_config, clear_global_memory
+from memory_extractor import init_global_memory
 from db import get_conn
 import sqlite3
 
@@ -214,6 +236,7 @@ import sqlite3
 @app.route("/api/memory/manage", methods=["GET"])
 def api_memory_panel_data():
     cfg = load_memory_config()
+    init_global_memory()
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     facts = [dict(r) for r in conn.execute("SELECT * FROM global_memory ORDER BY updated_at DESC").fetchall()]

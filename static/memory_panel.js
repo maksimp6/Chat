@@ -93,15 +93,30 @@
   };
 
   function bindMemoryPanelEvents() {
-    var bindings = [
-      ["memory-btn", "click", window.openMemoryModal],
-      ["memoryCloseBtn", "click", window.closeMemoryModal],
+    if (window.__aliceMemoryPanelBound === true) return;
+    window.__aliceMemoryPanelBound = true;
+
+    document.addEventListener("click", function (event) {
+      var target = event.target && event.target.closest
+        ? event.target.closest("#memoryCloseBtn, #memoryClearBtn")
+        : null;
+      if (!target) return;
+
+      if (target.id === "memoryCloseBtn") {
+        event.preventDefault();
+        window.closeMemoryModal();
+      } else if (target.id === "memoryClearBtn") {
+        event.preventDefault();
+        window.clearMemory(null);
+      }
+    }, true);
+
+    var configBindings = [
       ["memEnabled", "change", window.updateMemoryConfig],
-      ["memLimit", "change", window.updateMemoryConfig],
-      ["memoryClearBtn", "click", function () { window.clearMemory(null); }]
+      ["memLimit", "change", window.updateMemoryConfig]
     ];
 
-    bindings.forEach(function (binding) {
+    configBindings.forEach(function (binding) {
       var element = byId(binding[0]);
       if (!element || element.dataset.bound === "true") return;
       element.addEventListener(binding[1], binding[2]);

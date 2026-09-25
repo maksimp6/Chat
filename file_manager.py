@@ -7,6 +7,7 @@ import logging
 api_logger = logging.getLogger("yandex_api_debug")
 
 from yandex_client import YandexClientError, _sanitize_for_log
+from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 
 class YandexFileManagerMixin:
     """Миксин для Files и Vector Stores. Подключается к YandexResponsesClient."""
@@ -14,6 +15,7 @@ class YandexFileManagerMixin:
     def _fm_request(self, method, url, **kwargs):
         """Запрос с retry + логирование через _log_request/_log_response.
         Для multipart убирает Content-Type из заголовков сессии."""
+        _resolve_global_provider_credential(self)
         restore_ct = None
         if kwargs.get('files') and 'Content-Type' in self.session.headers:
             restore_ct = self.session.headers.pop('Content-Type')

@@ -3,25 +3,51 @@ function renderApprovalCard(toolCall, origMsg) {
     if (!chatbox) return;
 
     const card = document.createElement("div");
-    card.className = "msg bot";
-    card.style.cssText = "border: 1px solid var(--accent); background: rgba(0, 122, 255, 0.05); border-radius: 12px; padding: 14px;";
+    card.className = "msg bot approval-card";
 
     const paramsStr = JSON.stringify(toolCall.arguments, null, 2);
-    card.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 6px; color: var(--accent);">⚠️ Требуется подтверждение действия</div>
-        <div style="font-size: 14px; margin-bottom: 8px;"><strong>Действие:</strong> ${toolCall.description || toolCall.name}</div>
-        <pre style="font-size: 12px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; margin-bottom: 10px;"><code>${paramsStr}</code></pre>
-        <div style="display: flex; gap: 10px;">
-            <button id="btn-approve-${toolCall.call_id}" style="padding: 6px 14px; background: #28a745; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">✓ Разрешить</button>
-            <button id="btn-reject-${toolCall.call_id}" style="padding: 6px 14px; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer;">✗ Отклонить</button>
-        </div>
-    `;
+    const heading = document.createElement("div");
+    heading.className = "approval-card-title";
+    heading.textContent = "⚠️ Требуется подтверждение действия";
 
+    const action = document.createElement("div");
+    action.className = "approval-card-action";
+    const actionLabel = document.createElement("strong");
+    actionLabel.textContent = "Действие:";
+    action.appendChild(actionLabel);
+    action.appendChild(document.createTextNode(" " + (toolCall.description || toolCall.name)));
+
+    const pre = document.createElement("pre");
+    pre.className = "approval-card-params";
+    const code = document.createElement("code");
+    code.textContent = paramsStr;
+    pre.appendChild(code);
+
+    const actions = document.createElement("div");
+    actions.className = "approval-card-actions";
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "approval-btn approval-btn-approve";
+    approveBtn.textContent = "✓ Разрешить";
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "approval-btn approval-btn-reject";
+    rejectBtn.textContent = "✗ Отклонить";
+
+    actions.appendChild(approveBtn);
+    actions.appendChild(rejectBtn);
+    card.appendChild(heading);
+    card.appendChild(action);
+    card.appendChild(pre);
+    card.appendChild(actions);
     chatbox.appendChild(card);
     chatbox.scrollTop = chatbox.scrollHeight;
 
-    document.getElementById(`btn-approve-${toolCall.call_id}`).onclick = function() {
-        card.innerHTML = "<em>Выполняется...</em>";
+    approveBtn.addEventListener("click", function() {
+        card.classList.add("is-executing");
+        card.replaceChildren(document.createTextNode("Выполняется..."));
         var approvalPayload = {
             conversation_id: currentConvId,
             model: currentModel,
@@ -61,7 +87,7 @@ function renderApprovalCard(toolCall, origMsg) {
         });
     };
 
-    document.getElementById(`btn-reject-${toolCall.call_id}`).onclick = function() {
+    rejectBtn.addEventListener("click", function() {
         card.remove();
         addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
     };
@@ -82,7 +108,7 @@ function parseMarkdown(text) {
     safe = safe.replace(/```([\w\-\+\#]*)\n?([\s\S]*?)```/g, function(m, lang, code) {
         var ph = "\x00CB" + codeBlocks.length + "\x00";
         code = code.replace(/^\n/, '').replace(/\n$/, '');
-        codeBlocks.push('<div style="margin:8px 0;"><pre style="margin:0;"><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre></div>');
+        codeBlocks.push('<div class="md-code-block"><pre class="md-code"><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre></div>');
         return ph;
     });
 
@@ -194,7 +220,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     bubble.className = "bubble";
     let htmlContent = "";
     if (reasoning && reasoning.trim() !== "") {
-        htmlContent += `<details style="margin-bottom:10px;font-size:13px;background:rgba(0,0,0,0.05);border-radius:8px;padding:8px 12px;border:1px dashed var(--border-color);"><summary style="cursor:pointer;font-weight:600;color:var(--accent);">🧠 Ход мыслей модели (Reasoning)</summary><div style="margin-top:8px;white-space:pre-wrap;font-family:monospace;font-size:12px;color:var(--text-main);opacity:0.85;">${parseMarkdown(reasoning)}</div></details>`;
+        htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">🧠 Ход мыслей модели (Reasoning)</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
     }
     htmlContent += parseMarkdown(text);
     bubble.innerHTML = htmlContent;
@@ -204,8 +230,8 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     copyBtn.className = "copy-btn";
     copyBtn.textContent = "📋";
     copyBtn.title = "Копировать";
-    copyBtn.style.cssText = "margin-left:10px;cursor:pointer;background:none;border:none;";
-    copyBtn.onclick = function() {
+
+    copyBtn.addEventListener("click", function() {
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = "✅";
             setTimeout(() => copyBtn.textContent = "📋", 2000);
@@ -214,19 +240,33 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     msg.appendChild(copyBtn);
 
     const metaWrap = document.createElement("div");
-    metaWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;";
+    metaWrap.className = "msg-meta";
 
     if (usage && (usage.input_tokens || usage.total_tokens)) {
         const usageBadge = document.createElement("details");
-        usageBadge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.04);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
-        let detailsHtml = `<summary style="font-weight:500;">📊 Токены: <strong>${usage.total_tokens || 0}</strong> (вход: ${usage.input_tokens}, выход: ${usage.output_tokens})</summary>` +
-                          `<div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;font-family:monospace;font-size:11px;">` +
-                          `<div>💾 Кэшированные: <strong>${usage.cached_tokens || 0}</strong></div>` +
-                          `<div>🧰 Инструменты: <strong>${usage.tool_tokens || 0}</strong></div>` +
-                          `<div>🧠 Рассуждения: <strong>${usage.reasoning_tokens || 0}</strong></div>`;
-        if (usage.incomplete_details) detailsHtml += `<div style="color:var(--danger);">⚠️ Прерывание: ${JSON.stringify(usage.incomplete_details)}</div>`;
-        detailsHtml += `</div>`;
-        usageBadge.innerHTML = detailsHtml;
+        usageBadge.className = "msg-meta-details";
+        const usageSummary = document.createElement("summary");
+        usageSummary.className = "msg-meta-summary";
+        usageSummary.textContent = `📊 Токены: ${usage.total_tokens || 0} (вход: ${usage.input_tokens}, выход: ${usage.output_tokens})`;
+        const usageDetails = document.createElement("div");
+        usageDetails.className = "msg-meta-detail-list";
+        [
+            ["💾 Кэшированные:", usage.cached_tokens || 0],
+            ["🧰 Инструменты:", usage.tool_tokens || 0],
+            ["🧠 Рассуждения:", usage.reasoning_tokens || 0]
+        ].forEach(function(item) {
+            const row = document.createElement("div");
+            row.textContent = item[0] + " " + item[1];
+            usageDetails.appendChild(row);
+        });
+        if (usage.incomplete_details) {
+            const row = document.createElement("div");
+            row.className = "msg-meta-error";
+            row.textContent = "⚠️ Прерывание: " + JSON.stringify(usage.incomplete_details);
+            usageDetails.appendChild(row);
+        }
+        usageBadge.appendChild(usageSummary);
+        usageBadge.appendChild(usageDetails);
         metaWrap.appendChild(usageBadge);
     }
 
@@ -240,15 +280,32 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     if (timings && timings.length > 0) {
         const total = totalDurationMs ? `${totalDurationMs} мс` : "";
         const badge = document.createElement("details");
-        badge.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);";
-        let stepsHtml = `<summary style="font-weight:600;">⏱️ Выполнение: <strong>${total || (timings.length + ' этапов')}</strong></summary><div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">`;
+        badge.className = "msg-meta-details";
+        const stepsSummary = document.createElement("summary");
+        stepsSummary.className = "msg-meta-summary";
+        stepsSummary.textContent = `⏱️ Выполнение: ${total || (timings.length + " этапов")}`;
+        const steps = document.createElement("div");
+        steps.className = "msg-meta-detail-list";
         timings.forEach((t, idx) => {
             const dur = t.duration_source === "unavailable" ? "—" : `${t.duration_ms} мс`;
-            let srv = t.server_label ? `<span style="color:var(--accent);font-size:10px;margin-left:4px;">${t.server_label}</span>` : "";
-            stepsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;"><span>${idx + 1}. ${t.name}${srv}</span><strong>${dur}</strong></div>`;
+            const row = document.createElement("div");
+            row.className = "msg-meta-step";
+            const label = document.createElement("span");
+            label.textContent = `${idx + 1}. ${t.name}`;
+            if (t.server_label) {
+                const server = document.createElement("span");
+                server.className = "msg-meta-server";
+                server.textContent = t.server_label;
+                label.appendChild(server);
+            }
+            const duration = document.createElement("strong");
+            duration.textContent = dur;
+            row.appendChild(label);
+            row.appendChild(duration);
+            steps.appendChild(row);
         });
-        stepsHtml += "</div>";
-        badge.innerHTML = stepsHtml;
+        badge.appendChild(stepsSummary);
+        badge.appendChild(steps);
         metaWrap.appendChild(badge);
     }
 
@@ -259,9 +316,9 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
         }
         if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
             const traceEl = document.createElement("details");
-            traceEl.style.cssText = "font-size:11px;background:rgba(0,0,0,0.06);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--text-secondary);width:100%;margin-top:4px;";
+            traceEl.className = "msg-meta-details msg-trace-details";
             const summary = document.createElement("summary");
-            summary.style.fontWeight = "600";
+            summary.className = "msg-meta-summary";
             const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
             const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
             summary.textContent = `🔍 Trace [${traceId}...] (${eventsCount} соб.)`;
@@ -275,8 +332,8 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
             openTraceBtn.className = "alice-trace-open-viewer";
             openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
             openTraceBtn.title = "Открыть Execution Trace viewer";
-            openTraceBtn.style.cssText = "font-size:11px;background:transparent;border:0;padding:2px 0;margin-left:8px;color:var(--accent);cursor:pointer;font-weight:600;";
-            openTraceBtn.onclick = function(event) {
+
+            openTraceBtn.addEventListener("click", function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 if (typeof window.openTraceViewer === "function") {
@@ -298,7 +355,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
 function loadHistory(convId) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
-    chatbox.innerHTML = "";
+    chatbox.replaceChildren();
     fetch(`/api/conversations/${convId}/messages`)
         .then(r => r.json())
         .then(data => {
@@ -309,16 +366,25 @@ function loadHistory(convId) {
                         addMessage(msg.text, role, false, msg.cost || 0, msg.timings, 0, msg.reasoning, msg.usage, msg.trace);
                     });
                 } else {
-                    chatbox.innerHTML = '<div class="empty-state">Начните диалог</div>';
+                    const empty = document.createElement("div");
+                    empty.className = "empty-state";
+                    empty.textContent = "Начните диалог";
+                    chatbox.replaceChildren(empty);
                 }
             } catch (renderErr) {
                 console.error("[CHAT] Render history error:", renderErr);
-                chatbox.innerHTML = `<div class="empty-state">Ошибка отрисовки истории: ${renderErr.message}</div>`;
+                const error = document.createElement("div");
+                error.className = "empty-state error-state";
+                error.textContent = "Ошибка отрисовки истории: " + renderErr.message;
+                chatbox.replaceChildren(error);
             }
         })
         .catch(err => {
             console.error("[CHAT] Fetch history error:", err);
-            chatbox.innerHTML = `<div class="empty-state">Ошибка сети: ${err.message}</div>`;
+            const error = document.createElement("div");
+            error.className = "empty-state error-state";
+            error.textContent = "Ошибка сети: " + err.message;
+            chatbox.replaceChildren(error);
         });
 }
 

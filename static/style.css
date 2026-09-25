@@ -832,3 +832,503 @@ html, body {
     color: #888;
     font-size: 13px;
 }
+
+
+/* Progressive enhancement: state previously carried by inline styles. */
+.alice-pro-app .conv-empty {
+    padding: 20px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+.alice-pro-app .model-option-empty {
+    cursor: default;
+    opacity: .7;
+}
+.alice-pro-app .model-option-price {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.alice-pro-app #voice-ui,
+.alice-pro-app #response-mode-wrap,
+.alice-pro-app #mic-btn,
+.alice-pro-app #upload-image-btn {
+    display: none;
+}
+
+.alice-pro-app #text-ui {
+    display: flex;
+}
+
+.alice-pro-app.alice-model-voice #voice-ui,
+.alice-pro-app.alice-model-voice #response-mode-wrap,
+.alice-pro-app.alice-model-voice #mic-btn {
+    display: flex;
+}
+
+.alice-pro-app.alice-model-voice #text-ui {
+    display: none;
+}
+
+.alice-pro-app.alice-model-multimodal #upload-image-btn {
+    display: flex;
+}
+
+.alice-pro-app #voice-ui[aria-hidden="true"],
+.alice-pro-app #text-ui[aria-hidden="true"],
+.alice-pro-app #response-mode-wrap[aria-hidden="true"],
+.alice-pro-app #mic-btn[aria-hidden="true"],
+.alice-pro-app #upload-image-btn[aria-hidden="true"] {
+    display: none;
+}
+
+.alice-pro-app .conv-link {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.alice-pro-app .conv-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+
+/* Chat progressive-enhancement states. */
+.alice-pro-app .approval-card {
+    border: 1px solid var(--accent);
+    background: rgba(0, 122, 255, 0.05);
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.alice-pro-app .approval-card-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--accent);
+}
+
+.alice-pro-app .approval-card-action {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.alice-pro-app .approval-card-params {
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+}
+
+.alice-pro-app .approval-card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.alice-pro-app .approval-btn {
+    padding: 6px 14px;
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.alice-pro-app .approval-btn-approve {
+    background: #28a745;
+}
+
+.alice-pro-app .approval-btn-reject {
+    background: #dc3545;
+}
+
+.alice-pro-app .approval-card.is-executing {
+    opacity: 0.75;
+}
+
+.alice-pro-app .copy-btn {
+    margin-left: 10px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+}
+
+.alice-pro-app .msg-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    align-items: center;
+}
+
+.alice-pro-app .msg-meta-details {
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.alice-pro-app .msg-meta-summary {
+    font-weight: 600;
+}
+
+.alice-pro-app .msg-meta-detail-list {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.alice-pro-app .msg-meta-error {
+    color: var(--danger);
+}
+
+.alice-pro-app .msg-meta-step {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.alice-pro-app .msg-meta-server {
+    color: var(--accent);
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.alice-pro-app .msg-trace-details {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.alice-pro-app .alice-trace-open-viewer {
+    font-size: 11px;
+    background: transparent;
+    border: 0;
+    padding: 2px 0;
+    margin-left: 8px;
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.alice-pro-app .error-state {
+    color: var(--danger);
+}
+
+
+.alice-pro-app .trace-viewer-auto-button {
+    font-size: 11px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.alice-pro-app .trace-viewer-auto-details {
+    width: auto;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+
+.alice-pro-app .theme-rollback-card {
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.alice-pro-app .theme-rollback-button {
+    border: 1px solid var(--border-color);
+    background: var(--btn-bg);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+}
+
+
+.alice-pro-app .provider-field { margin: 14px 0; }
+.alice-pro-app .provider-field-label { display: block; font-weight: 600; margin-bottom: 6px; }
+.alice-pro-app .provider-field-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 1px solid #555;
+    border-radius: 7px;
+    background: var(--input-bg, #222);
+    color: var(--text, #fff);
+}
+.alice-pro-app .provider-field-input.has-error { border-color: #ff6b6b; }
+.alice-pro-app .provider-field-help { margin-top: 5px; font-size: 12px; opacity: .7; line-height: 1.35; }
+.alice-pro-app .provider-field-error { display: none; margin-top: 6px; font-size: 12px; color: #ff6b6b; line-height: 1.35; }
+.alice-pro-app .provider-field-error.is-visible { display: block; }
+.alice-pro-app .provider-status-card { padding: 12px; margin: 8px 0; border: 1px solid #444; border-radius: 8px; }
+.alice-pro-app .provider-status-title { font-weight: 700; }
+.alice-pro-app .provider-status-line { margin-top: 5px; }
+.alice-pro-app .provider-status-meta { margin-top: 7px; font-size: 11px; opacity: .65; }
+.alice-pro-app .provider-credentials-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100002;
+    background: rgba(0, 0, 0, .72);
+    align-items: center;
+    justify-content: center;
+}
+.alice-pro-app .provider-credentials-modal.visible { display: flex; }
+.alice-pro-app .provider-credentials-box {
+    background: var(--bg, #1e1e1e);
+    color: var(--text, #fff);
+    padding: 20px;
+    border-radius: 12px;
+    width: min(560px, 92vw);
+    max-height: 90vh;
+    overflow: auto;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+}
+.alice-pro-app .provider-credentials-close {
+    position: absolute;
+    right: 12px;
+    top: 8px;
+    font-size: 24px;
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+}
+.alice-pro-app .provider-credentials-title { margin-top: 0; }
+.alice-pro-app .provider-credentials-actions { display: flex; gap: 8px; margin-top: 14px; }
+.alice-pro-app .provider-credentials-status { margin-top: 14px; }
+
+
+.alice-pro-app .cloudru-iam-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100001;
+    background: rgba(0, 0, 0, .7);
+    align-items: center;
+    justify-content: center;
+}
+.alice-pro-app .cloudru-iam-modal.visible { display: flex; }
+.alice-pro-app .cloudru-iam-box {
+    background: var(--bg, #1e1e1e);
+    color: var(--text, #fff);
+    padding: 20px;
+    border-radius: 10px;
+    width: min(520px, 92vw);
+    max-height: 88vh;
+    overflow: auto;
+    position: relative;
+}
+.alice-pro-app .cloudru-iam-close {
+    position: absolute;
+    right: 12px;
+    top: 8px;
+    font-size: 24px;
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+}
+.alice-pro-app .cloudru-iam-field { display: block; margin: 10px 0; }
+.alice-pro-app .cloudru-iam-label { display: block; margin-bottom: 4px; }
+.alice-pro-app .cloudru-iam-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+}
+.alice-pro-app .cloudru-iam-confirm { display: block; margin: 14px 0; }
+.alice-pro-app .cloudru-iam-output {
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #222;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 12px;
+}
+.alice-pro-app .cloudru-iam-output.visible { display: block; }
+
+
+.alice-pro-app .file-manager-modal,
+.alice-pro-app .file-manager-add-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--m-overlay, rgba(0, 0, 0, .6));
+    z-index: 10001;
+}
+.alice-pro-app .file-manager-add-modal {
+    background: rgba(0, 0, 0, .5);
+    z-index: 10002;
+}
+.alice-pro-app .file-manager-box {
+    background: var(--m-bg, #fff);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px var(--m-shadow, rgba(0, 0, 0, .3));
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-add-box {
+    background: var(--m-bg, #fff);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 500px;
+    width: 85%;
+    max-height: 70vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
+    color: var(--m-text, #222);
+}
+
+
+/* Chat markdown and reasoning presentation. */
+.alice-pro-app .md-code-block {
+    margin: 8px 0;
+}
+.alice-pro-app .md-code {
+    margin: 0;
+}
+.alice-pro-app .reasoning-details {
+    margin-bottom: 10px;
+    font-size: 13px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px dashed var(--border-color);
+}
+.alice-pro-app .reasoning-summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent);
+}
+.alice-pro-app .reasoning-content {
+    margin-top: 8px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-main);
+    opacity: 0.85;
+}
+
+
+/* File manager vector-store rendering. */
+.alice-pro-app .file-manager-state {
+    padding: 10px;
+    text-align: center;
+    color: var(--m-muted, #999);
+    font-size: 12px;
+}
+.alice-pro-app .file-manager-state-error {
+    color: var(--m-danger, #c33);
+}
+.alice-pro-app .file-manager-vs-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--m-section-border, #eee);
+    font-size: 12px;
+}
+.alice-pro-app .file-manager-vs-details {
+    flex: 1;
+    min-width: 0;
+}
+.alice-pro-app .file-manager-vs-name {
+    font-weight: 700;
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-vs-meta {
+    font-size: 11px;
+    color: var(--m-muted, #666);
+}
+.alice-pro-app .file-manager-copy-id {
+    cursor: pointer;
+    color: var(--m-accent, #4a90d9);
+}
+.alice-pro-app .file-manager-secondary-btn,
+.alice-pro-app .file-manager-danger-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--m-border, #ddd);
+    background: var(--m-card, #fff);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+.alice-pro-app .file-manager-secondary-btn {
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-danger-btn {
+    color: var(--m-danger, #c33);
+}
+
+
+/* File manager vector-store file picker. */
+.alice-pro-app .file-manager-add-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.alice-pro-app .file-manager-add-title {
+    margin: 0;
+    font-size: 14px;
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-close-btn {
+    border: 0;
+    background: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--m-muted, #666);
+}
+.alice-pro-app .file-manager-add-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+.alice-pro-app .file-manager-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    border-bottom: 1px solid var(--m-section-border, #eee);
+    font-size: 12px;
+    cursor: pointer;
+}
+.alice-pro-app .file-manager-add-name {
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-add-size {
+    margin-left: auto;
+    color: var(--m-muted, #666);
+    font-size: 11px;
+}
+.alice-pro-app .file-manager-primary-btn {
+    width: 100%;
+    padding: 8px;
+    background: var(--m-accent, #4a90d9);
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
