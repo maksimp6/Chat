@@ -800,14 +800,33 @@ chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
 
 @chatgpt_mcp_bp.route("/.well-known/oauth-protected-resource", methods=["GET"])
 def oauth_protected_resource() -> Response:
-    issuer = os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
     resource = PUBLIC_BASE_URL or request.url_root.rstrip("/")
     body = {
         "resource": resource,
-        "authorization_servers": [issuer] if issuer else [],
+        "authorization_servers": [OAUTH_ISSUER] if OAUTH_ISSUER else [],
         "scopes_supported": [OAUTH_SCOPE],
+        "resource_documentation": f"{resource}/docs/mcp/chatgpt_apps.md",
     }
-    return jsonify(body)
+    return jsonify({key: value for key, value in body.items() if value not in (None, [], "")})
+
+
+@chatgpt_mcp_bp.route("/.well-known/oauth-authorization-server", methods=["GET"])
+def oauth_authorization_server() -> Response:
+    if not OAUTH_ISSUER:
+        return jsonify({"error": "oauth_not_configured"}), 404
+
+    body = {
+        "issuer": OAUTH_ISSUER,
+        "authorization_endpoint": OAUTH_AUTHORIZATION_URL,
+        "token_endpoint": OAUTH_TOKEN_URL,
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["none", "private_key_jwt"],
+        "scopes_supported": [OAUTH_SCOPE],
+        "client_id_metadata_document_supported": True,
+    }
+    return jsonify({key: value for key, value in body.items() if value not in (None, [], "")})
 
 
 @chatgpt_mcp_bp.route(MCP_PATH, methods=["OPTIONS"])
