@@ -45,7 +45,7 @@ function renderApprovalCard(toolCall, origMsg) {
     chatbox.appendChild(card);
     chatbox.scrollTop = chatbox.scrollHeight;
 
-    approveBtn.onclick = function() {
+    approveBtn.addEventListener("click", function() {
         card.classList.add("is-executing");
         card.replaceChildren(document.createTextNode("Выполняется..."));
         var approvalPayload = {
@@ -108,7 +108,7 @@ function parseMarkdown(text) {
     safe = safe.replace(/```([\w\-\+\#]*)\n?([\s\S]*?)```/g, function(m, lang, code) {
         var ph = "\x00CB" + codeBlocks.length + "\x00";
         code = code.replace(/^\n/, '').replace(/\n$/, '');
-        codeBlocks.push('<div style="margin:8px 0;"><pre style="margin:0;"><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre></div>');
+        codeBlocks.push('<div class="md-code-block"><pre class="md-code"><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' + code + '</code></pre></div>');
         return ph;
     });
 
@@ -220,7 +220,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     bubble.className = "bubble";
     let htmlContent = "";
     if (reasoning && reasoning.trim() !== "") {
-        htmlContent += `<details style="margin-bottom:10px;font-size:13px;background:rgba(0,0,0,0.05);border-radius:8px;padding:8px 12px;border:1px dashed var(--border-color);"><summary style="cursor:pointer;font-weight:600;color:var(--accent);">🧠 Ход мыслей модели (Reasoning)</summary><div style="margin-top:8px;white-space:pre-wrap;font-family:monospace;font-size:12px;color:var(--text-main);opacity:0.85;">${parseMarkdown(reasoning)}</div></details>`;
+        htmlContent += `<details class="reasoning-details"><summary class="reasoning-summary">🧠 Ход мыслей модели (Reasoning)</summary><div class="reasoning-content">${parseMarkdown(reasoning)}</div></details>`;
     }
     htmlContent += parseMarkdown(text);
     bubble.innerHTML = htmlContent;
@@ -231,7 +231,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     copyBtn.textContent = "📋";
     copyBtn.title = "Копировать";
 
-    copyBtn.onclick = function() {
+    copyBtn.addEventListener("click", function() {
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = "✅";
             setTimeout(() => copyBtn.textContent = "📋", 2000);
@@ -240,7 +240,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     msg.appendChild(copyBtn);
 
     const metaWrap = document.createElement("div");
-    metaWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;";
+    metaWrap.className = "msg-meta";
 
     if (usage && (usage.input_tokens || usage.total_tokens)) {
         const usageBadge = document.createElement("details");
@@ -333,7 +333,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
             openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
             openTraceBtn.title = "Открыть Execution Trace viewer";
 
-            openTraceBtn.onclick = function(event) {
+            openTraceBtn.addEventListener("click", function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 if (typeof window.openTraceViewer === "function") {
