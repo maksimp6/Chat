@@ -1038,6 +1038,54 @@ def partners_update(partner_id: str):
         return jsonify({"error": str(exc)}), status
 
 
+@partner_relations_bp.get("/<partner_id>/contacts")
+def partner_contacts_list(partner_id: str):
+    try:
+        return jsonify(list_contacts({"partner_id": partner_id}))
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except ValueError as exc:
+        status = 404 if str(exc) == "partner not found" else 400
+        return jsonify({"error": str(exc)}), status
+
+
+@partner_relations_bp.post("/<partner_id>/contacts")
+def partner_contact_create(partner_id: str):
+    data = request.get_json(silent=True) or {}
+    data["partner_id"] = partner_id
+    try:
+        return jsonify(add_contact(data)), 201
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except ValueError as exc:
+        status = 404 if str(exc) == "partner not found" else 400
+        return jsonify({"error": str(exc)}), status
+
+
+@partner_relations_bp.put("/contacts/<contact_id>")
+def partner_contact_update(contact_id: str):
+    data = request.get_json(silent=True) or {}
+    data["contact_id"] = contact_id
+    try:
+        return jsonify(update_contact(data))
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except ValueError as exc:
+        status = 404 if str(exc) == "contact not found" else 400
+        return jsonify({"error": str(exc)}), status
+
+
+@partner_relations_bp.delete("/contacts/<contact_id>")
+def partner_contact_delete(contact_id: str):
+    try:
+        return jsonify(delete_contact({"contact_id": contact_id}))
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except ValueError as exc:
+        status = 404 if str(exc) == "contact not found" else 400
+        return jsonify({"error": str(exc)}), status
+
+
 @partner_relations_bp.get("/<partner_id>/messages")
 def partner_messages(partner_id: str):
     try:
