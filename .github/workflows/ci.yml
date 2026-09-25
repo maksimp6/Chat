@@ -30,7 +30,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov playwright
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
@@ -64,10 +64,12 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:5678/ >/dev/null
+      - name: Install Chromium for live browser resource coverage
+        run: python -m playwright install --with-deps chromium
       - name: Run live Flask resource contract tests
         env:
           ALICE_LIVE_BASE_URL: http://127.0.0.1:5678
-        run: pytest -q tests/test_live_flask_resources.py
+        run: pytest -q tests/test_live_flask_resources.py tests/test_live_browser_resource_coverage.py
       - name: Stop Flask live validation server
         if: always()
         run: |
