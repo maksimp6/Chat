@@ -25,7 +25,7 @@ create table if not exists budget_operations (
   operation_id uuid primary key default gen_random_uuid(),
   budget_id text not null,
   account_type text not null check (account_type in ('REAL','DEMO')),
-  operation_type text not null check (operation_type in ('RESERVE','SETTLE','RELEASE','SPEND','REFUND','WIN')),
+  operation_type text not null check (operation_type in ('ALLOCATE','RESERVE','SETTLE','RELEASE','SPEND','REFUND','WIN')),
   amount numeric(20,2) not null check (amount >= 0),
   status text not null check (status in ('APPLIED','REJECTED')),
   idempotency_key text,
@@ -73,7 +73,12 @@ begin
     if result is not null then return result; end if;
   end if;
 
-  if p_operation_type = 'RESERVE' then
+  if p_operation_type = 'ALLOCATE' then
+    update budget_accounts set allocated = allocated + p_amount,
+      version = version + 1, updated_at = now()
+      where budget_id = p_budget_id and account_type = p_account_type;
+
+  elsif p_operation_type = 'RESERVE' then
     if p_amount > (a.allocated + a.won - a.spent - a.reserved) then
       raise exception 'insufficient available budget';
     end if;
