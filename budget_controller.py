@@ -455,6 +455,7 @@ class BudgetController:
             amount,
             idempotency_key="budget-" + uuid.uuid4().hex,
             actor=actor or self._persistence_actor,
+            cooldown_seconds=self.cooldown_seconds,
         )
 
     def _check_limits(self, account: BudgetAccount, amount: Decimal) -> None:
