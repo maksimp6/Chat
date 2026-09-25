@@ -503,7 +503,7 @@ def test_authenticated_tools_advertise_oauth2_security_scheme(client, monkeypatc
     tools = response.get_json()["result"]["tools"]
     assert tools
     assert all(
-        tool["securitySchemes"] == [{"type": "oauth2", "scopes": [chatgpt_mcp.OAUTH_SCOPE]}]
+        tool["securitySchemes"] == [{"type": "oauth2", "scopes": [chatgpt_mcp._oauth_scope()]}]
         for tool in tools
     )
 
@@ -527,7 +527,7 @@ def test_oauth_protected_resource_metadata_is_chatgpt_compatible(client, monkeyp
     body = response.get_json()
     assert body["resource"] == "https://mcp.example.com"
     assert body["authorization_servers"] == ["https://auth.example.com"]
-    assert body["scopes_supported"] == [chatgpt_mcp.OAUTH_SCOPE]
+    assert body["scopes_supported"] == ["alice.read"]
 
 
 def test_oauth_authorization_server_metadata_is_chatgpt_compatible(client, monkeypatch):
