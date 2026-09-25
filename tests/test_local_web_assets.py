@@ -88,6 +88,17 @@ def test_index_response_disables_shell_caching():
     assert response.headers.get("Cache-Control") == "no-store, max-age=0"
 
 
+def test_ssh_runtime_modal_has_safe_header_action_contract():
+    modal = Path("static/settings/ssh_runtime_modal.js").read_text(encoding="utf-8")
+    header = Path("static/header_actions.js").read_text(encoding="utf-8")
+    html = Path("templates/index.html").read_text(encoding="utf-8")
+
+    assert "window.openSshRuntimeModal = function" in modal
+    assert 'typeof window.openSshRuntimeModal === "function"' in header
+    assert 'console.error("[SSH Runtime] Modal script is unavailable")' in header
+    assert html.index("ssh_runtime_modal.js") < html.index("header_actions.js")
+
+
 def test_application_javascript_parses_when_node_is_available():
     node = shutil.which("node")
     if not node:
