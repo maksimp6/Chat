@@ -894,3 +894,131 @@ html, body {
     outline-offset: 2px;
     border-radius: 4px;
 }
+
+
+/* Chat progressive-enhancement states. */
+.alice-pro-app .approval-card {
+    border: 1px solid var(--accent);
+    background: rgba(0, 122, 255, 0.05);
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.alice-pro-app .approval-card-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--accent);
+}
+
+.alice-pro-app .approval-card-action {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.alice-pro-app .approval-card-params {
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+}
+
+.alice-pro-app .approval-card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.alice-pro-app .approval-btn {
+    padding: 6px 14px;
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.alice-pro-app .approval-btn-approve {
+    background: #28a745;
+}
+
+.alice-pro-app .approval-btn-reject {
+    background: #dc3545;
+}
+
+.alice-pro-app .approval-card.is-executing {
+    opacity: 0.75;
+}
+
+.alice-pro-app .copy-btn {
+    margin-left: 10px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+}
+
+.alice-pro-app .msg-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    align-items: center;
+}
+
+.alice-pro-app .msg-meta-details {
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.alice-pro-app .msg-meta-summary {
+    font-weight: 600;
+}
+
+.alice-pro-app .msg-meta-detail-list {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.alice-pro-app .msg-meta-error {
+    color: var(--danger);
+}
+
+.alice-pro-app .msg-meta-step {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.alice-pro-app .msg-meta-server {
+    color: var(--accent);
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.alice-pro-app .msg-trace-details {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.alice-pro-app .alice-trace-open-viewer {
+    font-size: 11px;
+    background: transparent;
+    border: 0;
+    padding: 2px 0;
+    margin-left: 8px;
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.alice-pro-app .error-state {
+    color: var(--danger);
+}
