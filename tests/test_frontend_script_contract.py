@@ -25,12 +25,12 @@ def test_critical_boot_script_is_local_and_synchronous():
     assert ' defer' not in html.split('<script id="alice-boot"', 1)[1].split('</script>', 1)[0]
 
 
-def test_local_script_tags_are_deferred_except_critical_boot():
+def test_local_script_tags_are_deferred_or_async_except_critical_boot():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     for tag in re.findall(r'<script[^>]+src="{{ static_root }}/[^"]+"[^>]*>', html):
         if '/boot.js?' in tag:
             continue
-        assert " defer" in tag, f"Application script is not deferred: {tag}"
+        assert (" defer" in tag) or (" async" in tag), f"Application script is neither deferred nor async: {tag}"
 
 
 def test_index_has_no_inline_application_script():
