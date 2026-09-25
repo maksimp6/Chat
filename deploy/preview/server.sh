@@ -15,6 +15,7 @@ DOZZLE_IMAGE="amir20/dozzle:v11.1.0"
 DOZZLE_CLEANUP_IMAGE="amir20/dozzle:v11.1.0-alpine"
 IMAGE_PREFIX="alice-preview"
 CONTAINER_PREFIX="alice-preview"
+RUNTIME_IMAGE_PREFIX="alice-preview-runtime-ssh"
 ACME_DIR="$ROOT_DIR/keys/letsencrypt"
 ACME_FILE="$ACME_DIR/acme.json"
 ACME_EMAIL="${ALICE_ACME_EMAIL:-Maxxxxpavlov@yandex.ru}"
@@ -65,44 +66,238 @@ ensure_traefik() {
   docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$ACME_DIR:/letsencrypt" "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL" --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json --certificatesresolvers.letsencrypt.acme.httpchallenge=true --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web --api.dashboard=false --accesslog=false >/dev/null
 }
 
-ensure_dozzle_profile() {
+clear_dozzle_data() {
   local dozzle_data="$1"
-  local profile="$dozzle_data/__default__/profile.json"
-  mkdir -p "$(dirname "$profile")"
-  if [[ ! -s "$profile" ]]; then
-    cat > "$profile" <<'EOF'
-{
-  "settings": {
-    "showTimestamp": true,
-    "showStd": false,
-    "showAllContainers": false,
-    "softWrap": true,
-    "collapseNav": false,
-    "smallerScrollbars": true,
-    "search": true,
-    "compact": false,
-    "menuWidth": 18,
-    "size": "medium",
-    "lightTheme": "auto",
-    "hourStyle": "24",
-    "dateLocale": "auto",
-    "locale": "ru",
-    "groupContainers": "always",
-    "automaticRedirect": "delayed"
-  },
-  "pinned": [],
-  "visibleKeys": [],
-  "collapsedGroups": [],
-  "dismissedLinkHint": true
+  mkdir -p "$dozzle_data"
+  docker run --rm --user 0 -v "$dozzle_data:/data" --entrypoint sh "$DOZZLE_CLEANUP_IMAGE" -c 'rm -rf /data/* /data/.[!.]* /data/..?*' >/dev/null 2>&1 || true
 }
+
+prepare_runtime_smoke() {
+  local key="$1"
+  local workdir="$2"
+  local runtime_dir="$workdir/runtime"
+  local runtime_container="$CONTAINER_PREFIX-$key-runtime-ssh"
+  local runtime_image="$RUNTIME_IMAGE_PREFIX:$key"
+  local client_key="$runtime_dir/id_ed25519"
+  local client_pub="$client_key.pub"
+  local host_key="$runtime_dir/ssh_host_ed25519_key"
+  local host_pub="$host_key.pub"
+  local authorized_keys="$runtime_dir/authorized_keys"
+  local known_hosts="$runtime_dir/known_hosts"
+  local dockerfile="$runtime_dir/Dockerfile"
+  local sshd_config="$runtime_dir/sshd_config"
+
+  rm -rf -- "$runtime_dir"
+  mkdir -p "$runtime_dir"
+  umask 077
+
+  ssh-keygen -q -t ed25519 -N "" -f "$client_key"
+  ssh-keygen -q -t ed25519 -N "" -f "$host_key"
+  cp "$client_pub" "$authorized_keys"
+  printf '%s %s\n' "$runtime_container" "$(cut -d' ' -f1-2 "$host_pub")" > "$known_hosts"
+
+  cat > "$sshd_config" <<'EOF'
+Port 22
+ListenAddress 0.0.0.0
+HostKey /etc/ssh/ssh_host_ed25519_key
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+AllowUsers alice-runtime
+AuthorizedKeysFile .ssh/authorized_keys
+UsePAM no
+UseDNS no
+X11Forwarding no
+AllowTcpForwarding no
+PermitTunnel no
+StrictModes yes
 EOF
-    chmod 600 "$profile"
-  fi
+
+  cat > "$dockerfile" <<'EOF'
+FROM debian:bookworm-slim
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssh-server coreutils && \
+    rm -rf /var/lib/apt/lists/* && \
+    useradd --create-home --shell /bin/bash alice-runtime && \
+    passwd -d alice-runtime && \
+    mkdir -p /home/alice-runtime/.ssh /run/sshd && \
+    chown -R alice-runtime:alice-runtime /home/alice-runtime
+COPY sshd_config /etc/ssh/sshd_config
+COPY ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+COPY ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
+COPY authorized_keys /home/alice-runtime/.ssh/authorized_keys
+RUN chown alice-runtime:alice-runtime /home/alice-runtime/.ssh/authorized_keys && \
+    chmod 700 /home/alice-runtime/.ssh && \
+    chmod 600 /home/alice-runtime/.ssh/authorized_keys && \
+    chmod 600 /etc/ssh/ssh_host_ed25519_key
+CMD ["/usr/sbin/sshd", "-D", "-e"]
+EOF
+
+  docker rm -f "$runtime_container" >/dev/null 2>&1 || true
+  docker image rm "$runtime_image" >/dev/null 2>&1 || true
+  log "building isolated SSH Runtime target $runtime_container"
+  docker build --pull -q -t "$runtime_image" "$runtime_dir" >/dev/null
+  local expires_at
+  expires_at="$(docker inspect -f '{{ index .Config.Labels "alice.preview.expires_at" }}' "$CONTAINER_PREFIX-$key" 2>/dev/null || true)"
+  docker run -d --name "$runtime_container" --network "$NETWORK_NAME" \
+    --label "alice.preview=true" \
+    --label "alice.preview.key=$key" \
+    --label "alice.preview.runtime=true" \
+    --label "alice.preview.expires_at=$expires_at" \
+    "$runtime_image" >/dev/null
+}
+
+runtime_smoke() {
+  local key="$1"
+  require_key
+  local container="$CONTAINER_PREFIX-$key"
+  local workdir="$ROOT_DIR/previews/$key"
+  local runtime_dir="$workdir/runtime"
+  local runtime_container="$CONTAINER_PREFIX-$key-runtime-ssh"
+  local runtime_client_key="$runtime_dir/id_ed25519"
+  local runtime_known_hosts="$runtime_dir/known_hosts"
+  local smoke_script="$runtime_dir/smoke.py"
+
+  docker inspect "$container" >/dev/null 2>&1 || die "preview container not found: $container"
+
+  cleanup_runtime_smoke() {
+    local app_container="$1"
+    local cleanup_runtime_dir="$2"
+    local cleanup_runtime_container="$3"
+    local cleanup_key="$4"
+    docker exec "$app_container" rm -f \
+      /tmp/alice-runtime-id_ed25519 \
+      /tmp/alice-runtime-known_hosts \
+      /tmp/alice-runtime-smoke.py >/dev/null 2>&1 || true
+    rm -rf -- "$cleanup_runtime_dir"
+    docker rm -f "$cleanup_runtime_container" >/dev/null 2>&1 || true
+    docker image rm "$RUNTIME_IMAGE_PREFIX:$cleanup_key" >/dev/null 2>&1 || true
+  }
+  trap "cleanup_runtime_smoke '$container' '$runtime_dir' '$runtime_container' '$key'" EXIT
+
+  prepare_runtime_smoke "$key" "$workdir"
+
+  cat > "$smoke_script" <<'PY'
+from trace_manager import ExecutionTrace
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_registry import registry
+
+OWNER = "preview-runtime-owner"
+TARGET = "preview-runtime"
+PATH = "/home/alice-runtime/alice-runtime-smoke.txt"
+CONTENT = "ALICE_RUNTIME_SMOKE_OK\n"
+
+
+def invoke(name, arguments, approved):
+    trace = ExecutionTrace()
+    call = UniversalToolCall(
+        tool_name=name,
+        arguments=arguments,
+        transport="internal",
+        call_id=f"preview-smoke-{name}",
+        user_id=OWNER,
+        approved=approved,
+    )
+    result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
+    if not result.get("success"):
+        raise AssertionError(f"{name} failed: {result.get('error')}")
+    return result, trace
+
+
+exec_result, exec_trace = invoke(
+    "ssh_runtime_exec",
+    {"target": TARGET, "timeout_seconds": 10, "command": "id -un"},
+    True,
+)
+assert exec_result["data"]["linux_user"] == "alice-runtime"
+assert exec_result["data"]["stdout"].strip() == "alice-runtime"
+assert any(
+    event.get("type") == "runtime_finished"
+    and event.get("payload", {}).get("linux_user") == "alice-runtime"
+    for event in exec_trace.trace["events"]
+)
+assert exec_trace.trace["tool_calls"][0]["arguments"]["command"] == "<redacted>"
+assert exec_trace.trace["tool_calls"][0]["result"]["data"]["stdout"] == "<redacted>"
+
+write_result, write_trace = invoke(
+    "ssh_runtime_write_file",
+    {"target": TARGET, "timeout_seconds": 10, "path": PATH, "content": CONTENT},
+    True,
+)
+assert write_result["data"]["success"] is True
+assert write_result["data"]["linux_user"] == "alice-runtime"
+assert write_trace.trace["tool_calls"][0]["arguments"]["content"] == "<redacted>"
+
+read_result, read_trace = invoke(
+    "ssh_runtime_read_file",
+    {"target": TARGET, "timeout_seconds": 10, "path": PATH},
+    False,
+)
+assert read_result["data"]["stdout"] == CONTENT
+assert read_result["data"]["linux_user"] == "alice-runtime"
+assert read_trace.trace["tool_calls"][0]["result"]["data"]["stdout"] == "<redacted>"
+
+cleanup_result, _ = invoke(
+    "ssh_runtime_exec",
+    {"target": TARGET, "timeout_seconds": 10, "command": f"rm -f -- {PATH}"},
+    True,
+)
+assert cleanup_result["data"]["exit_code"] == 0
+print("SSH Runtime Preview smoke passed")
+PY
+
+  docker cp "$runtime_client_key" "$container:/tmp/alice-runtime-id_ed25519" >/dev/null
+  docker cp "$runtime_known_hosts" "$container:/tmp/alice-runtime-known_hosts" >/dev/null
+  docker cp "$smoke_script" "$container:/tmp/alice-runtime-smoke.py" >/dev/null
+  docker exec -u 0 "$container" chmod 600 \
+    /tmp/alice-runtime-id_ed25519 \
+    /tmp/alice-runtime-known_hosts
+
+  local runtime_targets_json
+  runtime_targets_json="{\"preview-runtime\":{\"host\":\"$runtime_container\",\"port\":22,\"default_user\":\"alice-runtime\",\"allowed_users\":[\"alice-runtime\"],\"identity_map\":{\"preview-runtime-owner\":\"alice-runtime\"},\"workspace_root\":\"/home/alice-runtime\",\"identity_file\":\"/tmp/alice-runtime-id_ed25519\",\"known_hosts\":\"/tmp/alice-runtime-known_hosts\",\"command_timeout_seconds\":30}}"
+
+  for attempt in $(seq 1 20); do
+    if docker exec -u 0 \
+      -e "ALICE_SSH_TARGETS_JSON=$runtime_targets_json" \
+      -e "ALICE_SSH_KNOWN_HOSTS=/tmp/alice-runtime-known_hosts" \
+      "$container" \
+      ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+      -o UserKnownHostsFile=/tmp/alice-runtime-known_hosts \
+      -o ConnectTimeout=2 -i /tmp/alice-runtime-id_ed25519 \
+      "alice-runtime@$runtime_container" true >/dev/null 2>&1; then
+      break
+    fi
+    if [ "$attempt" -eq 20 ]; then
+      echo "SSH Runtime container state:" >&2
+      docker inspect --format '{{json .State}}' "$runtime_container" >&2 || true
+      echo "SSH Runtime container logs:" >&2
+      docker logs --tail 120 "$runtime_container" >&2 || true
+      echo "SSH Runtime sshd config validation:" >&2
+      docker exec -u 0 "$runtime_container" /usr/sbin/sshd -t >&2 || true
+      die "isolated SSH Runtime target did not become ready"
+    fi
+    sleep 1
+  done
+
+  docker exec -u 0 \
+    -e "ALICE_SSH_TARGETS_JSON=$runtime_targets_json" \
+    -e "ALICE_SSH_KNOWN_HOSTS=/tmp/alice-runtime-known_hosts" \
+    "$container" sh -lc 'cd /app && python /tmp/alice-runtime-smoke.py'
+
+  log "SSH Runtime smoke passed for $key"
+  trap - EXIT
+  cleanup_runtime_smoke "$container" "$runtime_dir" "$runtime_container" "$key"
 }
 
 cleanup_key() {
   local key="$1"; local container="${CONTAINER_PREFIX}-${key}"; local image="${IMAGE_PREFIX}:${key}"; local workdir="${ROOT_DIR}/previews/${key}"; local archive_path="${ROOT_DIR}/incoming/${key}.tar.gz"
   docker rm -f "$container" >/dev/null 2>&1 || true
+  local runtime_container="$CONTAINER_PREFIX-$key-runtime-ssh"
+  local runtime_image="$RUNTIME_IMAGE_PREFIX:$key"
+  docker rm -f "$runtime_container" >/dev/null 2>&1 || true
+  docker image rm "$runtime_image" >/dev/null 2>&1 || true
   local dozzle_container="${container}-dozzle"
   clear_dozzle_data "$workdir/dozzle"
   docker rm -f "$dozzle_container" >/dev/null 2>&1 || true
@@ -128,7 +323,9 @@ deploy() {
   local image="${IMAGE_PREFIX}:${key}"
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   clear_dozzle_data "$workdir/dozzle"
-  mkdir -p "$workdir" "$data_dir"; ensure_dozzle_profile "$workdir/dozzle"; rm -rf -- "$builddir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
+  mkdir -p "$workdir" "$data_dir"
+  ensure_dozzle_profile "$workdir/dozzle"
+  rm -rf -- "$builddir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
   local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
@@ -181,7 +378,6 @@ deploy() {
     -e DOZZLE_ENABLE_ACTIONS=false \
     -e DOZZLE_ENABLE_SHELL=false \
     -e DOZZLE_NO_ANALYTICS=true \
-    -v "$data_dir:/app/data" \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
     -v "$dozzle_data:/data" \
     "$DOZZLE_IMAGE" >/dev/null
@@ -201,5 +397,6 @@ case "$ACTION" in
   cleanup) [[ $# -eq 2 ]] || die "usage: server.sh cleanup <key>"; require_key; cleanup_key "$KEY" ;;
   cleanup-expired) [[ $# -eq 1 ]] || die "usage: server.sh cleanup-expired"; cleanup_expired ;;
   ensure-traefik) [[ $# -eq 1 ]] || die "usage: server.sh ensure-traefik"; ensure_traefik ;;
+  runtime-smoke) [[ $# -eq 2 ]] || die "usage: server.sh runtime-smoke <key>"; runtime_smoke "$KEY" ;;
   *) die "unknown action: $ACTION" ;;
 esac
