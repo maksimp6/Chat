@@ -21,7 +21,8 @@ def test_index_references_existing_versioned_local_scripts():
 
 def test_critical_boot_script_is_local_and_synchronous():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    assert '<script src="{{ static_root }}/boot.js?v={{ static_version }}"></script>' in html
+    assert '<script id="alice-boot" src="{{ static_root }}/boot.js?v={{ static_version }}"' in html
+    assert ' defer' not in html.split('<script id="alice-boot"', 1)[1].split('</script>', 1)[0]
 
 
 def test_local_script_tags_are_deferred_except_critical_boot():
