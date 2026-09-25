@@ -103,59 +103,66 @@ window.fetchVectorStores = function() {
         function renderVsManagerList(stores) {
             var cont = document.getElementById('vs-manager-list');
             if (!cont) return;
+            cont.replaceChildren();
+
             if (!Array.isArray(stores)) {
-                cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-danger,#c33);font-size:12px;">Ошибка: список Vector Stores имеет неожиданный формат.</div>';
+                var invalid = document.createElement('div');
+                invalid.className = 'file-manager-state file-manager-state-error';
+                invalid.textContent = 'Ошибка: список Vector Stores имеет неожиданный формат.';
+                cont.appendChild(invalid);
                 return;
             }
             if (stores.length === 0) {
-                cont.innerHTML = '<div style="padding:10px;text-align:center;color:var(--m-muted,#999);font-size:12px;">Нет векторных хранилищ. Создайте новое.</div>';
+                var empty = document.createElement('div');
+                empty.className = 'file-manager-state';
+                empty.textContent = 'Нет векторных хранилищ. Создайте новое.';
+                cont.appendChild(empty);
                 return;
             }
-            cont.innerHTML = stores.map(function(vs) {
-                var idShort = vs.id.substring(0, 12) + '...';
+
+            stores.forEach(function(vs) {
+                var row = document.createElement('div');
+                row.className = 'file-manager-vs-row';
+
+                var details = document.createElement('div');
+                details.className = 'file-manager-vs-details';
+
+                var name = document.createElement('div');
+                name.className = 'file-manager-vs-name';
+                name.textContent = vs.name || '(без названия)';
+
+                var meta = document.createElement('div');
+                meta.className = 'file-manager-vs-meta';
+                var idLabel = document.createTextNode('ID: ');
+                var idCode = document.createElement('code');
+                idCode.className = 'vs-id-copy file-manager-copy-id';
+                idCode.dataset.id = vs.id || '';
+                idCode.textContent = (vs.id || '').substring(0, 12) + '...';
                 var fileCount = vs.file_counts ? (vs.file_counts.completed || 0) : 0;
-                return '<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--m-section-border,#eee);font-size:12px;">' +
-                    '<div style="flex:1;min-width:0;">' +
-                    '    <div style="font-weight:bold;color:var(--m-text,#222);">' + UI.escapeHtml(vs.name || '(без названия)') + '</div>' +
-                    '    <div style="font-size:11px;color:var(--m-muted,#666);">ID: <code style="cursor:pointer;color:var(--m-accent,#4a90d9);" class="vs-id-copy" data-id="' + UI.escapeHtml(vs.id) + '">' + UI.escapeHtml(idShort) + '</code> · Файлов: ' + fileCount + '</div>' +
-                    '</div>' +
-                    '<button class="vs-add-files-btn" data-id="' + UI.escapeHtml(vs.id) + '" data-name="' + UI.escapeHtml(vs.name || '') + '" style="padding:4px 8px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:11px;color:var(--m-text,#222);">+ Файлы</button>' +
-                    '<button class="vs-delete-btn" data-id="' + UI.escapeHtml(vs.id) + '" style="padding:4px 8px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:11px;color:var(--m-danger,#c33);">Удалить</button>' +
-                    '</div>';
-            }).join('');
+                meta.appendChild(idLabel);
+                meta.appendChild(idCode);
+                meta.appendChild(document.createTextNode(' · Файлов: ' + fileCount));
 
-            // Копирование ID по клику
-            cont.querySelectorAll('.vs-id-copy').forEach(function(code) {
-                code.addEventListener('click', function() {
-                    var id = this.getAttribute('data-id');
-                    copyToClipboard(id);
-                    var orig = this.textContent;
-                    this.textContent = 'скопировано!';
-                    var self = this;
-                    setTimeout(function() { self.textContent = orig; }, 1500);
-                });
-            });
+                details.appendChild(name);
+                details.appendChild(meta);
 
-            // Кнопка "Добавить файлы"
-            cont.querySelectorAll('.vs-add-files-btn').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    var vsId = this.getAttribute('data-id');
-                    var vsName = this.getAttribute('data-name');
-                    openAddFilesToVsModal(vsId, vsName);
-                });
-            });
+                var addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'vs-add-files-btn file-manager-secondary-btn';
+                addBtn.dataset.id = vs.id || '';
+                addBtn.dataset.name = vs.name || '';
+                addBtn.textContent = '+ Файлы';
 
-            // Кнопка "Удалить"
-            cont.querySelectorAll('.vs-delete-btn').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    var vsId = this.getAttribute('data-id');
-                    if (!confirm('Удалить векторное хранилище?')) return;
-                    this.disabled = true;
-                    this.innerText = '...';
-                    fetch('/api/vector-stores/' + vsId, { method: 'DELETE' })
-                        .then(function() { loadVsList(); })
-                        .catch(function(e) { alert('Ошибка: ' + e.message); });
-                });
+                var deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'vs-delete-btn file-manager-danger-btn';
+                deleteBtn.dataset.id = vs.id || '';
+                deleteBtn.textContent = 'Удалить';
+
+                row.appendChild(details);
+                row.appendChild(addBtn);
+                row.appendChild(deleteBtn);
+                cont.appendChild(row);
             });
         }
 
