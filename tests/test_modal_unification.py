@@ -407,3 +407,53 @@ def test_modal_spacing_is_css_owned_not_inline_style():
                 assert "style" not in node.attrs, (
                     f"{modal.attrs.get('id')}: inline style is forbidden inside modal DOM"
                 )
+
+
+def test_html_source_is_strict_utf8_without_bom_or_surrogates():
+    source = (ROOT / "templates" / "index.html").read_bytes()
+    assert not source.startswith(b"\\xef\\xbb\\xbf"), "UTF-8 BOM is forbidden"
+    decoded = source.decode("utf-8")
+    assert decoded.encode("utf-8") == source, "index.html must round-trip as UTF-8"
+    assert not any(0xD800 <= ord(ch) <= 0xDFFF for ch in decoded), "UTF-16 surrogate code points are forbidden"
+
+
+def test_html_declares_utf8_and_has_no_conflicting_charset():
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    import re
+    charsets = re.findall(r"<meta\\b[^>]*charset\\s*=\\s*[\\\"']?([^\\\"'\\s/>]+)", source, flags=re.I)
+    assert charsets, "document must declare a charset"
+    assert all(value.lower() == "utf-8" for value in charsets), f"conflicting charset declarations: {charsets!r}"
+
+
+def test_modal_html_entities_and_escape_sequences_are_valid():
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    roots = parse_html()
+    import re
+    entity_re = re.compile(r"&(?:#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]+);", re.I)
+    invalid_ampersand = re.compile(r"&(?!#x[0-9a-f]+;|#[0-9]+;|[a-z][a-z0-9]+;)", re.I)
+    mojibake = re.compile(r"(?:Р[\\u0400-\\u04ff]|С[\\u0400-\\u04ff]){2,}")
+    assert not mojibake.search(source), "possible UTF-8/Windows-1251 mojibake detected"
+
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for raw in modal.raw_data:
+                for match in entity_re.finditer(raw):
+                    value = match.group(0)
+                    assert value.endswith(";"), f"unterminated HTML entity: {value!r}"
+                assert not invalid_ampersand.search(raw), (
+                    f"{modal.attrs.get('id')}: raw '&' must be escaped as an HTML entity"
+                )
+
+    assert "&times;" in source
+    assert "×" not in source, "literal multiplication sign must use the established &times; escape in HTML source"
+
+
+def test_modal_text_is_unicode_after_entity_decoding():
+    roots = parse_html()
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for node in walk(modal):
+                for text in node.text:
+                    assert text == text.encode("utf-8").decode("utf-8")
+                    assert "\\ufffd" not in text, f"{modal.attrs.get('id')}: replacement character indicates decode loss"
+                    assert "\\x00" not in text, f"{modal.attrs.get('id')}: NUL is forbidden"
