@@ -140,15 +140,69 @@ def create_conversation(conv_id, title, model):
     conn.close()
 
 
-def update_conversation_title(conv_id, title):
+def normalize_conversation_title(title, max_length=80):
+    """Normalize a conversation title into a compact server-authoritative label."""
+    value = " ".join(str(title or "").strip().split())
+    if not value:
+        return "Новый чат"
+    if len(value) <= max_length:
+        return value
+    return value[: max_length - 1].rstrip() + "…"
+
+
+def get_conversation_title(conv_id, default=None):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT title FROM conversations WHERE id = ?", (conv_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row["title"] if row else default
+
+
+def update_conversation_title(conv_id, title, owner_id=None):
+    """Persist an explicit title; owner authorization is enforced by the route layer."""
+    normalized = normalize_conversation_title(title)
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
-        (title, int(datetime.utcnow().timestamp()), conv_id),
+        (normalized, int(datetime.utcnow().timestamp()), conv_id),
     )
     conn.commit()
     conn.close()
+
+
+def maybe_update_conversation_title(conv_id, source_text):
+    """Set a useful title only while the conversation still has a default title."""
+    text = str(source_text or "").strip()
+    if not text:
+        return get_conversation_title(conv_id)
+
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    if not first_line:
+        return get_conversation_title(conv_id)
+
+    candidate = normalize_conversation_title(first_line)
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE conversations
+           SET title = ?, updated_at = ?
+         WHERE id = ? AND title IN (?, ?)
+        """,
+        (
+            candidate,
+            int(datetime.utcnow().timestamp()),
+            conv_id,
+            "Новый чат",
+            "Новый диалог",
+        ),
+    )
+    changed = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return candidate if changed else get_conversation_title(conv_id)
 
 
 def update_conversation_model(conv_id, model):
