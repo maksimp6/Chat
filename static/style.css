@@ -1229,3 +1229,54 @@ html, body {
     color: var(--text-main);
     opacity: 0.85;
 }
+
+
+/* File manager vector-store rendering. */
+.alice-pro-app .file-manager-state {
+    padding: 10px;
+    text-align: center;
+    color: var(--m-muted, #999);
+    font-size: 12px;
+}
+.alice-pro-app .file-manager-state-error {
+    color: var(--m-danger, #c33);
+}
+.alice-pro-app .file-manager-vs-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--m-section-border, #eee);
+    font-size: 12px;
+}
+.alice-pro-app .file-manager-vs-details {
+    flex: 1;
+    min-width: 0;
+}
+.alice-pro-app .file-manager-vs-name {
+    font-weight: 700;
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-vs-meta {
+    font-size: 11px;
+    color: var(--m-muted, #666);
+}
+.alice-pro-app .file-manager-copy-id {
+    cursor: pointer;
+    color: var(--m-accent, #4a90d9);
+}
+.alice-pro-app .file-manager-secondary-btn,
+.alice-pro-app .file-manager-danger-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--m-border, #ddd);
+    background: var(--m-card, #fff);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+.alice-pro-app .file-manager-secondary-btn {
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-danger-btn {
+    color: var(--m-danger, #c33);
+}
