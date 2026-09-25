@@ -53,6 +53,8 @@
             document.getElementById('set-ssh-max-output').value = ssh.max_output_bytes || 1048576;
             document.getElementById('set-ssh-known-hosts').value = ssh.known_hosts || '';
             document.getElementById('set-ssh-targets').value = JSON.stringify(ssh.targets || {}, null, 2);
+            document.getElementById('set-ssh-allow-exec').disabled = ssh.read_only === true;
+            document.getElementById('set-ssh-allow-write').disabled = ssh.read_only === true;
             var targetNames = Object.keys(ssh.targets || {});
             if (sshTestTargetEl && targetNames.length && !sshTestTargetEl.value) sshTestTargetEl.value = targetNames[0];
             var last = ssh.last_test;
@@ -83,6 +85,10 @@
             document.getElementById('set-ssh-allow-write').checked = false;
             document.getElementById('set-ssh-allow-exec').disabled = disabled;
             document.getElementById('set-ssh-allow-write').disabled = disabled;
+            if (!disabled) {
+                document.getElementById('set-ssh-allow-exec').checked = true;
+                document.getElementById('set-ssh-allow-write').checked = true;
+            }
         });
 
         document.getElementById('set-ssh-save-btn').addEventListener('click', function() {
