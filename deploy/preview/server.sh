@@ -65,10 +65,39 @@ ensure_traefik() {
   docker run -d --name "$TRAEFIK_NAME" --restart unless-stopped --network "$NETWORK_NAME" -p 0.0.0.0:80:80 -p 0.0.0.0:443:443 -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$ROOT_DIR/traefik:/etc/traefik/dynamic:ro" -v "$ACME_DIR:/letsencrypt" "$TRAEFIK_IMAGE" --providers.docker=true --providers.docker.exposedbydefault=false --providers.file.directory=/etc/traefik/dynamic --providers.file.watch=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL" --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json --certificatesresolvers.letsencrypt.acme.httpchallenge=true --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web --api.dashboard=false --accesslog=false >/dev/null
 }
 
-clear_dozzle_data() {
+ensure_dozzle_profile() {
   local dozzle_data="$1"
-  mkdir -p "$dozzle_data"
-  docker run --rm --user 0 -v "$dozzle_data:/data" --entrypoint sh "$DOZZLE_CLEANUP_IMAGE" -c 'rm -rf /data/* /data/.[!.]* /data/..?*' >/dev/null 2>&1 || true
+  local profile="$dozzle_data/__default__/profile.json"
+  mkdir -p "$(dirname "$profile")"
+  if [[ ! -s "$profile" ]]; then
+    cat > "$profile" <<'EOF'
+{
+  "settings": {
+    "showTimestamp": true,
+    "showStd": false,
+    "showAllContainers": false,
+    "softWrap": true,
+    "collapseNav": false,
+    "smallerScrollbars": true,
+    "search": true,
+    "compact": false,
+    "menuWidth": 18,
+    "size": "medium",
+    "lightTheme": "auto",
+    "hourStyle": "24",
+    "dateLocale": "auto",
+    "locale": "ru",
+    "groupContainers": "always",
+    "automaticRedirect": "delayed"
+  },
+  "pinned": [],
+  "visibleKeys": [],
+  "collapsedGroups": [],
+  "dismissedLinkHint": true
+}
+EOF
+    chmod 600 "$profile"
+  fi
 }
 
 cleanup_key() {
