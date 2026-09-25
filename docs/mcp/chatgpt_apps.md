@@ -8,11 +8,11 @@ The connector endpoint is:
 
 `https://<public-host>/mcp`
 
-The service uses MCP Streamable HTTP. The current implementation accepts protocol versions `2026-07-28`, `2025-06-18` and `2025-03-26`. Requests may omit `MCP-Protocol-Version`; when absent, the server uses the latest supported version (`2026-07-28`). It does not require non-standard per-method or per-tool HTTP headers, so standard Streamable HTTP clients can connect directly.
+The service uses MCP Streamable HTTP. The endpoint supports the current `2026-07-28` discovery flow and the `2025-06-18` / `2025-03-26` handshake flow. Modern clients use `server/discover`; legacy clients can use `initialize`. The implementation accepts the `MCP-Protocol-Version` header when present and can default to the latest supported revision for local/compatibility clients.
 
 MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `ALICE_MCP_BEARER_TOKEN` plus `ALICE_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
-No connection/session state is stored by the MCP transport. Alice Pro's existing runtime `Session`, `Invocation` and `ExecutionTrace` records remain the application-level state.
+The HTTP transport remains stateless. Each `tools/call` creates a short-lived Alice Pro `Invocation` with a persisted `ExecutionTrace`; the response returns the `invocation_id` and `trace_id` for correlation. This keeps MCP connection state out of the web process while retaining an auditable application-level execution record.
 
 ## Exposed tools
 
@@ -101,6 +101,8 @@ The contract is covered by `tests/test_chatgpt_mcp.py`, including:
 
 - deterministic `tools/list`;
 - structured `tools/call` results;
+- legacy `initialize` handshake compatibility;
+- persisted ExecutionTrace correlation for MCP tool calls;
 - standard MCP header validation;
 - authentication failures and bearer authentication;
 - user isolation for conversations, invocation and trace reads;

@@ -351,3 +351,67 @@ def test_mcp_conversation_tools_are_advertised(client):
         "alice_get_execution",
         "alice_get_execution_trace",
     }.issubset(names)
+
+
+def test_mcp_initialize_handshake_is_supported(client):
+    response = mcp_request(client, "initialize", {"clientInfo": {"name": "test", "version": "1"}})
+    assert response.status_code == 200
+    result = response.get_json()["result"]
+    assert result["protocolVersion"] == chatgpt_mcp.DEFAULT_PROTOCOL_VERSION
+    assert result["capabilities"]["tools"] == {}
+    assert result["serverInfo"]["name"] == "Alice Pro"
+
+
+def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
+    import db
+    from runtime_migrations import init_runtime_tables
+
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "trace-user")
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
+    db.init_db()
+    init_runtime_tables()
+
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(chatgpt_mcp.chatgpt_mcp_bp)
+    app.testing = True
+
+    with app.test_client() as test_client:
+        response = mcp_request(
+            test_client,
+            "tools/call",
+            {"name": "alice_get_system_status", "arguments": {}},
+            name="alice_get_system_status",
+            Authorization="Bearer trace-token",
+        )
+
+        assert response.status_code == 200
+        meta = response.get_json()["result"]["_meta"]
+        assert meta["trace_id"]
+        assert meta["invocation_id"]
+
+        trace_response = mcp_request(
+            test_client,
+            "tools/call",
+            {
+                "name": "alice_get_invocation_trace",
+                "arguments": {"invocation_id": meta["invocation_id"]},
+            },
+            name="alice_get_invocation_trace",
+            Authorization="Bearer trace-token",
+        )
+
+        assert trace_response.status_code == 200
+        trace = trace_response.get_json()["result"]["structuredContent"]["trace"]
+        assert trace["trace_id"] == meta["trace_id"]
+        assert trace["context"]["user_id"] == "trace-user"
+        assert any(
+            call.get("tool_name") == "alice_get_system_status"
+            for call in trace["tool_calls"]
+        )
+        assert any(
+            event.get("type") == "mcp_tool_call_completed"
+            for event in trace["events"]
+        )
