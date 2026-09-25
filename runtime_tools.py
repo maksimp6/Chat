@@ -12,10 +12,10 @@ from ssh_runtime_settings import assert_operation_allowed, build_runtime
 runtime = None
 
 
-def _runtime_for_operation(operation: str) -> SSHRuntime:
+def _runtime_for_operation(operation: str, *, command: str | None = None, approved: bool = False) -> SSHRuntime:
     if runtime is not None:
         return runtime
-    assert_operation_allowed(operation)
+    assert_operation_allowed(operation, command=command, approved=approved)
     return build_runtime()
 
 
@@ -30,6 +30,11 @@ def _trace_event(cfg: dict | None, event_type: str, payload: dict) -> None:
 
 def _universal_context(cfg: dict | None) -> dict:
     return cfg.get("_universal_context") if isinstance(cfg, dict) else {}
+
+def _approved(cfg: dict | None) -> bool:
+    context = _universal_context(cfg)
+    call = context.get("call") if isinstance(context, dict) else None
+    return bool(getattr(call, "approved", False)) if call is not None else False
 
 def _trusted_identity(cfg: dict | None) -> str | None:
     context = _universal_context(cfg)
@@ -55,7 +60,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         "identity_id": runtime_args["identity_id"],
     })
     try:
-        result = _runtime_for_operation("execute").execute(command=command, **runtime_args)
+        result = _runtime_for_operation("execute", command=command, approved=_approved(cfg)).execute(command=command, **runtime_args)
     except SSHRuntimeError as exc:
         _trace_event(cfg, "runtime_failed", {
             "runtime": "ssh",
@@ -116,7 +121,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
         "identity_id": runtime_args["identity_id"],
     })
     try:
-        result = _runtime_for_operation("write_file").write_file(
+        result = _runtime_for_operation("write_file", approved=_approved(cfg)).write_file(
             path=str(args.get("path") or ""),
             content=str(args.get("content") or ""),
             **runtime_args,

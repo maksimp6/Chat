@@ -370,7 +370,7 @@ class ExecutionTrace:
         finally:
             end_timestamp = time.time()
             elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-            entry = {"name": name,
+            entry = {"name": name, "tool_name": name,
                      "arguments": self._sanitize_trace_value(
                          trace_arguments if trace_arguments is not None else arguments
                      ),
