@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 from db import get_config, set_config
 from ssh_runtime import SSHRuntime, SSHRuntimeError
+from trace_manager import get_current_trace
 
 logger = logging.getLogger("ssh_runtime_settings")
 
@@ -164,6 +165,17 @@ def get_settings() -> dict[str, Any]:
 def save_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
     validated = validate_settings(settings)
     set_config(SETTINGS_KEY, validated)
+    trace = get_current_trace()
+    if trace is not None:
+        trace.add_event("ssh_runtime_settings_updated", {
+            "enabled": validated["enabled"],
+            "targets": sorted(validated["targets"]),
+            "read_only": validated["read_only"],
+            "allow_command_execution": validated["allow_command_execution"],
+            "allow_write_operations": validated["allow_write_operations"],
+            "allow_privileged_operations": validated["allow_privileged_operations"],
+            "command_allowlist_count": len(validated["command_allowlist"]),
+        })
     logger.info(
         "SSH Runtime settings updated: enabled=%s targets=%s read_only=%s",
         validated["enabled"],
@@ -288,6 +300,15 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
         "known_hosts_configured": bool(known_hosts),
     }
     record_test_result(result)
+    trace = get_current_trace()
+    if trace is not None:
+        trace.add_event("ssh_runtime_connection_test", {
+            "target": target.name,
+            "linux_user": user,
+            "success": result["success"],
+            "status": result["status"],
+            "duration_ms": result["duration_ms"],
+        })
     logger.info(
         "SSH Runtime connection test: target=%s user=%s success=%s exit_code=%s",
         target.name,
