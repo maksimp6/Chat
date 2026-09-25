@@ -16,8 +16,8 @@ from budget_controller import (
 )
 
 
-def make_controller(trace=None, *, fallback=True, cooldown_seconds=0, now=None):
-    limits = BudgetLimits("50", "100", "300")
+def make_controller(trace=None, *, fallback=True, cooldown_seconds=0, now=None, max_daily_loss="100"):
+    limits = BudgetLimits("50", max_daily_loss, "300")
     clock = (lambda: now) if now is not None else None
     return BudgetController(
         "GAMBLING-001",
@@ -72,7 +72,7 @@ def test_limits_are_deterministic():
 
 
 def test_insufficient_budget_without_fallback():
-    controller = make_controller(fallback=False)
+    controller = make_controller(fallback=False, max_daily_loss="300")
     controller.spend("50", account_type=AccountType.REAL)
     controller.spend("50", account_type=AccountType.REAL)
     with pytest.raises(InsufficientFunds):
