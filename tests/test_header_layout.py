@@ -19,7 +19,6 @@ def test_dynamic_header_actions_target_secondary_row():
     assert 'memory-btn' in memory
     assert 'window.openMemoryModal' in memory
     assert 'memory-btn' not in header
-    assert 'memory-btn' in header
     assert 'window.openMemoryModal' in memory
 
 
