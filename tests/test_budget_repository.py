@@ -74,7 +74,7 @@ def test_repository_uses_adapter_placeholders_and_returns_result(monkeypatch):
 
     assert result == {"operation_id": "op-1", "status": "APPLIED"}
     assert conn.committed is True
-    assert "?, ?, ?, ?, ?, ?" in conn.cur.sql
+    assert "?, ?, ?, ?, ?, ?, ?" in conn.cur.sql
     assert conn.cur.params[0:3] == ("GAMBLING-001", "REAL", "RESERVE")
     assert str(conn.cur.params[3]) == "10.00"
 
