@@ -98,14 +98,11 @@
 
     document.addEventListener("click", function (event) {
       var target = event.target && event.target.closest
-        ? event.target.closest("#memory-btn, #memoryCloseBtn, #memoryClearBtn")
+        ? event.target.closest("#memoryCloseBtn, #memoryClearBtn")
         : null;
       if (!target) return;
 
-      if (target.id === "memory-btn") {
-        event.preventDefault();
-        window.openMemoryModal();
-      } else if (target.id === "memoryCloseBtn") {
+      if (target.id === "memoryCloseBtn") {
         event.preventDefault();
         window.closeMemoryModal();
       } else if (target.id === "memoryClearBtn") {
