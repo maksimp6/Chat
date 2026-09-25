@@ -24,8 +24,6 @@ def _owner():
 
 
 def _context():
-    # Environment lifecycle can originate outside a chat session. The manager
-    # therefore creates infrastructure-scoped trace correlation when absent.
     return None
 
 
