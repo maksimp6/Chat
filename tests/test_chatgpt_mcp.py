@@ -583,3 +583,21 @@ def test_invalid_jsonrpc_and_unknown_method_are_rejected(client):
     response = mcp_request(client, "does/not-exist")
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == -32601
+
+def test_anonymous_mcp_uses_configured_owner_for_conversation_tools(monkeypatch):
+    import chatgpt_mcp
+
+    monkeypatch.setenv("ALICE_MCP_ALLOW_ANONYMOUS", "true")
+    monkeypatch.delenv("ALICE_MCP_USER_ID", raising=False)
+    monkeypatch.setenv("ALICE_OWNER_ID", "owner-single-user")
+
+    monkeypatch.setattr(
+        chatgpt_mcp,
+        "list_owned_conversations",
+        lambda owner: [{"id": "conv-1", "owner_id": owner}],
+    )
+
+    with chatgpt_mcp.chatgpt_mcp_bp.app_context():
+        result = chatgpt_mcp._conversations({}, chatgpt_mcp._auth_user_from_request())
+
+    assert result["conversations"][0]["owner_id"] == "owner-single-user"
