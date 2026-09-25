@@ -5,13 +5,13 @@
 
   window.openMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) modal.style.display = "flex";
+    if (modal) modal.hidden = false;
     window.loadMemoryData();
   };
 
   window.closeMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) modal.style.display = "none";
+    if (modal) modal.hidden = true;
   };
 
   window.loadMemoryData = async function () {
@@ -26,7 +26,7 @@
       list.replaceChildren();
       if (data.facts.length === 0) {
         var empty = document.createElement("p");
-        empty.style.cssText = "color:#888;font-size:13px;";
+        empty.className = "memory-empty";
         empty.textContent = "Память пуста.";
         list.appendChild(empty);
         return;
@@ -34,9 +34,9 @@
 
       data.facts.forEach(function (fact) {
         var item = document.createElement("div");
-        item.style.cssText = "background:#2a2a2a;padding:8px;margin-bottom:6px;border-radius:4px;font-size:12px;";
+        item.className = "memory-fact";
         var category = document.createElement("span");
-        category.style.cssText = "color:#4da6ff;font-weight:bold;text-transform:uppercase;";
+        category.className = "memory-fact-category";
         category.textContent = "[" + String(fact.category || "") + "]";
         item.appendChild(category);
         item.appendChild(document.createTextNode(" " + String(fact.fact || "")));
@@ -80,7 +80,40 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", bindMemoryPanelEvents);
+  function bindMemoryPanelEvents() {
+    var openButton = byId("memory-btn");
+    if (openButton && !openButton.dataset.bound) {
+      openButton.addEventListener("click", window.openMemoryModal);
+      openButton.dataset.bound = "true";
+    }
+
+    var closeButton = byId("memoryCloseBtn");
+    if (closeButton && !closeButton.dataset.bound) {
+      closeButton.addEventListener("click", window.closeMemoryModal);
+      closeButton.dataset.bound = "true";
+    }
+    var enabled = byId("memEnabled");
+    if (enabled && !enabled.dataset.bound) {
+      enabled.addEventListener("change", window.updateMemoryConfig);
+      enabled.dataset.bound = "true";
+    }
+    var limit = byId("memLimit");
+    if (limit && !limit.dataset.bound) {
+      limit.addEventListener("change", window.updateMemoryConfig);
+      limit.dataset.bound = "true";
+    }
+    var clearButton = byId("memoryClearBtn");
+    if (clearButton && !clearButton.dataset.bound) {
+      clearButton.addEventListener("click", function () { window.clearMemory(null); });
+      clearButton.dataset.bound = "true";
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindMemoryPanelEvents, { once: true });
+  } else {
+    bindMemoryPanelEvents();
+  }
 
   window.clearMemory = async function (category) {
     if (!confirm("Очистить память?")) return;
