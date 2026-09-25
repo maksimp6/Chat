@@ -170,7 +170,9 @@ function build() {
     modal.setAttribute("aria-labelledby", "provider-credentials-title");
     modal.setAttribute("aria-hidden", "true");
     title.id = "provider-credentials-title";
-    modal.appendChild(box); document.body.appendChild(modal);
+    modal.appendChild(box);
+    var app = document.querySelector(".alice-pro-app");
+    (app || document.body).appendChild(modal);
 }
 
 window.openProviderCredentialsModal=async function(){
