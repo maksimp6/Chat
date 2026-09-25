@@ -434,9 +434,14 @@ def execute_approved():
             return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
 
         owner_id = get_current_owner_id(required=False)
+        tool_arguments = dict(arguments or {})
+        if func_name == "set_ui_theme":
+            current_theme = str(data.get("current_theme") or "").strip().lower()
+            if current_theme:
+                tool_arguments["current_theme"] = current_theme
         call = UniversalToolCall(
             tool_name=func_name,
-            arguments=arguments,
+            arguments=tool_arguments,
             transport="internal",
             user_id=owner_id,
             approved=True,
