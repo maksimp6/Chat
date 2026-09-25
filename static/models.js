@@ -18,6 +18,13 @@ function initModels() {
     });
 }
 
+window.addEventListener("alice:model-load-state", function(event) {
+    window.modelLoadState = event.detail || {status: "idle", error: null};
+    if (window.modelLoadState.status === "error") {
+        console.error("[MODEL_UI] Model loading failed:", window.modelLoadState.error);
+    }
+});
+
 document.addEventListener("DOMContentLoaded", initModels);
 
 function renderModelModal() {
@@ -29,8 +36,22 @@ function renderModelModal() {
     if (Object.keys(allModels).length === 0) {
         var empty = document.createElement("div");
         empty.className = "model-option model-option-empty";
-        empty.textContent = "Модели временно недоступны. Интерфейс продолжает работать.";
+        var state = window.modelLoadState || {status: "idle", error: null};
+        empty.textContent = state.error && state.error.message
+            ? "Не удалось загрузить модели: " + state.error.message
+            : "Модели временно недоступны. Интерфейс продолжает работать.";
         modelList.appendChild(empty);
+
+        if (state.status === "error") {
+            var retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "model-load-retry";
+            retry.textContent = "Повторить загрузку";
+            retry.addEventListener("click", function() {
+                if (typeof window.retryModelLoad === "function") window.retryModelLoad();
+            });
+            modelList.appendChild(retry);
+        }
         return;
     }
     Object.keys(allModels).forEach(function(key) {
