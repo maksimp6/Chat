@@ -4,7 +4,13 @@
     // === 1. Модальное окно локальных инструментов (Tools) с немедленным сохранением в БД ===
     window.openToolsModal = function() {
         var UI = window.SettingsUI;
+        var Storage = window.SettingsStorage;
         var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
+        var settings = Storage.load(currentConvId);
+        var cfg = settings.tools_config || {};
+        var ws = cfg.web_search || {};
+        var fs = cfg.file_search || {};
+        var ci = cfg.code_interpreter || {};
 
         var existing = document.getElementById("tools-modal-custom");
         if (existing) existing.remove();
@@ -14,82 +20,98 @@
         ov.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;";
 
         var md = document.createElement("div");
-        md.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:550px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+        md.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
 
-        var html = [
+        md.innerHTML = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">',
-            '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Локальные инструменты (Tools)</h2>',
-            '    <button id="tools-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
+            ' <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Инструменты</h2>',
+            ' <button id="tools-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
             '</div>',
-            '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Отключенные категории полностью исключаются из контекста LLM:</div>',
-            '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">',
-            '    <div style="padding:10px;text-align:center;color:var(--m-muted,#888);">Загрузка инструментов...</div>',
-            '</div>',
+            '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
+            '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
+            '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">Загрузка инструментов...</div>',
+            '<hr style="margin:18px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
+            '<h3 style="font-size:14px;margin:12px 0 8px;">Встроенные инструменты Yandex AI Studio</h3>',
+            UI.chk('tools-ws-en', ws.enabled || false, '<strong>🌐 Web Search</strong> (поиск в интернете)'),
+            '<div style="margin-top:8px;">' + UI.lbl('Search Context Size') + UI.sel('tools-ws-context',
+                '<option value="low"' + (ws.context_size === 'low' ? ' selected' : '') + '>Low</option>' +
+                '<option value="medium"' + (!ws.context_size || ws.context_size === 'medium' ? ' selected' : '') + '>Medium</option>' +
+                '<option value="high"' + (ws.context_size === 'high' ? ' selected' : '') + '>High</option>') + '</div>',
+            '<div style="margin-top:8px;">' + UI.lbl('Разрешённые домены') + UI.inp('tools-ws-allow', 'text', ws.allowed_domains || '', ' placeholder="example.com, wikipedia.org"') + '</div>',
+            '<div style="margin-top:8px;">' + UI.lbl('Заблокированные домены') + UI.inp('tools-ws-block', 'text', ws.blocked_domains || '', ' placeholder="example.org"') + '</div>',
+            '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
+            UI.chk('tools-ci-en', ci.enabled || false, '<strong>🧮 Code Interpreter</strong> (Python)'),
+            '<hr style="margin:14px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
+            UI.chk('tools-fs-en', fs.enabled || false, '<strong>📚 File Search</strong> (поиск по Vector Store)'),
+            '<div style="margin-top:8px;">' + UI.lbl('Vector Store IDs') + UI.inp('tools-fs-vids', 'text', fs.vector_store_ids || '', ' placeholder="vs_xxx, vs_yyy"') + '</div>',
+            '<div style="margin-top:8px;">' + UI.lbl('Максимум результатов') + UI.inp('tools-fs-max', 'number', fs.max_results || 20, ' min="1"') + '</div>',
+            '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
             '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
-            '    <button id="tools-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить в диалог</button>',
+            ' <button id="tools-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить инструменты</button>',
             '</div>'
         ].join('');
-
-        md.innerHTML = html;
         ov.appendChild(md);
         document.body.appendChild(ov);
-
 
         function closeModal() { ov.remove(); }
         document.getElementById('tools-close-btn').addEventListener('click', closeModal);
         ov.addEventListener('click', function(e) { if (e.target === ov) closeModal(); });
 
         var categoryLabels = {
-            "termux": "📱 Termux Hardware (батарея, буфер, сенсоры, TTS, тосты)",
-            "git": "🌿 Local Git (статус, ветки, diff, коммиты)",
-            "filesystem": "⚙️ Файловая система (чтение, запись, apply_patch)",
-            "system": "🔧 Системные драйверы Termux",
-            "wikipedia": "📚 Wikipedia Engine (поиск и сводка статей)",
-            "profiler": "⏱️ Профайлер и инспекция состояния"
+            termux: "📱 Termux Hardware (батарея, буфер, сенсоры, TTS, тосты)",
+            git: "🌿 Local Git (статус, ветки, diff, коммиты)",
+            filesystem: "⚙️ Файловая система (чтение, запись, apply_patch)",
+            system: "🔧 Системные драйверы Termux",
+            wikipedia: "📚 Wikipedia Engine (поиск и сводка статей)",
+            profiler: "⏱️ Профайлер и инспекция состояния"
         };
 
         Promise.all([
-            fetch('/api/tools/categories').then(r => r.json()),
-            currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools').then(r => r.json()) : Promise.resolve({active_tool_categories: null})
-        ]).then(([catData, activeData]) => {
+            fetch('/api/tools/categories').then(function(r) { return r.json(); }),
+            currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools').then(function(r) { return r.json(); }) : Promise.resolve({active_tool_categories: null})
+        ]).then(function(results) {
+            var catData = results[0];
+            var activeData = results[1];
             var listEl = document.getElementById('tools-category-list');
             var categories = catData.categories || {};
-            var active = (activeData && activeData.active_tool_categories !== null) 
-                ? activeData.active_tool_categories 
-                : Object.keys(categories);
-
+            var active = (activeData && activeData.active_tool_categories !== null) ? activeData.active_tool_categories : Object.keys(categories);
             listEl.innerHTML = Object.keys(categories).map(function(cat) {
                 var isChecked = active.indexOf(cat) !== -1;
-                var label = categoryLabels[cat] || `Модуль: ${cat}`;
+                var label = categoryLabels[cat] || 'Модуль: ' + cat;
                 var count = (categories[cat] || []).length;
                 return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--m-border,#ddd);border-radius:6px;background:var(--m-card,#fff);cursor:pointer;">' +
                     '<input type="checkbox" class="tool-cat-chk" value="' + UI.escapeHtml(cat) + '" ' + (isChecked ? 'checked' : '') + '>' +
-                    '<div style="flex:1;">' +
-                    '   <div style="font-weight:600;font-size:13px;color:var(--m-text,#222);">' + UI.escapeHtml(label) + '</div>' +
-                    '   <div style="font-size:11px;color:var(--m-muted,#666);">' + count + ' функций доступно</div>' +
-                    '</div>' +
-                    '</label>';
+                    '<div style="flex:1;"><div style="font-weight:600;font-size:13px;color:var(--m-text,#222);">' + UI.escapeHtml(label) + '</div>' +
+                    '<div style="font-size:11px;color:var(--m-muted,#666);">' + count + ' функций доступно</div></div></label>';
             }).join('');
-        }).catch(err => {
-            document.getElementById('tools-category-list').innerHTML = '<div style="color:red;padding:10px;">Ошибка загрузки категорий</div>';
+        }).catch(function() {
+            var listEl = document.getElementById('tools-category-list');
+            if (listEl) listEl.textContent = 'Ошибка загрузки категорий';
         });
 
         document.getElementById('tools-save-btn').addEventListener('click', function() {
             var selected = [];
-            document.querySelectorAll('.tool-cat-chk:checked').forEach(function(chk) {
-                selected.push(chk.value);
-            });
-            if (currentConvId) {
-                fetch('/api/conversations/' + currentConvId + '/tools', {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({active_tool_categories: selected})
-                }).then(r => r.json()).then(res => {
-                    closeModal();
-                }).catch(() => closeModal());
-            } else {
-                closeModal();
-            }
+            document.querySelectorAll('.tool-cat-chk:checked').forEach(function(chk) { selected.push(chk.value); });
+            settings.tools_config = {
+                web_search: {
+                    enabled: document.getElementById('tools-ws-en').checked,
+                    context_size: document.getElementById('tools-ws-context').value,
+                    allowed_domains: document.getElementById('tools-ws-allow').value.trim(),
+                    blocked_domains: document.getElementById('tools-ws-block').value.trim()
+                },
+                code_interpreter: { enabled: document.getElementById('tools-ci-en').checked },
+                file_search: {
+                    enabled: document.getElementById('tools-fs-en').checked,
+                    vector_store_ids: document.getElementById('tools-fs-vids').value.trim(),
+                    max_results: Math.max(1, parseInt(document.getElementById('tools-fs-max').value, 10) || 20)
+                }
+            };
+            var localSave = currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({active_tool_categories: selected})
+            }) : Promise.resolve();
+            Promise.all([localSave, Promise.resolve(Storage.save(settings, currentConvId))]).then(closeModal).catch(closeModal);
         });
     };
 
@@ -188,101 +210,6 @@
     var fs = cfg.file_search || {};
     var ci = cfg.code_interpreter || {};
 
-    var tabTools = [
-        '<div id="tab-tools" class="llm-tab-content" style="display:none;">',
-
-        UI.section("Встроенные инструменты Yandex AI Studio"),
-
-        UI.chk(
-            'set-ws-en',
-            ws.enabled || false,
-            '<strong>🌐 Web Search</strong> (поиск в интернете)'
-        ),
-
-        UI.gap2(
-            '<div>' +
-                UI.lbl('Search Context Size') +
-                UI.sel(
-                    'set-ws-context',
-                    '<option value="low"' +
-                        (ws.context_size === 'low' ? ' selected' : '') +
-                        '>Low</option>' +
-                    '<option value="medium"' +
-                        (!ws.context_size || ws.context_size === 'medium' ? ' selected' : '') +
-                        '>Medium</option>' +
-                    '<option value="high"' +
-                        (ws.context_size === 'high' ? ' selected' : '') +
-                        '>High</option>'
-                ) +
-            '</div>',
-            '<div></div>'
-        ),
-
-        '<div style="margin-top:10px;">' +
-            UI.lbl('Разрешённые домены') +
-            UI.inp(
-                'set-ws-allow',
-                'text',
-                ws.allowed_domains || '',
-                ' placeholder="example.com, wikipedia.org"'
-            ) +
-        '</div>',
-
-        '<div style="margin-top:10px;">' +
-            UI.lbl('Заблокированные домены') +
-            UI.inp(
-                'set-ws-block',
-                'text',
-                ws.blocked_domains || '',
-                ' placeholder="example.org"'
-            ) +
-        '</div>',
-
-        '<hr style="margin:16px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
-
-        UI.chk(
-            'set-ci-en',
-            ci.enabled || false,
-            '<strong>🧮 Code Interpreter</strong> (Python)'
-        ),
-
-        '<hr style="margin:16px 0;border:none;border-top:1px solid var(--m-border,#ddd);">',
-
-        UI.chk(
-            'set-fs-en',
-            fs.enabled || false,
-            '<strong>📚 File Search</strong> (поиск по Vector Store)'
-        ),
-
-        '<div style="margin-top:10px;">' +
-            UI.lbl('Vector Store IDs') +
-            UI.inp(
-                'set-fs-vids',
-                'text',
-                fs.vector_store_ids || '',
-                ' placeholder="vs_xxx, vs_yyy"'
-            ) +
-        '</div>',
-
-        '<div style="margin-top:10px;">' +
-            UI.lbl('Максимум результатов') +
-            UI.inp(
-                'set-fs-max',
-                'number',
-                fs.max_results || 20,
-                ' min="1"'
-            ) +
-        '</div>',
-
-        '<div style="margin-top:14px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">' +
-            'Эти инструменты выполняются на стороне Yandex AI Studio. ' +
-            'Они независимы от MCP и локального Tool Registry.' +
-        '</div>',
-
-        '</div>'
-    ].join('');
-
-
 var tabSsh = [
             '<div id="tab-ssh" class="llm-tab-content" style="display:none;">',
             UI.section("SSH Runtime"),
@@ -362,7 +289,7 @@ var footer = [
             '</div>'
         ].join('');
 
-        md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabTools + tabSsh + tabAdv + tabTheme + footer;
+        md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabSsh + tabAdv + tabTheme + footer;
         ov.appendChild(md);
         document.body.appendChild(ov);
 
@@ -567,29 +494,6 @@ var footer = [
             settings.prompt_version = document.getElementById('set-prompt-ver').value.trim();
             settings.prompt_variables = document.getElementById('set-prompt-vars').value.trim();
             settings.conv_metadata = document.getElementById('set-conv-meta').value.trim();
-        // Встроенные инструменты Yandex AI Studio.
-        // MCP и локальные инструменты здесь не изменяются.
-        settings.tools_config = {
-            web_search: {
-                enabled: document.getElementById('set-ws-en').checked,
-                context_size: document.getElementById('set-ws-context').value,
-                allowed_domains: document.getElementById('set-ws-allow').value.trim(),
-                blocked_domains: document.getElementById('set-ws-block').value.trim()
-            },
-            code_interpreter: {
-                enabled: document.getElementById('set-ci-en').checked
-            },
-            file_search: {
-                enabled: document.getElementById('set-fs-en').checked,
-                vector_store_ids: document.getElementById('set-fs-vids').value.trim(),
-                max_results: Math.max(
-                    1,
-                    parseInt(document.getElementById('set-fs-max').value, 10) || 20
-                )
-            }
-        };
-
-
             Storage.save(settings, currentConvId);
             closeModal();
         });
