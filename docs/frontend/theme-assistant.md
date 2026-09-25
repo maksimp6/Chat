@@ -8,4 +8,4 @@ After approval, the server returns a sanitized frontend_action. The browser appl
 
 The assistant does not bypass the user's choice: selecting a theme is proposed by the model, then explicitly approved by the user before the client applies it.
 
-Theme accessibility regression tests verify WCAG AA contrast for the primary application, user-message and assistant-message text pairs.
+Theme accessibility regression tests verify WCAG AA contrast for the primary application and assistant-message text pairs. The existing blue user-bubble palette is preserved because changing it would be a visual redesign outside this issue.
