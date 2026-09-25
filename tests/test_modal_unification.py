@@ -116,7 +116,7 @@ def test_memory_modal_complete_dom_shape():
                 ("div", (("class", "memory-clear"),), (), (
                     ("button", (("class", "memory-clear-btn"), ("id", "memoryClearBtn"), ("type", "button")), ("Очистить всю память",), ()),
                 )),
-                ("h3", (("class", "memory-facts-title"),), ("Факты (", "),), (
+                ("h3", (("class", "memory-facts-title"),), ("Факты (", ")"), (
                     ("span", (("id", "memCount"),), ("0",), ()),
                 )),
                 ("div", (("class", "memory-facts-list"), ("id", "memoryFactsList")), (), ()),
