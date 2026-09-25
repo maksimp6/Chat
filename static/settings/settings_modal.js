@@ -408,13 +408,11 @@ var footer = [
 
         document.getElementById('set-ssh-readonly').addEventListener('change', function() {
             var disabled = this.checked;
-            document.getElementById('set-ssh-allow-exec').checked = false;
-            document.getElementById('set-ssh-allow-write').checked = false;
             document.getElementById('set-ssh-allow-exec').disabled = disabled;
             document.getElementById('set-ssh-allow-write').disabled = disabled;
-            if (!disabled) {
-                document.getElementById('set-ssh-allow-exec').checked = true;
-                document.getElementById('set-ssh-allow-write').checked = true;
+            if (disabled) {
+                document.getElementById('set-ssh-allow-exec').checked = false;
+                document.getElementById('set-ssh-allow-write').checked = false;
             }
         });
 
