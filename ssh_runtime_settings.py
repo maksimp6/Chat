@@ -158,8 +158,12 @@ def build_runtime() -> SSHRuntime:
     settings = get_settings()
     if not settings["enabled"]:
         raise SSHRuntimeError("SSH Runtime is disabled in settings")
+    targets = copy.deepcopy(settings["targets"])
+    for target in targets.values():
+        if isinstance(target, Mapping):
+            target.setdefault("max_output_bytes", settings["max_output_bytes"])
     return SSHRuntime(
-        targets=settings["targets"],
+        targets=targets,
         known_hosts=settings["known_hosts"],
     )
 
