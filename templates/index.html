@@ -21,7 +21,21 @@
 <div id="app-root" class="alice-pro-app">
 <div id="sidebar"><div id="sidebar-header"><button id="new-chat-btn" type="button" aria-label="Новый чат">+ Новый чат</button><button id="close-sidebar-btn" type="button" aria-label="Закрыть меню">&times;</button></div><div id="conv-list"></div></div><div id="overlay"></div>
 <div id="main"><div id="header"><div class="header-row header-row-primary"><button id="menu-btn" type="button" class="header-btn" aria-label="Открыть меню" aria-controls="sidebar" aria-expanded="false">☰</button><button id="model-btn" class="header-btn model-btn" title="Выбор модели" aria-label="Выбор модели">🤖</button><button id="tools-btn" class="header-btn" title="Локальные инструменты">🧰</button><button id="ssh-runtime-btn" class="header-btn" title="SSH Runtime" aria-label="SSH Runtime">🔐</button></div><div id="header-actions-2" class="header-row header-row-secondary"><button id="mcp-btn" class="header-btn" title="Внешние MCP шлюзы">🌐</button><button id="settings-btn" class="header-btn" title="Параметры генерации">⚙️</button><button id="file-manager-btn" class="header-btn" title="Файловый менеджер">📁</button><button id="treasury-btn" class="header-btn" title="Казначейство" aria-label="Казначейство">💰</button><button id="dozzle-btn" class="header-btn" title="Логи Dozzle" aria-label="Логи Dozzle">🐳</button><button id="departments-btn" class="header-btn" title="Departments">🏢</button><button id="update-app-btn" class="header-btn" title="Обновить приложение">⬆️</button><button id="provider-credentials-btn" class="header-btn" title="Ключи провайдеров" aria-label="Ключи провайдеров">🔑</button><button id="memory-btn" class="header-btn" title="Управление памятью" aria-label="Управление памятью">🧠</button><button id="theme-toggle" class="header-btn" title="Цветовая схема" aria-label="Цветовая схема">🌙</button></div></div>
-<div id="chatbox"><div class="empty-state">Начните диалог или выберите модель</div></div>
+<div id="chatbox">
+{% if selected_conversation %}
+<div class="server-rendered-conversation" data-conversation-id="{{ selected_conversation.id }}" data-server-rendered="true">
+<h2 class="server-conversation-title">{{ selected_conversation.title }}</h2>
+{% for message in selected_messages %}
+<article class="server-message server-message-{{ message.role }}">
+<header class="server-message-role">{{ "Вы" if message.role == "user" else "Alice Pro" }}</header>
+<div class="server-message-content">{{ message.text }}</div>
+</article>
+{% endfor %}
+</div>
+{% else %}
+<div class="empty-state">Начните диалог или выберите модель</div>
+{% endif %}
+</div>
 <div id="voice-ui"><canvas id="waveform"></canvas><div id="voice-status"></div><button id="mic-btn">🎤</button></div>
 <div id="text-ui"><div id="response-mode-wrap" style="display:none;"><select id="response-mode-select"><option value="audio">🔊 Голос</option><option value="text">📝 Текст</option><option value="both">🔊+📝 Оба</option></select></div><button id="upload-image-btn" class="icon-btn" style="display:none;">📷</button><button id="mic-btn-inline" class="icon-btn" style="display:none;">🎤</button><input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off"><button id="send-btn">➤</button></div></div>
 <div id="model-modal" class="modal"><div class="modal-content"><h3>Выбор модели</h3><button id="close-modal">&times;</button><div id="model-list"></div></div></div></div>
