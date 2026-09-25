@@ -33,8 +33,8 @@ def test_user_quotas_are_isolated_and_usage_is_recorded(monkeypatch):
             assert first is not None
             record_usage(first, token_count=42, cost=0.125)
 
-            usage_a = get_usage("user-a")
-            usage_b = get_usage("user-b")
+            usage_a = get_usage("user-a", now=3_600_001)
+            usage_b = get_usage("user-b", now=3_600_001)
             assert usage_a["usage"]["requests"] == 1
             assert usage_a["usage"]["tokens"] == 42
             assert usage_a["usage"]["cost"] == 0.125
@@ -110,6 +110,6 @@ def test_concurrent_requests_cannot_overspend_sqlite_quota(monkeypatch):
 
             assert sum(kind == "ok" for kind, _ in results) == 1
             assert sum(kind == "denied" for kind, _ in results) == 7
-            assert get_usage("race-user")["usage"]["requests"] == 1
+            assert get_usage("race-user", now=1_801)["usage"]["requests"] == 1
         finally:
             db.DB_PATH = old
