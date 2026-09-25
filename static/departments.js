@@ -15,7 +15,14 @@
       (data.departments||[]).forEach(function(d){
         var row=el("button",{class:"alice-dept-row"});
         row.appendChild(el("strong",{},d.name)); row.appendChild(el("span",{},(d.description||d.type||"").slice(0,120)));
-        row.onclick=function(){fetch("/api/departments/"+encodeURIComponent(d.id)+"/sessions",{method:"POST",headers:{"Accept":"application/json"}}).then(function(r){return r.json().then(function(x){return {ok:r.ok,data:x};});}).then(function(x){if(!x.ok){alert(x.data.error||"Не удалось начать сессию");return;} row.querySelector("span").textContent="Сессия: "+x.data.session.id;});};
+        row.onclick=function(){
+        if (d.id === "partner-relations" && typeof window.openPartnerRelationsModal === "function") {
+          close();
+          window.openPartnerRelationsModal();
+          return;
+        }
+        fetch("/api/departments/"+encodeURIComponent(d.id)+"/sessions",{method:"POST",headers:{"Accept":"application/json"}}).then(function(r){return r.json().then(function(x){return {ok:r.ok,data:x};});}).then(function(x){if(!x.ok){alert(x.data.error||"Не удалось начать сессию");return;} row.querySelector("span").textContent="Сессия: "+x.data.session.id;});
+      };
         list.appendChild(row);
       });
       if(!list.children.length) list.appendChild(el("div",{},"Пока нет активных departments."));
