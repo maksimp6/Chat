@@ -270,6 +270,7 @@ class EnvironmentRuntime:
             "GIT_BRANCH": self.environment["branch_name"],
             "GIT_COMMIT_SHA": self.environment["commit_sha"],
             "ALICE_ENV_NAMESPACE": self.environment["data_namespace"],
+            "ALICE_PREVIEW_BASE_PATH": "/environments/" + self.environment["environment_id"],
             "ALICE_DB_PATH": str(self.data_dir / "alice_pro.db"),
             "HOST": "127.0.0.1",
             "PORT": str(port),
