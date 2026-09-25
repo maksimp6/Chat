@@ -26,3 +26,12 @@ def test_ssh_runtime_panel_is_visible_on_open():
     source = Path("static/settings/ssh_runtime_modal.js").read_text(encoding="utf-8")
     assert '<div id="tab-ssh" class="llm-tab-content">' in source
     assert '<div id="tab-ssh" class="llm-tab-content" style="display:none;">' not in source
+
+
+def test_memory_action_uses_document_delegation_for_dynamic_header_lifecycle():
+    source = Path("static/memory_panel.js").read_text(encoding="utf-8")
+    assert 'window.__aliceMemoryPanelBound === true' in source
+    assert 'document.addEventListener("click"' in source
+    assert 'target.closest("#memory-btn, #memoryCloseBtn, #memoryClearBtn")' in source
+    assert 'event.preventDefault();' in source
+    assert 'window.openMemoryModal();' in source
