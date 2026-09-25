@@ -22,16 +22,20 @@ function renderApprovalCard(toolCall, origMsg) {
 
     document.getElementById(`btn-approve-${toolCall.call_id}`).onclick = function() {
         card.innerHTML = "<em>Выполняется...</em>";
+        var approvalPayload = {
+            conversation_id: currentConvId,
+            model: currentModel,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+            original_message: origMsg
+        };
+        if (toolCall.name === "set_ui_theme" && window.AliceTheme) {
+            approvalPayload.current_theme = window.AliceTheme.getStored();
+        }
         fetch("/api/mcp/execute-approved", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                conversation_id: currentConvId,
-                model: currentModel,
-                name: toolCall.name,
-                arguments: toolCall.arguments,
-                original_message: origMsg
-            })
+            body: JSON.stringify(approvalPayload)
         })
         .then(async r => {
             const data = await r.json().catch(() => ({}));
@@ -43,6 +47,9 @@ function renderApprovalCard(toolCall, origMsg) {
             if (data.requires_approval) {
                 renderApprovalCard(data.tool_call, origMsg);
             } else if (data.reply) {
+                if (data.execution_result && typeof window.applyThemeAssistantResult === "function") {
+                    window.applyThemeAssistantResult(data.execution_result);
+                }
                 addMessage(data.reply, "bot", false, data.cost || 0, data.timings, null, data.reasoning, data.usage, data.trace);
             } else {
                 addMessage("⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`), "bot", false, 0, null, null, null, null, data.trace);
