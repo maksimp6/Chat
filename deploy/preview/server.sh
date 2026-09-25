@@ -318,7 +318,13 @@ deploy() {
   [[ "$archive_path" == "$ROOT_DIR/incoming/"*.tar.gz ]] || die "archive must be inside $ROOT_DIR/incoming"
   [[ "$ttl" =~ ^[0-9]+$ ]] && (( ttl > 0 && ttl <= 720 )) || die "invalid TTL"
   [[ -f "$archive_path" ]] || die "archive not found: $archive_path"
-  require_short_token; require_owner_id; ensure_provider_credential_key; ensure_traefik
+  require_short_token
+  # Preview deployments are isolated single-user environments. If CI has not
+  # supplied a dedicated owner id, derive a stable non-user-controlled owner
+  # from the preview key so MCP conversation scoping still works.
+  ALICE_OWNER_ID="${ALICE_OWNER_ID:-preview-${key}}"
+  export ALICE_OWNER_ID
+  require_owner_id; ensure_provider_credential_key; ensure_traefik
   mkdir -p "$ROOT_DIR/incoming" "$ROOT_DIR/previews"
   local workdir="${ROOT_DIR}/previews/${key}"
   local builddir="${workdir}/build"
