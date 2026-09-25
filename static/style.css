@@ -832,3 +832,19 @@ html, body {
     color: #888;
     font-size: 13px;
 }
+
+
+/* Progressive enhancement: state previously carried by inline styles. */
+.alice-pro-app .conv-empty {
+    padding: 20px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+.alice-pro-app .model-option-empty {
+    cursor: default;
+    opacity: .7;
+}
+.alice-pro-app .model-option-price {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
