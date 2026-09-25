@@ -23,10 +23,6 @@ def _owner():
         return None
 
 
-def _context():
-    return None
-
-
 @environment_bp.get("")
 def environments_list():
     return jsonify({"environments": list_environments(_owner())})
@@ -40,7 +36,7 @@ def environments_create():
     if not branch:
         return jsonify({"error": "branch is required"}), 400
     try:
-        return jsonify(create_environment(branch, commit_sha, _owner(), context=_context())), 201
+        return jsonify(create_environment(branch, commit_sha, _owner())), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -57,7 +53,7 @@ def environments_get(environment_id):
 @environment_bp.post("/<environment_id>/start")
 def environments_start(environment_id):
     try:
-        return jsonify(start_environment(environment_id, _owner(), context=_context()))
+        return jsonify(start_environment(environment_id, _owner()))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
@@ -69,7 +65,7 @@ def environments_start(environment_id):
 @environment_bp.post("/<environment_id>/stop")
 def environments_stop(environment_id):
     try:
-        return jsonify(stop_environment(environment_id, _owner(), context=_context()))
+        return jsonify(stop_environment(environment_id, _owner()))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
@@ -79,11 +75,13 @@ def environments_stop(environment_id):
 @environment_bp.post("/<environment_id>/restart")
 def environments_restart(environment_id):
     try:
-        return jsonify(restart_environment(environment_id, _owner(), context=_context()))
+        return jsonify(restart_environment(environment_id, _owner()))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -91,10 +89,10 @@ def environments_restart(environment_id):
 @environment_bp.delete("/<environment_id>")
 def environments_delete(environment_id):
     try:
-        return jsonify(delete_environment(environment_id, _owner(), context=_context()))
+        return jsonify(delete_environment(environment_id, _owner()))
     except KeyError:
         return jsonify({"error": "environment_not_found"}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
     except Exception as exc:
-        return jsonify({"error": str(exc)), 500
+        return jsonify({"error": str(exc)}), 500
