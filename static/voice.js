@@ -253,7 +253,7 @@
         }
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
+    function initVoice() {
         micBtn = document.getElementById("mic-btn");
         voiceStatus = document.getElementById("voice-status");
         waveformCanvas = document.getElementById("waveform");
@@ -267,5 +267,7 @@
         }
 
         clearWaveform();
-    });
+    }
+
+    initVoice();
 })();
