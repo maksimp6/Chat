@@ -912,7 +912,7 @@ def mcp_post() -> Response:
         return _error_response(request_id, -32600, "Invalid JSON-RPC request")
 
     if method.startswith("notifications/"):
-        return Response(status=204)
+        return Response(status=202, headers=dict(MCP_CORS_HEADERS))
 
     protocol_version = _request_protocol_version(payload)
     if protocol_version not in SUPPORTED_PROTOCOL_VERSIONS:
