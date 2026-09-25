@@ -13,7 +13,7 @@ def main():
         branch = float(root.attrib.get("branch-rate", 0)) * 100
         lines.append(f"- Line coverage: **{rate:.2f}%**")
         lines.append(f"- Branch coverage: **{branch:.2f}%**")
-        lines.append(f"- Files measured: **{len(root.findall(".//class"))}**")
+        lines.append(f'- Files measured: **{len(root.findall(".//class"))}**')
     else:
         lines.append("- Coverage report was not produced.")
     lines += ["", "## Live Flask/browser resource validation", ""]
