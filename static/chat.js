@@ -347,6 +347,14 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(result => {
             const data = result.data || {};
             const clientTotalMs = Math.round(performance.now() - t0);
+            if (data.title && Array.isArray(conversations)) {
+                var conversation = conversations.find(function(item) { return item.id === currentConvId; });
+                if (conversation) {
+                    conversation.title = data.title;
+                    localStorage.setItem("conversations", JSON.stringify(conversations));
+                    if (typeof renderSidebar === "function") renderSidebar();
+                }
+            }
             if (data.reply) {
                 addMessage(data.reply, "bot", false, data.cost || 0, data.timings, clientTotalMs, data.reasoning, data.usage, data.trace);
             } else if (data.error) {
