@@ -333,6 +333,32 @@ def get_partner(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = No
     return {"partner": partner}
 
 
+def delete_partner(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    owner_id = _trusted_owner(cfg)
+    partner_id = str(arguments.get("partner_id") or "").strip()
+    if not partner_id:
+        raise ValueError("partner_id is required")
+    if not _get_partner(owner_id, partner_id):
+        raise ValueError("partner not found")
+    now = _now()
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE partners SET status = 'archived', updated_at = ? WHERE id = ? AND owner_id = ?",
+            (now, partner_id, owner_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _trace_event(cfg, "partner_action", {
+        "action": "delete",
+        "partner_id": partner_id,
+        "owner_id": owner_id,
+        "result": "archived",
+    })
+    return {"deleted": True, "partner_id": partner_id, "status": "archived"}
+
+
 def update_partner(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
     partner_id = str(arguments.get("partner_id") or "").strip()
@@ -840,6 +866,20 @@ PARTNER_TOOLS = {
         "executor": {"type": "local"},
         "func": add_contact,
     },
+    "partner.delete": {
+        "title": "Partner Archive",
+        "description": "Архивировать партнёра, сохранив историю коммуникаций.",
+        "parameters": _tool_schema({
+            "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        }, ["partner_id"]),
+        "capabilities": ["partner", "crm", "delete"],
+        "risk_level": "high",
+        "read_only": False,
+        "requires_approval": True,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": delete_partner,
+    },
     "partner.contact.list": {
         "title": "Partner Contact List",
         "description": "Получить контакты выбранного партнёра.",
@@ -1031,6 +1071,17 @@ def partners_update(partner_id: str):
     data["partner_id"] = partner_id
     try:
         return jsonify(update_partner(data))
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except ValueError as exc:
+        status = 404 if str(exc) == "partner not found" else 400
+        return jsonify({"error": str(exc)}), status
+
+
+@partner_relations_bp.delete("/<partner_id>")
+def partners_delete(partner_id: str):
+    try:
+        return jsonify(delete_partner({"partner_id": partner_id}))
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
     except ValueError as exc:
