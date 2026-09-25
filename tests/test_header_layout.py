@@ -34,4 +34,4 @@ def test_memory_action_uses_document_delegation_for_dynamic_header_lifecycle():
     assert 'document.addEventListener("click"' in source
     assert 'target.closest("#memoryCloseBtn, #memoryClearBtn")' in source
     assert 'event.preventDefault();' in source
-    assert 'window.openMemoryModal();' in source
+    assert 'window.openMemoryModal();' not in source
