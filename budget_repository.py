@@ -53,7 +53,7 @@ class BudgetRepository:
             cur.execute(
                 """
                 SELECT apply_budget_operation(
-                    %s, %s, %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
