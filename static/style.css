@@ -1022,3 +1022,20 @@ html, body {
 .alice-pro-app .error-state {
     color: var(--danger);
 }
+
+
+.alice-pro-app .trace-viewer-auto-button {
+    font-size: 11px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.alice-pro-app .trace-viewer-auto-details {
+    width: auto;
+    display: inline-block;
+    margin-top: 4px;
+}
