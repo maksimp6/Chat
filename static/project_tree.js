@@ -10,7 +10,13 @@
         var row = document.createElement("div");
         row.className = "project-tree-row";
         row.dataset.path = node.path;
-        row.innerHTML = "<span class="project-tree-icon">" + (node.icon || "📄") + "</span><span>" + node.name + "</span>";
+        var icon = document.createElement("span");
+        icon.className = "project-tree-icon";
+        icon.textContent = node.icon || "📄";
+        var label = document.createElement("span");
+        label.textContent = node.name;
+        row.appendChild(icon);
+        row.appendChild(label);
         parent.appendChild(row);
         if (node.kind === "directory" && Array.isArray(node.children)) {
             var children = document.createElement("div");
