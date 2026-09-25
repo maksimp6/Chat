@@ -422,6 +422,16 @@ def add_contact(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = No
 
 
 def _contact_for_owner(owner_id: str, contact_id: str) -> Optional[dict[str, Any]]:
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM partner_contacts WHERE id = ? AND owner_id = ?",
+            (contact_id, owner_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    return _contact_row(row) if row else None
+
 
 def list_contacts(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     owner_id = _trusted_owner(cfg)
@@ -458,10 +468,10 @@ def update_contact(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] =
              WHERE id = ? AND owner_id = ?""",
             (
                 str(arguments.get("name") or existing["name"]).strip(),
-                str(arguments.get("role") or "").strip(),
-                str(arguments.get("email") or "").strip(),
-                str(arguments.get("phone") or "").strip(),
-                str(arguments.get("notes") or "").strip(),
+                str(arguments.get("role") or existing["role"]).strip(),
+                str(arguments.get("email") or existing["email"]).strip(),
+                str(arguments.get("phone") or existing["phone"]).strip(),
+                str(arguments.get("notes") or existing["notes"]).strip(),
                 now,
                 contact_id,
                 owner_id,
@@ -503,17 +513,6 @@ def delete_contact(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] =
         "owner_id": owner_id,
     })
     return {"deleted": True, "contact_id": contact_id, "partner_id": existing["partner_id"]}
-
-
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM partner_contacts WHERE id = ? AND owner_id = ?",
-            (contact_id, owner_id),
-        ).fetchone()
-    finally:
-        conn.close()
-    return _contact_row(row) if row else None
 
 
 def prepare_message(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
