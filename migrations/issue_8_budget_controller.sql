@@ -52,8 +52,9 @@ create or replace function apply_budget_operation(
   p_cooldown_seconds integer default 0
 ) returns jsonb
 language plpgsql
+security definer
 set search_path = public
-as $$
+as $
 declare
   a budget_accounts%rowtype;
   result jsonb;
