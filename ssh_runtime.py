@@ -97,7 +97,10 @@ class SSHRuntime:
                     )
                 )
 
-            max_output = int(cfg.get("max_output_bytes", 1048576))
+            try:
+                max_output = int(cfg.get("max_output_bytes", 1048576))
+            except (TypeError, ValueError) as exc:
+                raise SSHRuntimeError(f"SSH target '{name}' has invalid max_output_bytes") from exc
             if not 4096 <= max_output <= 10 * 1024 * 1024:
                 raise SSHRuntimeError(f"SSH target '{name}' has invalid max_output_bytes")
 
