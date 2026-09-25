@@ -154,7 +154,8 @@ jobs:
             "static/models.js" \
             "static/chat.js" \
             "static/eruda_init.js" \
-            "static/eruda.js"; do
+            "static/eruda.js" \
+            "static/settings/ssh_runtime_modal.js"; do
             if ! curl --fail --silent --show-error --connect-timeout 5 --max-time 30 "$base/$asset" >/dev/null; then
               echo "Asset check failed: $asset"
               exit 1
