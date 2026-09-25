@@ -1,13 +1,16 @@
 import logging
 
 import app as app_module
+import mcp_routes
 
 
 def test_unhandled_backend_exception_is_logged_and_not_swallowed(monkeypatch, caplog):
     def explode(*args, **kwargs):
         raise RuntimeError("deliberate swallowed-error regression")
 
-    monkeypatch.setattr(app_module, "get_conversations", explode)
+    # /api/conversations is owned by the MCP routes blueprint, so patch the
+    # dependency where that route resolves it rather than the app module alias.
+    monkeypatch.setattr(mcp_routes, "get_conversations", explode)
     client = app_module.app.test_client()
 
     with caplog.at_level(logging.ERROR, logger="alice_app"):
