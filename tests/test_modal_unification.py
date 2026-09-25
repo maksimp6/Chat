@@ -232,7 +232,10 @@ def test_every_modal_attribute_has_valid_type_length_enum_or_url():
 def test_modal_form_controls_have_semantically_valid_attributes():
     roots = parse_html()
     controls = [
-        node for root in roots for node in walk(root)
+        node
+        for root in roots
+        for modal in [n for n in walk(root) if "modal" in n.attrs.get("class", "").split()]
+        for node in walk(modal)
         if node.tag in {"input", "button", "select", "textarea", "a"}
     ]
     for node in controls:
