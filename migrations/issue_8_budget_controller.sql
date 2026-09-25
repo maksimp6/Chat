@@ -108,7 +108,11 @@ begin
     update budget_accounts set reserved = reserved - p_amount,
       spent = spent + p_amount,
       loss_today = case when loss_period = current_date then loss_today + p_amount else p_amount end,
-      loss_period = current_date, version = version + 1, updated_at = now()
+      loss_period = current_date,
+      locked_until = case when a.loss_today + p_amount >= a.max_daily_loss and p_cooldown_seconds > 0
+                          then now() + make_interval(secs => p_cooldown_seconds) else a.locked_until end,
+      cooldown_seconds = p_cooldown_seconds,
+      version = version + 1, updated_at = now()
       where budget_id = p_budget_id and account_type = p_account_type;
 
   elsif p_operation_type = 'RELEASE' then
