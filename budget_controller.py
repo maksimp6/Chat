@@ -83,6 +83,7 @@ class BudgetAccount:
     reserved: Decimal = Decimal("0")
     won: Decimal = Decimal("0")
     loss_today: Decimal = Decimal("0")
+    loss_period: str = ""
     limits: BudgetLimits = field(
         default_factory=lambda: BudgetLimits(Decimal("0"), Decimal("0"), Decimal("0"))
     )
@@ -94,6 +95,7 @@ class BudgetAccount:
         self.reserved = _money(self.reserved)
         self.won = _money(self.won)
         self.loss_today = _money(self.loss_today)
+        self.loss_period = self.loss_period or datetime.now(timezone.utc).date().isoformat()
         self.currency = self.currency.upper()
 
     @property
@@ -165,6 +167,7 @@ class BudgetController:
                         "won": str(account.won),
                         "available": str(account.available),
                         "loss_today": str(account.loss_today),
+                        "loss_period": account.loss_period,
                         "status": account.status(now).value,
                         "locked_until": account.locked_until.isoformat() if account.locked_until else None,
                         "limits": {
@@ -422,6 +425,7 @@ class BudgetController:
         raise DemoConversionDenied("DEMO funds have no monetary value and cannot convert to REAL")
 
     def _check_limits(self, account: BudgetAccount, amount: Decimal) -> None:
+        self._roll_loss_period(account)
         if amount > account.limits.max_single_operation:
             raise BudgetLimitExceeded("single-operation limit exceeded")
         if account.spent + amount > account.limits.max_total_loss:
@@ -430,6 +434,14 @@ class BudgetController:
             self._lock_account(account, reason="daily_loss_limit")
             raise BudgetLimitExceeded("daily-loss limit exceeded")
 
+    def _roll_loss_period(self, account: BudgetAccount) -> None:
+        today = self._now().date().isoformat()
+        if account.loss_period != today:
+            account.loss_period = today
+            account.loss_today = Decimal("0.00")
+            account.locked_until = None
+            self._emit("loss_period_reset", account_type=account.account_type.value, currency=account.currency, amount="0.00")
+
     def _apply_cooldown_if_needed(self, account: BudgetAccount) -> None:
         if account.loss_today >= account.limits.max_daily_loss:
             self._lock_account(account, reason="daily_loss_limit")
@@ -437,12 +449,7 @@ class BudgetController:
     def _lock_account(self, account: BudgetAccount, *, reason: str) -> None:
         if self.cooldown_seconds <= 0:
             return
-        account.locked_until = self._now().timestamp() and (
-            self._now()
-        )
-        account.locked_until = datetime.fromtimestamp(
-            self._now().timestamp() + self.cooldown_seconds, tz=timezone.utc
-        )
+        account.locked_until = self._now() + __import__("datetime").timedelta(seconds=self.cooldown_seconds)
         self._emit(
             "cooldown_started",
             account_type=account.account_type.value,
@@ -453,6 +460,7 @@ class BudgetController:
         )
 
     def _ensure_not_locked(self, account: BudgetAccount) -> None:
+        self._roll_loss_period(account)
         if account.locked_until is not None and self._now() < account.locked_until:
             raise BudgetLimitExceeded("budget is in cooldown")
         if account.locked_until is not None and self._now() >= account.locked_until:
