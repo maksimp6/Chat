@@ -58,13 +58,28 @@ def _run_git(*args: str, cwd: Optional[Path] = None) -> str:
 
 def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
     """Resolve a branch/ref to one immutable commit without shell evaluation."""
-    value = str(commit_sha or branch or "").strip()
-    if not value:
+    branch_value = str(branch or "").strip()
+    value = str(commit_sha or branch_value).strip()
+    if not branch_value:
         raise ValueError("branch is required")
-    if any(ch in value for ch in ("\x00", "\n", "\r")):
+    if not value:
+        raise ValueError("commit is required")
+    if any(ch in value for ch in ("\x00", "\n", "\r")) or any(ch in branch_value for ch in ("\x00", "\n", "\r")):
         raise ValueError("invalid git ref")
     try:
         resolved = _run_git("rev-parse", "--verify", f"{value}^{{commit}}")
+        if commit_sha:
+            branch_resolved = _run_git("rev-parse", "--verify", f"{branch_value}^{{commit}}")
+            check = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", resolved, branch_resolved],
+                cwd=str(_repo_root()),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if check.returncode != 0:
+                raise ValueError("commit is not reachable from branch")
     except ValueError as exc:
         raise ValueError(f"git ref is not available: {value}") from exc
     if len(resolved) != 40 or any(ch not in "0123456789abcdef" for ch in resolved.lower()):
