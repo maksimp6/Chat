@@ -260,7 +260,7 @@ window.fetchVectorStores = function() {
             bg.className = "modal file-manager-add-modal";
 
             var panel = document.createElement('div');
-            panel.className = "file-manager-add-box";
+            panel.className = "modal-content file-manager-add-box";
 
             var header = document.createElement('div');
             header.className = 'file-manager-add-header';
