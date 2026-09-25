@@ -297,6 +297,10 @@ var tabSsh = [
                 '<div>' + UI.chk('set-ssh-allow-write', true, 'Разрешить запись файлов') + '</div>'
             ),
             '<div style="margin-top:10px;">' + UI.lbl('Общий known_hosts (серверный путь)') + UI.inp('set-ssh-known-hosts', 'text', '', ' placeholder="/srv/alice/ssh/known_hosts"') + '</div>',
+            '<div style="margin-top:10px;">' + UI.lbl('Command allowlist (regex, один шаблон на строку)') + UI.ta('set-ssh-command-allowlist', '', 'height:80px;font-family:monospace;font-size:11px;') + '</div>',
+            UI.chk('set-ssh-allow-privileged', false, 'Разрешать privileged-команды (sudo/su/doas/pkexec)', '', 'Опасные операции остаются под approval gate.'),
+            UI.chk('set-ssh-approval-write', true, 'Требовать подтверждение записи файлов'),
+            UI.chk('set-ssh-approval-privileged', true, 'Требовать подтверждение privileged-команд'),
             '<div style="margin-top:10px;">' + UI.lbl('Named targets (JSON)') + UI.ta('set-ssh-targets', '', 'height:180px;font-family:monospace;font-size:11px;') + '</div>',
             '<div style="display:flex;gap:8px;align-items:end;margin-top:10px;">',
             '<div style="flex:1;">' + UI.lbl('Проверить target') + UI.inp('set-ssh-test-target', 'text', '', ' placeholder="preview"') + '</div>',
@@ -379,6 +383,10 @@ var footer = [
             document.getElementById('set-ssh-allow-write').checked = ssh.allow_write_operations !== false;
             document.getElementById('set-ssh-max-output').value = ssh.max_output_bytes || 1048576;
             document.getElementById('set-ssh-known-hosts').value = ssh.known_hosts || '';
+            document.getElementById('set-ssh-command-allowlist').value = (ssh.command_allowlist || []).join('\n');
+            document.getElementById('set-ssh-allow-privileged').checked = ssh.allow_privileged_operations === true;
+            document.getElementById('set-ssh-approval-write').checked = ssh.approval_required_for_write !== false;
+            document.getElementById('set-ssh-approval-privileged').checked = ssh.approval_required_for_privileged !== false;
             document.getElementById('set-ssh-targets').value = JSON.stringify(ssh.targets || {}, null, 2);
             document.getElementById('set-ssh-allow-exec').disabled = ssh.read_only === true;
             document.getElementById('set-ssh-allow-write').disabled = ssh.read_only === true;
@@ -433,6 +441,10 @@ var footer = [
                 allow_write_operations: document.getElementById('set-ssh-allow-write').checked,
                 max_output_bytes: parseInt(document.getElementById('set-ssh-max-output').value, 10) || 1048576,
                 known_hosts: document.getElementById('set-ssh-known-hosts').value.trim() || null,
+                command_allowlist: document.getElementById('set-ssh-command-allowlist').value.split(/\r?\n/).map(function(v){ return v.trim(); }).filter(Boolean),
+                allow_privileged_operations: document.getElementById('set-ssh-allow-privileged').checked,
+                approval_required_for_write: document.getElementById('set-ssh-approval-write').checked,
+                approval_required_for_privileged: document.getElementById('set-ssh-approval-privileged').checked,
                 targets: targets
             };
 
