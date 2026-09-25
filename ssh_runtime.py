@@ -314,7 +314,6 @@ class SSHRuntime:
         quoted_parent = shlex.quote(parent)
         quoted_path = shlex.quote(remote_path)
         template = shlex.quote(parent + "/.alice-runtime-XXXXXX")
-        workspace_root = target_config.workspace_root if target_config else None
         if workspace_root and os.path.normpath(workspace_root) != "/":
             root = shlex.quote(os.path.normpath(workspace_root))
             workspace_guard = (
