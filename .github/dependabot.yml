@@ -1,17 +1,46 @@
 version: 2
+
 updates:
   - package-ecosystem: pip
-    directory: /
+    directory: "/"
     schedule:
       interval: weekly
+      day: monday
     open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+    groups:
+      python-minor:
+        update-types: [minor]
+
   - package-ecosystem: gradle
-    directory: /android
+    directory: "/android"
     schedule:
       interval: weekly
+      day: monday
     open-pull-requests-limit: 5
+    labels: [dependencies, android]
+    commit-message:
+      prefix: "chore(deps)"
+
   - package-ecosystem: github-actions
-    directory: /
+    directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    labels: [dependencies, github_actions]
+    commit-message:
+      prefix: "ci(deps)"
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels: [dependencies]
+    commit-message:
+      prefix: "chore(deps)"
