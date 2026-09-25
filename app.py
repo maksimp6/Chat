@@ -78,6 +78,9 @@ def _set_web_cache_headers(response):
         response.headers["Cache-Control"] = "no-store, max-age=0"
     elif request.path.startswith("/static/"):
         response.headers.setdefault("Cache-Control", "no-cache")
+    elif request.path.startswith("/api/"):
+        # API responses may contain user-specific state, traces, settings, or credentials.
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 
