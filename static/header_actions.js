@@ -2,7 +2,13 @@
   function bindHeaderActions() {
     var bindings = [
       ["tools-btn", "click", function () { window.openToolsModal(); }],
-      ["ssh-runtime-btn", "click", function () {\n        if (typeof window.openSshRuntimeModal === "function") {\n          window.openSshRuntimeModal();\n        } else {\n          console.error("[SSH Runtime] Modal script is unavailable");\n        }\n      }],
+      ["ssh-runtime-btn", "click", function () {
+        if (typeof window.openSshRuntimeModal === "function") {
+          window.openSshRuntimeModal();
+        } else {
+          console.error("[SSH Runtime] Modal script is unavailable");
+        }
+      }],
       ["mcp-btn", "click", function () { window.openMcpManagerModal(); }],
       ["settings-btn", "click", function () { window.openSettingsModal(); }],
       ["file-manager-btn", "click", function () { window.openFileManagerModal(); }],
