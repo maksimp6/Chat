@@ -87,9 +87,17 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
     def test_saved_settings_are_used(self, set_config, get_config):
         from ssh_runtime_settings import get_settings, save_settings
 
-        get_config.return_value = None
+        saved = {}
+
+        def read(key, default=None):
+            return saved.get(key, default)
+
+        def write(key, value):
+            saved[key] = value
+
+        get_config.side_effect = read
+        set_config.side_effect = write
         settings = save_settings(self.BASE)
-        set_config.assert_called_once()
         self.assertEqual(settings["targets"]["preview"]["host"], "preview.example")
         self.assertEqual(get_settings()["targets"]["preview"]["default_user"], "alice-agent")
 
