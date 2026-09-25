@@ -11,7 +11,13 @@ import json
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from db import get_conn\nfrom db_backend import is_postgres_configured
+from db import get_conn
+from db_backend import is_postgres_configured
+
+try:
+    from trace_manager import get_current_trace
+except Exception:  # pragma: no cover - trace integration is optional
+    get_current_trace = None
 
 
 class BudgetPersistenceError(RuntimeError):
@@ -37,19 +43,16 @@ class BudgetRepository:
 
         conn = get_conn()
         try:
-            cur = conn.cursor()
-            # PostgreSQL exposes the deterministic transaction as an RPC-like
-            # function. SQLite/local development must not silently emulate
-            # financial concurrency semantics.
-            if not hasattr(conn, "autocommit"):
+            if not is_postgres_configured():
                 raise BudgetPersistenceError(
                     "budget persistence requires the PostgreSQL backend"
                 )
 
+            cur = conn.cursor()
             cur.execute(
                 """
                 SELECT apply_budget_operation(
-                    %s, %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -65,8 +68,20 @@ class BudgetRepository:
             conn.commit()
             if not row:
                 raise BudgetPersistenceError("budget operation returned no result")
-            value = row[0]
-            return json.loads(value) if isinstance(value, str) else value
+
+            value = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+            trace = get_current_trace() if get_current_trace is not None else None
+            if trace is not None:
+                trace.add_event("budget_operation_persisted", {
+                    "budget_id": budget_id,
+                    "account_type": account_type,
+                    "operation_type": operation_type,
+                    "amount": str(amount),
+                    "operation_id": value.get("operation_id") if isinstance(value, dict) else None,
+                    "status": value.get("status") if isinstance(value, dict) else None,
+                    "idempotency_key": idempotency_key,
+                })
+            return value
         except Exception:
             conn.rollback()
             raise
