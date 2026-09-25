@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import shlex
+import socket
 import time
 import uuid
 from pathlib import Path
@@ -246,7 +247,9 @@ class EnvironmentRuntime:
         requested = int(self.environment.get("runtime_port") or 0)
         if requested:
             return requested
-        return 51000 + (int(uuid.UUID(self.environment["environment_id"])) % 1000)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            return int(sock.getsockname()[1])
 
     def start(self) -> tuple[int, int]:
         self.root.mkdir(parents=True, exist_ok=True)
