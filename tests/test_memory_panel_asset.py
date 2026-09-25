@@ -15,3 +15,6 @@ def test_memory_panel_renders_facts_without_inner_html():
     assert "replaceChildren()" in script
     assert "textContent" in script
     assert ".innerHTML" not in script
+    assert "onclick=" not in script
+    assert "onchange=" not in script
+    assert "addEventListener" in script
