@@ -24,6 +24,7 @@ from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner
+from ssh_runtime_settings import public_settings, save_settings, test_connection
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -242,6 +243,51 @@ def treasury_top_up():
         return jsonify({"error": str(exc)}), 401
     except (TypeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/ssh-runtime/settings", methods=["GET"])
+def get_ssh_runtime_settings():
+    try:
+        get_current_owner_id()
+        return jsonify(public_settings())
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except Exception as exc:
+        logger.exception("Failed to load SSH Runtime settings")
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/ssh-runtime/settings", methods=["PUT"])
+def put_ssh_runtime_settings():
+    try:
+        get_current_owner_id()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({"error": "settings must be an object"}), 400
+        saved = save_settings(data)
+        return jsonify({"status": "ok", "settings": saved})
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except Exception as exc:
+        logger.exception("Failed to save SSH Runtime settings")
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/ssh-runtime/test", methods=["POST"])
+def test_ssh_runtime_connection():
+    try:
+        owner_id = get_current_owner_id()
+        data = request.get_json(silent=True) or {}
+        target = str(data.get("target") or "").strip()
+        if not target:
+            return jsonify({"error": "target is required"}), 400
+        result = test_connection(target, owner_id)
+        return jsonify(result)
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    except Exception as exc:
+        logger.exception("SSH Runtime connection test failed")
+        return jsonify({"success": False, "error": str(exc)}), 400
 
 
 if __name__ == "__main__":
