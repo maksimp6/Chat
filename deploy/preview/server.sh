@@ -127,7 +127,7 @@ deploy() {
   local image="${IMAGE_PREFIX}:${key}"
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   clear_dozzle_data "$workdir/dozzle"
-  rm -rf -- "$workdir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
+  mkdir -p "$workdir"; ensure_dozzle_profile "$workdir/dozzle"; rm -rf -- "$builddir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
   local tokenized_rule="PathPrefix(\`$tokenized_prefix\`)"
