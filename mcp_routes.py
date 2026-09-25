@@ -18,7 +18,8 @@ import mcp_storage
 from tool_registry import registry
 from db import (
     get_conversations, create_conversation, get_messages, add_message,
-    get_conv_settings, save_conv_settings
+    get_conv_settings, save_conv_settings, maybe_update_conversation_title,
+    get_conversation_title
 )
 from partial_output import extract_last_response_text, format_partial_output_message
 from responses_tool_loop import run_tool_loop, extract_function_calls
@@ -141,6 +142,10 @@ def chat():
             params["active_tool_categories"] = active_tools
 
         add_message(invocation.conversation_id, "user", message)
+        conversation_title = maybe_update_conversation_title(
+            invocation.conversation_id,
+            message,
+        )
         client = AliceClient(Config)
 
         response = client.ask_with_mcp(
@@ -264,7 +269,8 @@ def chat():
             "session_id": invocation.session_id,
             "conversation_id": invocation.conversation_id,
             "trace_id": invocation.trace_id,
-            "trace": trace_data
+            "trace": trace_data,
+            "title": conversation_title or get_conversation_title(invocation.conversation_id),
         })
     except Exception as e:
         logger.exception(f"[CHAT] Ошибка: {e}")
