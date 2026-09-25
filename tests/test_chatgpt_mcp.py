@@ -415,3 +415,100 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
             event.get("type") == "mcp_tool_call_completed"
             for event in trace["events"]
         )
+
+
+
+def test_authenticated_tools_advertise_oauth2_security_scheme(client, monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
+
+    response = mcp_request(
+        client,
+        "tools/list",
+        Authorization="Bearer test-token",
+    )
+    assert response.status_code == 200
+    tools = response.get_json()["result"]["tools"]
+    assert tools
+    assert all(
+        tool["securitySchemes"] == [{"type": "oauth2", "scopes": [chatgpt_mcp.OAUTH_SCOPE]}]
+        for tool in tools
+    )
+
+
+def test_tool_annotations_match_read_only_and_write_behavior(client):
+    response = mcp_request(client, "tools/list")
+    assert response.status_code == 200
+    tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
+
+    assert tools["git_status"]["annotations"]["readOnlyHint"] is True
+    assert tools["git_status"]["annotations"]["destructiveHint"] is False
+    assert tools["git_commit"]["annotations"]["readOnlyHint"] is False
+    assert tools["git_commit"]["annotations"]["destructiveHint"] is True
+
+
+def test_oauth_protected_resource_metadata_is_chatgpt_compatible(client, monkeypatch):
+    monkeypatch.setenv("ALICE_MCP_PUBLIC_URL", "https://mcp.example.com")
+    monkeypatch.setenv("ALICE_MCP_OAUTH_ISSUER", "https://auth.example.com")
+    response = client.get("/.well-known/oauth-protected-resource")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["resource"] == "https://mcp.example.com"
+    assert body["authorization_servers"] == ["https://auth.example.com"]
+    assert body["scopes_supported"] == [chatgpt_mcp.OAUTH_SCOPE]
+
+
+def test_oauth_authorization_server_metadata_is_chatgpt_compatible(client, monkeypatch):
+    monkeypatch.setenv("ALICE_MCP_OAUTH_ISSUER", "https://auth.example.com")
+    monkeypatch.setenv(
+        "ALICE_MCP_OAUTH_AUTHORIZATION_URL",
+        "https://auth.example.com/oauth/authorize",
+    )
+    monkeypatch.setenv(
+        "ALICE_MCP_OAUTH_TOKEN_URL",
+        "https://auth.example.com/oauth/token",
+    )
+
+    response = client.get("/.well-known/oauth-authorization-server")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["issuer"] == "https://auth.example.com"
+    assert body["authorization_endpoint"] == "https://auth.example.com/oauth/authorize"
+    assert body["token_endpoint"] == "https://auth.example.com/oauth/token"
+    assert body["response_types_supported"] == ["code"]
+    assert body["grant_types_supported"] == ["authorization_code"]
+    assert body["code_challenge_methods_supported"] == ["S256"]
+    assert body["client_id_metadata_document_supported"] is True
+
+
+def test_unauthenticated_mcp_call_exposes_oauth_challenge_for_chatgpt(client, monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+    monkeypatch.setenv("ALICE_MCP_PUBLIC_URL", "https://mcp.example.com")
+
+    response = mcp_request(
+        client,
+        "tools/call",
+        {"name": "alice_get_system_status", "arguments": {}},
+        name="alice_get_system_status",
+    )
+    assert response.status_code == 401
+    assert "resource_metadata=" in response.headers["WWW-Authenticate"]
+    error = response.get_json()["error"]
+    assert error["data"]["_meta"]["mcp/www_authenticate"]
+
+
+def test_invalid_jsonrpc_and_unknown_method_are_rejected(client):
+    response = client.post(
+        "/mcp",
+        data=json.dumps({"jsonrpc": "1.0", "id": 1, "method": "ping", "params": {}}),
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32600
+
+    response = mcp_request(client, "does/not-exist")
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == -32601
