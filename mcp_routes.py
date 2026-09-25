@@ -24,7 +24,7 @@ from db import (
 from partial_output import extract_last_response_text, format_partial_output_message
 from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
-from treasury_identity import get_current_owner_id
+from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_quotas import ProviderQuotaExceeded
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from conversation_ownership import (
@@ -390,7 +390,12 @@ def handle_mcp_server_item(server_id):
 
 @mcp_bp.route('/api/conversations', methods=['GET', 'POST'])
 def conversations():
-    owner_id = get_current_owner_id(required=False)
+    try:
+        owner_id = get_current_owner_id(required=False)
+    except TreasuryIdentityError as exc:
+        logger.warning("[CONVERSATION] Invalid owner identity: %s", exc)
+        return jsonify({"error": str(exc)}), 401
+
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         client = AliceClient(Config)
