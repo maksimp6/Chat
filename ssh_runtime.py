@@ -202,6 +202,8 @@ class SSHRuntime:
             "-o",
             "BatchMode=yes",
             "-o",
+            "IdentitiesOnly=yes",
+            "-o",
             f"ConnectTimeout={max(1, int(target.connect_timeout_seconds))}",
             "-o",
             "StrictHostKeyChecking=yes",
@@ -275,9 +277,20 @@ class SSHRuntime:
         target_config = self._targets.get(str(target))
         workspace_root = target_config.workspace_root if target_config else None
         remote_path = self._path_within_workspace(remote_path, workspace_root)
+        if workspace_root and os.path.normpath(workspace_root) != "/":
+            root = shlex.quote(os.path.normpath(workspace_root))
+            path_arg = shlex.quote(remote_path)
+            read_command = (
+                f"root=$(realpath -e -- {root}) && "
+                f"target=$(realpath -e -- {path_arg}) && "
+                'case "$target" in "$root"|"$root"/*) cat -- "$target";; '
+                '*) echo "Remote file path is outside the configured workspace" >&2; exit 1;; esac'
+            )
+        else:
+            read_command = f"cat -- {shlex.quote(remote_path)}"
         result = self.execute(
             target=target,
-            command=f"cat -- {shlex.quote(remote_path)}",
+            command=read_command,
             timeout_seconds=timeout_seconds,
             identity_id=identity_id,
         )
@@ -301,9 +314,21 @@ class SSHRuntime:
         quoted_parent = shlex.quote(parent)
         quoted_path = shlex.quote(remote_path)
         template = shlex.quote(parent + "/.alice-runtime-XXXXXX")
+        workspace_root = target_config.workspace_root if target_config else None
+        if workspace_root and os.path.normpath(workspace_root) != "/":
+            root = shlex.quote(os.path.normpath(workspace_root))
+            workspace_guard = (
+                f"root=$(realpath -e -- {root}); "
+                f"mkdir -p -- {quoted_parent}; "
+                f"resolved_parent=$(realpath -e -- {quoted_parent}); "
+                'case "$resolved_parent" in "$root"|"$root"/*) ;; '
+                '*) echo "Remote file path is outside the configured workspace" >&2; exit 1;; esac; '
+            )
+        else:
+            workspace_guard = f"mkdir -p -- {quoted_parent}; "
         script = (
             "set -eu; "
-            f"mkdir -p -- {quoted_parent}; "
+            f"{workspace_guard}"
             f"tmp=$(mktemp -- {template}); "
             "trap 'rm -f -- \"$tmp\"' EXIT; "
             'cat > "$tmp"; '
