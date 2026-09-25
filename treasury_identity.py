@@ -36,7 +36,12 @@ def get_current_owner_id(*, required: bool = True) -> Optional[str]:
         if token:
             token_owner_id = authenticate_user_token(token)
             if token_owner_id is None:
-                raise TreasuryIdentityError("invalid authenticated owner token")
+                if required:
+                    raise TreasuryIdentityError("invalid authenticated owner token")
+                # Optional identity is used by ordinary Chat endpoints. An invalid
+                # Treasury token must not turn those endpoints into 500s, and must
+                # not fall through to ALICE_OWNER_ID as if the caller were trusted.
+                return None
             owner_id = token_owner_id
 
     if owner_id is None:
