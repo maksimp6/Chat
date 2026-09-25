@@ -5,7 +5,7 @@ def test_optional_debug_scripts_do_not_block_dom_ready():
     html = Path("templates/index.html").read_text(encoding="utf-8")
 
     for script in ("android_diagnostics.js", "eruda_init.js"):
-        marker = f'src="{{{{ static_root }}}}/{script}?v="{{{{ static_version }}}}"'
+        marker = f'src="{{{{ static_root }}}}/{script}?v={{{{ static_version }}}}"'
         start = html.find(marker)
         assert start >= 0, f"{script} is not present in the main template"
         end = html.find("</script>", start)
