@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import shlex
 import time
 import uuid
 from pathlib import Path
@@ -239,7 +240,7 @@ class EnvironmentRuntime:
 
     def _command(self) -> list[str]:
         raw = os.environ.get("ALICE_ENV_RUNTIME_COMMAND", "python app.py")
-        return raw.split()
+        return shlex.split(raw)
 
     def _port(self) -> int:
         requested = int(self.environment.get("runtime_port") or 0)
