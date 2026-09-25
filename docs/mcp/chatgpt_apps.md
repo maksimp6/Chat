@@ -8,7 +8,7 @@ The connector endpoint is:
 
 `https://<public-host>/mcp`
 
-The service uses MCP Streamable HTTP. The endpoint supports the current `2026-07-28` discovery flow and the `2025-06-18` / `2025-03-26` handshake flow. Modern clients use `server/discover`; legacy clients can use `initialize`. The implementation accepts the `MCP-Protocol-Version` header when present and can default to the latest supported revision for local/compatibility clients.
+The service uses MCP Streamable HTTP at `/mcp`. POST carries JSON-RPC messages; GET is available as an SSE stream for server-to-client notifications (currently a stateless keepalive stream because Alice Pro has no unsolicited MCP notifications); DELETE is idempotent because the endpoint does not create MCP sessions; OPTIONS exposes the transport headers for browser clients. The endpoint supports the current `2026-07-28` discovery flow and the `2025-11-25` and earlier handshake revisions.
 
 MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. For authenticated ChatGPT connections, tool descriptors advertise the OAuth 2.0 security scheme and the server exposes protected-resource metadata plus OAuth authorization-server discovery. Bearer mode remains available for private development/testing; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
@@ -114,7 +114,8 @@ The contract is covered by `tests/test_chatgpt_mcp.py`, including:
 - user isolation for conversations, invocation and trace reads;
 - project tool execution through MCP;
 - all existing Git read tools through MCP;
-- approval enforcement for all existing Git write tools.
+- approval enforcement for all existing Git write tools;
+- Streamable HTTP GET/SSE, DELETE and CORS method/header compatibility.
 
 ## Next expansion
 
