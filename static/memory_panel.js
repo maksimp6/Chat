@@ -94,7 +94,7 @@
 
   function bindMemoryPanelEvents() {
     var bindings = [
-      ["memory-btn", "click", window.openMemoryModal],
+      [document.getElementById("memory-btn"), "click", window.openMemoryModal],
       ["memoryCloseBtn", "click", window.closeMemoryModal],
       ["memEnabled", "change", window.updateMemoryConfig],
       ["memLimit", "change", window.updateMemoryConfig],
@@ -102,7 +102,7 @@
     ];
 
     bindings.forEach(function (binding) {
-      var element = byId(binding[0]);
+      var element = typeof binding[0] === "string" ? byId(binding[0]) : binding[0];
       if (!element || element.dataset.bound === "true") return;
       element.addEventListener(binding[1], binding[2]);
       element.dataset.bound = "true";
