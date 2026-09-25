@@ -1332,3 +1332,22 @@ html, body {
     cursor: pointer;
     font-size: 13px;
 }
+
+
+/* Header actions stay on one horizontal line; narrow screens scroll instead of wrapping. */
+.alice-pro-app #header {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.alice-pro-app #header .header-row {
+    flex: 0 0 auto;
+}
+
+.alice-pro-app #header .header-row-secondary {
+    overflow: visible;
+    padding-bottom: 0;
+}

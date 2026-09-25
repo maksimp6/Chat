@@ -2,6 +2,7 @@
 import unittest
 from unittest.mock import patch
 
+import db
 import mcp_routes
 from trace_manager import ExecutionTrace
 
@@ -19,8 +20,6 @@ class TestPreApiTiming(unittest.TestCase):
         api_start = init_ts + 0.450
         trace.add_api_request({}, step_index=1, start_timestamp=api_start)
 
-        # Reproduce the marker logic used by /api/chat without sleeping for
-        # hundreds of milliseconds in the test.
         api_requests = trace.trace.get("api_requests", [])
         first_api_start = api_requests[0].get("timestamp")
         request_init_timestamp = request_initialized.get("timestamp")
@@ -51,6 +50,7 @@ class TestPreApiTiming(unittest.TestCase):
     def test_chat_response_contains_pre_api_timing(self):
         from app import app
 
+        db.init_db()
         conversation_id = "pre-api-timing-test"
 
         class FakeClient:
@@ -86,7 +86,11 @@ class TestPreApiTiming(unittest.TestCase):
 
         with patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()), \
              patch.object(mcp_routes, "get_conv_settings", return_value={}), \
-             patch.object(mcp_routes, "add_message"):
+             patch.object(mcp_routes, "add_message"), \
+             patch.object(mcp_routes, "settle_billing_to_treasury", return_value={"status": "not_applicable"}), \
+             patch.object(mcp_routes, "persist_invocation_trace"), \
+             patch.object(mcp_routes, "finish_invocation"), \
+             patch.object(mcp_routes, "get_conversation_title", return_value=None):
             app.config["TESTING"] = True
             with app.test_client() as client:
                 response = client.post(

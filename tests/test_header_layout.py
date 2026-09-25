@@ -1,12 +1,16 @@
 from pathlib import Path
 
 
-def test_header_has_two_explicit_action_rows():
+def test_header_actions_stay_on_one_horizontal_line():
     html = Path("templates/index.html").read_text(encoding="utf-8")
-    assert 'id="header-actions-2"' in html
+    css = Path("static/style.css").read_text(encoding="utf-8")
     assert 'class="header-row header-row-primary"' in html
     assert 'class="header-row header-row-secondary"' in html
-    assert html.index('id="mcp-btn"') > html.index('id="header-actions-2"')
+    assert 'id="header-actions-2"' in html
+    assert '.alice-pro-app #header {' in css
+    assert 'flex-direction: row;' in css
+    assert 'flex-wrap: nowrap;' in css
+    assert 'overflow-x: auto;' in css
 
 
 def test_dynamic_header_actions_target_secondary_row():

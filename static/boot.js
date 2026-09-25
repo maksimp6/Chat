@@ -11,6 +11,31 @@
 
     var basePath = window.__ALICE_BASE_PATH || "";
 
+    function emitDiagnostic(level, event, error, extra) {
+        var details = Object.assign({
+            component: "boot",
+            event: event,
+            message: error && error.message ? error.message : String(error || ""),
+            timestamp: new Date().toISOString()
+        }, extra || {});
+        var logger = console[level] || console.error;
+        logger.call(console, "[BOOT]", details);
+        window.dispatchEvent(new CustomEvent("alice:diagnostic", {detail: details}));
+    }
+
+    console.info("[BOOT] hello: Alice Pro frontend boot loaded");
+    window.addEventListener("error", function (event) {
+        emitDiagnostic("error", "uncaught_error", event.error || event.message, {
+            filename: event.filename || "",
+            line: event.lineno || 0,
+            column: event.colno || 0
+        });
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+        emitDiagnostic("error", "unhandled_rejection", event.reason);
+    });
+
+
     function prefixUrl(input) {
         if (!basePath || typeof input !== "string") return input;
         if (!input || input.charAt(0) !== "/" || input.indexOf("//") === 0) return input;

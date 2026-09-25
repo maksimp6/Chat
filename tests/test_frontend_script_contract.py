@@ -64,3 +64,12 @@ def test_index_route_renders_conversation_from_query_server_side():
     assert 'get_owned_conversation(conversation_id, owner_id)' in app_source
     assert 'selected_messages = get_messages(conversation_id)' in app_source
     assert 'selected_conversation=selected_conversation' in app_source
+
+
+def test_boot_is_first_and_project_tree_module_is_loaded():
+    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    boot = html.index('id="alice-boot"')
+    project_tree = html.index('/project_tree.js?')
+    assert boot < project_tree
+    assert 'id="project-tree-btn"' in html
+    assert "Структура проекта" in html
