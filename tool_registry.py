@@ -137,6 +137,13 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Profiler: {e}")
 
         try:
+            from theme_tools import THEME_TOOLS
+            for name, cfg in THEME_TOOLS.items():
+                self._register("theme", name, cfg)
+        except Exception as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки Theme: {e}")
+
+        try:
             from runtime_tools import RUNTIME_TOOLS
             for name, cfg in RUNTIME_TOOLS.items():
                 self._register("runtime", name, cfg)
