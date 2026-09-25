@@ -22,7 +22,6 @@ from partner_relations import partner_relations_bp, init_partner_relations_table
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
-from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
@@ -91,7 +90,6 @@ init_runtime_tables()
 init_local_agent_tables()
 check_supabase_trace_mirror()
 init_treasury_tables()
-init_user_identity_table()
 init_conversation_ownership_table()
 init_department_tables()
 from provider_quotas import init_quota_tables
@@ -129,29 +127,6 @@ def index():
 @app.route("/healthz", methods=["GET"])
 def healthz():
     return jsonify({"status": "ok"})
-
-
-@app.route("/api/users/bootstrap", methods=["POST"])
-def bootstrap_anonymous_user():
-    data = request.get_json(silent=True) or {}
-    metadata = data.get("metadata") or {}
-    if not isinstance(metadata, dict):
-        return jsonify({"error": "metadata must be an object"}), 400
-
-    try:
-        identity = register_anonymous_user(data.get("installation_id"), metadata)
-        response = jsonify(identity)
-        response.set_cookie(
-            "alice_user_token",
-            identity["auth_token"],
-            httponly=True,
-            secure=request.is_secure,
-            samesite="Lax",
-            path="/",
-        )
-        return response
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
 
 
 MODEL_DISCOVERY = get_model_discovery()
