@@ -14,7 +14,7 @@
         header.innerHTML = '<h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🔐 SSH Runtime</h2><button id="set-close-btn" type="button" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>';
         md.appendChild(header);
         var tabSsh = [
-            '<div id="tab-ssh" class="llm-tab-content" style="display:none;">',
+            '<div id="tab-ssh" class="llm-tab-content">',
             UI.section("SSH Runtime"),
             '<div id="ssh-settings-status" style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Загрузка конфигурации...</div>',
             UI.chk('set-ssh-enabled', false, '<strong>🔐 SSH Runtime</strong> включён'),
