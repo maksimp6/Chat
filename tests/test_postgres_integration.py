@@ -9,6 +9,7 @@ from local_agent_gateway import init_local_agent_tables
 from runtime_migrations import init_runtime_tables
 from treasury import init_treasury_tables
 from user_identity import init_user_identity_table
+from observability_migrations import MIGRATION_VERSION, apply_observability_migrations
 
 
 def _require_postgres():
@@ -26,6 +27,7 @@ def test_postgres_bootstraps_shared_application_schema():
     init_treasury_tables()
     init_user_identity_table()
     init_department_tables()
+    apply_observability_migrations()
 
     conn = db.get_conn()
     try:
@@ -60,6 +62,9 @@ def test_postgres_bootstraps_shared_application_schema():
         "treasury_ledger",
         "users",
         "departments",
+        "schema_migrations",
+        "project_tree_preferences",
+        "frontend_error_events",
     }
     assert expected.issubset(tables)
 
@@ -109,3 +114,18 @@ def test_postgres_is_the_same_store_used_by_application_modules():
         conn.close()
 
     assert count == 1
+
+
+def test_postgres_observability_migration_is_idempotent():
+    _require_postgres()
+    apply_observability_migrations()
+    apply_observability_migrations()
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT version FROM schema_migrations WHERE version = ?",
+            (MIGRATION_VERSION,),
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 1
