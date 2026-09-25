@@ -14,6 +14,8 @@ class Node:
 
 
 class ModalParser(HTMLParser):
+    VOID = {"meta", "link", "input", "br", "hr", "img", "source"}
+
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.stack = []
@@ -25,7 +27,7 @@ class ModalParser(HTMLParser):
             self.stack[-1].children.append(node)
         else:
             self.roots.append(node)
-        if tag not in {"meta", "link", "input", "br", "hr", "img", "source"}:
+        if tag not in self.VOID:
             self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
@@ -41,14 +43,14 @@ class ModalParser(HTMLParser):
         assert node.tag == tag, f"expected </{node.tag}>, got </{tag}>"
 
     def handle_data(self, data):
-        if self.stack and data.strip():
-            self.stack[-1].text.append(data.strip())
+        text = " ".join(data.split())
+        if self.stack and text:
+            self.stack[-1].text.append(text)
 
 
-def parse_modal_html():
-    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+def parse_html():
     parser = ModalParser()
-    parser.feed(html)
+    parser.feed((ROOT / "templates" / "index.html").read_text(encoding="utf-8"))
     parser.close()
     assert not parser.stack, "HTML ended before all tags were closed"
     return parser.roots
@@ -60,91 +62,91 @@ def walk(node):
         yield from walk(child)
 
 
-def find_by_id(roots, element_id):
+def find(roots, element_id):
     matches = [n for root in roots for n in walk(root) if n.attrs.get("id") == element_id]
     assert len(matches) == 1, f"expected exactly one #{element_id}, got {len(matches)}"
     return matches[0]
 
 
-def child(node, tag, element_id=None):
-    matches = [n for n in node.children if n.tag == tag and (element_id is None or n.attrs.get("id") == element_id)]
-    assert len(matches) == 1, f"expected one direct <{tag}> child, got {len(matches)}"
-    return matches[0]
+def shape(node):
+    # The complete subtree is reduced to an exact tag/attribute/text structure.
+    # Therefore a missing, reordered, duplicated, or unexpected HTML tag fails.
+    attrs = tuple(sorted(node.attrs.items()))
+    text = tuple(node.text)
+    return (node.tag, attrs, text, tuple(shape(child) for child in node.children))
 
 
-def test_modal_html_is_balanced_from_opening_to_closing_tag():
-    roots = parse_modal_html()
-    # Parsing must consume every opening/closing tag. This is intentionally a
-    # full-document structural test, not a substring/regex check.
+def test_document_html_is_balanced_from_first_to_last_tag():
+    roots = parse_html()
     assert roots
 
 
-def test_model_modal_is_a_complete_dom_tree():
-    roots = parse_modal_html()
-    modal = find_by_id(roots, "model-modal")
-    assert modal.tag == "div"
-    assert modal.attrs.get("class") == "modal"
-    assert len(modal.children) == 1
-    content = child(modal, "div")
-    assert content.attrs.get("class") == "modal-content"
-    assert child(content, "h3").text == ["Выбор модели"]
-    assert child(content, "button", "close-modal").attrs.get("id") == "close-modal"
-    assert child(content, "div", "model-list").tag == "div"
+def test_model_modal_complete_dom_shape():
+    modal = find(parse_html(), "model-modal")
+    expected = (
+        "div", (("class", "modal"), ("id", "model-modal")), (), (
+            ("div", (("class", "modal-content"),), (), (
+                ("h3", (), ("Выбор модели",), ()),
+                ("button", (("id", "close-modal"),), ("&times;",), ()),
+                ("div", (("id", "model-list"),), (), ()),
+            )),
+        ),
+    )
+    assert shape(modal) == expected
 
 
-def test_memory_modal_is_a_complete_dom_tree():
-    roots = parse_modal_html()
-    modal = find_by_id(roots, "memoryModal")
-    assert modal.tag == "div"
-    assert modal.attrs.get("class") == "modal memory-modal"
-    assert modal.attrs.get("hidden") is not None
-    assert len(modal.children) == 1
-
-    content = child(modal, "div")
-    assert content.attrs.get("class") == "modal-content memory-modal-content"
-    assert content.attrs.get("role") == "dialog"
-    assert content.attrs.get("aria-modal") == "true"
-    assert content.attrs.get("aria-labelledby") == "memoryModalTitle"
-
-    close = child(content, "button", "memoryCloseBtn")
-    assert close.attrs.get("type") == "button"
-    assert close.attrs.get("aria-label") == "Закрыть"
-    assert close.text == ["×"]
-
-    title = child(content, "h2", "memoryModalTitle")
-    assert title.text == ["Управление памятью"]
-
-    config = child(content, "div")
-    assert config.attrs.get("class") == "memory-config"
-    labels = [n for n in config.children if n.tag == "label"]
-    assert len(labels) == 2
-    assert child(labels[0], "input", "memEnabled").attrs.get("type") == "checkbox"
-    assert child(labels[1], "input", "memLimit").attrs.get("type") == "number"
-
-    clear = child(content, "div")
-    assert clear.attrs.get("class") == "memory-clear"
-    assert child(clear, "button", "memoryClearBtn").attrs.get("type") == "button"
-
-    facts_title = child(content, "h3")
-    assert facts_title.attrs.get("class") == "memory-facts-title"
-    assert child(facts_title, "span", "memCount").text == ["0"]
-    facts = child(content, "div", "memoryFactsList")
-    assert facts.attrs.get("class") == "memory-facts-list"
+def test_memory_modal_complete_dom_shape():
+    modal = find(parse_html(), "memoryModal")
+    expected = (
+        "div", (("class", "modal memory-modal"), ("hidden", None), ("id", "memoryModal")), (), (
+            ("div", (
+                ("aria-labelledby", "memoryModalTitle"), ("aria-modal", "true"),
+                ("class", "modal-content memory-modal-content"), ("role", "dialog"),
+            ), (), (
+                ("button", (("aria-label", "Закрыть"), ("class", "memory-modal-close"), ("id", "memoryCloseBtn"), ("type", "button")), ("×",), ()),
+                ("h2", (("class", "memory-modal-title"), ("id", "memoryModalTitle")), ("Управление памятью",), ()),
+                ("div", (("class", "memory-config"),), (), (
+                    ("label", (("class", "memory-config-option"),), ("Включить память",), (
+                        ("input", (("id", "memEnabled"), ("type", "checkbox")), (), ()),
+                    )),
+                    ("label", (("class", "memory-config-option"),), ("Макс. фактов:",), (
+                        ("input", (("class", "memory-limit"), ("id", "memLimit"), ("max", "50"), ("min", "1"), ("type", "number")), (), ()),
+                    )),
+                )),
+                ("div", (("class", "memory-clear"),), (), (
+                    ("button", (("class", "memory-clear-btn"), ("id", "memoryClearBtn"), ("type", "button")), ("Очистить всю память",), ()),
+                )),
+                ("h3", (("class", "memory-facts-title"),), ("Факты (", "),), (
+                    ("span", (("id", "memCount"),), ("0",), ()),
+                )),
+                ("div", (("class", "memory-facts-list"), ("id", "memoryFactsList")), (), ()),
+            )),
+        ),
+    )
+    assert shape(modal) == expected
 
 
-def test_every_modal_has_one_canonical_content_child():
-    roots = parse_modal_html()
+def test_every_static_modal_has_exactly_one_content_root_until_closing_tag():
+    roots = parse_html()
     modals = [node for root in roots for node in walk(root) if "modal" in node.attrs.get("class", "").split()]
-    assert modals, "no modal roots found"
+    assert modals
     for modal in modals:
-        content = [n for n in modal.children if n.tag == "div" and "modal-content" in n.attrs.get("class", "").split()]
-        assert len(content) == 1, f"{modal.attrs.get('id')}: modal must contain exactly one .modal-content root"
-        assert content[0].attrs.get("class", "").split()[0] == "modal-content"
+        content = [
+            child for child in modal.children
+            if child.tag == "div" and "modal-content" in child.attrs.get("class", "").split()
+        ]
+        assert len(content) == 1, f"{modal.attrs.get('id')}: expected exactly one .modal-content"
+        assert modal.children[-1] is content[0], (
+            f"{modal.attrs.get('id')}: .modal-content must be the final subtree before </div>"
+        )
 
 
-def test_each_modal_dom_node_has_no_orphan_sibling_after_content():
-    roots = parse_modal_html()
+def test_no_static_modal_contains_another_modal_root():
+    roots = parse_html()
     modals = [node for root in roots for node in walk(root) if "modal" in node.attrs.get("class", "").split()]
     for modal in modals:
-        content = [n for n in modal.children if n.tag == "div" and "modal-content" in n.attrs.get("class", "").split()][0]
-        assert modal.children[-1] is content, f"{modal.attrs.get('id')}: content must run to the modal's closing tag"
+        nested = [
+            node for node in walk(modal)[1:]
+            if "modal" in node.attrs.get("class", "").split()
+        ]
+        assert not nested, f"{modal.attrs.get('id')}: nested modal roots are not allowed"
