@@ -1,6 +1,49 @@
 (function () {
     "use strict";
 
+    window.__ALICE_USER_ID = window.__ALICE_USER_ID || "";
+    window.__ALICE_BASE_PATH = {{ (preview_base_path or "")|tojson }};
+    window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
+    window.__ALICE_STATIC_VERSION = {{ static_version|tojson }};
+
+    var basePath = window.__ALICE_BASE_PATH || "";
+
+    function prefixUrl(input) {
+        if (!basePath || typeof input !== "string") return input;
+        if (!input || input.charAt(0) !== "/" || input.indexOf("//") === 0) return input;
+        if (input === basePath || input.indexOf(basePath + "/") === 0) return input;
+        return basePath + input;
+    }
+
+    var originalFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        var target = input;
+        if (typeof input === "string") target = prefixUrl(input);
+        else if (input instanceof URL) target = prefixUrl(input.toString());
+        else if (typeof Request !== "undefined" && input instanceof Request) {
+            var url = prefixUrl(input.url);
+            if (url !== input.url) target = new Request(url, input);
+        }
+
+        init = init || {};
+        var headers = new Headers(init.headers || (typeof Request !== "undefined" && target instanceof Request ? target.headers : {}));
+        if (window.__ALICE_USER_ID) headers.set("X-Alice-User-ID", window.__ALICE_USER_ID);
+        init.headers = headers;
+        return originalFetch(target, init);
+    };
+
+    var NativeEventSource = window.EventSource;
+    if (NativeEventSource) {
+        function PatchedEventSource(url, config) {
+            return new NativeEventSource(prefixUrl(url), config);
+        }
+        PatchedEventSource.prototype = NativeEventSource.prototype;
+        PatchedEventSource.CONNECTING = NativeEventSource.CONNECTING;
+        PatchedEventSource.OPEN = NativeEventSource.OPEN;
+        PatchedEventSource.CLOSED = NativeEventSource.CLOSED;
+        window.EventSource = PatchedEventSource;
+    }
+
     function cleanupLegacyServiceWorkers() {
         try {
             if (!navigator.serviceWorker || typeof navigator.serviceWorker.getRegistrations !== "function") return;
