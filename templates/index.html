@@ -9,52 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ static_root }}/favicon.svg?v={{ static_version }}">
     <link rel="shortcut icon" href="{{ static_root }}/favicon.svg?v={{ static_version }}">
 
-<script>
-window.__ALICE_USER_ID = window.__ALICE_USER_ID || "";
-window.__ALICE_BASE_PATH = {{ (preview_base_path or "")|tojson }};
-window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
-window.__ALICE_STATIC_VERSION = {{ static_version|tojson }};
-(function () {
-  var basePath = window.__ALICE_BASE_PATH || "";
-
-  function prefixUrl(input) {
-    if (!basePath || typeof input !== "string") return input;
-    if (!input || input.charAt(0) !== "/" || input.indexOf("//") === 0) return input;
-    if (input === basePath || input.indexOf(basePath + "/") === 0) return input;
-    return basePath + input;
-  }
-
-  var originalFetch = window.fetch.bind(window);
-  window.fetch = function (input, init) {
-    var target = input;
-    if (typeof input === "string") target = prefixUrl(input);
-    else if (input instanceof URL) target = prefixUrl(input.toString());
-    else if (typeof Request !== "undefined" && input instanceof Request) {
-      var url = prefixUrl(input.url);
-      if (url !== input.url) target = new Request(url, input);
-    }
-
-    init = init || {};
-    var headers = new Headers(init.headers || (typeof Request !== "undefined" && target instanceof Request ? target.headers : {}));
-    if (window.__ALICE_USER_ID) headers.set("X-Alice-User-ID", window.__ALICE_USER_ID);
-    init.headers = headers;
-    return originalFetch(target, init);
-  };
-
-  var NativeEventSource = window.EventSource;
-  if (NativeEventSource) {
-    function PatchedEventSource(url, config) {
-      return new NativeEventSource(prefixUrl(url), config);
-    }
-    PatchedEventSource.prototype = NativeEventSource.prototype;
-    PatchedEventSource.CONNECTING = NativeEventSource.CONNECTING;
-    PatchedEventSource.OPEN = NativeEventSource.OPEN;
-    PatchedEventSource.CLOSED = NativeEventSource.CLOSED;
-    window.EventSource = PatchedEventSource;
-  }
-})();
-</script>
-    <script src="{{ static_root }}/boot.js?v={{ static_version }}" defer></script>
+    <script id="alice-boot" src="{{ static_root }}/boot.js?v={{ static_version }}" data-base-path="{{ preview_base_path or '' }}" data-static-base="{{ static_root }}" data-static-version="{{ static_version }}"></script>
     <script src="{{ static_root }}/file_manager.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/treasury.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/settings/ui_helpers.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_storage.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_mcp.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_params.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings/settings_modal.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/settings.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/core.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/theme_assistant.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/sidebar.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/models.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/chat.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer_timing_fix.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer_error_ui.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/trace_viewer_auto.js?v={{ static_version }}" defer></script><script src="{{ static_root }}/voice.js?v={{ static_version }}" defer></script>

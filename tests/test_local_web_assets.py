@@ -21,8 +21,9 @@ def test_index_uses_only_local_ui_resources():
     html = Path("templates/index.html").read_text(encoding="utf-8")
     assert not EXTERNAL_RESOURCE_RE.search(html), "UI resources must be served locally"
     assert "{% set static_root" in html
-    assert 'window.__ALICE_BASE_PATH' in html
-    assert 'window.__ALICE_STATIC_BASE' in html
+    assert 'id="alice-boot"' in html
+    assert 'data-base-path="{{ preview_base_path or \'\' }}"' in html
+    assert 'data-static-base="{{ static_root }}"' in html
     assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
     assert '<script src="{{ static_root }}/eruda.js' not in html
 
@@ -44,7 +45,7 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
     assert 'href="/preview/pr-203/static/style.css?v=' in html
     assert 'src="/preview/pr-203/static/eruda_init.js?v=' in html
     assert '/preview/pr-203/static/eruda.js?v={{' not in html
-    assert 'window.__ALICE_BASE_PATH = "/preview/pr-203"' in html
+    assert 'data-base-path="/preview/pr-203"' in html
     assert 'src="/preview/pr-203/static/memory_panel.js?v=' in html
 
 
@@ -69,6 +70,7 @@ def test_web_boot_and_startup_guards_are_present():
     boot = Path("static/boot.js").read_text(encoding="utf-8")
     eruda_loader = Path("static/eruda_init.js").read_text(encoding="utf-8")
     core = Path("static/core.js").read_text(encoding="utf-8")
+    assert "document.currentScript" in boot
     assert "getRegistrations" in boot
     assert "alice-pro-" in boot
     assert "maxAttempts = 5" in eruda_loader
