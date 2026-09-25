@@ -315,7 +315,8 @@ def reserve_request(user_id: Optional[str], *, now: Optional[int] = None) -> Opt
                 """INSERT INTO provider_quota_usage
                    (user_id, period_start, request_count, token_count, cost,
                     rate_window_start, rate_count, updated_at)
-                   VALUES (?, ?, 0, 0, 0, ?, 0, ?)""",
+                   VALUES (?, ?, 0, 0, 0, ?, 0, ?)
+                   ON CONFLICT(user_id) DO NOTHING""",
                 (trusted_user_id, period_start, rate_window_start, now_value),
             )
             usage = conn.execute(select_sql, (trusted_user_id,)).fetchone()
