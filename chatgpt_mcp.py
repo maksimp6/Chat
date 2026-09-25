@@ -220,13 +220,15 @@ def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Response]]:
     try:
         return _auth_user_from_request(), None
     except PermissionError as exc:
-        return None, _jsonrpc_error(
+        response = _jsonrpc_error(
             request_id,
             -32001,
             str(exc),
             status=401,
             headers={"WWW-Authenticate": _www_authenticate()},
         )
+        response.headers["Access-Control-Expose-Headers"] = "WWW-Authenticate, MCP-Protocol-Version"
+        return None, response
 
 
 def _owner_id_from_invocation(invocation: Mapping[str, Any]) -> Optional[str]:
@@ -938,7 +940,16 @@ def mcp_post() -> Response:
         except LookupError as exc:
             return _error_response(request_id, -32602, str(exc), status=404)
         except PermissionError as exc:
-            return _error_response(request_id, -32003, str(exc), status=403)
+            response = _error_response(
+                request_id,
+                -32003,
+                str(exc),
+                data={"_meta": {"mcp/www_authenticate": [_www_authenticate()]}},
+                status=401 if "token" in str(exc).lower() else 403,
+                headers={"WWW-Authenticate": _www_authenticate()},
+            )
+            response.headers["Access-Control-Expose-Headers"] = "WWW-Authenticate, MCP-Protocol-Version"
+            return response
         except (TypeError, ValueError) as exc:
             return _error_response(request_id, -32602, str(exc))
         except Exception:
