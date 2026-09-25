@@ -6,7 +6,7 @@ Issue #105 verifies and restores the end-to-end voice assistant path.
 
 `microphone -> browser recording -> /api/voice/audio -> SpeechKit STT -> existing Alice chat pipeline -> SpeechKit TTS -> browser playback`
 
-The browser prefers OggOpus recording when the browser exposes it. A PCM/WAV fallback is used otherwise. SpeechKit synchronous recognition is limited to 1 MiB and 30 seconds, so the server rejects larger audio payloads. citeturn3search7
+The browser prefers OggOpus recording when the browser exposes it. A PCM/WAV fallback is used otherwise. SpeechKit synchronous recognition is limited to 1 MiB and 30 seconds, so the server rejects larger audio payloads.
 
 ## API
 
@@ -20,7 +20,7 @@ The browser prefers OggOpus recording when the browser exposes it. A PCM/WAV fal
 
 The backend accepts either server-side `YANDEX_API_KEY` or `YANDEX_IAM_TOKEN`. The optional `YANDEX_PROJECT_ID`/folder ID is passed to SpeechKit when configured. Credentials are never sent to the browser.
 
-Yandex documents IAM-token authentication with `Authorization: Bearer` and service-account API-key authentication with `Authorization: Api-Key`. citeturn2search8
+Yandex documents IAM-token authentication with `Authorization: Bearer` and service-account API-key authentication with `Authorization: Api-Key`.
 
 ## Response modes
 
@@ -36,4 +36,4 @@ Voice session IDs are random UUID-derived values. A session is scoped to the own
 
 ## Known scope
 
-This implementation is a reliable request/response voice assistant, not a bidirectional low-latency SpeechKit realtime session. Streaming recognition and streaming TTS can be introduced later through SpeechKit API v2/v3 without changing the public browser session contract. Yandex documents streaming recognition separately from the synchronous v1 API. citeturn3search11turn1search11
+This implementation is a reliable request/response voice assistant, not a bidirectional low-latency SpeechKit realtime session. Streaming recognition and streaming TTS can be introduced later through SpeechKit API v2/v3 without changing the public browser session contract. Yandex documents streaming recognition separately from the synchronous v1 API.
