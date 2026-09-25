@@ -1,3 +1,5 @@
+from pathlib import Path
+
 def test_legacy_default_conversation_title_is_migrated(tmp_path, monkeypatch):
     import db
 
