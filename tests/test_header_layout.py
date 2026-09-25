@@ -15,4 +15,4 @@ def test_dynamic_header_actions_target_secondary_row():
     html = Path("templates/index.html").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
     assert 'getElementById("header-actions-2")' in diagnostics
-    assert 'getElementById("memory-btn")' in memory
+    assert 'memory-btn' in memory\n    assert 'window.openMemoryModal' in memory
