@@ -25,7 +25,7 @@ from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from government import government_bp, init_government_tables, ensure_government_department
-from environment_routes import environment_bp
+from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
@@ -75,6 +75,7 @@ app.register_blueprint(partner_relations_bp)
 app.register_blueprint(departments_bp)
 app.register_blueprint(government_bp)
 app.register_blueprint(environment_bp)
+app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 
 @app.after_request
