@@ -46,6 +46,9 @@ SERVER_NAME = "Alice Pro"
 SERVER_VERSION = os.getenv("ALICE_VERSION", "dev")
 OAUTH_SCOPE = os.getenv("ALICE_MCP_OAUTH_SCOPE", "alice.read")
 PUBLIC_BASE_URL = os.getenv("ALICE_MCP_PUBLIC_URL", "").rstrip("/")
+OAUTH_ISSUER = os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
+OAUTH_AUTHORIZATION_URL = os.getenv("ALICE_MCP_OAUTH_AUTHORIZATION_URL", "").strip()
+OAUTH_TOKEN_URL = os.getenv("ALICE_MCP_OAUTH_TOKEN_URL", "").strip()
 
 
 def _truthy(value: str | None) -> bool:
@@ -148,8 +151,8 @@ def _protected_resource_url() -> Optional[str]:
 def _www_authenticate() -> Optional[str]:
     resource = _protected_resource_url()
     if resource:
-        return f'Bearer resource_metadata="{resource}"'
-    return "Bearer"
+        return f'Bearer resource_metadata="{resource}", scope="{OAUTH_SCOPE}"'
+    return f'Bearer scope="{OAUTH_SCOPE}"'
 
 
 def _auth_user_from_request() -> Optional[str]:
@@ -665,7 +668,7 @@ def _security_schemes() -> list[dict[str, Any]]:
     mode = _auth_mode()
     if mode == "anonymous":
         return [{"type": "noauth"}]
-    return [{"type": "http", "scheme": "bearer"}]
+    return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
