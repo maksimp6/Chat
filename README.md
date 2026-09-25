@@ -9,7 +9,7 @@ The project is actively evolving. Some components are production-oriented, while
 - **AI chat** with Yandex AI Studio Responses API integration.
 - **MCP and local tools** with a unified execution boundary.
 - **Execution Trace** for provider requests, polling, tool execution, errors, timing, billing, and correlation.
-- **Agent Gateway and runtime** for isolated invocation/session workflows.
+- **Agent Gateway and runtime** for isolated invocation/session workflows, including an optional SSH Runtime that executes commands and file operations as configured Linux users.
 - **Files and knowledge** through the file manager and vector-knowledge integrations.
 - **Treasury and billing** for internal usage accounting and demo balances.
 - **Departments** for domain-specific agent capabilities.
@@ -29,6 +29,9 @@ flowchart TD
     O --> T[UniversalToolExecutor]
     T --> M[MCP / Local Tools]
     O --> A[Agent Gateway / Runtime]
+    O --> R[SSH Runtime]
+    R --> L[Linux user / permissions]
+    R --> X[ExecutionTrace]
     O --> X[ExecutionTrace]
     X --> B[Billing]
     X --> S[Optional Supabase Trace Mirror]
@@ -66,6 +69,7 @@ For the current validated development path:
 - Git.
 - Optional: PostgreSQL 17 for shared deployments. Omit ALICE_DATABASE_URL for the default SQLite/Termux mode.
 - Optional: a Supabase project for trace mirroring and production migrations.
+- Optional: a non-production SSH target with a verified known_hosts file for Runtime Preview checks.
 
 ### Backend
 
