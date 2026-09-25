@@ -1,0 +1,92 @@
+
+.alice-pro-app .environments-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100010;
+    background: rgba(0, 0, 0, .68);
+    align-items: center;
+    justify-content: center;
+}
+.alice-pro-app .environments-modal.visible { display: flex; }
+.alice-pro-app .environments-box {
+    width: min(760px, 94vw);
+    max-height: 88vh;
+    overflow: auto;
+    background: var(--bg-sidebar);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 18px;
+}
+.alice-pro-app .environments-close {
+    float: right;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 24px;
+    cursor: pointer;
+}
+.alice-pro-app .environments-head,
+.alice-pro-app .environment-card-main,
+.alice-pro-app .environment-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.alice-pro-app .environments-head { justify-content: space-between; margin-bottom: 14px; }
+.alice-pro-app .environments-head h2 { margin: 0; }
+.alice-pro-app .environments-head p { margin: 3px 0 0; color: var(--text-secondary); font-size: 12px; }
+.alice-pro-app .environments-create { display: flex; gap: 8px; margin-bottom: 12px; }
+.alice-pro-app .environments-create input {
+    flex: 1;
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-main);
+}
+.alice-pro-app .environments-create button,
+.alice-pro-app .environments-refresh,
+.alice-pro-app .environment-card-actions button,
+.alice-pro-app .environment-card-actions a {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 7px 10px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    text-decoration: none;
+    cursor: pointer;
+}
+.alice-pro-app .environments-status {
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    color: var(--danger);
+}
+.alice-pro-app .environment-card {
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+.alice-pro-app .environment-card-main { flex-wrap: wrap; }
+.alice-pro-app .environment-card-main code { color: var(--text-secondary); }
+.alice-pro-app .environment-card-meta {
+    margin: 6px 0;
+    color: var(--text-secondary);
+    font: 11px monospace;
+    overflow-wrap: anywhere;
+}
+.alice-pro-app .environment-status {
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: var(--btn-bg);
+    font-size: 11px;
+}
+.alice-pro-app .environment-status-running { color: #28a745; }
+.alice-pro-app .environment-status-failed { color: var(--danger); }
+.alice-pro-app .environment-card-actions { flex-wrap: wrap; }
+.alice-pro-app .environments-empty { padding: 24px; text-align: center; color: var(--text-secondary); }
