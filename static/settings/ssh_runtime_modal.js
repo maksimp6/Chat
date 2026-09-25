@@ -9,6 +9,10 @@
         ov.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;";
         var md = document.createElement("div");
         md.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+        var header = document.createElement("div");
+        header.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;";
+        header.innerHTML = '<h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🔐 SSH Runtime</h2><button id="set-close-btn" type="button" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>';
+        md.appendChild(header);
         var tabSsh = [
             '<div id="tab-ssh" class="llm-tab-content" style="display:none;">',
             UI.section("SSH Runtime"),
@@ -43,7 +47,9 @@
         ].join('');
 
 
-        md.innerHTML = tabSsh;
+        var content = document.createElement("div");
+        content.innerHTML = tabSsh;
+        md.appendChild(content);
         ov.appendChild(md);
         document.body.appendChild(ov);
         var sshStatusEl = document.getElementById('ssh-settings-status');
