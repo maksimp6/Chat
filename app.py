@@ -31,6 +31,8 @@ from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
 from ssh_runtime_settings import public_settings, save_settings, test_connection
 from plugin_routes import plugin_bp
+from project_tree import project_tree_bp
+from observability_migrations import apply_observability_migrations
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -62,6 +64,7 @@ def _static_asset_version():
 STATIC_ASSET_VERSION = _static_asset_version()
 
 logger = logging.getLogger("alice_app")
+logger.info("[BOOT] hello: Alice Pro backend module loaded")
 
 app.register_blueprint(mcp_bp)
 app.register_blueprint(chatgpt_mcp_bp)
@@ -77,6 +80,7 @@ app.register_blueprint(government_bp)
 app.register_blueprint(environment_bp)
 app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
+app.register_blueprint(project_tree_bp)
 
 @app.after_request
 
@@ -107,6 +111,8 @@ ensure_partner_department()
 init_government_tables()
 ensure_government_department()
 init_environment_tables()
+apply_observability_migrations()
+logger.info("[BOOT] hello: database initialization completed")
 
 
 @app.route("/")
