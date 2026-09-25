@@ -158,17 +158,39 @@ def _request_protocol_version(payload: Mapping[str, Any]) -> str:
     return DEFAULT_PROTOCOL_VERSION
 
 
+def _public_base_url() -> str:
+    return os.getenv("ALICE_MCP_PUBLIC_URL", "").rstrip("/")
+
+
+def _oauth_issuer() -> str:
+    return os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
+
+
+def _oauth_authorization_url() -> str:
+    return os.getenv("ALICE_MCP_OAUTH_AUTHORIZATION_URL", "").strip()
+
+
+def _oauth_token_url() -> str:
+    return os.getenv("ALICE_MCP_OAUTH_TOKEN_URL", "").strip()
+
+
+def _oauth_scope() -> str:
+    return os.getenv("ALICE_MCP_OAUTH_SCOPE", "alice.read").strip() or "alice.read"
+
+
 def _protected_resource_url() -> Optional[str]:
-    if not PUBLIC_BASE_URL:
+    public_base_url = _public_base_url()
+    if not public_base_url:
         return None
-    return f"{PUBLIC_BASE_URL}/.well-known/oauth-protected-resource"
+    return f"{public_base_url}/.well-known/oauth-protected-resource"
 
 
 def _www_authenticate() -> Optional[str]:
     resource = _protected_resource_url()
+    scope = _oauth_scope()
     if resource:
-        return f'Bearer resource_metadata="{resource}", scope="{OAUTH_SCOPE}"'
-    return f'Bearer scope="{OAUTH_SCOPE}"'
+        return f'Bearer resource_metadata="{resource}", scope="{scope}"'
+    return f'Bearer scope="{scope}"'
 
 
 def _auth_user_from_request() -> Optional[str]:
@@ -229,7 +251,7 @@ def _introspect_token(token: str) -> Optional[str]:
         raise PermissionError("Access token is inactive")
 
     scopes = str(data.get("scope") or "").split()
-    if OAUTH_SCOPE and OAUTH_SCOPE not in scopes:
+    scope = _oauth_scope()\n    if scope and scope not in scopes:
         raise PermissionError("Access token lacks the required scope")
 
     return str(data.get("sub") or "") or None
@@ -689,7 +711,7 @@ def _security_schemes() -> list[dict[str, Any]]:
     mode = _auth_mode()
     if mode == "anonymous":
         return [{"type": "noauth"}]
-    return [{"type": "oauth2", "scopes": [OAUTH_SCOPE]}]
+    return [{"type": "oauth2", "scopes": [_oauth_scope()]}]
 
 
 def _tools_list() -> list[dict[str, Any]]:
@@ -852,7 +874,7 @@ def oauth_authorization_server() -> Response:
         "grant_types_supported": ["authorization_code"],
         "code_challenge_methods_supported": ["S256"],
         "token_endpoint_auth_methods_supported": ["none", "private_key_jwt"],
-        "scopes_supported": [os.getenv("ALICE_MCP_OAUTH_SCOPE", "alice.read")],
+        "scopes_supported": [_oauth_scope()],
         "client_id_metadata_document_supported": True,
     }
     return jsonify({key: value for key, value in body.items() if value not in (None, [], "")})
