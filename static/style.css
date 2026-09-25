@@ -1161,3 +1161,41 @@ html, body {
     margin-top: 12px;
 }
 .alice-pro-app .cloudru-iam-output.visible { display: block; }
+
+
+.alice-pro-app .file-manager-modal,
+.alice-pro-app .file-manager-add-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--m-overlay, rgba(0, 0, 0, .6));
+    z-index: 10001;
+}
+.alice-pro-app .file-manager-add-modal {
+    background: rgba(0, 0, 0, .5);
+    z-index: 10002;
+}
+.alice-pro-app .file-manager-box {
+    background: var(--m-bg, #fff);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px var(--m-shadow, rgba(0, 0, 0, .3));
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-add-box {
+    background: var(--m-bg, #fff);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 500px;
+    width: 85%;
+    max-height: 70vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
+    color: var(--m-text, #222);
+}
