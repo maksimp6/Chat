@@ -304,10 +304,12 @@ def reserve_request(user_id: Optional[str], *, now: Optional[int] = None) -> Opt
     conn = get_conn()
     try:
         _begin_transaction(conn)
-        usage = conn.execute(
-            "SELECT * FROM provider_quota_usage WHERE user_id = ?",
-            (trusted_user_id,),
-        ).fetchone()
+        select_sql = (
+            "SELECT * FROM provider_quota_usage WHERE user_id = ? FOR UPDATE"
+            if is_postgres_configured()
+            else "SELECT * FROM provider_quota_usage WHERE user_id = ?"
+        )
+        usage = conn.execute(select_sql, (trusted_user_id,)).fetchone()
         if usage is None:
             conn.execute(
                 """INSERT INTO provider_quota_usage
@@ -316,10 +318,7 @@ def reserve_request(user_id: Optional[str], *, now: Optional[int] = None) -> Opt
                    VALUES (?, ?, 0, 0, 0, ?, 0, ?)""",
                 (trusted_user_id, period_start, rate_window_start, now_value),
             )
-            usage = conn.execute(
-                "SELECT * FROM provider_quota_usage WHERE user_id = ?",
-                (trusted_user_id,),
-            ).fetchone()
+            usage = conn.execute(select_sql, (trusted_user_id,)).fetchone()
 
         current_period = int(usage["period_start"]) == period_start
         current_rate_window = int(usage["rate_window_start"]) == rate_window_start
@@ -383,12 +382,9 @@ def reserve_request(user_id: Optional[str], *, now: Optional[int] = None) -> Opt
             reserved_request_number=new_requests,
         )
     except Exception:
-        try:
-            conn.rollback()
-        finally:
-            conn.close()
+        conn.rollback()
         raise
-    else:
+    finally:
         conn.close()
 
 
