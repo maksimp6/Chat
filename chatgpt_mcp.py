@@ -12,12 +12,21 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import uuid
 from typing import Any, Callable, Mapping, Optional
 
 from flask import Blueprint, Response, jsonify, request
 
 from agent_gateway import AgentGateway
 from invocation_api import get_invocation_status, get_invocation_trace
+from invocation_manager import (
+    create_invocation,
+    start_invocation,
+    persist_invocation_trace,
+    finish_invocation,
+    fail_invocation,
+)
+from invocation_trace import create_invocation_trace
 from session_manager import get_session
 from db import get_conversations, get_messages
 from conversation_ownership import list_owned_conversations, get_owned_conversation, check_access
@@ -689,42 +698,98 @@ def _tools_list() -> list[dict[str, Any]]:
 def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise ValueError("arguments must be an object")
+
+    # The HTTP transport stays stateless, but every external tool call gets a
+    # persisted invocation and ExecutionTrace for auditability and correlation.
+    correlation_id = str(uuid.uuid4())
+    context = create_invocation(
+        f"mcp:{correlation_id}",
+        f"mcp:{correlation_id}",
+        metadata={"source": "chatgpt_mcp", "tool": name},
+        user_id=user,
+    )
+    start_invocation(context.invocation_id)
+    trace = create_invocation_trace(context)
+    trace.set_request({
+        "transport": "mcp",
+        "method": "tools/call",
+        "tool": name,
+        "arguments": arguments,
+        "call_id": correlation_id,
+    })
+
     call = UniversalToolCall(
         tool_name=name,
         arguments=arguments,
         transport="mcp",
+        call_id=correlation_id,
+        trace_id=context.trace_id,
+        invocation_id=context.invocation_id,
         user_id=user,
         metadata={"source": "chatgpt_mcp"},
     )
-    result = UniversalToolExecutor(registry).execute(call)
-    if not result.get("success"):
-        phase = (result.get("metadata") or {}).get("phase")
-        if phase == "transport":
-            raise LookupError(result.get("error") or "Tool transport is not supported")
-        if phase == "validation":
-            raise ValueError(result.get("error") or "Tool input validation failed")
-        if phase == "authorization":
-            raise PermissionError(result.get("error") or "Tool authorization denied")
-        if phase == "approval_required":
-            raise PermissionError(result.get("error") or "Tool approval required")
-        if phase == "execution":
-            execution_error = str(result.get("error") or "Tool execution failed")
-            if execution_error.startswith("LookupError:"):
-                raise LookupError(execution_error.split(":", 1)[1].strip())
-        raise RuntimeError(result.get("error") or "Tool execution failed")
-    return {
-        "structuredContent": result.get("data"),
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps(result.get("data"), ensure_ascii=False),
-            }
-        ],
-        "_meta": {
-            "serverInfo": _server_info(),
-            "toolResult": result,
-        },
-    }
+
+    try:
+        result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
+        trace.add_event("mcp_tool_call_completed", {
+            "tool": name,
+            "call_id": correlation_id,
+            "success": bool(result.get("success")),
+        })
+        trace_data = trace.finalize()
+        persist_invocation_trace(context.invocation_id, trace_data)
+
+        if not result.get("success"):
+            fail_invocation(
+                context.invocation_id,
+                error={
+                    "tool": name,
+                    "error": result.get("error"),
+                    "phase": (result.get("metadata") or {}).get("phase"),
+                },
+            )
+            phase = (result.get("metadata") or {}).get("phase")
+            if phase == "transport":
+                raise LookupError(result.get("error") or "Tool transport is not supported")
+            if phase == "validation":
+                raise ValueError(result.get("error") or "Tool input validation failed")
+            if phase == "authorization":
+                raise PermissionError(result.get("error") or "Tool authorization denied")
+            if phase == "approval_required":
+                raise PermissionError(result.get("error") or "Tool approval required")
+            if phase == "execution":
+                execution_error = str(result.get("error") or "Tool execution failed")
+                if execution_error.startswith("LookupError:"):
+                    raise LookupError(execution_error.split(":", 1)[1].strip())
+            raise RuntimeError(result.get("error") or "Tool execution failed")
+
+        finish_invocation(
+            context.invocation_id,
+            result={"tool": name, "success": True, "trace_id": context.trace_id},
+        )
+        return {
+            "structuredContent": result.get("data"),
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(result.get("data"), ensure_ascii=False),
+                }
+            ],
+            "_meta": {
+                "serverInfo": _server_info(),
+                "toolResult": result,
+                "trace_id": context.trace_id,
+                "invocation_id": context.invocation_id,
+            },
+        }
+    except (LookupError, PermissionError, ValueError, RuntimeError):
+        raise
+    except Exception as exc:
+        trace.record_error("mcp_tool_call", str(exc), exception=exc)
+        trace_data = trace.finalize()
+        persist_invocation_trace(context.invocation_id, trace_data)
+        fail_invocation(context.invocation_id, error={"tool": name, "error": str(exc)})
+        raise
 
 
 chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
@@ -798,6 +863,17 @@ def mcp_post() -> Response:
     user, auth_error = _require_auth(request_id)
     if auth_error is not None:
         return auth_error
+
+    if method == "initialize":
+        return _jsonrpc_result(
+            request_id,
+            {
+                "protocolVersion": protocol_version,
+                "capabilities": {"tools": {}},
+                "serverInfo": _server_info(),
+                "instructions": "Alice Pro MCP exposes audited tools through the Universal Tool Registry/Executor.",
+            },
+        )
 
     if method == "ping":
         return _jsonrpc_result(
