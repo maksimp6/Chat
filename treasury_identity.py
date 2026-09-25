@@ -1,18 +1,14 @@
 """Resolve the server-side identity used by Treasury operations.
 
-Client-supplied owner_id values are never trusted. In authenticated requests,
-ownership comes from a server-side Flask auth context or from the bootstrap
-bearer token stored in the HttpOnly identity cookie/header. The fixed
-ALICE_OWNER_ID fallback remains available for explicitly configured
-single-user deployments.
+Client-supplied owner_id values are never trusted. Treasury ownership comes
+only from a trusted server-side Flask auth context or the explicit
+ALICE_OWNER_ID deployment identity.
 """
 
 import os
 from typing import Optional
 
-from flask import g, has_request_context, request
-
-from user_identity import authenticate_user_token
+from flask import g, has_request_context
 
 
 class TreasuryIdentityError(ValueError):
@@ -28,16 +24,6 @@ def get_current_owner_id(*, required: bool = True) -> Optional[str]:
             getattr(g, "authenticated_user_id", None)
             or getattr(g, "user_id", None)
         )
-
-        token = (
-            request.headers.get("X-Alice-User-Token")
-            or request.cookies.get("alice_user_token")
-        )
-        if token:
-            token_owner_id = authenticate_user_token(token)
-            if token_owner_id is None:
-                raise TreasuryIdentityError("invalid authenticated owner token")
-            owner_id = token_owner_id
 
     if owner_id is None:
         owner_id = os.getenv("ALICE_OWNER_ID")
