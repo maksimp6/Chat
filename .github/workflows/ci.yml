@@ -42,6 +42,7 @@ jobs:
         run: |
           node tests/test_file_manager.js
           node tests/test_dozzle_header.js
+          node tests/test_model_loader.js
       - name: Run tests
         run: pytest -q
 
