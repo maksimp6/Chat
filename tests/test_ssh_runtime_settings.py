@@ -84,6 +84,39 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
 
     @patch("ssh_runtime_settings.get_config")
     @patch("ssh_runtime_settings.set_config")
+    def test_build_runtime_applies_global_output_limit(self, set_config, get_config):
+        from ssh_runtime_settings import build_runtime
+
+        stored = dict(self.BASE)
+        stored["max_output_bytes"] = 16384
+        stored["targets"] = {"preview": {**self.BASE["targets"]["preview"]}}
+        stored["targets"]["preview"].pop("max_output_bytes")
+        get_config.side_effect = lambda key, default=None: stored if key == "ssh_runtime_settings" else default
+
+        runtime = build_runtime()
+        self.assertEqual(runtime._targets["preview"].max_output_bytes, 16384)
+
+    @patch("ssh_runtime_settings.get_config")
+    @patch("ssh_runtime_settings.set_config")
+    @patch("ssh_runtime_settings.subprocess.run")
+    def test_connection_test_uses_only_fixed_true(self, run, set_config, get_config):
+        from ssh_runtime_settings import test_connection
+
+        stored = dict(self.BASE)
+        get_config.side_effect = lambda key, default=None: stored if key == "ssh_runtime_settings" else default
+        run.return_value.returncode = 0
+        run.return_value.stdout = ""
+        run.return_value.stderr = ""
+
+        result = test_connection("preview", "owner-1")
+
+        self.assertTrue(result["success"])
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[-1], "true")
+        self.assertNotIn("echo", argv[-1])
+
+    @patch("ssh_runtime_settings.get_config")
+    @patch("ssh_runtime_settings.set_config")
     def test_saved_settings_are_used(self, set_config, get_config):
         from ssh_runtime_settings import get_settings, save_settings
 
