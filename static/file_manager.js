@@ -164,6 +164,44 @@ window.fetchVectorStores = function() {
                 row.appendChild(deleteBtn);
                 cont.appendChild(row);
             });
+
+            cont.querySelectorAll('.vs-id-copy').forEach(function(code) {
+                code.addEventListener('click', function() {
+                    var id = this.dataset.id || '';
+                    copyToClipboard(id);
+                    var original = this.textContent;
+                    this.textContent = 'скопировано!';
+                    var self = this;
+                    setTimeout(function() { self.textContent = original; }, 1500);
+                });
+            });
+
+            cont.querySelectorAll('.vs-add-files-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    openAddFilesToVsModal(this.dataset.id || '', this.dataset.name || '');
+                });
+            });
+
+            cont.querySelectorAll('.vs-delete-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var button = this;
+                    var vsId = button.dataset.id || '';
+                    if (!confirm('Удалить векторное хранилище?')) return;
+                    button.disabled = true;
+                    button.textContent = '...';
+                    fetch('/api/vector-stores/' + encodeURIComponent(vsId), { method: 'DELETE' })
+                        .then(function(response) {
+                            if (!response.ok) throw new Error('HTTP ' + response.status);
+                            return response.json().catch(function() { return {}; });
+                        })
+                        .then(function() { loadVsList(); })
+                        .catch(function(error) {
+                            button.disabled = false;
+                            button.textContent = 'Удалить';
+                            alert('Ошибка: ' + error.message);
+                        });
+                });
+            });
         }
 
         function loadVsList() {
