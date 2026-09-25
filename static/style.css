@@ -880,3 +880,17 @@ html, body {
 .alice-pro-app #upload-image-btn[aria-hidden="true"] {
     display: none;
 }
+
+.alice-pro-app .conv-link {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.alice-pro-app .conv-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
