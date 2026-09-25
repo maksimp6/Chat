@@ -70,3 +70,96 @@ def test_runtime_enforces_timeout(tmp_path):
     )
     result = runtime.execute("sleep 2")
     assert result["timed_out"] is True
+
+
+def test_runtime_marks_unexpected_failure_and_does_not_restart(monkeypatch, tmp_path):
+    runtime = VirtualLowConsumptionServer(
+        "sess_failed",
+        VirtualServerConfig(cwd=str(tmp_path)),
+    )
+
+    def explode(*args, **kwargs):
+        raise OSError("runtime backend failed")
+
+    monkeypatch.setattr("session_runtime.subprocess.run", explode)
+
+    try:
+        runtime.execute("printf 'boom'")
+    except OSError as exc:
+        assert str(exc) == "runtime backend failed"
+    else:
+        raise AssertionError("expected runtime backend failure")
+
+    assert runtime.state == "failed"
+
+    try:
+        runtime.start()
+    except RuntimeError as exc:
+        assert str(exc) == "runtime is in failed state"
+    else:
+        raise AssertionError("failed runtime must not restart implicitly")
+
+
+def test_reaper_and_start_are_serialized(tmp_path):
+    import threading
+
+    runtime = VirtualLowConsumptionServer(
+        "sess_race",
+        VirtualServerConfig(cwd=str(tmp_path), idle_timeout_seconds=1),
+    )
+    runtime.start()
+    runtime.mark_idle()
+
+    barrier = threading.Barrier(2)
+    results = []
+
+    def reap():
+        barrier.wait()
+        results.append(runtime.reap_if_idle(time.time() + 2))
+
+    def invoke():
+        barrier.wait()
+        runtime.start()
+
+    threads = [threading.Thread(target=reap), threading.Thread(target=invoke)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert results == [True] or results == [False]
+    assert runtime.state in {"running", "suspended"}
+    if runtime.state == "suspended":
+        runtime.start()
+        assert runtime.state == "running"
+
+
+def test_ten_concurrent_clones_are_independent():
+    from concurrent.futures import ThreadPoolExecutor
+
+    template = ReadyMadeSession(
+        "template",
+        "Developer",
+        "developer",
+        tools=["terminal"],
+        environment={"MODE": "dev"},
+        files=["README.md"],
+        state={"cwd": "/workspace"},
+        template=True,
+    )
+
+    def clone_and_mutate(index):
+        clone = template.clone(f"clone-{index}")
+        clone.tools.append(f"tool-{index}")
+        clone.environment["INDEX"] = str(index)
+        clone.state["index"] = index
+        return clone
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        clones = list(executor.map(clone_and_mutate, range(10)))
+
+    assert len({clone.id for clone in clones}) == 10
+    assert template.tools == ["terminal"]
+    assert template.environment == {"MODE": "dev"}
+    assert template.state == {"cwd": "/workspace"}
+    assert all(clone.template is False for clone in clones)
