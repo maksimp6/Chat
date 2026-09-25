@@ -36,6 +36,7 @@ class BudgetRepository:
         *,
         idempotency_key: Optional[str] = None,
         actor: Optional[str] = None,
+        cooldown_seconds: int = 0,
     ) -> Dict[str, Any]:
         amount = Decimal(str(amount))
         if amount < 0:
@@ -52,7 +53,7 @@ class BudgetRepository:
             cur.execute(
                 """
                 SELECT apply_budget_operation(
-                    ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -62,6 +63,7 @@ class BudgetRepository:
                     amount,
                     idempotency_key,
                     actor,
+                    cooldown_seconds,
                 ),
             )
             row = cur.fetchone()
