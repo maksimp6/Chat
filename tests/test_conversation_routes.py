@@ -39,3 +39,31 @@ def test_patch_conversation_model_rejects_unauthorized_conversation(monkeypatch)
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "conversation_not_found"
+
+
+def test_conversations_does_not_require_treasury_token(monkeypatch):
+    import mcp_routes
+
+    monkeypatch.setenv("ALICE_OWNER_ID", "preview-owner")
+    monkeypatch.setattr(
+        mcp_routes,
+        "list_owned_conversations",
+        lambda owner_id: [{"id": "conv-1", "owner_id": owner_id}],
+    )
+
+    app = mcp_routes.mcp_bp
+    from flask import Flask
+
+    flask_app = Flask(__name__)
+    flask_app.register_blueprint(app)
+
+    client = flask_app.test_client()
+    response = client.get(
+        "/api/conversations",
+        headers={"X-Alice-User-Token": "invalid-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "conversations": [{"id": "conv-1", "owner_id": "preview-owner"}]
+    }
