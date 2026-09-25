@@ -35,130 +35,6 @@
         document.body.appendChild(ov);
 
 
-        var sshStatusEl = document.getElementById('ssh-settings-status');
-        var sshTestTargetEl = document.getElementById('set-ssh-test-target');
-
-        function setSshStatus(message, error) {
-            if (!sshStatusEl) return;
-            sshStatusEl.textContent = message;
-            sshStatusEl.style.color = error ? 'var(--m-danger,#c33)' : 'var(--m-muted,#666)';
-        }
-
-        function populateSshSettings(data) {
-            var ssh = data || {};
-            document.getElementById('set-ssh-enabled').checked = ssh.enabled === true;
-            document.getElementById('set-ssh-readonly').checked = ssh.read_only === true;
-            document.getElementById('set-ssh-allow-exec').checked = ssh.allow_command_execution !== false;
-            document.getElementById('set-ssh-allow-write').checked = ssh.allow_write_operations !== false;
-            document.getElementById('set-ssh-max-output').value = ssh.max_output_bytes || 1048576;
-            document.getElementById('set-ssh-known-hosts').value = ssh.known_hosts || '';
-            document.getElementById('set-ssh-targets').value = JSON.stringify(ssh.targets || {}, null, 2);
-            document.getElementById('set-ssh-allow-exec').disabled = ssh.read_only === true;
-            document.getElementById('set-ssh-allow-write').disabled = ssh.read_only === true;
-            var targetNames = Object.keys(ssh.targets || {});
-            if (sshTestTargetEl && targetNames.length && !sshTestTargetEl.value) sshTestTargetEl.value = targetNames[0];
-            var last = ssh.last_test;
-            if (last) {
-                setSshStatus('Последняя проверка: ' + (last.success ? 'успешна' : 'ошибка') +
-                    (last.target ? ' · ' + last.target : '') +
-                    (last.duration_ms != null ? ' · ' + last.duration_ms + ' ms' : ''));
-            } else {
-                setSshStatus('Конфигурация загружена.');
-            }
-        }
-
-        fetch('/api/ssh-runtime/settings')
-            .then(function(r) {
-                return r.json().then(function(data) {
-                    if (!r.ok) throw new Error(data.error || 'Не удалось загрузить SSH settings');
-                    return data;
-                });
-            })
-            .then(populateSshSettings)
-            .catch(function(err) {
-                setSshStatus(err.message, true);
-            });
-
-        document.getElementById('set-ssh-readonly').addEventListener('change', function() {
-            var disabled = this.checked;
-            document.getElementById('set-ssh-allow-exec').checked = false;
-            document.getElementById('set-ssh-allow-write').checked = false;
-            document.getElementById('set-ssh-allow-exec').disabled = disabled;
-            document.getElementById('set-ssh-allow-write').disabled = disabled;
-            if (!disabled) {
-                document.getElementById('set-ssh-allow-exec').checked = true;
-                document.getElementById('set-ssh-allow-write').checked = true;
-            }
-        });
-
-        document.getElementById('set-ssh-save-btn').addEventListener('click', function() {
-            var targetsText = document.getElementById('set-ssh-targets').value.trim();
-            var targets;
-            try {
-                targets = targetsText ? JSON.parse(targetsText) : {};
-            } catch (err) {
-                setSshStatus('Targets JSON: ' + err.message, true);
-                return;
-            }
-
-            var payload = {
-                enabled: document.getElementById('set-ssh-enabled').checked,
-                read_only: document.getElementById('set-ssh-readonly').checked,
-                allow_command_execution: document.getElementById('set-ssh-allow-exec').checked,
-                allow_write_operations: document.getElementById('set-ssh-allow-write').checked,
-                max_output_bytes: parseInt(document.getElementById('set-ssh-max-output').value, 10) || 1048576,
-                known_hosts: document.getElementById('set-ssh-known-hosts').value.trim() || null,
-                targets: targets
-            };
-
-            setSshStatus('Сохранение...');
-            fetch('/api/ssh-runtime/settings', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            }).then(function(r) {
-                return r.json().then(function(data) {
-                    if (!r.ok) throw new Error(data.error || 'Не удалось сохранить');
-                    return data;
-                });
-            }).then(function(data) {
-                populateSshSettings(data.settings || payload);
-                setSshStatus('SSH Runtime settings сохранены.');
-            }).catch(function(err) {
-                setSshStatus(err.message, true);
-            });
-        });
-
-        document.getElementById('set-ssh-test-btn').addEventListener('click', function() {
-            var target = (sshTestTargetEl && sshTestTargetEl.value || '').trim();
-            if (!target) {
-                setSshStatus('Укажите target для проверки.', true);
-                return;
-            }
-            setSshStatus('Проверка подключения...');
-            fetch('/api/ssh-runtime/test', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({target: target})
-            }).then(function(r) {
-                return r.json().then(function(data) {
-                    if (!r.ok) throw new Error(data.error || 'SSH connection failed');
-                    return data;
-                });
-            }).then(function(data) {
-                setSshStatus(
-                    'Подключение успешно: ' + data.target + ' · пользователь ' + data.linux_user +
-                    ' · ' + data.duration_ms + ' ms'
-                );
-                fetch('/api/ssh-runtime/settings')
-                    .then(function(r) { return r.json(); })
-                    .then(populateSshSettings)
-                    .catch(function() {});
-            }).catch(function(err) {
-                setSshStatus(err.message, true);
-            });
-        });
-
         function closeModal() { ov.remove(); }
         document.getElementById('tools-close-btn').addEventListener('click', closeModal);
         ov.addEventListener('click', function(e) { if (e.target === ov) closeModal(); });
@@ -243,8 +119,8 @@
             '    <button class="llm-tab-btn active" data-tab="tab-gen" style="padding:8px 12px;border:none;background:none;border-bottom:2px solid var(--m-accent,#4a90d9);color:var(--m-text,#222);font-weight:600;cursor:pointer;white-space:nowrap;">Сэмплинг</button>',
             '    <button class="llm-tab-btn" data-tab="tab-output" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Формат вывода</button>',
             '    <button class="llm-tab-btn" data-tab="tab-routing" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Маршрутизация вызовов</button>',
-            '    <button class="llm-tab-btn" data-tab="tab-tools" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Встроенные тулы</button>
-            <button class="llm-tab-btn" data-tab="tab-ssh" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">SSH Runtime</button>',
+            '    <button class="llm-tab-btn" data-tab="tab-tools" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Встроенные тулы</button>',
+            '    <button class="llm-tab-btn" data-tab="tab-ssh" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">SSH Runtime</button>',
             '    <button class="llm-tab-btn" data-tab="tab-adv" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Промпты & Кэш</button>',
             '    <button class="llm-tab-btn" data-tab="tab-theme" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Оформление</button>',
             '</div>'
@@ -485,6 +361,130 @@ var footer = [
         md.innerHTML = tabsHeader + tabGen + tabOutput + tabRouting + tabTools + tabSsh + tabAdv + tabTheme + footer;
         ov.appendChild(md);
         document.body.appendChild(ov);
+
+        var sshStatusEl = document.getElementById('ssh-settings-status');
+        var sshTestTargetEl = document.getElementById('set-ssh-test-target');
+
+        function setSshStatus(message, error) {
+            if (!sshStatusEl) return;
+            sshStatusEl.textContent = message;
+            sshStatusEl.style.color = error ? 'var(--m-danger,#c33)' : 'var(--m-muted,#666)';
+        }
+
+        function populateSshSettings(data) {
+            var ssh = data || {};
+            document.getElementById('set-ssh-enabled').checked = ssh.enabled === true;
+            document.getElementById('set-ssh-readonly').checked = ssh.read_only === true;
+            document.getElementById('set-ssh-allow-exec').checked = ssh.allow_command_execution !== false;
+            document.getElementById('set-ssh-allow-write').checked = ssh.allow_write_operations !== false;
+            document.getElementById('set-ssh-max-output').value = ssh.max_output_bytes || 1048576;
+            document.getElementById('set-ssh-known-hosts').value = ssh.known_hosts || '';
+            document.getElementById('set-ssh-targets').value = JSON.stringify(ssh.targets || {}, null, 2);
+            document.getElementById('set-ssh-allow-exec').disabled = ssh.read_only === true;
+            document.getElementById('set-ssh-allow-write').disabled = ssh.read_only === true;
+            var targetNames = Object.keys(ssh.targets || {});
+            if (sshTestTargetEl && targetNames.length && !sshTestTargetEl.value) sshTestTargetEl.value = targetNames[0];
+            var last = ssh.last_test;
+            if (last) {
+                setSshStatus('Последняя проверка: ' + (last.success ? 'успешна' : 'ошибка') +
+                    (last.target ? ' · ' + last.target : '') +
+                    (last.duration_ms != null ? ' · ' + last.duration_ms + ' ms' : ''));
+            } else {
+                setSshStatus('Конфигурация загружена.');
+            }
+        }
+
+        fetch('/api/ssh-runtime/settings')
+            .then(function(r) {
+                return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(data.error || 'Не удалось загрузить SSH settings');
+                    return data;
+                });
+            })
+            .then(populateSshSettings)
+            .catch(function(err) {
+                setSshStatus(err.message, true);
+            });
+
+        document.getElementById('set-ssh-readonly').addEventListener('change', function() {
+            var disabled = this.checked;
+            document.getElementById('set-ssh-allow-exec').checked = false;
+            document.getElementById('set-ssh-allow-write').checked = false;
+            document.getElementById('set-ssh-allow-exec').disabled = disabled;
+            document.getElementById('set-ssh-allow-write').disabled = disabled;
+            if (!disabled) {
+                document.getElementById('set-ssh-allow-exec').checked = true;
+                document.getElementById('set-ssh-allow-write').checked = true;
+            }
+        });
+
+        document.getElementById('set-ssh-save-btn').addEventListener('click', function() {
+            var targetsText = document.getElementById('set-ssh-targets').value.trim();
+            var targets;
+            try {
+                targets = targetsText ? JSON.parse(targetsText) : {};
+            } catch (err) {
+                setSshStatus('Targets JSON: ' + err.message, true);
+                return;
+            }
+
+            var payload = {
+                enabled: document.getElementById('set-ssh-enabled').checked,
+                read_only: document.getElementById('set-ssh-readonly').checked,
+                allow_command_execution: document.getElementById('set-ssh-allow-exec').checked,
+                allow_write_operations: document.getElementById('set-ssh-allow-write').checked,
+                max_output_bytes: parseInt(document.getElementById('set-ssh-max-output').value, 10) || 1048576,
+                known_hosts: document.getElementById('set-ssh-known-hosts').value.trim() || null,
+                targets: targets
+            };
+
+            setSshStatus('Сохранение...');
+            fetch('/api/ssh-runtime/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            }).then(function(r) {
+                return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(data.error || 'Не удалось сохранить');
+                    return data;
+                });
+            }).then(function(data) {
+                populateSshSettings(data.settings || payload);
+                setSshStatus('SSH Runtime settings сохранены.');
+            }).catch(function(err) {
+                setSshStatus(err.message, true);
+            });
+        });
+
+        document.getElementById('set-ssh-test-btn').addEventListener('click', function() {
+            var target = (sshTestTargetEl && sshTestTargetEl.value || '').trim();
+            if (!target) {
+                setSshStatus('Укажите target для проверки.', true);
+                return;
+            }
+            setSshStatus('Проверка подключения...');
+            fetch('/api/ssh-runtime/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({target: target})
+            }).then(function(r) {
+                return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(data.error || 'SSH connection failed');
+                    return data;
+                });
+            }).then(function(data) {
+                setSshStatus(
+                    'Подключение успешно: ' + data.target + ' · пользователь ' + data.linux_user +
+                    ' · ' + data.duration_ms + ' ms'
+                );
+                fetch('/api/ssh-runtime/settings')
+                    .then(function(r) { return r.json(); })
+                    .then(populateSshSettings)
+                    .catch(function() {});
+            }).catch(function(err) {
+                setSshStatus(err.message, true);
+            });
+        });
 
         function closeModal() { ov.remove(); }
         document.getElementById('set-close-btn').addEventListener('click', closeModal);
