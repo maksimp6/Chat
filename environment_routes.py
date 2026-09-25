@@ -120,6 +120,7 @@ def _proxy(environment_id, subpath=""):
             },
             cookies=request.cookies,
             allow_redirects=False,
+            stream=True,
             timeout=30,
         )
     except requests.RequestException as exc:
@@ -131,10 +132,18 @@ def _proxy(environment_id, subpath=""):
         for key, value in upstream.headers.items()
         if key.lower() not in excluded
     ]
-    return Response(upstream.content, status=upstream.status_code, headers=headers)
+    def body():
+        try:
+            for chunk in upstream.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    return Response(body(), status=upstream.status_code, headers=headers)
 
 
-@environment_gateway_bp.route("/environments/<environment_id>", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@environment_gateway_bp.route("/environments/<environment_id>", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 @environment_gateway_bp.route("/environments/<environment_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 @environment_gateway_bp.route("/environments/<environment_id>/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 def environment_gateway(environment_id, subpath):
