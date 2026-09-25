@@ -43,7 +43,7 @@ def test_real_and_demo_are_separate():
 
 
 def test_real_exhaustion_switches_to_demo():
-    controller = make_controller()
+    controller = make_controller(max_daily_loss="300")
     controller.spend("50", account_type=AccountType.REAL)
     controller.spend("50", account_type=AccountType.REAL)
     controller.spend("1")
