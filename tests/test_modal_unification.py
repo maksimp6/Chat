@@ -87,7 +87,7 @@ def test_model_modal_complete_dom_shape():
         "div", (("class", "modal"), ("id", "model-modal")), (), (
             ("div", (("class", "modal-content"),), (), (
                 ("h3", (), ("Выбор модели",), ()),
-                ("button", (("id", "close-modal"),), ("&times;",), ()),
+                ("button", (("id", "close-modal"),), ("×",), ()),
                 ("div", (("id", "model-list"),), (), ()),
             )),
         ),
@@ -150,3 +150,130 @@ def test_no_static_modal_contains_another_modal_root():
             if "modal" in node.attrs.get("class", "").split()
         ]
         assert not nested, f"{modal.attrs.get('id')}: nested modal roots are not allowed"
+
+
+def assert_string(value, name, *, min_length=1, max_length=200):
+    assert isinstance(value, str), f"{name}: expected string, got {type(value).__name__}"
+    assert min_length <= len(value) <= max_length, (
+        f"{name}: length {len(value)} outside {min_length}..{max_length}"
+    )
+
+
+def assert_integer(value, name, *, minimum=None, maximum=None):
+    assert isinstance(value, str) and value.strip(), f"{name}: expected integer string"
+    assert value.strip().lstrip("-").isdigit(), f"{name}: expected integer, got {value!r}"
+    number = int(value)
+    if minimum is not None:
+        assert number >= minimum, f"{name}: {number} < minimum {minimum}"
+    if maximum is not None:
+        assert number <= maximum, f"{name}: {number} > maximum {maximum}"
+
+
+def assert_enum(value, name, allowed):
+    assert value in allowed, f"{name}: {value!r} is not in {sorted(allowed)!r}"
+
+
+def assert_boolean(value, name):
+    assert value in {"true", "false"}, f"{name}: expected true/false, got {value!r}"
+
+
+def assert_url(value, name):
+    assert_string(value, name, max_length=2048)
+    assert value.startswith(("/", "http://", "https://")), f"{name}: invalid URL {value!r}"
+    if value.startswith(("http://", "https://")):
+        from urllib.parse import urlparse
+        parsed = urlparse(value)
+        assert parsed.scheme in {"http", "https"} and parsed.netloc, f"{name}: invalid absolute URL"
+
+
+def validate_attribute(node, name, value):
+    tag = node.tag
+
+    if name in {"id", "class", "role", "aria-label", "aria-labelledby", "name", "placeholder"}:
+        assert_string(value, f"<{tag}>.{name}")
+    elif name == "type":
+        assert_enum(value, f"<{tag}>.{name}", {
+            "button", "checkbox", "number", "text", "email", "password", "hidden", "submit"
+        })
+    elif name in {"min", "max", "maxlength", "minlength", "size", "tabindex"}:
+        assert_integer(value, f"<{tag}>.{name}", minimum=0)
+    elif name == "step":
+        assert value == "any" or _is_number(value), f"<{tag}>.step: expected number or 'any'"
+    elif name in {"aria-modal", "aria-hidden"}:
+        assert_boolean(value, f"<{tag}>.{name}")
+    elif name in {"href", "src", "action"}:
+        assert_url(value, f"<{tag}>.{name}")
+    elif name == "autocomplete":
+        assert_string(value, f"<{tag}>.{name}", max_length=100)
+    elif name == "hidden":
+        assert value is None, f"<{tag}>.hidden: boolean attribute must not have a value"
+    else:
+        assert_string(value, f"<{tag}>.{name}", max_length=2048)
+
+
+def _is_number(value):
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def test_every_modal_attribute_has_valid_type_length_enum_or_url():
+    roots = parse_html()
+    modals = [node for root in roots for node in walk(root)
+              if "modal" in node.attrs.get("class", "").split()]
+    for modal in modals:
+        for node in walk(modal):
+            for name, value in node.attrs.items():
+                validate_attribute(node, name, value)
+
+
+def test_modal_form_controls_have_semantically_valid_attributes():
+    roots = parse_html()
+    controls = [
+        node for root in roots for node in walk(root)
+        if node.tag in {"input", "button", "select", "textarea", "a"}
+    ]
+    for node in controls:
+        if node.tag == "input":
+            assert "type" in node.attrs, f"<input id={node.attrs.get('id')!r}> must declare type"
+        if node.tag == "button":
+            assert_enum(node.attrs.get("type", "submit"), f"<button id={node.attrs.get('id')!r}>.type",
+                        {"button", "submit", "reset"})
+        if node.tag == "a" and "href" in node.attrs:
+            assert_url(node.attrs["href"], f"<a id={node.attrs.get('id')!r}>.href")
+
+
+def test_modal_links_are_valid_and_non_empty():
+    roots = parse_html()
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for link in [node for node in walk(modal) if node.tag == "a"]:
+                href = link.attrs.get("href")
+                assert href, f"{modal.attrs.get('id')}: link must have href"
+                assert_url(href, f"{modal.attrs.get('id')}: link href")
+                assert any(link.text) or link.children, (
+                    f"{modal.attrs.get('id')}: link must have visible text or child content"
+                )
+
+
+def test_modal_numeric_constraints_are_mathematically_consistent():
+    roots = parse_html()
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for node in walk(modal):
+                if node.tag not in {"input", "textarea", "select"}:
+                    continue
+                minimum = node.attrs.get("min")
+                maximum = node.attrs.get("max")
+                if minimum is not None and maximum is not None:
+                    assert float(minimum) <= float(maximum), (
+                        f"{modal.attrs.get('id')}: min must not exceed max"
+                    )
+                minimum_length = node.attrs.get("minlength")
+                maximum_length = node.attrs.get("maxlength")
+                if minimum_length is not None and maximum_length is not None:
+                    assert int(minimum_length) <= int(maximum_length), (
+                        f"{modal.attrs.get('id')}: minlength must not exceed maxlength"
+                    )
