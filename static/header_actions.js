@@ -2,6 +2,14 @@
   function bindHeaderActions() {
     var bindings = [
       ["tools-btn", "click", function () { window.openToolsModal(); }],
+      ["memory-btn", "click", function (event) {
+        event.preventDefault();
+        if (typeof window.openMemoryModal === "function") {
+          window.openMemoryModal();
+        } else {
+          console.error("[Memory] Modal script is unavailable");
+        }
+      }],
       ["ssh-runtime-btn", "click", function () {
         if (typeof window.openSshRuntimeModal === "function") {
           window.openSshRuntimeModal();
