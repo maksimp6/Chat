@@ -2,7 +2,7 @@
     "use strict";
     console.log("[SETTINGS] v7 — modules loaded, per-dialog, dark theme");
 
-    document.addEventListener('DOMContentLoaded', function() {
+    function initSettings() {
         // Инжект CSS-переменных для тёмной/светлой темы
         if (window.SettingsUI && typeof window.SettingsUI.injectModalStyles === "function") {
             window.SettingsUI.injectModalStyles();
@@ -16,5 +16,7 @@
                 if (typeof window.openSettingsModal === "function") window.openSettingsModal();
             });
         }
-    });
+    }
+
+    initSettings();
 })();
