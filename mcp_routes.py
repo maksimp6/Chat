@@ -1,6 +1,7 @@
 """Маршруты чата с сохранением полной цепочки выполнения в БД."""
 from flask import Blueprint, request, jsonify
 import logging
+import os
 import json as _json
 from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
@@ -390,7 +391,10 @@ def handle_mcp_server_item(server_id):
 
 @mcp_bp.route('/api/conversations', methods=['GET', 'POST'])
 def conversations():
-    owner_id = get_current_owner_id(required=False)
+    # Conversations are ordinary Chat state, not Treasury operations.
+    # Preview/single-user deployments may scope them to the configured server
+    # owner, but an invalid Treasury token must never block this endpoint.
+    owner_id = os.getenv("ALICE_OWNER_ID") or None
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         client = AliceClient(Config)
