@@ -36,3 +36,16 @@ def test_local_script_tags_are_deferred_or_async_except_critical_boot():
 def test_index_has_no_inline_application_script():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert not re.search(r'<script(?![^>]+src=)[^>]*>.*?</script>', html, re.DOTALL)
+
+
+def test_critical_sidebar_controls_keep_native_html_semantics():
+    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    sidebar = (ROOT / "static" / "sidebar.js").read_text(encoding="utf-8")
+
+    assert '<button id="new-chat-btn" type="button"' in html
+    assert '<button id="close-sidebar-btn" type="button"' in html
+    assert '<button id="menu-btn" type="button"' in html
+    assert 'link.href = "?conversation_id=" + encodeURIComponent(conv.id);' in sidebar
+    assert 'e.preventDefault();' in sidebar
+    assert 'window.__aliceSidebarHistoryBound' in sidebar
+    assert 'document.addEventListener("DOMContentLoaded", initSidebar, { once: true });' in sidebar
