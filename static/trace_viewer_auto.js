@@ -6,7 +6,7 @@
         if (!root || typeof window.openTraceViewer !== "function") return;
         var nodes = root.querySelectorAll ? root.querySelectorAll("details") : [];
         nodes.forEach(function (details) {
-            if (details.dataset.traceViewerBound === "1") return;
+            if (details.dataset.traceViewerBound === "1" || details.dataset.traceViewerDirect === "1") return;
             var summary = details.querySelector("summary");
             var pre = details.querySelector("pre");
             if (!summary || !pre) return;
