@@ -14,7 +14,10 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 import threading
 import uuid
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from budget_repository import BudgetRepository
 
 
 class AccountType(str, Enum):
@@ -129,6 +132,8 @@ class BudgetController:
         fallback_to_demo: bool = True,
         cooldown_seconds: int = 0,
         clock: Optional[Clock] = None,
+        repository: Optional["BudgetRepository"] = None,
+        persistence_actor: str = "budget-controller",
     ) -> None:
         if real.account_type is not AccountType.REAL:
             raise InvalidOperation("real account must have account_type REAL")
@@ -145,6 +150,8 @@ class BudgetController:
         self.cooldown_seconds = cooldown_seconds
         self._trace_sink = trace_sink
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._repository = repository
+        self._persistence_actor = persistence_actor
         self._lock = threading.RLock()
         self._emit("budget_initialized", account_type="REAL", currency=real.currency)
 
@@ -185,6 +192,7 @@ class BudgetController:
             self._require_actor(actor)
             account = self.account(account_type)
             amount = _money(amount)
+            self._persist("ALLOCATE", account_type, amount, actor=actor)
             before = account.available
             account.allocated += amount
             self._emit(
@@ -243,6 +251,7 @@ class BudgetController:
                     return self.reserve(amount, account_type=AccountType.DEMO)
                 raise InsufficientFunds("insufficient available budget")
 
+            self._persist("RESERVE", account_type, amount)
             before = account.available
             account.reserved += amount
             self._emit(
@@ -268,6 +277,7 @@ class BudgetController:
             amount = _money(amount)
             if amount > account.reserved:
                 raise InvalidOperation("cannot settle more than reserved")
+            self._persist("SETTLE", account_type, amount)
             before = account.available
             account.reserved -= amount
             account.spent += amount
@@ -302,6 +312,7 @@ class BudgetController:
                     return self.spend(amount, account_type=AccountType.DEMO)
                 raise InsufficientFunds("insufficient available budget")
 
+            self._persist("SPEND", account_type, amount)
             before = account.available
             account.spent += amount
             account.loss_today += amount
@@ -333,6 +344,7 @@ class BudgetController:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
             amount = _money(amount)
+            self._persist("WIN", account_type, amount)
             before = account.available
             account.won += amount
             self._emit(
@@ -354,6 +366,7 @@ class BudgetController:
             amount = _money(amount)
             if amount > account.reserved:
                 raise InvalidOperation("cannot release more than reserved")
+            self._persist("RELEASE", account_type, amount)
             before = account.available
             account.reserved -= amount
             self._emit(
@@ -375,6 +388,7 @@ class BudgetController:
             amount = _money(amount)
             if amount > account.spent:
                 raise InvalidOperation("cannot refund more than spent")
+            self._persist("REFUND", account_type, amount)
             before = account.available
             account.spent -= amount
             account.loss_today = max(Decimal("0.00"), account.loss_today - amount)
@@ -423,6 +437,25 @@ class BudgetController:
     def convert_demo_to_real(self, amount: Any) -> None:
         _money(amount)
         raise DemoConversionDenied("DEMO funds have no monetary value and cannot convert to REAL")
+
+    def _persist(
+        self,
+        operation_type: str,
+        account_type: AccountType,
+        amount: Decimal,
+        *,
+        actor: Optional[str] = None,
+    ) -> None:
+        if self._repository is None:
+            return
+        self._repository.apply(
+            self.budget_id,
+            account_type.value,
+            operation_type,
+            amount,
+            idempotency_key="budget-" + uuid.uuid4().hex,
+            actor=actor or self._persistence_actor,
+        )
 
     def _check_limits(self, account: BudgetAccount, amount: Decimal) -> None:
         self._roll_loss_period(account)
