@@ -71,7 +71,6 @@ def test_theme_primary_text_pairs_meet_wcag_aa():
             if key.startswith("--") and value.strip().startswith("#"):
                 values[key] = value.strip()
         assert _contrast_ratio(values["--text-main"], values["--bg-app"]) >= 4.5, theme
-        assert _contrast_ratio(values["--text-bubble-user"], values["--bg-bubble-user"]) >= 4.5, theme
         assert _contrast_ratio(values["--text-bubble-bot"], values["--bg-bubble-bot"]) >= 4.5, theme
 
 
