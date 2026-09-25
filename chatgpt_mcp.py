@@ -684,6 +684,11 @@ def _tools_list() -> list[dict[str, Any]]:
             "inputSchema": definition.get("inputSchema") or definition.get("input_schema") or {},
             "outputSchema": definition.get("outputSchema") or definition.get("output_schema") or {"type": "object"},
             "securitySchemes": schemes,
+            "annotations": {
+                "readOnlyHint": bool(definition.get("read_only")),
+                "destructiveHint": bool(not definition.get("read_only")),
+                "openWorldHint": False,
+            },
         }
         meta = dict(definition.get("metadata") or {})
         meta.update({
