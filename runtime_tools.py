@@ -4,8 +4,19 @@ from __future__ import annotations
 from typing import Any
 
 from ssh_runtime import SSHRuntime, SSHRuntimeError
+from ssh_runtime_settings import assert_operation_allowed, build_runtime
 
-runtime = SSHRuntime()
+# Tests may inject a runtime instance. Production resolves the persisted
+# SSH Runtime settings for every operation so settings changes take effect
+# without restarting the application.
+runtime = None
+
+
+def _runtime_for_operation(operation: str) -> SSHRuntime:
+    if runtime is not None:
+        return runtime
+    assert_operation_allowed(operation)
+    return build_runtime()
 
 
 def _trace_event(cfg: dict | None, event_type: str, payload: dict) -> None:
@@ -44,7 +55,7 @@ def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
         "identity_id": runtime_args["identity_id"],
     })
     try:
-        result = runtime.execute(command=command, **runtime_args)
+        result = _runtime_for_operation("execute").execute(command=command, **runtime_args)
     except SSHRuntimeError as exc:
         _trace_event(cfg, "runtime_failed", {
             "runtime": "ssh",
@@ -75,7 +86,7 @@ def ssh_runtime_read_file(args: dict, cfg: dict | None = None) -> dict[str, Any]
         "identity_id": runtime_args["identity_id"],
     })
     try:
-        result = runtime.read_file(path=str(args.get("path") or ""), **runtime_args)
+        result = _runtime_for_operation("read_file").read_file(path=str(args.get("path") or ""), **runtime_args)
     except SSHRuntimeError as exc:
         _trace_event(cfg, "runtime_failed", {
             "runtime": "ssh",
@@ -105,7 +116,7 @@ def ssh_runtime_write_file(args: dict, cfg: dict | None = None) -> dict[str, Any
         "identity_id": runtime_args["identity_id"],
     })
     try:
-        result = runtime.write_file(
+        result = _runtime_for_operation("write_file").write_file(
             path=str(args.get("path") or ""),
             content=str(args.get("content") or ""),
             **runtime_args,
