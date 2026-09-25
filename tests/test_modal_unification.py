@@ -146,7 +146,7 @@ def test_no_static_modal_contains_another_modal_root():
     modals = [node for root in roots for node in walk(root) if "modal" in node.attrs.get("class", "").split()]
     for modal in modals:
         nested = [
-            node for node in walk(modal)[1:]
+            node for node in list(walk(modal))[1:]
             if "modal" in node.attrs.get("class", "").split()
         ]
         assert not nested, f"{modal.attrs.get('id')}: nested modal roots are not allowed"
@@ -285,18 +285,46 @@ def test_modal_numeric_constraints_are_mathematically_consistent():
 def parse_css_rules():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
     import re
-    rules = []
-    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
-        declarations = {}
-        for declaration in body.split(";"):
-            if ":" not in declaration:
-                continue
-            name, value = declaration.split(":", 1)
-            declarations[name.strip()] = value.strip()
-        for item in selector.split(","):
-            rules.append((item.strip(), declarations))
-    return rules
 
+    css = re.sub(r"/\\*.*?\\*/", "", css, flags=re.S)
+    rules = []
+    depth = 0
+    selector_start = 0
+    body_start = None
+    quote = None
+    for index, char in enumerate(css):
+        if quote:
+            if char == quote and css[index - 1:index] != "\\\\":
+                quote = None
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            continue
+        if char == "{":
+            if depth == 0:
+                selector_start = css.rfind("}", 0, index) + 1
+                body_start = index + 1
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0 and body_start is not None:
+                selector = css[selector_start:index - (index - body_start + 1) + 1].strip()
+                body = css[body_start:index]
+                # Only top-level rules are contracts here. Nested media rules are
+                # tested separately by inspecting the source.
+                if selector and not selector.startswith("@"):
+                    declarations = {}
+                    for declaration in body.split(";"):
+                        if ":" not in declaration:
+                            continue
+                        name, value = declaration.split(":", 1)
+                        declarations[name.strip()] = value.strip()
+                    rules.append((selector, declarations))
+    result = {}
+    for selector, declarations in rules:
+        if "," not in selector:
+            result[selector] = declarations
+    return result
 
 def test_canonical_modal_css_has_complete_layout_contract():
     rules = dict(parse_css_rules())
