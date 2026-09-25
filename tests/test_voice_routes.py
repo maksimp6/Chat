@@ -31,7 +31,7 @@ def client(monkeypatch):
 def test_voice_session_lifecycle_and_pipeline(client, monkeypatch):
     calls = []
 
-    def fake_stt(audio):
+    def fake_stt(audio, content_type="application/octet-stream"):
         calls.append(("stt", audio))
         return "Привет"
 
@@ -97,7 +97,7 @@ def test_voice_audio_size_limit(client):
 
 
 def test_voice_events_is_sse(client, monkeypatch):
-    monkeypatch.setattr(voice_routes, "_stt", lambda audio: "тест")
+    monkeypatch.setattr(voice_routes, "_stt", lambda audio, content_type="application/octet-stream": "тест")
     monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: "ответ")
     monkeypatch.setattr(voice_routes, "_tts", lambda text, voice: b"audio")
 
