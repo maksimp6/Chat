@@ -38,6 +38,7 @@ class VoiceSession:
     response_mode: str
     created_at: float = field(default_factory=time.time)
     audio: bytearray = field(default_factory=bytearray)
+    audio_content_type: str = "application/octet-stream"
     output_audio: bytes | None = None
     events: queue.Queue = field(default_factory=queue.Queue)
 
@@ -92,13 +93,24 @@ def _check_owner(session: VoiceSession) -> None:
         raise PermissionError("conversation access denied")
 
 
-def _stt(audio: bytes) -> str:
+def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
     if not audio:
         raise ValueError("audio is empty")
     if len(audio) > _MAX_AUDIO_BYTES:
         raise ValueError("audio exceeds 1 MiB limit")
 
     data: dict[str, str] = {"topic": "general", "lang": "ru-RU"}
+    if content_type.startswith("audio/wav") or content_type.startswith("audio/x-wav"):
+        if len(audio) < 44 or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
+            raise ValueError("invalid WAV audio")
+        sample_rate = int.from_bytes(audio[24:28], "little")
+        channels = int.from_bytes(audio[22:24], "little")
+        bits = int.from_bytes(audio[34:36], "little")
+        if channels != 1 or bits != 16 or sample_rate not in {8000, 16000, 48000}:
+            raise ValueError("WAV must be mono 16-bit PCM at 8, 16 or 48 kHz")
+        data["format"] = "lpcm"
+        data["sampleRateHertz"] = str(sample_rate)
+        audio = audio[44:]
     folder_id = _folder_id()
     if folder_id:
         data["folderId"] = folder_id
@@ -157,7 +169,7 @@ def _tts(text: str, voice: str) -> bytes:
 def _process(session: VoiceSession) -> None:
     try:
         _emit(session, "input_audio_buffer.speech_stopped")
-        transcript = _stt(bytes(session.audio))
+        transcript = _stt(bytes(session.audio), session.audio_content_type)
         if not transcript:
             raise ValueError("speech was not recognized")
         _emit(session, "conversation.item.input_audio_transcription.completed", transcript=transcript)
@@ -216,6 +228,9 @@ def append_voice_audio():
         return jsonify({"error": "audio chunk is empty"}), 400
     if len(session.audio) + len(chunk) > _MAX_AUDIO_BYTES:
         return jsonify({"error": "audio exceeds 1 MiB limit"}), 413
+    if session.audio and session.audio_content_type != request.content_type:
+        return jsonify({"error": "audio content type cannot change within a session"}), 400
+    session.audio_content_type = request.content_type or "application/octet-stream"
     session.audio.extend(chunk)
     return jsonify({"accepted_bytes": len(chunk), "total_bytes": len(session.audio)})
 
