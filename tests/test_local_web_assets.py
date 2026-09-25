@@ -101,6 +101,7 @@ def test_application_javascript_parses_when_node_is_available():
         Path("static/settings/settings_storage.js"),
         Path("static/settings/settings_mcp.js"),
         Path("static/settings/settings_modal.js"),
+        Path("static/settings/ssh_runtime_modal.js"),
         Path("static/eruda_init.js"),
     ]
     for path in files:
