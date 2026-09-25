@@ -4,7 +4,7 @@ import app as app_module
 def test_patch_conversation_model_updates_owned_conversation(monkeypatch):
     calls = []
 
-    monkeypatch.setattr(app_module, "get_current_owner_id", lambda required=False: "owner-1")
+    monkeypatch.setenv("ALICE_OWNER_ID", "owner-1")
     monkeypatch.setattr(app_module, "check_access", lambda conv_id, owner_id: True)
     monkeypatch.setattr(
         app_module,
@@ -23,7 +23,7 @@ def test_patch_conversation_model_updates_owned_conversation(monkeypatch):
 
 
 def test_patch_conversation_model_rejects_unauthorized_conversation(monkeypatch):
-    monkeypatch.setattr(app_module, "get_current_owner_id", lambda required=False: "owner-2")
+    monkeypatch.setenv("ALICE_OWNER_ID", "owner-2")
     monkeypatch.setattr(app_module, "check_access", lambda conv_id, owner_id: False)
 
     def fail_update(*args):
@@ -70,19 +70,24 @@ def test_conversations_does_not_require_treasury_token(monkeypatch):
 
 
 def test_conversation_history_does_not_require_treasury_token(monkeypatch):
+    import mcp_routes
+    from flask import Flask
+
     monkeypatch.setenv("ALICE_OWNER_ID", "preview-owner")
     monkeypatch.setattr(
-        app_module,
+        mcp_routes,
         "check_access",
         lambda conv_id, owner_id: owner_id == "preview-owner",
     )
     monkeypatch.setattr(
-        app_module,
+        mcp_routes,
         "get_messages",
         lambda conv_id: [{"id": "msg-1", "role": "user", "text": "hello"}],
     )
 
-    client = app_module.app.test_client()
+    flask_app = Flask(__name__)
+    flask_app.register_blueprint(mcp_routes.mcp_bp)
+    client = flask_app.test_client()
     response = client.get(
         "/api/conversations/conv-1/messages",
         headers={"X-Alice-User-Token": "invalid-token"},
