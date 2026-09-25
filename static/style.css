@@ -1056,3 +1056,58 @@ html, body {
     padding: 7px 10px;
     cursor: pointer;
 }
+
+
+.alice-pro-app .provider-field { margin: 14px 0; }
+.alice-pro-app .provider-field-label { display: block; font-weight: 600; margin-bottom: 6px; }
+.alice-pro-app .provider-field-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 1px solid #555;
+    border-radius: 7px;
+    background: var(--input-bg, #222);
+    color: var(--text, #fff);
+}
+.alice-pro-app .provider-field-input.has-error { border-color: #ff6b6b; }
+.alice-pro-app .provider-field-help { margin-top: 5px; font-size: 12px; opacity: .7; line-height: 1.35; }
+.alice-pro-app .provider-field-error { display: none; margin-top: 6px; font-size: 12px; color: #ff6b6b; line-height: 1.35; }
+.alice-pro-app .provider-field-error.is-visible { display: block; }
+.alice-pro-app .provider-status-card { padding: 12px; margin: 8px 0; border: 1px solid #444; border-radius: 8px; }
+.alice-pro-app .provider-status-title { font-weight: 700; }
+.alice-pro-app .provider-status-line { margin-top: 5px; }
+.alice-pro-app .provider-status-meta { margin-top: 7px; font-size: 11px; opacity: .65; }
+.alice-pro-app .provider-credentials-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100002;
+    background: rgba(0, 0, 0, .72);
+    align-items: center;
+    justify-content: center;
+}
+.alice-pro-app .provider-credentials-modal.visible { display: flex; }
+.alice-pro-app .provider-credentials-box {
+    background: var(--bg, #1e1e1e);
+    color: var(--text, #fff);
+    padding: 20px;
+    border-radius: 12px;
+    width: min(560px, 92vw);
+    max-height: 90vh;
+    overflow: auto;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+}
+.alice-pro-app .provider-credentials-close {
+    position: absolute;
+    right: 12px;
+    top: 8px;
+    font-size: 24px;
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+}
+.alice-pro-app .provider-credentials-title { margin-top: 0; }
+.alice-pro-app .provider-credentials-actions { display: flex; gap: 8px; margin-top: 14px; }
+.alice-pro-app .provider-credentials-status { margin-top: 14px; }
