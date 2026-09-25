@@ -20,6 +20,7 @@
     var userMsgSent = false;
     var botMsgSent = false;
     var audioPlayer = null;
+    var recordingTimer = null;
 
     function log(msg) { console.log("[VOICE]", msg); }
 
@@ -162,6 +163,8 @@
 
         isRecording = true;
         isConnecting = false;
+        if (recordingTimer) clearTimeout(recordingTimer);
+        recordingTimer = setTimeout(function () { if (isRecording) toggleVoice(); }, mediaRecorder ? 29000 : 8000);
         if (micBtn) micBtn.classList.add("recording");
         setStatus("Говорите...");
 
@@ -224,6 +227,7 @@
                 if (eventSource) { eventSource.close(); eventSource = null; }
                 sessionId = null;
             } finally {
+                if (recordingTimer) { clearTimeout(recordingTimer); recordingTimer = null; }
                 if (audioContext) { audioContext.close(); audioContext = null; }
                 mediaRecorder = null;
                 pcmChunks = [];
