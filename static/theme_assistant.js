@@ -8,12 +8,12 @@
 
         var card = document.createElement("div");
         card.className = "msg bot";
-        card.style.cssText = "padding:8px 12px;display:flex;gap:8px;align-items:center;";
+        card.classList.add("theme-rollback-card");
 
         var button = document.createElement("button");
         button.type = "button";
         button.textContent = "↩ Вернуть предыдущую тему";
-        button.style.cssText = "border:1px solid var(--border-color);background:var(--btn-bg);color:var(--text-main);border-radius:8px;padding:7px 10px;cursor:pointer;";
+        button.className = "theme-rollback-button";
         button.addEventListener("click", function() {
             window.AliceTheme.apply(previousTheme, true);
             button.disabled = true;
