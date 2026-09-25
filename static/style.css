@@ -1102,8 +1102,6 @@ html, body {
     color: var(--text, #fff);
     padding: 20px;
     border-radius: 10px;
-    padding: 20px;
-    border-radius: 10px;
 }
 .alice-pro-app .cloudru-iam-close {
     position: absolute;
