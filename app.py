@@ -27,6 +27,7 @@ from departments import departments_bp, init_department_tables
 from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
 from ssh_runtime_settings import public_settings, save_settings, test_connection
+from plugin_routes import plugin_bp
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -69,6 +70,7 @@ app.register_blueprint(provider_credentials_bp)
 app.register_blueprint(provider_quota_bp)
 app.register_blueprint(partner_relations_bp)
 app.register_blueprint(departments_bp)
+app.register_blueprint(plugin_bp)
 
 @app.after_request
 
