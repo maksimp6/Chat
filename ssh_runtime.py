@@ -32,6 +32,7 @@ class SSHTarget:
     workspace_root: Optional[str] = None
     connect_timeout_seconds: float = 10.0
     command_timeout_seconds: float = 30.0
+    max_output_bytes: int = 1048576
 
 
 class SSHRuntime:
@@ -96,6 +97,10 @@ class SSHRuntime:
                     )
                 )
 
+            max_output = int(cfg.get("max_output_bytes", 1048576))
+            if not 4096 <= max_output <= 10 * 1024 * 1024:
+                raise SSHRuntimeError(f"SSH target '{name}' has invalid max_output_bytes")
+
             result[str(name)] = SSHTarget(
                 name=str(name),
                 host=host,
@@ -108,6 +113,7 @@ class SSHRuntime:
                 workspace_root=(str(cfg["workspace_root"]).strip() if cfg.get("workspace_root") else None),
                 connect_timeout_seconds=float(cfg.get("connect_timeout_seconds", 10.0)),
                 command_timeout_seconds=float(cfg.get("command_timeout_seconds", 30.0)),
+                max_output_bytes=int(cfg.get("max_output_bytes", 1048576)),
             )
         return result
 
@@ -149,6 +155,17 @@ class SSHRuntime:
                 f"Linux user '{user}' is not allowed on SSH target '{target.name}'"
             )
         return target, user
+
+    @staticmethod
+    def _limit_output(value: str, max_bytes: int) -> str:
+        text = value or ""
+        raw = text.encode("utf-8", errors="replace")
+        if len(raw) <= max_bytes:
+            return text
+        suffix = "\n...[output truncated]"
+        suffix_bytes = suffix.encode("utf-8")
+        budget = max(0, max_bytes - len(suffix_bytes))
+        return raw[:budget].decode("utf-8", errors="ignore") + suffix
 
     @staticmethod
     def _validate_remote_path(path: str) -> str:
@@ -260,8 +277,8 @@ class SSHRuntime:
             "host": resolved_target.host,
             "linux_user": user,
             "command": command,
-            "stdout": completed.stdout,
-            "stderr": completed.stderr,
+            "stdout": self._limit_output(completed.stdout, resolved_target.max_output_bytes),
+            "stderr": self._limit_output(completed.stderr, resolved_target.max_output_bytes),
             "exit_code": completed.returncode,
         }
 
@@ -371,8 +388,8 @@ class SSHRuntime:
             "path": remote_path,
             "operation": "write_file",
             "bytes_written": len(str(content).encode("utf-8")),
-            "stdout": completed.stdout,
-            "stderr": completed.stderr,
+            "stdout": self._limit_output(completed.stdout, resolved_target.max_output_bytes),
+            "stderr": self._limit_output(completed.stderr, resolved_target.max_output_bytes),
             "exit_code": completed.returncode,
         }
 
