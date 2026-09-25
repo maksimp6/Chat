@@ -13,3 +13,11 @@ if grep -Fq 'dozzle_strip_middleware' "$script"; then
 fi
 
 echo "Dozzle subpath regression checks passed"
+
+profile_defaults='$(grep -F 'ensure_dozzle_profile()' "$script")'
+grep -Fq '"search": true' "$script"
+grep -Fq '"locale": "ru"' "$script"
+grep -Fq '"lightTheme": "auto"' "$script"
+grep -Fq '"groupContainers": "always"' "$script"
+grep -Fq 'if [[ ! -s "$profile" ]]' "$script"
+if grep -Fq 'clear_dozzle_data "$workdir/dozzle"' "$script"; then echo 'Dozzle profile must survive redeploys' >&2; exit 1; fi
