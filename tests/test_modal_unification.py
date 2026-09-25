@@ -496,3 +496,47 @@ def test_modal_text_contains_no_obvious_random_gibberish():
                         assert not _looks_like_random_gibberish(token), (
                             f"{modal.attrs.get('id')}: suspicious random text: {token!r}"
                         )
+
+
+def test_template_resources_resolve_to_existing_local_assets():
+    import re
+    from urllib.parse import urlparse
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    refs = re.findall(r'<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I)
+    assert refs, "template must declare browser resources"
+    for ref in refs:
+        assert not ref.startswith(("http://", "https://", "//", "data:", "blob:")), f"external/non-local resource: {ref}"
+        clean = ref.split("?", 1)[0]
+        clean = clean.replace("{{ static_root }}", "/static").replace("{{static_root}}", "/static")
+        assert clean.startswith("/static/"), f"resource is outside local static root: {ref}"
+        relative = clean.removeprefix("/static/")
+        path = ROOT / "static" / relative
+        assert path.is_file(), f"resource does not exist: {ref} -> {path}"
+
+
+def test_template_resource_types_match_local_extensions():
+    import re
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    for tag, attr, ref in re.findall(r'<(script|link)\\b([^>]*?)\\b(src|href)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I):
+        clean = ref.split("?", 1)[0].replace("{{ static_root }}", "/static").replace("{{static_root}}", "/static")
+        suffix = clean.rsplit(".", 1)[-1].lower() if "." in clean.rsplit("/", 1)[-1] else ""
+        if tag.lower() == "script":
+            assert suffix == "js", f"script must resolve to .js: {ref}"
+        elif "stylesheet" in attr.lower() or tag.lower() == "link":
+            if suffix not in {"css", "svg", "ico", "png", "jpg", "jpeg", "webp"}:
+                raise AssertionError(f"unexpected link resource type: {ref}")
+
+
+def test_local_resource_files_are_utf8_when_text_based():
+    import re
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    refs = re.findall(r'<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I)
+    for ref in refs:
+        clean = ref.split("?", 1)[0].replace("{{ static_root }}", "/static").replace("{{static_root}}", "/static")
+        path = ROOT / "static" / clean.removeprefix("/static/")
+        if path.suffix.lower() not in {".js", ".css", ".html", ".svg"}:
+            continue
+        data = path.read_bytes()
+        assert not data.startswith(b"\\xef\\xbb\\xbf"), f"UTF-8 BOM in resource: {path}"
+        decoded = data.decode("utf-8")
+        assert decoded.encode("utf-8") == data, f"resource is not stable UTF-8: {path}"
