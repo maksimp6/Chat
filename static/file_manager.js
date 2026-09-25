@@ -48,10 +48,10 @@ window.fetchVectorStores = function() {
 
         var ov = document.createElement("div");
         ov.id = "file-manager-modal";
-        ov.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:var(--m-overlay,rgba(0,0,0,0.6));z-index:10001;display:flex;align-items:center;justify-content:center;";
+        ov.className = "modal file-manager-modal";
 
         var md = document.createElement("div");
-        md.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:24px;max-width:800px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
+        md.className = "file-manager-box";
 
         md.innerHTML = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">',
@@ -212,10 +212,10 @@ window.fetchVectorStores = function() {
 
             var bg = document.createElement('div');
             bg.id = 'vs-add-files-modal';
-            bg.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10002;display:flex;align-items:center;justify-content:center;";
+            bg.className = "modal file-manager-add-modal";
 
             var panel = document.createElement('div');
-            panel.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:500px;width:85%;max-height:70vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+            panel.className = "file-manager-add-box";
 
             panel.innerHTML = [
                 '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">',
