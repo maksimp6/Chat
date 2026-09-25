@@ -94,7 +94,6 @@
 
   function bindMemoryPanelEvents() {
     var bindings = [
-      ["memory-btn", "click", window.openMemoryModal],
       ["memoryCloseBtn", "click", window.closeMemoryModal],
       ["memEnabled", "change", window.updateMemoryConfig],
       ["memLimit", "change", window.updateMemoryConfig],
