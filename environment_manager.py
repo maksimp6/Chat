@@ -449,15 +449,12 @@ def delete_environment(environment_id: str, owner_id: Optional[str] = None, *, c
         item = _require(environment_id, owner_id)
     _transition(item["status"], "DELETING")
     EnvironmentRuntime(item).remove()
+    item.update({"status": "DELETING", "deleted_at": _now()})
+    _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
     conn = get_conn()
     try:
-        conn.execute(
-            "UPDATE environments SET status = ?, deleted_at = ?, updated_at = ? WHERE environment_id = ?",
-            ("DELETING", _now(), _now(), environment_id),
-        )
+        conn.execute("DELETE FROM environments WHERE environment_id = ?", (environment_id,))
         conn.commit()
     finally:
         conn.close()
-    item.update({"status": "DELETING", "deleted_at": _now()})
-    _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
     return item
