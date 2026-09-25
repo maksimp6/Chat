@@ -16,6 +16,7 @@ create table if not exists budget_accounts (
   max_daily_loss numeric(20,2) not null check (max_daily_loss >= 0),
   max_total_loss numeric(20,2) not null check (max_total_loss >= 0),
   locked_until timestamptz,
+  cooldown_seconds integer not null default 0 check (cooldown_seconds >= 0),
   version bigint not null default 0,
   updated_at timestamptz not null default now(),
   primary key (budget_id, account_type)
@@ -47,7 +48,8 @@ create or replace function apply_budget_operation(
   p_operation_type text,
   p_amount numeric,
   p_idempotency_key text default null,
-  p_actor text default null
+  p_actor text default null,
+  p_cooldown_seconds integer default 0
 ) returns jsonb
 language plpgsql
 set search_path = public
@@ -57,6 +59,7 @@ declare
   result jsonb;
 begin
   if p_amount < 0 then raise exception 'amount must be non-negative'; end if;
+  if p_cooldown_seconds < 0 then raise exception 'cooldown_seconds must be non-negative'; end if;
 
   select * into a
     from budget_accounts
@@ -73,12 +76,23 @@ begin
     if result is not null then return result; end if;
   end if;
 
+  if a.loss_period <> current_date then
+    update budget_accounts set loss_today = 0, loss_period = current_date,
+      locked_until = null, updated_at = now()
+      where budget_id = p_budget_id and account_type = p_account_type;
+    a.loss_today := 0;
+    a.loss_period := current_date;
+    a.locked_until := null;
+  end if;
+
   if p_operation_type = 'ALLOCATE' then
     update budget_accounts set allocated = allocated + p_amount,
       version = version + 1, updated_at = now()
       where budget_id = p_budget_id and account_type = p_account_type;
 
   elsif p_operation_type = 'RESERVE' then
+    if a.locked_until is not null and a.locked_until > now() then raise exception 'budget is in cooldown'; end if;
+    if p_amount > a.max_single_operation then raise exception 'single-operation limit exceeded'; end if;
     if p_amount > (a.allocated + a.won - a.spent - a.reserved) then
       raise exception 'insufficient available budget';
     end if;
@@ -88,6 +102,9 @@ begin
 
   elsif p_operation_type = 'SETTLE' then
     if p_amount > a.reserved then raise exception 'cannot settle more than reserved'; end if;
+    if p_amount > a.max_single_operation then raise exception 'single-operation limit exceeded'; end if;
+    if a.spent + p_amount > a.max_total_loss then raise exception 'total-loss limit exceeded'; end if;
+    if a.loss_today + p_amount > a.max_daily_loss then raise exception 'daily-loss limit exceeded'; end if;
     update budget_accounts set reserved = reserved - p_amount,
       spent = spent + p_amount,
       loss_today = case when loss_period = current_date then loss_today + p_amount else p_amount end,
@@ -101,12 +118,20 @@ begin
       where budget_id = p_budget_id and account_type = p_account_type;
 
   elsif p_operation_type = 'SPEND' then
+    if a.locked_until is not null and a.locked_until > now() then raise exception 'budget is in cooldown'; end if;
+    if p_amount > a.max_single_operation then raise exception 'single-operation limit exceeded'; end if;
+    if a.spent + p_amount > a.max_total_loss then raise exception 'total-loss limit exceeded'; end if;
+    if a.loss_today + p_amount > a.max_daily_loss then raise exception 'daily-loss limit exceeded'; end if;
     if p_amount > (a.allocated + a.won - a.spent - a.reserved) then
       raise exception 'insufficient available budget';
     end if;
     update budget_accounts set spent = spent + p_amount,
       loss_today = case when loss_period = current_date then loss_today + p_amount else p_amount end,
-      loss_period = current_date, version = version + 1, updated_at = now()
+      loss_period = current_date,
+      locked_until = case when a.loss_today + p_amount >= a.max_daily_loss and p_cooldown_seconds > 0
+                          then now() + make_interval(secs => p_cooldown_seconds) else a.locked_until end,
+      cooldown_seconds = p_cooldown_seconds,
+      version = version + 1, updated_at = now()
       where budget_id = p_budget_id and account_type = p_account_type;
 
   elsif p_operation_type = 'REFUND' then
@@ -135,4 +160,4 @@ begin
 end;
 $$;
 
-revoke all on function apply_budget_operation(text,text,text,numeric,text,text) from public;
+revoke all on function apply_budget_operation(text,text,text,numeric,text,text,integer) from public;
