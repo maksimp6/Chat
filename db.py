@@ -66,20 +66,16 @@ def _next_message_id():
 
 
 def get_conn():
+    if is_memory_configured():
+        raise RuntimeError("memory backend does not expose a SQL connection; use db API functions")
     database_url = postgres_url_from_env()
     if database_url:
         return connect_postgres(database_url)
-
-    conn = sqlite3.connect(
-        DB_PATH,
-        detect_types=sqlite3.PARSE_DECLTYPES,
-        timeout=15,
-    )
+    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
-
 
 def init_db():
     from provider_credentials import create_schema as create_provider_credentials_schema
