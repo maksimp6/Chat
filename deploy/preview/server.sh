@@ -324,7 +324,6 @@ deploy() {
   local expires_at="$(( $(date +%s) + ttl * 3600 ))"
   clear_dozzle_data "$workdir/dozzle"
   mkdir -p "$workdir" "$data_dir"
-  ensure_dozzle_profile "$workdir/dozzle"
   rm -rf -- "$builddir"; mkdir -p "$builddir"; tar -xzf "$archive_path" -C "$builddir"; log "building $image"; docker build --pull -t "$image" "$builddir" >/dev/null; docker rm -f "$container" >/dev/null 2>&1 || true
   log "starting $container at $base_path"
   local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"
@@ -345,6 +344,7 @@ deploy() {
     --label "traefik.http.middlewares.${container}-token-strip.stripprefixregex.regex=^/[^/]+${base_path}" \
     --label "traefik.http.middlewares.${container}-proxy-auth.headers.customrequestheaders.X-Alice-Proxy-Authenticated=true" \
     --label "traefik.http.services.${container}.loadbalancer.server.port=8080" \
+    -v "$data_dir:/app/data" \
     -e HOST=0.0.0.0 -e PORT=8080 -e ALICE_DB_PATH=/app/data/alice_pro.db -e ALICE_REQUIRE_SHORT_TOKEN=1 -e ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN" -e ALICE_PROVIDER_CREDENTIAL_KEY="$ALICE_PROVIDER_CREDENTIAL_KEY" -e SUPABASE_URL="$SUPABASE_URL" -e SUPABASE_SECRET_KEY="$SUPABASE_SECRET_KEY" -e ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path" -e ALICE_MCP_ALLOW_ANONYMOUS=true "$image" >/dev/null
   local dozzle_container="${container}-dozzle"
   local dozzle_ru_router="${dozzle_container}-logs-ru"
