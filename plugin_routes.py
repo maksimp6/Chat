@@ -3,12 +3,30 @@
 from flask import Blueprint, jsonify, request
 
 from plugin_manager import PluginError, plugin_manager
+from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 plugin_bp = Blueprint("plugins", __name__, url_prefix="/api/plugins")
 
 
 def _error(exc: Exception):
     return jsonify({"error": str(exc)}), 400
+
+
+def _require_owner():
+    try:
+        return get_current_owner_id()
+    except TreasuryIdentityError as exc:
+        return None, (jsonify({"error": str(exc)}), 401)
+    return None, None
+
+
+@plugin_bp.before_request
+def require_plugin_identity():
+    try:
+        get_current_owner_id()
+    except TreasuryIdentityError as exc:
+        return jsonify({"error": str(exc)}), 401
+    return None
 
 
 @plugin_bp.get("")
