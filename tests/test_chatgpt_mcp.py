@@ -77,6 +77,25 @@ def test_every_registered_tool_is_exposed_through_mcp(client):
     )
 
 
+def test_current_2025_protocol_revision_is_accepted(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {},
+    }
+    response = client.post(
+        "/mcp",
+        data=json.dumps(payload),
+        headers={
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": "2025-11-25",
+        },
+    )
+    assert response.status_code == 200
+    assert response.get_json()["result"]["tools"]
+
+
 def test_protocol_version_defaults_to_latest_when_header_is_absent(client):
     payload = {
         "jsonrpc": "2.0",
