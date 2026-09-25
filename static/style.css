@@ -1199,3 +1199,33 @@ html, body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
     color: var(--m-text, #222);
 }
+
+
+/* Chat markdown and reasoning presentation. */
+.alice-pro-app .md-code-block {
+    margin: 8px 0;
+}
+.alice-pro-app .md-code {
+    margin: 0;
+}
+.alice-pro-app .reasoning-details {
+    margin-bottom: 10px;
+    font-size: 13px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px dashed var(--border-color);
+}
+.alice-pro-app .reasoning-summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent);
+}
+.alice-pro-app .reasoning-content {
+    margin-top: 8px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-main);
+    opacity: 0.85;
+}
