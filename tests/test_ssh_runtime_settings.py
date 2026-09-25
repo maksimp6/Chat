@@ -13,6 +13,10 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         "allow_write_operations": True,
         "max_output_bytes": 8192,
         "known_hosts": "/srv/alice/ssh/known_hosts",
+        "command_allowlist": [r"id(?:\s+-un)?", r"cat(?:\s+--)?\s+.*", r"sudo\s+.*"],
+        "allow_privileged_operations": False,
+        "approval_required_for_write": True,
+        "approval_required_for_privileged": True,
         "targets": {
             "preview": {
                 "host": "preview.example",
@@ -28,6 +32,40 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
             }
         },
     }
+
+    def test_command_allowlist_is_required_when_execution_is_enabled(self):
+        settings = dict(self.BASE)
+        settings["command_allowlist"] = []
+        with self.assertRaises(SSHRuntimeError):
+            validate_settings(settings)
+
+    def test_invalid_command_allowlist_pattern_is_rejected(self):
+        settings = dict(self.BASE)
+        settings["command_allowlist"] = ["["]
+        with self.assertRaises(SSHRuntimeError):
+            validate_settings(settings)
+
+    def test_settings_update_is_recorded_in_execution_trace(self):
+        from ssh_runtime_settings import save_settings
+        trace = type("Trace", (), {"events": []})()
+        trace.add_event = lambda event_type, payload: trace.events.append((event_type, payload))
+        with patch("ssh_runtime_settings.get_current_trace", return_value=trace), patch("ssh_runtime_settings.set_config"):
+            save_settings(self.BASE)
+        self.assertEqual(trace.events[0][0], "ssh_runtime_settings_updated")
+        self.assertEqual(trace.events[0][1]["targets"], ["preview"])
+        self.assertEqual(trace.events[0][1]["command_allowlist_count"], 3)
+
+    def test_privileged_operations_are_disabled_by_default(self):
+        from ssh_runtime_settings import assert_operation_allowed
+        with patch("ssh_runtime_settings.get_settings", return_value=self.BASE):
+            with self.assertRaises(SSHRuntimeError):
+                assert_operation_allowed("execute", command="sudo id", approved=True)
+
+    def test_write_requires_approval(self):
+        from ssh_runtime_settings import assert_operation_allowed
+        with patch("ssh_runtime_settings.get_settings", return_value=self.BASE):
+            with self.assertRaises(SSHRuntimeError):
+                assert_operation_allowed("write_file", approved=False)
 
     def test_valid_settings_normalize_read_only_policy(self):
         settings = dict(self.BASE)
