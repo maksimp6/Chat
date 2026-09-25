@@ -48,6 +48,32 @@ jobs:
           NODE_V8_COVERAGE=coverage-js node tests/test_project_tree.js
           NODE_V8_COVERAGE=coverage-js node tests/test_header_dom.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
+      - name: Start Flask for live browser resource validation
+        env:
+          HOST: 127.0.0.1
+          PORT: 5678
+          FLASK_DEBUG: "0"
+          ALICE_DATABASE_URL: sqlite:///alice_pro_ci_live.db
+        run: |
+          python app.py > flask-live.log 2>&1 &
+          echo $! > flask-live.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5678/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5678/ >/dev/null
+      - name: Run live Flask resource contract tests
+        env:
+          ALICE_LIVE_BASE_URL: http://127.0.0.1:5678
+        run: pytest -q tests/test_live_flask_resources.py
+      - name: Stop Flask live validation server
+        if: always()
+        run: |
+          if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
+          if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
+
       - name: Run tests with backend coverage
         run: pytest --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml -q
       - name: Upload coverage reports
