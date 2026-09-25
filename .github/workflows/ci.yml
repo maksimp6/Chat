@@ -77,14 +77,22 @@ jobs:
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
       - name: Run tests with backend coverage
-        run: pytest --cov=. --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=100 -q
+        run: pytest --cov=. --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json --cov-fail-under=100 -q
+      - name: Generate validation report
+        if: always()
+        run: |
+          python tests/generate_ci_validation_report.py | tee ci-validation-report.md
+          cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ github.run_number }}
           path: |
             coverage.xml
+            coverage.json
             coverage-js/
+            ci-validation-report.md
+            flask-live.log
           if-no-files-found: error
 
 
