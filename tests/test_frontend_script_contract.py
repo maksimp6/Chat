@@ -49,3 +49,18 @@ def test_critical_sidebar_controls_keep_native_html_semantics():
     assert 'e.preventDefault();' in sidebar
     assert 'window.__aliceSidebarHistoryBound' in sidebar
     assert 'document.addEventListener("DOMContentLoaded", initSidebar, { once: true });' in sidebar
+
+
+def test_index_exposes_server_rendered_conversation_baseline():
+    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    assert 'data-server-rendered="true"' in html
+    assert '{{ selected_conversation.title }}' in html
+    assert '{{ message.text }}' in html
+
+
+def test_index_route_renders_conversation_from_query_server_side():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert 'request.args.get("conversation_id")' in app_source
+    assert 'get_owned_conversation(conversation_id, owner_id)' in app_source
+    assert 'selected_messages = get_messages(conversation_id)' in app_source
+    assert 'selected_conversation=selected_conversation' in app_source
