@@ -4,9 +4,65 @@ import sqlite3
 from datetime import datetime
 
 from db_backend import connect_postgres, postgres_url_from_env
+from memory_db import Column, MemoryDatabase
 
 
 DB_PATH = os.getenv("ALICE_DB_PATH", "alice_pro.db")
+_MEMORY_DB = MemoryDatabase()
+_MEMORY_INITIALIZED = False
+
+
+def is_memory_configured():
+    return os.getenv("ALICE_DB_BACKEND", "").strip().lower() == "memory"
+
+
+def _memory_setup():
+    global _MEMORY_INITIALIZED
+    if _MEMORY_INITIALIZED:
+        return
+    _MEMORY_DB.create_table("conversations", [
+        Column("id", str, nullable=False, unique=True),
+        Column("title", str, nullable=False),
+        Column("model", str, nullable=False),
+        Column("created_at", int, nullable=False),
+        Column("updated_at", int, nullable=False),
+    ])
+    _MEMORY_DB.create_table("messages", [
+        Column("id", int, nullable=False, unique=True),
+        Column("conversation_id", str, nullable=False),
+        Column("role", str, nullable=False),
+        Column("content", str, nullable=False),
+        Column("created_at", int, nullable=False),
+        Column("cost", (int, float), nullable=False, default=0.0),
+        Column("timings_json", str, nullable=False, default="[]"),
+        Column("trace_json", str, nullable=False, default="{}"),
+    ])
+    _MEMORY_DB.create_table("conv_settings", [
+        Column("conversation_id", str, nullable=False, unique=True),
+        Column("settings_json", str, nullable=False),
+        Column("updated_at", int, nullable=False),
+    ])
+    _MEMORY_DB.create_table("configs", [
+        Column("key", str, nullable=False, unique=True),
+        Column("value", str, nullable=False),
+    ])
+    _MEMORY_DB.create_table("conv_yandex_map", [
+        Column("local_id", str, nullable=False, unique=True),
+        Column("yandex_id", str, nullable=False),
+    ])
+    _MEMORY_INITIALIZED = True
+
+
+def reset_memory_db():
+    global _MEMORY_INITIALIZED
+    _MEMORY_DB.clear()
+    _MEMORY_INITIALIZED = False
+    _memory_setup()
+
+
+def _next_message_id():
+    rows = _MEMORY_DB.select("messages")
+    return max((row["id"] for row in rows), default=0) + 1
 
 
 def get_conn():
