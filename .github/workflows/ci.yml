@@ -77,7 +77,7 @@ jobs:
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
       - name: Run tests with backend coverage
-        run: pytest --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml -q
+        run: pytest --cov=. --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=100 -q
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7
         with:
