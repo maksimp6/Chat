@@ -77,7 +77,7 @@ Alice Pro publishes:
 
 `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-authorization-server`
 
-The endpoint points ChatGPT at the configured authorization server and advertises the required scope.
+The endpoint points ChatGPT at the configured authorization server and advertises the required scope. OAuth endpoint settings are resolved from the current process environment for each request.
 
 Conversation data is protected by a dedicated `conversation_owners` table. An authenticated MCP principal can only enumerate and read conversations mapped to that principal. Execution and trace reads additionally enforce the existing invocation ownership metadata. The transport session itself remains stateless.
 
