@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 from db import get_conn
+from treasury_identity import get_current_owner_id, TreasuryIdentityError
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 
@@ -61,6 +62,18 @@ def _row(row: Any) -> dict[str, Any]:
         "created_at": row["created_at"], "updated_at": row["updated_at"],
     }
 
+def _current_owner() -> Optional[str]:
+    try:
+        return get_current_owner_id(required=False)
+    except TreasuryIdentityError:
+        return None
+
+def _case_owned_by_current_user(case: Optional[dict[str, Any]]) -> bool:
+    if not case:
+        return False
+    owner = _current_owner()
+    return not owner or not case.get("user_id") or case.get("user_id") == owner
+
 def get_case(case_id: str) -> Optional[dict[str, Any]]:
     init_government_tables()
     conn = get_conn()
@@ -72,7 +85,7 @@ def get_case(case_id: str) -> Optional[dict[str, Any]]:
 
 def _require_case(case_id: str) -> dict[str, Any]:
     case = get_case(case_id)
-    if not case:
+    if not case or not _case_owned_by_current_user(case):
         raise ValueError("government case not found")
     return case
 
@@ -260,13 +273,14 @@ def ensure_government_department() -> None:
 @government_bp.get("/cases/<case_id>")
 def api_case(case_id: str):
     case = get_case(case_id)
-    return jsonify({"case": case}) if case else (jsonify({"error": "government_case_not_found"}), 404)
+    return jsonify({"case": case}) if _case_owned_by_current_user(case) else (jsonify({"error": "government_case_not_found"}), 404)
 
 @government_bp.post("/cases")
 def api_create_case():
     data = request.get_json(silent=True) or {}
+    owner = _current_owner()
     try:
-        return jsonify({"case": create_case(data.get("case_type", "IP_REGISTRATION"), data.get("user_id"))}), 201
+        return jsonify({"case": create_case(data.get("case_type", "IP_REGISTRATION"), owner or data.get("user_id"))}), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
