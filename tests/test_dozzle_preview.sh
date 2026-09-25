@@ -23,3 +23,8 @@ grep -Fq 'if [[ ! -s "$profile" ]]' "$script"
 if grep -Fq 'clear_dozzle_data "$workdir/dozzle"' "$script"; then echo 'Dozzle profile must survive redeploys' >&2; exit 1; fi
 
 if grep -Fq 'rm -rf -- "$workdir"; mkdir -p "$builddir"' "$script"; then echo 'Preview deploy must not delete the Dozzle data directory' >&2; exit 1; fi
+
+# Preview application state, including provider credentials, must survive container recreation.
+grep -Fq 'local data_dir="${workdir}/data"' "$script"
+grep -Fq -- '-e ALICE_DB_PATH=/app/data/alice_pro.db' "$script"
+grep -Fq -- '-v "$data_dir:/app/data"' "$script"
