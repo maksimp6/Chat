@@ -9,7 +9,7 @@ returning from DEMO to REAL.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 import threading
@@ -449,7 +449,7 @@ class BudgetController:
     def _lock_account(self, account: BudgetAccount, *, reason: str) -> None:
         if self.cooldown_seconds <= 0:
             return
-        account.locked_until = self._now() + __import__("datetime").timedelta(seconds=self.cooldown_seconds)
+        account.locked_until = self._now() + timedelta(seconds=self.cooldown_seconds)
         self._emit(
             "cooldown_started",
             account_type=account.account_type.value,
