@@ -1280,3 +1280,55 @@ html, body {
 .alice-pro-app .file-manager-danger-btn {
     color: var(--m-danger, #c33);
 }
+
+
+/* File manager vector-store file picker. */
+.alice-pro-app .file-manager-add-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.alice-pro-app .file-manager-add-title {
+    margin: 0;
+    font-size: 14px;
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-close-btn {
+    border: 0;
+    background: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--m-muted, #666);
+}
+.alice-pro-app .file-manager-add-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+.alice-pro-app .file-manager-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    border-bottom: 1px solid var(--m-section-border, #eee);
+    font-size: 12px;
+    cursor: pointer;
+}
+.alice-pro-app .file-manager-add-name {
+    color: var(--m-text, #222);
+}
+.alice-pro-app .file-manager-add-size {
+    margin-left: auto;
+    color: var(--m-muted, #666);
+    font-size: 11px;
+}
+.alice-pro-app .file-manager-primary-btn {
+    width: 100%;
+    padding: 8px;
+    background: var(--m-accent, #4a90d9);
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
