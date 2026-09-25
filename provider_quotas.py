@@ -429,15 +429,15 @@ def record_usage(
         conn.close()
 
 
-def get_usage(user_id: str) -> dict[str, Any]:
+def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
     user_id = str(user_id or "").strip()
     if not user_id:
         raise ValueError("user_id is required")
 
     policy = get_user_policy(user_id)
-    now = _now()
-    period_start = (now // policy["period_seconds"]) * policy["period_seconds"]
-    rate_window_start = (now // 60) * 60
+    now_value = int(now if now is not None else _now())
+    period_start = (now_value // policy["period_seconds"]) * policy["period_seconds"]
+    rate_window_start = (now_value // 60) * 60
 
     init_quota_tables()
     conn = get_conn()
