@@ -14,3 +14,8 @@ api_debug.txt
 debug_response.json
 history_debug.json
 app.log
+
+# Runtime and local backup artifacts
+.safe_backups/
+execution_logs/
+alice_pro_files.tar.gz

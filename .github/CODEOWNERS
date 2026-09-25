@@ -1,0 +1,27 @@
+*                                  @maksimp6
+
+# Backend и агентное ядро
+/*.py                              @maksimp6
+/yandex_client_modules/            @maksimp6
+/scripts/                          @maksimp6
+
+# Инфраструктура и деплой
+/.github/                          @maksimp6
+/deploy/                           @maksimp6
+Dockerfile                         @maksimp6
+docker-compose.postgres.yml        @maksimp6
+
+# Данные и миграции
+/supabase/migrations/              @maksimp6
+/db.py                             @maksimp6
+/db_backend.py                     @maksimp6
+
+# Android-клиент
+/android/                          @maksimp6
+
+# Документация и правила репозитория
+/docs/                             @maksimp6
+README.md                          @maksimp6
+CONTRIBUTING.md                    @maksimp6
+SECURITY.md                        @maksimp6
+AGENTS.md                          @maksimp6
