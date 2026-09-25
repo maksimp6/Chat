@@ -27,20 +27,6 @@
           window.openProviderCredentialsModal();
         }
       }],
-      ["memory-btn", "click", function () {
-        if (typeof window.openMemoryModal === "function") {
-          window.openMemoryModal();
-        } else {
-          console.error("[Memory] Modal script is unavailable");
-        }
-      }],
-      ["memory-btn", "click", function () {
-        if (typeof window.openMemoryModal === "function") {
-          window.openMemoryModal();
-        } else {
-          console.error("[Memory] Modal script is unavailable");
-        }
-      }],
       ["upload-image-btn", "click", function () { window.uploadImage(); }]
     ];
 
