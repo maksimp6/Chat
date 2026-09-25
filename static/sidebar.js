@@ -36,6 +36,7 @@ function initSidebar() {
         if (modal) modal.classList.add("visible");
     });
     if (typeof renderSidebar === "function") renderSidebar();
+    window.addEventListener("popstate", handleHistoryNavigation);
 }
 
 document.addEventListener("DOMContentLoaded", initSidebar);
@@ -108,9 +109,21 @@ function renderSidebar() {
             }
         });
         
-        div.appendChild(titleSpan);
+        var link = document.createElement("a");
+        link.className = "conv-link";
+        link.href = "?conversation_id=" + encodeURIComponent(conv.id);
+        link.setAttribute("aria-current", conv.id === currentConvId ? "page" : "false");
+        link.appendChild(titleSpan);
+        div.appendChild(link);
         div.appendChild(delBtn);
-        div.addEventListener("click", function() { selectConv(conv.id); });
+        div.addEventListener("click", function(e) {
+            if (e.target === delBtn || e.target.closest(".conv-link")) return;
+            selectConv(conv.id);
+        });
+        link.addEventListener("click", function(e) {
+            e.preventDefault();
+            selectConv(conv.id);
+        });
         list.appendChild(div);
     });
 }
@@ -159,7 +172,13 @@ function deleteConv(id) {
             selectConv(currentConvId);
         } else {
             var chatbox = document.getElementById("chatbox");
-            if (chatbox) chatbox.innerHTML = '<div class="empty-state">Нажмите + Новый чат</div>';
+            if (chatbox) {
+                chatbox.replaceChildren();
+                var empty = document.createElement("div");
+                empty.className = "empty-state";
+                empty.textContent = "Нажмите + Новый чат";
+                chatbox.appendChild(empty);
+            }
             if (typeof window.changeModel === "function") {
                 window.changeModel("aliceai-llm", true);
             }
@@ -168,7 +187,7 @@ function deleteConv(id) {
     if (typeof renderSidebar === "function") renderSidebar();
 }
 
-window.addEventListener('popstate', function(event) {
+function handleHistoryNavigation(event) {
     var params = new URLSearchParams(window.location.search);
     var convId = params.get('conversation_id');
     if (convId && convId !== currentConvId) {
@@ -177,7 +196,13 @@ window.addEventListener('popstate', function(event) {
         currentConvId = null;
         localStorage.removeItem("current_conv_id");
         var chatbox = document.getElementById("chatbox");
-        if (chatbox) chatbox.innerHTML = '<div class="empty-state">Нажмите + Новый чат</div>';
+        if (chatbox) {
+            chatbox.replaceChildren();
+            var empty = document.createElement("div");
+            empty.className = "empty-state";
+            empty.textContent = "Нажмите + Новый чат";
+            chatbox.appendChild(empty);
+        }
         if (typeof renderSidebar === "function") renderSidebar();
     }
-});
+}
