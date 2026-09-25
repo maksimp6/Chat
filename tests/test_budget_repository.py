@@ -1,8 +1,6 @@
-import json
-
 import pytest
 
-from budget_repository import BudgetRepository, BudgetPersistenceError
+from budget_repository import BudgetPersistenceError, BudgetRepository
 
 
 def test_repository_rejects_negative_amount():
@@ -10,13 +8,12 @@ def test_repository_rejects_negative_amount():
         BudgetRepository().apply("GAMBLING-001", "REAL", "SPEND", -1)
 
 
-def test_repository_requires_postgres_backend(monkeypatch):
-    class FakeConn:
-        def __init__(self):
-            self.autocommit = None
+def test_repository_requires_postgres_configuration(monkeypatch):
+    monkeypatch.setattr("budget_repository.is_postgres_configured", lambda: False)
 
+    class FakeConn:
         def cursor(self):
-            raise AssertionError("should not be reached")
+            raise AssertionError("PostgreSQL cursor must not be touched")
 
         def rollback(self):
             pass
@@ -25,7 +22,6 @@ def test_repository_requires_postgres_backend(monkeypatch):
             pass
 
     monkeypatch.setattr("budget_repository.get_conn", lambda: FakeConn())
-    # This verifies the adapter's explicit backend boundary. A real PostgreSQL
-    # integration test belongs in the postgres CI job.
-    result = BudgetRepository().apply
-    assert callable(result)
+
+    with pytest.raises(BudgetPersistenceError, match="PostgreSQL backend"):
+        BudgetRepository().apply("GAMBLING-001", "REAL", "SPEND", 1)
