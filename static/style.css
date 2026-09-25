@@ -1111,3 +1111,53 @@ html, body {
 .alice-pro-app .provider-credentials-title { margin-top: 0; }
 .alice-pro-app .provider-credentials-actions { display: flex; gap: 8px; margin-top: 14px; }
 .alice-pro-app .provider-credentials-status { margin-top: 14px; }
+
+
+.alice-pro-app .cloudru-iam-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100001;
+    background: rgba(0, 0, 0, .7);
+    align-items: center;
+    justify-content: center;
+}
+.alice-pro-app .cloudru-iam-modal.visible { display: flex; }
+.alice-pro-app .cloudru-iam-box {
+    background: var(--bg, #1e1e1e);
+    color: var(--text, #fff);
+    padding: 20px;
+    border-radius: 10px;
+    width: min(520px, 92vw);
+    max-height: 88vh;
+    overflow: auto;
+    position: relative;
+}
+.alice-pro-app .cloudru-iam-close {
+    position: absolute;
+    right: 12px;
+    top: 8px;
+    font-size: 24px;
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+}
+.alice-pro-app .cloudru-iam-field { display: block; margin: 10px 0; }
+.alice-pro-app .cloudru-iam-label { display: block; margin-bottom: 4px; }
+.alice-pro-app .cloudru-iam-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+}
+.alice-pro-app .cloudru-iam-confirm { display: block; margin: 14px 0; }
+.alice-pro-app .cloudru-iam-output {
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #222;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 12px;
+}
+.alice-pro-app .cloudru-iam-output.visible { display: block; }
