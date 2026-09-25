@@ -30,7 +30,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest
+          pip install pytest pytest-cov
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
@@ -38,12 +38,26 @@ jobs:
           bash tests/test_dozzle_preview.sh
       - name: Compile Python sources
         run: python -m compileall -q .
-      - name: Run frontend JavaScript regression tests
+      - name: Run frontend JavaScript regression tests with coverage
         run: |
-          node tests/test_file_manager.js
-          node tests/test_dozzle_header.js
-      - name: Run tests
-        run: pytest -q
+          rm -rf coverage-js
+          mkdir -p coverage-js
+          NODE_V8_COVERAGE=coverage-js node tests/test_file_manager.js
+          NODE_V8_COVERAGE=coverage-js node tests/test_dozzle_header.js
+          NODE_V8_COVERAGE=coverage-js node tests/test_model_loader.js
+          NODE_V8_COVERAGE=coverage-js node tests/test_frontend_boot.js
+          NODE_V8_COVERAGE=coverage-js node tests/test_project_tree.js
+          test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
+      - name: Run tests with backend coverage
+        run: pytest --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml -q
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ github.run_number }}
+          path: |
+            coverage.xml
+            coverage-js/
+          if-no-files-found: error
 
 
   postgres:
