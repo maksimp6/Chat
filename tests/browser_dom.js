@@ -40,6 +40,7 @@ class ElementShim extends EventTargetShim {
         this.classList = new ClassList(this);
         this._text = "";
         this._rect = {left: 0, top: 0, width: 0, height: 0};
+
         for (const [name, value] of Object.entries(attributes)) {
             if (name.startsWith("data-")) {
                 const key = name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
@@ -47,6 +48,7 @@ class ElementShim extends EventTargetShim {
             }
         }
     }
+
     get id() { return this.attributes.id || ""; }
     set id(value) { this.attributes.id = String(value); }
     get className() { return this.attributes.class || ""; }
@@ -58,18 +60,22 @@ class ElementShim extends EventTargetShim {
     set textContent(value) { this._text = String(value ?? ""); this.children = []; }
     get innerHTML() { return this.children.map((child) => serialize(child)).join("") || this._text; }
     set innerHTML(value) { this.children = []; this._text = ""; parseHTML(String(value), this); }
+
     appendChild(child) {
         if (child.parentNode) child.parentNode.removeChild(child);
         child.parentNode = this;
         this.children.push(child);
         return child;
     }
+
     removeChild(child) {
         const index = this.children.indexOf(child);
         if (index >= 0) { this.children.splice(index, 1); child.parentNode = null; }
         return child;
     }
+
     remove() { if (this.parentNode) this.parentNode.removeChild(this); }
+
     replaceWith(replacement) {
         if (!this.parentNode) return;
         const parent = this.parentNode;
@@ -77,8 +83,10 @@ class ElementShim extends EventTargetShim {
         this.parentNode = null;
         if (index >= 0) { replacement.parentNode = parent; parent.children[index] = replacement; }
     }
+
     click() { this.dispatchEvent({type: "click", target: this}); }
     getBoundingClientRect() { return {...this._rect}; }
+
     querySelectorAll(selector) {
         const parts = selector.trim().split(/\s+/).filter(Boolean);
         let current = [this];
@@ -91,6 +99,7 @@ class ElementShim extends EventTargetShim {
         }
         return current;
     }
+
     querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
 }
 
@@ -102,6 +111,7 @@ class DocumentShim extends ElementShim {
         this.appendChild(this.body);
         parseHTML(html, this.body);
     }
+
     createElement(tagName) { return new ElementShim(tagName); }
     getElementById(id) { return this.querySelector("#" + id); }
 }
@@ -198,16 +208,21 @@ function serialize(element) {
 function applyHeaderFlexLayout(document, cssText) {
     const header = document.getElementById("header");
     if (!header) throw new Error("header not found");
-    const ruleMatch = cssText.match(/\.alice-pro-app\s+#header\s*\{([\s\S]*?)\}/);
-    if (!ruleMatch) throw new Error("browser-layout rule for #header not found");
+
+    const ruleMatches = [...cssText.matchAll(/\.alice-pro-app\s+#header\s*\{([\s\S]*?)\}/g)];
+    if (!ruleMatches.length) throw new Error("browser-layout rule for #header not found");
+
+    const ruleBody = ruleMatches.at(-1)[1];
     const declarations = Object.fromEntries(
-        ruleMatch[1].split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
+        ruleBody.split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
             const index = part.indexOf(":");
             return [part.slice(0, index).trim(), part.slice(index + 1).trim()];
         })
     );
+
     assertLayoutRule(declarations, "flex-direction", "row");
     assertLayoutRule(declarations, "flex-wrap", "nowrap");
+
     const rows = header.querySelectorAll(".header-row");
     rows.forEach((row, index) => {
         row._rect = {left: index * 100, top: 0, width: 100, height: 40};
