@@ -173,7 +173,7 @@ def list_models():
 
 @app.route("/api/conversations/<conv_id>", methods=["PATCH"])
 def patch_conversation(conv_id):
-    owner_id = get_current_owner_id(required=False)
+    owner_id = os.getenv("ALICE_OWNER_ID") or None
     if owner_id and not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     data = request.get_json(silent=True) or {}
@@ -186,7 +186,7 @@ def patch_conversation(conv_id):
 
 @app.route("/api/conversations/<conv_id>/title", methods=["PUT"])
 def set_conv_title(conv_id):
-    owner_id = get_current_owner_id(required=False)
+    owner_id = os.getenv("ALICE_OWNER_ID") or None
     if owner_id and not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     title = (request.get_json(silent=True) or {}).get("title")
@@ -198,7 +198,7 @@ def set_conv_title(conv_id):
 
 @app.route("/api/conversations/<conv_id>/model", methods=["PUT"])
 def set_conv_model(conv_id):
-    owner_id = get_current_owner_id(required=False)
+    owner_id = os.getenv("ALICE_OWNER_ID") or None
     if owner_id and not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     model = (request.get_json(silent=True) or {}).get("model")
@@ -210,7 +210,7 @@ def set_conv_model(conv_id):
 
 @app.route("/api/conversations/<conv_id>", methods=["DELETE"])
 def remove_conv(conv_id):
-    owner_id = get_current_owner_id(required=False)
+    owner_id = os.getenv("ALICE_OWNER_ID") or None
     if owner_id and not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     delete_conversation(conv_id)
