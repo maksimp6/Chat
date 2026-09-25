@@ -10,7 +10,7 @@ The connector endpoint is:
 
 The service uses MCP Streamable HTTP. The endpoint supports the current `2026-07-28` discovery flow and the `2025-06-18` / `2025-03-26` handshake flow. Modern clients use `server/discover`; legacy clients can use `initialize`. The implementation accepts the `MCP-Protocol-Version` header when present and can default to the latest supported revision for local/compatibility clients.
 
-MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. Bearer mode uses `ALICE_MCP_BEARER_TOKEN` plus `ALICE_MCP_USER_ID`; introspection mode resolves the user ID from an RFC 7662-style introspection response.
+MCP authentication is enforced unless local anonymous mode is explicitly enabled with `ALICE_MCP_ALLOW_ANONYMOUS=true`. For authenticated ChatGPT connections, tool descriptors advertise the OAuth 2.0 security scheme and the server exposes protected-resource metadata plus OAuth authorization-server discovery. Bearer mode remains available for private development/testing; introspection mode resolves the user ID from an RFC 7662-style introspection response.
 
 The HTTP transport remains stateless. Each `tools/call` creates a short-lived Alice Pro `Invocation` with a persisted `ExecutionTrace`; the response returns the `invocation_id` and `trace_id` for correlation. This keeps MCP connection state out of the web process while retaining an auditable application-level execution record.
 
@@ -75,7 +75,7 @@ ALICE_MCP_INTROSPECTION_CLIENT_SECRET=<secret>
 
 Alice Pro publishes:
 
-`GET /.well-known/oauth-protected-resource`
+`GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-authorization-server`
 
 The endpoint points ChatGPT at the configured authorization server and advertises the required scope.
 
@@ -94,6 +94,12 @@ Secrets must never be included in MCP tool metadata, results, ordinary logs, or 
 The production service must be reachable over HTTPS. In ChatGPT developer mode, create an app/connector using the public URL ending in `/mcp`.
 
 For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish the Yandex API key or Supabase service-role credential.
+
+## ChatGPT compatibility contract
+
+Authenticated tools advertise `securitySchemes: [{"type": "oauth2", "scopes": ["alice.read"]}]`. Tool descriptors also expose standard MCP annotations such as `readOnlyHint` and `destructiveHint`. Authentication failures return a `WWW-Authenticate` resource-metadata challenge and the MCP authentication metadata needed for ChatGPT to start linking.
+
+The authorization server must support OAuth 2.1 authorization-code + PKCE with S256 and echo the MCP resource through the authorization/token flow. Set `ALICE_MCP_OAUTH_AUTHORIZATION_URL` and `ALICE_MCP_OAUTH_TOKEN_URL` to the actual provider endpoints. Alice Pro does not implement the identity provider itself.
 
 ## Validation
 
