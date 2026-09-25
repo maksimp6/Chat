@@ -11,6 +11,7 @@ class Node:
         self.attrs = dict(attrs)
         self.children = []
         self.text = []
+        self.raw_data = []
 
 
 class ModalParser(HTMLParser):
@@ -43,9 +44,11 @@ class ModalParser(HTMLParser):
         assert node.tag == tag, f"expected </{node.tag}>, got </{tag}>"
 
     def handle_data(self, data):
-        text = " ".join(data.split())
-        if self.stack and text:
-            self.stack[-1].text.append(text)
+        if self.stack:
+            self.stack[-1].raw_data.append(data)
+            text = " ".join(data.split())
+            if text:
+                self.stack[-1].text.append(text)
 
 
 def parse_html():
@@ -365,3 +368,42 @@ def test_modal_responsive_css_only_adjusts_shared_content_shell():
     rules = dict(parse_css_rules())
     responsive = rules.get(".alice-pro-app .modal-content", {})
     assert responsive.get("max-width") == "95%"
+
+
+def test_modal_inter_tag_whitespace_is_explicit_and_bounded():
+    roots = parse_html()
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for node in walk(modal):
+                for raw in node.raw_data:
+                    if raw.strip():
+                        continue
+                    assert "\\r" not in raw, f"{modal.attrs.get('id')}: CR line endings are forbidden"
+                    assert "\\t" not in raw, f"{modal.attrs.get('id')}: tab indentation is forbidden"
+                    assert raw.count("\\n") <= 2, f"{modal.attrs.get('id')}: too many blank lines between tags"
+                    for line in raw.split("\\n"):
+                        assert len(line) - len(line.lstrip(" ")) <= 8, (
+                            f"{modal.attrs.get('id')}: indentation exceeds 8 spaces"
+                        )
+
+
+def test_modal_text_nodes_have_no_accidental_edge_whitespace():
+    roots = parse_html()
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for node in walk(modal):
+                for raw in node.raw_data:
+                    if raw.strip():
+                        assert raw == raw.strip(), (
+                            f"{modal.attrs.get('id')}: text node has accidental edge whitespace: {raw!r}"
+                        )
+
+
+def test_modal_spacing_is_css_owned_not_inline_style():
+    roots = parse_html()
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for node in walk(modal):
+                assert "style" not in node.attrs, (
+                    f"{modal.attrs.get('id')}: inline style is forbidden inside modal DOM"
+                )
