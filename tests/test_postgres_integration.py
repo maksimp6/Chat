@@ -8,7 +8,6 @@ from departments import init_department_tables
 from local_agent_gateway import init_local_agent_tables
 from runtime_migrations import init_runtime_tables
 from treasury import init_treasury_tables
-from user_identity import init_user_identity_table
 
 
 def _require_postgres():
@@ -24,7 +23,6 @@ def test_postgres_bootstraps_shared_application_schema():
     mcp_storage.init_db()
     init_local_agent_tables()
     init_treasury_tables()
-    init_user_identity_table()
     init_department_tables()
 
     conn = db.get_conn()
@@ -58,7 +56,6 @@ def test_postgres_bootstraps_shared_application_schema():
         "local_agent_jobs",
         "treasury_accounts",
         "treasury_ledger",
-        "users",
         "departments",
     }
     assert expected.issubset(tables)
