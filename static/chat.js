@@ -259,11 +259,27 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
             const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
             summary.textContent = `🔍 Trace [${traceId}...] (${eventsCount} соб.)`;
             traceEl.appendChild(summary);
-            const pre = document.createElement("pre");
-            pre.style.cssText = "margin-top:6px;max-height:250px;overflow-y:auto;background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;font-family:monospace;font-size:10px;white-space:pre-wrap;text-align:left;";
-            pre.textContent = JSON.stringify(traceObj, null, 2);
-            traceEl.appendChild(pre);
+
+            // The Trace Viewer is a first-class chat action. Do not rely only on
+            // trace_viewer_auto.js parsing the generated HTML after the fact.
+            traceEl.dataset.traceViewerDirect = "1";
+            const openTraceBtn = document.createElement("button");
+            openTraceBtn.type = "button";
+            openTraceBtn.className = "alice-trace-open-viewer";
+            openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
+            openTraceBtn.title = "Открыть Execution Trace viewer";
+            openTraceBtn.style.cssText = "font-size:11px;background:transparent;border:0;padding:2px 0;margin-left:8px;color:var(--accent);cursor:pointer;font-weight:600;";
+            openTraceBtn.onclick = function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (typeof window.openTraceViewer === "function") {
+                    window.openTraceViewer(traceObj);
+                } else {
+                    console.error("[CHAT] Execution Trace Viewer is not loaded");
+                }
+            };
             metaWrap.appendChild(traceEl);
+            metaWrap.appendChild(openTraceBtn);
         }
     }
 
