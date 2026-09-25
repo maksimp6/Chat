@@ -78,6 +78,7 @@ async function flush() {
     assert.equal(fetchCalls, 1);
     const modal = document.getElementById("project-tree-modal");
     assert.ok(modal);
+    assert.equal(modal.classList.contains("visible"), true);
     assert.equal(modal.querySelector("h3").textContent, "🌳 Структура проекта");
     assert.equal(modal.querySelectorAll(".project-tree-row").length, 2);
     assert.equal(modal.querySelector(".project-tree-row").querySelector(".project-tree-icon").textContent, "📁");
