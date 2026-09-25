@@ -37,6 +37,7 @@ class SSHRuntimeTests(unittest.TestCase):
         self.assertEqual(result["linux_user"], "alice-agent")
         self.assertIn("alice-agent@preview.example", argv)
         self.assertIn("StrictHostKeyChecking=yes", argv)
+        self.assertIn("IdentitiesOnly=yes", argv)
         self.assertIn("UserKnownHostsFile=/keys/known_hosts", argv)
         self.assertIn("timeout --foreground", argv[-1])
         self.assertIn("env -i", argv[-1])
@@ -57,6 +58,7 @@ class SSHRuntimeTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["input"], "VALUE = 1\n")
         self.assertFalse(run.call_args.kwargs["shell"])
         self.assertIn("mktemp", run.call_args.args[0][-1])
+        self.assertIn("realpath -e", run.call_args.args[0][-1])
         self.assertIn("mv -f", run.call_args.args[0][-1])
 
     @patch("ssh_runtime.subprocess.run")
