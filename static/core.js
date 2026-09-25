@@ -3,6 +3,7 @@ let conversations = [];
 let currentModel = "aliceai-llm";
 let currentModelType = "text";
 let modelsData = {text: {}, voice: {}};
+let modelLoadState = {status: "idle", error: null};
 let coreInitialized = false;
 let coreEnhancementStarted = false;
 
@@ -141,22 +142,27 @@ async function enhanceCore() {
         if (typeof renderSidebar === "function") renderSidebar();
 
         console.log("[CORE] Загрузка моделей...");
-        var modelsRes = await fetchWithTimeout(
-            "/api/models",
-            {credentials: "same-origin", cache: "no-store"},
-            10000
-        );
-        if (!modelsRes.ok) {
-            throw new Error("Failed to load models: " + modelsRes.status);
+        if (!window.AliceModelLoader || typeof window.AliceModelLoader.load !== "function") {
+            throw new Error("Model loader is unavailable");
         }
-
-        var loadedModels = await modelsRes.json();
-        modelsData = loadedModels && typeof loadedModels === "object"
-            ? {
-                text: loadedModels.text && typeof loadedModels.text === "object" ? loadedModels.text : {},
-                voice: loadedModels.voice && typeof loadedModels.voice === "object" ? loadedModels.voice : {}
-            }
-            : {text: {}, voice: {}};
+        modelLoadState = {status: "loading", error: null};
+        window.dispatchEvent(new CustomEvent("alice:model-load-state", {detail: modelLoadState}));
+        try {
+            modelsData = await window.AliceModelLoader.load();
+            modelLoadState = {status: "ready", error: null};
+            window.dispatchEvent(new CustomEvent("alice:model-load-state", {detail: modelLoadState}));
+        } catch (modelError) {
+            modelLoadState = {
+                status: "error",
+                error: {
+                    code: modelError.code || "MODEL_LOAD_ERROR",
+                    message: modelError.message || String(modelError),
+                    status: modelError.status || null
+                }
+            };
+            window.dispatchEvent(new CustomEvent("alice:model-load-state", {detail: modelLoadState}));
+            throw modelError;
+        }
 
         if (currentConvId) {
             var conv = conversations.find(function(c) { return c.id === currentConvId; });
