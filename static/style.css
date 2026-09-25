@@ -1039,3 +1039,20 @@ html, body {
     display: inline-block;
     margin-top: 4px;
 }
+
+
+.alice-pro-app .theme-rollback-card {
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.alice-pro-app .theme-rollback-button {
+    border: 1px solid var(--border-color);
+    background: var(--btn-bg);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+}
