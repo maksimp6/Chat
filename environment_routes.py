@@ -82,8 +82,6 @@ def environments_restart(environment_id):
         return jsonify({"error": str(exc)}), 409
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
 
 
 @environment_bp.delete("/<environment_id>")
