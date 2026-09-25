@@ -31,6 +31,7 @@ from short_token_auth import install_short_token_auth
 from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
 from ssh_runtime_settings import public_settings, save_settings, test_connection
 from plugin_routes import plugin_bp
+from voice_routes import voice_bp
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -77,6 +78,7 @@ app.register_blueprint(government_bp)
 app.register_blueprint(environment_bp)
 app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
+app.register_blueprint(voice_bp)
 
 @app.after_request
 
