@@ -1,15 +1,15 @@
-"""Reusable AI sessions and a lightweight, lazy execution runtime.
+"""Managed lightweight runtimes for reusable AI sessions.
 
-The runtime intentionally stays small: it is a managed subprocess environment,
-not a security container. Strong isolation should be supplied by a container/VM
-backend in deployments that execute untrusted code.
+This module provides lifecycle/state management around a per-session working
+directory. It deliberately does not claim to be a security sandbox: production
+execution of untrusted code must use a container, VM, or equivalent isolation
+backend.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import signal
 import subprocess
 import threading
 import time
@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional
 
 try:
     import resource
-except ImportError:  # pragma: no cover - Windows
+except ImportError:  # pragma: no cover
     resource = None
 
 
@@ -37,9 +37,7 @@ class VirtualServerConfig:
 
 
 class VirtualLowConsumptionServer:
-    """Lazy-started session runtime with explicit lifecycle and resource limits."""
-
-    STATES = {"stopped", "starting", "running", "idle", "suspended", "stopping", "error"}
+    STATES = {"stopped", "starting", "running", "idle", "suspended", "stopping", "failed"}
 
     def __init__(self, session_id: str, config: Optional[VirtualServerConfig] = None):
         self.session_id = session_id
@@ -48,7 +46,6 @@ class VirtualLowConsumptionServer:
         self.runtime_id = f"runtime_{uuid.uuid4().hex}"
         self._last_used = 0.0
         self._lock = threading.RLock()
-        self._process: Optional[subprocess.Popen[str]] = None
 
     @property
     def last_used(self) -> float:
@@ -56,7 +53,7 @@ class VirtualLowConsumptionServer:
 
     def _touch(self) -> None:
         self._last_used = time.time()
-        if self.state == "idle":
+        if self.state in {"idle", "suspended"}:
             self.state = "running"
 
     def start(self) -> str:
@@ -64,6 +61,8 @@ class VirtualLowConsumptionServer:
             if self.state in {"running", "idle"}:
                 self._touch()
                 return self.runtime_id
+            if self.state == "failed":
+                raise RuntimeError("runtime is in failed state")
             self.state = "starting"
             Path(self.config.cwd).mkdir(parents=True, exist_ok=True)
             self.state = "running"
@@ -99,15 +98,13 @@ class VirtualLowConsumptionServer:
                     timeout=timeout,
                     preexec_fn=limits if resource is not None and os.name == "posix" else None,
                 )
-                stdout = completed.stdout[: self.config.max_output_bytes]
-                stderr = completed.stderr[: self.config.max_output_bytes]
                 self._touch()
                 return {
                     "runtime_id": self.runtime_id,
                     "state": self.state,
                     "exit_code": completed.returncode,
-                    "stdout": stdout,
-                    "stderr": stderr,
+                    "stdout": completed.stdout[: self.config.max_output_bytes],
+                    "stderr": completed.stderr[: self.config.max_output_bytes],
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 }
             except subprocess.TimeoutExpired as exc:
@@ -122,7 +119,7 @@ class VirtualLowConsumptionServer:
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 }
             except Exception:
-                self.state = "error"
+                self.state = "failed"
                 raise
 
     def suspend(self) -> None:
@@ -133,9 +130,6 @@ class VirtualLowConsumptionServer:
     def stop(self) -> None:
         with self._lock:
             self.state = "stopping"
-            if self._process and self._process.poll() is None:
-                self._process.terminate()
-            self._process = None
             self.state = "stopped"
 
     def mark_idle(self) -> None:
@@ -144,7 +138,7 @@ class VirtualLowConsumptionServer:
                 self.state = "idle"
 
     def reap_if_idle(self, now: Optional[float] = None) -> bool:
-        now = now or time.time()
+        now = time.time() if now is None else now
         with self._lock:
             if self.state in {"running", "idle"} and now - self._last_used >= self.config.idle_timeout_seconds:
                 self.suspend()
@@ -156,6 +150,7 @@ class VirtualLowConsumptionServer:
             "session_id": self.session_id,
             "runtime_id": self.runtime_id,
             "state": self.state,
+            "failed": self.state == "failed",
             "last_used": self._last_used,
             "config": asdict(self.config),
         }
@@ -163,8 +158,6 @@ class VirtualLowConsumptionServer:
 
 @dataclass
 class ReadyMadeSession:
-    """Persistent configuration for a reusable AI environment."""
-
     id: str
     name: str
     type: str = "assistant"
@@ -186,6 +179,9 @@ class ReadyMadeSession:
         data["name"] = name
         data["template"] = False
         data["state"] = json.loads(json.dumps(self.state))
+        data["environment"] = json.loads(json.dumps(self.environment))
+        data["files"] = list(self.files)
+        data["tools"] = list(self.tools)
         data["virtual_server"] = VirtualServerConfig(**data["virtual_server"])
         return ReadyMadeSession(**data)
 
