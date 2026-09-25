@@ -121,6 +121,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends openssh-server coreutils && \
     rm -rf /var/lib/apt/lists/* && \
     useradd --create-home --shell /bin/bash alice-runtime && \
+    passwd -d alice-runtime && \
     mkdir -p /home/alice-runtime/.ssh /run/sshd && \
     chown -R alice-runtime:alice-runtime /home/alice-runtime
 COPY sshd_config /etc/ssh/sshd_config
