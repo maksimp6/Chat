@@ -216,36 +216,34 @@ def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
 
 _CASE = {"case_id": {"type": "string", "minLength": 1, "maxLength": 128}}
+def _tool_create(args, cfg=None): return create_case(args.get("case_type", "IP_REGISTRATION"), args.get("user_id"))
+def _tool_requirements(args, cfg=None): return requirements(args.get("case_type", "IP_REGISTRATION"))
+def _tool_collect(args, cfg=None): return collect_data(args["case_id"], args.get("data") or {})
+def _tool_validate(args, cfg=None): return validate_data(args["case_id"])
+def _tool_tax_options(args, cfg=None): return tax_options()
+def _tool_prepare_application(args, cfg=None): return prepare_application(args["case_id"])
+def _tool_prepare_documents(args, cfg=None): return prepare_documents(args["case_id"])
+def _tool_request_approval(args, cfg=None): return request_approval(args["case_id"])
+def _tool_status(args, cfg=None): return status(args["case_id"])
+def _tool_process_response(args, cfg=None): return process_response(args["case_id"], args.get("response") or {})
+def _tool_archive(args, cfg=None): return archive_case(args["case_id"])
+def _tool_submit(args, cfg=None): return submit_case(args["case_id"])
+
 GOVERNMENT_TOOLS = {
-    "gov.case.create": _tool(create_case, read_only=False, requires_approval=False,
-        schema=_schema({"case_type": {"type": "string", "enum": list(CASE_TYPES)}, "user_id": {"type": ["string", "null"]}}, []),
-        title="Government Case Create", description="Создать государственное дело."),
-    "gov.requirements": _tool(requirements, read_only=True, requires_approval=False,
-        schema=_schema({"case_type": {"type": "string", "enum": ["IP_REGISTRATION"]}}, []),
-        title="Government Requirements", description="Получить контракт данных для открытия ИП."),
-    "gov.collect_data": _tool(collect_data, read_only=False, requires_approval=True,
-        schema=_schema({**_CASE, "data": {"type": "object"}}, ["case_id", "data"]),
-        title="Government Collect Data", description="Сохранить данные пользователя в дело."),
-    "gov.validate_data": _tool(validate_data, read_only=False, requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]), title="Government Validate Data", description="Детерминированно проверить данные дела."),
-    "gov.tax_options": _tool(tax_options, read_only=True, requires_approval=False,
-        schema=_schema({}, []), title="Government Tax Options", description="Вернуть варианты налогового режима."),
-    "gov.prepare_application": _tool(prepare_application, read_only=False, requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]), title="Government Prepare Application", description="Подготовить заявление Р21001."),
-    "gov.prepare_documents": _tool(prepare_documents, read_only=False, requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]), title="Government Prepare Documents", description="Подготовить документы без отправки."),
-    "gov.request_approval": _tool(request_approval, read_only=True, requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]), title="Government Request Approval", description="Проверить готовность дела к подтверждению."),
-    "gov.status": _tool(status, read_only=True, requires_approval=False,
-        schema=_schema(_CASE, ["case_id"]), title="Government Case Status", description="Получить состояние дела."),
-    "gov.process_response": _tool(process_response, read_only=False, requires_approval=False,
-        schema=_schema({**_CASE, "response": {"type": "object"}}, ["case_id", "response"]),
-        title="Government Process Response", description="Сохранить ответ ведомства."),
-    "gov.archive_case": _tool(archive_case, read_only=False, requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]), title="Government Archive Case", description="Архивировать дело."),
-    "gov.submit": _tool(submit_case, read_only=False, requires_approval=True,
-        schema=_schema(_CASE, ["case_id"]), title="Government Submit", description="Отправить подтверждённое дело через GovGateway."),
+    "gov.case.create": _tool(_tool_create, read_only=False, requires_approval=False, schema=_schema({"case_type": {"type": "string", "enum": list(CASE_TYPES)}, "user_id": {"type": ["string", "null"]}}, []), title="Government Case Create", description="Создать государственное дело."),
+    "gov.requirements": _tool(_tool_requirements, read_only=True, requires_approval=False, schema=_schema({"case_type": {"type": "string", "enum": ["IP_REGISTRATION"]}}, []), title="Government Requirements", description="Получить контракт данных для открытия ИП."),
+    "gov.collect_data": _tool(_tool_collect, read_only=False, requires_approval=True, schema=_schema({**_CASE, "data": {"type": "object"}}, ["case_id", "data"]), title="Government Collect Data", description="Сохранить данные пользователя в дело."),
+    "gov.validate_data": _tool(_tool_validate, read_only=False, requires_approval=False, schema=_schema(_CASE, ["case_id"]), title="Government Validate Data", description="Детерминированно проверить данные дела."),
+    "gov.tax_options": _tool(_tool_tax_options, read_only=True, requires_approval=False, schema=_schema({}, []), title="Government Tax Options", description="Вернуть варианты налогового режима."),
+    "gov.prepare_application": _tool(_tool_prepare_application, read_only=False, requires_approval=False, schema=_schema(_CASE, ["case_id"]), title="Government Prepare Application", description="Подготовить заявление Р21001."),
+    "gov.prepare_documents": _tool(_tool_prepare_documents, read_only=False, requires_approval=False, schema=_schema(_CASE, ["case_id"]), title="Government Prepare Documents", description="Подготовить документы без отправки."),
+    "gov.request_approval": _tool(_tool_request_approval, read_only=True, requires_approval=False, schema=_schema(_CASE, ["case_id"]), title="Government Request Approval", description="Проверить готовность дела к подтверждению."),
+    "gov.status": _tool(_tool_status, read_only=True, requires_approval=False, schema=_schema(_CASE, ["case_id"]), title="Government Case Status", description="Получить состояние дела."),
+    "gov.process_response": _tool(_tool_process_response, read_only=False, requires_approval=False, schema=_schema({**_CASE, "response": {"type": "object"}}, ["case_id", "response"]), title="Government Process Response", description="Сохранить ответ ведомства."),
+    "gov.archive_case": _tool(_tool_archive, read_only=False, requires_approval=True, schema=_schema(_CASE, ["case_id"]), title="Government Archive Case", description="Архивировать дело."),
+    "gov.submit": _tool(_tool_submit, read_only=False, requires_approval=True, schema=_schema(_CASE, ["case_id"]), title="Government Submit", description="Отправить подтверждённое дело через GovGateway."),
 }
+
 
 def ensure_government_department() -> None:
     from departments import get_department, upsert_department
