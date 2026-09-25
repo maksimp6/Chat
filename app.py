@@ -17,6 +17,7 @@ from runtime_migrations import init_runtime_tables
 from local_agent_gateway import local_agent_bp, init_local_agent_tables
 from cloudru_iam_routes import cloudru_iam_bp
 from provider_credentials_routes import provider_credentials_bp
+from provider_quota_routes import provider_quota_bp
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
@@ -64,6 +65,7 @@ app.register_blueprint(runtime_bp)
 app.register_blueprint(local_agent_bp)
 app.register_blueprint(cloudru_iam_bp)
 app.register_blueprint(provider_credentials_bp)
+app.register_blueprint(provider_quota_bp)
 app.register_blueprint(departments_bp)
 
 @app.after_request
@@ -85,6 +87,8 @@ init_treasury_tables()
 init_user_identity_table()
 init_conversation_ownership_table()
 init_department_tables()
+from provider_quotas import init_quota_tables
+init_quota_tables()
 
 
 @app.route("/")
