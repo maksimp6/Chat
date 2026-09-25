@@ -32,9 +32,9 @@ _DEFAULTS = {
     "known_hosts": None,
     "targets": {},
     "command_allowlist": [],
-    "allow_privileged_operations": false,
-    "approval_required_for_write": true,
-    "approval_required_for_privileged": true,
+    "allow_privileged_operations": False,
+    "approval_required_for_write": True,
+    "approval_required_for_privileged": True,
 }
 
 
