@@ -53,6 +53,16 @@ class SSHRuntimeSettingsTests(unittest.TestCase):
         self.assertFalse(normalized["allow_command_execution"])
         self.assertFalse(normalized["allow_write_operations"])
 
+    def test_settings_update_is_recorded_in_execution_trace(self):
+        from ssh_runtime_settings import save_settings
+        trace = type("Trace", (), {"events": []})()
+        trace.add_event = lambda event_type, payload: trace.events.append((event_type, payload))
+        with patch("ssh_runtime_settings.get_current_trace", return_value=trace), patch("ssh_runtime_settings.set_config"):
+            save_settings(self.BASE)
+        self.assertEqual(trace.events[0][0], "ssh_runtime_settings_updated")
+        self.assertEqual(trace.events[0][1]["targets"], ["preview"])
+        self.assertEqual(trace.events[0][1]["command_allowlist_count"], 3)
+
     def test_privileged_operations_are_disabled_by_default(self):
         from ssh_runtime_settings import assert_operation_allowed
         with patch("ssh_runtime_settings.get_settings", return_value=self.BASE):
