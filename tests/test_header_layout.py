@@ -17,7 +17,9 @@ def test_dynamic_header_actions_target_secondary_row():
     assert 'id="memory-btn"' in html
     assert 'getElementById("header-actions-2")' in diagnostics
     assert 'memory-btn' in header
-    assert 'window.openMemoryModal' in header
+    assert 'window.__aliceHeaderActionsBound === true' in header
+    assert 'target.closest("#memory-btn")' in header
+    assert 'window.openMemoryModal();' in header
     assert 'memory-btn' not in memory
     assert 'window.openMemoryModal' in memory
 
@@ -28,7 +30,7 @@ def test_ssh_runtime_panel_is_visible_on_open():
     assert '<div id="tab-ssh" class="llm-tab-content" style="display:none;">' not in source
 
 
-def test_memory_action_uses_document_delegation_for_dynamic_header_lifecycle():
+def test_memory_action_uses_document_delegation_for_dynamic_modal_lifecycle():
     source = Path("static/memory_panel.js").read_text(encoding="utf-8")
     assert 'window.__aliceMemoryPanelBound === true' in source
     assert 'document.addEventListener("click"' in source
