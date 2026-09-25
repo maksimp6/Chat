@@ -11,7 +11,7 @@ def test_treasury_uses_one_header_entry_point():
     assert html.count('id="treasury-btn"') == 1
     assert 'id="expenses-btn"' not in html
     assert 'id="top-up-btn"' not in html
-    assert 'id="treasury-btn", "click"' in header
+    assert '["treasury-btn", "click"' in header
 
 
 def test_treasury_modal_contains_both_actions_and_balance():
