@@ -82,7 +82,7 @@ window.fetchVectorStores = function() {
         ].join('');
 
         ov.appendChild(md);
-        document.body.appendChild(ov);
+        (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
 
         function closeModal() { ov.remove(); }
         document.getElementById('close-fm-btn').addEventListener('click', closeModal);
@@ -227,7 +227,7 @@ window.fetchVectorStores = function() {
             ].join('');
 
             bg.appendChild(panel);
-            document.body.appendChild(bg);
+            (document.querySelector(".alice-pro-app") || document.body).appendChild(bg);
 
             function closeAddModal() { bg.remove(); }
             document.getElementById('vs-add-close').addEventListener('click', closeAddModal);
