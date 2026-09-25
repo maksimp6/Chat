@@ -12,14 +12,6 @@ def _error(exc: Exception):
     return jsonify({"error": str(exc)}), 400
 
 
-def _require_owner():
-    try:
-        return get_current_owner_id()
-    except TreasuryIdentityError as exc:
-        return None, (jsonify({"error": str(exc)}), 401)
-    return None, None
-
-
 @plugin_bp.before_request
 def require_plugin_identity():
     try:
