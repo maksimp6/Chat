@@ -53,12 +53,12 @@ def test_enable_and_disable_isolated_hook_failure(tmp_path):
     assert manager.get("demo").error == "boom"
 
 
-def test_entrypoint_cannot_escape_plugin_directory(tmp_path):
-    folder = write_plugin(tmp_path, entrypoint="../outside.py")
+def test_discovery_rejects_entrypoint_escape(tmp_path):
+    write_plugin(tmp_path, entrypoint="../outside.py")
     manager = PluginManager(tmp_path)
-    manager.discover()
 
-    with pytest.raises(PluginError, match="escapes"):
+    assert manager.discover() == []
+    with pytest.raises(PluginError, match="unknown plugin"):
         manager.enable("demo")
 
 
