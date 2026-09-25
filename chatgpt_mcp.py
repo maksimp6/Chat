@@ -51,6 +51,18 @@ OAUTH_ISSUER = os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
 OAUTH_AUTHORIZATION_URL = os.getenv("ALICE_MCP_OAUTH_AUTHORIZATION_URL", "").strip()
 OAUTH_TOKEN_URL = os.getenv("ALICE_MCP_OAUTH_TOKEN_URL", "").strip()
 
+MCP_CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, GET, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": (
+        "Accept, Content-Type, Authorization, MCP-Protocol-Version, "
+        "Mcp-Method, Mcp-Name, Mcp-Session-Id, Last-Event-ID"
+    ),
+    "Access-Control-Expose-Headers": (
+        "MCP-Protocol-Version, Mcp-Session-Id, WWW-Authenticate"
+    ),
+}
+
 
 def _truthy(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -87,6 +99,7 @@ def _jsonrpc_result(request_id: Any, result: Any) -> Response:
         ),
         status=200,
         mimetype="application/json",
+        headers=dict(MCP_CORS_HEADERS),
     )
 
 
@@ -102,6 +115,8 @@ def _jsonrpc_error(
     error: dict[str, Any] = {"code": code, "message": message}
     if data is not None:
         error["data"] = data
+    response_headers = dict(MCP_CORS_HEADERS)
+    response_headers.update(headers or {})
     return Response(
         json.dumps(
             {"jsonrpc": "2.0", "id": request_id, "error": error},
@@ -110,7 +125,7 @@ def _jsonrpc_error(
         ),
         status=status,
         mimetype="application/json",
-        headers=dict(headers or {}),
+        headers=response_headers,
     )
 
 
@@ -839,28 +854,50 @@ def oauth_authorization_server() -> Response:
 
 @chatgpt_mcp_bp.route(MCP_PATH, methods=["OPTIONS"])
 def mcp_options() -> Response:
-    response = Response(status=204)
-    response.headers.update(
-        {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": (
-                "Content-Type, Authorization, MCP-Protocol-Version, "
-                "Mcp-Method, Mcp-Name"
-            ),
-        }
-    )
-    return response
+    return Response(status=204, headers=dict(MCP_CORS_HEADERS))
+
+
+def _accepts_sse() -> bool:
+    accept = request.headers.get("Accept", "")
+    if not accept:
+        return True
+    return "text/event-stream" in accept or "*/*" in accept
 
 
 @chatgpt_mcp_bp.route(MCP_PATH, methods=["GET"])
 def mcp_get() -> Response:
+    _, auth_error = _require_auth(None)
+    if auth_error is not None:
+        return auth_error
+    if not _accepts_sse():
+        return Response(
+            "GET /mcp requires an Accept header containing text/event-stream.",
+            status=406,
+            headers={**MCP_CORS_HEADERS, "Allow": "GET, POST, OPTIONS, DELETE"},
+            mimetype="text/plain",
+        )
+
+    # Alice Pro currently has no server-initiated notifications to stream.
+    # Emit a valid SSE comment and close the stateless stream immediately.
     return Response(
-        "Alice Pro MCP endpoint accepts POST requests only.",
-        status=405,
-        headers={"Allow": "POST, OPTIONS"},
-        mimetype="text/plain",
+        ": alice-pro-mcp\n\n",
+        status=200,
+        headers={
+            **MCP_CORS_HEADERS,
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+        mimetype="text/event-stream",
     )
+
+
+@chatgpt_mcp_bp.route(MCP_PATH, methods=["DELETE"])
+def mcp_delete() -> Response:
+    _, auth_error = _require_auth(None)
+    if auth_error is not None:
+        return auth_error
+    # The Alice Pro endpoint is stateless and does not allocate MCP session IDs.
+    return Response(status=204, headers=dict(MCP_CORS_HEADERS))
 
 
 @chatgpt_mcp_bp.route(MCP_PATH, methods=["POST"])
