@@ -21,3 +21,5 @@ grep -Fq '"lightTheme": "auto"' "$script"
 grep -Fq '"groupContainers": "always"' "$script"
 grep -Fq 'if [[ ! -s "$profile" ]]' "$script"
 if grep -Fq 'clear_dozzle_data "$workdir/dozzle"' "$script"; then echo 'Dozzle profile must survive redeploys' >&2; exit 1; fi
+
+if grep -Fq 'rm -rf -- "$workdir"; mkdir -p "$builddir"' "$script"; then echo 'Preview deploy must not delete the Dozzle data directory' >&2; exit 1; fi
