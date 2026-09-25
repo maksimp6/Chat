@@ -4,6 +4,7 @@ let currentModel = "aliceai-llm";
 let currentModelType = "text";
 let modelsData = {text: {}, voice: {}};
 let modelLoadState = {status: "idle", error: null};
+window.modelLoadState = modelLoadState;
 let coreInitialized = false;
 let coreEnhancementStarted = false;
 
@@ -146,10 +147,12 @@ async function enhanceCore() {
             throw new Error("Model loader is unavailable");
         }
         modelLoadState = {status: "loading", error: null};
+        window.modelLoadState = modelLoadState;
         window.dispatchEvent(new CustomEvent("alice:model-load-state", {detail: modelLoadState}));
         try {
             modelsData = await window.AliceModelLoader.load();
             modelLoadState = {status: "ready", error: null};
+            window.modelLoadState = modelLoadState;
             window.dispatchEvent(new CustomEvent("alice:model-load-state", {detail: modelLoadState}));
         } catch (modelError) {
             modelLoadState = {
@@ -160,6 +163,7 @@ async function enhanceCore() {
                     status: modelError.status || null
                 }
             };
+            window.modelLoadState = modelLoadState;
             window.dispatchEvent(new CustomEvent("alice:model-load-state", {detail: modelLoadState}));
             throw modelError;
         }
@@ -199,6 +203,11 @@ async function enhanceCore() {
         if (typeof updateModelButton === "function") updateModelButton();
     }
 }
+
+window.retryModelLoad = function() {
+    coreEnhancementStarted = false;
+    void enhanceCore();
+};
 
 function initCore() {
     if (coreInitialized) return;
