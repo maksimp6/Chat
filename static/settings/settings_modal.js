@@ -141,7 +141,6 @@
             '    <button class="llm-tab-btn active" data-tab="tab-gen" style="padding:8px 12px;border:none;background:none;border-bottom:2px solid var(--m-accent,#4a90d9);color:var(--m-text,#222);font-weight:600;cursor:pointer;white-space:nowrap;">Сэмплинг</button>',
             '    <button class="llm-tab-btn" data-tab="tab-output" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Формат вывода</button>',
             '    <button class="llm-tab-btn" data-tab="tab-routing" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Маршрутизация вызовов</button>',
-            '    <button class="llm-tab-btn" data-tab="tab-tools" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Встроенные тулы</button>',
             '    <button class="llm-tab-btn" data-tab="tab-ssh" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">SSH Runtime</button>',
             '    <button class="llm-tab-btn" data-tab="tab-adv" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Промпты & Кэш</button>',
             '    <button class="llm-tab-btn" data-tab="tab-theme" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Оформление</button>',
@@ -204,11 +203,6 @@
             ),
             '</div>'
         ].join('');
-
-        var cfg = settings.tools_config || {};
-    var ws = cfg.web_search || {};
-    var fs = cfg.file_search || {};
-    var ci = cfg.code_interpreter || {};
 
 var tabSsh = [
             '<div id="tab-ssh" class="llm-tab-content" style="display:none;">',
