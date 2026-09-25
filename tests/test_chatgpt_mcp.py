@@ -85,7 +85,7 @@ def test_streamable_http_get_opens_sse_stream(client):
     )
     assert response.status_code == 200
     assert response.mimetype == "text/event-stream"
-    assert response.get_data(as_text=True) == ": alice-pro-mcp\\n\\n"
+    assert response.get_data(as_text=True) == ": alice-pro-mcp\n\n"
     assert response.headers["Cache-Control"] == "no-cache"
     assert response.headers["X-Accel-Buffering"] == "no"
 
