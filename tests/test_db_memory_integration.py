@@ -50,3 +50,32 @@ def test_memory_backend_does_not_expose_sql_connection(monkeypatch):
         assert "does not expose a SQL connection" in str(exc)
     else:
         raise AssertionError("memory backend leaked a SQL connection")
+
+
+def test_memory_backend_title_logic_and_config_string(monkeypatch):
+    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    db.init_db()
+    db.create_conversation("c1", "Новый чат", "model")
+
+    assert db.maybe_update_conversation_title("c1", "\n  Первая строка  \nвторая") == "Первая строка"
+    assert db.get_conversation_title("c1") == "Первая строка"
+    assert db.maybe_update_conversation_title("c1", "другая") == "Первая строка"
+    assert db.maybe_update_conversation_title("c1", "   ") == "Первая строка"
+    assert db.maybe_update_conversation_title("missing", "текст") == "текст"
+
+    db.set_config("plain", "hello")
+    assert db.get_config("plain") == "hello"
+    assert db.get_config("missing", "fallback") == "fallback"
+
+
+def test_memory_backend_non_string_message_and_invalid_json(monkeypatch):
+    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    db.init_db()
+    db.create_conversation("c1", "Chat", "model")
+    db.add_message("c1", "assistant", {"answer": "ok"})
+    assert db.get_messages("c1")[0]["text"] == '{"answer": "ok"}'
+
+    db._MEMORY_DB.update("messages", lambda r: True, timings_json="{bad", trace_json="{bad")
+    message = db.get_messages("c1")[0]
+    assert message["timings"] == []
+    assert message["trace"] == {}
