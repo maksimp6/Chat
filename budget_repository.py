@@ -11,7 +11,7 @@ import json
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from db import get_conn
+from db import get_conn\nfrom db_backend import is_postgres_configured
 
 
 class BudgetPersistenceError(RuntimeError):
