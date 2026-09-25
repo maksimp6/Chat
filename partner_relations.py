@@ -422,6 +422,89 @@ def add_contact(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = No
 
 
 def _contact_for_owner(owner_id: str, contact_id: str) -> Optional[dict[str, Any]]:
+
+def list_contacts(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    owner_id = _trusted_owner(cfg)
+    partner_id = str(arguments.get("partner_id") or "").strip()
+    if not partner_id:
+        raise ValueError("partner_id is required")
+    if not _get_partner(owner_id, partner_id):
+        raise ValueError("partner not found")
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM partner_contacts WHERE owner_id = ? AND partner_id = ? ORDER BY updated_at DESC, name ASC",
+            (owner_id, partner_id),
+        ).fetchall()
+    finally:
+        conn.close()
+    return {"contacts": [_contact_row(row) for row in rows]}
+
+
+def update_contact(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    owner_id = _trusted_owner(cfg)
+    contact_id = str(arguments.get("contact_id") or "").strip()
+    if not contact_id:
+        raise ValueError("contact_id is required")
+    existing = _contact_for_owner(owner_id, contact_id)
+    if not existing:
+        raise ValueError("contact not found")
+    now = _now()
+    conn = get_conn()
+    try:
+        conn.execute(
+            """UPDATE partner_contacts
+               SET name = ?, role = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+             WHERE id = ? AND owner_id = ?""",
+            (
+                str(arguments.get("name") or existing["name"]).strip(),
+                str(arguments.get("role") or "").strip(),
+                str(arguments.get("email") or "").strip(),
+                str(arguments.get("phone") or "").strip(),
+                str(arguments.get("notes") or "").strip(),
+                now,
+                contact_id,
+                owner_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _trace_event(cfg, "partner_action", {
+        "action": "contact_update",
+        "partner_id": existing["partner_id"],
+        "contact_id": contact_id,
+        "owner_id": owner_id,
+    })
+    return {"contact": _contact_for_owner(owner_id, contact_id)}
+
+
+def delete_contact(arguments: Mapping[str, Any], cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    owner_id = _trusted_owner(cfg)
+    contact_id = str(arguments.get("contact_id") or "").strip()
+    if not contact_id:
+        raise ValueError("contact_id is required")
+    existing = _contact_for_owner(owner_id, contact_id)
+    if not existing:
+        raise ValueError("contact not found")
+    conn = get_conn()
+    try:
+        conn.execute(
+            "DELETE FROM partner_contacts WHERE id = ? AND owner_id = ?",
+            (contact_id, owner_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _trace_event(cfg, "partner_action", {
+        "action": "contact_delete",
+        "partner_id": existing["partner_id"],
+        "contact_id": contact_id,
+        "owner_id": owner_id,
+    })
+    return {"deleted": True, "contact_id": contact_id, "partner_id": existing["partner_id"]}
+
+
     conn = get_conn()
     try:
         row = conn.execute(
@@ -757,6 +840,53 @@ PARTNER_TOOLS = {
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
         "func": add_contact,
+    },
+    "partner.contact.list": {
+        "title": "Partner Contact List",
+        "description": "Получить контакты выбранного партнёра.",
+        "parameters": _tool_schema({
+            "partner_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        }, ["partner_id"]),
+        "capabilities": ["partner", "contact", "read"],
+        "risk_level": "low",
+        "read_only": True,
+        "requires_approval": False,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": list_contacts,
+    },
+    "partner.contact.update": {
+        "title": "Partner Contact Update",
+        "description": "Изменить контакт партнёра.",
+        "parameters": _tool_schema({
+            "contact_id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "name": {"type": "string", "minLength": 1, "maxLength": 200},
+            "role": {"type": "string", "maxLength": 200},
+            "email": {"type": "string", "maxLength": 320},
+            "phone": {"type": "string", "maxLength": 64},
+            "notes": {"type": "string", "maxLength": 10000},
+        }, ["contact_id", "name", "role", "email", "phone", "notes"]),
+        "capabilities": ["partner", "contact"],
+        "risk_level": "medium",
+        "read_only": False,
+        "requires_approval": True,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": update_contact,
+    },
+    "partner.contact.delete": {
+        "title": "Partner Contact Delete",
+        "description": "Удалить контакт партнёра из личного реестра.",
+        "parameters": _tool_schema({
+            "contact_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        }, ["contact_id"]),
+        "capabilities": ["partner", "contact", "delete"],
+        "risk_level": "high",
+        "read_only": False,
+        "requires_approval": True,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": delete_contact,
     },
     "partner.message.prepare": {
         "title": "Partner Message Prepare",
