@@ -50,10 +50,11 @@
 
         var modal = document.createElement("div");
         modal.id = "project-tree-modal";
-        modal.className = "modal";
+        modal.className = "modal visible";
+
         var box = document.createElement("div");
         box.className = "modal-content";
-        box.innerHTML = "<button type="button" class="project-tree-close">&times;</button><h3>🌳 Структура проекта</h3><div class="project-tree-state">Загрузка...</div>";
+        box.innerHTML = '<button type="button" class="project-tree-close">&times;</button><h3>🌳 Структура проекта</h3><div class="project-tree-state">Загрузка...</div>';
         modal.appendChild(box);
         (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
 
