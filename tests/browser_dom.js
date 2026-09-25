@@ -49,7 +49,11 @@ class ElementShim extends EventTargetShim {
         }
     }
 
-    getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; }\n    setAttribute(name, value) { this.attributes[name] = String(value); }\n    removeAttribute(name) { delete this.attributes[name]; }\n    hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }\n\n    get id() { return this.attributes.id || ""; }
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; }
+setAttribute(name, value) { this.attributes[name] = String(value); }
+removeAttribute(name) { delete this.attributes[name]; }
+hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }\n
+get id() { return this.attributes.id || ""; }
     set id(value) { this.attributes.id = String(value); }
     get className() { return this.attributes.class || ""; }
     set className(value) { this.attributes.class = String(value); }
