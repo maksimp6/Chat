@@ -39,3 +39,20 @@ def test_patch_conversation_model_rejects_unauthorized_conversation(monkeypatch)
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "conversation_not_found"
+
+def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
+    from treasury_identity import TreasuryIdentityError
+
+    def raise_invalid_token(*, required=False):
+        raise TreasuryIdentityError("invalid authenticated owner token")
+
+    monkeypatch.setattr(app_module, "get_current_owner_id", raise_invalid_token)
+
+    client = app_module.app.test_client()
+    response = client.get(
+        "/api/conversations",
+        headers={"X-Alice-User-Token": "not-a-valid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "invalid authenticated owner token"
