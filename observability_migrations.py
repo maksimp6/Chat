@@ -29,7 +29,7 @@ def apply_observability_migrations():
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS frontend_error_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id TEXT PRIMARY KEY,
                     event_name TEXT NOT NULL,
                     error_code TEXT,
                     message TEXT NOT NULL,
