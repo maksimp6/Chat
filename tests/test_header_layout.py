@@ -18,7 +18,9 @@ def test_dynamic_header_actions_target_secondary_row():
     assert 'getElementById("header-actions-2")' in diagnostics
     assert 'memory-btn' in memory
     assert 'window.openMemoryModal' in memory
-    assert 'memory-btn' not in header
+    assert 'memory-btn' in header
+    assert 'window.openMemoryModal' in header
+    assert 'memory-btn' not in memory
     assert 'window.openMemoryModal' in memory
 
 
@@ -32,6 +34,6 @@ def test_memory_action_uses_document_delegation_for_dynamic_header_lifecycle():
     source = Path("static/memory_panel.js").read_text(encoding="utf-8")
     assert 'window.__aliceMemoryPanelBound === true' in source
     assert 'document.addEventListener("click"' in source
-    assert 'target.closest("#memory-btn, #memoryCloseBtn, #memoryClearBtn")' in source
+    assert 'target.closest("#memoryCloseBtn, #memoryClearBtn")' in source
     assert 'event.preventDefault();' in source
     assert 'window.openMemoryModal();' in source
