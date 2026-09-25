@@ -25,6 +25,7 @@ from partial_output import extract_last_response_text, format_partial_output_mes
 from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
 from treasury_identity import get_current_owner_id
+from provider_quotas import ProviderQuotaExceeded
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from conversation_ownership import (
     init_conversation_ownership_table,
@@ -292,6 +293,25 @@ def chat():
             trace.record_error("chat_pipeline", error_message, exception=e)
             record_yandex_mcp_activity(trace)
             trace_data = trace.finalize()
+            if isinstance(e, ProviderQuotaExceeded):
+                trace.add_event("provider_quota_http_response", {
+                    "status_code": 429,
+                    "reason": e.reason,
+                    "user_id": e.user_id,
+                })
+                trace_data = trace.finalize()
+                if invocation is not None:
+                    persist_invocation_trace(invocation.invocation_id, trace_data)
+                    fail_invocation(invocation.invocation_id, error=e.to_dict()["error"])
+                return jsonify({
+                    **e.to_dict(),
+                    "reply": "⚠️ Лимит запросов исчерпан. Повторите после указанного времени сброса.",
+                    "invocation_id": invocation.invocation_id if invocation else None,
+                    "session_id": invocation.session_id if invocation else None,
+                    "conversation_id": invocation.conversation_id if invocation else conv_id,
+                    "trace_id": invocation.trace_id if invocation else trace.trace_id,
+                    "trace": trace_data,
+                }), 429
             responses = trace_data.get("responses", [])
             partial_output, _ = extract_last_response_text(responses)
             reply = format_partial_output_message(partial_output, error_message)
