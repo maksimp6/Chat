@@ -24,5 +24,5 @@ def test_sidebar_and_model_rendering_avoid_presentation_inline_styles():
     assert 'style="' not in sidebar
     assert 'modelList.innerHTML' not in models
     assert 'style="' not in models
-    assert "textContent = m.name" in models
+    assert "name.textContent = m.name + badges" in models
     assert "model-option-price" in models
