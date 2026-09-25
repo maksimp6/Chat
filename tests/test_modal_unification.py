@@ -280,3 +280,85 @@ def test_modal_numeric_constraints_are_mathematically_consistent():
                     assert int(minimum_length) <= int(maximum_length), (
                         f"{modal.attrs.get('id')}: minlength must not exceed maxlength"
                     )
+
+
+def parse_css_rules():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    import re
+    rules = []
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        declarations = {}
+        for declaration in body.split(";"):
+            if ":" not in declaration:
+                continue
+            name, value = declaration.split(":", 1)
+            declarations[name.strip()] = value.strip()
+        for item in selector.split(","):
+            rules.append((item.strip(), declarations))
+    return rules
+
+
+def test_canonical_modal_css_has_complete_layout_contract():
+    rules = dict(parse_css_rules())
+    root = rules[".alice-pro-app .modal"]
+    visible = rules[".alice-pro-app .modal.visible"]
+    content = rules[".alice-pro-app .modal-content"]
+
+    assert root["display"] == "none"
+    assert root["position"] == "fixed"
+    assert root["inset"] == "0"
+    assert root["z-index"].isdigit()
+    assert root["align-items"] == "center"
+    assert root["justify-content"] == "center"
+
+    assert visible["display"] == "flex"
+
+    assert content["position"] == "relative"
+    assert content["width"] == "90%"
+    assert content["max-width"] == "500px"
+    assert content["max-height"] == "80vh"
+    assert content["overflow-y"] == "auto"
+
+
+def test_feature_modal_roots_cannot_override_canonical_layout():
+    forbidden = {
+        "display", "position", "inset", "top", "right", "bottom", "left",
+        "align-items", "justify-content", "overflow", "overflow-x", "overflow-y",
+    }
+    selectors = {
+        ".alice-pro-app .treasury-modal",
+        ".alice-pro-app .memory-modal",
+        ".alice-pro-app .provider-credentials-modal",
+        ".alice-pro-app .cloudru-iam-modal",
+        ".alice-pro-app .file-manager-modal",
+        ".alice-pro-app .file-manager-add-modal",
+    }
+    rules = dict(parse_css_rules())
+    for selector in selectors:
+        declarations = rules.get(selector, {})
+        overlap = forbidden.intersection(declarations)
+        assert not overlap, f"{selector} overrides canonical modal layout: {sorted(overlap)}"
+
+
+def test_feature_modal_content_uses_canonical_content_shell():
+    rules = dict(parse_css_rules())
+    content_classes = {
+        ".alice-pro-app .treasury-modal-content",
+        ".alice-pro-app .memory-modal-content",
+        ".alice-pro-app .provider-credentials-box",
+        ".alice-pro-app .cloudru-iam-box",
+        ".alice-pro-app .file-manager-box",
+        ".alice-pro-app .file-manager-add-box",
+    }
+    forbidden = {"position", "width", "max-width", "max-height", "overflow", "overflow-y"}
+    for selector in content_classes:
+        declarations = rules.get(selector, {})
+        # Feature styles may add visual details, but cannot replace the shared geometry.
+        overlap = forbidden.intersection(declarations)
+        assert not overlap, f"{selector} overrides canonical content geometry: {sorted(overlap)}"
+
+
+def test_modal_responsive_css_only_adjusts_shared_content_shell():
+    rules = dict(parse_css_rules())
+    responsive = rules.get(".alice-pro-app .modal-content", {})
+    assert responsive.get("max-width") == "95%"
