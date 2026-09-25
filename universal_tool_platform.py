@@ -6,7 +6,7 @@ Adapters create a UniversalToolCall and hand it to UniversalToolExecutor.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Mapping, Optional
 import time
 
@@ -370,13 +370,47 @@ class UniversalToolExecutor:
         if trace is None:
             return self.execute(call, **hooks)
 
-        return trace.track_tool_execution(
+        definition = self.registry.get_universal_definition(call.tool_name)
+        trace_arguments = dict(call.arguments)
+        if definition is not None:
+            redact = set(dict(definition.metadata or {}).get("trace_redact_arguments") or ())
+            for key in redact:
+                if key in trace_arguments:
+                    trace_arguments[key] = "<redacted>"
+
+        traced_call = replace(
+            call,
+            metadata={**dict(call.metadata), "execution_trace": trace},
+        )
+        result = trace.track_tool_execution(
             call.tool_name,
             dict(call.arguments),
-            lambda: self.execute(call, **hooks),
+            lambda: self.execute(traced_call, **hooks),
             call_id=call.call_id,
             step=None,
+            trace_arguments=trace_arguments,
         )
+
+        redact_result_fields = set(
+            dict(definition.metadata or {}).get("trace_redact_result_fields") or ()
+        ) if definition is not None else set()
+
+        def redact_fields(value):
+            if isinstance(value, dict):
+                return {
+                    key: "<redacted>" if key in redact_result_fields else redact_fields(item)
+                    for key, item in value.items()
+                }
+            if isinstance(value, list):
+                return [redact_fields(item) for item in value]
+            return value
+
+        if redact_result_fields:
+            for entry in reversed(trace.trace.get("tool_calls", [])):
+                if entry.get("call_id") == call.call_id:
+                    entry["result"] = redact_fields(entry.get("result"))
+                    break
+        return result
 
     def _execute_remote(
         self,
@@ -399,6 +433,7 @@ class UniversalToolExecutor:
                 **dict(call.metadata),
                 "transport": call.transport,
                 "risk_level": definition.risk_level,
+                "user_id": call.user_id,
             },
             trace_id=call.trace_id,
             invocation_id=call.invocation_id,

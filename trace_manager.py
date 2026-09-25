@@ -338,7 +338,8 @@ class ExecutionTrace:
 
     def track_tool_execution(self, name: str, arguments: Dict[str, Any], executor_fn, *args,
                              call_id: Optional[str] = None, parent_id: Optional[str] = None,
-                             step: Optional[int] = None, server: Optional[str] = None, **kwargs) -> Any:
+                             step: Optional[int] = None, server: Optional[str] = None,
+                             trace_arguments: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         start_timestamp = time.time()
         started = time.perf_counter()
         error = None
@@ -369,7 +370,10 @@ class ExecutionTrace:
         finally:
             end_timestamp = time.time()
             elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-            entry = {"name": name, "arguments": self._sanitize_trace_value(arguments),
+            entry = {"name": name,
+                     "arguments": self._sanitize_trace_value(
+                         trace_arguments if trace_arguments is not None else arguments
+                     ),
                      "result": self._sanitize_trace_value(result), "error": error,
                      "timing_ms": elapsed_ms, "timestamp": end_timestamp,
                      "start_timestamp": start_timestamp, "end_timestamp": end_timestamp}
