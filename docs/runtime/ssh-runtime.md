@@ -21,6 +21,10 @@ Private key material is never accepted by the settings API. `identity_file` is o
 
 Read-only mode disables command execution and file writes.
 
+Command execution is fail-closed behind `command_allowlist`: when command execution is enabled, at least one full-match regex must be configured. Privileged commands (`sudo`, `su`, `doas`, `pkexec`) are disabled by default and require both explicit enablement and the normal approval gate when configured that way.
+
+File writes require approval by default. These policies are persisted with the Runtime settings and settings changes emit sanitized `ssh_runtime_settings_updated` events in Execution Trace.
+
 Command output is bounded by `max_output_bytes` to prevent an SSH call from exhausting memory or flooding the trace.
 
 ## Settings API
@@ -52,6 +56,12 @@ The target must already exist in the saved configuration. The test executes only
   "allow_command_execution": true,
   "allow_write_operations": true,
   "max_output_bytes": 1048576,
+  "command_allowlist": [
+    "^id(?:\\s+-un)?$"
+  ],
+  "allow_privileged_operations": false,
+  "approval_required_for_write": true,
+  "approval_required_for_privileged": true,
   "known_hosts": "/srv/alice/ssh/known_hosts",
   "targets": {
     "preview": {
