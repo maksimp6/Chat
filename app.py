@@ -264,7 +264,8 @@ def put_ssh_runtime_settings():
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
             return jsonify({"error": "settings must be an object"}), 400
-        return jsonify({"status": "ok", "settings": public_settings() if False else save_settings(data)})
+        saved = save_settings(data)
+        return jsonify({"status": "ok", "settings": saved})
     except TreasuryIdentityError as exc:
         return jsonify({"error": str(exc)}), 401
     except Exception as exc:
