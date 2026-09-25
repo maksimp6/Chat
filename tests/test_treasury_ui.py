@@ -6,11 +6,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_treasury_uses_one_header_entry_point():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    header = (ROOT / "static" / "header_actions.js").read_text(encoding="utf-8")
 
     assert html.count('id="treasury-btn"') == 1
     assert 'id="expenses-btn"' not in html
     assert 'id="top-up-btn"' not in html
-    assert 'onclick="window.openTreasuryPanel()"' in html
+    assert 'id="treasury-btn", "click"' in header
 
 
 def test_treasury_modal_contains_both_actions_and_balance():
