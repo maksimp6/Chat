@@ -439,7 +439,9 @@ def conversations():
 
 @mcp_bp.route('/api/conversations/<conv_id>/messages', methods=['GET'])
 def get_conv_messages(conv_id):
-    owner_id = get_current_owner_id(required=False)
+    # Conversation history is ordinary Chat state. Treasury identity is not
+    # required here, including in single-user preview deployments.
+    owner_id = os.getenv("ALICE_OWNER_ID") or None
     if owner_id and not check_access(conv_id, owner_id):
         return jsonify({"error": "conversation_not_found"}), 404
     return jsonify({"messages": get_messages(conv_id)})
