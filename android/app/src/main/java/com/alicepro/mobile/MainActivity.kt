@@ -18,7 +18,6 @@ import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
 import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
@@ -26,15 +25,6 @@ class MainActivity : AppCompatActivity() {
     private val serverUrl = "http://127.0.0.1:5000"
     private val prefs by lazy { getSharedPreferences("alice_pro", MODE_PRIVATE) }
     private val updateManager by lazy { UpdateManager(this) }
-    private val installationId: String
-        get() {
-            val existing = prefs.getString(KEY_INSTALLATION_ID, "").orEmpty()
-            if (existing.isNotBlank()) return existing
-            val created = "android-" + UUID.randomUUID().toString().replace("-", "")
-            prefs.edit().putString(KEY_INSTALLATION_ID, created).apply()
-            return created
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppLogger.initialize(this)
