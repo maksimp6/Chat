@@ -2,6 +2,7 @@
 import unittest
 from unittest.mock import patch
 
+import db
 import mcp_routes
 from trace_manager import ExecutionTrace
 
@@ -49,6 +50,7 @@ class TestPreApiTiming(unittest.TestCase):
     def test_chat_response_contains_pre_api_timing(self):
         from app import app
 
+        db.init_db()
         conversation_id = "pre-api-timing-test"
 
         class FakeClient:
