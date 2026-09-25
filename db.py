@@ -78,6 +78,9 @@ def get_conn():
     return conn
 
 def init_db():
+    if is_memory_configured():
+        _memory_setup()
+        return
     from provider_credentials import create_schema as create_provider_credentials_schema
     from key_manager import create_schema as create_key_manager_schema
 
@@ -154,6 +157,10 @@ def init_db():
 
 
 def get_conversations():
+    if is_memory_configured():
+        _memory_setup()
+        rows = sorted(_MEMORY_DB.select("conversations"), key=lambda r: r["updated_at"], reverse=True)
+        return [{"id": r["id"], "title": r["title"], "model": r["model"], "created_at": r["created_at"], "updated_at": r["updated_at"]} for r in rows]
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM conversations ORDER BY updated_at DESC")
@@ -173,6 +180,12 @@ def get_conversations():
 
 def create_conversation(conv_id, title, model):
     now = int(datetime.utcnow().timestamp())
+    if is_memory_configured():
+        _memory_setup()
+        updated = _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, title=title, model=model, created_at=now, updated_at=now)
+        if not updated:
+            _MEMORY_DB.insert("conversations", id=conv_id, title=title, model=model, created_at=now, updated_at=now)
+        return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -203,6 +216,9 @@ def normalize_conversation_title(title, max_length=80):
 
 
 def get_conversation_title(conv_id, default=None):
+    if is_memory_configured():
+        rows = _MEMORY_DB.select("conversations", lambda r: r["id"] == conv_id)
+        return rows[0]["title"] if rows else default
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT title FROM conversations WHERE id = ?", (conv_id,))
@@ -214,6 +230,9 @@ def get_conversation_title(conv_id, default=None):
 def update_conversation_title(conv_id, title, owner_id=None):
     """Persist an explicit title; owner authorization is enforced by the route layer."""
     normalized = normalize_conversation_title(title)
+    if is_memory_configured():
+        _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, title=normalized, updated_at=int(datetime.utcnow().timestamp()))
+        return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -258,6 +277,9 @@ def maybe_update_conversation_title(conv_id, source_text):
 
 
 def update_conversation_model(conv_id, model):
+    if is_memory_configured():
+        _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, model=model, updated_at=int(datetime.utcnow().timestamp()))
+        return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -269,6 +291,11 @@ def update_conversation_model(conv_id, model):
 
 
 def delete_conversation(conv_id):
+    if is_memory_configured():
+        _MEMORY_DB.delete("messages", lambda r: r["conversation_id"] == conv_id)
+        _MEMORY_DB.delete("conv_settings", lambda r: r["conversation_id"] == conv_id)
+        _MEMORY_DB.delete("conversations", lambda r: r["id"] == conv_id)
+        return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
@@ -279,6 +306,16 @@ def delete_conversation(conv_id):
 
 
 def get_messages(conv_id):
+    if is_memory_configured():
+        rows = sorted(_MEMORY_DB.select("messages", lambda r: r["conversation_id"] == conv_id), key=lambda r: r["id"])
+        result = []
+        for r in rows:
+            try: timings = json.loads(r["timings_json"])
+            except Exception: timings = []
+            try: trace = json.loads(r["trace_json"])
+            except Exception: trace = {}
+            result.append({"role": r["role"], "text": r["content"], "cost": r["cost"], "created_at": r["created_at"], "timings": timings, "trace": trace})
+        return result
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -325,6 +362,12 @@ def add_message(
     trace=None,
 ):
     now = int(datetime.utcnow().timestamp())
+    if is_memory_configured():
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False) if content is not None else ""
+        _MEMORY_DB.insert("messages", id=_next_message_id(), conversation_id=conv_id, role=role, content=content, created_at=now, cost=cost, timings_json=json.dumps(timings or [], ensure_ascii=False), trace_json=json.dumps(trace or {}, ensure_ascii=False))
+        _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, updated_at=now)
+        return
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if content is not None else ""
 
@@ -350,7 +393,13 @@ def add_message(
 
 
 def save_conv_settings(conv_id, settings_dict):
-    now = datetime.utcnow()
+    now = int(datetime.utcnow().timestamp())
+    if is_memory_configured():
+        payload = json.dumps(settings_dict, ensure_ascii=False)
+        updated = _MEMORY_DB.update("conv_settings", lambda r: r["conversation_id"] == conv_id, settings_json=payload, updated_at=now)
+        if not updated:
+            _MEMORY_DB.insert("conv_settings", conversation_id=conv_id, settings_json=payload, updated_at=now)
+        return
     settings_json = json.dumps(settings_dict, ensure_ascii=False)
     conn = get_conn()
     cur = conn.cursor()
@@ -369,6 +418,12 @@ def save_conv_settings(conv_id, settings_dict):
 
 
 def get_conv_settings(conv_id):
+    if is_memory_configured():
+        rows = _MEMORY_DB.select("conv_settings", lambda r: r["conversation_id"] == conv_id)
+        if not rows:
+            return None
+        try: return json.loads(rows[0]["settings_json"])
+        except Exception: return None
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -388,6 +443,9 @@ def get_conv_settings(conv_id):
 
 
 def init_config_table():
+    if is_memory_configured():
+        _memory_setup()
+        return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -402,6 +460,11 @@ def init_config_table():
 
 def get_config(key: str, default=None):
     init_config_table()
+    if is_memory_configured():
+        rows = _MEMORY_DB.select("configs", lambda r: r["key"] == key)
+        if not rows: return default
+        try: return json.loads(rows[0]["value"])
+        except Exception: return rows[0]["value"]
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT value FROM configs WHERE key = ?", (key,))
@@ -420,6 +483,10 @@ def get_config(key: str, default=None):
 def set_config(key: str, value):
     init_config_table()
     val_str = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
+    if is_memory_configured():
+        if _MEMORY_DB.update("configs", lambda r: r["key"] == key, value=val_str) == 0:
+            _MEMORY_DB.insert("configs", key=key, value=val_str)
+        return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
