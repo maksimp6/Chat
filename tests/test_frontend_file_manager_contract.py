@@ -25,3 +25,14 @@ def test_vector_store_rendering_uses_owned_dom_and_css():
     assert "file-manager-vs-row" in source
     assert "file-manager-state-error" in source
     assert "cont.innerHTML" not in source.split("function renderVsManagerList", 1)[1].split("function loadVsList", 1)[0]
+
+
+def test_vector_store_file_picker_avoids_inline_markup():
+    source = read("static/file_manager.js")
+    start = source.index("function openAddFilesToVsModal")
+    end = source.index("// === Рендер файлов ===", start)
+    section = source[start:end]
+    assert "panel.innerHTML" not in section
+    assert 'style="' not in section
+    assert "file-manager-add-row" in section
+    assert "file-manager-state" in section
