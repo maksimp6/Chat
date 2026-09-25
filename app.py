@@ -82,6 +82,15 @@ app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 
+@app.errorhandler(Exception)
+def _handle_unexpected_error(exc):
+    logger.exception("[ERROR] Unhandled application exception")
+    return jsonify({
+        "error": "internal_server_error",
+        "code": "UNHANDLED_EXCEPTION",
+    }), 500
+
+
 @app.after_request
 
 def _set_web_cache_headers(response):
