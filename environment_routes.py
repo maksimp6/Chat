@@ -1,6 +1,7 @@
 """REST API for branch-aware application environments."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
+import requests
 
 from environment_manager import (
     create_environment,
@@ -14,6 +15,7 @@ from environment_manager import (
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
+environment_gateway_bp = Blueprint("environment_gateway", __name__)
 
 
 def _owner():
@@ -94,3 +96,46 @@ def environments_delete(environment_id):
         return jsonify({"error": str(exc)}), 409
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+def _proxy(environment_id, subpath=""):
+    item = _get(environment_id)
+    owner = _owner()
+    if not item or (owner and item.get("owner_id") not in (None, owner)):
+        return jsonify({"error": "environment_not_found"}), 404
+    if item.get("status") != "RUNNING" or not item.get("runtime_port"):
+        return jsonify({"error": "environment_not_running"}), 503
+
+    target = "http://127.0.0.1:" + str(int(item["runtime_port"])) + "/" + subpath.lstrip("/")
+    try:
+        upstream = requests.request(
+            request.method,
+            target,
+            params=request.args,
+            data=request.get_data(),
+            headers={
+                key: value
+                for key, value in request.headers.items()
+                if key.lower() not in {"host", "content-length", "connection"}
+            },
+            cookies=request.cookies,
+            allow_redirects=False,
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        return jsonify({"error": "environment_runtime_unreachable", "detail": str(exc)}), 502
+
+    excluded = {"content-length", "connection", "transfer-encoding", "content-encoding"}
+    headers = [
+        (key, value)
+        for key, value in upstream.headers.items()
+        if key.lower() not in excluded
+    ]
+    return Response(upstream.content, status=upstream.status_code, headers=headers)
+
+
+@environment_gateway_bp.route("/environments/<environment_id>", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@environment_gateway_bp.route("/environments/<environment_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@environment_gateway_bp.route("/environments/<environment_id>/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+def environment_gateway(environment_id, subpath):
+    return _proxy(environment_id, subpath)
