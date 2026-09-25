@@ -38,6 +38,7 @@ from filesystem_mcp_tools import grep_search, list_directory, read_file
 MCP_PATH = "/mcp"
 SUPPORTED_PROTOCOL_VERSIONS = {
     "2026-07-28",
+    "2025-11-25",
     "2025-06-18",
     "2025-03-26",
 }
