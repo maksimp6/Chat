@@ -1,44 +1,50 @@
-# Serverless + Sessioned Runtime
+# Reusable AI sessions
 
-Alice Pro treats every `/api/chat` execution as an independent invocation.
+Alice Pro exposes immutable built-in session profiles that can be cloned into
+independent persisted sessions.
 
-## Lifecycle
+## Built-in profiles
 
-```text
-Session
-  └── Conversation
-        └── Invocation
-              └── ExecutionTrace
-```
+The initial profiles are:
 
-- **Session** is the reusable runtime environment and persistent session metadata.
-- **Conversation** is the message history and dialog-level configuration.
-- **Invocation** is one execution of the pipeline.
-- **ExecutionTrace** is the audit record for that invocation.
+- developer: filesystem, terminal and git tools
+- researcher: web and MCP tools
+- assistant: general assistant profile
+- terminal: terminal and filesystem tools
+- agent: filesystem, terminal and MCP tools
 
-## InvocationContext
-
-`InvocationContext` contains only request-scoped identifiers and metadata:
-`session_id`, `conversation_id`, `invocation_id`, and `trace_id`.
-
-It must not contain DB connections, global clients, mutable execution state, or a
-reference to the trace itself. This keeps serialization safe and prevents the
-circular-reference failure mode where `params["execution_trace"]` points back to
-the trace.
-
-## Persistence
-
-The runtime schema stores sessions and invocations separately. Invocation status
-moves through `created -> running -> completed|failed`. Results and errors are
-stored as JSON for reload by a later serverless request.
+Profiles are templates, not mutable sessions.
 
 ## API
 
-- `POST /api/sessions`
-- `GET /api/sessions/<session_id>`
-- `POST /api/sessions/<session_id>/invocations`
-- `GET /api/invocations/<invocation_id>`
+List profiles:
 
-The existing chat endpoint remains unchanged in this phase. The next phase will
-bind the existing Yandex/MCP/local-tool pipeline to `InvocationContext`, then
-migrate `/api/chat` incrementally.
+GET /api/session-profiles
+
+Inspect one:
+
+GET /api/session-profiles/<profile_id>
+
+Clone one into a persisted session:
+
+POST /api/session-profiles/<profile_id>/clone
+
+Optional request body:
+
+{"name": "My Developer"}
+
+The response contains both the created persisted session and its copied profile
+configuration. The copy is independent from the built-in template.
+
+A created session can then be used by the existing invocation lifecycle:
+
+POST /api/sessions/<session_id>/invocations
+
+with a conversation_id.
+
+## Runtime boundary
+
+The existing virtual low-consumption runtime remains deliberately lightweight.
+It is a managed subprocess environment, not a security sandbox. Production
+untrusted-code execution requires a container, VM, or another runtime backend
+with enforceable isolation.

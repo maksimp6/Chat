@@ -5,8 +5,34 @@ from flask import Blueprint, jsonify, request
 from invocation_api import get_invocation_status, get_invocation_trace
 from invocation_manager import create_invocation
 from session_manager import create_session, get_session
+from session_profiles import clone_profile, get_profile, list_profiles, session_profile
 
 runtime_bp = Blueprint("runtime", __name__, url_prefix="/api")
+
+
+@runtime_bp.get("/session-profiles")
+def api_list_session_profiles():
+    return jsonify({"profiles": list_profiles()})
+
+
+@runtime_bp.get("/session-profiles/<profile_id>")
+def api_get_session_profile(profile_id):
+    profile = get_profile(profile_id)
+    if not profile:
+        return jsonify({"error": "profile_not_found"}), 404
+    return jsonify(profile)
+
+
+@runtime_bp.post("/session-profiles/<profile_id>/clone")
+def api_clone_session_profile(profile_id):
+    data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    if name is not None and (not isinstance(name, str) or not name.strip()):
+        return jsonify({"error": "name must be a non-empty string"}), 400
+    try:
+        return jsonify(clone_profile(profile_id, name.strip() if name else None)), 201
+    except KeyError:
+        return jsonify({"error": "profile_not_found"}), 404
 
 
 @runtime_bp.post("/sessions")
@@ -20,7 +46,9 @@ def api_get_session(session_id):
     session = get_session(session_id)
     if not session:
         return jsonify({"error": "session_not_found"}), 404
-    return jsonify(session)
+    response = dict(session)
+    response["profile"] = session_profile(session_id)
+    return jsonify(response)
 
 
 @runtime_bp.post("/sessions/<session_id>/invocations")
