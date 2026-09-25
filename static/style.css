@@ -848,3 +848,35 @@ html, body {
     font-size: 11px;
     color: var(--text-secondary);
 }
+.alice-pro-app #voice-ui,
+.alice-pro-app #response-mode-wrap,
+.alice-pro-app #mic-btn,
+.alice-pro-app #upload-image-btn {
+    display: none;
+}
+
+.alice-pro-app #text-ui {
+    display: flex;
+}
+
+.alice-pro-app.alice-model-voice #voice-ui,
+.alice-pro-app.alice-model-voice #response-mode-wrap,
+.alice-pro-app.alice-model-voice #mic-btn {
+    display: flex;
+}
+
+.alice-pro-app.alice-model-voice #text-ui {
+    display: none;
+}
+
+.alice-pro-app.alice-model-multimodal #upload-image-btn {
+    display: flex;
+}
+
+.alice-pro-app #voice-ui[aria-hidden="true"],
+.alice-pro-app #text-ui[aria-hidden="true"],
+.alice-pro-app #response-mode-wrap[aria-hidden="true"],
+.alice-pro-app #mic-btn[aria-hidden="true"],
+.alice-pro-app #upload-image-btn[aria-hidden="true"] {
+    display: none;
+}
