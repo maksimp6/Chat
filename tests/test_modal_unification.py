@@ -457,3 +457,42 @@ def test_modal_text_is_unicode_after_entity_decoding():
                     assert text == text.encode("utf-8").decode("utf-8")
                     assert "\\ufffd" not in text, f"{modal.attrs.get('id')}: replacement character indicates decode loss"
                     assert "\\x00" not in text, f"{modal.attrs.get('id')}: NUL is forbidden"
+
+
+def _looks_like_random_gibberish(token):
+    import re
+    token = token.strip().lower()
+    if len(token) < 5 or len(token) > 24 or not re.fullmatch(r"[a-z]+", token):
+        return False
+    vowels = sum(ch in "aeiouy" for ch in token)
+    consonants = len(token) - vowels
+    if vowels == 0 or consonants == 0:
+        return False
+    if re.search(r"[bcdfghjklmnpqrstvwxz]{4,}", token):
+        return True
+    if re.search(r"(.)\\1{2,}", token):
+        return True
+    # Random-looking short Latin tokens with unusually high consonant density.
+    return len(token) >= 7 and consonants / len(token) >= 0.72
+
+
+def test_modal_text_rejects_manual_random_gibberish():
+    import re
+    suspicious_fixture = "ddgdef htibv dweh"
+    tokens = re.findall(r"[A-Za-z]+", suspicious_fixture)
+    assert any(_looks_like_random_gibberish(token) for token in tokens), (
+        "the gibberish detector must catch the manual random-text fixture"
+    )
+
+
+def test_modal_text_contains_no_obvious_random_gibberish():
+    roots = parse_html()
+    import re
+    for root in roots:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
+            for node in walk(modal):
+                for text in node.text:
+                    for token in re.findall(r"[A-Za-z]+", text):
+                        assert not _looks_like_random_gibberish(token), (
+                            f"{modal.attrs.get('id')}: suspicious random text: {token!r}"
+                        )
