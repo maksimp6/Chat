@@ -15,6 +15,7 @@ def test_header_actions_are_bound_by_local_asset():
 
     for element_id in (
         "tools-btn",
+        "ssh-runtime-btn",
         "mcp-btn",
         "settings-btn",
         "file-manager-btn",
