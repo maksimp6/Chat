@@ -29,6 +29,7 @@ def mcp_request(client, method, params=None, request_id=1, name=None, **headers)
     }
     http_headers = {
         "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
         "MCP-Protocol-Version": chatgpt_mcp.DEFAULT_PROTOCOL_VERSION,
         **headers,
     }
@@ -75,6 +76,57 @@ def test_every_registered_tool_is_exposed_through_mcp(client):
         "mcp" in definition["supported_transports"]
         for definition in chatgpt_mcp.registry.get_universal_definitions()
     )
+
+
+def test_streamable_http_get_opens_sse_stream(client):
+    response = client.get(
+        "/mcp",
+        headers={"Accept": "text/event-stream"},
+    )
+    assert response.status_code == 200
+    assert response.mimetype == "text/event-stream"
+    assert response.get_data(as_text=True) == ": alice-pro-mcp\\n\\n"
+    assert response.headers["Cache-Control"] == "no-cache"
+    assert response.headers["X-Accel-Buffering"] == "no"
+
+
+def test_streamable_http_get_rejects_non_sse_accept_header(client):
+    response = client.get(
+        "/mcp",
+        headers={"Accept": "application/json"},
+    )
+    assert response.status_code == 406
+
+
+def test_streamable_http_options_advertises_required_headers(client):
+    response = client.options("/mcp")
+    assert response.status_code == 204
+    assert response.headers["Access-Control-Allow-Methods"] == "POST, GET, DELETE, OPTIONS"
+    allow_headers = response.headers["Access-Control-Allow-Headers"]
+    assert "Accept" in allow_headers
+    assert "Mcp-Session-Id" in allow_headers
+    assert "Last-Event-ID" in allow_headers
+    expose = response.headers["Access-Control-Expose-Headers"]
+    assert "Mcp-Session-Id" in expose
+
+
+def test_streamable_http_delete_is_idempotent_for_stateless_endpoint(client):
+    response = client.delete("/mcp")
+    assert response.status_code == 204
+
+
+def test_protected_streamable_http_get_requires_auth(client, monkeypatch):
+    monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
+    monkeypatch.delenv("ALICE_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("ALICE_MCP_INTROSPECTION_URL", raising=False)
+
+    response = client.get(
+        "/mcp",
+        headers={"Accept": "text/event-stream"},
+    )
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers
+
 
 
 def test_current_2025_protocol_revision_is_accepted(client):
