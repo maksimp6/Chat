@@ -1,4 +1,6 @@
-document.addEventListener("DOMContentLoaded", function() {
+function initModels() {
+    if (document.documentElement.dataset.modelsInitialized === "true") return;
+    document.documentElement.dataset.modelsInitialized = "true";
     var modelBtn = document.getElementById("model-btn");
     var closeModalBtn = document.getElementById("close-modal");
 
@@ -14,16 +16,21 @@ document.addEventListener("DOMContentLoaded", function() {
         var modal = document.getElementById("model-modal");
         if (modal) modal.classList.add("visible");
     });
-});
+}
+
+document.addEventListener("DOMContentLoaded", initModels);
 
 function renderModelModal() {
     var modelList = document.getElementById("model-list");
     var modelModal = document.getElementById("model-modal");
     if (!modelList) return;
-    modelList.innerHTML = "";
+    modelList.replaceChildren();
     var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
     if (Object.keys(allModels).length === 0) {
-        modelList.innerHTML = '<div class="model-option" style="cursor:default;opacity:.7;">Модели временно недоступны. Интерфейс продолжает работать.</div>';
+        var empty = document.createElement("div");
+        empty.className = "model-option model-option-empty";
+        empty.textContent = "Модели временно недоступны. Интерфейс продолжает работать.";
+        modelList.appendChild(empty);
         return;
     }
     Object.keys(allModels).forEach(function(key) {
@@ -34,8 +41,17 @@ function renderModelModal() {
         var badges = "";
         if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
         if (m.multimodal) badges += " \uD83D\uDCF7";
-        div.innerHTML = '<div><strong>' + m.name + badges + '</strong></div>' +
-                        '<div style="font-size:11px;color:var(--text-secondary)">' + priceText + '</div>';
+        var nameWrap = document.createElement("div");
+        var name = document.createElement("strong");
+        name.textContent = m.name + badges;
+        nameWrap.appendChild(name);
+
+        var price = document.createElement("div");
+        price.className = "model-option-price";
+        price.textContent = priceText;
+
+        div.appendChild(nameWrap);
+        div.appendChild(price);
         div.addEventListener("click", function() {
             if (typeof window.changeModel === "function") {
                 window.changeModel(key);
