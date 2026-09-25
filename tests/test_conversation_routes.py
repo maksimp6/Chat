@@ -67,3 +67,28 @@ def test_conversations_does_not_require_treasury_token(monkeypatch):
     assert response.get_json() == {
         "conversations": [{"id": "conv-1", "owner_id": "preview-owner"}]
     }
+
+
+def test_conversation_history_does_not_require_treasury_token(monkeypatch):
+    monkeypatch.setenv("ALICE_OWNER_ID", "preview-owner")
+    monkeypatch.setattr(
+        app_module,
+        "check_access",
+        lambda conv_id, owner_id: owner_id == "preview-owner",
+    )
+    monkeypatch.setattr(
+        app_module,
+        "get_messages",
+        lambda conv_id: [{"id": "msg-1", "role": "user", "text": "hello"}],
+    )
+
+    client = app_module.app.test_client()
+    response = client.get(
+        "/api/conversations/conv-1/messages",
+        headers={"X-Alice-User-Token": "invalid-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "messages": [{"id": "msg-1", "role": "user", "text": "hello"}]
+    }
