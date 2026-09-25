@@ -41,7 +41,7 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
     monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_COMMAND", f"{sys.executable} -c 'import time; time.sleep(120)'")
+    monkeypatch.setenv("ALICE_ENV_RUNTIME_COMMAND", f'{sys.executable} -c "import time; time.sleep(120)"')
     db.init_db()
     init_environment_tables()
     return repo, master_sha, one_sha, two_sha
