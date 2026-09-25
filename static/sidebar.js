@@ -1,4 +1,3 @@
-document.addEventListener("DOMContentLoaded", function() {
     var sidebar = document.getElementById("sidebar");
     var menuBtn = document.getElementById("menu-btn");
     var closeBtn = document.getElementById("close-sidebar-btn");
@@ -34,7 +33,6 @@ document.addEventListener("DOMContentLoaded", function() {
         if (modal) modal.classList.add("visible");
     });
     if (typeof renderSidebar === "function") renderSidebar();
-});
 
 function renderSidebar() {
     var list = document.getElementById("conv-list");
