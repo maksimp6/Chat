@@ -3,25 +3,25 @@
 
 function makeField(id, title, help, placeholder, type) {
     var wrap = document.createElement("div");
-    wrap.style.cssText = "margin:14px 0;";
+    wrap.className = "provider-field";
     var label = document.createElement("label");
     label.textContent = title;
-    label.style.cssText = "display:block;font-weight:600;margin-bottom:6px;";
+    label.className = "provider-field-label";
     var input = document.createElement("input");
     input.id = id;
     input.type = type || "password";
     input.autocomplete = "new-password";
     input.placeholder = placeholder || "";
-    input.style.cssText = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #555;border-radius:7px;background:var(--input-bg,#222);color:var(--text,#fff);";
+    input.className = "provider-field-input";
     if (help) {
         var small = document.createElement("div");
         small.textContent = help;
-        small.style.cssText = "margin-top:5px;font-size:12px;opacity:.7;line-height:1.35;";
+        small.className = "provider-field-help";
         wrap.appendChild(small);
     }
     var error = document.createElement("div");
     error.className = "provider-field-error";
-    error.style.cssText = "display:none;margin-top:6px;font-size:12px;color:#ff6b6b;line-height:1.35;";
+    error.className = "provider-field-error";
     wrap.appendChild(label); wrap.appendChild(input); wrap.appendChild(error);
     return wrap;
 }
@@ -32,8 +32,8 @@ function setFieldError(id, message) {
     var error = field.parentElement && field.parentElement.querySelector(".provider-field-error");
     if (!error) return;
     error.textContent = message || "";
-    error.style.display = message ? "block" : "none";
-    field.style.borderColor = message ? "#ff6b6b" : "#555";
+    error.classList.toggle("is-visible", Boolean(message));
+    field.classList.toggle("has-error", Boolean(message));
 }
 
 function clearFieldErrors() {
@@ -80,15 +80,15 @@ function renderStatus(container, providers) {
     container.innerHTML = "";
     (providers || []).forEach(function (item) {
         var card = document.createElement("div");
-        card.style.cssText = "padding:12px;margin:8px 0;border:1px solid #444;border-radius:8px;";
+        card.className = "provider-status-card";
         var title = document.createElement("div");
-        title.style.fontWeight = "700";
+        title.className = "provider-status-title";
         title.textContent = item.provider === "yandex" ? "Yandex Cloud" : "Cloud.ru";
         var line = document.createElement("div");
         line.textContent = statusText(item);
-        line.style.marginTop = "5px";
+        line.className = "provider-status-line";
         var meta = document.createElement("div");
-        meta.style.cssText = "margin-top:7px;font-size:11px;opacity:.65;";
+        meta.className = "provider-status-meta";
         var fp = item.credential && item.credential.fingerprint;
         var exp = item.credential && item.credential.expires_at;
         meta.textContent = (fp ? "fp: " + fp.slice(0, 12) : "fingerprint: —") + (exp ? " • expires: " + exp : "");
@@ -111,23 +111,23 @@ function build() {
     if (document.getElementById("provider-credentials-modal")) return;
     var modal = document.createElement("div");
     modal.id = "provider-credentials-modal";
-    modal.style.cssText = "display:none;position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,.72);align-items:center;justify-content:center;";
+    modal.className = "modal provider-credentials-modal";
     var box = document.createElement("div");
-    box.style.cssText = "background:var(--bg,#1e1e1e);color:var(--text,#fff);padding:20px;border-radius:12px;width:min(560px,92vw);max-height:90vh;overflow:auto;position:relative;box-shadow:0 10px 30px rgba(0,0,0,.35);";
+    box.className = "provider-credentials-box";
     var close = document.createElement("button");
     close.textContent = "×"; close.setAttribute("aria-label","Закрыть");
-    close.style.cssText = "position:absolute;right:12px;top:8px;font-size:24px;background:none;border:0;color:inherit;cursor:pointer;";
-    close.onclick = function(){ modal.style.display="none"; };
-    var title=document.createElement("h3"); title.textContent="Провайдеры"; title.style.marginTop="0";
+    close.className = "provider-credentials-close";
+    close.addEventListener("click", function(){ modal.classList.remove("visible"); modal.setAttribute("aria-hidden", "true"); });
+    var title=document.createElement("h3"); title.textContent="Провайдеры"; title.className="provider-credentials-title";
     box.appendChild(close); box.appendChild(title);
 
     box.appendChild(makeField("provider-yandex-key","Yandex Cloud API key","","Yandex API key","password"));
     box.appendChild(makeField("provider-yandex-project","Yandex Cloud Project ID","Обязателен вместе с Yandex API key.","например: b1g1fekh2198nuan1tnh","text"));
     box.appendChild(makeField("provider-cloudru-key","Cloud.ru API key","","Cloud.ru API key","password"));
 
-    var actions=document.createElement("div"); actions.style.cssText="display:flex;gap:8px;margin-top:14px;";
+    var actions=document.createElement("div"); actions.className="provider-credentials-actions";
     var save=document.createElement("button"); save.textContent="Подключить"; save.className="btn-primary";
-    save.onclick=async function(){
+    save.addEventListener("click", async function(){
         var y=document.getElementById("provider-yandex-key").value.trim();
         var project=document.getElementById("provider-yandex-project").value.trim();
         var cloudru=document.getElementById("provider-cloudru-key").value.trim();
@@ -161,16 +161,21 @@ function build() {
             await fetchStatus(output);
         }catch(error){ output.textContent="Ошибка подключения: "+error.message; }
         finally { save.disabled=false; }
-    };
+    });
     actions.appendChild(save); box.appendChild(actions);
 
-    var output=document.createElement("div"); output.id="provider-credentials-status"; output.style.marginTop="14px"; box.appendChild(output);
+    var output=document.createElement("div"); output.id="provider-credentials-status"; output.className="provider-credentials-status"; box.appendChild(output);
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "provider-credentials-title");
+    modal.setAttribute("aria-hidden", "true");
+    title.id = "provider-credentials-title";
     modal.appendChild(box); document.body.appendChild(modal);
 }
 
 window.openProviderCredentialsModal=async function(){
     build();
-    var modal=document.getElementById("provider-credentials-modal"); modal.style.display="flex";
+    var modal=document.getElementById("provider-credentials-modal"); modal.classList.add("visible"); modal.setAttribute("aria-hidden", "false");
     var output=document.getElementById("provider-credentials-status");
     await fetchStatus(output);
 };
