@@ -1,0 +1,102 @@
+"""REST API for branch-aware application environments."""
+
+from flask import Blueprint, jsonify, request
+
+from environment_manager import (
+    create_environment,
+    delete_environment,
+    list_environments,
+    restart_environment,
+    start_environment,
+    stop_environment,
+    _get,
+)
+from treasury_identity import TreasuryIdentityError, get_current_owner_id
+
+environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
+
+
+def _owner():
+    try:
+        return get_current_owner_id(required=False)
+    except TreasuryIdentityError:
+        return None
+
+
+def _context():
+    # Environment lifecycle can originate outside a chat session. The manager
+    # therefore creates infrastructure-scoped trace correlation when absent.
+    return None
+
+
+@environment_bp.get("")
+def environments_list():
+    return jsonify({"environments": list_environments(_owner())})
+
+
+@environment_bp.post("")
+def environments_create():
+    data = request.get_json(silent=True) or {}
+    branch = str(data.get("branch") or "").strip()
+    commit_sha = data.get("commit_sha")
+    if not branch:
+        return jsonify({"error": "branch is required"}), 400
+    try:
+        return jsonify(create_environment(branch, commit_sha, _owner(), context=_context())), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@environment_bp.get("/<environment_id>")
+def environments_get(environment_id):
+    item = _get(environment_id)
+    owner = _owner()
+    if not item or (owner and item.get("owner_id") not in (None, owner)):
+        return jsonify({"error": "environment_not_found"}), 404
+    return jsonify(item)
+
+
+@environment_bp.post("/<environment_id>/start")
+def environments_start(environment_id):
+    try:
+        return jsonify(start_environment(environment_id, _owner(), context=_context()))
+    except KeyError:
+        return jsonify({"error": "environment_not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@environment_bp.post("/<environment_id>/stop")
+def environments_stop(environment_id):
+    try:
+        return jsonify(stop_environment(environment_id, _owner(), context=_context()))
+    except KeyError:
+        return jsonify({"error": "environment_not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+
+
+@environment_bp.post("/<environment_id>/restart")
+def environments_restart(environment_id):
+    try:
+        return jsonify(restart_environment(environment_id, _owner(), context=_context()))
+    except KeyError:
+        return jsonify({"error": "environment_not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@environment_bp.delete("/<environment_id>")
+def environments_delete(environment_id):
+    try:
+        return jsonify(delete_environment(environment_id, _owner(), context=_context()))
+    except KeyError:
+        return jsonify({"error": "environment_not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        return jsonify({"error": str(exc)), 500
