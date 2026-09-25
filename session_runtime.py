@@ -37,7 +37,7 @@ class VirtualServerConfig:
 
 
 class VirtualLowConsumptionServer:
-    STATES = {"stopped", "starting", "running", "idle", "suspended", "stopping", "error"}
+    STATES = {"stopped", "starting", "running", "idle", "suspended", "stopping", "failed"}
 
     def __init__(self, session_id: str, config: Optional[VirtualServerConfig] = None):
         self.session_id = session_id
@@ -61,8 +61,8 @@ class VirtualLowConsumptionServer:
             if self.state in {"running", "idle"}:
                 self._touch()
                 return self.runtime_id
-            if self.state == "error":
-                raise RuntimeError("runtime is in error state")
+            if self.state == "failed":
+                raise RuntimeError("runtime is in failed state")
             self.state = "starting"
             Path(self.config.cwd).mkdir(parents=True, exist_ok=True)
             self.state = "running"
@@ -119,7 +119,7 @@ class VirtualLowConsumptionServer:
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 }
             except Exception:
-                self.state = "error"
+                self.state = "failed"
                 raise
 
     def suspend(self) -> None:
@@ -150,6 +150,7 @@ class VirtualLowConsumptionServer:
             "session_id": self.session_id,
             "runtime_id": self.runtime_id,
             "state": self.state,
+            "failed": self.state == "failed",
             "last_used": self._last_used,
             "config": asdict(self.config),
         }
