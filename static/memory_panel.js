@@ -57,6 +57,31 @@
     });
   };
 
+  function bindMemoryPanelEvents() {
+    var closeButton = byId("memoryCloseBtn");
+    if (closeButton && !closeButton.dataset.bound) {
+      closeButton.addEventListener("click", window.closeMemoryModal);
+      closeButton.dataset.bound = "true";
+    }
+    var enabled = byId("memEnabled");
+    if (enabled && !enabled.dataset.bound) {
+      enabled.addEventListener("change", window.updateMemoryConfig);
+      enabled.dataset.bound = "true";
+    }
+    var limit = byId("memLimit");
+    if (limit && !limit.dataset.bound) {
+      limit.addEventListener("change", window.updateMemoryConfig);
+      limit.dataset.bound = "true";
+    }
+    var clearButton = byId("memoryClearBtn");
+    if (clearButton && !clearButton.dataset.bound) {
+      clearButton.addEventListener("click", function () { window.clearMemory(null); });
+      clearButton.dataset.bound = "true";
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", bindMemoryPanelEvents);
+
   window.clearMemory = async function (category) {
     if (!confirm("Очистить память?")) return;
     await fetch("/api/memory/clear", {
