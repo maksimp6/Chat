@@ -1,10 +1,13 @@
 (function () {
     "use strict";
 
+    var currentScript = document.currentScript;
+    var config = currentScript && currentScript.dataset ? currentScript.dataset : {};
+
     window.__ALICE_USER_ID = window.__ALICE_USER_ID || "";
-    window.__ALICE_BASE_PATH = {{ (preview_base_path or "")|tojson }};
-    window.__ALICE_STATIC_BASE = {{ static_root|tojson }};
-    window.__ALICE_STATIC_VERSION = {{ static_version|tojson }};
+    window.__ALICE_BASE_PATH = config.basePath || "";
+    window.__ALICE_STATIC_BASE = config.staticBase || "/static";
+    window.__ALICE_STATIC_VERSION = config.staticVersion || "";
 
     var basePath = window.__ALICE_BASE_PATH || "";
 
