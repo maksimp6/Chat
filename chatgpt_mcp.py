@@ -175,7 +175,10 @@ def _auth_user_from_request() -> Optional[str]:
     """Resolve the authenticated MCP principal."""
     mode = _auth_mode()
     if mode == "anonymous":
-        return os.getenv("ALICE_MCP_USER_ID") or None
+        # Anonymous MCP has no OAuth/login identity. In the single-user
+        # deployment, bind it to the configured server owner so conversation
+        # tools can work without inventing a second authentication system.
+        return os.getenv("ALICE_MCP_USER_ID") or os.getenv("ALICE_OWNER_ID") or None
 
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
