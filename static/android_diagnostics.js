@@ -24,13 +24,13 @@
         button.className = "header-btn";
         button.title = "Диагностика Android";
         button.textContent = "🩺";
-        button.onclick = function () {
+        button.addEventListener("click", function () {
             try {
                 bridge().openDiagnostics();
             } catch (error) {
                 nativeLog("ERROR", "Diagnostics", error);
             }
-        };
+        });
         actionRow.appendChild(button);
     }
 
@@ -55,6 +55,16 @@
         );
     });
 
-    document.addEventListener("DOMContentLoaded", installDiagnosticsButton);
-    setTimeout(installDiagnosticsButton, 500);
+    function initDiagnostics() {
+        if (document.documentElement.dataset.androidDiagnosticsInitialized === "true") return;
+        document.documentElement.dataset.androidDiagnosticsInitialized = "true";
+        installDiagnosticsButton();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initDiagnostics, {once: true});
+    } else {
+        initDiagnostics();
+    }
+    setTimeout(initDiagnostics, 500);
 })();
