@@ -14,6 +14,40 @@ except ImportError:  # pragma: no cover
 from yandex_request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_request_builder import build_response_payload
 from yandex_client_modules.errors import YandexClientError
+from provider_quotas import ProviderQuotaExceeded, record_usage, reserve_request
+
+
+def _resolve_quota_user_id(execution_trace=None):
+    if isinstance(execution_trace, ExecutionTrace):
+        user_id = (execution_trace.trace.get("context") or {}).get("user_id")
+        if user_id:
+            return str(user_id).strip()
+    try:
+        from treasury_identity import get_current_owner_id
+        return get_current_owner_id(required=False)
+    except Exception:
+        return None
+
+
+def _record_quota_usage(execution_trace, reservation, response):
+    if reservation is None or not isinstance(response, dict):
+        return
+    usage = response.get("usage") or {}
+    if not isinstance(usage, dict):
+        return
+    input_tokens = int(usage.get("input_tokens", 0) or 0)
+    output_tokens = int(usage.get("output_tokens", 0) or 0)
+    total_tokens = int(usage.get("total_tokens", input_tokens + output_tokens) or 0)
+    token_count = max(total_tokens, input_tokens + output_tokens)
+    record_usage(reservation, token_count=token_count)
+    if isinstance(execution_trace, ExecutionTrace):
+        execution_trace.add_event("provider_quota_usage_recorded", {
+            "user_id": reservation.user_id,
+            "policy": reservation.policy_name,
+            "request_number": reservation.reserved_request_number,
+            "token_count": token_count,
+            "response_id": response.get("id"),
+        })
 
 
 def _resolve_global_provider_credential(client, execution_trace=None):
@@ -67,6 +101,21 @@ class YandexRequestMixin:
         if is_background: params["store"] = True
         
         credential = _resolve_global_provider_credential(self, execution_trace)
+        quota_user_id = _resolve_quota_user_id(execution_trace)
+        try:
+            quota_reservation = reserve_request(quota_user_id)
+        except ProviderQuotaExceeded as exc:
+            if execution_trace and isinstance(execution_trace, ExecutionTrace):
+                execution_trace.add_event("provider_quota_denied", exc.to_dict()["error"])
+                execution_trace.record_error("provider_quota", str(exc), error_type=exc.code)
+            raise
+        if execution_trace and isinstance(execution_trace, ExecutionTrace) and quota_reservation is not None:
+            execution_trace.add_event("provider_quota_reserved", {
+                "user_id": quota_reservation.user_id,
+                "policy": quota_reservation.policy_name,
+                "request_number": quota_reservation.reserved_request_number,
+                "period_reset_at": quota_reservation.period_reset_at,
+            })
         yandex_conv_id = self._resolve_yandex_conv_id(conversation_id)
 
         metadata = (
@@ -178,7 +227,12 @@ class YandexRequestMixin:
         task_id = data.get("id")
         if not is_background:
             status = data.get("status")
-            if status in ("completed", "incomplete"): return data
-            if status in ("failed", "cancelled"): raise YandexClientError(f"Task status: {status}")
-        return self._wait(task_id, execution_trace=execution_trace, trace_step=trace_step_number)
+            if status in ("completed", "incomplete"):
+                _record_quota_usage(execution_trace, quota_reservation, data)
+                return data
+            if status in ("failed", "cancelled"):
+                raise YandexClientError(f"Task status: {status}")
+        result = self._wait(task_id, execution_trace=execution_trace, trace_step=trace_step_number)
+        _record_quota_usage(execution_trace, quota_reservation, result)
+        return result
 
