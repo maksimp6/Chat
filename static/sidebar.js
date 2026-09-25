@@ -1,4 +1,6 @@
-document.addEventListener("DOMContentLoaded", function() {
+function initSidebar() {
+    if (document.documentElement.dataset.sidebarInitialized === "true") return;
+    document.documentElement.dataset.sidebarInitialized = "true";
     var sidebar = document.getElementById("sidebar");
     var menuBtn = document.getElementById("menu-btn");
     var closeBtn = document.getElementById("close-sidebar-btn");
@@ -34,15 +36,20 @@ document.addEventListener("DOMContentLoaded", function() {
         if (modal) modal.classList.add("visible");
     });
     if (typeof renderSidebar === "function") renderSidebar();
-});
+}
+
+document.addEventListener("DOMContentLoaded", initSidebar);
 
 function renderSidebar() {
     var list = document.getElementById("conv-list");
     if (!list) return;
-    list.innerHTML = "";
+    list.replaceChildren();
     var items = Array.isArray(conversations) ? conversations : [];
     if (!items.length) {
-        list.innerHTML = '<div style="padding:20px;color:var(--text-secondary);text-align:center">Нет диалогов</div>';
+        var empty = document.createElement("div");
+        empty.className = "conv-empty";
+        empty.textContent = "Нет диалогов";
+        list.appendChild(empty);
         return;
     }
     items.forEach(function(conv) {
