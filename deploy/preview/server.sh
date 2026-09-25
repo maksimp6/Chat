@@ -175,7 +175,7 @@ runtime_smoke() {
     docker rm -f "$cleanup_runtime_container" >/dev/null 2>&1 || true
     docker image rm "$RUNTIME_IMAGE_PREFIX:$cleanup_key" >/dev/null 2>&1 || true
   }
-  trap 'cleanup_runtime_smoke "$container" "$runtime_dir" "$runtime_container" "$key"' EXIT
+  trap "cleanup_runtime_smoke '$container' '$runtime_dir' '$runtime_container' '$key'" EXIT
 
   prepare_runtime_smoke "$key" "$workdir"
 
@@ -284,7 +284,7 @@ PY
   docker exec -u 0 \
     -e "ALICE_SSH_TARGETS_JSON=$runtime_targets_json" \
     -e "ALICE_SSH_KNOWN_HOSTS=/tmp/alice-runtime-known_hosts" \
-    "$container" python /tmp/alice-runtime-smoke.py
+    "$container" sh -lc 'cd /app && python /tmp/alice-runtime-smoke.py'
 
   log "SSH Runtime smoke passed for $key"
   trap - EXIT
