@@ -149,6 +149,12 @@ class ToolRegistry:
                 self._register("runtime", name, cfg)
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Runtime: {e}")
+        try:
+            from partner_relations import PARTNER_TOOLS
+            for name, cfg in PARTNER_TOOLS.items():
+                self._register("partner", name, cfg)
+        except Exception as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки Partner Relations: {e}")
 
     @staticmethod
     def _strict_schema(schema: dict) -> dict:
