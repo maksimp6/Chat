@@ -254,6 +254,14 @@ def maybe_update_conversation_title(conv_id, source_text):
         return get_conversation_title(conv_id)
 
     candidate = normalize_conversation_title(first_line)
+    if is_memory_configured():
+        changed = _MEMORY_DB.update(
+            "conversations",
+            lambda r: r["id"] == conv_id and r["title"] in ("Новый чат", "Новый диалог"),
+            title=candidate,
+            updated_at=int(datetime.utcnow().timestamp()),
+        )
+        return candidate if changed else get_conversation_title(conv_id)
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
