@@ -8,45 +8,23 @@ const {BrowserShim} = require("./browser_dom");
 const ROOT = require("path").resolve(__dirname, "..");
 
 async function main() {
-    const browser = new BrowserShim();
-    const button = browser.document.createElement("button");
-    button.id = "system-status-btn";
-    button.setAttribute("type", "button");
-    browser.document.body.appendChild(button);
-
-    const panel = browser.document.createElement("div");
-    panel.id = "alice-system-status";
-    panel.setAttribute("hidden", "");
-    panel.setAttribute("role", "dialog");
-    browser.document.body.appendChild(panel);
-
-    const content = browser.document.createElement("div");
-    content.className = "alice-system-status-content";
-    panel.appendChild(content);
-
-    const close = browser.document.createElement("button");
-    close.className = "alice-btn alice-system-status-close";
-    close.setAttribute("type", "button");
-    content.appendChild(close);
-
-    const title = browser.document.createElement("h2");
-    title.className = "alice-system-status-title";
-    content.appendChild(title);
-
-    const list = browser.document.createElement("div");
-    list.className = "alice-system-status-list";
-    content.appendChild(list);
-
-    const context = browser.context();
-    const load = (name) => {
-        const source = fs.readFileSync(require("path").join(ROOT, "static", name), "utf8");
-        vm.runInContext(source, context, {filename: name});
+    const browser = new BrowserShim(
+        '<button id="system-status-btn" type="button"></button>' +
+        '<div id="alice-system-status" hidden role="dialog">' +
+        '<div class="alice-system-status-content">' +
+        '<button class="alice-btn alice-system-status-close" type="button"></button>' +
+        '<h2 id="alice-system-status-title"></h2>' +
+        '<div class="alice-system-status-list"></div>' +
+        '</div></div>'
+    );
+    let requests = 0;
+    const mockFetch = async () => {
+        requests += 1;
+        return {ok: true, status: 200, json: async () => ({ok: true})};
     };
-
-    load("core_api.js");
-    load("dispatcher.js");
-    load("system_status.js");
-    browser.document.dispatchEvent(new browser.BrowserEvent("DOMContentLoaded"));
+    const sourcePaths = ["core_api.js", "dispatcher.js", "system_status.js"]
+        .map((name) => require("path").join(ROOT, "static", name));
+    browser.load(sourcePaths, {fetch: mockFetch, URL}); 
 
     const core = browser.window.AliceCoreAPI;
     assert.strictEqual(core.apiVersion, "1");
@@ -102,10 +80,16 @@ async function main() {
     assert.strictEqual(panel.hasAttribute("hidden"), true);
     assert.strictEqual(button.getAttribute("aria-expanded"), "false");
 
+    const response = await browser.window.AliceDispatcher.request("/api/status");
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(requests, 1);
+    assert.ok(JSON.stringify(core.status.snapshot()).includes("network"));
+
     const networkTrace = core.trace.begin("network-test", {authorization: "secret"});
     networkTrace.event("response", {path: "/api/test", status: 200});
     const networkSnapshot = networkTrace.end("completed");
     assert.strictEqual(networkSnapshot.metadata.authorization, "[REDACTED]");
+    assert.ok(!JSON.stringify(networkSnapshot).includes("secret"));
 
     console.log("system status/core API contract tests passed");
 }
