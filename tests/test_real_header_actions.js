@@ -91,5 +91,6 @@ if (!modelModal.hidden || modelModal.classList.contains("visible")) {
 if (modelModal.getAttribute("aria-hidden") !== "true") {
   throw new Error("closed real model modal must expose aria-hidden=true");
 }
+console.log("Real model modal click lifecycle passed");
 
 console.log("Real header runtime action tests passed");
