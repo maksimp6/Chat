@@ -210,7 +210,14 @@ LOCAL_REPO_DIR = os.getenv("ALICE_LOCAL_REPO_DIR", "/sdcard/repo")
 def list_local_files():
     try:
         subpath = request.args.get("path", "").strip("/")
-        target_dir = os.path.join(LOCAL_REPO_DIR, subpath)
+        root_dir = os.path.abspath(LOCAL_REPO_DIR)
+        target_dir = os.path.abspath(os.path.join(root_dir, subpath))
+        try:
+            inside_root = os.path.commonpath([root_dir, target_dir]) == root_dir
+        except ValueError:
+            inside_root = False
+        if not inside_root:
+            return jsonify({"error": "Недопустимый путь"}), 400
         if not os.path.exists(target_dir):
             return jsonify({"error": f"Папка не найдена: {target_dir}"}), 404
         items = []
