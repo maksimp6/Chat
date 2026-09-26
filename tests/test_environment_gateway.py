@@ -2,6 +2,8 @@ from pathlib import Path
 import subprocess
 import threading
 
+import pytest
+
 import db
 from flask import Flask, Response, jsonify
 
@@ -12,6 +14,7 @@ from environment_manager import (
     start_environment,
     stop_environment,
 )
+import environment_routes
 from environment_routes import environment_bp, environment_gateway_bp
 from runtime import current_runtime_base_path, current_runtime_id
 
@@ -133,3 +136,42 @@ def test_environment_gateway_has_no_localhost_proxy_transport():
     assert "http://127.0.0.1:" not in routes
     assert "subprocess.Popen(" not in manager
     assert "os.kill(" not in manager
+
+
+def test_runtime_http_request_requires_application():
+    with pytest.raises(RuntimeError, match="runtime application is unavailable"):
+        environment_routes._runtime_http_request(None, {})
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code", "payload"),
+    [
+        (TimeoutError("slow"), 504, {"error": "environment_runtime_timeout"}),
+        (RuntimeError("stopped"), 503, {"error": "environment_not_running"}),
+        (ValueError("broken"), 502, {"error": "environment_runtime_unreachable"}),
+    ],
+)
+def test_environment_gateway_maps_runtime_failures(monkeypatch, error, status_code, payload):
+    app = Flask(__name__)
+    app.register_blueprint(environment_gateway_bp)
+
+    monkeypatch.setattr(
+        environment_routes,
+        "_get",
+        lambda _environment_id: {
+            "environment_id": "runtime-a",
+            "owner_id": None,
+            "status": "RUNNING",
+            "runtime_thread_id": 123,
+        },
+    )
+    monkeypatch.setattr(environment_routes, "_owner", lambda: None)
+
+    def fail_dispatch(*_args, **_kwargs):
+        raise error
+
+    monkeypatch.setattr(environment_routes, "dispatch_environment_http", fail_dispatch)
+
+    response = app.test_client().get("/environments/runtime-a/runtime-root")
+    assert response.status_code == status_code
+    assert response.get_json() == payload
