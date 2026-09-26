@@ -303,6 +303,35 @@
     });
   }
 
+  function defer(callback, delayMs) {
+    if (typeof callback !== "function") throw new Error("Scheduler callback must be a function");
+    var ms = Math.min(Math.max(Number(delayMs || 0), 0), 30000);
+    if (ms === 0 && typeof queueMicrotask === "function") {
+      var cancelled = false;
+      queueMicrotask(function () {
+        if (!cancelled) callback();
+      });
+      return Object.freeze({cancel: function () { cancelled = true; }});
+    }
+    if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") {
+      throw new Error("Scheduler is unavailable: AbortSignal.timeout is required");
+    }
+    var signal = AbortSignal.timeout(ms);
+    var active = true;
+    var listener = function () {
+      if (!active) return;
+      active = false;
+      callback();
+    };
+    signal.addEventListener("abort", listener, {once: true});
+    return Object.freeze({
+      cancel: function () {
+        active = false;
+        signal.removeEventListener("abort", listener);
+      }
+    });
+  }
+
   function getStatusSnapshot() {
     var snapshot = {};
     statuses.forEach(function (value, key) {
@@ -338,6 +367,9 @@
     }),
     security: Object.freeze({
       redact: safeData
+    }),
+    scheduler: Object.freeze({
+      defer: defer
     })
   });
 
