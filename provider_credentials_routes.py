@@ -233,13 +233,13 @@ def _perform_health_check(provider: str) -> dict:
             _provider_client(provider).validate_key(credential.api_key)
         error = None
         status = "connected"
-    except PermissionError as exc:
+    except PermissionError:
         logger.exception("Provider health check authorization failed: provider=%s", provider)
-        error = str(exc)
+        error = "authorization_failed"
         status = "invalid"
-    except Exception as exc:
+    except Exception:
         logger.exception("Provider health check failed: provider=%s", provider)
-        error = str(exc)
+        error = "provider_unavailable"
         status = "unavailable"
 
     conn = get_conn()
@@ -270,12 +270,12 @@ def provider_credentials_status_check():
             if provider not in (YANDEX, CLOUDRU):
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
-    except Exception as exc:
+    except Exception:
         logger.exception("Provider health check request failed")
         return jsonify(
             {
                 "error": "health_check_failed",
-                "detail": str(exc),
+                "detail": "Проверка провайдера временно недоступна",
             }
         ), 503
     return provider_credentials_status()
@@ -349,8 +349,14 @@ def cloudru_service_accounts():
                 ]
             }
         )
-    except Exception as exc:
-        return jsonify({"error": "cloudru_service_accounts_failed", "detail": str(exc)}), 502
+    except Exception:
+        logger.exception("Cloud.ru service account discovery failed")
+        return jsonify(
+            {
+                "error": "cloudru_service_accounts_failed",
+                "detail": "Не удалось получить список service accounts",
+            }
+        ), 502
 
 
 @provider_credentials_bp.post("/cloudru/bootstrap")
@@ -472,8 +478,14 @@ def bootstrap_cloudru():
         )
     except PermissionError:
         return jsonify({"error": "Cloud.ru Foundation Models authorization failed"}), 401
-    except Exception as exc:
-        return jsonify({"error": "cloudru_bootstrap_failed", "detail": str(exc)}), 502
+    except Exception:
+        logger.exception("Cloud.ru bootstrap failed")
+        return jsonify(
+            {
+                "error": "cloudru_bootstrap_failed",
+                "detail": "Не удалось завершить настройку Cloud.ru",
+            }
+        ), 502
 
 
 @provider_credentials_bp.put("")
@@ -484,9 +496,11 @@ def update_provider_credentials():
         return guard
     try:
         data = request.get_json(silent=False)
-    except Exception as exc:
+    except Exception:
         logger.exception("Invalid provider credentials JSON payload")
-        return jsonify({"error": "invalid_json", "detail": str(exc)}), 400
+        return jsonify(
+            {"error": "invalid_json", "detail": "Тело запроса должно содержать корректный JSON"}
+        ), 400
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
 
@@ -530,11 +544,10 @@ def update_provider_credentials():
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
-            except PermissionError as exc:
+            except PermissionError:
                 logger.debug(
-                    "provider credential validation rejected: provider=%s reason=%s",
+                    "provider credential validation rejected: provider=%s",
                     provider,
-                    str(exc),
                 )
                 return jsonify(
                     {
@@ -543,14 +556,14 @@ def update_provider_credentials():
                         "status": "invalid",
                     }
                 ), 401
-            except Exception as exc:
+            except Exception:
                 logger.exception("provider credential validation failed: provider=%s", provider)
                 return jsonify(
                     {
                         "error": "provider_health_check_failed",
                         "provider": provider,
                         "status": "invalid",
-                        "detail": str(exc),
+                        "detail": "Проверка API key завершилась ошибкой провайдера",
                     }
                 ), 502
             else:
