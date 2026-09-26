@@ -58,10 +58,12 @@ async function main() {
         capabilities: ["storage.read", "network"]
     });
 
-    moduleContext.status.set("running", "Тестовая операция", {
+    moduleContext.status.set("running", "Тестовая операция token=visible-secret", {
         revocable: true,
         authorization: "do-not-leak"
     });
+    const statusSnapshot = core.status.snapshot();
+    assert.ok(!JSON.stringify(statusSnapshot).includes("visible-secret"));
 
     const trace = moduleContext.trace.begin("secret-operation", {
         api_key: "top-secret",
@@ -72,12 +74,14 @@ async function main() {
         value: "safe"
     });
     trace.response({status: 200, password: "hidden"});
+    trace.response("Bearer plain-secret");
     const snapshot = trace.end("completed");
 
     const serialized = JSON.stringify(snapshot);
     assert.ok(!serialized.includes("top-secret"));
     assert.ok(!serialized.includes("secret-token"));
     assert.ok(!serialized.includes("hidden"));
+    assert.ok(!serialized.includes("plain-secret"));
     assert.ok(serialized.includes("visible"));
 
     assert.strictEqual(moduleContext.security.require("storage.read"), true);
