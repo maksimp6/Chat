@@ -63,11 +63,21 @@ def entropy(value: str) -> float:
     return -sum((count / n) * math.log2(count / n) for count in counts.values())
 
 
-def is_dispatcher(path: Path) -> bool:\n    return path.name == "dispatcher.js"\n\n\ndef is_vendor(path: Path) -> bool:
+def is_dispatcher(path: Path) -> bool:
+    return path.name == "dispatcher.js"
+
+\ndef is_vendor(path: Path) -> bool:
     return path.name in {"eruda.js"} or "vendor" in path.parts
 
 
-def _timer_errors(text: str, rel: Path) -> list[str]:\n    errors = []\n    for pattern, label in TIMER_PATTERNS:\n        if pattern.search(text):\n            errors.append(f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle")\n    return errors\n\n\ndef _loop_errors(text: str, rel: Path) -> list[str]:
+def _timer_errors(text: str, rel: Path) -> list[str]:
+    errors = []
+    for pattern, label in TIMER_PATTERNS:
+        if pattern.search(text):
+            errors.append(f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle")
+    return errors
+
+\ndef _loop_errors(text: str, rel: Path) -> list[str]:
     errors = []
     for pattern, label in INFINITE_LOOP_PATTERNS:
         if pattern.search(text):
@@ -128,7 +138,9 @@ def validate_file(path: Path) -> list[str]:
         if len(line.encode("utf-8")) > MAX_LINE_BYTES:
             errors.append(f"{rel}:{number}: line exceeds {MAX_LINE_BYTES} bytes")
 
-    if not is_dispatcher(path) and re.search(r"\\bfetch\\s*\\(", text):\n        errors.append(f"{rel}: dispatcher safety violation: direct transport access is forbidden")\n\n    if TEXT_FORBIDDEN.search(text):
+    if not is_dispatcher(path) and re.search(r"\\bfetch\\s*\\(", text):
+        errors.append(f"{rel}: dispatcher safety violation: direct transport access is forbidden")\n
+    if TEXT_FORBIDDEN.search(text):
         errors.append(f"{rel}: unusual text classification: forbidden control character")
 
     for pattern, label in OBFUSCATION_PATTERNS:
@@ -158,7 +170,8 @@ def validate_file(path: Path) -> list[str]:
         if entropy(text) > 5.95 and len(text) > 32 * 1024 and not is_vendor(path):
             errors.append(f"{rel}: unusual text classification: high source entropy")
 
-    errors.extend(_timer_errors(text, rel))\n    errors.extend(_loop_errors(text, rel))
+    errors.extend(_timer_errors(text, rel))
+    errors.extend(_loop_errors(text, rel))
     errors.extend(_array_errors(text, rel))
     errors.extend(_cache_errors(text, rel))
     return errors
