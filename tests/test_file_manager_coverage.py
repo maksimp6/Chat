@@ -1,4 +1,5 @@
 import io
+import re
 
 import pytest
 import requests
@@ -149,7 +150,7 @@ def test_fm_handle_error_maps_http_failures(status, payload, text, expected):
     client = Client(FakeSession())
     response = FakeResponse(status_code=status, payload=payload, text=text)
 
-    with pytest.raises(YandexClientError, match=expected):
+    with pytest.raises(YandexClientError, match=re.escape(expected)):
         client._fm_handle_error(response, "Context")
 
 
