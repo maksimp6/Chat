@@ -1469,3 +1469,21 @@ html, body {
     color: var(--text-main);
     font-size: 11px;
 }
+
+
+.alice-pro-app .file-manager-vs-create-btn,
+.alice-pro-app .file-manager-vs-refresh-btn {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+.alice-pro-app .file-manager-vs-create-btn {
+    border: 0;
+    background: var(--m-accent, #4a90d9);
+    color: #fff;
+}
+.alice-pro-app .file-manager-vs-refresh-btn {
+    border: 1px solid var(--m-border, #ddd);
+    background: var(--m-card, #fff);
+    color: var(--m-text, #222);
+}
