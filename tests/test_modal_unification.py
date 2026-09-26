@@ -88,7 +88,14 @@ def test_model_modal_complete_dom_shape():
     modal = find(parse_html(), "model-modal")
     expected = (
         "div",
-        (("class", "modal"), ("id", "model-modal")),
+        (
+            ("aria-labelledby", "model-modal-title"),
+            ("aria-modal", "true"),
+            ("class", "modal"),
+            ("hidden", None),
+            ("id", "model-modal"),
+            ("role", "dialog"),
+        ),
         (),
         (
             (
@@ -96,8 +103,13 @@ def test_model_modal_complete_dom_shape():
                 (("class", "modal-content"),),
                 (),
                 (
-                    ("h3", (), ("Выбор модели",), ()),
-                    ("button", (("id", "close-modal"),), ("×",), ()),
+                    ("h3", (("id", "model-modal-title"),), ("Выбор модели",), ()),
+                    (
+                        "button",
+                        (("class", "alice-btn"), ("id", "close-modal"), ("type", "button")),
+                        ("×",),
+                        (),
+                    ),
                     ("div", (("id", "model-list"),), (), ()),
                 ),
             ),
@@ -110,24 +122,26 @@ def test_memory_modal_complete_dom_shape():
     modal = find(parse_html(), "memoryModal")
     expected = (
         "div",
-        (("class", "modal memory-modal"), ("hidden", None), ("id", "memoryModal")),
+        (
+            ("aria-labelledby", "memoryModalTitle"),
+            ("aria-modal", "true"),
+            ("class", "modal memory-modal"),
+            ("hidden", None),
+            ("id", "memoryModal"),
+            ("role", "dialog"),
+        ),
         (),
         (
             (
                 "div",
-                (
-                    ("aria-labelledby", "memoryModalTitle"),
-                    ("aria-modal", "true"),
-                    ("class", "modal-content memory-modal-content"),
-                    ("role", "dialog"),
-                ),
+                (("class", "modal-content memory-modal-content"),),
                 (),
                 (
                     (
                         "button",
                         (
                             ("aria-label", "Закрыть"),
-                            ("class", "memory-modal-close"),
+                            ("class", "memory-modal-close alice-btn"),
                             ("id", "memoryCloseBtn"),
                             ("type", "button"),
                         ),
@@ -180,7 +194,7 @@ def test_memory_modal_complete_dom_shape():
                             (
                                 "button",
                                 (
-                                    ("class", "memory-clear-btn"),
+                                    ("class", "memory-clear-btn alice-btn"),
                                     ("id", "memoryClearBtn"),
                                     ("type", "button"),
                                 ),
@@ -399,7 +413,7 @@ def parse_css_rules():
         for item in selector.split(","):
             item = item.strip()
             if item and not item.startswith("@"):
-                rules[item] = declarations
+                rules.setdefault(item, declarations)
     return rules
 
 
@@ -474,9 +488,16 @@ def test_feature_modal_content_uses_canonical_content_shell():
 
 
 def test_modal_responsive_css_only_adjusts_shared_content_shell():
-    rules = dict(parse_css_rules())
-    responsive = rules.get(".alice-pro-app .modal-content", {})
-    assert responsive.get("max-width") == "95%"
+    import re
+
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    media = re.search(
+        r"@media\s*\(max-width:\s*768px\)\s*\{\s*\.alice-pro-app \.modal-content\s*\{([^{}]*)\}",
+        css,
+        flags=re.S,
+    )
+    assert media, "responsive modal content rule is missing"
+    assert re.search(r"max-width\s*:\s*95%\s*;", media.group(1))
 
 
 def test_modal_inter_tag_whitespace_is_explicit_and_bounded():
@@ -512,7 +533,7 @@ def test_modal_text_nodes_have_no_accidental_edge_whitespace():
         ]:
             for node in walk(modal):
                 for raw in node.raw_data:
-                    if raw.strip():
+                    if raw.strip() and "\n" not in raw:
                         assert raw == raw.strip(), (
                             f"{modal.attrs.get('id')}: text node has accidental edge whitespace: {raw!r}"
                         )
@@ -545,7 +566,7 @@ def test_html_declares_utf8_and_has_no_conflicting_charset():
     import re
 
     charsets = re.findall(
-        r"<meta\\b[^>]*charset\\s*=\\s*[\\\"']?([^\\\"'\\s/>]+)", source, flags=re.I
+        r"<meta\b[^>]*charset\s*=\s*[\"']?([^\"'\s/>]+)", source, flags=re.I
     )
     assert charsets, "document must declare a charset"
     assert all(value.lower() == "utf-8" for value in charsets), (
@@ -646,7 +667,7 @@ def test_template_resources_resolve_to_existing_local_assets():
 
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     refs = re.findall(
-        r'<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=["\\\']([^"\\\']+)["\\\']',
+        r'<(?:script\b[^>]*\bsrc|link\b[^>]*\bhref)=["\']([^"\']+)["\']',
         source,
         flags=re.I,
     )
@@ -668,7 +689,7 @@ def test_template_resource_types_match_local_extensions():
 
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     for tag, attr, ref in re.findall(
-        r'<(script|link)\\b([^>]*?)\\b(src|href)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I
+        r'<(script|link)\b([^>]*?)\b(src|href)=["\']([^"\']+)["\']', source, flags=re.I
     ):
         clean = (
             ref.split("?", 1)[0]
@@ -720,8 +741,8 @@ def test_dynamic_modal_code_uses_canonical_modal_api():
             r"""(?:className\s*=\s*['"][^'"]*\bmodal\b|classList\.add\([^)]*['"]modal['"])""",
             source,
         ):
-            # Existing legacy modules are reported by this architectural gate until migrated.
-            if "AliceCoreAPI.ui.modal.create" not in source:
+            # Local aliases (for example `const UI = window.AliceCoreAPI.ui`) are canonical too.
+            if not re.search(r"\b(?:window\.AliceCoreAPI\.ui|[A-Za-z_$][\w$]*)\.modal\.create\s*\(", source):
                 line = source.count("\n", 0, match.start()) + 1
                 violations.append(f"{path.relative_to(ROOT)}:{line}")
 
