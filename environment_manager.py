@@ -22,7 +22,7 @@ from db import get_conn, init_db as init_runtime_db
 from invocation_context import InvocationContext
 from invocation_trace import create_invocation_trace
 from trace_manager import ExecutionTrace
-from runtime import RuntimeDispatcher
+from runtime import RuntimeDispatcher, RuntimeNotFound, RuntimeOwnerViolation
 from runtime.request_context import bind_runtime_request
 
 
@@ -542,6 +542,25 @@ class EnvironmentRuntime:
 def register_runtime_operation(name: str, handler) -> None:
     """Register a dispatcher operation available to managed runtime threads."""
     _RUNTIME_DISPATCHER.register_operation(name, handler)
+
+
+def authorize_environment_runtime(
+    environment_id: str,
+    owner_id: Optional[str],
+) -> None:
+    """Authorize gateway access without exposing another owner's environment."""
+    try:
+        _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
+        return
+    except RuntimeNotFound:
+        # Stopped environments intentionally have no dispatcher context.  Keep
+        # owner checks centralized here so the gateway can distinguish a
+        # stopped owned environment (503) from a missing/cross-owner one (404).
+        item = _get(environment_id)
+        if not item:
+            raise
+        if owner_id and item.get("owner_id") not in (None, owner_id):
+            raise RuntimeOwnerViolation(environment_id) from None
 
 
 def dispatch_environment_operation(

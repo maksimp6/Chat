@@ -5,6 +5,7 @@ from .dispatcher import (
     RuntimeDispatcher,
     RuntimeNotFound,
     RuntimeOperationNotFound,
+    RuntimeOwnerViolation,
     RuntimeScopeViolation,
 )
 from .request_context import (
@@ -19,6 +20,7 @@ __all__ = [
     "RuntimeDispatcher",
     "RuntimeNotFound",
     "RuntimeOperationNotFound",
+    "RuntimeOwnerViolation",
     "RuntimeScopeViolation",
     "bind_runtime_request",
     "current_runtime_base_path",
