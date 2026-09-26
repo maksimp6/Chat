@@ -13,10 +13,14 @@ def test_theme_and_provider_modules_do_not_own_presentation_inline_styles():
         assert ".style.margin" not in source
 
 
-def test_provider_modal_uses_semantic_dialog_state():
+def test_provider_modal_uses_canonical_semantic_dialog_state():
     source = read("static/provider_credentials.js")
-    assert 'role", "dialog"' in source
-    assert 'aria-modal", "true"' in source
-    assert 'classList.add("visible")' in source
-    assert 'classList.remove("visible")' in source
+    core = read("static/core_api.js")
+
+    assert "UI.modal.create({" in source
+    assert "window.AliceCoreAPI.ui.modal.open(modal)" in source
+    assert "window.AliceCoreAPI.ui.modal.close(modal)" in source
     assert ".onclick" not in source
+
+    assert 'modal.setAttribute("role", "dialog")' in core
+    assert 'modal.setAttribute("aria-modal", "true")' in core
