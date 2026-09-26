@@ -2,10 +2,8 @@ const fs = require("node:fs");
 const {BrowserShim} = require("./browser_dom");
 
 const template = fs.readFileSync("templates/index.html", "utf8");
-const headerMatch = template.match(/<header id="header"[\s\S]*?<\/header>/);
-if (!headerMatch) throw new Error("real header not found in index.html");
-
-const shim = new BrowserShim(headerMatch[0]);
+const shim = new BrowserShim(template);
+if (!shim.document.getElementById("header")) throw new Error("real header not found in index.html");
 const {window, document} = shim.load(["static/core_api.js", "static/ui_runtime.js"]);
 
 const UI = window.AliceCoreAPI.ui;
