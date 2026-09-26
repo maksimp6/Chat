@@ -25,10 +25,6 @@
     actions.register("header.dozzle.open", call("openDozzleLogs"));
     actions.register("header.departments.open", call("openDepartmentsModal"));
     actions.register("header.credentials.open", call("openProviderCredentialsModal"));
-    actions.register(
-      "header.memory.open",
-      call("openMemoryModal", "[Memory] Modal script is unavailable"),
-    );
     actions.register("header.update.open", function () {
       if (window.AliceAndroid) {
         window.AliceAndroid.openUpdater();
