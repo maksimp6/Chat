@@ -1,8 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const vm = require("node:vm");
+const {BrowserShim} = require("./browser_dom");
 
-const coreSource = fs.readFileSync("static/core_api.js", "utf8");
 const source = fs.readFileSync("static/file_manager.js", "utf8");
 
 function response(status, payload) {
@@ -14,24 +13,18 @@ function response(status, payload) {
 }
 
 async function runWithFetch(mockResponse) {
-    const context = {
-        window: {},
-        document: {
-            createElement: () => ({}),
-            body: {},
+    const shim = new BrowserShim();
+    const loaded = shim.load(
+        ["static/core_api.js", "static/file_manager.js"],
+        {
+            navigator: {},
+            fetch: async () => mockResponse,
         },
-        console,
-        setTimeout,
-        clearTimeout,
-        navigator: {},
-    };
-    context.window.document = context.document;
-    vm.runInNewContext(coreSource, context, { filename: "static/core_api.js" });
-    context.window.AliceDispatcher = {
+    );
+    loaded.window.AliceDispatcher = {
         request: async () => mockResponse,
     };
-    vm.runInNewContext(source, context, { filename: "static/file_manager.js" });
-    return context.window.fetchVectorStores();
+    return loaded.window.fetchVectorStores();
 }
 
 (async () => {
