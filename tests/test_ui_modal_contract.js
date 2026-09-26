@@ -1,13 +1,10 @@
-const fs = require("fs");
-const vm = require("vm");
 const {BrowserShim} = require("./browser_dom");
 
 const shim = new BrowserShim();
-const context = shim.createContext();
-vm.runInContext(fs.readFileSync("static/core_api.js", "utf8"), context);
+const {window, document} = shim.load(["static/core_api.js"]);
 
-const UI = context.window.AliceCoreAPI.ui;
-const body = context.document.createElement("div");
+const UI = window.AliceCoreAPI.ui;
+const body = document.createElement("div");
 body.className = "modal-body";
 body.textContent = "Body";
 
@@ -46,8 +43,8 @@ const unregister = UI.actions.register("contract.modal.close", function() {
     closeCalls += 1;
     UI.modal.close(modal);
 });
-context.document.body.appendChild(modal);
-const unmount = UI.events.mountClicks(context.document.body);
+document.body.appendChild(modal);
+const unmount = UI.events.mountClicks(document.body);
 
 UI.modal.open(modal);
 close.click();
