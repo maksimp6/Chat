@@ -39,13 +39,15 @@ function click(element) {
         "static/core.js",
         "static/models.js",
       ],
-      '<button id="model-btn" data-action="model.open" data-modal="model-modal"></button><div id="model-modal" class="modal"><div class="modal-content"><button id="close-modal"></button><div id="model-list"></div></div></div>',
+      '<button id="model-btn" data-action="modal.open" data-modal="model-modal"></button><div id="model-modal" class="modal" hidden><div class="modal-content"><button id="close-modal" data-action="modal.close" data-modal="model-modal"></button><div id="model-list"></div></div></div>',
     );
     vm.runInContext(
       `modelsData = {text: {lite: {name: "Lite", input: "1", output: "2", multimodal: true}, full: {name: "Full", input: "3", output: "4"}}, voice: {voice: {name: "Voice", input: "5", output: "6"}}}; currentModel = "lite"; window.changeModel = function(model) { currentModel = model; };`,
       context,
     );
-    vm.runInContext("renderModelModal()", context);
+    click(document.getElementById("model-btn"));
+    assert.equal(document.getElementById("model-modal").hidden, false);
+    assert.equal(document.getElementById("model-modal").classList.contains("visible"), true);
     const options = document.getElementById("model-list").querySelectorAll(".model-option");
     assert.equal(options.length, 3);
     assert.ok(options[0].classList.contains("active"));
@@ -53,8 +55,9 @@ function click(element) {
     assert.match(options[0].textContent, /📷/);
     assert.match(options[2].textContent, /🎤/);
     click(document.getElementById("close-modal"));
+    assert.equal(document.getElementById("model-modal").hidden, true);
     assert.equal(document.getElementById("model-modal").classList.contains("visible"), false);
-    document.getElementById("model-modal").classList.add("visible");
+    click(document.getElementById("model-btn"));
     click(options[1]);
     assert.equal(vm.runInContext("currentModel", context), "full");
     assert.equal(document.getElementById("model-modal").classList.contains("visible"), false);
@@ -114,9 +117,8 @@ function click(element) {
         "static/ui_runtime.js",
         "static/dispatcher.js",
         "static/memory_panel.js",
-        "static/header_actions.js",
       ],
-      '<button id="memory-btn" data-action="header.memory.open"></button><div id="memoryModal" hidden><button id="memoryCloseBtn"></button><button id="memoryClearBtn"></button><input id="memEnabled"><input id="memLimit"><span id="memCount"></span><div id="memoryFactsList"></div>',
+      '<button id="memory-btn" data-action="modal.open" data-modal="memoryModal"></button><div id="memoryModal" class="modal" hidden><button id="memoryCloseBtn" data-action="modal.close" data-modal="memoryModal"></button><button id="memoryClearBtn"></button><input id="memEnabled"><input id="memLimit"><span id="memCount"></span><div id="memoryFactsList"></div>',
       { fetch },
     );
 
@@ -124,6 +126,7 @@ function click(element) {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     assert.equal(document.getElementById("memoryModal").hidden, false);
+    assert.equal(document.getElementById("memoryModal").classList.contains("visible"), true);
     assert.equal(document.getElementById("memEnabled").checked, true);
     assert.equal(document.getElementById("memLimit").value, 7);
     assert.equal(document.getElementById("memCount").textContent, "1");
@@ -135,6 +138,7 @@ function click(element) {
 
     click(document.getElementById("memoryCloseBtn"));
     assert.equal(document.getElementById("memoryModal").hidden, true);
+    assert.equal(document.getElementById("memoryModal").classList.contains("visible"), false);
   }
 
   console.log("frontend smoke tests passed");
