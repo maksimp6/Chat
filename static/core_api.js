@@ -392,7 +392,11 @@
     function onClick(event) {
       var button = findActionButton(event.target, root);
       if (!button || button.disabled) return;
-      dispatchAction(button.dataset.action, {element: button}, event);
+      try {
+        dispatchAction(button.dataset.action, {element: button}, event);
+      } catch (error) {
+        console.error("[UI ACTION]", error);
+      }
     }
 
     root.addEventListener("click", onClick);
