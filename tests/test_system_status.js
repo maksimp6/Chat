@@ -7,7 +7,7 @@ const ROOT = require("path").resolve(__dirname, "..");
 
 async function main() {
     const browser = new BrowserShim(
-        '<button id="system-status-btn" type="button"></button>' +
+        '<button id="system-status-btn" type="button" data-action="system-status.toggle"></button>' +
         '<div id="alice-system-status" hidden role="dialog">' +
         '<div class="alice-system-status-content">' +
         '<button class="alice-btn alice-system-status-close" type="button"></button>' +
@@ -20,7 +20,7 @@ async function main() {
         requests += 1;
         return {ok: true, status: 200, json: async () => ({ok: true})};
     };
-    const sourcePaths = ["core_api.js", "dispatcher.js", "system_status.js"]
+    const sourcePaths = ["core_api.js", "ui_runtime.js", "dispatcher.js", "system_status.js"]
         .map((name) => require("path").join(ROOT, "static", name));
     browser.load(sourcePaths, {fetch: mockFetch, URL}); 
 
