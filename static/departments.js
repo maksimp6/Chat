@@ -1,49 +1,59 @@
 (function () {
   "use strict";
+
   var modal = null;
+
   function el(tag, attrs, text) {
-    var n = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (k) {
-      n.setAttribute(k, attrs[k]);
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (key) {
+      node.setAttribute(key, attrs[key]);
     });
-    if (text !== undefined) n.textContent = text;
-    return n;
+    if (text !== undefined) node.textContent = text;
+    return node;
   }
+
   function close() {
+    if (!modal) return;
+    window.AliceCoreAPI.ui.modal.close(modal);
+  }
+
+  function open() {
     if (modal) {
       modal.remove();
       modal = null;
     }
-  }
-  function open() {
-    close();
-    modal = el("div", { class: "alice-dept-overlay" });
-    var card = el("div", { class: "alice-dept-card" });
-    var head = el("div", { class: "alice-dept-head" });
-    head.appendChild(el("h3", {}, "Departments"));
-    var x = el("button", { "aria-label": "Закрыть" }, "×");
-    x.onclick = close;
-    head.appendChild(x);
-    card.appendChild(head);
-    var list = el("div", { class: "alice-dept-list" });
-    list.textContent = "Загрузка…";
-    card.appendChild(list);
-    modal.appendChild(card);
-    document.body.appendChild(modal);
+
+    var UI = window.AliceCoreAPI.ui;
+    var list = el("div", { class: "alice-dept-list" }, "Загрузка…");
+    modal = UI.modal.create({
+      id: "departments-modal",
+      title: "Departments",
+      titleTag: "h3",
+      className: "alice-dept-overlay",
+      contentClassName: "alice-dept-card",
+      closeAction: "departments.close",
+      body: list,
+    });
+
+    (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
+    UI.modal.open(modal);
+
     window.AliceDispatcher.request("/api/departments", { headers: { Accept: "application/json" } })
-      .then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.json();
       })
       .then(function (data) {
         list.textContent = "";
-        (data.departments || []).forEach(function (d) {
+        (data.departments || []).forEach(function (department) {
           var row = el("button", { class: "alice-dept-row" });
-          row.appendChild(el("strong", {}, d.name));
-          row.appendChild(el("span", {}, (d.description || d.type || "").slice(0, 120)));
+          row.appendChild(el("strong", {}, department.name));
+          row.appendChild(
+            el("span", {}, (department.description || department.type || "").slice(0, 120)),
+          );
           row.onclick = function () {
             if (
-              d.id === "partner-relations" &&
+              department.id === "partner-relations" &&
               typeof window.openPartnerRelationsModal === "function"
             ) {
               close();
@@ -51,31 +61,34 @@
               return;
             }
             window.AliceDispatcher.request(
-              "/api/departments/" + encodeURIComponent(d.id) + "/sessions",
+              "/api/departments/" + encodeURIComponent(department.id) + "/sessions",
               { method: "POST", headers: { Accept: "application/json" } },
             )
-              .then(function (r) {
-                return r.json().then(function (x) {
-                  return { ok: r.ok, data: x };
+              .then(function (response) {
+                return response.json().then(function (payload) {
+                  return { ok: response.ok, data: payload };
                 });
               })
-              .then(function (x) {
-                if (!x.ok) {
-                  alert(x.data.error || "Не удалось начать сессию");
+              .then(function (result) {
+                if (!result.ok) {
+                  alert(result.data.error || "Не удалось начать сессию");
                   return;
                 }
-                row.querySelector("span").textContent = "Сессия: " + x.data.session.id;
+                row.querySelector("span").textContent = "Сессия: " + result.data.session.id;
               });
           };
           list.appendChild(row);
         });
-        if (!list.children.length)
+        if (!list.children.length) {
           list.appendChild(el("div", {}, "Пока нет активных departments."));
+        }
       })
-      .catch(function (e) {
-        list.textContent = "Ошибка: " + e.message;
+      .catch(function (error) {
+        list.textContent = "Ошибка: " + error.message;
       });
   }
+
+  window.AliceCoreAPI.ui.actions.register("departments.close", close);
   window.openDepartmentsModal = open;
   window.closeDepartmentsModal = close;
 })();
