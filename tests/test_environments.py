@@ -116,3 +116,29 @@ def test_environment_api_exposes_lifecycle_contract(tmp_path, monkeypatch):
     assert client.post(f"/api/environments/{environment_id}/restart").status_code == 200
     assert client.delete(f"/api/environments/{environment_id}").status_code == 200
     assert client.get(f"/api/environments/{environment_id}").status_code == 404
+
+
+def test_environment_init_recovers_stale_running_state_after_process_restart(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    item = create_environment("feature/one")
+    conn = db.get_conn()
+    conn.execute(
+        "UPDATE environments SET status = ?, runtime_pid = ?, runtime_port = ? WHERE environment_id = ?",
+        ("RUNNING", 12345, 54321, item["environment_id"]),
+    )
+    conn.commit()
+    conn.close()
+
+    init_environment_tables()
+
+    recovered = next(
+        environment
+        for environment in list_environments()
+        if environment["environment_id"] == item["environment_id"]
+    )
+    assert recovered["status"] == "STOPPED"
+    assert recovered["runtime_pid"] is None
+    assert recovered["runtime_port"] is None
+    assert recovered["runtime_thread_id"] is None
+
+    delete_environment(item["environment_id"])
