@@ -84,9 +84,7 @@ def test_validation_report_main_renders_frontend_python_and_live_sections(
     assert "# Alice Pro validation report" in capsys.readouterr().out
 
 
-def test_validation_report_main_handles_missing_coverage_and_frontend_log(
-    monkeypatch, tmp_path
-):
+def test_validation_report_main_handles_missing_coverage_and_frontend_log(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     report.main()
@@ -96,4 +94,3 @@ def test_validation_report_main_handles_missing_coverage_and_frontend_log(
     assert "Coverage report was not produced." in rendered
     assert "Flask live log: not available" in rendered
     assert "**not run**" in rendered
-
