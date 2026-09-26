@@ -44,7 +44,7 @@ FETCH_IN_LOOP_RE = re.compile(
 )
 ARRAY_LITERAL_RE = re.compile(r"\[([^\[\]]*)\]", re.DOTALL)
 ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)")
-REPEATED_LOOKUP_RE = re.compile(
+TIMER_PATTERNS = (\n    (re.compile(r"\\bsetTimeout\\s*\\("), "setTimeout"),\n    (re.compile(r"\\bsetInterval\\s*\\("), "setInterval"),\n    (re.compile(r"\\bclearTimeout\\s*\\("), "clearTimeout"),\n    (re.compile(r"\\bclearInterval\\s*\\("), "clearInterval"),\n    (re.compile(r"\\b(?:delay|sleep)\\s*\\("), "delay/sleep"),\n)\nREPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
     r"[\s\S]{0,250}\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\("
 )
@@ -60,7 +60,7 @@ def is_vendor(path: Path) -> bool:
     return path.name in {"eruda.js"} or "vendor" in path.parts
 
 
-def _loop_errors(text: str, rel: Path) -> list[str]:
+def _timer_errors(text: str, rel: Path) -> list[str]:\n    errors = []\n    for pattern, label in TIMER_PATTERNS:\n        if pattern.search(text):\n            errors.append(f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle")\n    return errors\n\n\ndef _loop_errors(text: str, rel: Path) -> list[str]:
     errors = []
     for pattern, label in INFINITE_LOOP_PATTERNS:
         if pattern.search(text):
@@ -151,7 +151,7 @@ def validate_file(path: Path) -> list[str]:
         if entropy(text) > 5.95 and len(text) > 32 * 1024 and not is_vendor(path):
             errors.append(f"{rel}: unusual text classification: high source entropy")
 
-    errors.extend(_loop_errors(text, rel))
+    errors.extend(_timer_errors(text, rel))\n    errors.extend(_loop_errors(text, rel))
     errors.extend(_array_errors(text, rel))
     errors.extend(_cache_errors(text, rel))
     return errors
