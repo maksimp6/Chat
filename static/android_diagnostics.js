@@ -21,7 +21,8 @@
 
         var button = document.createElement("button");
         button.id = "android-diagnostics-btn";
-        button.className = "header-btn";
+        button.className = "header-btn alice-btn";
+        button.type = "button";
         button.title = "Диагностика Android";
         button.textContent = "🩺";
         button.addEventListener("click", function () {
@@ -66,5 +67,5 @@
     } else {
         initDiagnostics();
     }
-    setTimeout(initDiagnostics, 500);
+    window.AliceCoreAPI.scheduler.defer(initDiagnostics, 500);
 })();
