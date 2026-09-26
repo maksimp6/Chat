@@ -57,3 +57,9 @@ def test_preview_workflow_passes_runtime_token_to_vps_deployer():
     assert "Path-prefix" not in workflow
     assert 'printf "%s/alice-preview" "$HOME"' in workflow
     assert "Verify VPS routing" in workflow
+    assert "Verify rendered application shell" in workflow
+    assert 'id="app-root"' in workflow
+    assert 'id="msg-input"' in workflow
+    assert 'data-base-path=' in workflow
+    assert 'data-static-base=' in workflow
+    assert 'static/boot.js' in workflow
