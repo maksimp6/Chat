@@ -171,10 +171,29 @@
         }
     }
 
+    function decodeBase64(b64) {
+        if (typeof b64 !== "string" || b64.length > 2 * 1024 * 1024) {
+            throw new Error("Invalid or oversized audio payload");
+        }
+        var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        var bytes = new Uint8Array(Math.floor((b64.length * 3) / 4));
+        var outputIndex = 0;
+        for (var i = 0; i + 3 < b64.length; i += 4) {
+            var a = alphabet.indexOf(b64.charAt(i));
+            var b = alphabet.indexOf(b64.charAt(i + 1));
+            var c1 = alphabet.indexOf(b64.charAt(i + 2));
+            var d = alphabet.indexOf(b64.charAt(i + 3));
+            if (a < 0 || b < 0) throw new Error("Invalid audio encoding");
+            var value = (a << 18) | (b << 12) | ((c1 < 0 ? 0 : c1) << 6) | (d < 0 ? 0 : d);
+            bytes[outputIndex++] = (value >> 16) & 255;
+            if (c1 >= 0) bytes[outputIndex++] = (value >> 8) & 255;
+            if (d >= 0) bytes[outputIndex++] = value & 255;
+        }
+        return bytes.slice(0, outputIndex);
+    }
+
     function playAudioChunk(b64) {
-        var binary = atob(b64);
-        var bytes = new Uint8Array(binary.length);
-        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        var bytes = decodeBase64(b64);
         var int16 = new Int16Array(bytes.buffer);
         var float32 = new Float32Array(int16.length);
         for (var i = 0; i < int16.length; i++) float32[i] = int16[i] / 0x8000;
