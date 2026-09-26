@@ -191,9 +191,12 @@ const toolsButton = toolsRuntime.document.getElementById("tools-btn");
 if (!toolsButton) throw new Error("real tools button must exist in index.html");
 toolsButton.click();
 const toolsModal = toolsRuntime.document.getElementById("tools-modal-custom");
-const toolsClose = toolsRuntime.document.getElementById("tools-close-btn");
+const toolsClose = toolsModal && toolsModal.querySelector(".modal-close");
 if (!toolsModal || !toolsClose) {
   throw new Error("real tools modal controls must be created after click");
+}
+if (toolsClose.dataset.action !== "modal.close" || toolsClose.dataset.modal !== "tools-modal-custom") {
+  throw new Error("tools modal close must use generic modal.close dispatcher contract");
 }
 if (!toolsModal.parentNode || toolsModal.parentNode.id !== "app-root") {
   throw new Error("real tools modal must mount inside .alice-pro-app");
