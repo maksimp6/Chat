@@ -99,9 +99,7 @@
       "click",
       function (event) {
         var target =
-          event.target && event.target.closest
-            ? event.target.closest("#memoryClearBtn")
-            : null;
+          event.target && event.target.closest ? event.target.closest("#memoryClearBtn") : null;
         if (!target) return;
 
         if (target.id === "memoryClearBtn") {
