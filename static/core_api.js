@@ -374,6 +374,24 @@
     return handler(payload, event);
   }
 
+  function actionParams(element) {
+    var params = {};
+    if (!element || !element.dataset) return params;
+    Object.keys(element.dataset).forEach(function (key) {
+      if (key !== "action") params[key] = element.dataset[key];
+    });
+    return params;
+  }
+
+  function actionPayload(button, event) {
+    return Object.freeze({
+      action: button.dataset.action,
+      element: button,
+      event: event,
+      params: Object.freeze(actionParams(button))
+    });
+  }
+
   function findActionButton(target, root) {
     if (!target || typeof target.closest !== "function") return null;
     var button = target.closest("button[data-action]");
@@ -394,7 +412,7 @@
       var button = findActionButton(event.target, root);
       if (!button || button.disabled) return;
       try {
-        dispatchAction(button.dataset.action, {element: button}, event);
+        dispatchAction(button.dataset.action, actionPayload(button, event), event);
       } catch (error) {
         console.error("[UI ACTION]", error);
       }
@@ -419,6 +437,12 @@
     button.className = "alice-btn" + (options.className ? " " + String(options.className).trim() : "");
     button.dataset.action = options.action;
     if (options.id) button.id = String(options.id);
+    if (options.params) {
+      Object.keys(options.params).forEach(function (key) {
+        if (key === "action") return;
+        button.dataset[key] = String(options.params[key]);
+      });
+    }
     if (options.label) button.setAttribute("aria-label", String(options.label));
     if (options.title) button.title = String(options.title);
     if (options.text !== undefined) button.textContent = String(options.text);
@@ -483,6 +507,22 @@
     modal.setAttribute("aria-hidden", "true");
     return modal;
   }
+
+  function modalFromPayload(payload) {
+    var modalId = payload && payload.params && payload.params.modal;
+    if (!modalId) throw new Error("Modal action requires data-modal");
+    var modal = document.getElementById(String(modalId));
+    if (!modal) throw new Error("Unknown modal: " + modalId);
+    return modal;
+  }
+
+  registerAction("modal.open", function (payload) {
+    return openModal(modalFromPayload(payload));
+  });
+
+  registerAction("modal.close", function (payload) {
+    return closeModal(modalFromPayload(payload));
+  });
 
   window.AliceCoreAPI = Object.freeze({
     apiVersion: MODULE_API_VERSION,
