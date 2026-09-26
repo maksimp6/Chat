@@ -1,3 +1,4 @@
+from pathlib import Path
 import subprocess
 import threading
 
@@ -127,3 +128,14 @@ def test_environment_gateway_rejects_stopped_runtime_without_transport(tmp_path,
     assert response.status_code == 503
     assert response.get_json() == {"error": "environment_not_running"}
     delete_environment(created["environment_id"])
+
+
+def test_environment_gateway_has_no_localhost_proxy_transport():
+    root = Path(__file__).resolve().parents[1]
+    routes = (root / "environment_routes.py").read_text(encoding="utf-8")
+    manager = (root / "environment_manager.py").read_text(encoding="utf-8")
+    assert "import requests" not in routes
+    assert "requests.request(" not in routes
+    assert "http://127.0.0.1:" not in routes
+    assert "subprocess.Popen(" not in manager
+    assert "os.kill(" not in manager
