@@ -67,7 +67,7 @@ function renderModelModal() {
 }
 
 function createConversation(modelKey) {
-    fetch("/api/conversations", {
+    window.AliceDispatcher.request("/api/conversations", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({model: modelKey})
