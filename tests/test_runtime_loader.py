@@ -73,3 +73,88 @@ def test_loader_rejects_imports_instead_of_claiming_thread_isolation(tmp_path):
     )
     with pytest.raises(RuntimeLoadError, match="imports are not supported"):
         loader.load()
+
+
+def test_host_api_dispatches_through_runtime_dispatcher():
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    dispatcher.register_operation(
+        "echo",
+        lambda context, payload: {"runtime": context.runtime_id, "payload": dict(payload or {})},
+    )
+    from runtime import RuntimeHostAPI
+
+    host = RuntimeHostAPI("runtime", dispatcher)
+    assert host.dispatch("echo", {"value": 1}) == {
+        "runtime": "runtime",
+        "payload": {"value": 1},
+    }
+
+
+def test_loader_reports_digest_and_missing_entrypoint(tmp_path):
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    root = tmp_path / "revision"
+    root.mkdir()
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="d" * 40, source_root=root, dispatcher=dispatcher
+    )
+
+    assert loader.source_digest is None
+    assert loader.load() is False
+    assert loader.loaded is False
+
+
+def test_loader_rejects_unreadable_entrypoint(tmp_path, monkeypatch):
+    root = tmp_path / "revision"
+    root.mkdir()
+    (root / "alice_runtime.py").write_text("def create_runtime(host): pass\n", encoding="utf-8")
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="e" * 40, source_root=root, dispatcher=dispatcher
+    )
+
+    monkeypatch.setattr("importlib.machinery.SourceFileLoader.get_source", lambda self, name: None)
+    with pytest.raises(RuntimeLoadError, match="could not be read"):
+        loader.load()
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        ("VALUE = 1\n", "must define create_runtime"),
+        (
+            "def create_runtime(host):\n    return object()\n",
+            "runtime application must define invoke",
+        ),
+        ("def create_runtime(:\n    pass\n", "invalid runtime entry point"),
+        (
+            "def create_runtime(host):\n    eval('1')\n",
+            "revision call to eval\(\) is not supported",
+        ),
+    ],
+)
+def test_loader_rejects_invalid_runtime_contracts(tmp_path, source, message):
+    root = tmp_path / "revision"
+    root.mkdir()
+    (root / "alice_runtime.py").write_text(source, encoding="utf-8")
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="f" * 40, source_root=root, dispatcher=dispatcher
+    )
+
+    with pytest.raises(RuntimeLoadError, match=message):
+        loader.load()
+
+
+def test_loader_rejects_invoke_before_load(tmp_path):
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="0" * 40, source_root=tmp_path, dispatcher=dispatcher
+    )
+
+    with pytest.raises(RuntimeLoadError, match="revision runtime is not loaded"):
+        loader.invoke("noop")
