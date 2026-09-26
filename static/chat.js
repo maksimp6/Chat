@@ -85,7 +85,7 @@ function renderApprovalCard(toolCall, origMsg) {
             card.remove();
             addMessage("Сетевая ошибка при выполнении действия", "bot", false, 0);
         });
-    };
+    });
 
     rejectBtn.addEventListener("click", function() {
         card.remove();
