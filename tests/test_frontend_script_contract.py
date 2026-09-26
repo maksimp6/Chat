@@ -1,9 +1,23 @@
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_RE = re.compile(r'<script[^>]+src="{{ static_root }}/([^"]+)"[^>]*>')
+
+
+class ButtonParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.buttons = {}
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "button":
+            return
+        values = dict(attrs)
+        if values.get("id"):
+            self.buttons[values["id"]] = values
 
 
 def test_index_references_existing_versioned_local_scripts():
@@ -19,8 +33,11 @@ def test_index_references_existing_versioned_local_scripts():
 
 def test_critical_boot_script_is_local_and_synchronous():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    assert '<script id="alice-boot" src="{{ static_root }}/boot.js?v={{ static_version }}"' in html
-    assert " defer" not in html.split('<script id="alice-boot"', 1)[1].split("</script>", 1)[0]
+    tag = re.search(r'<script[^>]*id="alice-boot"[^>]*>', html)
+    assert tag, "critical boot script must be present"
+    assert 'src="{{ static_root }}/boot.js?v={{ static_version }}"' in tag.group(0)
+    assert " defer" not in tag.group(0)
+    assert " async" not in tag.group(0)
 
 
 def test_local_script_tags_are_deferred_or_async_except_critical_boot():
@@ -41,10 +58,12 @@ def test_index_has_no_inline_application_script():
 def test_critical_sidebar_controls_keep_native_html_semantics():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     sidebar = (ROOT / "static" / "sidebar.js").read_text(encoding="utf-8")
+    parser = ButtonParser()
+    parser.feed(html)
 
-    assert '<button id="new-chat-btn" type="button"' in html
-    assert '<button id="close-sidebar-btn" type="button"' in html
-    assert '<button id="menu-btn" type="button"' in html
+    for control_id in ("new-chat-btn", "close-sidebar-btn", "menu-btn"):
+        assert parser.buttons[control_id].get("type") == "button"
+
     assert 'link.href = "?conversation_id=" + encodeURIComponent(conv.id);' in sidebar
     assert "e.preventDefault();" in sidebar
     assert "window.__aliceSidebarHistoryBound" in sidebar
