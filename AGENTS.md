@@ -9,9 +9,11 @@ Use the smallest independent change that satisfies an issue or subtask.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
 5. Run the relevant backend/Android checks in CI.
-6. Open a PR describing the issue, behavior change, validation, and any migration/security impact.
-7. Merge only after required checks and review policy are satisfied.
-8. Never rewrite `master` directly and never commit secrets.
+6. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
+7. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
+8. If publication is blocked by missing remote, credentials, network access, or tooling, report the exact failing command/error and do not claim that a PR exists.
+9. Merge only after required checks and review policy are satisfied.
+10. Never rewrite `master` directly and never commit secrets.
 
 ## Architecture rules
 

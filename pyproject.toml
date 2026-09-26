@@ -12,3 +12,8 @@ exclude = [
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = ["--strict-config", "--strict-markers"]
+xfail_strict = true
