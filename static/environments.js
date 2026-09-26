@@ -25,10 +25,10 @@
         node.className = "environments-modal";
         node.innerHTML = [
             '<div class="environments-box" role="dialog" aria-modal="true" aria-labelledby="environments-title">',
-            '<button class="environments-close" type="button" aria-label="Закрыть">&times;</button>',
+            '<button class="alice-btn environments-close" type="button" aria-label="Закрыть">&times;</button>',
             '<div class="environments-head"><div><h2 id="environments-title">Environments</h2><p>Immutable branch runtimes</p></div>',
-            '<button class="environments-refresh" type="button">Обновить</button></div>',
-            '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button type="submit">Создать</button></form>',
+            '<button class="alice-btn environments-refresh" type="button">Обновить</button></div>',
+            '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="alice-btn" type="submit">Создать</button></form>',
             '<div class="environments-status" aria-live="polite" hidden></div><div class="environments-list"></div></div>'
         ].join("");
         document.body.appendChild(node);
@@ -67,9 +67,9 @@
                 '<div class="environment-card-meta">', esc(env.environment_id), ' · ', esc(env.data_namespace), '</div>',
                 '<div class="environment-card-actions">',
                 '<a href="', esc(env.url), '" target="_blank" rel="noopener">Открыть</a>',
-                '<button data-op="', action, '" data-id="', esc(env.environment_id), '">', label, '</button>',
-                '<button data-op="restart" data-id="', esc(env.environment_id), '">Перезапуск</button>',
-                '<button data-op="delete" data-id="', esc(env.environment_id), '">Удалить</button>',
+                '<button class="alice-btn" data-op="', action, '" data-id="', esc(env.environment_id), '">', label, '</button>',
+                '<button class="alice-btn" data-op="restart" data-id="', esc(env.environment_id), '">Перезапуск</button>',
+                '<button class="alice-btn" data-op="delete" data-id="', esc(env.environment_id), '">Удалить</button>',
                 '</div></article>'
             ].join("");
         }).join("") : '<div class="environments-empty">Нет окружений</div>';
@@ -114,7 +114,7 @@
         if (!header || document.getElementById("environments-btn")) return;
         const button = document.createElement("button");
         button.id = "environments-btn";
-        button.className = "header-btn";
+        button.className = "alice-btn header-btn";
         button.title = "Environments";
         button.setAttribute("aria-label", "Environments");
         button.textContent = "🌿";
