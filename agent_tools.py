@@ -12,11 +12,17 @@ TOOLS_SCHEMA = [
             "type": "object",
             "properties": {
                 "repo_path": {"type": "string", "description": "Путь к каталогу"},
-                "bare": {"type": "boolean", "description": "Флаг True для создания bare репозитория (--bare)"},
-                "initial_branch": {"type": "string", "description": "Начальная ветка (по умолчанию main)"}
+                "bare": {
+                    "type": "boolean",
+                    "description": "Флаг True для создания bare репозитория (--bare)",
+                },
+                "initial_branch": {
+                    "type": "string",
+                    "description": "Начальная ветка (по умолчанию main)",
+                },
             },
-            "required": ["repo_path"]
-        }
+            "required": ["repo_path"],
+        },
     },
     {
         "name": "git_clone",
@@ -24,13 +30,16 @@ TOOLS_SCHEMA = [
         "parameters": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "URL репозитория (https, ssh или локальный путь)"},
+                "url": {
+                    "type": "string",
+                    "description": "URL репозитория (https, ssh или локальный путь)",
+                },
                 "target_path": {"type": "string", "description": "Каталог назначения"},
                 "bare": {"type": "boolean", "description": "Клонировать как bare (--bare)"},
-                "mirror": {"type": "boolean", "description": "Клонировать как mirror (--mirror)"}
+                "mirror": {"type": "boolean", "description": "Клонировать как mirror (--mirror)"},
             },
-            "required": ["url", "target_path"]
-        }
+            "required": ["url", "target_path"],
+        },
     },
     {
         "name": "git_status",
@@ -39,9 +48,12 @@ TOOLS_SCHEMA = [
             "type": "object",
             "properties": {
                 "repo_path": {"type": "string", "description": "Путь к git репозиторию"},
-                "work_tree": {"type": "string", "description": "Рабочее дерево (обязательно для bare репозитория при проверке статуса файлов)"}
-            }
-        }
+                "work_tree": {
+                    "type": "string",
+                    "description": "Рабочее дерево (обязательно для bare репозитория при проверке статуса файлов)",
+                },
+            },
+        },
     },
     {
         "name": "git_commit",
@@ -50,12 +62,19 @@ TOOLS_SCHEMA = [
             "type": "object",
             "properties": {
                 "message": {"type": "string", "description": "Сообщение коммита"},
-                "files": {"type": "array", "items": {"type": "string"}, "description": "Список файлов для добавления"},
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Список файлов для добавления",
+                },
                 "repo_path": {"type": "string", "description": "Путь к git репозиторию"},
-                "work_tree": {"type": "string", "description": "Путь к рабочей директории, если репозиторий bare"}
+                "work_tree": {
+                    "type": "string",
+                    "description": "Путь к рабочей директории, если репозиторий bare",
+                },
             },
-            "required": ["message"]
-        }
+            "required": ["message"],
+        },
     },
     {
         "name": "git_remotes",
@@ -63,13 +82,17 @@ TOOLS_SCHEMA = [
         "parameters": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "enum": ["list", "add", "set_url", "remove", "show"], "description": "Действие"},
+                "action": {
+                    "type": "string",
+                    "enum": ["list", "add", "set_url", "remove", "show"],
+                    "description": "Действие",
+                },
                 "name": {"type": "string", "description": "Имя remote (по умолчанию 'origin')"},
                 "url": {"type": "string", "description": "URL удаленного репозитория"},
-                "repo_path": {"type": "string", "description": "Путь к git репозиторию"}
+                "repo_path": {"type": "string", "description": "Путь к git репозиторию"},
             },
-            "required": ["action"]
-        }
+            "required": ["action"],
+        },
     },
     {
         "name": "git_push",
@@ -79,11 +102,14 @@ TOOLS_SCHEMA = [
             "properties": {
                 "remote": {"type": "string", "description": "Имя remote (например 'origin')"},
                 "branch": {"type": "string", "description": "Ветка или refspec"},
-                "mirror": {"type": "boolean", "description": "Флаг --mirror для полной репликации bare репозитория"},
+                "mirror": {
+                    "type": "boolean",
+                    "description": "Флаг --mirror для полной репликации bare репозитория",
+                },
                 "set_upstream": {"type": "boolean", "description": "Флаг -u"},
-                "repo_path": {"type": "string", "description": "Путь к git репозиторию"}
-            }
-        }
+                "repo_path": {"type": "string", "description": "Путь к git репозиторию"},
+            },
+        },
     },
     {
         "name": "git_fetch",
@@ -92,10 +118,13 @@ TOOLS_SCHEMA = [
             "type": "object",
             "properties": {
                 "remote": {"type": "string", "description": "Имя remote (по умолчанию 'origin')"},
-                "prune": {"type": "boolean", "description": "Флаг --prune для очистки устаревших веток"},
-                "repo_path": {"type": "string", "description": "Путь к git репозиторию"}
-            }
-        }
+                "prune": {
+                    "type": "boolean",
+                    "description": "Флаг --prune для очистки устаревших веток",
+                },
+                "repo_path": {"type": "string", "description": "Путь к git репозиторию"},
+            },
+        },
     },
     {
         "name": "git_log",
@@ -104,9 +133,9 @@ TOOLS_SCHEMA = [
             "type": "object",
             "properties": {
                 "count": {"type": "integer", "description": "Количество коммитов (по умолчанию 5)"},
-                "repo_path": {"type": "string", "description": "Путь к git репозиторию"}
-            }
-        }
+                "repo_path": {"type": "string", "description": "Путь к git репозиторию"},
+            },
+        },
     },
     # --- СИСТЕМНЫЕ ИНСТРУМЕНТЫ ---
     {
@@ -117,50 +146,49 @@ TOOLS_SCHEMA = [
             "properties": {
                 "filepath": {"type": "string", "description": "Путь к файлу"},
                 "old_text": {"type": "string", "description": "Исходный фрагмент текста"},
-                "new_text": {"type": "string", "description": "Новый фрагмент текста"}
+                "new_text": {"type": "string", "description": "Новый фрагмент текста"},
             },
-            "required": ["filepath", "old_text", "new_text"]
-        }
+            "required": ["filepath", "old_text", "new_text"],
+        },
     },
     {
         "name": "shell_execute",
         "description": "Выполнить shell-команду в системе.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "Команда для терминала"}
-            },
-            "required": ["command"]
-        }
-    }
+            "properties": {"command": {"type": "string", "description": "Команда для терминала"}},
+            "required": ["command"],
+        },
+    },
 ]
+
 
 class ToolExecutor:
     @staticmethod
     def _run_git(args: list, repo_path: str = ".", work_tree: str = None):
         cmd = ["git"]
-        
+
         # Если явно передан work_tree или bare git dir
         if repo_path and repo_path != ".":
-            cmd.extend(["--git-dir", repo_path] if os.path.exists(os.path.join(repo_path, "HEAD")) and not os.path.exists(os.path.join(repo_path, ".git")) else ["-C", repo_path])
-        
+            cmd.extend(
+                ["--git-dir", repo_path]
+                if os.path.exists(os.path.join(repo_path, "HEAD"))
+                and not os.path.exists(os.path.join(repo_path, ".git"))
+                else ["-C", repo_path]
+            )
+
         if work_tree:
             cmd.extend(["--work-tree", work_tree])
 
         cmd.extend(args)
 
         try:
-            res = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             return {
                 "success": res.returncode == 0,
                 "stdout": res.stdout.strip(),
                 "stderr": res.stderr.strip(),
-                "exit_code": res.returncode
+                "exit_code": res.returncode,
             }
         except subprocess.TimeoutExpired:
             return {"success": False, "error": "Превышено время ожидания команды git (30с)"}
@@ -201,26 +229,34 @@ class ToolExecutor:
                 "success": True,
                 "is_bare": True,
                 "head_branch": head_info.get("stdout"),
-                "branches": branch_info.get("stdout").split("\n") if branch_info.get("stdout") else [],
-                "note": "Это bare-репозиторий без рабочей директории. Проверка рабочих файлов не требуется."
+                "branches": branch_info.get("stdout").split("\n")
+                if branch_info.get("stdout")
+                else [],
+                "note": "Это bare-репозиторий без рабочей директории. Проверка рабочих файлов не требуется.",
             }
-        
+
         res = cls._run_git(["status", "-sb"], repo_path=repo_path, work_tree=work_tree)
         res["is_bare"] = is_bare
         return res
 
     @classmethod
-    def git_commit(cls, message: str, files: list = None, repo_path: str = ".", work_tree: str = None):
+    def git_commit(
+        cls, message: str, files: list = None, repo_path: str = ".", work_tree: str = None
+    ):
         if cls._is_bare(repo_path) and not work_tree:
             return {
                 "success": False,
-                "error": "Нельзя сделать git commit в bare-репозиторий без указания параметра 'work_tree'."
+                "error": "Нельзя сделать git commit в bare-репозиторий без указания параметра 'work_tree'.",
             }
 
         add_target = files if files else ["."]
         add_res = cls._run_git(["add"] + add_target, repo_path=repo_path, work_tree=work_tree)
         if not add_res["success"]:
-            return {"success": False, "error": "Ошибка при добавлении файлов в индекс", "details": add_res}
+            return {
+                "success": False,
+                "error": "Ошибка при добавлении файлов в индекс",
+                "details": add_res,
+            }
 
         return cls._run_git(["commit", "-m", message], repo_path=repo_path, work_tree=work_tree)
 
@@ -230,7 +266,10 @@ class ToolExecutor:
             return cls._run_git(["remote", "-v"], repo_path=repo_path)
         elif action == "add":
             if not url:
-                return {"success": False, "error": "Параметр 'url' обязателен для добавления remote"}
+                return {
+                    "success": False,
+                    "error": "Параметр 'url' обязателен для добавления remote",
+                }
             return cls._run_git(["remote", "add", name, url], repo_path=repo_path)
         elif action == "set_url":
             if not url:
@@ -243,7 +282,14 @@ class ToolExecutor:
         return {"success": False, "error": f"Неизвестное действие: {action}"}
 
     @classmethod
-    def git_push(cls, remote: str = "origin", branch: str = None, mirror: bool = False, set_upstream: bool = False, repo_path: str = "."):
+    def git_push(
+        cls,
+        remote: str = "origin",
+        branch: str = None,
+        mirror: bool = False,
+        set_upstream: bool = False,
+        repo_path: str = ".",
+    ):
         args = ["push"]
         if mirror:
             args.append("--mirror")
@@ -295,12 +341,13 @@ class ToolExecutor:
                 "success": res.returncode == 0,
                 "stdout": res.stdout.strip(),
                 "stderr": res.stderr.strip(),
-                "exit_code": res.returncode
+                "exit_code": res.returncode,
             }
         except subprocess.TimeoutExpired:
             return {"success": False, "error": "Команда превысила лимит времени (20с)"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
 
 def dispatch_tool(tool_name: str, args: dict = None):
     args = args or {}

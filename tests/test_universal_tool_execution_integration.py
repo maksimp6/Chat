@@ -2,7 +2,11 @@ import unittest
 from unittest.mock import patch
 
 from trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolExecutor, UniversalToolCall, UniversalToolDefinition
+from universal_tool_platform import (
+    UniversalToolExecutor,
+    UniversalToolCall,
+    UniversalToolDefinition,
+)
 from tool_registry import registry
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
@@ -12,7 +16,11 @@ class TestUniversalToolExecutionIntegration(unittest.TestCase):
         return UniversalToolDefinition(
             name=name,
             description="demo",
-            input_schema={"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"]},
+            input_schema={
+                "type": "object",
+                "properties": {"value": {"type": "integer"}},
+                "required": ["value"],
+            },
             output_schema={"type": "object"},
             read_only=True,
             requires_approval=False,
@@ -35,7 +43,12 @@ class TestUniversalToolExecutionIntegration(unittest.TestCase):
             "call_id": "call-7",
         }
 
-        with patch.object(registry, "get_universal_definition", return_value=self._definition("demo_tool")),              patch.object(registry, "execute", return_value={"value": 7}) as legacy_execute:
+        with (
+            patch.object(
+                registry, "get_universal_definition", return_value=self._definition("demo_tool")
+            ),
+            patch.object(registry, "execute", return_value={"value": 7}) as legacy_execute,
+        ):
             result = YandexMcpMixin()._execute_single_tool(call, [], trace=trace)
 
         self.assertEqual(result["result"], {"value": 7})
@@ -50,7 +63,12 @@ class TestUniversalToolExecutionIntegration(unittest.TestCase):
                 return UniversalToolDefinition(
                     name=name,
                     description="demo",
-                    input_schema={"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+                    input_schema={
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                        "additionalProperties": False,
+                    },
                     output_schema={"type": "object"},
                     read_only=True,
                     requires_approval=False,

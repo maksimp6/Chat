@@ -27,22 +27,33 @@ from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
 from file_manager import YandexFileManagerMixin
 
-class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConversationMixin, YandexMcpMixin, YandexFileManagerMixin):
+
+class YandexResponsesClient(
+    YandexRequestMixin,
+    YandexPollingMixin,
+    YandexConversationMixin,
+    YandexMcpMixin,
+    YandexFileManagerMixin,
+):
     def __init__(self, config):
         self._config = config
         self.base_url = config.BASE_URL.rstrip("/")
         self.responses_url = self.base_url + "/responses"
         self.conversations_url = self.base_url + "/conversations"
         self.session = requests.Session()
-        self.session.headers.update({
-            "Content-Type": "application/json",
-        })
+        self.session.headers.update(
+            {
+                "Content-Type": "application/json",
+            }
+        )
 
     def _log_request(self, method, url, **kwargs):
         api_logger.info(f"[REQ] {method} {url}")
-        if kwargs.get('json'):
-            safe_payload = _sanitize_for_log(kwargs['json'])
-            api_logger.debug(f"[REQ BODY]\n{json.dumps(safe_payload, ensure_ascii=False, indent=2)}")
+        if kwargs.get("json"):
+            safe_payload = _sanitize_for_log(kwargs["json"])
+            api_logger.debug(
+                f"[REQ BODY]\n{json.dumps(safe_payload, ensure_ascii=False, indent=2)}"
+            )
 
     def _log_response(self, resp):
         status = resp.status_code
@@ -62,14 +73,17 @@ class YandexResponsesClient(YandexRequestMixin, YandexPollingMixin, YandexConver
     @staticmethod
     def extract_reasoning_and_text(data):
         from yandex_client_modules.parsers import extract_reasoning_and_text
+
         return extract_reasoning_and_text(data)
 
     @staticmethod
     def extract_text(data):
         from yandex_client_modules.parsers import extract_text
+
         return extract_text(data)
 
     @staticmethod
     def extract_usage(data):
         from yandex_client_modules.parsers import extract_usage
+
         return extract_usage(data)

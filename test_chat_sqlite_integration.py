@@ -1,4 +1,5 @@
 """Real SQLite integration test for failed /api/chat partial output persistence."""
+
 import os
 import tempfile
 import unittest
@@ -40,8 +41,10 @@ class TestChatSQLiteIntegration(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = os.path.join(tmpdir, "integration.db")
-            with patch.object(db, "DB_PATH", db_path), \
-                 patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()):
+            with (
+                patch.object(db, "DB_PATH", db_path),
+                patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+            ):
                 db.init_db()
                 db.create_conversation(conversation_id, "SQLite integration test", "aliceai-llm")
 
@@ -61,7 +64,8 @@ class TestChatSQLiteIntegration(unittest.TestCase):
                 payload = response.get_json()
                 self.assertEqual(payload["partial_output"], "Generated before failure")
                 self.assertIn("Generated before failure", payload["reply"])
-                self.assertIn("Failure after model response", payload["reply"])
+                self.assertIn("Внутренняя ошибка обработки запроса", payload["reply"])
+                self.assertNotIn("Failure after model response", str(payload))
                 self.assertTrue(payload["trace"]["responses"])
                 self.assertTrue(payload["trace"]["errors"])
 

@@ -13,7 +13,10 @@ from runtime_migrations import init_runtime_tables
 from session_manager import create_session, restore_session
 
 
-_SENSITIVE_KEY_RE = re.compile(r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)", re.IGNORECASE)
+_SENSITIVE_KEY_RE = re.compile(
+    r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)",
+    re.IGNORECASE,
+)
 
 
 def _now() -> int:
@@ -41,6 +44,7 @@ def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
         return session_id
     try:
         from flask import has_request_context, request
+
         if has_request_context():
             data = request.get_json(silent=True) or {}
             explicit = data.get("session_id")
@@ -87,7 +91,9 @@ def create_invocation(
     trace_id = str(uuid.uuid4())
     now = _now()
     persisted_metadata = _sanitize_metadata(metadata or {})
-    resolved_user_id = str(user_id).strip() if user_id is not None and str(user_id).strip() else None
+    resolved_user_id = (
+        str(user_id).strip() if user_id is not None and str(user_id).strip() else None
+    )
     if resolved_user_id is not None:
         persisted_metadata["user_id"] = resolved_user_id
     conn = get_conn()
@@ -173,8 +179,12 @@ def _complete(invocation_id: str, status: str, result: Any = None, error: Any = 
             (
                 status,
                 now,
-                json.dumps(_sanitize_metadata(result), ensure_ascii=False) if result is not None else None,
-                json.dumps(_sanitize_metadata(error), ensure_ascii=False) if error is not None else None,
+                json.dumps(_sanitize_metadata(result), ensure_ascii=False)
+                if result is not None
+                else None,
+                json.dumps(_sanitize_metadata(error), ensure_ascii=False)
+                if error is not None
+                else None,
                 invocation_id,
             ),
         )

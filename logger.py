@@ -1,6 +1,7 @@
 """
 logger.py - Централизованная система логирования для Alice Pro
 """
+
 import logging
 import os
 from datetime import datetime
@@ -8,17 +9,18 @@ from functools import wraps
 from logging.handlers import RotatingFileHandler
 from yc_logging import yc_logger
 
-os.makedirs('logs', exist_ok=True)
+os.makedirs("logs", exist_ok=True)
 
-LOG_FORMAT = '%(asctime)s | %(levelname)-7s | %(name)s | %(message)s'
-DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class ForceCriticalFilter(logging.Filter):
     """Normalize every project log record to CRITICAL for unified visibility."""
+
     def filter(self, record):
         record.levelno = logging.CRITICAL
-        record.levelname = 'CRITICAL'
+        record.levelname = "CRITICAL"
         return True
 
 
@@ -37,16 +39,16 @@ class AliceLogger:
         self._setup_loggers()
 
     def _setup_loggers(self):
-        self.loggers['app'] = self._create_logger('alice_pro', 'logs/app.txt')
-        self.loggers['api'] = self._create_logger('yandex_api', 'logs/api_debug.txt')
-        self.loggers['voice'] = self._create_logger('voice', 'logs/voice.txt')
-        self.loggers['chat'] = self._create_logger('chat', 'logs/chat.txt')
-        self.loggers['db'] = self._create_logger('database', 'logs/database.txt')
-        self.loggers['export'] = self._create_logger('export', 'logs/export.txt')
-        self.loggers['search'] = self._create_logger('search', 'logs/search.txt')
-        self.loggers['prompts'] = self._create_logger('prompts', 'logs/prompts.txt')
-        self.loggers['stats'] = self._create_logger('stats', 'logs/stats.txt')
-        self.loggers['error'] = self._create_logger('errors', 'logs/errors.txt')
+        self.loggers["app"] = self._create_logger("alice_pro", "logs/app.txt")
+        self.loggers["api"] = self._create_logger("yandex_api", "logs/api_debug.txt")
+        self.loggers["voice"] = self._create_logger("voice", "logs/voice.txt")
+        self.loggers["chat"] = self._create_logger("chat", "logs/chat.txt")
+        self.loggers["db"] = self._create_logger("database", "logs/database.txt")
+        self.loggers["export"] = self._create_logger("export", "logs/export.txt")
+        self.loggers["search"] = self._create_logger("search", "logs/search.txt")
+        self.loggers["prompts"] = self._create_logger("prompts", "logs/prompts.txt")
+        self.loggers["stats"] = self._create_logger("stats", "logs/stats.txt")
+        self.loggers["error"] = self._create_logger("errors", "logs/errors.txt")
 
     def _create_logger(self, name, filename):
         logger = logging.getLogger(name)
@@ -57,7 +59,7 @@ class AliceLogger:
             filename,
             maxBytes=5 * 1024 * 1024,
             backupCount=3,
-            encoding='utf-8',
+            encoding="utf-8",
         )
         fh.setLevel(logging.DEBUG)
         fh.addFilter(ForceCriticalFilter())
@@ -78,7 +80,7 @@ class AliceLogger:
         return logger
 
     def get(self, name):
-        return self.loggers.get(name, self.loggers['app'])
+        return self.loggers.get(name, self.loggers["app"])
 
 
 alice_logger = AliceLogger()
@@ -91,12 +93,12 @@ def _configure_global_logging():
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
 
-    app_logger = alice_logger.get('app')
+    app_logger = alice_logger.get("app")
     for handler in list(app_logger.handlers):
         if handler not in root.handlers:
             root.addHandler(handler)
 
-    for logger_name in ('werkzeug', 'flask.app'):
+    for logger_name in ("werkzeug", "flask.app"):
         logger = logging.getLogger(logger_name)
         logger.setLevel(logging.DEBUG)
         logger.handlers.clear()
@@ -106,7 +108,7 @@ def _configure_global_logging():
 _configure_global_logging()
 
 
-def log_function(logger_name='app'):
+def log_function(logger_name="app"):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -119,19 +121,26 @@ def log_function(logger_name='app'):
             except Exception as e:
                 logger.error(f"✗ {func.__name__}() ошибка: {str(e)}", exc_info=True)
                 raise
+
         return wrapper
+
     return decorator
 
 
-def log_request(logger_name='app'):
+def log_request(logger_name="app"):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             logger = alice_logger.get(logger_name)
             from flask import request
+
             logger.info(f"→ {request.method} {request.path}")
             if request.is_json:
-                keys = sorted(request.get_json(silent=True).keys()) if isinstance(request.get_json(silent=True), dict) else []
+                keys = (
+                    sorted(request.get_json(silent=True).keys())
+                    if isinstance(request.get_json(silent=True), dict)
+                    else []
+                )
                 logger.debug(f"  JSON body received (fields={','.join(keys) if keys else 'none'})")
             start_time = datetime.now()
             try:
@@ -141,50 +150,54 @@ def log_request(logger_name='app'):
                 return result
             except Exception as e:
                 duration = (datetime.now() - start_time).total_seconds()
-                logger.error(f"✗ {request.method} {request.path} - {duration:.3f}s - {str(e)}", exc_info=True)
+                logger.error(
+                    f"✗ {request.method} {request.path} - {duration:.3f}s - {str(e)}", exc_info=True
+                )
                 raise
+
         return wrapper
+
     return decorator
 
 
 def log_error(error_type, context=None):
-    logger = alice_logger.get('error')
+    logger = alice_logger.get("error")
     error_msg = f"[{error_type}]"
     if context:
         error_msg += f" {context}"
     logger.error(error_msg, exc_info=True)
 
 
-def log_voice(message, level='info'):
-    logger = alice_logger.get('voice')
+def log_voice(message, level="info"):
+    logger = alice_logger.get("voice")
     getattr(logger, level)(f"[VOICE] {message}")
 
 
-def log_chat(message, level='info'):
-    logger = alice_logger.get('chat')
+def log_chat(message, level="info"):
+    logger = alice_logger.get("chat")
     getattr(logger, level)(f"[CHAT] {message}")
 
 
-def log_db(message, level='info'):
-    logger = alice_logger.get('db')
+def log_db(message, level="info"):
+    logger = alice_logger.get("db")
     getattr(logger, level)(f"[DB] {message}")
 
 
-def log_search(message, level='info'):
-    logger = alice_logger.get('search')
+def log_search(message, level="info"):
+    logger = alice_logger.get("search")
     getattr(logger, level)(f"[SEARCH] {message}")
 
 
-def log_prompt(message, level='info'):
-    logger = alice_logger.get('prompts')
+def log_prompt(message, level="info"):
+    logger = alice_logger.get("prompts")
     getattr(logger, level)(f"[PROMPT] {message}")
 
 
-def log_export(message, level='info'):
-    logger = alice_logger.get('export')
+def log_export(message, level="info"):
+    logger = alice_logger.get("export")
     getattr(logger, level)(f"[EXPORT] {message}")
 
 
-def log_stats(message, level='info'):
-    logger = alice_logger.get('stats')
+def log_stats(message, level="info"):
+    logger = alice_logger.get("stats")
     getattr(logger, level)(f"[STATS] {message}")

@@ -14,7 +14,10 @@ def _tree(path, depth=0):
         return []
     entries = []
     try:
-        names = sorted(os.listdir(path), key=lambda value: (not os.path.isdir(os.path.join(path, value)), value.lower()))
+        names = sorted(
+            os.listdir(path),
+            key=lambda value: (not os.path.isdir(os.path.join(path, value)), value.lower()),
+        )
     except OSError as exc:
         raise RuntimeError(f"Cannot read project tree: {exc}") from exc
 
@@ -49,10 +52,12 @@ def _walk_count(items):
 @project_tree_bp.route("/api/project-tree", methods=["GET"])
 def get_project_tree():
     try:
-        return jsonify({
-            "root": os.path.basename(PROJECT_ROOT) or PROJECT_ROOT,
-            "path": ".",
-            "nodes": _tree(PROJECT_ROOT),
-        })
+        return jsonify(
+            {
+                "root": os.path.basename(PROJECT_ROOT) or PROJECT_ROOT,
+                "path": ".",
+                "nodes": _tree(PROJECT_ROOT),
+            }
+        )
     except RuntimeError as exc:
         return jsonify({"error": str(exc), "code": "PROJECT_TREE_ERROR"}), 500

@@ -24,15 +24,9 @@ def get_current_owner_id(*, required: bool = True) -> Optional[str]:
     owner_id = None
 
     if has_request_context():
-        owner_id = (
-            getattr(g, "authenticated_user_id", None)
-            or getattr(g, "user_id", None)
-        )
+        owner_id = getattr(g, "authenticated_user_id", None) or getattr(g, "user_id", None)
 
-        token = (
-            request.headers.get("X-Alice-User-Token")
-            or request.cookies.get("alice_user_token")
-        )
+        token = request.headers.get("X-Alice-User-Token") or request.cookies.get("alice_user_token")
         if token:
             token_owner_id = authenticate_user_token(token)
             if token_owner_id is None:

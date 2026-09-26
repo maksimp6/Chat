@@ -1,4 +1,5 @@
 """Provider-backed model discovery with a bounded in-process cache."""
+
 from __future__ import annotations
 
 import logging
@@ -149,8 +150,6 @@ def build_model_discovery() -> ModelDiscovery:
         ttl_seconds=ttl,
         timeout_seconds=timeout,
     )
-
-
 
 
 _DEFAULT_DISCOVERY: ModelDiscovery | None = None

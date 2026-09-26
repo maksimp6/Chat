@@ -7,6 +7,7 @@ Rotation uses Cloud.ru's documented API-key reissue operation through IAM
 management credentials. Reissue keeps the provider key ID unchanged, so the
 old resource must not be revoked after a successful reissue.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -44,10 +45,16 @@ class CloudRuApiKeyProvider:
         trace = get_current_trace()
         started = datetime.now()
         if trace:
-            trace.add_event("provider_api_request", {
-                "provider": "cloudru", "service": "foundation_models",
-                "operation": "validate_key", "method": "GET", "path": "/models",
-            })
+            trace.add_event(
+                "provider_api_request",
+                {
+                    "provider": "cloudru",
+                    "service": "foundation_models",
+                    "operation": "validate_key",
+                    "method": "GET",
+                    "path": "/models",
+                },
+            )
         try:
             response = requests.get(
                 f"{self.base_url}/models",
@@ -59,24 +66,40 @@ class CloudRuApiKeyProvider:
             )
             response.raise_for_status()
             if trace:
-                trace.add_event("provider_api_response", {
-                    "provider": "cloudru", "service": "foundation_models",
-                    "operation": "validate_key", "method": "GET", "path": "/models",
-                    "http_status": response.status_code,
-                    "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
-                    "success": True,
-                })
+                trace.add_event(
+                    "provider_api_response",
+                    {
+                        "provider": "cloudru",
+                        "service": "foundation_models",
+                        "operation": "validate_key",
+                        "method": "GET",
+                        "path": "/models",
+                        "http_status": response.status_code,
+                        "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
+                        "success": True,
+                    },
+                )
         except requests.RequestException as exc:
             status = getattr(exc.response, "status_code", None)
             if trace:
-                trace.add_event("provider_api_response", {
-                    "provider": "cloudru", "service": "foundation_models",
-                    "operation": "validate_key", "method": "GET", "path": "/models",
-                    "http_status": status,
-                    "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
-                    "success": False,
-                })
-                trace.record_error("cloudru.foundation_models.validate_key", "Cloud.ru Foundation Models health check failed", exception=exc)
+                trace.add_event(
+                    "provider_api_response",
+                    {
+                        "provider": "cloudru",
+                        "service": "foundation_models",
+                        "operation": "validate_key",
+                        "method": "GET",
+                        "path": "/models",
+                        "http_status": status,
+                        "timing_ms": round((datetime.now() - started).total_seconds() * 1000, 2),
+                        "success": False,
+                    },
+                )
+                trace.record_error(
+                    "cloudru.foundation_models.validate_key",
+                    "Cloud.ru Foundation Models health check failed",
+                    exception=exc,
+                )
             if status in (401, 403):
                 raise PermissionError("Cloud.ru Foundation Models authorization failed") from exc
             raise RuntimeError("Cloud.ru Foundation Models health check failed") from exc
@@ -87,20 +110,14 @@ class CloudRuApiKeyProvider:
         client = CloudRuIamClient()
         if not client.key_id or not client.key_secret:
             raise CloudRuIamError(
-                "Cloud.ru key rotation requires CLOUDRU_IAM_KEY_ID and "
-                "CLOUDRU_IAM_KEY_SECRET"
+                "Cloud.ru key rotation requires CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET"
             )
         return client
 
     def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
         """Return true only when reissue can actually be performed."""
         management = self.iam_client
-        return bool(
-            provider_key_id
-            and management
-            and management.key_id
-            and management.key_secret
-        )
+        return bool(provider_key_id and management and management.key_id and management.key_secret)
 
     def reissue_key(
         self,
@@ -121,9 +138,7 @@ class CloudRuApiKeyProvider:
         key_id = body.get("id") or body.get("key_id")
         secret = body.get("secret")
         if not key_id or not secret:
-            raise RuntimeError(
-                "Cloud.ru reissue response did not include key ID and Key Secret"
-            )
+            raise RuntimeError("Cloud.ru reissue response did not include key ID and Key Secret")
         return str(key_id), str(secret)
 
     def create_key(self, *, expires_at: datetime) -> tuple[str, str]:

@@ -1,4 +1,5 @@
 """Concrete Yandex Cloud API-key provider used by the rotation worker."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -45,25 +46,27 @@ class YandexApiKeyProvider:
             ]
         )
         self.scopes = raw_scopes
-        self.endpoint = (endpoint or os.getenv(
-            "YANDEX_IAM_ENDPOINT",
-            "https://iam.api.cloud.yandex.net",
-        )).rstrip("/")
-        self.ai_endpoint = (ai_endpoint or os.getenv(
-            "YANDEX_AI_ENDPOINT",
-            "https://ai.api.cloud.yandex.net/v1",
-        )).rstrip("/")
+        self.endpoint = (
+            endpoint
+            or os.getenv(
+                "YANDEX_IAM_ENDPOINT",
+                "https://iam.api.cloud.yandex.net",
+            )
+        ).rstrip("/")
+        self.ai_endpoint = (
+            ai_endpoint
+            or os.getenv(
+                "YANDEX_AI_ENDPOINT",
+                "https://ai.api.cloud.yandex.net/v1",
+            )
+        ).rstrip("/")
         self.project_id = project_id.strip() if isinstance(project_id, str) else ""
         if not self.project_id:
             raise ValueError("Yandex project_id is required")
         self.timeout = timeout
 
     def rotation_supported(self, provider_key_id: Optional[str]) -> bool:
-        return bool(
-            provider_key_id
-            and self.iam_token
-            and self.service_account_id
-        )
+        return bool(provider_key_id and self.iam_token and self.service_account_id)
 
     def _require_management_credentials(self) -> None:
         if not self.iam_token:

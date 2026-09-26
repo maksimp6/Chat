@@ -1,4 +1,5 @@
 """Cloud.ru IAM API-key wizard routes."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -139,9 +140,7 @@ def create_api_key():
             environment=environment,
             owner=owner,
             expires_at=(
-                datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-                if expires_at
-                else None
+                datetime.fromisoformat(expires_at.replace("Z", "+00:00")) if expires_at else None
             ),
             key_ref=f"cloudru_{key_id}",
         )

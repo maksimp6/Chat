@@ -20,7 +20,8 @@ def test_observability_migration_is_idempotent(tmp_path, monkeypatch):
         ).fetchall()
         assert len(versions) == 1
         tables = {
-            row[0] for row in conn.execute(
+            row[0]
+            for row in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             ).fetchall()
         }

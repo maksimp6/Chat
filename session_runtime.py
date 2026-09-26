@@ -82,7 +82,9 @@ class VirtualLowConsumptionServer:
             def limits() -> None:
                 if resource is None:
                     return
-                resource.setrlimit(resource.RLIMIT_CPU, (self.config.cpu_seconds, self.config.cpu_seconds))
+                resource.setrlimit(
+                    resource.RLIMIT_CPU, (self.config.cpu_seconds, self.config.cpu_seconds)
+                )
                 memory = self.config.memory_mb * 1024 * 1024
                 resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
 
@@ -140,7 +142,10 @@ class VirtualLowConsumptionServer:
     def reap_if_idle(self, now: Optional[float] = None) -> bool:
         now = time.time() if now is None else now
         with self._lock:
-            if self.state in {"running", "idle"} and now - self._last_used >= self.config.idle_timeout_seconds:
+            if (
+                self.state in {"running", "idle"}
+                and now - self._last_used >= self.config.idle_timeout_seconds
+            ):
                 self.suspend()
                 return True
             return False
@@ -187,9 +192,19 @@ class ReadyMadeSession:
 
 
 DEFAULT_SESSIONS = [
-    ReadyMadeSession("developer", "Developer", "developer", tools=["filesystem", "terminal", "git"], template=True),
+    ReadyMadeSession(
+        "developer",
+        "Developer",
+        "developer",
+        tools=["filesystem", "terminal", "git"],
+        template=True,
+    ),
     ReadyMadeSession("researcher", "Researcher", "researcher", tools=["web", "mcp"], template=True),
     ReadyMadeSession("assistant", "Assistant", "assistant", template=True),
-    ReadyMadeSession("terminal", "Terminal", "terminal", tools=["terminal", "filesystem"], template=True),
-    ReadyMadeSession("agent", "Agent", "agent", tools=["filesystem", "terminal", "mcp"], template=True),
+    ReadyMadeSession(
+        "terminal", "Terminal", "terminal", tools=["terminal", "filesystem"], template=True
+    ),
+    ReadyMadeSession(
+        "agent", "Agent", "agent", tools=["filesystem", "terminal", "mcp"], template=True
+    ),
 ]

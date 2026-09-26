@@ -5,9 +5,16 @@ import json
 from config import TEXT_MODELS, VOICE_MODELS
 from model_discovery import ModelDiscoveryError, get_model_discovery, static_model_catalog
 from db import (
-    init_db, get_conversations, create_conversation, update_conversation_title,
-    update_conversation_model, delete_conversation, get_messages, add_message,
-    save_conv_settings, get_conv_settings
+    init_db,
+    get_conversations,
+    create_conversation,
+    update_conversation_title,
+    update_conversation_model,
+    delete_conversation,
+    get_messages,
+    add_message,
+    save_conv_settings,
+    get_conv_settings,
 )
 from mcp_routes import mcp_bp
 from chatgpt_mcp import chatgpt_mcp_bp
@@ -18,7 +25,11 @@ from local_agent_gateway import local_agent_bp, init_local_agent_tables
 from cloudru_iam_routes import cloudru_iam_bp
 from provider_credentials_routes import provider_credentials_bp
 from provider_quota_routes import provider_quota_bp
-from partner_relations import partner_relations_bp, init_partner_relations_tables, ensure_partner_department
+from partner_relations import (
+    partner_relations_bp,
+    init_partner_relations_tables,
+    ensure_partner_department,
+)
 from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
@@ -28,7 +39,12 @@ from government import government_bp, init_government_tables, ensure_government_
 from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
-from conversation_ownership import init_conversation_ownership_table, check_access, delete_owner, get_owned_conversation
+from conversation_ownership import (
+    init_conversation_ownership_table,
+    check_access,
+    delete_owner,
+    get_owned_conversation,
+)
 from ssh_runtime_settings import public_settings, save_settings, test_connection
 from plugin_routes import plugin_bp
 from project_tree import project_tree_bp
@@ -82,17 +98,19 @@ app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 
+
 @app.errorhandler(Exception)
 def _handle_unexpected_error(exc):
     logger.exception("[ERROR] Unhandled application exception")
-    return jsonify({
-        "error": "internal_server_error",
-        "code": "UNHANDLED_EXCEPTION",
-    }), 500
+    return jsonify(
+        {
+            "error": "internal_server_error",
+            "code": "UNHANDLED_EXCEPTION",
+        }
+    ), 500
 
 
 @app.after_request
-
 def _set_web_cache_headers(response):
     # The HTML shell must never pin an older JavaScript dependency graph across deploys.
     if request.path == "/":
@@ -114,6 +132,7 @@ init_user_identity_table()
 init_conversation_ownership_table()
 init_department_tables()
 from provider_quotas import init_quota_tables
+
 init_quota_tables()
 init_partner_relations_tables()
 ensure_partner_department()
@@ -265,7 +284,10 @@ def api_memory_panel_data():
     init_global_memory()
     conn = get_conn()
     conn.row_factory = sqlite3.Row
-    facts = [dict(r) for r in conn.execute("SELECT * FROM global_memory ORDER BY updated_at DESC").fetchall()]
+    facts = [
+        dict(r)
+        for r in conn.execute("SELECT * FROM global_memory ORDER BY updated_at DESC").fetchall()
+    ]
     conn.close()
     return jsonify({"config": cfg, "facts": facts})
 

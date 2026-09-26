@@ -48,8 +48,7 @@ def test_tools_list_is_deterministic_and_read_only(client):
     assert names == sorted(names)
 
     registry_names = sorted(
-        definition["name"]
-        for definition in chatgpt_mcp.registry.get_universal_definitions("mcp")
+        definition["name"] for definition in chatgpt_mcp.registry.get_universal_definitions("mcp")
     )
     assert names == registry_names
 
@@ -65,8 +64,7 @@ def test_every_registered_tool_is_exposed_through_mcp(client):
 
     mcp_names = {tool["name"] for tool in response.get_json()["result"]["tools"]}
     registry_names = {
-        definition["name"]
-        for definition in chatgpt_mcp.registry.get_universal_definitions("mcp")
+        definition["name"] for definition in chatgpt_mcp.registry.get_universal_definitions("mcp")
     }
 
     assert mcp_names == registry_names
@@ -150,7 +148,9 @@ def test_project_read_tools_are_exposed_and_read_only(client):
     response = mcp_request(client, "tools/list")
     assert response.status_code == 200
     tools = {tool["name"]: tool for tool in response.get_json()["result"]["tools"]}
-    assert {"alice_list_project_files", "alice_read_project_file", "alice_search_project"} <= set(tools)
+    assert {"alice_list_project_files", "alice_read_project_file", "alice_search_project"} <= set(
+        tools
+    )
     for name in ("alice_list_project_files", "alice_read_project_file", "alice_search_project"):
         assert tools[name]["_meta"]["read_only"] is True
         assert tools[name]["_meta"]["requires_approval"] is False
@@ -374,6 +374,7 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
     init_runtime_tables()
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(chatgpt_mcp.chatgpt_mcp_bp)
     app.testing = True
@@ -408,10 +409,6 @@ def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
         assert trace["trace_id"] == meta["trace_id"]
         assert trace["context"]["user_id"] == "trace-user"
         assert any(
-            call.get("tool_name") == "alice_get_system_status"
-            for call in trace["tool_calls"]
+            call.get("tool_name") == "alice_get_system_status" for call in trace["tool_calls"]
         )
-        assert any(
-            event.get("type") == "mcp_tool_call_completed"
-            for event in trace["events"]
-        )
+        assert any(event.get("type") == "mcp_tool_call_completed" for event in trace["events"])

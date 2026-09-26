@@ -17,17 +17,21 @@ class FakeProvider:
 def test_status_never_returns_secret(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "status.db")
     db.init_db()
     monkeypatch.setenv(
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"1" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
+    monkeypatch.setattr(
+        routes, "_provider_client", lambda provider, project_id=None: FakeProvider()
+    )
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
     conn = db.get_conn()
     from provider_credentials import replace_active_credential
+
     replace_active_credential(
         conn,
         "super-secret-yandex",
@@ -39,6 +43,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
     conn.close()
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -53,6 +58,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
 def test_status_without_active_credentials_does_not_use_removed_config_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "status-empty.db")
     db.init_db()
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
@@ -60,6 +66,7 @@ def test_status_without_active_credentials_does_not_use_removed_config_key(monke
     monkeypatch.delattr(routes.config, "API_KEY", raising=False)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -76,17 +83,21 @@ def test_status_without_active_credentials_does_not_use_removed_config_key(monke
 def test_update_validates_before_persisting_and_clears_frontend_contract(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "update.db")
     db.init_db()
     monkeypatch.setenv(
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"2" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
+    monkeypatch.setattr(
+        routes, "_provider_client", lambda provider, project_id=None: FakeProvider()
+    )
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -110,17 +121,21 @@ def test_update_validates_before_persisting_and_clears_frontend_contract(monkeyp
 def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "reject.db")
     db.init_db()
     monkeypatch.setenv(
         "ALICE_PROVIDER_CREDENTIAL_KEY",
         base64.urlsafe_b64encode(b"3" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
+    monkeypatch.setattr(
+        routes, "_provider_client", lambda provider, project_id=None: FakeProvider()
+    )
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -132,9 +147,7 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
 
     assert response.status_code == 401
     conn = db.get_conn()
-    rows = conn.execute(
-        "SELECT * FROM provider_credentials WHERE provider = 'yandex'"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM provider_credentials WHERE provider = 'yandex'").fetchall()
     conn.close()
     assert rows == []
 
@@ -142,12 +155,14 @@ def test_update_rejects_unauthorized_key_without_persisting(monkeypatch, tmp_pat
 def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "auth.db")
     db.init_db()
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
     monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "false")
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -164,6 +179,7 @@ def test_provider_credentials_rejects_remote_without_admin_token(monkeypatch, tm
 def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "admin.db")
     db.init_db()
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
@@ -171,7 +187,9 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
         "ALICE_PROVIDER_CREDENTIALS_KEY",
         base64.urlsafe_b64encode(b"4" * 32).decode("ascii"),
     )
-    monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeProvider())
+    monkeypatch.setattr(
+        routes, "_provider_client", lambda provider, project_id=None: FakeProvider()
+    )
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
     monkeypatch.setattr(routes.config, "CLOUDRU_API_KEY", "", raising=False)
     monkeypatch.setenv(
@@ -180,6 +198,7 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
     )
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -196,12 +215,14 @@ def test_provider_credentials_accepts_explicit_admin_token(monkeypatch, tmp_path
 def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "check-auth.db")
     db.init_db()
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
     monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "false")
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -218,11 +239,13 @@ def test_provider_credentials_status_check_requires_auth(monkeypatch, tmp_path):
 def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "expired-master.db")
     db.init_db()
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -245,11 +268,13 @@ def test_cloudru_bootstrap_rejects_expired_master_key(monkeypatch, tmp_path):
 def test_cloudru_bootstrap_requires_existing_service_account(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "service-account-required.db")
     db.init_db()
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -271,6 +296,7 @@ def test_cloudru_bootstrap_requires_existing_service_account(monkeypatch, tmp_pa
 def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "bootstrap.db")
     db.init_db()
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "admin-test-token")
@@ -306,6 +332,7 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
     monkeypatch.setattr(routes, "record_health_check", lambda *args, **kwargs: None)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -330,6 +357,7 @@ def test_cloudru_bootstrap_does_not_enumerate_service_accounts(monkeypatch, tmp_
 def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "cloudru-direct.db")
     db.init_db()
     monkeypatch.setenv(
@@ -348,6 +376,7 @@ def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -377,6 +406,7 @@ def test_update_accepts_direct_cloudru_api_key(monkeypatch, tmp_path):
 def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     import db
+
     db.DB_PATH = str(tmp_path / "both-providers.db")
     db.init_db()
     monkeypatch.setenv(
@@ -390,13 +420,16 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
         lambda provider, project_id=None: type(
             "Provider",
             (),
-            {"validate_key": lambda self, key: validated.append((provider, key)),
-             "rotation_supported": lambda self, key_id: False},
+            {
+                "validate_key": lambda self, key: validated.append((provider, key)),
+                "rotation_supported": lambda self, key_id: False,
+            },
         )(),
     )
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)
 
@@ -419,3 +452,203 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     serialized = str(payload)
     assert "yandex-runtime-secret" not in serialized
     assert "cloudru-runtime-secret" not in serialized
+
+
+def test_provider_status_check_hides_internal_exception(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "provider-internal-marker-should-not-leak"
+
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    def fail_health_check(_provider):
+        raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(routes, "_perform_health_check", fail_health_check)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/status/check",
+            json={"provider": "cloudru"},
+        )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "health_check_failed"
+    assert payload["detail"] == "Проверка провайдера временно недоступна"
+    assert internal_marker not in str(payload)
+
+
+def test_perform_health_check_classifies_provider_failures(monkeypatch):
+    from types import SimpleNamespace
+
+    credential = SimpleNamespace(project_id="project-test", api_key="runtime-key")
+    monkeypatch.setattr(routes, "_load_credential", lambda _provider: credential)
+
+    class FakeConn:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(routes, "get_conn", lambda: FakeConn())
+    recorded = []
+    monkeypatch.setattr(
+        routes,
+        "record_health_check",
+        lambda _conn, provider, status, error: recorded.append((provider, status, error)),
+    )
+
+    class PermissionDeniedProvider:
+        def validate_key(self, _api_key):
+            raise PermissionError("provider-auth-internal-marker")
+
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider, project_id=None: PermissionDeniedProvider(),
+    )
+    denied = routes._perform_health_check("yandex")
+    assert denied == {"status": "invalid", "error": "authorization_failed"}
+
+    class UnavailableProvider:
+        def validate_key(self, _api_key):
+            raise RuntimeError("provider-health-internal-marker")
+
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider, project_id=None: UnavailableProvider(),
+    )
+    unavailable = routes._perform_health_check("cloudru")
+    assert unavailable == {"status": "unavailable", "error": "provider_unavailable"}
+    assert recorded[-2:] == [
+        ("yandex", "invalid", "authorization_failed"),
+        ("cloudru", "unavailable", "provider_unavailable"),
+    ]
+
+
+def test_cloudru_service_accounts_failure_is_sanitized(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "cloudru-service-account-internal-marker"
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    class FailingIam:
+        def __init__(self, **_kwargs):
+            pass
+
+        def list_service_accounts(self):
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(routes, "CloudRuIamClient", FailingIam)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/service-accounts",
+            data={"iam_key_id": "id", "iam_key_secret": "secret"},
+        )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "cloudru_service_accounts_failed"
+    assert internal_marker not in str(payload)
+
+
+def test_cloudru_bootstrap_failure_is_sanitized(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "cloudru-bootstrap-internal-marker"
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    class FailingIam:
+        def __init__(self, **_kwargs):
+            pass
+
+        def create_api_key(self, **_kwargs):
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(routes, "CloudRuIamClient", FailingIam)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/bootstrap",
+            data={
+                "iam_key_id": "id",
+                "iam_key_secret": "secret",
+                "project_id": "project",
+                "service_account_id": "550e8400-e29b-41d4-a716-446655440000",
+            },
+        )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "cloudru_bootstrap_failed"
+    assert internal_marker not in str(payload)
+
+
+def test_provider_update_rejects_invalid_json_without_parser_details(monkeypatch):
+    from flask import Flask
+
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            data="{",
+            content_type="application/json",
+        )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload == {
+        "error": "invalid_json",
+        "detail": "Тело запроса должно содержать корректный JSON",
+    }
+
+
+def test_provider_validation_failure_is_sanitized(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "provider-validation-internal-marker"
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    class FailingProvider:
+        def validate_key(self, _api_key):
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider, project_id=None: FailingProvider(),
+    )
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"cloudru_api_key": "runtime-secret"},
+        )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "provider_health_check_failed"
+    assert payload["provider"] == "cloudru"
+    assert internal_marker not in str(payload)

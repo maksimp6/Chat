@@ -9,7 +9,9 @@ class TraceMirrorIntegrationTests(unittest.TestCase):
     def test_finalize_mirrors_trace_once_and_returns_finalized_data(self):
         trace = ExecutionTrace(trace_id="integration-test-trace")
 
-        with patch.object(trace_mirror_integration, "mirror_finalized_trace", return_value=True) as mirror:
+        with patch.object(
+            trace_mirror_integration, "mirror_finalized_trace", return_value=True
+        ) as mirror:
             result = trace.finalize()
             second_result = trace.finalize()
 

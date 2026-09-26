@@ -28,20 +28,22 @@ def test_theme_presets_and_persistence_are_defined():
 def test_theme_value_is_normalized_before_dom_attribute_is_set():
     core = _read("static/core.js")
     assert "normalizeAliceTheme" in core
-    assert 'Object.prototype.hasOwnProperty.call(ALICE_THEMES, value)' in core
+    assert "Object.prototype.hasOwnProperty.call(ALICE_THEMES, value)" in core
 
 
 def _parse_hex(value):
     value = value.lstrip("#")
     if len(value) == 3:
         value = "".join(ch * 2 for ch in value)
-    return tuple(int(value[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return tuple(int(value[i : i + 2], 16) / 255 for i in (0, 2, 4))
 
 
 def _relative_luminance(rgb):
     channels = []
     for channel in rgb:
-        channels.append(channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4)
+        channels.append(
+            channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        )
     return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
 
 
@@ -58,7 +60,7 @@ def test_theme_primary_text_pairs_meet_wcag_aa():
     for theme in ("light", "dark", "dim", "high-contrast"):
         marker = ":root {" if theme == "light" else f'[data-theme="{theme}"] {{'
         start = style.index(marker)
-        remainder = style[start + len(marker):]
+        remainder = style[start + len(marker) :]
         end = remainder.index("}")
         blocks[theme] = remainder[:end]
 
@@ -76,6 +78,7 @@ def test_theme_primary_text_pairs_meet_wcag_aa():
 
 def test_ai_theme_tool_requires_approval_and_returns_safe_frontend_action():
     from theme_tools import set_ui_theme
+
     result = set_ui_theme({"theme": "dim", "reason": "меньше яркости", "current_theme": "light"})
     assert result["success"] is True
     assert result["frontend_action"] == {
@@ -85,6 +88,7 @@ def test_ai_theme_tool_requires_approval_and_returns_safe_frontend_action():
     }
 
     from tool_registry import registry
+
     metadata = registry.get_tool_meta("set_ui_theme")
     assert metadata["requires_approval"] is True
     assert metadata["read_only"] is False

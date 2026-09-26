@@ -4,6 +4,7 @@ SSH connection details are stored as structured server-side configuration.
 Private key material is never accepted by this module, only a server-side
 reference to an existing key file.
 """
+
 from __future__ import annotations
 
 import copy
@@ -104,13 +105,18 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
             raise SSHRuntimeError("command_allowlist pattern is too long")
         try:
             import re
+
             re.compile(value)
         except re.error as exc:
             raise SSHRuntimeError(f"Invalid command_allowlist pattern: {value}") from exc
         normalized_allowlist.append(value)
     result["command_allowlist"] = normalized_allowlist
 
-    for key in ("allow_privileged_operations", "approval_required_for_write", "approval_required_for_privileged"):
+    for key in (
+        "allow_privileged_operations",
+        "approval_required_for_write",
+        "approval_required_for_privileged",
+    ):
         if not isinstance(result.get(key), bool):
             raise SSHRuntimeError(f"SSH Runtime setting '{key}' must be boolean")
 
@@ -128,7 +134,9 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
 
     if result["enabled"]:
         if result["allow_command_execution"] and not result["command_allowlist"]:
-            raise SSHRuntimeError("command_allowlist is required when SSH command execution is enabled")
+            raise SSHRuntimeError(
+                "command_allowlist is required when SSH command execution is enabled"
+            )
         try:
             SSHRuntime(targets=result["targets"], known_hosts=result["known_hosts"])
         except SSHRuntimeError:
@@ -147,13 +155,9 @@ def validate_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
                     for field in ("connect_timeout_seconds", "command_timeout_seconds"):
                         value = float(target.get(field, 30 if "command" in field else 10))
                         if value <= 0 or value > 3600:
-                            raise SSHRuntimeError(
-                                f"SSH target '{name}' has invalid {field}"
-                            )
+                            raise SSHRuntimeError(f"SSH target '{name}' has invalid {field}")
                 except (TypeError, ValueError) as exc:
-                    raise SSHRuntimeError(
-                        f"SSH target '{name}' has invalid timeout"
-                    ) from exc
+                    raise SSHRuntimeError(f"SSH target '{name}' has invalid timeout") from exc
 
     return result
 
@@ -167,15 +171,18 @@ def save_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
     set_config(SETTINGS_KEY, validated)
     trace = get_current_trace()
     if trace is not None:
-        trace.add_event("ssh_runtime_settings_updated", {
-            "enabled": validated["enabled"],
-            "targets": sorted(validated["targets"]),
-            "read_only": validated["read_only"],
-            "allow_command_execution": validated["allow_command_execution"],
-            "allow_write_operations": validated["allow_write_operations"],
-            "allow_privileged_operations": validated["allow_privileged_operations"],
-            "command_allowlist_count": len(validated["command_allowlist"]),
-        })
+        trace.add_event(
+            "ssh_runtime_settings_updated",
+            {
+                "enabled": validated["enabled"],
+                "targets": sorted(validated["targets"]),
+                "read_only": validated["read_only"],
+                "allow_command_execution": validated["allow_command_execution"],
+                "allow_write_operations": validated["allow_write_operations"],
+                "allow_privileged_operations": validated["allow_privileged_operations"],
+                "command_allowlist_count": len(validated["command_allowlist"]),
+            },
+        )
     logger.info(
         "SSH Runtime settings updated: enabled=%s targets=%s read_only=%s",
         validated["enabled"],
@@ -210,17 +217,21 @@ def build_runtime() -> SSHRuntime:
 
 def command_matches_allowlist(command: str, allowlist: list[str]) -> bool:
     import re
+
     value = str(command or "").strip()
     return any(re.fullmatch(pattern, value) for pattern in allowlist)
 
 
 def is_privileged_command(command: str) -> bool:
     import re
+
     value = str(command or "").strip()
     return bool(re.match(r"^(?:sudo|su|doas|pkexec)(?:\s|$)", value))
 
 
-def assert_operation_allowed(operation: str, *, command: str | None = None, approved: bool = False) -> None:
+def assert_operation_allowed(
+    operation: str, *, command: str | None = None, approved: bool = False
+) -> None:
     settings = get_settings()
     if not settings["enabled"]:
         raise SSHRuntimeError("SSH Runtime is disabled in settings")
@@ -229,10 +240,14 @@ def assert_operation_allowed(operation: str, *, command: str | None = None, appr
         if not settings["allow_command_execution"]:
             raise SSHRuntimeError("SSH command execution is disabled in SSH Runtime settings")
         if command is None or not command_matches_allowlist(command, settings["command_allowlist"]):
-            raise SSHRuntimeError("SSH command is not permitted by the configured command allowlist")
+            raise SSHRuntimeError(
+                "SSH command is not permitted by the configured command allowlist"
+            )
         if is_privileged_command(command):
             if not settings["allow_privileged_operations"]:
-                raise SSHRuntimeError("Privileged SSH commands are disabled in SSH Runtime settings")
+                raise SSHRuntimeError(
+                    "Privileged SSH commands are disabled in SSH Runtime settings"
+                )
             if settings["approval_required_for_privileged"] and not approved:
                 raise SSHRuntimeError("Approval is required for privileged SSH commands")
     if operation == "write_file":
@@ -302,13 +317,16 @@ def test_connection(target_name: str, identity_id: str | None) -> dict[str, Any]
     record_test_result(result)
     trace = get_current_trace()
     if trace is not None:
-        trace.add_event("ssh_runtime_connection_test", {
-            "target": target.name,
-            "linux_user": user,
-            "success": result["success"],
-            "status": result["status"],
-            "duration_ms": result["duration_ms"],
-        })
+        trace.add_event(
+            "ssh_runtime_connection_test",
+            {
+                "target": target.name,
+                "linux_user": user,
+                "success": result["success"],
+                "status": result["status"],
+                "duration_ms": result["duration_ms"],
+            },
+        )
     logger.info(
         "SSH Runtime connection test: target=%s user=%s success=%s exit_code=%s",
         target.name,

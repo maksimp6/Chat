@@ -7,20 +7,19 @@
 
   window.openMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) {
-      modal.hidden = false;
-      window.loadMemoryData();
-    }
+    if (!modal) return;
+    window.AliceCoreAPI.ui.modal.open(modal);
+    window.loadMemoryData();
   };
 
   window.closeMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) modal.hidden = true;
+    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
   };
 
   window.loadMemoryData = async function () {
     try {
-      var response = await fetch("/api/memory/manage");
+      var response = await window.AliceDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
       var data = await response.json();
       var enabled = byId("memEnabled");
@@ -62,13 +61,13 @@
     var enabled = byId("memEnabled");
     var limit = byId("memLimit");
     try {
-      var response = await fetch("/api/memory/config", {
+      var response = await window.AliceDispatcher.request("/api/memory/config", {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: Boolean(enabled && enabled.checked),
-          max_context_facts: parseInt(limit && limit.value, 10) || 15
-        })
+          max_context_facts: parseInt(limit && limit.value, 10) || 15,
+        }),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       await window.loadMemoryData();
@@ -80,10 +79,10 @@
   window.clearMemory = async function (category) {
     if (!confirm("Очистить память?")) return;
     try {
-      var response = await fetch("/api/memory/clear", {
+      var response = await window.AliceDispatcher.request("/api/memory/clear", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({category: category})
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: category }),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       await window.loadMemoryData();
@@ -96,24 +95,30 @@
     if (window.__aliceMemoryPanelBound === true) return;
     window.__aliceMemoryPanelBound = true;
 
-    document.addEventListener("click", function (event) {
-      var target = event.target && event.target.closest
-        ? event.target.closest("#memoryCloseBtn, #memoryClearBtn")
-        : null;
-      if (!target) return;
+    document.addEventListener(
+      "click",
+      function (event) {
+        var target =
+          event.target && event.target.closest ? event.target.closest("#memoryClearBtn") : null;
+        if (!target) return;
 
-      if (target.id === "memoryCloseBtn") {
-        event.preventDefault();
-        window.closeMemoryModal();
-      } else if (target.id === "memoryClearBtn") {
-        event.preventDefault();
-        window.clearMemory(null);
-      }
-    }, true);
+        if (target.id === "memoryClearBtn") {
+          event.preventDefault();
+          window.clearMemory(null);
+        }
+      },
+      true,
+    );
+
+    document.addEventListener("alice:modal:before-open", function (event) {
+      var detail = event && event.detail;
+      if (!detail || detail.modalId !== "memoryModal") return;
+      window.loadMemoryData();
+    });
 
     var configBindings = [
       ["memEnabled", "change", window.updateMemoryConfig],
-      ["memLimit", "change", window.updateMemoryConfig]
+      ["memLimit", "change", window.updateMemoryConfig],
     ];
 
     configBindings.forEach(function (binding) {

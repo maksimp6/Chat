@@ -4,6 +4,7 @@ Providers may either create a replacement resource (Yandex) or reissue the
 existing resource in place (Cloud.ru). Both paths validate the new secret
 before promotion.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -84,9 +85,7 @@ def rotate_active_key(
             expires_at=expires_at,
         )
         if str(provider_key_id) != str(old_provider_key_id):
-            raise RuntimeError(
-                f"{provider_name} reissue changed the provider key ID unexpectedly"
-            )
+            raise RuntimeError(f"{provider_name} reissue changed the provider key ID unexpectedly")
         provider.validate_key(plaintext)
         encrypted = encrypt(plaintext)
         promote_rotated_key(

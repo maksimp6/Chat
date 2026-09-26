@@ -22,14 +22,16 @@ class FakeDb:
 
 def test_get_active_key_decrypts_active_unexpired_key():
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    db = FakeDb({
-        "api_key_encrypted": "ciphertext",
-        "id": 7,
-        "yandex_key_id": "aje-key-7",
-        "project_id": "project-1",
-        "issued_at": now - timedelta(hours=11),
-        "expires_at": now + timedelta(hours=1),
-    })
+    db = FakeDb(
+        {
+            "api_key_encrypted": "ciphertext",
+            "id": 7,
+            "yandex_key_id": "aje-key-7",
+            "project_id": "project-1",
+            "issued_at": now - timedelta(hours=11),
+            "expires_at": now + timedelta(hours=1),
+        }
+    )
     assert get_active_key(db, lambda value: f"secret:{value}", now) == "secret:ciphertext"
 
 
@@ -40,14 +42,16 @@ def test_missing_active_key_fails():
 
 def test_expired_active_key_fails():
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    db = FakeDb({
-        "api_key_encrypted": "ciphertext",
-        "id": 7,
-        "yandex_key_id": "aje-key-7",
-        "project_id": "project-1",
-        "issued_at": now - timedelta(hours=13),
-        "expires_at": now - timedelta(seconds=1),
-    })
+    db = FakeDb(
+        {
+            "api_key_encrypted": "ciphertext",
+            "id": 7,
+            "yandex_key_id": "aje-key-7",
+            "project_id": "project-1",
+            "issued_at": now - timedelta(hours=13),
+            "expires_at": now - timedelta(seconds=1),
+        }
+    )
     with pytest.raises(ExpiredCredentialError):
         get_active_key(db, lambda value: value, now)
 
@@ -66,6 +70,7 @@ def test_issue_window_is_12_hours():
 
 def test_fingerprint_is_stable_and_non_secret():
     from provider_credentials import fingerprint_key
+
     secret = "sk-provider-secret"
     fingerprint = fingerprint_key(secret)
     assert len(fingerprint) == 64
@@ -162,9 +167,7 @@ def test_create_schema_migrates_legacy_global_index():
     create_schema(conn)
     indexes = {
         row["name"]
-        for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index'"
-        ).fetchall()
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
     }
     row = conn.execute(
         "SELECT provider, provider_key_id FROM provider_credentials WHERE id=1"
@@ -235,7 +238,6 @@ def test_manual_provider_credential_does_not_fabricate_remote_key_id():
     assert row["fingerprint"]
 
 
-
 def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
     from flask import Flask
     import provider_credentials_routes as routes
@@ -280,7 +282,6 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
     body = response.get_json()
     assert body["error"] == "provider_credential_admin_authentication_required"
     assert "provider API-key validation" in body["detail"]
-
 
 
 def test_provider_credentials_update_accepts_yandex_static_key_without_remote_probe(monkeypatch):
@@ -333,7 +334,9 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
 
     monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
-    monkeypatch.setattr(routes, "get_conn", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded")))
+    monkeypatch.setattr(
+        routes, "get_conn", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded"))
+    )
 
     app = Flask(__name__)
     app.register_blueprint(routes.provider_credentials_bp)

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 LOG_FILE = "app_logs.jsonl"
 
+
 class LocalLogger:
     def __init__(self, log_file=LOG_FILE):
         self.log_file = log_file
@@ -14,9 +15,9 @@ class LocalLogger:
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "level": level.upper(),
             "stream": stream_name,
-            "message": str(message)
+            "message": str(message),
         }
-        
+
         # Вывод в консоль Termux
         print(f"[{entry['timestamp']}] [{entry['level']}] {entry['message']}", flush=True)
 
@@ -29,5 +30,6 @@ class LocalLogger:
 
     def flush(self):
         sys.stdout.flush()
+
 
 yc_logger = LocalLogger()

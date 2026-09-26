@@ -24,9 +24,7 @@ def test_create_key_returns_resource_id_and_secret(mock_post):
     }
     mock_post.return_value = response
 
-    key_id, secret = provider().create_key(
-        expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
-    )
+    key_id, secret = provider().create_key(expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc))
 
     response.raise_for_status.assert_called_once()
     assert (key_id, secret) == ("aje-key-1", "secret-value")
@@ -67,9 +65,7 @@ def test_create_key_defaults_to_runtime_ai_scopes(mock_post, monkeypatch):
         iam_token="iam-secret",
         service_account_id="sa-1",
         project_id="project-1",
-    ).create_key(
-        expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
-    )
+    ).create_key(expires_at=datetime(2026, 1, 1, 12, tzinfo=timezone.utc))
 
     scopes = mock_post.call_args.kwargs["json"]["scopes"]
     assert "yc.ai.languageModels.execute" in scopes

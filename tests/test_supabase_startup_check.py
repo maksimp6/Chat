@@ -55,9 +55,7 @@ def test_http_error_logs_status_and_safe_body(monkeypatch, caplog):
             401,
             "Unauthorized",
             {},
-            __import__("io").BytesIO(
-                f"invalid key {secret}".encode("utf-8")
-            ),
+            __import__("io").BytesIO(f"invalid key {secret}".encode("utf-8")),
         )
 
     monkeypatch.setattr(checker, "urlopen", fail)
@@ -76,9 +74,7 @@ def test_generic_error_logs_exception_details(monkeypatch, caplog):
     monkeypatch.setattr(
         checker,
         "urlopen",
-        lambda request, timeout: (_ for _ in ()).throw(
-            TimeoutError("connection timed out")
-        ),
+        lambda request, timeout: (_ for _ in ()).throw(TimeoutError("connection timed out")),
     )
 
     with caplog.at_level("WARNING", logger="alice_app.supabase"):

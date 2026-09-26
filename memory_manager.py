@@ -7,8 +7,9 @@ DEFAULT_CONFIG = {
     "enabled": True,
     "max_context_facts": 15,
     "auto_extraction": True,
-    "categories_allowed": ["git", "paths", "architecture", "tools", "general"]
+    "categories_allowed": ["git", "paths", "architecture", "tools", "general"],
 }
+
 
 def load_memory_config() -> dict:
     cfg = get_config("memory_config")
@@ -22,10 +23,12 @@ def load_memory_config() -> dict:
             return DEFAULT_CONFIG
     return cfg
 
+
 def save_memory_config(new_config: dict):
     current = load_memory_config()
     current.update(new_config)
     set_config("memory_config", current)
+
 
 def get_controlled_memory_summary() -> str:
     cfg = load_memory_config()
@@ -39,13 +42,18 @@ def get_controlled_memory_summary() -> str:
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    
+
     if allowed_cats:
         placeholders = ",".join(["?"] * len(allowed_cats))
-        cur.execute(f"SELECT category, fact FROM global_memory WHERE category IN ({placeholders}) ORDER BY updated_at DESC LIMIT ?", (*allowed_cats, limit))
+        cur.execute(
+            f"SELECT category, fact FROM global_memory WHERE category IN ({placeholders}) ORDER BY updated_at DESC LIMIT ?",
+            (*allowed_cats, limit),
+        )
     else:
-        cur.execute("SELECT category, fact FROM global_memory ORDER BY updated_at DESC LIMIT ?", (limit,))
-        
+        cur.execute(
+            "SELECT category, fact FROM global_memory ORDER BY updated_at DESC LIMIT ?", (limit,)
+        )
+
     rows = cur.fetchall()
     conn.close()
 
@@ -56,6 +64,7 @@ def get_controlled_memory_summary() -> str:
     for r in rows:
         summary += f"- [{r['category'].upper()}] {r['fact']}\n"
     return summary
+
 
 def clear_global_memory(category: str = None):
     init_global_memory()

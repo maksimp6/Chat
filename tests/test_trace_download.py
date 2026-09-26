@@ -9,13 +9,13 @@ def test_trace_download_has_mobile_safe_state_transitions():
     assert 'setButtonState(button, "⏳", true)' in SOURCE
     assert 'setButtonState(button, "✓ JSON", true)' in SOURCE
     assert 'setButtonState(button, "⚠ JSON", true)' in SOURCE
-    assert 'download = traceFilename()' in SOURCE
+    assert "download = traceFilename()" in SOURCE
 
 
 def test_trace_export_redacts_sensitive_fields_and_uses_json():
     assert re.search(r"api\[_-\]\?key|authorization|token|secret|password", SOURCE, re.I)
-    assert 'application/json' in SOURCE
-    assert 'link.download = traceFilename()' in SOURCE
+    assert "application/json" in SOURCE
+    assert "link.download = traceFilename()" in SOURCE
 
 
 def test_trace_download_is_local_frontend_code():

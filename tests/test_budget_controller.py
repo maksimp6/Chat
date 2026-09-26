@@ -16,7 +16,9 @@ from budget_controller import (
 )
 
 
-def make_controller(trace=None, *, fallback=True, cooldown_seconds=0, now=None, max_daily_loss="100"):
+def make_controller(
+    trace=None, *, fallback=True, cooldown_seconds=0, now=None, max_daily_loss="100"
+):
     limits = BudgetLimits("50", max_daily_loss, "300")
     clock = (lambda: now) if now is not None else None
     return BudgetController(
@@ -139,12 +141,14 @@ def test_daily_loss_resets_on_new_day():
 
 def test_concurrent_spends_do_not_overspend():
     controller = make_controller(fallback=False)
+
     def spend():
         try:
             controller.spend("10", account_type=AccountType.REAL)
             return True
         except (InsufficientFunds, BudgetLimitExceeded):
             return False
+
     with ThreadPoolExecutor(max_workers=16) as pool:
         results = list(pool.map(lambda _: spend(), range(16)))
     assert sum(results) == 10
@@ -161,6 +165,14 @@ def test_trace_events_never_contain_secret_like_fields():
 def test_snapshot_contains_required_budget_fields():
     real = make_controller().snapshot()["accounts"]["REAL"]
     assert set(real) >= {
-        "allocated", "spent", "reserved", "won", "available",
-        "currency", "account_type", "status", "limits", "locked_until",
+        "allocated",
+        "spent",
+        "reserved",
+        "won",
+        "available",
+        "currency",
+        "account_type",
+        "status",
+        "limits",
+        "locked_until",
     }

@@ -36,7 +36,10 @@ def test_partner_data_is_isolated_by_trusted_owner(monkeypatch):
             first = create_partner({"name": "Alpha", "organization": "One"}, _ctx("user-a"))
             second = create_partner({"name": "Beta", "organization": "Two"}, _ctx("user-b"))
 
-            assert get_partner({"partner_id": first["id"]}, _ctx("user-a"))["partner"]["name"] == "Alpha"
+            assert (
+                get_partner({"partner_id": first["id"]}, _ctx("user-a"))["partner"]["name"]
+                == "Alpha"
+            )
             try:
                 get_partner({"partner_id": first["id"]}, _ctx("user-b"))
             except ValueError as exc:
@@ -44,7 +47,10 @@ def test_partner_data_is_isolated_by_trusted_owner(monkeypatch):
             else:
                 raise AssertionError("cross-owner partner access was allowed")
 
-            assert get_partner({"partner_id": second["id"]}, _ctx("user-b"))["partner"]["name"] == "Beta"
+            assert (
+                get_partner({"partner_id": second["id"]}, _ctx("user-b"))["partner"]["name"]
+                == "Beta"
+            )
         finally:
             db.DB_PATH = old
 
@@ -57,30 +63,42 @@ def test_contacts_messages_status_and_followups_round_trip(monkeypatch):
             init_partner_relations_tables()
             ctx = _ctx("owner-1")
             partner = create_partner({"name": "Acme", "status": "lead"}, ctx)
-            contact = add_contact({
-                "partner_id": partner["id"],
-                "name": "Ada",
-                "role": "CTO",
-                "email": "ada@example.test",
-            }, ctx)["contact"]
-            updated = update_contact({
-                "contact_id": contact["id"],
-                "name": "Ada Lovelace",
-                "role": "CTO",
-                "email": "ada@example.test",
-            }, ctx)["contact"]
+            contact = add_contact(
+                {
+                    "partner_id": partner["id"],
+                    "name": "Ada",
+                    "role": "CTO",
+                    "email": "ada@example.test",
+                },
+                ctx,
+            )["contact"]
+            updated = update_contact(
+                {
+                    "contact_id": contact["id"],
+                    "name": "Ada Lovelace",
+                    "role": "CTO",
+                    "email": "ada@example.test",
+                },
+                ctx,
+            )["contact"]
             assert updated["name"] == "Ada Lovelace"
 
-            message = prepare_message({
-                "partner_id": partner["id"],
-                "body": "Добрый день",
-                "subject": "Встреча",
-            }, ctx)["message"]
-            followup = create_followup({
-                "partner_id": partner["id"],
-                "title": "Позвонить",
-                "due_at": 2_000_000_000,
-            }, ctx)
+            message = prepare_message(
+                {
+                    "partner_id": partner["id"],
+                    "body": "Добрый день",
+                    "subject": "Встреча",
+                },
+                ctx,
+            )["message"]
+            followup = create_followup(
+                {
+                    "partner_id": partner["id"],
+                    "title": "Позвонить",
+                    "due_at": 2_000_000_000,
+                },
+                ctx,
+            )
             status = update_status({"partner_id": partner["id"], "status": "negotiating"}, ctx)
 
             details = get_partner({"partner_id": partner["id"]}, ctx)["partner"]

@@ -1,4 +1,5 @@
 """Trace correlation helpers for MCP activity managed by Yandex AI Studio."""
+
 from typing import Any, Dict, Iterable, List
 
 
@@ -29,7 +30,9 @@ def _activity_key(item: Dict[str, Any], response_id: Any, step: Any) -> str:
     call_id = item.get("call_id") or item.get("id") or item.get("tool_call_id")
     name = item.get("name") or item.get("tool_name")
     server = item.get("server_label") or item.get("server_name") or item.get("server_url")
-    return "|".join(str(value or "") for value in (step, response_id, call_id, server, name, item.get("type")))
+    return "|".join(
+        str(value or "") for value in (step, response_id, call_id, server, name, item.get("type"))
+    )
 
 
 def record_yandex_mcp_activity(trace: Any) -> int:
@@ -72,14 +75,19 @@ def record_yandex_mcp_activity(trace: Any) -> int:
                     "data": clean,
                 }
                 recorded.append(entry)
-                trace.add_event("mcp_activity_observed", {
-                    "step": step,
-                    "response_id": response_id,
-                    "type": item.get("type"),
-                    "call_id": item.get("call_id") or item.get("id") or item.get("tool_call_id"),
-                    "name": item.get("name") or item.get("tool_name"),
-                    "server": item.get("server_label") or item.get("server_name"),
-                })
+                trace.add_event(
+                    "mcp_activity_observed",
+                    {
+                        "step": step,
+                        "response_id": response_id,
+                        "type": item.get("type"),
+                        "call_id": item.get("call_id")
+                        or item.get("id")
+                        or item.get("tool_call_id"),
+                        "name": item.get("name") or item.get("tool_name"),
+                        "server": item.get("server_label") or item.get("server_name"),
+                    },
+                )
                 count += 1
 
     return count

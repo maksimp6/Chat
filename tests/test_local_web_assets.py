@@ -22,7 +22,7 @@ def test_index_uses_only_local_ui_resources():
     assert not EXTERNAL_RESOURCE_RE.search(html), "UI resources must be served locally"
     assert "{% set static_root" in html
     assert 'id="alice-boot"' in html
-    assert 'data-base-path="{{ preview_base_path or \'\' }}"' in html
+    assert "data-base-path=\"{{ preview_base_path or '' }}\"" in html
     assert 'data-static-base="{{ static_root }}"' in html
     assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
     assert '<script src="{{ static_root }}/eruda.js' not in html
@@ -44,7 +44,7 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
     assert response.status_code == 200
     assert 'href="/preview/pr-203/static/style.css?v=' in html
     assert 'src="/preview/pr-203/static/eruda_init.js?v=' in html
-    assert '/preview/pr-203/static/eruda.js?v={{' not in html
+    assert "/preview/pr-203/static/eruda.js?v={{" not in html
     assert 'data-base-path="/preview/pr-203"' in html
     assert 'src="/preview/pr-203/static/memory_panel.js?v=' in html
 
@@ -52,9 +52,7 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
 def test_static_stylesheets_have_no_external_asset_urls():
     for css in Path("static").rglob("*.css"):
         content = css.read_text(encoding="utf-8")
-        assert not EXTERNAL_CSS_URL_RE.search(content), (
-            f"External CSS resource found in {css}"
-        )
+        assert not EXTERNAL_CSS_URL_RE.search(content), f"External CSS resource found in {css}"
 
 
 def test_local_eruda_loader_initializes_the_bundled_library():
@@ -70,15 +68,21 @@ def test_web_boot_and_startup_guards_are_present():
     boot = Path("static/boot.js").read_text(encoding="utf-8")
     eruda_loader = Path("static/eruda_init.js").read_text(encoding="utf-8")
     core = Path("static/core.js").read_text(encoding="utf-8")
+    dispatcher = Path("static/dispatcher.js").read_text(encoding="utf-8")
     assert "document.currentScript" in boot
     assert "getRegistrations" in boot
     assert "alice-pro-" in boot
     assert "maxAttempts = 5" in eruda_loader
     assert "script.async = true" in eruda_loader
-    assert 'script.src = (window.__ALICE_STATIC_BASE || "/static") + "/eruda.js' in eruda_loader
+    assert re.search(
+        r'script\.src\s*=\s*\(window\.__ALICE_STATIC_BASE\s*\|\|\s*"/static"\)\s*\+\s*"/eruda\.js\?v="',
+        eruda_loader,
+    )
     assert "fetchWithTimeout" in core
-    assert "AbortController" in core
-    assert "setTimeout(resolve, 5000)" in core
+    assert "window.AliceDispatcher.request" in core
+    assert "AbortSignal.timeout" in dispatcher
+    assert "MAX_TIMEOUT_MS" in dispatcher
+    assert "return window.AliceDispatcher.request(input, init, { timeoutMs: timeoutMs });" in core
 
 
 def test_index_response_disables_shell_caching():
@@ -94,8 +98,11 @@ def test_ssh_runtime_modal_has_safe_header_action_contract():
     html = Path("templates/index.html").read_text(encoding="utf-8")
 
     assert "window.openSshRuntimeModal = function" in modal
-    assert 'typeof window.openSshRuntimeModal === "function"' in header
-    assert 'console.error("[SSH Runtime] Modal script is unavailable")' in header
+    assert re.search(r'actions\.register\(\s*"header\.ssh\.open"', header)
+    assert re.search(
+        r'call\(\s*"openSshRuntimeModal"\s*,\s*"\[SSH Runtime\] Modal script is unavailable"',
+        header,
+    )
     assert html.index("ssh_runtime_modal.js") < html.index("header_actions.js")
 
 

@@ -22,12 +22,15 @@ class YandexPollingMixin:
                     try:
                         quota_reservation = reserve_request(quota_user_id)
                     except ProviderQuotaExceeded as exc:
-                        execution_trace.add_event("provider_quota_denied", {
-                            "reason": exc.reason,
-                            "user_id": exc.user_id,
-                            "request_type": "poll",
-                            "response_id": task_id,
-                        })
+                        execution_trace.add_event(
+                            "provider_quota_denied",
+                            {
+                                "reason": exc.reason,
+                                "user_id": exc.user_id,
+                                "request_type": "poll",
+                                "response_id": task_id,
+                            },
+                        )
                         execution_trace.record_error(
                             "provider_quota",
                             str(exc),
@@ -36,23 +39,31 @@ class YandexPollingMixin:
                         )
                         raise
                     if quota_reservation is not None:
-                        execution_trace.add_event("provider_quota_reserved", {
-                            "user_id": quota_reservation.user_id,
-                            "policy": quota_reservation.policy_name,
-                            "request_number": quota_reservation.reserved_request_number,
-                            "request_type": "poll",
-                            "period_reset_at": quota_reservation.period_reset_at,
-                        })
+                        execution_trace.add_event(
+                            "provider_quota_reserved",
+                            {
+                                "user_id": quota_reservation.user_id,
+                                "policy": quota_reservation.policy_name,
+                                "request_number": quota_reservation.reserved_request_number,
+                                "request_type": "poll",
+                                "period_reset_at": quota_reservation.period_reset_at,
+                            },
+                        )
                 self._log_request("GET", url)
                 resp = self._log_response(self.session.get(url, timeout=15))
                 if resp.status_code == 404:
                     if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                        execution_trace.add_event("api_poll_error", {
-                            "step": trace_step,
-                            "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
-                            "response_id": task_id,
-                            "status_code": 404
-                        })
+                        execution_trace.add_event(
+                            "api_poll_error",
+                            {
+                                "step": trace_step,
+                                "correlation_id": execution_trace.get_step_correlation_id(
+                                    trace_step or 1
+                                ),
+                                "response_id": task_id,
+                                "status_code": 404,
+                            },
+                        )
                         execution_trace.record_error(
                             "yandex_poll",
                             "HTTP 404 while polling response",
@@ -66,12 +77,17 @@ class YandexPollingMixin:
                 data = resp.json()
             except requests.RequestException as e:
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                    execution_trace.add_event("api_poll_error", {
-                        "step": trace_step,
-                        "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
-                        "response_id": task_id,
-                        "error": str(e)
-                    })
+                    execution_trace.add_event(
+                        "api_poll_error",
+                        {
+                            "step": trace_step,
+                            "correlation_id": execution_trace.get_step_correlation_id(
+                                trace_step or 1
+                            ),
+                            "response_id": task_id,
+                            "error": str(e),
+                        },
+                    )
                     execution_trace.record_error(
                         "yandex_poll",
                         str(e),
@@ -84,7 +100,11 @@ class YandexPollingMixin:
 
             poll_end = time.time()
             snapshot_key = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
-            if execution_trace and isinstance(execution_trace, ExecutionTrace) and snapshot_key != last_snapshot:
+            if (
+                execution_trace
+                and isinstance(execution_trace, ExecutionTrace)
+                and snapshot_key != last_snapshot
+            ):
                 poll_timing_ms = round((poll_end - poll_start) * 1000, 2)
                 execution_trace.add_response(
                     data,
@@ -92,31 +112,39 @@ class YandexPollingMixin:
                     start_timestamp=poll_start,
                     end_timestamp=poll_end,
                     timing_ms=poll_timing_ms,
-                    kind="poll_response"
+                    kind="poll_response",
                 )
-                execution_trace.add_event("api_poll_response_received", {
-                    "step": trace_step,
-                    "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
-                    "response_id": task_id,
-                    "status": data.get("status"),
-                    "timing_ms": poll_timing_ms,
-                    "has_output": bool(data.get("output")),
-                    "snapshot_changed": True
-                })
+                execution_trace.add_event(
+                    "api_poll_response_received",
+                    {
+                        "step": trace_step,
+                        "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                        "response_id": task_id,
+                        "status": data.get("status"),
+                        "timing_ms": poll_timing_ms,
+                        "has_output": bool(data.get("output")),
+                        "snapshot_changed": True,
+                    },
+                )
                 last_snapshot = snapshot_key
 
             status = data.get("status")
             if status in ("completed", "incomplete", "failed", "cancelled"):
                 if execution_trace and isinstance(execution_trace, ExecutionTrace):
-                    execution_trace.add_event("api_poll_completed", {
-                        "step": trace_step,
-                        "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
-                        "response_id": task_id,
-                        "status": status
-                    })
+                    execution_trace.add_event(
+                        "api_poll_completed",
+                        {
+                            "step": trace_step,
+                            "correlation_id": execution_trace.get_step_correlation_id(
+                                trace_step or 1
+                            ),
+                            "response_id": task_id,
+                            "status": status,
+                        },
+                    )
                 if status == "failed":
-                    err = data.get('error')
-                    err_msg = err.get('message', 'unknown') if isinstance(err, dict) else str(err)
+                    err = data.get("error")
+                    err_msg = err.get("message", "unknown") if isinstance(err, dict) else str(err)
                     execution_trace.record_error(
                         "yandex_poll",
                         err_msg,
@@ -137,12 +165,15 @@ class YandexPollingMixin:
             delay = min(delay * 1.5, 3)
 
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
-            execution_trace.add_event("api_poll_timeout", {
-                "step": trace_step,
-                "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
-                "response_id": task_id,
-                "timeout": timeout
-            })
+            execution_trace.add_event(
+                "api_poll_timeout",
+                {
+                    "step": trace_step,
+                    "correlation_id": execution_trace.get_step_correlation_id(trace_step or 1),
+                    "response_id": task_id,
+                    "timeout": timeout,
+                },
+            )
         if execution_trace and isinstance(execution_trace, ExecutionTrace):
             execution_trace.record_error(
                 "yandex_poll",

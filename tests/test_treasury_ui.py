@@ -9,9 +9,11 @@ def test_treasury_uses_one_header_entry_point():
     header = (ROOT / "static" / "header_actions.js").read_text(encoding="utf-8")
 
     assert html.count('id="treasury-btn"') == 1
+    assert 'data-action="header.treasury.open"' in html
     assert 'id="expenses-btn"' not in html
     assert 'id="top-up-btn"' not in html
-    assert '["treasury-btn", "click"' in header
+    assert 'actions.register("header.treasury.open"' in header
+    assert 'call("openTreasuryPanel")' in header
 
 
 def test_treasury_modal_contains_both_actions_and_balance():

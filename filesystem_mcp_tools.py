@@ -11,6 +11,7 @@
 - Управление файлами и папками (os, shutil): copy, move, delete, mkdir
 - Запуск bash-команд (subprocess) и сбор сведений о системе (platform, shutil)
 """
+
 import os
 import re
 import ast
@@ -34,6 +35,7 @@ BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
 BACKUP_DIR = os.path.join(BASE_DIR, ".safe_backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
+
 def _get_abs_path(path: str) -> str:
     """Нормализует путь и блокирует атаки Path Traversal за пределы проекта."""
     if not path or path.strip() in (".", "./"):
@@ -47,6 +49,7 @@ def _get_abs_path(path: str) -> str:
     except ValueError:
         raise PermissionError("Доступ запрещен: недопустимый путь к файлу")
     return target
+
 
 def read_file(args: dict) -> dict:
     """Низкоуровневое позиционированное чтение файлов (аналог C fopen + fseek + fread)."""
@@ -88,7 +91,9 @@ def read_file(args: dict) -> dict:
 
         with open(abs_path, "rb") as f:
             if whence == os.SEEK_END:
-                read_bytes = length if (length is not None and length > 0) else min(file_size, max_chunk)
+                read_bytes = (
+                    length if (length is not None and length > 0) else min(file_size, max_chunk)
+                )
                 seek_delta = -abs(offset) if offset != 0 else -read_bytes
                 f.seek(max(-file_size, seek_delta), os.SEEK_END)
             elif whence == os.SEEK_SET:
@@ -110,11 +115,12 @@ def read_file(args: dict) -> dict:
                 "bytes_read": len(chunk_data),
                 "has_more": has_more,
                 "content": content,
-                "lines_count": len(content.splitlines())
+                "lines_count": len(content.splitlines()),
             }
     except Exception as e:
         logger.exception(f"[FS] Ошибка чтения файла {path}: {e}")
         return {"error": f"Ошибка чтения: {str(e)}"}
+
 
 def write_file(args: dict) -> dict:
     """Безопасная запись файла с валидацией синтаксиса Python и автобэкапом."""
@@ -131,26 +137,28 @@ def write_file(args: dict) -> dict:
         target_dir = os.path.dirname(abs_path)
         os.makedirs(target_dir, exist_ok=True)
 
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=target_dir, delete=False, prefix=".tmp_", suffix=".tmp") as tmp:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=target_dir, delete=False, prefix=".tmp_", suffix=".tmp"
+        ) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
 
         if abs_path.endswith(".py"):
             verify = subprocess.run(
-                ["python3", "-m", "py_compile", tmp_path],
-                capture_output=True,
-                text=True
+                ["python3", "-m", "py_compile", tmp_path], capture_output=True, text=True
             )
             if verify.returncode != 0:
                 if os.path.exists(tmp_path):
-                    try: os.remove(tmp_path)
-                    except OSError: pass
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
                 err_msg = verify.stderr.strip() or verify.stdout.strip()
                 logger.error(f"[FS] Ошибка синтаксиса при записи в {path}: {err_msg}")
                 return {
                     "success": False,
                     "error": f"Файл не записан: синтаксическая ошибка Python:\n{err_msg}",
-                    "reverted": True
+                    "reverted": True,
                 }
 
         old_content = ""
@@ -171,26 +179,31 @@ def write_file(args: dict) -> dict:
             else:
                 raise
 
-        diff = list(difflib.unified_diff(
-            old_content.splitlines(),
-            content.splitlines(),
-            fromfile=f"a/{path}",
-            tofile=f"b/{path}",
-            lineterm=""
-        ))
+        diff = list(
+            difflib.unified_diff(
+                old_content.splitlines(),
+                content.splitlines(),
+                fromfile=f"a/{path}",
+                tofile=f"b/{path}",
+                lineterm="",
+            )
+        )
 
         return {
             "success": True,
             "path": path,
             "message": f"Файл '{path}' успешно проверен и сохранен.",
-            "diff": "\n".join(diff[:60]) if diff else "(файл создан заново)"
+            "diff": "\n".join(diff[:60]) if diff else "(файл создан заново)",
         }
     except Exception as e:
         if tmp_path and os.path.exists(tmp_path):
-            try: os.remove(tmp_path)
-            except OSError: pass
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         logger.exception(f"[FS] Ошибка записи файла {path}: {e}")
         return {"error": f"Ошибка записи: {str(e)}"}
+
 
 def apply_patch(args: dict, cfg: dict = None) -> dict:
     """Точечно заменить участок текста в файле на новый."""
@@ -203,19 +216,20 @@ def apply_patch(args: dict, cfg: dict = None) -> dict:
         abs_path = _get_abs_path(path)
         if not os.path.isfile(abs_path):
             return {"success": False, "error": f"Файл не найден: {path}"}
-        
+
         with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
-            
+
         if search_text not in content:
             return {"success": False, "error": "Искомый текст (search_text) не найден в файле."}
-            
+
         content = content.replace(search_text, replace_text or "", 1)
-        
+
         # Переиспользуем write_file для сохранения с проверкой синтаксиса
         return write_file({"path": path, "content": content})
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 def python_ast_outline(args: dict) -> dict:
     """Анализ структуры Python-файла через модуль ast без его выполнения."""
@@ -233,7 +247,10 @@ def python_ast_outline(args: dict) -> dict:
         try:
             tree = ast.parse(code, filename=path)
         except SyntaxError as se:
-            return {"success": False, "error": f"Синтаксическая ошибка на строке {se.lineno}: {se.msg}"}
+            return {
+                "success": False,
+                "error": f"Синтаксическая ошибка на строке {se.lineno}: {se.msg}",
+            }
 
         classes = []
         functions = []
@@ -246,20 +263,24 @@ def python_ast_outline(args: dict) -> dict:
                     if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         args_list = [a.arg for a in sub.args.args]
                         methods.append({"name": sub.name, "line": sub.lineno, "args": args_list})
-                classes.append({
-                    "name": node.name,
-                    "line": node.lineno,
-                    "docstring": ast.get_docstring(node) or "",
-                    "methods": methods
-                })
+                classes.append(
+                    {
+                        "name": node.name,
+                        "line": node.lineno,
+                        "docstring": ast.get_docstring(node) or "",
+                        "methods": methods,
+                    }
+                )
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 args_list = [a.arg for a in node.args.args]
-                functions.append({
-                    "name": node.name,
-                    "line": node.lineno,
-                    "args": args_list,
-                    "docstring": ast.get_docstring(node) or ""
-                })
+                functions.append(
+                    {
+                        "name": node.name,
+                        "line": node.lineno,
+                        "args": args_list,
+                        "docstring": ast.get_docstring(node) or "",
+                    }
+                )
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.append(alias.name)
@@ -275,10 +296,11 @@ def python_ast_outline(args: dict) -> dict:
             "docstring": ast.get_docstring(tree) or "",
             "imports": sorted(list(set(imports))),
             "classes": classes,
-            "functions": functions
+            "functions": functions,
         }
     except Exception as e:
         return {"error": f"Ошибка AST-анализа: {str(e)}"}
+
 
 def sqlite_query(args: dict) -> dict:
     """Выполнение безопасного запроса к локальной базе данных SQLite."""
@@ -308,7 +330,7 @@ def sqlite_query(args: dict) -> dict:
                 "db_path": db_name,
                 "columns": columns,
                 "count": len(results),
-                "rows": results
+                "rows": results,
             }
         else:
             conn.commit()
@@ -317,10 +339,11 @@ def sqlite_query(args: dict) -> dict:
             return {
                 "success": True,
                 "db_path": db_name,
-                "message": f"Запрос выполнен. Изменено строк: {changes}"
+                "message": f"Запрос выполнен. Изменено строк: {changes}",
             }
     except Exception as e:
         return {"error": f"Ошибка выполнения SQLite: {str(e)}"}
+
 
 def calculate_hash(args: dict) -> dict:
     """Вычисление хеша файла (sha256, md5, sha1) для проверки целостности."""
@@ -346,10 +369,11 @@ def calculate_hash(args: dict) -> dict:
             "path": path,
             "algorithm": algo_name,
             "digest": hasher.hexdigest(),
-            "size_bytes": os.path.getsize(abs_path)
+            "size_bytes": os.path.getsize(abs_path),
         }
     except Exception as e:
         return {"error": f"Ошибка вычисления хеша: {str(e)}"}
+
 
 def zip_compress(args: dict) -> dict:
     """Создание ZIP-архива файлов или каталога."""
@@ -382,10 +406,11 @@ def zip_compress(args: dict) -> dict:
             "success": True,
             "archive_path": out_archive,
             "files_archived": count,
-            "archive_size_bytes": os.path.getsize(abs_out)
+            "archive_size_bytes": os.path.getsize(abs_out),
         }
     except Exception as e:
         return {"error": f"Ошибка создания архива: {str(e)}"}
+
 
 def zip_extract(args: dict) -> dict:
     """Безопасная распаковка ZIP-архива с защитой от Zip Slip."""
@@ -415,10 +440,11 @@ def zip_extract(args: dict) -> dict:
             "archive_path": archive_path,
             "target_dir": target_dir,
             "extracted_count": len(extracted),
-            "files": extracted[:50]
+            "files": extracted[:50],
         }
     except Exception as e:
         return {"error": f"Ошибка распаковки архива: {str(e)}"}
+
 
 def http_fetch(args: dict) -> dict:
     """Простой HTTP GET-запрос через стандартный urllib."""
@@ -433,8 +459,7 @@ def http_fetch(args: dict) -> dict:
 
     try:
         req = urllib.request.Request(
-            url,
-            headers={"User-Agent": "AlicePro-StdLib/1.0", "Accept": "*/*"}
+            url, headers={"User-Agent": "AlicePro-StdLib/1.0", "Accept": "*/*"}
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read(max_bytes)
@@ -448,12 +473,13 @@ def http_fetch(args: dict) -> dict:
                 "status": status_code,
                 "bytes_received": len(raw),
                 "headers": {k: headers[k] for k in list(headers.keys())[:10]},
-                "body": text[:2000]
+                "body": text[:2000],
             }
     except urllib.error.HTTPError as he:
         return {"success": False, "status": he.code, "error": f"HTTP Error {he.code}: {he.reason}"}
     except Exception as e:
         return {"success": False, "error": f"Ошибка сетевого запроса: {str(e)}"}
+
 
 def make_directory(args: dict) -> dict:
     """Создание директории проекта (mkdir -p)."""
@@ -466,6 +492,7 @@ def make_directory(args: dict) -> dict:
         return {"success": True, "path": path, "message": f"Директория '{path}' создана."}
     except Exception as e:
         return {"error": f"Ошибка создания папки: {str(e)}"}
+
 
 def copy_or_move_file(args: dict) -> dict:
     """Копирование или перемещение/переименование файлов и папок."""
@@ -496,6 +523,7 @@ def copy_or_move_file(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка {action}: {str(e)}"}
 
+
 def delete_path(args: dict) -> dict:
     """Безопасное удаление файла или папки с защитой корня проекта и .git."""
     path = args.get("path")
@@ -522,6 +550,7 @@ def delete_path(args: dict) -> dict:
     except Exception as e:
         return {"error": f"Ошибка удаления: {str(e)}"}
 
+
 def list_directory(args: dict) -> dict:
     """Получение списка файлов и папок в директории проекта."""
     path = args.get("path") or "."
@@ -534,15 +563,18 @@ def list_directory(args: dict) -> dict:
         for entry in os.scandir(abs_path):
             if entry.name.startswith((".", "__pycache__")):
                 continue
-            items.append({
-                "name": entry.name,
-                "is_dir": entry.is_dir(),
-                "size": entry.stat().st_size if not entry.is_dir() else None
-            })
+            items.append(
+                {
+                    "name": entry.name,
+                    "is_dir": entry.is_dir(),
+                    "size": entry.stat().st_size if not entry.is_dir() else None,
+                }
+            )
         items.sort(key=lambda x: (not x["is_dir"], x["name"]))
         return {"success": True, "path": path, "items": items}
     except Exception as e:
         return {"error": f"Ошибка сканирования директории: {str(e)}"}
+
 
 def glob_search(args: dict) -> dict:
     """Поиск файлов по шаблону маски (glob)."""
@@ -554,14 +586,17 @@ def glob_search(args: dict) -> dict:
         for p in sorted(matches)[:100]:
             rel = os.path.relpath(p, BASE_DIR)
             if not rel.startswith((".", "__pycache__")):
-                results.append({
-                    "path": rel,
-                    "is_dir": os.path.isdir(p),
-                    "size": os.path.getsize(p) if os.path.isfile(p) else 0
-                })
+                results.append(
+                    {
+                        "path": rel,
+                        "is_dir": os.path.isdir(p),
+                        "size": os.path.getsize(p) if os.path.isfile(p) else 0,
+                    }
+                )
         return {"success": True, "pattern": pattern, "count": len(results), "matches": results}
     except Exception as e:
         return {"error": f"Ошибка поиска по маске: {str(e)}"}
+
 
 def grep_search(args: dict) -> dict:
     """Полнотекстовый и регулярный поиск строк по файлам проекта."""
@@ -591,18 +626,29 @@ def grep_search(args: dict) -> dict:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, start=1):
                             if regex.search(line):
-                                results.append({
-                                    "file": rel_path,
-                                    "line": line_num,
-                                    "text": line.strip()[:200]
-                                })
+                                results.append(
+                                    {"file": rel_path, "line": line_num, "text": line.strip()[:200]}
+                                )
                                 if len(results) >= max_matches:
-                                    return {"success": True, "query": query, "count": len(results), "truncated": True, "matches": results}
+                                    return {
+                                        "success": True,
+                                        "query": query,
+                                        "count": len(results),
+                                        "truncated": True,
+                                        "matches": results,
+                                    }
                 except Exception:
                     continue
-        return {"success": True, "query": query, "count": len(results), "truncated": False, "matches": results}
+        return {
+            "success": True,
+            "query": query,
+            "count": len(results),
+            "truncated": False,
+            "matches": results,
+        }
     except Exception as e:
         return {"error": f"Ошибка grep-поиска: {str(e)}"}
+
 
 def file_stat(args: dict) -> dict:
     """Получение детальных метаданных файла."""
@@ -623,10 +669,11 @@ def file_stat(args: dict) -> dict:
             "size_bytes": st.st_size,
             "created_time": int(st.st_ctime),
             "modified_time": int(st.st_mtime),
-            "permissions_octal": oct(st.st_mode)[-3:]
+            "permissions_octal": oct(st.st_mode)[-3:],
         }
     except Exception as e:
         return {"error": f"Ошибка чтения метаданных: {str(e)}"}
+
 
 def run_command(args: dict) -> dict:
     """Безопасное выполнение терминальной команды bash в рабочей директории."""
@@ -637,24 +684,20 @@ def run_command(args: dict) -> dict:
     timeout = int(args.get("timeout", 30))
     try:
         res = subprocess.run(
-            command,
-            shell=True,
-            cwd=BASE_DIR,
-            capture_output=True,
-            text=True,
-            timeout=timeout
+            command, shell=True, cwd=BASE_DIR, capture_output=True, text=True, timeout=timeout
         )
         return {
             "success": res.returncode == 0,
             "command": command,
             "returncode": res.returncode,
             "stdout": res.stdout.strip(),
-            "stderr": res.stderr.strip()
+            "stderr": res.stderr.strip(),
         }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": f"Превышено время ожидания команды ({timeout} сек)"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 def get_system_info(args: dict) -> dict:
     """Получение информации о дисковом пространстве, ОС и версии Python."""
@@ -666,18 +709,23 @@ def get_system_info(args: dict) -> dict:
             "machine": platform.machine(),
             "python_version": sys.version.split()[0],
             "project_dir": BASE_DIR,
-            "disk_total_gb": round(total / (1024 ** 3), 2),
-            "disk_used_gb": round(used / (1024 ** 3), 2),
-            "disk_free_gb": round(free / (1024 ** 3), 2)
+            "disk_total_gb": round(total / (1024**3), 2),
+            "disk_used_gb": round(used / (1024**3), 2),
+            "disk_free_gb": round(free / (1024**3), 2),
         }
     except Exception as e:
         return {"error": f"Ошибка сбора системной информации: {str(e)}"}
+
 
 TOOL_REGISTRY = {
     "apply_patch": {
         "func": apply_patch,
         "description": "Apply patch/changes to file.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "patch": {"type": "string"}}, "required": ["path", "patch"]}
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}, "patch": {"type": "string"}},
+            "required": ["path", "patch"],
+        },
     },
     "read_file": {
         "func": read_file,
@@ -686,13 +734,22 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "path": {"type": "string", "description": "Путь к файлу"},
-                "offset": {"type": "integer", "description": "Смещение байт (при whence='end' отступает назад от конца)"},
-                "length": {"type": "integer", "description": "Размер буфера чтения в байтах (по умолчанию 64KB)"},
-                "whence": {"type": "string", "description": "Точка отсчета: 0/'start' (SEEK_SET), 1/'cur' (SEEK_CUR), 2/'end' (SEEK_END для tail)"}
+                "offset": {
+                    "type": "integer",
+                    "description": "Смещение байт (при whence='end' отступает назад от конца)",
+                },
+                "length": {
+                    "type": "integer",
+                    "description": "Размер буфера чтения в байтах (по умолчанию 64KB)",
+                },
+                "whence": {
+                    "type": "string",
+                    "description": "Точка отсчета: 0/'start' (SEEK_SET), 1/'cur' (SEEK_CUR), 2/'end' (SEEK_END для tail)",
+                },
             },
-            "required": ["path"]
+            "required": ["path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "write_file": {
         "func": write_file,
@@ -701,11 +758,11 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "path": {"type": "string", "description": "Путь к файлу"},
-                "content": {"type": "string", "description": "Новое содержимое файла"}
+                "content": {"type": "string", "description": "Новое содержимое файла"},
             },
-            "required": ["path", "content"]
+            "required": ["path", "content"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "python_ast_outline": {
         "func": python_ast_outline,
@@ -715,9 +772,9 @@ TOOL_REGISTRY = {
             "properties": {
                 "path": {"type": "string", "description": "Путь к .py файлу для анализа структуры"}
             },
-            "required": ["path"]
+            "required": ["path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "sqlite_query": {
         "func": sqlite_query,
@@ -726,12 +783,18 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "SQL запрос для выполнения"},
-                "db_path": {"type": "string", "description": "Имя файла БД (по умолчанию alice_pro.db)"},
-                "limit": {"type": "integer", "description": "Лимит возвращаемых строк (по умолчанию 50)"}
+                "db_path": {
+                    "type": "string",
+                    "description": "Имя файла БД (по умолчанию alice_pro.db)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Лимит возвращаемых строк (по умолчанию 50)",
+                },
             },
-            "required": ["query"]
+            "required": ["query"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "calculate_hash": {
         "func": calculate_hash,
@@ -740,11 +803,15 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "path": {"type": "string", "description": "Путь к файлу"},
-                "algorithm": {"type": "string", "enum": ["sha256", "md5", "sha1"], "description": "Алгоритм хеширования"}
+                "algorithm": {
+                    "type": "string",
+                    "enum": ["sha256", "md5", "sha1"],
+                    "description": "Алгоритм хеширования",
+                },
             },
-            "required": ["path"]
+            "required": ["path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "zip_compress": {
         "func": zip_compress,
@@ -753,11 +820,11 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "source_path": {"type": "string", "description": "Исходный файл или папка"},
-                "archive_path": {"type": "string", "description": "Путь к создаваемому .zip файлу"}
+                "archive_path": {"type": "string", "description": "Путь к создаваемому .zip файлу"},
             },
-            "required": ["source_path", "archive_path"]
+            "required": ["source_path", "archive_path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "zip_extract": {
         "func": zip_extract,
@@ -766,11 +833,14 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "archive_path": {"type": "string", "description": "Путь к архиву .zip"},
-                "target_dir": {"type": "string", "description": "Директория назначения (по умолчанию '.')"}
+                "target_dir": {
+                    "type": "string",
+                    "description": "Директория назначения (по умолчанию '.')",
+                },
             },
-            "required": ["archive_path"]
+            "required": ["archive_path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "http_fetch": {
         "func": http_fetch,
@@ -779,23 +849,24 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "url": {"type": "string", "description": "URL адрес (http/https)"},
-                "timeout": {"type": "integer", "description": "Таймаут в секундах (по умолчанию 10)"}
+                "timeout": {
+                    "type": "integer",
+                    "description": "Таймаут в секундах (по умолчанию 10)",
+                },
             },
-            "required": ["url"]
+            "required": ["url"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "make_directory": {
         "func": make_directory,
         "description": "Создать новую директорию в проекте (включая промежуточные папки).",
         "parameters": {
             "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Путь к создаваемой папке"}
-            },
-            "required": ["path"]
+            "properties": {"path": {"type": "string", "description": "Путь к создаваемой папке"}},
+            "required": ["path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "copy_or_move_file": {
         "func": copy_or_move_file,
@@ -805,11 +876,15 @@ TOOL_REGISTRY = {
             "properties": {
                 "src": {"type": "string", "description": "Исходный путь"},
                 "dst": {"type": "string", "description": "Целевой путь"},
-                "action": {"type": "string", "enum": ["copy", "move"], "description": "Действие: 'copy' или 'move'"}
+                "action": {
+                    "type": "string",
+                    "enum": ["copy", "move"],
+                    "description": "Действие: 'copy' или 'move'",
+                },
             },
-            "required": ["src", "dst"]
+            "required": ["src", "dst"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "delete_path": {
         "func": delete_path,
@@ -819,29 +894,33 @@ TOOL_REGISTRY = {
             "properties": {
                 "path": {"type": "string", "description": "Путь к удаляемому файлу или директории"}
             },
-            "required": ["path"]
+            "required": ["path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "list_directory": {
         "func": list_directory,
         "description": "Получение списка файлов и папок в директории проекта.",
         "parameters": {
             "type": "object",
-            "properties": {"path": {"type": "string", "description": "Путь к директории ('.' по умолчанию)"}},
-            "required": []
+            "properties": {
+                "path": {"type": "string", "description": "Путь к директории ('.' по умолчанию)"}
+            },
+            "required": [],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "glob_search": {
         "func": glob_search,
         "description": "Поиск файлов по шаблону маски (glob), например '*.py' или 'logs/*.txt'.",
         "parameters": {
             "type": "object",
-            "properties": {"pattern": {"type": "string", "description": "Шаблон поиска (например '*.py')"}},
-            "required": ["pattern"]
+            "properties": {
+                "pattern": {"type": "string", "description": "Шаблон поиска (например '*.py')"}
+            },
+            "required": ["pattern"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "grep_search": {
         "func": grep_search,
@@ -850,12 +929,18 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Текст или regex для поиска"},
-                "file_pattern": {"type": "string", "description": "Маска файлов (по умолчанию '*.py')"},
-                "max_matches": {"type": "integer", "description": "Максимум совпадений (по умолчанию 50)"}
+                "file_pattern": {
+                    "type": "string",
+                    "description": "Маска файлов (по умолчанию '*.py')",
+                },
+                "max_matches": {
+                    "type": "integer",
+                    "description": "Максимум совпадений (по умолчанию 50)",
+                },
             },
-            "required": ["query"]
+            "required": ["query"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "file_stat": {
         "func": file_stat,
@@ -863,9 +948,9 @@ TOOL_REGISTRY = {
         "parameters": {
             "type": "object",
             "properties": {"path": {"type": "string", "description": "Путь к файлу"}},
-            "required": ["path"]
+            "required": ["path"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "run_command": {
         "func": run_command,
@@ -874,21 +959,25 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "command": {"type": "string", "description": "Команда для терминала"},
-                "timeout": {"type": "integer", "description": "Таймаут выполнения в секундах (по умолчанию 30)"}
+                "timeout": {
+                    "type": "integer",
+                    "description": "Таймаут выполнения в секундах (по умолчанию 30)",
+                },
             },
-            "required": ["command"]
+            "required": ["command"],
         },
-        "requires_approval": False
+        "requires_approval": False,
     },
     "get_system_info": {
         "func": get_system_info,
         "description": "Получить данные о дисковом пространстве, платформе Android/Termux и версии Python.",
         "parameters": {"type": "object", "properties": {}, "required": []},
-        "requires_approval": False
-    }
+        "requires_approval": False,
+    },
 }
 
 FILESYSTEM_TOOLS = TOOL_REGISTRY
+
 
 def execute_fs_tool(tool_name: str, arguments: dict) -> dict:
     """Точка входа для выполнения зарегистрированных инструментов файловой системы."""

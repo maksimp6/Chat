@@ -1,4 +1,5 @@
 """Provider credential configuration and health-check API."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -69,21 +70,27 @@ def _guard():
         logger.warning(
             "Provider credentials request rejected: admin authentication failed "
             "method=%s path=%s remote=%s auth_header_present=%s",
-            request.method, request.path, request.remote_addr,
+            request.method,
+            request.path,
+            request.remote_addr,
             bool(request.headers.get("Authorization")),
         )
-        return jsonify({
-            "error": "provider_credential_admin_authentication_required",
-            "detail": (
-                "Request rejected before provider API-key validation. "
-                "Configure ALICE_PROVIDER_CREDENTIALS_TOKEN and send "
-                "Authorization: Bearer <token>, or enable the authenticated "
-                "short-token session."
-            ),
-        }), 401
+        return jsonify(
+            {
+                "error": "provider_credential_admin_authentication_required",
+                "detail": (
+                    "Request rejected before provider API-key validation. "
+                    "Configure ALICE_PROVIDER_CREDENTIALS_TOKEN and send "
+                    "Authorization: Bearer <token>, or enable the authenticated "
+                    "short-token session."
+                ),
+            }
+        ), 401
     logger.info(
         "Provider credentials admin authentication accepted: method=%s path=%s remote=%s",
-        request.method, request.path, request.remote_addr,
+        request.method,
+        request.path,
+        request.remote_addr,
     )
     return None
 
@@ -124,6 +131,7 @@ def _load_credential(provider: str) -> ProviderCredential | None:
             return None
     finally:
         conn.close()
+
 
 def _metadata(credential: ProviderCredential | None) -> dict:
     if credential is None:
@@ -172,10 +180,14 @@ def _status_for(provider: str) -> dict:
         return {
             "provider": provider,
             "status": (
-                "connected" if authorization_ok
-                else "invalid" if health_status == "invalid"
-                else "forbidden" if health_status == "forbidden"
-                else "configured" if health_status == "configured"
+                "connected"
+                if authorization_ok
+                else "invalid"
+                if health_status == "invalid"
+                else "forbidden"
+                if health_status == "forbidden"
+                else "configured"
+                if health_status == "configured"
                 else "checking"
             ),
             "authorization_ok": authorization_ok,
@@ -189,13 +201,10 @@ def _status_for(provider: str) -> dict:
                         lambda _key_id: False,
                     )(credential["provider_key_id"])
                 ),
-                "due": bool(
-                    row["expires_at"] and rotation_needed(row["expires_at"])
-                ),
+                "due": bool(row["expires_at"] and rotation_needed(row["expires_at"])),
                 "active_key_verified": authorization_ok,
             },
-            "last_checked_at": str(row["last_checked_at"])
-                if row["last_checked_at"] else None,
+            "last_checked_at": str(row["last_checked_at"]) if row["last_checked_at"] else None,
         }
 
     return {
@@ -224,13 +233,13 @@ def _perform_health_check(provider: str) -> dict:
             _provider_client(provider).validate_key(credential.api_key)
         error = None
         status = "connected"
-    except PermissionError as exc:
+    except PermissionError:
         logger.exception("Provider health check authorization failed: provider=%s", provider)
-        error = str(exc)
+        error = "authorization_failed"
         status = "invalid"
-    except Exception as exc:
+    except Exception:
         logger.exception("Provider health check failed: provider=%s", provider)
-        error = str(exc)
+        error = "provider_unavailable"
         status = "unavailable"
 
     conn = get_conn()
@@ -261,12 +270,14 @@ def provider_credentials_status_check():
             if provider not in (YANDEX, CLOUDRU):
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
-    except Exception as exc:
+    except Exception:
         logger.exception("Provider health check request failed")
-        return jsonify({
-            "error": "health_check_failed",
-            "detail": str(exc),
-        }), 503
+        return jsonify(
+            {
+                "error": "health_check_failed",
+                "detail": "Проверка провайдера временно недоступна",
+            }
+        ), 503
     return provider_credentials_status()
 
 
@@ -276,12 +287,14 @@ def provider_credentials_status():
     guard = _guard()
     if guard:
         return guard
-    return jsonify({
-        "providers": [
-            _status_for(YANDEX),
-            _status_for(CLOUDRU),
-        ]
-    })
+    return jsonify(
+        {
+            "providers": [
+                _status_for(YANDEX),
+                _status_for(CLOUDRU),
+            ]
+        }
+    )
 
 
 @provider_credentials_bp.post("/cloudru/service-accounts")
@@ -300,31 +313,50 @@ def cloudru_service_accounts():
         return ""
 
     key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
-    key_secret = pick("iam_key_secret", "secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
+    key_secret = pick(
+        "iam_key_secret",
+        "secret",
+        "keySecret",
+        "key_secret",
+        "accessKeySecret",
+        "access_key_secret",
+    )
     if not key_id or not key_secret:
         return jsonify({"error": "IAM JSON must contain Key ID and Key Secret"}), 400
     expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     if expires_raw:
         try:
-            if datetime.fromisoformat(expires_raw.replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+            if datetime.fromisoformat(expires_raw.replace("Z", "+00:00")) <= datetime.now(
+                timezone.utc
+            ):
                 return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
         except ValueError:
             return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
 
     try:
         accounts = CloudRuIamClient(key_id=key_id, key_secret=key_secret).list_service_accounts()
-        return jsonify({
-            "service_accounts": [
-                {
-                    "id": str(item.get("id") or item.get("service_account_id") or ""),
-                    "name": str(item.get("name") or ""),
-                    "project_id": str(item.get("project_id") or item.get("target", {}).get("project_id") or ""),
-                }
-                for item in accounts
-            ]
-        })
-    except Exception as exc:
-        return jsonify({"error": "cloudru_service_accounts_failed", "detail": str(exc)}), 502
+        return jsonify(
+            {
+                "service_accounts": [
+                    {
+                        "id": str(item.get("id") or item.get("service_account_id") or ""),
+                        "name": str(item.get("name") or ""),
+                        "project_id": str(
+                            item.get("project_id") or item.get("target", {}).get("project_id") or ""
+                        ),
+                    }
+                    for item in accounts
+                ]
+            }
+        )
+    except Exception:
+        logger.exception("Cloud.ru service account discovery failed")
+        return jsonify(
+            {
+                "error": "cloudru_service_accounts_failed",
+                "detail": "Не удалось получить список service accounts",
+            }
+        ), 502
 
 
 @provider_credentials_bp.post("/cloudru/bootstrap")
@@ -344,23 +376,36 @@ def bootstrap_cloudru():
         return ""
 
     key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
-    key_secret = pick("iam_key_secret", "secret", "keySecret", "key_secret", "accessKeySecret", "access_key_secret")
+    key_secret = pick(
+        "iam_key_secret",
+        "secret",
+        "keySecret",
+        "key_secret",
+        "accessKeySecret",
+        "access_key_secret",
+    )
     project_id = request.form.get("project_id", "").strip() or pick("projectId", "project_id")
-    requested_sa_id = request.form.get("service_account_id", "").strip() or pick("serviceAccountId", "service_account_id")
+    requested_sa_id = request.form.get("service_account_id", "").strip() or pick(
+        "serviceAccountId", "service_account_id"
+    )
     if not key_id or not key_secret:
         return jsonify({"error": "Cloud.ru IAM Key ID and Key Secret are required"}), 400
     if not requested_sa_id:
-        return jsonify({
-            "error": "service_account_id_required",
-            "detail": "Create or select an existing Cloud.ru service account with a project role, then provide its UUID.",
-        }), 400
+        return jsonify(
+            {
+                "error": "service_account_id_required",
+                "detail": "Create or select an existing Cloud.ru service account with a project role, then provide its UUID.",
+            }
+        ), 400
     try:
         service_account_id = str(uuid.UUID(requested_sa_id))
     except (ValueError, AttributeError) as exc:
-        return jsonify({
-            "error": "invalid_service_account_id",
-            "detail": "Cloud.ru service_account_id must be a valid UUID.",
-        }), 400
+        return jsonify(
+            {
+                "error": "invalid_service_account_id",
+                "detail": "Cloud.ru service_account_id must be a valid UUID.",
+            }
+        ), 400
 
     iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
     iam_expires_at = None
@@ -389,7 +434,9 @@ def bootstrap_cloudru():
         api_key_id = str(key.get("id") or key.get("key_id") or "")
         api_secret = key.get("secret")
         if not api_key_id or not isinstance(api_secret, str) or not api_secret:
-            return jsonify({"error": "Cloud.ru API-key creation did not return key ID and secret"}), 502
+            return jsonify(
+                {"error": "Cloud.ru API-key creation did not return key ID and secret"}
+            ), 502
 
         provider = CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL, iam_client=management)
         provider.validate_key(api_secret)
@@ -397,29 +444,48 @@ def bootstrap_cloudru():
         conn = get_conn()
         try:
             save_cloudru_iam_credentials(
-                conn, key_id=key_id, key_secret=key_secret,
-                project_id=project_id, service_account_id=service_account_id,
+                conn,
+                key_id=key_id,
+                key_secret=key_secret,
+                project_id=project_id,
+                service_account_id=service_account_id,
                 encrypt=encrypt_secret,
             )
             replace_active_credential(
-                conn, api_secret, project_id, encrypt_secret, CLOUDRU,
-                provider_key_id=api_key_id, ttl=_cloudru_ttl(),
+                conn,
+                api_secret,
+                project_id,
+                encrypt_secret,
+                CLOUDRU,
+                provider_key_id=api_key_id,
+                ttl=_cloudru_ttl(),
             )
             record_health_check(conn, CLOUDRU, status="connected", error=None)
         finally:
             conn.close()
 
-        return jsonify({
-            "provider": CLOUDRU,
-            "status": "connected",
-            "service_account_id": service_account_id,
-            "provider_key_id": api_key_id,
-            "rotation": {"supported": True, "ttl_days": int(_cloudru_ttl().total_seconds() / 86400)},
-        })
+        return jsonify(
+            {
+                "provider": CLOUDRU,
+                "status": "connected",
+                "service_account_id": service_account_id,
+                "provider_key_id": api_key_id,
+                "rotation": {
+                    "supported": True,
+                    "ttl_days": int(_cloudru_ttl().total_seconds() / 86400),
+                },
+            }
+        )
     except PermissionError:
         return jsonify({"error": "Cloud.ru Foundation Models authorization failed"}), 401
-    except Exception as exc:
-        return jsonify({"error": "cloudru_bootstrap_failed", "detail": str(exc)}), 502
+    except Exception:
+        logger.exception("Cloud.ru bootstrap failed")
+        return jsonify(
+            {
+                "error": "cloudru_bootstrap_failed",
+                "detail": "Не удалось завершить настройку Cloud.ru",
+            }
+        ), 502
 
 
 @provider_credentials_bp.put("")
@@ -430,9 +496,11 @@ def update_provider_credentials():
         return guard
     try:
         data = request.get_json(silent=False)
-    except Exception as exc:
+    except Exception:
         logger.exception("Invalid provider credentials JSON payload")
-        return jsonify({"error": "invalid_json", "detail": str(exc)}), 400
+        return jsonify(
+            {"error": "invalid_json", "detail": "Тело запроса должно содержать корректный JSON"}
+        ), 400
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
 
@@ -442,16 +510,29 @@ def update_provider_credentials():
         (YANDEX, yandex_api_key),
         (CLOUDRU, data.get("cloudru_api_key")),
     )
-    supplied = [(provider, value.strip()) for provider, value in values
-                if isinstance(value, str) and value.strip()]
+    supplied = [
+        (provider, value.strip())
+        for provider, value in values
+        if isinstance(value, str) and value.strip()
+    ]
     if isinstance(yandex_api_key, str) and yandex_api_key.strip():
         if not isinstance(yandex_project_id, str) or not yandex_project_id.strip():
-            return jsonify({"error": "yandex_project_id_required", "provider": YANDEX,
-                            "detail": "Yandex Cloud Project ID is required together with the API key."}), 400
+            return jsonify(
+                {
+                    "error": "yandex_project_id_required",
+                    "provider": YANDEX,
+                    "detail": "Yandex Cloud Project ID is required together with the API key.",
+                }
+            ), 400
         yandex_project_id = yandex_project_id.strip()
     elif isinstance(yandex_project_id, str) and yandex_project_id.strip():
-        return jsonify({"error": "yandex_api_key_required", "provider": YANDEX,
-                        "detail": "Yandex Cloud API key is required together with the Project ID."}), 400
+        return jsonify(
+            {
+                "error": "yandex_api_key_required",
+                "provider": YANDEX,
+                "detail": "Yandex Cloud API key is required together with the Project ID.",
+            }
+        ), 400
     if not supplied:
         return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
     if any(len(value) > 4096 for _, value in supplied):
@@ -463,24 +544,28 @@ def update_provider_credentials():
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
                 client.validate_key(api_key)
-            except PermissionError as exc:
+            except PermissionError:
                 logger.debug(
-                    "provider credential validation rejected: provider=%s reason=%s",
-                    provider, str(exc),
+                    "provider credential validation rejected: provider=%s",
+                    provider,
                 )
-                return jsonify({
-                    "error": "authorization_failed",
-                    "provider": provider,
-                    "status": "invalid",
-                }), 401
-            except Exception as exc:
+                return jsonify(
+                    {
+                        "error": "authorization_failed",
+                        "provider": provider,
+                        "status": "invalid",
+                    }
+                ), 401
+            except Exception:
                 logger.exception("provider credential validation failed: provider=%s", provider)
-                return jsonify({
-                    "error": "provider_health_check_failed",
-                    "provider": provider,
-                    "status": "invalid",
-                    "detail": str(exc),
-                }), 502
+                return jsonify(
+                    {
+                        "error": "provider_health_check_failed",
+                        "provider": provider,
+                        "status": "invalid",
+                        "detail": "Проверка API key завершилась ошибкой провайдера",
+                    }
+                ), 502
             else:
                 logger.debug("provider credential accepted for storage: provider=%s", provider)
 
@@ -510,10 +595,12 @@ def update_provider_credentials():
             [provider for provider, _ in supplied],
             exc,
         )
-        return jsonify({
-            "error": "credential_storage_failed",
-            "detail": "Ключ проверен, но сервер не смог сохранить его. Подробности записаны в серверный лог.",
-        }), 503
+        return jsonify(
+            {
+                "error": "credential_storage_failed",
+                "detail": "Ключ проверен, но сервер не смог сохранить его. Подробности записаны в серверный лог.",
+            }
+        ), 503
 
     if any(provider == YANDEX for provider, _ in supplied):
         invalidate_model_discovery_cache()

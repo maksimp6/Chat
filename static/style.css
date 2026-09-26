@@ -1,876 +1,1025 @@
 /* === RESET & VARIABLES (Глобальные, но безопасные) === */
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
-    --bg-app: #f5f5f7;
-    --bg-sidebar: #ffffff;
-    --bg-header: #007aff;
-    --bg-input: #ffffff;
-    --bg-bubble-user: #007aff;
-    --bg-bubble-bot: #ffffff;
-    --text-main: #1c1c1e;
-    --text-header: #ffffff;
-    --text-bubble-user: #ffffff;
-    --text-bubble-bot: #1c1c1e;
-    --text-secondary: #8e8e93;
-    --border-color: #e5e5ea;
-    --accent: #007aff;
-    --btn-bg: #f0f0f5;
-    --code-bg: #f6f8fa;
-    --code-border: #e1e4e8;
-    --danger: #ff3b30;
+  --bg-app: #f5f5f7;
+  --bg-sidebar: #ffffff;
+  --bg-header: #007aff;
+  --bg-input: #ffffff;
+  --bg-bubble-user: #007aff;
+  --bg-bubble-bot: #ffffff;
+  --text-main: #1c1c1e;
+  --text-header: #ffffff;
+  --text-bubble-user: #ffffff;
+  --text-bubble-bot: #1c1c1e;
+  --text-secondary: #8e8e93;
+  --border-color: #e5e5ea;
+  --accent: #007aff;
+  --btn-bg: #f0f0f5;
+  --code-bg: #f6f8fa;
+  --code-border: #e1e4e8;
+  --danger: #ff3b30;
 }
 
 [data-theme="dark"] {
-    --bg-app: #000000;
-    --bg-sidebar: #1c1c1e;
-    --bg-header: #1c1c1e;
-    --bg-input: #2c2c2e;
-    --bg-bubble-user: #0a84ff;
-    --bg-bubble-bot: #2c2c2e;
-    --text-main: #f5f5f7;
-    --text-header: #f5f5f7;
-    --text-bubble-user: #ffffff;
-    --text-bubble-bot: #f5f5f7;
-    --text-secondary: #8e8e93;
-    --border-color: #3a3a3c;
-    --accent: #0a84ff;
-    --btn-bg: #2c2c2e;
-    --code-bg: #1e1e1e;
-    --code-border: #444444;
-    --danger: #ff453a;
+  --bg-app: #000000;
+  --bg-sidebar: #1c1c1e;
+  --bg-header: #1c1c1e;
+  --bg-input: #2c2c2e;
+  --bg-bubble-user: #0a84ff;
+  --bg-bubble-bot: #2c2c2e;
+  --text-main: #f5f5f7;
+  --text-header: #f5f5f7;
+  --text-bubble-user: #ffffff;
+  --text-bubble-bot: #f5f5f7;
+  --text-secondary: #8e8e93;
+  --border-color: #3a3a3c;
+  --accent: #0a84ff;
+  --btn-bg: #2c2c2e;
+  --code-bg: #1e1e1e;
+  --code-border: #444444;
+  --danger: #ff453a;
 }
 
 [data-theme="dim"] {
-    --bg-app: #1f2329;
-    --bg-sidebar: #24292f;
-    --bg-header: #30363d;
-    --bg-input: #2d333b;
-    --bg-bubble-user: #388bfd;
-    --bg-bubble-bot: #2d333b;
-    --text-main: #e6edf3;
-    --text-header: #ffffff;
-    --text-bubble-user: #ffffff;
-    --text-bubble-bot: #e6edf3;
-    --text-secondary: #8b949e;
-    --border-color: #444c56;
-    --accent: #58a6ff;
-    --btn-bg: #30363d;
-    --code-bg: #161b22;
-    --code-border: #444c56;
-    --danger: #f85149;
+  --bg-app: #1f2329;
+  --bg-sidebar: #24292f;
+  --bg-header: #30363d;
+  --bg-input: #2d333b;
+  --bg-bubble-user: #388bfd;
+  --bg-bubble-bot: #2d333b;
+  --text-main: #e6edf3;
+  --text-header: #ffffff;
+  --text-bubble-user: #ffffff;
+  --text-bubble-bot: #e6edf3;
+  --text-secondary: #8b949e;
+  --border-color: #444c56;
+  --accent: #58a6ff;
+  --btn-bg: #30363d;
+  --code-bg: #161b22;
+  --code-border: #444c56;
+  --danger: #f85149;
 }
 
 [data-theme="high-contrast"] {
-    --bg-app: #ffffff;
-    --bg-sidebar: #ffffff;
-    --bg-header: #000000;
-    --bg-input: #ffffff;
-    --bg-bubble-user: #005fcc;
-    --bg-bubble-bot: #ffffff;
-    --text-main: #000000;
-    --text-header: #ffffff;
-    --text-bubble-user: #ffffff;
-    --text-bubble-bot: #000000;
-    --text-secondary: #333333;
-    --border-color: #000000;
-    --accent: #004c99;
-    --btn-bg: #ffffff;
-    --code-bg: #ffffff;
-    --code-border: #000000;
-    --danger: #b00020;
+  --bg-app: #ffffff;
+  --bg-sidebar: #ffffff;
+  --bg-header: #000000;
+  --bg-input: #ffffff;
+  --bg-bubble-user: #005fcc;
+  --bg-bubble-bot: #ffffff;
+  --text-main: #000000;
+  --text-header: #ffffff;
+  --text-bubble-user: #ffffff;
+  --text-bubble-bot: #000000;
+  --text-secondary: #333333;
+  --border-color: #000000;
+  --accent: #004c99;
+  --btn-bg: #ffffff;
+  --code-bg: #ffffff;
+  --code-border: #000000;
+  --danger: #b00020;
 }
 
-html, body {
-    height: 100%;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg-app);
-    color: var(--text-main);
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-app);
+  color: var(--text-main);
 }
 
 /* === ISOLATED APP STYLES === */
 .alice-pro-app {
-    display: flex;
-    height: 100dvh;
-    width: 100%;
-    position: relative;
+  display: flex;
+  height: 100dvh;
+  width: 100%;
+  position: relative;
 }
 
 /* Sidebar */
 .alice-pro-app #sidebar {
-    width: 280px;
-    background: var(--bg-sidebar);
-    border-right: 1px solid var(--border-color);
-    position: fixed !important; /* Eruda любит ломать fixed */
-    top: 0; left: 0;
-    height: 100%;
-    z-index: 200;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    display: flex;
-    flex-direction: column;
+  width: 280px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+  position: fixed !important; /* Eruda любит ломать fixed */
+  top: 0;
+  left: 0;
+  height: 100%;
+  z-index: 200;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
 }
-.alice-pro-app #sidebar.open { transform: translateX(0); }
+.alice-pro-app #sidebar.open {
+  transform: translateX(0);
+}
 
 .alice-pro-app #sidebar-header {
-    padding: 14px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
+  padding: 14px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .alice-pro-app #new-chat-btn {
-    flex: 1;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
+  flex: 1;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .alice-pro-app #close-sidebar-btn {
-    background: var(--btn-bg);
-    border: none;
-    border-radius: 8px;
-    width: 36px;
-    font-size: 18px;
-    cursor: pointer;
-    color: var(--text-main);
+  background: var(--btn-bg);
+  border: none;
+  border-radius: 8px;
+  width: 36px;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-main);
 }
 
-.alice-pro-app #conv-list { flex: 1; overflow-y: auto; padding: 8px; }
+.alice-pro-app #conv-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
 
 .alice-pro-app .conv-item {
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    margin-bottom: 2px;
-    font-size: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-.alice-pro-app .conv-item:hover { background: var(--btn-bg); }
-.alice-pro-app .conv-item.active { background: rgba(10,132,255,0.15); color: var(--accent); font-weight: 500; }
-.alice-pro-app .conv-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.alice-pro-app .delete-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; padding: 0 4px; }
+.alice-pro-app .conv-item:hover {
+  background: var(--btn-bg);
+}
+.alice-pro-app .conv-item.active {
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--accent);
+  font-weight: 500;
+}
+.alice-pro-app .conv-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alice-pro-app .delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+}
 
 /* Overlay */
 .alice-pro-app #overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.35);
-    z-index: 150;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.25s;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
 }
-.alice-pro-app #overlay.visible { opacity: 1; pointer-events: auto; }
+.alice-pro-app #overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* Main Layout */
-.alice-pro-app #main { 
-    flex: 1; 
-    display: flex; 
-    flex-direction: column; 
-    width: 100%; 
-    height: 100%; 
-    position: relative; 
-    background: var(--bg-app);
+.alice-pro-app #main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--bg-app);
 }
 
 /* Header */
 .alice-pro-app #header {
-    background: var(--bg-header);
-    color: var(--text-header);
-    padding: 12px 15px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: 600;
-    font-size: 17px;
-    flex-shrink: 0;
+  background: var(--bg-header);
+  color: var(--text-header);
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 17px;
+  flex-shrink: 0;
 }
 
 .alice-pro-app .header-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    border-radius: 8px;
-    width: 38px; height: 38px;
-    font-size: 20px;
-    cursor: pointer;
-    color: var(--text-header);
-    display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-header);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .alice-pro-app .model-btn {
-    width: 38px; height: 38px; padding: 0;
-    flex: 0 0 38px; font-size: 20px;
-    background: rgba(255,255,255,0.2);
-    border: none; border-radius: 8px;
-    color: var(--text-header);
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  flex: 0 0 38px;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-header);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Chatbox */
 .alice-pro-app #chatbox {
-    flex: 1;
-    overflow-y: auto;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: var(--bg-app);
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-app);
 }
 
 .alice-pro-app .empty-state {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    color: var(--text-secondary); font-size: 15px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 15px;
 }
 
 /* Messages */
 .alice-pro-app .msg {
-    width: 100%;
-    max-width: 95%;
-    padding: 12px 16px;
-    border-radius: 18px;
-    line-height: 1.5;
-    word-wrap: break-word;
-    font-size: 16px;
-    position: relative;
+  width: 100%;
+  max-width: 95%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  font-size: 16px;
+  position: relative;
 }
-.alice-pro-app .user { align-self: flex-end; background: var(--bg-bubble-user); color: var(--text-bubble-user); border-bottom-right-radius: 4px; }
-.alice-pro-app .bot { align-self: flex-start; background: var(--bg-bubble-bot); color: var(--text-bubble-bot); border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.alice-pro-app .user {
+  align-self: flex-end;
+  background: var(--bg-bubble-user);
+  color: var(--text-bubble-user);
+  border-bottom-right-radius: 4px;
+}
+.alice-pro-app .bot {
+  align-self: flex-start;
+  background: var(--bg-bubble-bot);
+  color: var(--text-bubble-bot);
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
 
 .alice-pro-app .billing-bubble {
-    display: inline-block; margin-top: 4px; padding: 2px 8px;
-    background: rgba(0,0,0,0.05); color: var(--text-secondary);
-    border-radius: 4px; font-size: 11px; font-family: monospace;
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: monospace;
 }
-[data-theme="dark"] .alice-pro-app .billing-bubble { background: rgba(255,255,255,0.1); }
+[data-theme="dark"] .alice-pro-app .billing-bubble {
+  background: rgba(255, 255, 255, 0.1);
+}
 
 /* Voice UI */
 .alice-pro-app #voice-ui {
-    padding: 20px;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    background: var(--bg-app);
-    border-top: 1px solid var(--border-color);
-    flex-shrink: 0;
+  padding: 20px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  background: var(--bg-app);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .alice-pro-app #waveform {
-    width: 100%; height: 60px;
-    background: var(--bg-input);
-    border-radius: 12px;
+  width: 100%;
+  height: 60px;
+  background: var(--bg-input);
+  border-radius: 12px;
 }
 
-.alice-pro-app #voice-status { font-size: 14px; color: var(--text-secondary); min-height: 20px; }
+.alice-pro-app #voice-status {
+  font-size: 14px;
+  color: var(--text-secondary);
+  min-height: 20px;
+}
 
 .alice-pro-app #mic-btn {
-    width: 70px; height: 70px;
-    border-radius: 50%; border: none;
-    background: var(--accent); color: #fff;
-    font-size: 30px; cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    transition: all 0.2s;
-    display: flex; align-items: center; justify-content: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.alice-pro-app #mic-btn.recording { background: var(--danger); animation: pulse 1.5s infinite; }
+.alice-pro-app #mic-btn.recording {
+  background: var(--danger);
+  animation: pulse 1.5s infinite;
+}
 
 @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(255,59,48,0.7); }
-    70% { box-shadow: 0 0 0 15px rgba(255,59,48,0); }
-    100% { box-shadow: 0 0 0 0 rgba(255,59,48,0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(255, 59, 48, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
+  }
 }
 
 /* Text Input */
 .alice-pro-app #text-ui {
-    display: flex; padding: 10px;
-    background: var(--bg-input);
-    border-top: 1px solid var(--border-color);
-    gap: 10px; align-items: flex-end;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    flex-shrink: 0;
+  display: flex;
+  padding: 10px;
+  background: var(--bg-input);
+  border-top: 1px solid var(--border-color);
+  gap: 10px;
+  align-items: flex-end;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
 }
 
 .alice-pro-app #msg-input {
-    flex: 1; padding: 12px 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 20px; font-size: 16px;
-    outline: none; resize: none;
-    height: 44px; max-height: 120px;
-    background: var(--bg-sidebar); color: var(--text-main);
-    overflow: hidden;
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  font-size: 16px;
+  outline: none;
+  resize: none;
+  height: 44px;
+  max-height: 120px;
+  background: var(--bg-sidebar);
+  color: var(--text-main);
+  overflow: hidden;
 }
 
 .alice-pro-app #send-btn {
-    background: var(--accent); color: #fff;
-    border: none; border-radius: 50%;
-    width: 44px; height: 44px; font-size: 20px;
-    cursor: pointer; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Modals */
 .alice-pro-app .modal {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.5); z-index: 1000;
-    align-items: center; justify-content: center;
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
 }
-.alice-pro-app .modal.visible { display: flex; }
+.alice-pro-app .modal.visible {
+  display: flex;
+}
 
 .alice-pro-app .modal-content {
-    background: var(--bg-sidebar);
-    border-radius: 16px; padding: 24px;
-    width: 90%; max-width: 500px; max-height: 80vh;
-    overflow-y: auto; position: relative;
+  background: var(--bg-sidebar);
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
 }
 .alice-pro-app .modal-content h3 {
-    margin-top: 0;
-    margin-bottom: 16px;
-    padding-right: 48px;
-    color: var(--text-main);
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-right: 48px;
+  color: var(--text-main);
 }
 
 .alice-pro-app .model-option {
-    padding: 12px; border-radius: 8px; cursor: pointer;
-    margin-bottom: 8px; background: var(--btn-bg);
-    color: var(--text-main); border: 1px solid var(--border-color);
-    display: flex; flex-direction: column; gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.alice-pro-app .model-option:hover { border-color: var(--accent); }
-.alice-pro-app .model-option.active { border: 2px solid var(--accent); font-weight: 600; background: rgba(10,132,255,0.1); }
-.alice-pro-app .model-price { font-size: 11px; color: var(--text-secondary); }
+.alice-pro-app .model-option:hover {
+  border-color: var(--accent);
+}
+.alice-pro-app .model-option.active {
+  border: 2px solid var(--accent);
+  font-weight: 600;
+  background: rgba(10, 132, 255, 0.1);
+}
+.alice-pro-app .model-price {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
 
 .alice-pro-app #close-modal {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    margin: 0;
-    background: var(--btn-bg);
-    border: none;
-    border-radius: 8px;
-    color: var(--text-main);
-    font-size: 24px;
-    line-height: 36px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  background: var(--btn-bg);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 24px;
+  line-height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Markdown */
 .alice-pro-app .msg pre {
-    background: var(--code-bg); border: 1px solid var(--code-border);
-    border-radius: 8px; padding: 10px 12px; margin: 8px 0;
-    overflow-x: auto; max-width: 100%;
-    font-size: 13px; line-height: 1.4;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
 }
 .alice-pro-app .msg code {
-    background: var(--code-bg); border: 1px solid var(--code-border);
-    border-radius: 4px; padding: 2px 6px;
-    font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
-    font-size: 14px; color: #e01e5a;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  color: #e01e5a;
 }
-.alice-pro-app .msg pre code { background: none; border: none; padding: 0; color: var(--text-main); }
+.alice-pro-app .msg pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-main);
+}
 
 /* Animations */
-@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-.context-menu { animation: fadeIn 0.15s ease-out; }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.context-menu {
+  animation: fadeIn 0.15s ease-out;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
-    .alice-pro-app .modal-content { max-width: 95%; margin: 20px; }
+  .alice-pro-app .modal-content {
+    max-width: 95%;
+    margin: 20px;
+  }
 }
 
 /* Стили для Markdown */
-.alice-pro-app .bubble h1, .alice-pro-app .bubble h2, .alice-pro-app .bubble h3 {
-    margin-top: 10px;
-    margin-bottom: 5px;
-    font-weight: bold;
+.alice-pro-app .bubble h1,
+.alice-pro-app .bubble h2,
+.alice-pro-app .bubble h3 {
+  margin-top: 10px;
+  margin-bottom: 5px;
+  font-weight: bold;
 }
-.alice-pro-app .bubble ul, .alice-pro-app .bubble ol {
-    margin-left: 20px;
-    margin-bottom: 5px;
+.alice-pro-app .bubble ul,
+.alice-pro-app .bubble ol {
+  margin-left: 20px;
+  margin-bottom: 5px;
 }
 .alice-pro-app .bubble p {
-    margin-bottom: 8px;
+  margin-bottom: 8px;
 }
 .alice-pro-app .bubble pre {
-    background: var(--code-bg);
-    padding: 10px;
-    border-radius: 6px;
-    overflow-x: auto;
-    margin: 10px 0;
-    white-space: pre;
-    word-break: normal;
-    border: 1px solid var(--border-color);
+  background: var(--code-bg);
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 10px 0;
+  white-space: pre;
+  word-break: normal;
+  border: 1px solid var(--border-color);
 }
 .alice-pro-app .bubble code {
-    background: var(--code-bg);
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
 }
 .alice-pro-app .bubble pre code {
-    background: none;
-    padding: 0;
-    border: none;
+  background: none;
+  padding: 0;
+  border: none;
 }
 
 /* Стили для Markdown элементов */
-.alice-pro-app .bubble h1, .alice-pro-app .bubble h2, .alice-pro-app .bubble h3, .alice-pro-app .bubble h4 {
-    margin-top: 10px;
-    margin-bottom: 5px;
-    font-weight: bold;
+.alice-pro-app .bubble h1,
+.alice-pro-app .bubble h2,
+.alice-pro-app .bubble h3,
+.alice-pro-app .bubble h4 {
+  margin-top: 10px;
+  margin-bottom: 5px;
+  font-weight: bold;
 }
 .alice-pro-app .bubble h4 {
-    font-size: 1em;
+  font-size: 1em;
 }
 .alice-pro-app .bubble p {
-    margin-bottom: 8px;
+  margin-bottom: 8px;
 }
 .alice-pro-app .bubble ul {
-    margin-left: 20px;
-    margin-bottom: 8px;
+  margin-left: 20px;
+  margin-bottom: 8px;
 }
 .alice-pro-app .bubble li {
-    margin-bottom: 4px;
+  margin-bottom: 4px;
 }
 .alice-pro-app .bubble hr {
-    border: 0;
-    border-top: 1px solid var(--border-color);
-    margin: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  margin: 10px 0;
 }
 .alice-pro-app .bubble pre {
-    background: var(--code-bg);
-    border: 1px solid var(--code-border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin: 8px 0;
-    overflow-x: auto;
-    max-width: 100%;
-    font-size: 13px;
-    line-height: 1.4;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
 }
 .alice-pro-app .bubble code {
-    background: var(--code-bg);
-    border: 1px solid var(--code-border);
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
-    font-size: 14px;
-    color: #e01e5a;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  color: #e01e5a;
 }
 .alice-pro-app .bubble pre code {
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--text-main);
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-main);
 }
-
-
-
 
 /* Header rows */
 .alice-pro-app #header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
 }
 
 .alice-pro-app .header-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .alice-pro-app .header-row-secondary {
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 1px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 1px;
 }
 
 .alice-pro-app .header-row-secondary::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 .alice-pro-app .header-row-secondary .header-btn {
-    flex: 0 0 auto;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 768px) {
-    .alice-pro-app #header { gap: 6px; padding-left: 10px; padding-right: 10px; }
-    .alice-pro-app .header-row { gap: 8px; }
-    .alice-pro-app .header-row-primary .model-btn { min-width: 0; }
+  .alice-pro-app #header {
+    gap: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .alice-pro-app .header-row {
+    gap: 8px;
+  }
+  .alice-pro-app .header-row-primary .model-btn {
+    min-width: 0;
+  }
 }
 /* Treasury modal */
 .alice-pro-app .treasury-modal {
-    z-index: 1100;
-    padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
+  z-index: 1100;
+  padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
 }
 
 .alice-pro-app .treasury-modal-content {
-    width: min(94vw, 520px);
-    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
-    padding: 24px;
-    overflow-y: auto;
+  padding: 24px;
 }
 
 .alice-pro-app .treasury-modal-close {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 8px;
-    background: var(--btn-bg);
-    color: var(--text-main);
-    font-size: 24px;
-    line-height: 36px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+  font-size: 24px;
+  line-height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .alice-pro-app .treasury-balance-card {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 16px;
-    margin-bottom: 20px;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--btn-bg);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--btn-bg);
 }
 
 .alice-pro-app .treasury-balance-label {
-    color: var(--text-secondary);
-    font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .alice-pro-app .treasury-balance-value {
-    color: var(--text-main);
-    font-size: 24px;
-    overflow-wrap: anywhere;
+  color: var(--text-main);
+  font-size: 24px;
+  overflow-wrap: anywhere;
 }
 
 .alice-pro-app .treasury-action-section {
-    margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 .alice-pro-app .treasury-action-section h4 {
-    margin: 0 0 10px;
-    color: var(--text-main);
+  margin: 0 0 10px;
+  color: var(--text-main);
 }
 
 .alice-pro-app .treasury-top-up-row {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
 
 .alice-pro-app .treasury-amount-input {
-    min-width: 0;
-    flex: 1;
-    padding: 11px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    background: var(--bg-input);
-    color: var(--text-main);
-    font: inherit;
+  min-width: 0;
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font: inherit;
 }
 
 .alice-pro-app .treasury-action-btn {
-    flex: 0 0 auto;
-    padding: 11px 14px;
-    border: none;
-    border-radius: 10px;
-    background: var(--accent);
-    color: #fff;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .alice-pro-app .treasury-action-btn:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
 
 .alice-pro-app .treasury-expenses-list {
-    min-height: 40px;
+  min-height: 40px;
 }
 
 .alice-pro-app .treasury-expense-items {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .alice-pro-app .treasury-expense-item {
-    padding: 10px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    background: var(--btn-bg);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--btn-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .alice-pro-app .treasury-expense-description {
-    color: var(--text-main);
-    font-size: 14px;
+  color: var(--text-main);
+  font-size: 14px;
 }
 
 .alice-pro-app .treasury-expense-meta {
-    color: var(--text-secondary);
-    font-size: 12px;
-    overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .alice-pro-app .treasury-empty-state,
 .alice-pro-app .treasury-status {
-    color: var(--text-secondary);
-    font-size: 13px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .alice-pro-app .treasury-status {
-    min-height: 18px;
-    margin-top: 8px;
+  min-height: 18px;
+  margin-top: 8px;
 }
 
 .alice-pro-app .treasury-status.is-error {
-    color: var(--danger);
+  color: var(--danger);
 }
 
 @media (max-width: 520px) {
-    .alice-pro-app .treasury-modal {
-        padding-left: 8px;
-        padding-right: 8px;
-    }
+  .alice-pro-app .treasury-modal {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 
-    .alice-pro-app .treasury-modal-content {
-        width: 100%;
-        padding: 20px;
-        border-radius: 14px;
-    }
+  .alice-pro-app .treasury-modal-content {
+    width: 100%;
+    padding: 20px;
+    border-radius: 14px;
+  }
 
-    .alice-pro-app .treasury-top-up-row {
-        flex-direction: column;
-    }
+  .alice-pro-app .treasury-top-up-row {
+    flex-direction: column;
+  }
 
-    .alice-pro-app .treasury-action-btn {
-        width: 100%;
-    }
+  .alice-pro-app .treasury-action-btn {
+    width: 100%;
+  }
 }
 /* Header icon wrapping */
 .alice-pro-app #header > .header-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, 38px);
-    grid-auto-rows: 38px;
-    grid-auto-flow: row;
-    align-items: center;
-    justify-content: start;
-    gap: 8px 12px;
-    min-width: 0;
-    width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 38px);
+  grid-auto-rows: 38px;
+  grid-auto-flow: row;
+  align-items: center;
+  justify-content: start;
+  gap: 8px 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .alice-pro-app #header > .header-actions > .header-btn {
-    width: 38px;
-    height: 38px;
-    flex: none;
+  width: 38px;
+  height: 38px;
+  flex: none;
 }
 
 @media (max-width: 768px) {
-    .alice-pro-app #header > .header-actions {
-        grid-template-columns: repeat(auto-fill, 36px);
-        grid-auto-rows: 36px;
-        gap: 6px 8px;
-    }
+  .alice-pro-app #header > .header-actions {
+    grid-template-columns: repeat(auto-fill, 36px);
+    grid-auto-rows: 36px;
+    gap: 6px 8px;
+  }
 
-    .alice-pro-app #header > .header-actions > .header-btn {
-        width: 36px;
-        height: 36px;
-    }
+  .alice-pro-app #header > .header-actions > .header-btn {
+    width: 36px;
+    height: 36px;
+  }
 }
-
 
 /* Memory panel: HTML-first structure, presentation owned by CSS. */
 .alice-pro-app .memory-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 100000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    background: rgba(0, 0, 0, 0.7);
+  z-index: 100000;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .alice-pro-app .memory-modal[hidden] {
-    display: none;
+  display: none;
 }
 
 .alice-pro-app .memory-modal-content {
-    position: relative;
-    width: min(450px, 100%);
-    max-height: 80vh;
-    overflow-y: auto;
-    padding: 20px;
-    border-radius: 8px;
-    background: #1e1e1e;
-    color: #fff;
-    font-family: sans-serif;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  padding: 20px;
+  border-radius: 8px;
+  background: #1e1e1e;
+  color: #fff;
+  font-family: sans-serif;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
 
 .alice-pro-app .memory-modal-close {
-    position: absolute;
-    top: 10px;
-    right: 15px;
-    width: 36px;
-    height: 36px;
-    border: 0;
-    background: transparent;
-    color: #aaa;
-    font-size: 24px;
-    line-height: 1;
-    cursor: pointer;
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #aaa;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .alice-pro-app .memory-modal-title {
-    margin: 0;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #444;
-    font-size: 18px;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #444;
+  font-size: 18px;
 }
 
 .alice-pro-app .memory-config {
-    margin: 15px 0;
-    padding: 10px;
-    border-radius: 5px;
-    background: #2a2a2a;
+  margin: 15px 0;
+  padding: 10px;
+  border-radius: 5px;
+  background: #2a2a2a;
 }
 
 .alice-pro-app .memory-config-option {
-    display: block;
-    margin-bottom: 8px;
-    cursor: pointer;
+  display: block;
+  margin-bottom: 8px;
+  cursor: pointer;
 }
 
 .alice-pro-app .memory-config-option:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .alice-pro-app .memory-limit {
-    width: 60px;
-    padding: 3px;
-    border: 1px solid #555;
-    border-radius: 4px;
-    background: #333;
-    color: #fff;
+  width: 60px;
+  padding: 3px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #333;
+  color: #fff;
 }
 
 .alice-pro-app .memory-clear {
-    margin-bottom: 15px;
+  margin-bottom: 15px;
 }
 
 .alice-pro-app .memory-clear-btn {
-    padding: 6px 12px;
-    border: 0;
-    border-radius: 4px;
-    background: var(--danger);
-    color: #fff;
-    cursor: pointer;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--danger);
+  color: #fff;
+  cursor: pointer;
 }
 
 .alice-pro-app .memory-facts-title {
-    margin: 0 0 8px;
-    font-size: 14px;
+  margin: 0 0 8px;
+  font-size: 14px;
 }
 
 .alice-pro-app .memory-facts-list {
-    max-height: 220px;
-    overflow-y: auto;
-    padding-top: 8px;
-    border-top: 1px solid #444;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-top: 8px;
+  border-top: 1px solid #444;
 }
 
 .alice-pro-app .memory-fact {
-    margin-bottom: 6px;
-    padding: 8px;
-    border-radius: 4px;
-    background: #2a2a2a;
-    font-size: 12px;
+  margin-bottom: 6px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #2a2a2a;
+  font-size: 12px;
 }
 
 .alice-pro-app .memory-fact-category {
-    color: #4da6ff;
-    font-weight: 700;
-    text-transform: uppercase;
+  color: #4da6ff;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .alice-pro-app .memory-empty {
-    color: #888;
-    font-size: 13px;
+  color: #888;
+  font-size: 13px;
 }
-
 
 /* Progressive enhancement: state previously carried by inline styles. */
 .alice-pro-app .conv-empty {
-    padding: 20px;
-    color: var(--text-secondary);
-    text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 .alice-pro-app .model-option-empty {
-    cursor: default;
-    opacity: .7;
+  cursor: default;
+  opacity: 0.7;
 }
 .alice-pro-app .model-option-price {
-    font-size: 11px;
-    color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 .alice-pro-app #voice-ui,
 .alice-pro-app #response-mode-wrap,
 .alice-pro-app #mic-btn,
 .alice-pro-app #upload-image-btn {
-    display: none;
+  display: none;
 }
 
 .alice-pro-app #text-ui {
-    display: flex;
+  display: flex;
 }
 
 .alice-pro-app.alice-model-voice #voice-ui,
 .alice-pro-app.alice-model-voice #response-mode-wrap,
 .alice-pro-app.alice-model-voice #mic-btn {
-    display: flex;
+  display: flex;
 }
 
 .alice-pro-app.alice-model-voice #text-ui {
-    display: none;
+  display: none;
 }
 
 .alice-pro-app.alice-model-multimodal #upload-image-btn {
-    display: flex;
+  display: flex;
 }
 
 .alice-pro-app #voice-ui[aria-hidden="true"],
@@ -878,476 +1027,690 @@ html, body {
 .alice-pro-app #response-mode-wrap[aria-hidden="true"],
 .alice-pro-app #mic-btn[aria-hidden="true"],
 .alice-pro-app #upload-image-btn[aria-hidden="true"] {
-    display: none;
+  display: none;
 }
 
 .alice-pro-app .conv-link {
-    display: block;
-    flex: 1;
-    min-width: 0;
-    color: inherit;
-    text-decoration: none;
+  display: block;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 
 .alice-pro-app .conv-link:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
-
 
 /* Chat progressive-enhancement states. */
 .alice-pro-app .approval-card {
-    border: 1px solid var(--accent);
-    background: rgba(0, 122, 255, 0.05);
-    border-radius: 12px;
-    padding: 14px;
+  border: 1px solid var(--accent);
+  background: rgba(0, 122, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px;
 }
 
 .alice-pro-app .approval-card-title {
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--accent);
 }
 
 .alice-pro-app .approval-card-action {
-    font-size: 14px;
-    margin-bottom: 8px;
+  font-size: 14px;
+  margin-bottom: 8px;
 }
 
 .alice-pro-app .approval-card-params {
-    font-size: 12px;
-    background: rgba(0, 0, 0, 0.05);
-    padding: 8px;
-    border-radius: 6px;
-    margin-bottom: 10px;
-    white-space: pre-wrap;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  white-space: pre-wrap;
 }
 
 .alice-pro-app .approval-card-actions {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
 
 .alice-pro-app .approval-btn {
-    padding: 6px 14px;
-    color: #fff;
-    border: 0;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
+  padding: 6px 14px;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
 }
 
 .alice-pro-app .approval-btn-approve {
-    background: #28a745;
+  background: #28a745;
 }
 
 .alice-pro-app .approval-btn-reject {
-    background: #dc3545;
+  background: #dc3545;
 }
 
 .alice-pro-app .approval-card.is-executing {
-    opacity: 0.75;
+  opacity: 0.75;
 }
 
 .alice-pro-app .copy-btn {
-    margin-left: 10px;
-    cursor: pointer;
-    background: none;
-    border: 0;
+  margin-left: 10px;
+  cursor: pointer;
+  background: none;
+  border: 0;
 }
 
 .alice-pro-app .msg-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 6px;
-    align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  align-items: center;
 }
 
 .alice-pro-app .msg-meta-details {
-    font-size: 11px;
-    background: rgba(0, 0, 0, 0.06);
-    border-radius: 6px;
-    padding: 3px 8px;
-    cursor: pointer;
-    color: var(--text-secondary);
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
 }
 
 .alice-pro-app .msg-meta-summary {
-    font-weight: 600;
+  font-weight: 600;
 }
 
 .alice-pro-app .msg-meta-detail-list {
-    margin-top: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-family: monospace;
-    font-size: 11px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: monospace;
+  font-size: 11px;
 }
 
 .alice-pro-app .msg-meta-error {
-    color: var(--danger);
+  color: var(--danger);
 }
 
 .alice-pro-app .msg-meta-step {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .alice-pro-app .msg-meta-server {
-    color: var(--accent);
-    font-size: 10px;
-    margin-left: 4px;
+  color: var(--accent);
+  font-size: 10px;
+  margin-left: 4px;
 }
 
 .alice-pro-app .msg-trace-details {
-    width: 100%;
-    margin-top: 4px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 .alice-pro-app .alice-trace-open-viewer {
-    font-size: 11px;
-    background: transparent;
-    border: 0;
-    padding: 2px 0;
-    margin-left: 8px;
-    color: var(--accent);
-    cursor: pointer;
-    font-weight: 600;
+  font-size: 11px;
+  background: transparent;
+  border: 0;
+  padding: 2px 0;
+  margin-left: 8px;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .alice-pro-app .error-state {
-    color: var(--danger);
+  color: var(--danger);
 }
 
-
 .alice-pro-app .trace-viewer-auto-button {
-    font-size: 11px;
-    background: transparent;
-    border: 0;
-    padding: 0;
-    color: inherit;
-    cursor: pointer;
-    font-weight: 600;
+  font-size: 11px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .alice-pro-app .trace-viewer-auto-details {
-    width: auto;
-    display: inline-block;
-    margin-top: 4px;
+  width: auto;
+  display: inline-block;
+  margin-top: 4px;
 }
 
-
 .alice-pro-app .theme-rollback-card {
-    padding: 8px 12px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .alice-pro-app .theme-rollback-button {
-    border: 1px solid var(--border-color);
-    background: var(--btn-bg);
-    color: var(--text-main);
-    border-radius: 8px;
-    padding: 7px 10px;
-    cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--btn-bg);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
 }
 
-
-.alice-pro-app .provider-field { margin: 14px 0; }
-.alice-pro-app .provider-field-label { display: block; font-weight: 600; margin-bottom: 6px; }
+.alice-pro-app .provider-field {
+  margin: 14px 0;
+}
+.alice-pro-app .provider-field-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
 .alice-pro-app .provider-field-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 10px;
-    border: 1px solid #555;
-    border-radius: 7px;
-    background: var(--input-bg, #222);
-    color: var(--text, #fff);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #555;
+  border-radius: 7px;
+  background: var(--input-bg, #222);
+  color: var(--text, #fff);
 }
-.alice-pro-app .provider-field-input.has-error { border-color: #ff6b6b; }
-.alice-pro-app .provider-field-help { margin-top: 5px; font-size: 12px; opacity: .7; line-height: 1.35; }
-.alice-pro-app .provider-field-error { display: none; margin-top: 6px; font-size: 12px; color: #ff6b6b; line-height: 1.35; }
-.alice-pro-app .provider-field-error.is-visible { display: block; }
-.alice-pro-app .provider-status-card { padding: 12px; margin: 8px 0; border: 1px solid #444; border-radius: 8px; }
-.alice-pro-app .provider-status-title { font-weight: 700; }
-.alice-pro-app .provider-status-line { margin-top: 5px; }
-.alice-pro-app .provider-status-meta { margin-top: 7px; font-size: 11px; opacity: .65; }
+.alice-pro-app .provider-field-input.has-error {
+  border-color: #ff6b6b;
+}
+.alice-pro-app .provider-field-help {
+  margin-top: 5px;
+  font-size: 12px;
+  opacity: 0.7;
+  line-height: 1.35;
+}
+.alice-pro-app .provider-field-error {
+  display: none;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #ff6b6b;
+  line-height: 1.35;
+}
+.alice-pro-app .provider-field-error.is-visible {
+  display: block;
+}
+.alice-pro-app .provider-status-card {
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid #444;
+  border-radius: 8px;
+}
+.alice-pro-app .provider-status-title {
+  font-weight: 700;
+}
+.alice-pro-app .provider-status-line {
+  margin-top: 5px;
+}
+.alice-pro-app .provider-status-meta {
+  margin-top: 7px;
+  font-size: 11px;
+  opacity: 0.65;
+}
 .alice-pro-app .provider-credentials-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 100002;
-    background: rgba(0, 0, 0, .72);
-    align-items: center;
-    justify-content: center;
+  z-index: 100002;
+  background: rgba(0, 0, 0, 0.72);
 }
-.alice-pro-app .provider-credentials-modal.visible { display: flex; }
+.alice-pro-app .provider-credentials-modal.visible {
+  display: flex;
+}
 .alice-pro-app .provider-credentials-box {
-    background: var(--bg, #1e1e1e);
-    color: var(--text, #fff);
-    padding: 20px;
-    border-radius: 12px;
-    width: min(560px, 92vw);
-    max-height: 90vh;
-    overflow: auto;
-    position: relative;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  background: var(--bg, #1e1e1e);
+  color: var(--text, #fff);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 .alice-pro-app .provider-credentials-close {
-    position: absolute;
-    right: 12px;
-    top: 8px;
-    font-size: 24px;
-    background: none;
-    border: 0;
-    color: inherit;
-    cursor: pointer;
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  font-size: 24px;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
 }
-.alice-pro-app .provider-credentials-title { margin-top: 0; }
-.alice-pro-app .provider-credentials-actions { display: flex; gap: 8px; margin-top: 14px; }
-.alice-pro-app .provider-credentials-status { margin-top: 14px; }
-
+.alice-pro-app .provider-credentials-title {
+  margin-top: 0;
+}
+.alice-pro-app .provider-credentials-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.alice-pro-app .provider-credentials-status {
+  margin-top: 14px;
+}
 
 .alice-pro-app .cloudru-iam-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 100001;
-    background: rgba(0, 0, 0, .7);
-    align-items: center;
-    justify-content: center;
+  z-index: 100001;
+  background: rgba(0, 0, 0, 0.7);
 }
-.alice-pro-app .cloudru-iam-modal.visible { display: flex; }
+.alice-pro-app .cloudru-iam-modal.visible {
+  display: flex;
+}
 .alice-pro-app .cloudru-iam-box {
-    background: var(--bg, #1e1e1e);
-    color: var(--text, #fff);
-    padding: 20px;
-    border-radius: 10px;
-    width: min(520px, 92vw);
-    max-height: 88vh;
-    overflow: auto;
-    position: relative;
+  background: var(--bg, #1e1e1e);
+  color: var(--text, #fff);
+  padding: 20px;
+  border-radius: 10px;
 }
 .alice-pro-app .cloudru-iam-close {
-    position: absolute;
-    right: 12px;
-    top: 8px;
-    font-size: 24px;
-    background: none;
-    border: 0;
-    color: inherit;
-    cursor: pointer;
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  font-size: 24px;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
 }
-.alice-pro-app .cloudru-iam-field { display: block; margin: 10px 0; }
-.alice-pro-app .cloudru-iam-label { display: block; margin-bottom: 4px; }
+.alice-pro-app .cloudru-iam-field {
+  display: block;
+  margin: 10px 0;
+}
+.alice-pro-app .cloudru-iam-label {
+  display: block;
+  margin-bottom: 4px;
+}
 .alice-pro-app .cloudru-iam-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
 }
-.alice-pro-app .cloudru-iam-confirm { display: block; margin: 14px 0; }
+.alice-pro-app .cloudru-iam-confirm {
+  display: block;
+  margin: 14px 0;
+}
 .alice-pro-app .cloudru-iam-output {
-    display: none;
-    white-space: pre-wrap;
-    word-break: break-word;
-    background: #222;
-    padding: 12px;
-    border-radius: 6px;
-    margin-top: 12px;
+  display: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #222;
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 12px;
 }
-.alice-pro-app .cloudru-iam-output.visible { display: block; }
-
+.alice-pro-app .cloudru-iam-output.visible {
+  display: block;
+}
 
 .alice-pro-app .file-manager-modal,
 .alice-pro-app .file-manager-add-modal {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--m-overlay, rgba(0, 0, 0, .6));
-    z-index: 10001;
+  background: var(--m-overlay, rgba(0, 0, 0, 0.6));
+  z-index: 10001;
 }
 .alice-pro-app .file-manager-add-modal {
-    background: rgba(0, 0, 0, .5);
-    z-index: 10002;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10002;
 }
 .alice-pro-app .file-manager-box {
-    background: var(--m-bg, #fff);
-    border-radius: 12px;
-    padding: 24px;
-    max-width: 800px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 8px 32px var(--m-shadow, rgba(0, 0, 0, .3));
-    color: var(--m-text, #222);
+  background: var(--m-bg, #fff);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 32px var(--m-shadow, rgba(0, 0, 0, 0.3));
+  color: var(--m-text, #222);
 }
 .alice-pro-app .file-manager-add-box {
-    background: var(--m-bg, #fff);
-    border-radius: 12px;
-    padding: 20px;
-    max-width: 500px;
-    width: 85%;
-    max-height: 70vh;
-    overflow-y: auto;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
-    color: var(--m-text, #222);
+  background: var(--m-bg, #fff);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  color: var(--m-text, #222);
 }
-
 
 /* Chat markdown and reasoning presentation. */
 .alice-pro-app .md-code-block {
-    margin: 8px 0;
+  margin: 8px 0;
 }
 .alice-pro-app .md-code {
-    margin: 0;
+  margin: 0;
 }
 .alice-pro-app .reasoning-details {
-    margin-bottom: 10px;
-    font-size: 13px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
-    padding: 8px 12px;
-    border: 1px dashed var(--border-color);
+  margin-bottom: 10px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border-color);
 }
 .alice-pro-app .reasoning-summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
 }
 .alice-pro-app .reasoning-content {
-    margin-top: 8px;
-    white-space: pre-wrap;
-    font-family: monospace;
-    font-size: 12px;
-    color: var(--text-main);
-    opacity: 0.85;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-main);
+  opacity: 0.85;
 }
-
 
 /* File manager vector-store rendering. */
 .alice-pro-app .file-manager-state {
-    padding: 10px;
-    text-align: center;
-    color: var(--m-muted, #999);
-    font-size: 12px;
+  padding: 10px;
+  text-align: center;
+  color: var(--m-muted, #999);
+  font-size: 12px;
 }
 .alice-pro-app .file-manager-state-error {
-    color: var(--m-danger, #c33);
+  color: var(--m-danger, #c33);
 }
 .alice-pro-app .file-manager-vs-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    border-bottom: 1px solid var(--m-section-border, #eee);
-    font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--m-section-border, #eee);
+  font-size: 12px;
 }
 .alice-pro-app .file-manager-vs-details {
-    flex: 1;
-    min-width: 0;
+  flex: 1;
+  min-width: 0;
 }
 .alice-pro-app .file-manager-vs-name {
-    font-weight: 700;
-    color: var(--m-text, #222);
+  font-weight: 700;
+  color: var(--m-text, #222);
 }
 .alice-pro-app .file-manager-vs-meta {
-    font-size: 11px;
-    color: var(--m-muted, #666);
+  font-size: 11px;
+  color: var(--m-muted, #666);
 }
 .alice-pro-app .file-manager-copy-id {
-    cursor: pointer;
-    color: var(--m-accent, #4a90d9);
+  cursor: pointer;
+  color: var(--m-accent, #4a90d9);
 }
 .alice-pro-app .file-manager-secondary-btn,
 .alice-pro-app .file-manager-danger-btn {
-    padding: 4px 8px;
-    border: 1px solid var(--m-border, #ddd);
-    background: var(--m-card, #fff);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--m-border, #ddd);
+  background: var(--m-card, #fff);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
 }
 .alice-pro-app .file-manager-secondary-btn {
-    color: var(--m-text, #222);
+  color: var(--m-text, #222);
 }
 .alice-pro-app .file-manager-danger-btn {
-    color: var(--m-danger, #c33);
+  color: var(--m-danger, #c33);
 }
-
 
 /* File manager vector-store file picker. */
 .alice-pro-app .file-manager-add-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 .alice-pro-app .file-manager-add-title {
-    margin: 0;
-    font-size: 14px;
-    color: var(--m-text, #222);
+  margin: 0;
+  font-size: 14px;
+  color: var(--m-text, #222);
 }
 .alice-pro-app .file-manager-close-btn {
-    border: 0;
-    background: none;
-    font-size: 20px;
-    cursor: pointer;
-    color: var(--m-muted, #666);
+  border: 0;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--m-muted, #666);
 }
 .alice-pro-app .file-manager-add-list {
-    max-height: 300px;
-    overflow-y: auto;
-    margin-bottom: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
 }
 .alice-pro-app .file-manager-add-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px;
-    border-bottom: 1px solid var(--m-section-border, #eee);
-    font-size: 12px;
-    cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid var(--m-section-border, #eee);
+  font-size: 12px;
+  cursor: pointer;
 }
 .alice-pro-app .file-manager-add-name {
-    color: var(--m-text, #222);
+  color: var(--m-text, #222);
 }
 .alice-pro-app .file-manager-add-size {
-    margin-left: auto;
-    color: var(--m-muted, #666);
-    font-size: 11px;
+  margin-left: auto;
+  color: var(--m-muted, #666);
+  font-size: 11px;
 }
 .alice-pro-app .file-manager-primary-btn {
-    width: 100%;
-    padding: 8px;
-    background: var(--m-accent, #4a90d9);
-    color: #fff;
-    border: 0;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
+  width: 100%;
+  padding: 8px;
+  background: var(--m-accent, #4a90d9);
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
 }
-
 
 /* Header actions stay on one horizontal line; narrow screens scroll instead of wrapping. */
 .alice-pro-app #header {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .alice-pro-app #header .header-row {
-    flex: 0 0 auto;
+  flex: 0 0 auto;
 }
 
 .alice-pro-app #header .header-row-secondary {
-    overflow: visible;
-    padding-bottom: 0;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+/* === UNIFIED BUTTON CONTRACT === */
+.alice-pro-app .alice-btn {
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.05s ease;
+}
+.alice-pro-app .alice-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.alice-pro-app .alice-btn:disabled,
+.alice-pro-app .alice-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.alice-pro-app .alice-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.alice-pro-app .header-btn.alice-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-header);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 38px;
+}
+.alice-pro-app .header-btn.alice-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+@media (max-width: 768px) {
+  .alice-pro-app .header-btn.alice-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    flex-basis: 36px;
+  }
+}
+
+/* === SYSTEM STATUS MODULE === */
+.alice-pro-app #system-status-btn {
+  position: relative;
+  font-size: 18px;
+}
+.alice-pro-app #system-status-btn[data-state="ready"] {
+  color: #34c759;
+}
+.alice-pro-app #system-status-btn[data-state="running"],
+.alice-pro-app #system-status-btn[data-state="waiting"] {
+  color: #ffcc00;
+}
+.alice-pro-app #system-status-btn[data-state="degraded"] {
+  color: #ff9500;
+}
+.alice-pro-app #system-status-btn[data-state="blocked"],
+.alice-pro-app #system-status-btn[data-state="revoked"],
+.alice-pro-app #system-status-btn[data-state="error"] {
+  color: #ff3b30;
+}
+
+.alice-pro-app .alice-system-status-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 100010;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: calc(68px + env(safe-area-inset-top, 0px)) 12px 12px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.alice-pro-app .alice-system-status-panel[hidden] {
+  display: none;
+}
+
+.alice-pro-app .alice-system-status-content {
+  width: min(360px, 100%);
+  max-height: calc(100dvh - 92px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-sidebar);
+  color: var(--text-main);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24);
+}
+.alice-pro-app .alice-system-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.alice-pro-app .alice-system-status-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.alice-pro-app .alice-system-status-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+}
+.alice-pro-app .alice-system-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.alice-pro-app .alice-system-status-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-app);
+}
+.alice-pro-app .alice-system-status-row[data-status="error"],
+.alice-pro-app .alice-system-status-row[data-status="revoked"],
+.alice-pro-app .alice-system-status-row[data-status="blocked"] {
+  border-color: var(--danger);
+}
+.alice-pro-app .alice-system-status-indicator {
+  font-size: 14px;
+  line-height: 1;
+}
+.alice-pro-app .alice-system-status-row[data-status="ready"] .alice-system-status-indicator {
+  color: #34c759;
+}
+.alice-pro-app .alice-system-status-row[data-status="running"] .alice-system-status-indicator,
+.alice-pro-app .alice-system-status-row[data-status="waiting"] .alice-system-status-indicator {
+  color: #ffcc00;
+}
+.alice-pro-app .alice-system-status-row[data-status="degraded"] .alice-system-status-indicator {
+  color: #ff9500;
+}
+.alice-pro-app .alice-system-status-row[data-status="error"] .alice-system-status-indicator,
+.alice-pro-app .alice-system-status-row[data-status="revoked"] .alice-system-status-indicator,
+.alice-pro-app .alice-system-status-row[data-status="blocked"] .alice-system-status-indicator {
+  color: #ff3b30;
+}
+.alice-pro-app .alice-system-status-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.alice-pro-app .alice-system-status-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alice-pro-app .alice-system-status-text span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.alice-pro-app .alice-system-status-revoke {
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+  font-size: 11px;
+}
+
+.alice-pro-app .file-manager-vs-create-btn,
+.alice-pro-app .file-manager-vs-refresh-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.alice-pro-app .file-manager-vs-create-btn {
+  border: 0;
+  background: var(--m-accent, #4a90d9);
+  color: #fff;
+}
+.alice-pro-app .file-manager-vs-refresh-btn {
+  border: 1px solid var(--m-border, #ddd);
+  background: var(--m-card, #fff);
+  color: var(--m-text, #222);
 }

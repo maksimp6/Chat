@@ -1,4 +1,5 @@
 """Shared extraction of user-visible text from Yandex Responses API output."""
+
 from typing import Any, Dict, Optional, Tuple
 
 

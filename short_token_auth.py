@@ -24,7 +24,10 @@ _PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
 
 def _enabled() -> bool:
     return os.environ.get("ALICE_REQUIRE_SHORT_TOKEN", "").strip().lower() in {
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     }
 
 
@@ -69,7 +72,7 @@ def _token_path_remainder(token: str, path: Optional[str] = None) -> Optional[st
     prefix = f"/{token}"
     if not path == prefix and not path.startswith(prefix + "/"):
         return None
-    remainder = path[len(prefix):]
+    remainder = path[len(prefix) :]
     return remainder or "/"
 
 
@@ -86,7 +89,7 @@ class _TokenPathMiddleware:
             if token:
                 prefix = f"/{token}"
                 if path == prefix or path.startswith(prefix + "/"):
-                    environ["PATH_INFO"] = path[len(prefix):] or "/"
+                    environ["PATH_INFO"] = path[len(prefix) :] or "/"
                     environ[_TOKEN_PATH_MARKER] = True
         return self.app(environ, start_response)
 

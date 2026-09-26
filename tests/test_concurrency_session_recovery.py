@@ -39,10 +39,15 @@ def test_parallel_invocations_keep_contexts_and_traces_isolated():
                 return create_invocation(session_id, conversation_id, {"marker": conversation_id})
 
             with ThreadPoolExecutor(max_workers=2) as pool:
-                first, second = list(pool.map(make, [
-                    ("session-a", "conversation-a"),
-                    ("session-b", "conversation-b"),
-                ]))
+                first, second = list(
+                    pool.map(
+                        make,
+                        [
+                            ("session-a", "conversation-a"),
+                            ("session-b", "conversation-b"),
+                        ],
+                    )
+                )
 
             assert first.session_id == "session-a"
             assert first.conversation_id == "conversation-a"

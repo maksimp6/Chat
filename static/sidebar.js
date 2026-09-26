@@ -1,216 +1,221 @@
 function initSidebar() {
-    if (document.documentElement.dataset.sidebarInitialized === "true") return;
-    document.documentElement.dataset.sidebarInitialized = "true";
-    var sidebar = document.getElementById("sidebar");
-    var menuBtn = document.getElementById("menu-btn");
-    var closeBtn = document.getElementById("close-sidebar-btn");
-    var overlay = document.getElementById("overlay");
-    var newChatBtn = document.getElementById("new-chat-btn");
+  if (document.documentElement.dataset.sidebarInitialized === "true") return;
+  document.documentElement.dataset.sidebarInitialized = "true";
+  var sidebar = document.getElementById("sidebar");
+  var menuBtn = document.getElementById("menu-btn");
+  var closeBtn = document.getElementById("close-sidebar-btn");
+  var overlay = document.getElementById("overlay");
+  var newChatBtn = document.getElementById("new-chat-btn");
 
-    function openSidebar() {
-        if (!sidebar) return;
-        sidebar.classList.add("open");
-        if (overlay) overlay.classList.add("visible");
-        if (menuBtn) menuBtn.setAttribute("aria-expanded", "true");
-    }
-    function closeSidebar() {
-        if (sidebar) sidebar.classList.remove("open");
-        if (overlay) overlay.classList.remove("visible");
-        if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
-    }
+  function openSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.add("open");
+    if (overlay) overlay.classList.add("visible");
+    if (menuBtn) menuBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove("open");
+    if (overlay) overlay.classList.remove("visible");
+    if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+  }
 
-    if (menuBtn) {
-        menuBtn.setAttribute("aria-expanded", sidebar ? sidebar.classList.contains("open") ? "true" : "false" : "false");
-        menuBtn.setAttribute("aria-controls", "sidebar");
-        menuBtn.addEventListener("click", function() {
-            if (!sidebar) return;
-            sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
-        });
-    }
-    if (closeBtn) closeBtn.addEventListener("click", closeSidebar);
-    if (overlay) overlay.addEventListener("click", closeSidebar);
-    if (newChatBtn) newChatBtn.addEventListener("click", function() {
-        window.isCreatingNewChat = true;
-        if (typeof renderModelModal === "function") renderModelModal();
-        var modal = document.getElementById("model-modal");
-        if (modal) modal.classList.add("visible");
+  if (menuBtn) {
+    menuBtn.setAttribute(
+      "aria-expanded",
+      sidebar ? (sidebar.classList.contains("open") ? "true" : "false") : "false",
+    );
+    menuBtn.setAttribute("aria-controls", "sidebar");
+    window.AliceCoreAPI.ui.actions.register("sidebar.toggle", function () {
+      if (!sidebar) return;
+      sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
     });
-    if (typeof renderSidebar === "function") renderSidebar();
-    if (window.__aliceSidebarHistoryBound !== true) {
-        window.addEventListener("popstate", handleHistoryNavigation);
-        window.__aliceSidebarHistoryBound = true;
-    }
+  }
+  if (closeBtn) closeBtn.addEventListener("click", closeSidebar);
+  if (overlay) overlay.addEventListener("click", closeSidebar);
+  if (newChatBtn)
+    newChatBtn.addEventListener("click", function () {
+      window.isCreatingNewChat = true;
+      if (typeof renderModelModal === "function") renderModelModal();
+      var modal = document.getElementById("model-modal");
+      if (modal) modal.classList.add("visible");
+    });
+  if (typeof renderSidebar === "function") renderSidebar();
+  if (window.__aliceSidebarHistoryBound !== true) {
+    window.addEventListener("popstate", handleHistoryNavigation);
+    window.__aliceSidebarHistoryBound = true;
+  }
 }
 
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initSidebar, { once: true });
+  document.addEventListener("DOMContentLoaded", initSidebar, { once: true });
 } else {
-    initSidebar();
+  initSidebar();
 }
 
 function renderSidebar() {
-    var list = document.getElementById("conv-list");
-    if (!list) return;
-    list.replaceChildren();
-    var items = Array.isArray(conversations) ? conversations : [];
-    if (!items.length) {
-        var empty = document.createElement("div");
-        empty.className = "conv-empty";
-        empty.textContent = "Нет диалогов";
-        list.appendChild(empty);
-        return;
-    }
-    items.forEach(function(conv) {
-        var div = document.createElement("div");
-        div.className = "conv-item" + (conv.id === currentConvId ? " active" : "");
-        
-        var titleSpan = document.createElement("span");
-        titleSpan.className = "conv-title";
-        titleSpan.textContent = conv.title;
-        
-        // Двойной клик для переименования
-        titleSpan.addEventListener("dblclick", function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var newName = prompt("Новое имя диалога:", conv.title);
-            if (newName && newName.trim() !== "") {
-                fetch("/api/conversations/" + conv.id, {
-                    method: "PATCH",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ title: newName.trim() })
-                })
-                .then(r => {
-                    if (!r.ok) throw new Error("Network response was not ok");
-                    return r.json();
-                })
-                .then(data => {
-                    if (data.status === "ok") {
-                        conv.title = newName.trim();
-                        localStorage.setItem("conversations", JSON.stringify(conversations));
-                        renderSidebar();
-                    } else {
-                        alert("Ошибка переименования: " + (data.error || "Неизвестная ошибка"));
-                    }
-                })
-                .catch(err => {
-                    console.error("[SIDEBAR] Rename error:", err);
-                    alert("Ошибка сети при переименовании");
-                });
-            }
-        });
+  var list = document.getElementById("conv-list");
+  if (!list) return;
+  list.replaceChildren();
+  var items = Array.isArray(conversations) ? conversations : [];
+  if (!items.length) {
+    var empty = document.createElement("div");
+    empty.className = "conv-empty";
+    empty.textContent = "Нет диалогов";
+    list.appendChild(empty);
+    return;
+  }
+  items.forEach(function (conv) {
+    var div = document.createElement("div");
+    div.className = "conv-item" + (conv.id === currentConvId ? " active" : "");
 
-        var delBtn = document.createElement("button");
-        delBtn.className = "delete-btn";
-        delBtn.textContent = "×";
-        delBtn.addEventListener("click", function(e) { 
-            e.stopPropagation(); 
-            if(confirm("Удалить этот диалог?")) {
-                fetch("/api/conversations/" + conv.id, { method: "DELETE" })
-                .then(r => {
-                    if (!r.ok) throw new Error("Network response was not ok");
-                    deleteConv(conv.id);
-                })
-                .catch(err => {
-                    console.error("[SIDEBAR] Delete error:", err);
-                    alert("Ошибка сети при удалении");
-                });
+    var titleSpan = document.createElement("span");
+    titleSpan.className = "conv-title";
+    titleSpan.textContent = conv.title;
+
+    // Двойной клик для переименования
+    titleSpan.addEventListener("dblclick", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var newName = prompt("Новое имя диалога:", conv.title);
+      if (newName && newName.trim() !== "") {
+        window.AliceDispatcher.request("/api/conversations/" + conv.id, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newName.trim() }),
+        })
+          .then((r) => {
+            if (!r.ok) throw new Error("Network response was not ok");
+            return r.json();
+          })
+          .then((data) => {
+            if (data.status === "ok") {
+              conv.title = newName.trim();
+              localStorage.setItem("conversations", JSON.stringify(conversations));
+              renderSidebar();
+            } else {
+              alert("Ошибка переименования: " + (data.error || "Неизвестная ошибка"));
             }
-        });
-        
-        var link = document.createElement("a");
-        link.className = "conv-link";
-        link.href = "?conversation_id=" + encodeURIComponent(conv.id);
-        link.setAttribute("aria-current", conv.id === currentConvId ? "page" : "false");
-        link.appendChild(titleSpan);
-        div.appendChild(link);
-        div.appendChild(delBtn);
-        div.addEventListener("click", function(e) {
-            if (e.target === delBtn || e.target.closest(".conv-link")) return;
-            selectConv(conv.id);
-        });
-        link.addEventListener("click", function(e) {
-            e.preventDefault();
-            selectConv(conv.id);
-        });
-        list.appendChild(div);
+          })
+          .catch((err) => {
+            console.error("[SIDEBAR] Rename error:", err);
+            alert("Ошибка сети при переименовании");
+          });
+      }
     });
+
+    var delBtn = document.createElement("button");
+    delBtn.className = "alice-btn delete-btn";
+    delBtn.textContent = "×";
+    delBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (confirm("Удалить этот диалог?")) {
+        window.AliceDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
+          .then((r) => {
+            if (!r.ok) throw new Error("Network response was not ok");
+            deleteConv(conv.id);
+          })
+          .catch((err) => {
+            console.error("[SIDEBAR] Delete error:", err);
+            alert("Ошибка сети при удалении");
+          });
+      }
+    });
+
+    var link = document.createElement("a");
+    link.className = "conv-link";
+    link.href = "?conversation_id=" + encodeURIComponent(conv.id);
+    link.setAttribute("aria-current", conv.id === currentConvId ? "page" : "false");
+    link.appendChild(titleSpan);
+    div.appendChild(link);
+    div.appendChild(delBtn);
+    div.addEventListener("click", function (e) {
+      if (e.target === delBtn || e.target.closest(".conv-link")) return;
+      selectConv(conv.id);
+    });
+    link.addEventListener("click", function (e) {
+      e.preventDefault();
+      selectConv(conv.id);
+    });
+    list.appendChild(div);
+  });
 }
 
 function selectConv(id, updateHistory) {
-    if (updateHistory === undefined) updateHistory = true;
-    currentConvId = id;
-    localStorage.setItem("current_conv_id", id);
-    if (updateHistory) {
-        var newUrl = new URL(window.location);
-        newUrl.searchParams.set('conversation_id', id);
-        window.history.pushState({convId: id}, '', newUrl);
+  if (updateHistory === undefined) updateHistory = true;
+  currentConvId = id;
+  localStorage.setItem("current_conv_id", id);
+  if (updateHistory) {
+    var newUrl = new URL(window.location);
+    newUrl.searchParams.set("conversation_id", id);
+    window.history.pushState({ convId: id }, "", newUrl);
+  }
+  var conv = conversations.find(function (c) {
+    return c.id === id;
+  });
+  if (conv) {
+    if (typeof window.changeModel === "function") {
+      window.changeModel(conv.model || "aliceai-llm", true);
     }
-    var conv = conversations.find(function(c) { return c.id === id; });
-    if (conv) {
-        if (typeof window.changeModel === "function") {
-            window.changeModel(conv.model || "aliceai-llm", true);
-        }
-    }
-if (typeof window.loadServerConvSettings === "function") {
-    Promise.race([
-        window.loadServerConvSettings(id),
-        new Promise(function(resolve) { setTimeout(resolve, 5000); })
-    ]).catch(function(error) {
-        console.warn("[SIDEBAR] Settings load failed:", error);
+  }
+  if (typeof window.loadServerConvSettings === "function") {
+    window.loadServerConvSettings(id).catch(function (error) {
+      console.warn("[SIDEBAR] Settings load failed:", error);
     });
-}
+  }
 
-    if (typeof loadHistory === "function") loadHistory(id);
-    if (typeof renderSidebar === "function") renderSidebar();
-    var sidebar = document.getElementById("sidebar");
-    var overlay = document.getElementById("overlay");
-    if (sidebar) sidebar.classList.remove("open");
-    if (overlay) overlay.classList.remove("visible");
+  if (typeof loadHistory === "function") loadHistory(id);
+  if (typeof renderSidebar === "function") renderSidebar();
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("overlay");
+  if (sidebar) sidebar.classList.remove("open");
+  if (overlay) overlay.classList.remove("visible");
 }
 
 function deleteConv(id) {
-    conversations = conversations.filter(function(c) { return c.id !== id; });
-    localStorage.setItem("conversations", JSON.stringify(conversations));
-    localStorage.removeItem("messages_" + id);
-    
-    if (currentConvId === id) {
-        currentConvId = conversations.length ? conversations[0].id : null;
-        localStorage.setItem("current_conv_id", currentConvId);
-        if (currentConvId) {
-            selectConv(currentConvId);
-        } else {
-            var chatbox = document.getElementById("chatbox");
-            if (chatbox) {
-                chatbox.replaceChildren();
-                var empty = document.createElement("div");
-                empty.className = "empty-state";
-                empty.textContent = "Нажмите + Новый чат";
-                chatbox.appendChild(empty);
-            }
-            if (typeof window.changeModel === "function") {
-                window.changeModel("aliceai-llm", true);
-            }
-        }
+  conversations = conversations.filter(function (c) {
+    return c.id !== id;
+  });
+  localStorage.setItem("conversations", JSON.stringify(conversations));
+  localStorage.removeItem("messages_" + id);
+
+  if (currentConvId === id) {
+    currentConvId = conversations.length ? conversations[0].id : null;
+    localStorage.setItem("current_conv_id", currentConvId);
+    if (currentConvId) {
+      selectConv(currentConvId);
+    } else {
+      var chatbox = document.getElementById("chatbox");
+      if (chatbox) {
+        chatbox.replaceChildren();
+        var empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "Нажмите + Новый чат";
+        chatbox.appendChild(empty);
+      }
+      if (typeof window.changeModel === "function") {
+        window.changeModel("aliceai-llm", true);
+      }
     }
-    if (typeof renderSidebar === "function") renderSidebar();
+  }
+  if (typeof renderSidebar === "function") renderSidebar();
 }
 
 function handleHistoryNavigation(event) {
-    var params = new URLSearchParams(window.location.search);
-    var convId = params.get('conversation_id');
-    if (convId && convId !== currentConvId) {
-        selectConv(convId, false);
-    } else if (!convId && currentConvId) {
-        currentConvId = null;
-        localStorage.removeItem("current_conv_id");
-        var chatbox = document.getElementById("chatbox");
-        if (chatbox) {
-            chatbox.replaceChildren();
-            var empty = document.createElement("div");
-            empty.className = "empty-state";
-            empty.textContent = "Нажмите + Новый чат";
-            chatbox.appendChild(empty);
-        }
-        if (typeof renderSidebar === "function") renderSidebar();
+  var params = new URLSearchParams(window.location.search);
+  var convId = params.get("conversation_id");
+  if (convId && convId !== currentConvId) {
+    selectConv(convId, false);
+  } else if (!convId && currentConvId) {
+    currentConvId = null;
+    localStorage.removeItem("current_conv_id");
+    var chatbox = document.getElementById("chatbox");
+    if (chatbox) {
+      chatbox.replaceChildren();
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "Нажмите + Новый чат";
+      chatbox.appendChild(empty);
     }
+    if (typeof renderSidebar === "function") renderSidebar();
+  }
 }

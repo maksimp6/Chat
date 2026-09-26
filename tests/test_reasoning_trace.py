@@ -3,12 +3,14 @@ from trace_manager import ExecutionTrace
 
 def test_reasoning_plan_is_sanitized_and_attached_to_trace():
     trace = ExecutionTrace()
-    trace.set_reasoning_plan({
-        "plan_id": "plan-1",
-        "plan_type": "implementation",
-        "steps": [{"id": "inspect"}],
-        "token": "should-not-survive",
-    })
+    trace.set_reasoning_plan(
+        {
+            "plan_id": "plan-1",
+            "plan_type": "implementation",
+            "steps": [{"id": "inspect"}],
+            "token": "should-not-survive",
+        }
+    )
 
     assert trace.trace["reasoning_plan"]["plan_id"] == "plan-1"
     assert trace.trace["reasoning_plan"]["steps"][0]["id"] == "inspect"

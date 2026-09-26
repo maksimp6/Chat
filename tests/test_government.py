@@ -29,13 +29,16 @@ def _setup(tmp):
 
 def _complete_case():
     case = create_case("IP_REGISTRATION", "user-1")
-    collect_data(case["case_id"], {
-        "full_name": "Test User",
-        "birth_date": "1990-01-01",
-        "citizenship": "RU",
-        "passport": "TEST-PASSPORT",
-        "okved": ["62.01"],
-    })
+    collect_data(
+        case["case_id"],
+        {
+            "full_name": "Test User",
+            "birth_date": "1990-01-01",
+            "citizenship": "RU",
+            "passport": "TEST-PASSPORT",
+            "okved": ["62.01"],
+        },
+    )
     assert validate_data(case["case_id"])["valid"] is True
     prepare_documents(case["case_id"])
     return case["case_id"]
@@ -67,7 +70,9 @@ def test_government_http_case_and_approval_gate():
     with tempfile.TemporaryDirectory() as tmp:
         try:
             client = _setup(tmp).test_client()
-            created = client.post("/api/government/cases", json={"case_type": "IP_REGISTRATION", "user_id": "user-1"})
+            created = client.post(
+                "/api/government/cases", json={"case_type": "IP_REGISTRATION", "user_id": "user-1"}
+            )
             assert created.status_code == 201
             case_id = created.get_json()["case"]["case_id"]
 

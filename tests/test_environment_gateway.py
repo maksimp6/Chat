@@ -5,7 +5,13 @@ import db
 import requests
 from flask import Flask
 
-from environment_manager import create_environment, delete_environment, init_environment_tables, start_environment, stop_environment
+from environment_manager import (
+    create_environment,
+    delete_environment,
+    init_environment_tables,
+    start_environment,
+    stop_environment,
+)
 from environment_routes import environment_bp, environment_gateway_bp
 
 

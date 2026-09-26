@@ -3,12 +3,22 @@
 Kept independent from ExecutionTrace so request/response capture code can be
 split out incrementally without changing the existing public class API.
 """
+
 from typing import Any, Set
 
 
 SENSITIVE_KEYS: Set[str] = {
-    "api_key", "apikey", "authorization", "password", "passwd", "secret",
-    "token", "access_token", "refresh_token", "cookie", "set-cookie",
+    "api_key",
+    "apikey",
+    "authorization",
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "access_token",
+    "refresh_token",
+    "cookie",
+    "set-cookie",
 }
 MAX_REPR = 4000
 MAX_DEPTH = 12
@@ -61,7 +71,11 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
         for key, item in list(value.items())[:MAX_ITEMS]:
             key_text = str(key)
             normalized = key_text.lower().replace("-", "_")
-            result[key_text] = "<redacted>" if normalized in SENSITIVE_KEYS else sanitize_trace_value(item, depth + 1)
+            result[key_text] = (
+                "<redacted>"
+                if normalized in SENSITIVE_KEYS
+                else sanitize_trace_value(item, depth + 1)
+            )
         if len(value) > MAX_ITEMS:
             result["<truncated>"] = f"{len(value) - MAX_ITEMS} more items"
         return result

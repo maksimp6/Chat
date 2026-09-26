@@ -124,8 +124,7 @@ def init_local_agent_tables() -> None:
             "ON local_agent_jobs(agent_id, status, created_at)"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_local_agent_jobs_trace "
-            "ON local_agent_jobs(trace_id)"
+            "CREATE INDEX IF NOT EXISTS idx_local_agent_jobs_trace ON local_agent_jobs(trace_id)"
         )
         conn.commit()
     finally:
@@ -153,9 +152,7 @@ def enqueue_local_tool_job(
 
     conn = get_conn()
     try:
-        agent = conn.execute(
-            "SELECT status FROM local_agents WHERE id = ?", (agent_id,)
-        ).fetchone()
+        agent = conn.execute("SELECT status FROM local_agents WHERE id = ?", (agent_id,)).fetchone()
         if agent is None:
             raise LookupError("agent_not_found")
 

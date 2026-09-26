@@ -1,62 +1,50 @@
 (function () {
-  function bindHeaderActions() {
+  "use strict";
+
+  function call(name, fallbackMessage) {
+    return function () {
+      if (typeof window[name] === "function") return window[name]();
+      if (fallbackMessage) console.error(fallbackMessage);
+    };
+  }
+
+  function registerHeaderActions() {
     if (window.__aliceHeaderActionsBound === true) return;
     window.__aliceHeaderActionsBound = true;
 
-    document.addEventListener("click", function (event) {
-      var target = event.target && event.target.closest
-        ? event.target.closest("#memory-btn")
-        : null;
-      if (!target) return;
-      event.preventDefault();
-      if (typeof window.openMemoryModal === "function") {
-        window.openMemoryModal();
+    var actions = window.AliceCoreAPI.ui.actions;
+    actions.register("header.tools.open", call("openToolsModal"));
+    actions.register(
+      "header.ssh.open",
+      call("openSshRuntimeModal", "[SSH Runtime] Modal script is unavailable"),
+    );
+    actions.register("header.mcp.open", call("openMcpManagerModal"));
+    actions.register("header.settings.open", call("openSettingsModal"));
+    actions.register("header.files.open", call("openFileManagerModal"));
+    actions.register("header.treasury.open", call("openTreasuryPanel"));
+    actions.register("header.dozzle.open", call("openDozzleLogs"));
+    actions.register("header.departments.open", call("openDepartmentsModal"));
+    actions.register("header.credentials.open", call("openProviderCredentialsModal"));
+    actions.register("header.update.open", function () {
+      if (window.AliceAndroid) {
+        window.AliceAndroid.openUpdater();
       } else {
-        console.error("[Memory] Modal script is unavailable");
+        alert("Обновление APK доступно только в Android-приложении.");
       }
-    }, true);
-
-    var bindings = [
-      ["tools-btn", "click", function () { window.openToolsModal(); }],
-      ["ssh-runtime-btn", "click", function () {
-        if (typeof window.openSshRuntimeModal === "function") {
-          window.openSshRuntimeModal();
-        } else {
-          console.error("[SSH Runtime] Modal script is unavailable");
-        }
-      }],
-      ["mcp-btn", "click", function () { window.openMcpManagerModal(); }],
-      ["settings-btn", "click", function () { window.openSettingsModal(); }],
-      ["file-manager-btn", "click", function () { window.openFileManagerModal(); }],
-      ["treasury-btn", "click", function () { window.openTreasuryPanel(); }],
-      ["dozzle-btn", "click", function () { window.openDozzleLogs(); }],
-      ["departments-btn", "click", function () { window.openDepartmentsModal(); }],
-      ["update-app-btn", "click", function () {
-        if (window.AliceAndroid) {
-          window.AliceAndroid.openUpdater();
-        } else {
-          alert("Обновление APK доступно только в Android-приложении.");
-        }
-      }],
-      ["provider-credentials-btn", "click", function () {
-        if (window.openProviderCredentialsModal) {
-          window.openProviderCredentialsModal();
-        }
-      }],
-      ["upload-image-btn", "click", function () { window.uploadImage(); }]
-    ];
-
-    bindings.forEach(function (binding) {
-      var element = document.getElementById(binding[0]);
-      if (!element || element.dataset.bound === "true") return;
-      element.addEventListener(binding[1], binding[2]);
-      element.dataset.bound = "true";
     });
+
+    var upload = document.getElementById("upload-image-btn");
+    if (upload && upload.dataset.bound !== "true") {
+      upload.addEventListener("click", function () {
+        window.uploadImage();
+      });
+      upload.dataset.bound = "true";
+    }
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bindHeaderActions, { once: true });
+    document.addEventListener("DOMContentLoaded", registerHeaderActions, { once: true });
   } else {
-    bindHeaderActions();
+    registerHeaderActions();
   }
 })();

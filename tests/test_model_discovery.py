@@ -25,12 +25,16 @@ class FakeSession:
 
 
 def test_discovers_and_normalizes_models():
-    session = FakeSession(FakeResponse({
-        "data": [
-            {"id": "gpt://folder/qwen3.6-35b-a3b/latest"},
-            {"id": "gpt-oss-120b", "name": "GPT OSS 120B"},
-        ]
-    }))
+    session = FakeSession(
+        FakeResponse(
+            {
+                "data": [
+                    {"id": "gpt://folder/qwen3.6-35b-a3b/latest"},
+                    {"id": "gpt-oss-120b", "name": "GPT OSS 120B"},
+                ]
+            }
+        )
+    )
     discovery = ModelDiscovery(
         base_url="https://provider.example/v1",
         api_key="secret",

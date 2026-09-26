@@ -30,11 +30,14 @@ def wait_for_response(
             resp = log_response(session.get(url, timeout=15))
             if resp.status_code == 404:
                 if execution_trace is not None:
-                    execution_trace.add_event("api_poll_error", {
-                        "step": trace_step,
-                        "response_id": task_id,
-                        "status_code": 404,
-                    })
+                    execution_trace.add_event(
+                        "api_poll_error",
+                        {
+                            "step": trace_step,
+                            "response_id": task_id,
+                            "status_code": 404,
+                        },
+                    )
                 time.sleep(delay)
                 delay = min(delay * 1.5, 3)
                 continue
@@ -44,11 +47,14 @@ def wait_for_response(
             raise
         except (OSError, ValueError) as exc:
             if execution_trace is not None:
-                execution_trace.add_event("api_poll_error", {
-                    "step": trace_step,
-                    "response_id": task_id,
-                    "error": str(exc),
-                })
+                execution_trace.add_event(
+                    "api_poll_error",
+                    {
+                        "step": trace_step,
+                        "response_id": task_id,
+                        "error": str(exc),
+                    },
+                )
             time.sleep(delay)
             delay = min(delay * 1.5, 3)
             continue
@@ -69,11 +75,14 @@ def wait_for_response(
         status = data.get("status")
         if status in ("completed", "incomplete", "failed", "cancelled"):
             if execution_trace is not None:
-                execution_trace.add_event("api_poll_completed", {
-                    "step": trace_step,
-                    "response_id": task_id,
-                    "status": status,
-                })
+                execution_trace.add_event(
+                    "api_poll_completed",
+                    {
+                        "step": trace_step,
+                        "response_id": task_id,
+                        "status": status,
+                    },
+                )
             if status == "failed":
                 err = data.get("error")
                 err_msg = err.get("message", "unknown") if isinstance(err, dict) else str(err)
@@ -86,9 +95,12 @@ def wait_for_response(
         delay = min(delay * 1.5, 3)
 
     if execution_trace is not None:
-        execution_trace.add_event("api_poll_timeout", {
-            "step": trace_step,
-            "response_id": task_id,
-            "timeout": timeout,
-        })
+        execution_trace.add_event(
+            "api_poll_timeout",
+            {
+                "step": trace_step,
+                "response_id": task_id,
+                "timeout": timeout,
+            },
+        )
     raise error_cls(f"Timeout ({timeout}s) waiting for task {task_id}")

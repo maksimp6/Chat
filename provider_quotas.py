@@ -5,6 +5,7 @@ against the trusted user identity associated with the current invocation.
 SQLite uses an immediate transaction; PostgreSQL locks the usage row so two
 concurrent requests cannot spend the same quota bucket.
 """
+
 from __future__ import annotations
 
 import os
@@ -267,7 +268,9 @@ def get_user_policy(user_id: str) -> dict[str, Any]:
     }
 
 
-def reserve_request(user_id: Optional[str], *, now: Optional[int] = None) -> Optional[QuotaReservation]:
+def reserve_request(
+    user_id: Optional[str], *, now: Optional[int] = None
+) -> Optional[QuotaReservation]:
     """Atomically reserve one provider request for a trusted user.
 
     A missing identity preserves backwards compatibility. Set
@@ -455,7 +458,9 @@ def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
     else:
         used_requests = int(row["request_count"]) if int(row["period_start"]) == period_start else 0
         used_tokens = int(row["token_count"]) if int(row["period_start"]) == period_start else 0
-        used_rate = int(row["rate_count"]) if int(row["rate_window_start"]) == rate_window_start else 0
+        used_rate = (
+            int(row["rate_count"]) if int(row["rate_window_start"]) == rate_window_start else 0
+        )
 
     return {
         "user_id": user_id,

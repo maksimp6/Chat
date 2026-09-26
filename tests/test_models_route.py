@@ -15,10 +15,12 @@ class FakeDiscovery:
 
 
 def test_models_route_returns_provider_catalog(monkeypatch):
-    discovery = FakeDiscovery({
-        "text": {"provider-model": {"name": "Provider Model", "type": "text"}},
-        "voice": {},
-    })
+    discovery = FakeDiscovery(
+        {
+            "text": {"provider-model": {"name": "Provider Model", "type": "text"}},
+            "voice": {},
+        }
+    )
     monkeypatch.setattr(app_module, "MODEL_DISCOVERY", discovery)
 
     response = app_module.app.test_client().get("/api/models?refresh=1")

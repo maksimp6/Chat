@@ -166,6 +166,7 @@ class SSHRuntimeTests(unittest.TestCase):
         run.return_value.stderr = ""
         # Use the real executor, but point the runtime tool at a test-local runtime.
         import runtime_tools
+
         original = runtime_tools.runtime
         runtime_tools.runtime = self.runtime()
         try:
@@ -177,9 +178,14 @@ class SSHRuntimeTests(unittest.TestCase):
         self.assertEqual(trace.trace["tool_calls"][0]["arguments"]["command"], "<redacted>")
         self.assertEqual(trace.trace["tool_calls"][0]["result"]["data"]["stdout"], "<redacted>")
         self.assertEqual(
-            [event["type"] for event in trace.trace["events"] if event["type"].startswith("runtime_")],
+            [
+                event["type"]
+                for event in trace.trace["events"]
+                if event["type"].startswith("runtime_")
+            ],
             ["runtime_started", "runtime_finished"],
         )
+
 
 if __name__ == "__main__":
     unittest.main()

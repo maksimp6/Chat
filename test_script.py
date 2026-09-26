@@ -1,4 +1,5 @@
-print('Hello Safe Write')
+print("Hello Safe Write")
+
 
 def broken():
     pass

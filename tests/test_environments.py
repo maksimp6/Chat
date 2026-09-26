@@ -25,13 +25,21 @@ def _git_repo(tmp_path):
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "master"], cwd=repo, check=True, capture_output=True)
     master_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
-    subprocess.run(["git", "switch", "-c", "feature/one"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "switch", "-c", "feature/one"], cwd=repo, check=True, capture_output=True
+    )
     (repo / "marker.txt").write_text("feature-one\\n", encoding="utf-8")
-    subprocess.run(["git", "commit", "-am", "feature one"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-am", "feature one"], cwd=repo, check=True, capture_output=True
+    )
     one_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
-    subprocess.run(["git", "switch", "-c", "feature/two"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "switch", "-c", "feature/two"], cwd=repo, check=True, capture_output=True
+    )
     (repo / "marker.txt").write_text("feature-two\\n", encoding="utf-8")
-    subprocess.run(["git", "commit", "-am", "feature two"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-am", "feature two"], cwd=repo, check=True, capture_output=True
+    )
     two_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
     return repo, master_sha, one_sha, two_sha
 
@@ -41,7 +49,9 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
     monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
-    monkeypatch.setenv("ALICE_ENV_RUNTIME_COMMAND", f'{sys.executable} -c "import time; time.sleep(120)"')
+    monkeypatch.setenv(
+        "ALICE_ENV_RUNTIME_COMMAND", f'{sys.executable} -c "import time; time.sleep(120)"'
+    )
     db.init_db()
     init_environment_tables()
     return repo, master_sha, one_sha, two_sha
