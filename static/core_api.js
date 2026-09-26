@@ -56,6 +56,13 @@
     return result;
   }
 
+  function redactString(value) {
+    var text = String(value || "").slice(0, MAX_STRING_LENGTH);
+    text = text.replace(/(bearer\\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
+    text = text.replace(/((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)\\s*[:=]\\s*)[^\\s,;]+/gi, "$1[REDACTED]");
+    return text;
+  }
+
   function safeData(value) {
     return redact(value, 0, new WeakSet());
   }
@@ -155,7 +162,7 @@
     var value = {
       moduleId: moduleId,
       status: status,
-      message: typeof message === "string" ? message.slice(0, 300) : "",
+      message: typeof message === "string" ? redactString(message).slice(0, 300) : "",
       metadata: safeData(metadata || {}),
       timestamp: now()
     };
@@ -217,7 +224,7 @@
       detail: {
         type: String(type),
         id: String(id),
-        reason: typeof reason === "string" ? reason.slice(0, 300) : "revoked",
+        reason: typeof reason === "string" ? redactString(reason).slice(0, 300) : "revoked",
         timestamp: now()
       }
     }));
@@ -285,7 +292,7 @@
         var message = error && error.message ? error.message : String(error || "error");
         entry.errors.push({
           timestamp: now(),
-          message: message.slice(0, 500)
+          message: redactString(message).slice(0, 500)
         });
         return traceId;
       },
