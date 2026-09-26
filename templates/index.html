@@ -117,7 +117,7 @@
               class="header-btn model-btn alice-btn"
               title="Выбор модели"
               aria-label="Выбор модели"
-              data-action="model.open"
+              data-action="modal.open"
               data-modal="model-modal"
             >
               🤖</button
@@ -311,7 +311,15 @@
       >
         <div class="modal-content">
           <h3 id="model-modal-title">Выбор модели</h3>
-          <button id="close-modal" type="button" class="alice-btn">&times;</button>
+          <button
+            id="close-modal"
+            type="button"
+            class="alice-btn"
+            data-action="modal.close"
+            data-modal="model-modal"
+          >
+            &times;
+          </button>
           <div id="model-list"></div>
         </div>
       </div>
