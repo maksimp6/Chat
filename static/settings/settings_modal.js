@@ -102,7 +102,7 @@
       "</div>",
     ].join("");
     ov.appendChild(md);
-    document.body.appendChild(ov);
+    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
     function closeModal() {
