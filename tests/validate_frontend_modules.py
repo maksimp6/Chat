@@ -44,7 +44,14 @@ FETCH_IN_LOOP_RE = re.compile(
 )
 ARRAY_LITERAL_RE = re.compile(r"\[([^\[\]]*)\]", re.DOTALL)
 ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)")
-TIMER_PATTERNS = (\n    (re.compile(r"\\bsetTimeout\\s*\\("), "setTimeout"),\n    (re.compile(r"\\bsetInterval\\s*\\("), "setInterval"),\n    (re.compile(r"\\bclearTimeout\\s*\\("), "clearTimeout"),\n    (re.compile(r"\\bclearInterval\\s*\\("), "clearInterval"),\n    (re.compile(r"\\b(?:delay|sleep)\\s*\\("), "delay/sleep"),\n)\nREPEATED_LOOKUP_RE = re.compile(
+TIMER_PATTERNS = (
+    (re.compile(r"\bsetTimeout\s*\("), "setTimeout"),
+    (re.compile(r"\bsetInterval\s*\("), "setInterval"),
+    (re.compile(r"\bclearTimeout\s*\("), "clearTimeout"),
+    (re.compile(r"\bclearInterval\s*\("), "clearInterval"),
+    (re.compile(r"\b(?:delay|sleep)\s*\("), "delay/sleep"),
+)
+REPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
     r"[\s\S]{0,250}\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\("
 )
