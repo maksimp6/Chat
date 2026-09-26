@@ -44,6 +44,13 @@
         button.textContent = text;
     }
 
+    function defer(callback, delayMs) {
+        if (window.AliceCoreAPI && window.AliceCoreAPI.scheduler) {
+            return window.AliceCoreAPI.scheduler.defer(callback, delayMs);
+        }
+        throw new Error("Core scheduler unavailable");
+    }
+
     function download() {
         var button = document.getElementById(buttonId);
         setButtonState(button, "⏳", true);
@@ -59,12 +66,12 @@
             document.body.appendChild(link);
             link.click();
             link.remove();
-            window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            defer(function () { URL.revokeObjectURL(url); }, 1000);
             setButtonState(button, "✓ JSON", true);
-            window.setTimeout(function () { setButtonState(button, "⇩ JSON", false); }, 1200);
+            defer(function () { setButtonState(button, "⇩ JSON", false); }, 1200);
         } catch (error) {
             setButtonState(button, "⚠ JSON", true);
-            window.setTimeout(function () { setButtonState(button, "⇩ JSON", false); }, 1600);
+            defer(function () { setButtonState(button, "⇩ JSON", false); }, 1600);
             window.alert(error.message || "Не удалось подготовить трейс");
         }
     }
@@ -81,7 +88,7 @@
         var button = document.getElementById(uploadButtonId);
         if (button) { button.disabled = true; button.textContent = "⏳ Загрузка..."; }
 
-        fetch("/api/files", { method: "POST", body: form })
+        window.AliceDispatcher.request("/api/files", { method: "POST", body: form })
             .then(function (response) {
                 return response.json().catch(function () { return {}; }).then(function (data) {
                     if (!response.ok) throw new Error(data.error || "Ошибка загрузки");
@@ -143,5 +150,8 @@
     }
 
     hook();
-    window.setInterval(function () { hook(); installButton(); }, 500);
+    window.addEventListener("alice:trace-viewer-ready", function () {
+        hook();
+        installButton();
+    });
 })();
