@@ -138,6 +138,12 @@ def _proxy(environment_id, subpath=""):
     except (RuntimeNotFound, RuntimeOwnerViolation):
         return jsonify({"error": "environment_not_found"}), 404
 
+    item = _get(environment_id)
+    if not item:
+        return jsonify({"error": "environment_not_found"}), 404
+    if item.get("status") != "RUNNING" or not item.get("runtime_thread_id"):
+        return jsonify({"error": "environment_not_running"}), 503
+
     headers = [
         (key, value)
         for key, value in request.headers.items()
