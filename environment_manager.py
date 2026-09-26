@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import subprocess
-import shlex
-import socket
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -22,9 +22,16 @@ from db import get_conn
 from invocation_context import InvocationContext
 from invocation_trace import create_invocation_trace
 from trace_manager import ExecutionTrace
+from runtime import RuntimeDispatcher
+from runtime.request_context import bind_runtime_request
 
 
 ENV_STATUSES = ("CREATING", "RUNNING", "STOPPED", "FAILED", "DELETING")
+
+_RUNTIME_DISPATCHER = RuntimeDispatcher()
+_RUNTIME_WORKERS: dict[str, "EnvironmentRuntime"] = {}
+_RUNTIME_WORKERS_LOCK = threading.RLock()
+_RUNTIME_STOP = object()
 _ALLOWED_TRANSITIONS = {
     "CREATING": {"STOPPED", "FAILED"},
     "STOPPED": {"RUNNING", "DELETING"},
@@ -131,6 +138,24 @@ def init_environment_tables() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_environment_events_env ON environment_events(environment_id)"
         )
+        running_rows = conn.execute(
+            "SELECT environment_id FROM environments WHERE status = ?",
+            ("RUNNING",),
+        ).fetchall()
+        with _RUNTIME_WORKERS_LOCK:
+            active_runtime_ids = set(_RUNTIME_WORKERS)
+        for row in running_rows:
+            runtime_id = row["environment_id"] if hasattr(row, "keys") else row[0]
+            if runtime_id not in active_runtime_ids:
+                conn.execute(
+                    """
+                    UPDATE environments
+                       SET status = ?, runtime_pid = NULL, runtime_port = NULL,
+                           updated_at = ?, stopped_at = COALESCE(stopped_at, ?)
+                     WHERE environment_id = ?
+                    """,
+                    ("STOPPED", _now(), _now(), runtime_id),
+                )
         conn.commit()
     finally:
         conn.close()
@@ -141,8 +166,16 @@ def _transition(current: str, target: str) -> None:
         raise ValueError(f"invalid environment transition: {current} -> {target}")
 
 
+def _runtime_thread_id(environment_id: str) -> Optional[int]:
+    with _RUNTIME_WORKERS_LOCK:
+        worker = _RUNTIME_WORKERS.get(environment_id)
+    return worker.thread_id if worker else None
+
+
 def _row_to_dict(row) -> Dict[str, Any]:
-    return dict(row)
+    item = dict(row)
+    item["runtime_thread_id"] = _runtime_thread_id(item["environment_id"])
+    return item
 
 
 def _get(environment_id: str) -> Optional[Dict[str, Any]]:
@@ -242,34 +275,82 @@ def _record_trace(
     return trace_json
 
 
-class EnvironmentRuntime:
-    """Process runtime for an immutable git worktree.
+class RuntimeHTTPStream:
+    """Queue-backed response body produced by a runtime worker thread."""
 
-    Runtime commands are configured server-side. The default command is the
-    repository's Flask app, which keeps the feature useful locally and in CI.
+    def __init__(
+        self,
+        status_code: int,
+        headers: list[tuple[str, str]],
+        events: queue.Queue,
+        cancel: threading.Event,
+    ):
+        self.status_code = int(status_code)
+        self.headers = headers
+        self._events = events
+        self._cancel = cancel
+        self._closed = False
+
+    def __iter__(self):
+        try:
+            while True:
+                event = self._events.get()
+                kind = event[0]
+                if kind == "chunk":
+                    yield event[1]
+                elif kind == "error":
+                    raise event[1]
+                elif kind == "end":
+                    return
+        finally:
+            self.close()
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            self._cancel.set()
+
+
+def _stream_put(events: queue.Queue, event: tuple, cancel: threading.Event) -> bool:
+    while not cancel.is_set():
+        try:
+            events.put(event, timeout=0.1)
+            return True
+        except queue.Full:
+            continue
+    return False
+
+
+class EnvironmentRuntime:
+    """Managed runtime thread for one immutable environment scope.
+
+    The source worktree remains immutable metadata for the selected commit, but
+    the runtime itself stays inside the Alice Pro Python process. Runtime work
+    is executed only after RuntimeDispatcher binds the environment scope.
     """
 
     def __init__(self, environment: Dict[str, Any]):
         self.environment = environment
+        self.runtime_id = environment["environment_id"]
         self.root = Path(
             os.environ.get("ALICE_ENV_RUNTIME_ROOT") or ".alice-environments"
         ).resolve()
-        self.worktree = self.root / environment["environment_id"] / "source"
-        self.data_dir = self.root / environment["environment_id"] / "data"
+        self.worktree = self.root / self.runtime_id / "source"
+        self.data_dir = self.root / self.runtime_id / "data"
+        self._jobs: queue.Queue = queue.Queue()
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"alice-runtime-{self.runtime_id[:8]}",
+            daemon=True,
+        )
+        self._stream_lock = threading.RLock()
+        self._active_streams: dict[threading.Event, queue.Queue] = {}
 
-    def _command(self) -> list[str]:
-        raw = os.environ.get("ALICE_ENV_RUNTIME_COMMAND", "python app.py")
-        return shlex.split(raw)
+    @property
+    def thread_id(self) -> Optional[int]:
+        return self._thread.ident
 
-    def _port(self) -> int:
-        requested = int(self.environment.get("runtime_port") or 0)
-        if requested:
-            return requested
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(("127.0.0.1", 0))
-            return int(sock.getsockname()[1])
-
-    def start(self) -> tuple[int, int]:
+    def _prepare(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.worktree.parent.mkdir(parents=True, exist_ok=True)
@@ -289,39 +370,100 @@ class EnvironmentRuntime:
                 text=True,
                 timeout=60,
             )
-        port = self._port()
-        log_path = self.data_dir / "runtime.log"
-        log = open(log_path, "ab")
-        env = os.environ.copy()
-        env.update(
-            {
-                "ALICE_ENV_ID": self.environment["environment_id"],
-                "GIT_BRANCH": self.environment["branch_name"],
-                "GIT_COMMIT_SHA": self.environment["commit_sha"],
-                "ALICE_ENV_NAMESPACE": self.environment["data_namespace"],
-                "ALICE_PREVIEW_BASE_PATH": "/environments/" + self.environment["environment_id"],
-                "ALICE_DB_PATH": str(self.data_dir / "alice_pro.db"),
-                "HOST": "127.0.0.1",
-                "PORT": str(port),
-            }
-        )
-        process = subprocess.Popen(
-            self._command(),
-            cwd=str(self.worktree),
-            env=env,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        return process.pid, port
 
-    def stop(self, pid: Optional[int]) -> None:
-        if not pid:
-            return
+    def start(self) -> int:
+        self._prepare()
+        with _RUNTIME_WORKERS_LOCK:
+            if self.runtime_id in _RUNTIME_WORKERS:
+                raise RuntimeError("environment runtime is already running")
+            _RUNTIME_WORKERS[self.runtime_id] = self
         try:
-            os.kill(int(pid), 15)
-        except ProcessLookupError:
-            pass
+            _RUNTIME_DISPATCHER.register_runtime(
+                self.runtime_id,
+                owner_id=self.environment.get("owner_id"),
+                namespace=self.environment["data_namespace"],
+                root=str(self.data_dir),
+            )
+            self._thread.start()
+            for _ in range(100):
+                if self._thread.ident is not None:
+                    return int(self._thread.ident)
+                time.sleep(0.001)
+            raise RuntimeError("environment runtime thread did not start")
+        except Exception:
+            with _RUNTIME_WORKERS_LOCK:
+                _RUNTIME_WORKERS.pop(self.runtime_id, None)
+            _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
+            raise
+
+    def submit(
+        self,
+        operation: str,
+        payload: Optional[Dict[str, Any]] = None,
+        *,
+        timeout: float = 30.0,
+    ) -> Any:
+        if not self._thread.is_alive():
+            raise RuntimeError("environment runtime is not running")
+        result: queue.Queue = queue.Queue(maxsize=1)
+        self._jobs.put(("call", operation, dict(payload or {}), result))
+        try:
+            kind, value = result.get(timeout=timeout)
+        except queue.Empty as exc:
+            raise TimeoutError("environment runtime operation timed out") from exc
+        if kind == "error":
+            raise value
+        return value
+
+    def submit_http(
+        self,
+        payload: Dict[str, Any],
+        *,
+        timeout: float = 30.0,
+    ) -> RuntimeHTTPStream:
+        if not self._thread.is_alive():
+            raise RuntimeError("environment runtime is not running")
+        events: queue.Queue = queue.Queue(maxsize=8)
+        cancel = threading.Event()
+        with self._stream_lock:
+            self._active_streams[cancel] = events
+        self._jobs.put(("http", "http.request", dict(payload), events, cancel))
+        try:
+            first = events.get(timeout=timeout)
+        except queue.Empty as exc:
+            cancel.set()
+            raise TimeoutError("environment runtime HTTP request timed out") from exc
+        if first[0] == "error":
+            cancel.set()
+            raise first[1]
+        if first[0] != "start":
+            cancel.set()
+            raise RuntimeError("invalid environment runtime HTTP response")
+        return RuntimeHTTPStream(first[1], first[2], events, cancel)
+
+    def stop(self) -> None:
+        with self._stream_lock:
+            active_streams = tuple(self._active_streams.items())
+        for cancel, events in active_streams:
+            cancel.set()
+            try:
+                while True:
+                    events.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                events.put_nowait(("end",))
+            except queue.Full:
+                pass
+        if self._thread.is_alive():
+            self._jobs.put(_RUNTIME_STOP)
+            self._thread.join(timeout=5)
+        if self._thread.is_alive():
+            raise RuntimeError("environment runtime thread did not stop")
+        with _RUNTIME_WORKERS_LOCK:
+            if _RUNTIME_WORKERS.get(self.runtime_id) is self:
+                _RUNTIME_WORKERS.pop(self.runtime_id, None)
+        _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
 
     def remove(self) -> None:
         if self.worktree.exists():
@@ -336,6 +478,84 @@ class EnvironmentRuntime:
         import shutil
 
         shutil.rmtree(self.worktree.parent, ignore_errors=True)
+
+    def _run(self) -> None:
+        while True:
+            job = self._jobs.get()
+            if job is _RUNTIME_STOP:
+                return
+            kind = job[0]
+            if kind == "call":
+                _, operation, payload, result = job
+                try:
+                    value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
+                    result.put(("result", value))
+                except Exception as exc:
+                    result.put(("error", exc))
+                continue
+
+            _, operation, payload, events, cancel = job
+            source = None
+            try:
+                base_path = str(payload.get("base_path") or "")
+                with bind_runtime_request(self.runtime_id, base_path):
+                    source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
+                    status_code = int(source["status_code"])
+                    headers = list(source.get("headers") or [])
+                    if not _stream_put(events, ("start", status_code, headers), cancel):
+                        continue
+                    for chunk in source.get("body") or ():
+                        if cancel.is_set():
+                            break
+                        if isinstance(chunk, str):
+                            chunk = chunk.encode("utf-8")
+                        if chunk and not _stream_put(events, ("chunk", bytes(chunk)), cancel):
+                            break
+            except Exception as exc:
+                _stream_put(events, ("error", exc), cancel)
+            finally:
+                if source is not None:
+                    close = source.get("close")
+                    if callable(close):
+                        close()
+                if not cancel.is_set():
+                    _stream_put(events, ("end",), cancel)
+                with self._stream_lock:
+                    self._active_streams.pop(cancel, None)
+
+
+def register_runtime_operation(name: str, handler) -> None:
+    """Register a dispatcher operation available to managed runtime threads."""
+    _RUNTIME_DISPATCHER.register_operation(name, handler)
+
+
+def dispatch_environment_operation(
+    environment_id: str,
+    operation: str,
+    payload: Optional[Dict[str, Any]] = None,
+    *,
+    timeout: float = 30.0,
+) -> Any:
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(environment_id)
+    if runtime is None:
+        raise RuntimeError("environment runtime is not running")
+    _RUNTIME_DISPATCHER.context(environment_id)
+    return runtime.submit(operation, payload, timeout=timeout)
+
+
+def dispatch_environment_http(
+    environment_id: str,
+    payload: Dict[str, Any],
+    *,
+    timeout: float = 30.0,
+) -> RuntimeHTTPStream:
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(environment_id)
+    if runtime is None:
+        raise RuntimeError("environment runtime is not running")
+    _RUNTIME_DISPATCHER.context(environment_id)
+    return runtime.submit_http(payload, timeout=timeout)
 
 
 def create_environment(
@@ -418,17 +638,17 @@ def start_environment(
     _transition(item["status"], "RUNNING")
     runtime = EnvironmentRuntime(item)
     try:
-        pid, port = runtime.start()
+        thread_id = runtime.start()
         conn = get_conn()
         try:
             conn.execute(
                 """
                 UPDATE environments
-                   SET status = ?, runtime_pid = ?, runtime_port = ?, started_at = ?,
-                       updated_at = ?, error = NULL
+                   SET status = ?, runtime_pid = NULL, runtime_port = NULL,
+                       started_at = ?, updated_at = ?, error = NULL
                  WHERE environment_id = ?
                 """,
-                ("RUNNING", pid, port, _now(), _now(), environment_id),
+                ("RUNNING", _now(), _now(), environment_id),
             )
             conn.commit()
         finally:
@@ -436,14 +656,19 @@ def start_environment(
         item.update(
             {
                 "status": "RUNNING",
-                "runtime_pid": pid,
-                "runtime_port": port,
+                "runtime_pid": None,
+                "runtime_port": None,
+                "runtime_thread_id": thread_id,
                 "started_at": _now(),
                 "error": None,
             }
         )
         _record_trace(
-            item, "START_ENVIRONMENT", "SUCCESS", context=context, extra={"runtime_port": port}
+            item,
+            "START_ENVIRONMENT",
+            "SUCCESS",
+            context=context,
+            extra={"runtime_thread_id": thread_id},
         )
         return item
     except Exception as exc:
@@ -466,7 +691,10 @@ def stop_environment(
 ) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "STOPPED")
-    EnvironmentRuntime(item).stop(item.get("runtime_pid"))
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(environment_id)
+    if runtime is not None:
+        runtime.stop()
     conn = get_conn()
     try:
         conn.execute(
@@ -476,7 +704,15 @@ def stop_environment(
         conn.commit()
     finally:
         conn.close()
-    item.update({"status": "STOPPED", "runtime_pid": None, "stopped_at": _now()})
+    item.update(
+        {
+            "status": "STOPPED",
+            "runtime_pid": None,
+            "runtime_port": None,
+            "runtime_thread_id": None,
+            "stopped_at": _now(),
+        }
+    )
     _record_trace(item, "STOP_ENVIRONMENT", "SUCCESS", context=context)
     return item
 

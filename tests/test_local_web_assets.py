@@ -4,7 +4,8 @@ import re
 import shutil
 import subprocess
 
-from app import app
+from app import app, preview_base_path
+from runtime import bind_runtime_request
 
 
 EXTERNAL_RESOURCE_RE = re.compile(
@@ -130,3 +131,12 @@ def test_application_javascript_parses_when_node_is_available():
             check=False,
         )
         assert result.returncode == 0, f"{path}: {result.stderr}"
+
+
+def test_preview_base_path_prefers_runtime_request_scope(monkeypatch):
+    monkeypatch.setenv("ALICE_PREVIEW_BASE_PATH", "/preview/global")
+
+    with bind_runtime_request("runtime-a", "/environments/runtime-a"):
+        assert preview_base_path() == "/environments/runtime-a"
+
+    assert preview_base_path() == "/preview/global"

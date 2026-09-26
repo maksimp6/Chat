@@ -1,6 +1,5 @@
-import os
 import subprocess
-import sys
+import threading
 
 import db
 from environment_manager import (
@@ -49,9 +48,6 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
     monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
-    monkeypatch.setenv(
-        "ALICE_ENV_RUNTIME_COMMAND", f'{sys.executable} -c "import time; time.sleep(120)"'
-    )
     db.init_db()
     init_environment_tables()
     return repo, master_sha, one_sha, two_sha
@@ -71,8 +67,15 @@ def test_two_branch_environments_are_immutable_and_isolated(tmp_path, monkeypatc
     second = start_environment(second["environment_id"])
     assert first["status"] == "RUNNING"
     assert second["status"] == "RUNNING"
-    assert first["runtime_pid"] != second["runtime_pid"]
-    assert first["runtime_port"] != second["runtime_port"]
+    assert first["runtime_pid"] is None
+    assert second["runtime_pid"] is None
+    assert first["runtime_port"] is None
+    assert second["runtime_port"] is None
+    assert first["runtime_thread_id"] is not None
+    assert second["runtime_thread_id"] is not None
+    assert first["runtime_thread_id"] != second["runtime_thread_id"]
+    assert first["runtime_thread_id"] != threading.get_ident()
+    assert second["runtime_thread_id"] != threading.get_ident()
 
     stop_environment(first["environment_id"])
     stop_environment(second["environment_id"])
@@ -113,3 +116,29 @@ def test_environment_api_exposes_lifecycle_contract(tmp_path, monkeypatch):
     assert client.post(f"/api/environments/{environment_id}/restart").status_code == 200
     assert client.delete(f"/api/environments/{environment_id}").status_code == 200
     assert client.get(f"/api/environments/{environment_id}").status_code == 404
+
+
+def test_environment_init_recovers_stale_running_state_after_process_restart(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    item = create_environment("feature/one")
+    conn = db.get_conn()
+    conn.execute(
+        "UPDATE environments SET status = ?, runtime_pid = ?, runtime_port = ? WHERE environment_id = ?",
+        ("RUNNING", 12345, 54321, item["environment_id"]),
+    )
+    conn.commit()
+    conn.close()
+
+    init_environment_tables()
+
+    recovered = next(
+        environment
+        for environment in list_environments()
+        if environment["environment_id"] == item["environment_id"]
+    )
+    assert recovered["status"] == "STOPPED"
+    assert recovered["runtime_pid"] is None
+    assert recovered["runtime_port"] is None
+    assert recovered["runtime_thread_id"] is None
+
+    delete_environment(item["environment_id"])
