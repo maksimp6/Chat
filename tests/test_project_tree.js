@@ -13,7 +13,7 @@ const document = {
 };
 const context = {
     console,
-    window: {fetch: async () => ({ok: true, json: async () => ({nodes: []})})},
+    window: {AliceDispatcher: {request: async () => ({ok: true, json: async () => ({nodes: []})})}},
     document,
 };
 
@@ -24,7 +24,7 @@ const context = {
 
     const loader = context.window.ProjectTree.load;
     await loader();
-    context.window.fetch = async () => ({ok: false, status: 503});
+    context.window.AliceDispatcher.request = async () => ({ok: false, status: 503});
     await assert.rejects(loader, /HTTP 503/);
 
     console.log("project tree regression checks passed");
