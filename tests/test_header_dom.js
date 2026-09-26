@@ -17,27 +17,21 @@ async function flush() {
     let requestCalls = 0;
     const browser = new BrowserShim(html);
     const {document, window, context} = browser.load(["static/project_tree.js"], {
-        fetch: async () => {
-            requestCalls += 1;
-            return {
-                ok: true,
-                status: 200,
-                json: async () => ({
-                    root: "/alice-pro",
-                    nodes: [{
-                        name: "src",
-                        path: "src",
-                        kind: "directory",
-                        icon: "📁",
-                        children: [{
-                            name: "app.py",
-                            path: "src/app.py",
-                            kind: "file",
-                            icon: "📄",
+        AliceDispatcher: {
+            request: async () => {
+                requestCalls += 1;
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        root: "/alice-pro",
+                        nodes: [{
+                            name: "src", path: "src", kind: "directory", icon: "📁",
+                            children: [{name: "app.py", path: "src/app.py", kind: "file", icon: "📄"}],
                         }],
-                    }],
-                }),
-            };
+                    }),
+                };
+            },
         },
     });
     applyHeaderFlexLayout(document, css);
