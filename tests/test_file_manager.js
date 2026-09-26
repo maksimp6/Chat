@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
+const coreSource = fs.readFileSync("static/core_api.js", "utf8");
 const source = fs.readFileSync("static/file_manager.js", "utf8");
 
 function response(status, payload) {
@@ -14,15 +15,20 @@ function response(status, payload) {
 
 async function runWithFetch(mockResponse) {
     const context = {
-        window: {
-            AliceDispatcher: {
-                request: async () => mockResponse,
-            },
+        window: {},
+        document: {
+            createElement: () => ({}),
+            body: {},
         },
         console,
         setTimeout,
         clearTimeout,
         navigator: {},
+    };
+    context.window.document = context.document;
+    vm.runInNewContext(coreSource, context, { filename: "static/core_api.js" });
+    context.window.AliceDispatcher = {
+        request: async () => mockResponse,
     };
     vm.runInNewContext(source, context, { filename: "static/file_manager.js" });
     return context.window.fetchVectorStores();
