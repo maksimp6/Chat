@@ -196,9 +196,10 @@ def validate_syntax(path: Path) -> list[str]:
     )
     if result.returncode:
         detail = (result.stderr or result.stdout).strip().splitlines()
+        detail = [line for line in detail if line.strip() and not line.startswith("Node.js v")]
         return [
             f"{path.relative_to(ROOT)}: JavaScript syntax error: "
-            f"{detail[-1] if detail else 'unknown'}"
+            f"{detail[0] if detail else 'unknown'}"
         ]
     return []
 
