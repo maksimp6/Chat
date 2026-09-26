@@ -68,6 +68,7 @@ def test_web_boot_and_startup_guards_are_present():
     boot = Path("static/boot.js").read_text(encoding="utf-8")
     eruda_loader = Path("static/eruda_init.js").read_text(encoding="utf-8")
     core = Path("static/core.js").read_text(encoding="utf-8")
+    dispatcher = Path("static/dispatcher.js").read_text(encoding="utf-8")
     assert "document.currentScript" in boot
     assert "getRegistrations" in boot
     assert "alice-pro-" in boot
@@ -78,7 +79,9 @@ def test_web_boot_and_startup_guards_are_present():
         eruda_loader,
     )
     assert "fetchWithTimeout" in core
-    assert "AbortController" in core
+    assert "window.AliceDispatcher.request" in core
+    assert "AbortSignal.timeout" in dispatcher
+    assert "MAX_TIMEOUT_MS" in dispatcher
     assert "setTimeout(resolve, 5000)" in core
 
 
