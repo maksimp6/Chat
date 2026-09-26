@@ -48,7 +48,7 @@ async function flush() {
 
     const buttons = header.querySelectorAll(".header-btn");
     const expectedIds = [
-        "menu-btn", "model-btn", "tools-btn", "ssh-runtime-btn",
+        "menu-btn", "system-status-btn", "model-btn", "tools-btn", "ssh-runtime-btn",
         "mcp-btn", "settings-btn", "file-manager-btn", "treasury-btn",
         "dozzle-btn", "project-tree-btn", "departments-btn", "update-app-btn",
         "provider-credentials-btn", "memory-btn", "theme-toggle",
