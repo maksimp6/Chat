@@ -195,6 +195,9 @@ const toolsClose = toolsRuntime.document.getElementById("tools-close-btn");
 if (!toolsModal || !toolsClose) {
   throw new Error("real tools modal controls must be created after click");
 }
+if (!toolsModal.parentNode || toolsModal.parentNode.id !== "app-root") {
+  throw new Error("real tools modal must mount inside .alice-pro-app");
+}
 if (toolsModal.hidden || !toolsModal.classList.contains("visible")) {
   throw new Error("real tools button click must open tools modal");
 }
