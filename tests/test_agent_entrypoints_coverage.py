@@ -330,9 +330,7 @@ def test_yandex_agent_handles_text_tools_and_iteration_limit(monkeypatch):
                     }
                 }
             ),
-            _UrlResponse(
-                {"result": {"alternatives": [{"message": {"text": "after-tools"}}]}}
-            ),
+            _UrlResponse({"result": {"alternatives": [{"message": {"text": "after-tools"}}]}}),
         ]
     )
     monkeypatch.setattr(
@@ -369,9 +367,7 @@ def test_yandex_agent_handles_text_tools_and_iteration_limit(monkeypatch):
             }
         ),
     )
-    assert "Превышен лимит итераций" in yandex_agent_loop.execute_yandex_turn(
-        "task", max_turns=1
-    )
+    assert "Превышен лимит итераций" in yandex_agent_loop.execute_yandex_turn("task", max_turns=1)
 
 
 def test_yandex_agent_main_entrypoint(monkeypatch, tmp_path, capsys):
@@ -392,7 +388,9 @@ def test_yandex_agent_main_entrypoint(monkeypatch, tmp_path, capsys):
             return b"signature", b""
 
     monkeypatch.setenv("YC_IAM_KEY", str(key_path))
-    monkeypatch.setattr(yandex_agent_loop.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(
+        yandex_agent_loop.subprocess, "Popen", lambda *args, **kwargs: FakeProcess()
+    )
 
     def fake_urlopen(request, timeout):
         if "iam.api.cloud.yandex.net" in request.full_url:
