@@ -4,6 +4,7 @@
   // === 1. Модальное окно локальных инструментов (Tools) с немедленным сохранением в БД ===
   window.openToolsModal = function () {
     var UI = window.SettingsUI;
+    var CoreUI = window.AliceCoreAPI.ui;
     var Storage = window.SettingsStorage;
     var currentConvId = typeof window.currentConvId !== "undefined" ? window.currentConvId : null;
     var settings = Storage.load(currentConvId);
@@ -17,17 +18,24 @@
 
     var ov = document.createElement("div");
     ov.id = "tools-modal-custom";
+    ov.className = "modal tools-modal-custom";
+    ov.hidden = true;
+    ov.setAttribute("role", "dialog");
+    ov.setAttribute("aria-modal", "true");
+    ov.setAttribute("aria-hidden", "true");
+    ov.setAttribute("aria-labelledby", "tools-modal-title");
     ov.style.cssText =
-      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;";
+      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;";
 
     var md = document.createElement("div");
+    md.className = "modal-content settings-tools-modal-content";
     md.style.cssText =
       "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
 
     md.innerHTML = [
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">',
-      ' <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Инструменты</h2>',
-      ' <button class="alice-btn settings-contract-btn" id="tools-close-btn">&times;</button>',
+      ' <h2 id="tools-modal-title" style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Инструменты</h2>',
+      ' <button class="alice-btn settings-contract-btn" id="tools-close-btn" data-action="modal.close" data-modal="tools-modal-custom">&times;</button>',
       "</div>",
       '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
       '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
@@ -95,11 +103,11 @@
     ].join("");
     ov.appendChild(md);
     document.body.appendChild(ov);
+    CoreUI.modal.open(ov);
 
     function closeModal() {
-      ov.remove();
+      CoreUI.modal.close(ov);
     }
-    document.getElementById("tools-close-btn").addEventListener("click", closeModal);
     ov.addEventListener("click", function (e) {
       if (e.target === ov) closeModal();
     });
