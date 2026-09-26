@@ -241,7 +241,12 @@ mcpShim.window.AliceDispatcher = {
   },
 };
 const mcpRuntime = mcpShim.load(
-  ["static/core_api.js", "static/ui_runtime.js", "static/settings/settings_mcp.js", "static/header_actions.js"],
+  [
+    "static/core_api.js",
+    "static/ui_runtime.js",
+    "static/settings/settings_mcp.js",
+    "static/header_actions.js",
+  ],
   {
     SettingsUI: mcpShim.window.SettingsUI,
     AliceDispatcher: mcpShim.window.AliceDispatcher,
@@ -258,7 +263,10 @@ if (!mcpModal || !mcpClose) {
 if (!mcpModal.parentNode || mcpModal.parentNode.id !== "app-root") {
   throw new Error("real MCP modal must mount inside .alice-pro-app");
 }
-if (mcpClose.dataset.action !== "mcp-manager.close" || mcpClose.dataset.modal !== "mcp-manager-modal") {
+if (
+  mcpClose.dataset.action !== "mcp-manager.close" ||
+  mcpClose.dataset.modal !== "mcp-manager-modal"
+) {
   throw new Error("MCP modal close must use dispatcher contract");
 }
 if (mcpModal.hidden || !mcpModal.classList.contains("visible")) {
