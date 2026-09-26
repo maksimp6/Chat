@@ -455,4 +455,57 @@ if (credentialsModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real provider credentials modal click lifecycle passed");
 
+const departmentsShim = new BrowserShim(template);
+departmentsShim.window.AliceDispatcher = {
+  request: async function (url) {
+    if (url === "/api/departments") {
+      return {
+        ok: true,
+        status: 200,
+        json: async function () {
+          return { departments: [] };
+        },
+      };
+    }
+    throw new Error("unexpected departments request: " + url);
+  },
+};
+const departmentsRuntime = departmentsShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/departments.js", "static/header_actions.js"],
+  {
+    AliceDispatcher: departmentsShim.window.AliceDispatcher,
+  },
+);
+const departmentsButton = departmentsRuntime.document.getElementById("departments-btn");
+if (!departmentsButton) throw new Error("real departments button must exist in index.html");
+departmentsButton.click();
+const departmentsModal = departmentsRuntime.document.getElementById("departments-modal");
+const departmentsClose = departmentsModal && departmentsModal.querySelector(".modal-close");
+if (!departmentsModal || !departmentsClose) {
+  throw new Error("real departments modal controls must be created after click");
+}
+if (!departmentsModal.parentNode || departmentsModal.parentNode.id !== "app-root") {
+  throw new Error("real departments modal must mount inside .alice-pro-app");
+}
+if (
+  departmentsClose.dataset.action !== "departments.close" ||
+  departmentsClose.dataset.modal !== "departments-modal"
+) {
+  throw new Error("departments modal close must use dispatcher contract");
+}
+if (departmentsModal.hidden || !departmentsModal.classList.contains("visible")) {
+  throw new Error("real departments button click must open departments modal");
+}
+if (departmentsModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened departments modal must expose aria-hidden=false");
+}
+departmentsClose.click();
+if (!departmentsModal.hidden || departmentsModal.classList.contains("visible")) {
+  throw new Error("real departments close button must close departments modal");
+}
+if (departmentsModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed departments modal must expose aria-hidden=true");
+}
+console.log("Real departments modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
