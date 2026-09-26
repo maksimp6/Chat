@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 def test_header_actions_stay_on_one_horizontal_line():
@@ -21,7 +22,7 @@ def test_dynamic_header_actions_target_secondary_row():
     assert 'id="memory-btn"' in html
     assert 'data-action="header.memory.open"' in html
     assert 'getElementById("header-actions-2")' in diagnostics
-    assert 'actions.register("header.memory.open"' in header
+    assert re.search(r'actions\.register\(\s*"header\.memory\.open"', header)
     assert "window.__aliceHeaderActionsBound === true" in header
     assert 'call("openMemoryModal"' in header
     assert "memory-btn" not in memory
