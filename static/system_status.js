@@ -111,6 +111,14 @@
       button.setAttribute("aria-expanded", hidden ? "true" : "false");
     });
 
+    var closeButton = panel.querySelector(".alice-system-status-close");
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        panel.setAttribute("hidden", "");
+        button.setAttribute("aria-expanded", "false");
+      });
+    }
+
     panel.addEventListener("click", function (event) {
       if (event.target === panel) {
         panel.setAttribute("hidden", "");
