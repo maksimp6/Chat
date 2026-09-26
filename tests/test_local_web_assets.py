@@ -92,8 +92,8 @@ def test_ssh_runtime_modal_has_safe_header_action_contract():
     html = Path("templates/index.html").read_text(encoding="utf-8")
 
     assert "window.openSshRuntimeModal = function" in modal
-    assert 'typeof window.openSshRuntimeModal === "function"' in header
-    assert 'console.error("[SSH Runtime] Modal script is unavailable")' in header
+    assert 'actions.register("header.ssh.open"' in header
+    assert 'call("openSshRuntimeModal", "[SSH Runtime] Modal script is unavailable")' in header
     assert html.index("ssh_runtime_modal.js") < html.index("header_actions.js")
 
 
