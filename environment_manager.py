@@ -344,7 +344,7 @@ class EnvironmentRuntime:
             daemon=True,
         )
         self._stream_lock = threading.RLock()
-        self._active_streams: set[threading.Event] = set()
+        self._active_streams: dict[threading.Event, queue.Queue] = {}
 
     @property
     def thread_id(self) -> Optional[int]:
@@ -373,18 +373,17 @@ class EnvironmentRuntime:
 
     def start(self) -> int:
         self._prepare()
-        _RUNTIME_DISPATCHER.register_runtime(
-            self.runtime_id,
-            owner_id=self.environment.get("owner_id"),
-            namespace=self.environment["data_namespace"],
-            root=str(self.data_dir),
-        )
         with _RUNTIME_WORKERS_LOCK:
             if self.runtime_id in _RUNTIME_WORKERS:
-                _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
                 raise RuntimeError("environment runtime is already running")
             _RUNTIME_WORKERS[self.runtime_id] = self
         try:
+            _RUNTIME_DISPATCHER.register_runtime(
+                self.runtime_id,
+                owner_id=self.environment.get("owner_id"),
+                namespace=self.environment["data_namespace"],
+                root=str(self.data_dir),
+            )
             self._thread.start()
             for _ in range(100):
                 if self._thread.ident is not None:
@@ -427,7 +426,7 @@ class EnvironmentRuntime:
         events: queue.Queue = queue.Queue(maxsize=8)
         cancel = threading.Event()
         with self._stream_lock:
-            self._active_streams.add(cancel)
+            self._active_streams[cancel] = events
         self._jobs.put(("http", "http.request", dict(payload), events, cancel))
         try:
             first = events.get(timeout=timeout)
@@ -444,8 +443,18 @@ class EnvironmentRuntime:
 
     def stop(self) -> None:
         with self._stream_lock:
-            for cancel in tuple(self._active_streams):
-                cancel.set()
+            active_streams = tuple(self._active_streams.items())
+        for cancel, events in active_streams:
+            cancel.set()
+            try:
+                while True:
+                    events.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                events.put_nowait(("end",))
+            except queue.Full:
+                pass
         if self._thread.is_alive():
             self._jobs.put(_RUNTIME_STOP)
             self._thread.join(timeout=5)
@@ -512,7 +521,7 @@ class EnvironmentRuntime:
                 if not cancel.is_set():
                     _stream_put(events, ("end",), cancel)
                 with self._stream_lock:
-                    self._active_streams.discard(cancel)
+                    self._active_streams.pop(cancel, None)
 
 
 def register_runtime_operation(name: str, handler) -> None:
@@ -684,9 +693,8 @@ def stop_environment(
     _transition(item["status"], "STOPPED")
     with _RUNTIME_WORKERS_LOCK:
         runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is None:
-        raise RuntimeError("environment runtime is not running")
-    runtime.stop()
+    if runtime is not None:
+        runtime.stop()
     conn = get_conn()
     try:
         conn.execute(
