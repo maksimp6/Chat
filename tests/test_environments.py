@@ -1,7 +1,11 @@
 import subprocess
 import threading
+from types import SimpleNamespace
+
+import pytest
 
 import db
+import environment_manager
 from environment_manager import (
     create_environment,
     delete_environment,
@@ -180,3 +184,51 @@ def test_environment_init_recovers_stale_running_state_after_process_restart(tmp
     assert recovered["runtime_thread_id"] is None
 
     delete_environment(item["environment_id"])
+
+
+def test_revision_dispatch_rejects_missing_runtime():
+    with pytest.raises(RuntimeError, match="revision runtime is not loaded"):
+        environment_manager._invoke_revision_runtime(
+            SimpleNamespace(runtime_id="missing-runtime"),
+            {"operation": "noop", "payload": {}},
+        )
+
+
+def _runtime_for_prepare_failure(tmp_path, monkeypatch, commit_sha="a" * 40):
+    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
+    runtime = environment_manager.EnvironmentRuntime(
+        {
+            "environment_id": "runtime-prepare-failure",
+            "commit_sha": commit_sha,
+            "data_namespace": "runtime-prepare-failure",
+            "owner_id": None,
+        }
+    )
+    runtime.worktree.mkdir(parents=True)
+    return runtime
+
+
+def test_runtime_prepare_rejects_wrong_commit(tmp_path, monkeypatch):
+    expected = "a" * 40
+    runtime = _runtime_for_prepare_failure(tmp_path, monkeypatch, expected)
+    monkeypatch.setattr(environment_manager, "_run_git", lambda *args, **kwargs: "b" * 40)
+
+    with pytest.raises(RuntimeError, match="does not match the resolved commit"):
+        runtime._prepare()
+
+
+def test_runtime_prepare_rejects_dirty_snapshot(tmp_path, monkeypatch):
+    expected = "a" * 40
+    runtime = _runtime_for_prepare_failure(tmp_path, monkeypatch, expected)
+
+    def fake_git(*args, **kwargs):
+        if args[:2] == ("rev-parse", "HEAD"):
+            return expected
+        if args[:2] == ("status", "--porcelain"):
+            return " M alice_runtime.py"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(environment_manager, "_run_git", fake_git)
+
+    with pytest.raises(RuntimeError, match="not an immutable clean snapshot"):
+        runtime._prepare()
