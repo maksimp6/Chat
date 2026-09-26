@@ -1,8 +1,6 @@
 "use strict";
 
 const assert = require("assert");
-const fs = require("fs");
-const vm = require("vm");
 const {BrowserShim} = require("./browser_dom");
 
 const ROOT = require("path").resolve(__dirname, "..");
@@ -25,6 +23,10 @@ async function main() {
     const sourcePaths = ["core_api.js", "dispatcher.js", "system_status.js"]
         .map((name) => require("path").join(ROOT, "static", name));
     browser.load(sourcePaths, {fetch: mockFetch, URL}); 
+
+    const button = browser.document.getElementById("system-status-btn");
+    const panel = browser.document.getElementById("alice-system-status");
+    const close = panel.querySelector(".alice-system-status-close");
 
     const core = browser.window.AliceCoreAPI;
     assert.strictEqual(core.apiVersion, "1");
