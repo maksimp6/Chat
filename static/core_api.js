@@ -251,7 +251,7 @@
     };
 
     traces.set(traceId, entry);
-    while (traces.size > MAX_TRACE_COUNT) {
+    if (traces.size > MAX_TRACE_COUNT) {
       traces.delete(traces.keys().next().value);
     }
 
