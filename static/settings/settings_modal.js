@@ -16,27 +16,10 @@
     var existing = document.getElementById("tools-modal-custom");
     if (existing) existing.remove();
 
-    var ov = document.createElement("div");
-    ov.id = "tools-modal-custom";
-    ov.className = "modal tools-modal-custom";
-    ov.hidden = true;
-    ov.setAttribute("role", "dialog");
-    ov.setAttribute("aria-modal", "true");
-    ov.setAttribute("aria-hidden", "true");
-    ov.setAttribute("aria-labelledby", "tools-modal-title");
-    ov.style.cssText =
-      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;";
-
     var md = document.createElement("div");
-    md.className = "modal-content settings-tools-modal-content";
-    md.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+    md.className = "settings-tools-body";
 
     md.innerHTML = [
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">',
-      ' <h2 id="tools-modal-title" style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Инструменты</h2>',
-      ' <button class="alice-btn settings-contract-btn" id="tools-close-btn" data-action="modal.close" data-modal="tools-modal-custom">&times;</button>',
-      "</div>",
       '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
       '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
       '<div id="tools-category-list" style="display:flex;flex-direction:column;gap:8px;">Загрузка инструментов...</div>',
@@ -101,7 +84,16 @@
       ' <button class="alice-btn settings-contract-btn" id="tools-save-btn">Сохранить инструменты</button>',
       "</div>",
     ].join("");
-    ov.appendChild(md);
+    var ov = CoreUI.modal.create({
+      id: "tools-modal-custom",
+      title: "🧰 Инструменты",
+      className: "tools-modal-custom",
+      contentClassName: "settings-tools-modal-content",
+      body: md,
+    });
+    var modalContent = ov.querySelector(".modal-content");
+    modalContent.style.cssText =
+      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
     (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
     CoreUI.modal.open(ov);
 
