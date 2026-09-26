@@ -398,4 +398,61 @@ if (treasuryModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real treasury modal click lifecycle passed");
 
+const credentialsShim = new BrowserShim(template);
+credentialsShim.window.AliceDispatcher = {
+  request: async function (url) {
+    if (url === "/api/provider-credentials/status") {
+      return {
+        ok: true,
+        status: 200,
+        json: async function () {
+          return { providers: [] };
+        },
+      };
+    }
+    throw new Error("unexpected provider credentials request: " + url);
+  },
+};
+const credentialsRuntime = credentialsShim.load(
+  [
+    "static/core_api.js",
+    "static/ui_runtime.js",
+    "static/provider_credentials.js",
+    "static/header_actions.js",
+  ],
+  {
+    AliceDispatcher: credentialsShim.window.AliceDispatcher,
+  },
+);
+const credentialsButton = credentialsRuntime.document.getElementById("provider-credentials-btn");
+const credentialsModal = credentialsRuntime.document.getElementById("provider-credentials-modal");
+const credentialsClose = credentialsModal && credentialsModal.querySelector(".modal-close");
+if (!credentialsButton || !credentialsModal || !credentialsClose) {
+  throw new Error("real provider credentials modal controls must exist");
+}
+if (credentialsModal.hidden !== true) {
+  throw new Error("provider credentials modal must start hidden");
+}
+credentialsButton.click();
+if (credentialsModal.hidden || !credentialsModal.classList.contains("visible")) {
+  throw new Error("real provider credentials button click must open modal");
+}
+if (credentialsModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened provider credentials modal must expose aria-hidden=false");
+}
+if (
+  credentialsClose.dataset.action !== "provider-credentials.close" ||
+  credentialsClose.dataset.modal !== "provider-credentials-modal"
+) {
+  throw new Error("provider credentials close must use dispatcher contract");
+}
+credentialsClose.click();
+if (credentialsModal.hidden !== true || credentialsModal.classList.contains("visible")) {
+  throw new Error("real provider credentials close button must close modal");
+}
+if (credentialsModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed provider credentials modal must expose aria-hidden=true");
+}
+console.log("Real provider credentials modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
