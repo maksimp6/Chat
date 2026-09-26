@@ -30,7 +30,8 @@ if (button.getAttribute("aria-label") !== "Contract button") throw new Error("bu
 
 root.appendChild(button);
 const unmount = UI.events.mountClicks(root);
-UI.events.mountClicks(root);
+const duplicateUnmount = UI.events.mountClicks(root);
+if (duplicateUnmount !== unmount) throw new Error("duplicate mount must return the active cleanup handle");
 button.click();
 if (calls !== 1) throw new Error("one click must dispatch exactly one action");
 
