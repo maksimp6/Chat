@@ -1,7 +1,8 @@
 name: Format
 
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -9,12 +10,13 @@ permissions:
 jobs:
   format:
     name: Auto-format repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
@@ -33,4 +35,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "style: auto-format repository"
-          git push
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
