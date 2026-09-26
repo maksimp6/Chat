@@ -76,6 +76,26 @@ async function flush() {
   assert.equal(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size, 1);
   assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 1);
 
+  const domProbe = document.createElement("div");
+  const firstProbeChild = document.createElement("span");
+  firstProbeChild.textContent = "first";
+  const secondProbeChild = document.createElement("span");
+  secondProbeChild.textContent = "second";
+  domProbe.append(firstProbeChild, " middle ", secondProbeChild);
+  assert.equal(domProbe.children.length, 3);
+  assert.equal(domProbe.textContent, "first middle second");
+  assert.equal(domProbe.classList.toggle("active"), true);
+  assert.equal(domProbe.classList.contains("active"), true);
+  assert.equal(domProbe.classList.toggle("active", false), false);
+  assert.equal(domProbe.classList.contains("active"), false);
+
+  const focusProbe = document.createElement("input");
+  document.body.appendChild(focusProbe);
+  focusProbe.focus();
+  assert.equal(document.activeElement, focusProbe);
+  focusProbe.blur();
+  assert.equal(document.activeElement, document.body);
+
   const projectTreeButton = document.getElementById("project-tree-btn");
   assert.ok(projectTreeButton);
   projectTreeButton.click();
