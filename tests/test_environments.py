@@ -1,6 +1,5 @@
-import os
 import subprocess
-import sys
+import threading
 
 import db
 from environment_manager import (
@@ -49,9 +48,6 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
     monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(tmp_path / "runtimes"))
-    monkeypatch.setenv(
-        "ALICE_ENV_RUNTIME_COMMAND", f'{sys.executable} -c "import time; time.sleep(120)"'
-    )
     db.init_db()
     init_environment_tables()
     return repo, master_sha, one_sha, two_sha
@@ -71,8 +67,15 @@ def test_two_branch_environments_are_immutable_and_isolated(tmp_path, monkeypatc
     second = start_environment(second["environment_id"])
     assert first["status"] == "RUNNING"
     assert second["status"] == "RUNNING"
-    assert first["runtime_pid"] != second["runtime_pid"]
-    assert first["runtime_port"] != second["runtime_port"]
+    assert first["runtime_pid"] is None
+    assert second["runtime_pid"] is None
+    assert first["runtime_port"] is None
+    assert second["runtime_port"] is None
+    assert first["runtime_thread_id"] is not None
+    assert second["runtime_thread_id"] is not None
+    assert first["runtime_thread_id"] != second["runtime_thread_id"]
+    assert first["runtime_thread_id"] != threading.get_ident()
+    assert second["runtime_thread_id"] != threading.get_ident()
 
     stop_environment(first["environment_id"])
     stop_environment(second["environment_id"])
