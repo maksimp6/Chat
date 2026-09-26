@@ -146,7 +146,8 @@ def test_runtime_api_rejects_request_contract_drift(client):
     payload = unknown_session_field.get_json()
     validate_api_contract("runtime.error.invalid_request", payload)
     assert payload["error"] == "invalid_request"
-    assert "unexpected fields: unexpected" in payload["message"]
+    assert payload["message"] == "request payload does not match API contract"
+    assert "unexpected fields: unexpected" not in str(payload)
 
     wrong_metadata_type = client.post("/api/sessions", json={"metadata": "not-an-object"})
     assert wrong_metadata_type.status_code == 400
@@ -157,7 +158,8 @@ def test_runtime_api_rejects_request_contract_drift(client):
     assert missing_conversation.status_code == 400
     payload = missing_conversation.get_json()
     validate_api_contract("runtime.error.invalid_request", payload)
-    assert "missing required fields: conversation_id" in payload["message"]
+    assert payload["message"] == "request payload does not match API contract"
+    assert "missing required fields: conversation_id" not in str(payload)
 
     blank_conversation = client.post(
         f"/api/sessions/{session['id']}/invocations",
