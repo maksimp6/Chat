@@ -234,7 +234,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     copyBtn.addEventListener("click", function() {
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = "✅";
-            setTimeout(() => copyBtn.textContent = "📋", 2000);
+            window.AliceCoreAPI.scheduler.defer(() => copyBtn.textContent = "📋", 2000);
         });
     };
     msg.appendChild(copyBtn);
