@@ -99,7 +99,25 @@
     function renderMobileList(items){if(!state.list)return;state.list.textContent="";if(!items.length){state.list.appendChild(el("div",{className:"alice-trace-notice"},"Нет элементов в этом фильтре."));return;}items.forEach(function(x){var b=makeItemButton(x);x._mobileButton=b;state.list.appendChild(b);});}
     function renderSidebar(items){var side=el("div",{className:"alice-trace-nav"});side.appendChild(el("div",{className:"alice-trace-section-title"},"EVENTS / TRACE"));items.forEach(function(x){var b=makeItemButton(x);x._button=b;side.appendChild(b);});return side;}
     function tabsFor(item){if(item.kind==="response")return["Overview","Text","Request","Raw Response","Output","Usage","Tools","Reasoning","Metadata"];if(item.kind==="tool")return["Overview","Arguments","Result","Metadata","Raw"];if(item.kind==="pipeline")return["Overview","Raw"];return["Overview","Payload","Raw"];}
-    function rawFor(item){return item.kind==="response"?(item.data.raw||item.data):item.data;}\n    function responseText(item){\n        var raw=item&&item.data&&item.data.raw;\n        if(!raw||typeof raw!=="object")return "";\n        if(typeof raw.output_text==="string")return raw.output_text;\n        var out=Array.isArray(raw.output)?raw.output:[];\n        var parts=[];\n        out.forEach(function(x){\n            if(!x||typeof x!=="object")return;\n            if(typeof x.text==="string")parts.push(x.text);\n            (Array.isArray(x.content)?x.content:[]).forEach(function(c){\n                if(c&&typeof c.text==="string")parts.push(c.text);\n                if(c&&c.type==="output_text"&&typeof c.text==="string")parts.push(c.text);\n            });\n        });\n        return parts.join("\\n").trim();\n    }
+    function rawFor(item){
+        return item.kind==="response" ? (item.data.raw || item.data) : item.data;
+    }
+    function responseText(item){
+        var raw=item&&item.data&&item.data.raw;
+        if(!raw||typeof raw!=="object") return "";
+        if(typeof raw.output_text==="string") return raw.output_text;
+        var out=Array.isArray(raw.output)?raw.output:[];
+        var parts=[];
+        out.forEach(function(x){
+            if(!x||typeof x!=="object") return;
+            if(typeof x.text==="string") parts.push(x.text);
+            (Array.isArray(x.content)?x.content:[]).forEach(function(c){
+                if(c&&typeof c.text==="string") parts.push(c.text);
+                if(c&&c.type==="output_text"&&typeof c.text==="string") parts.push(c.text);
+            });
+        });
+        return parts.join("\\n").trim();
+    }
 
     function addJsonToolbar(content,rerender){var bar=el("div",{className:"alice-trace-json-toolbar"});bar.appendChild(el("span",{className:"alice-trace-json-label"},"JSON depth"));var sel=el("select",{className:"alice-trace-depth",title:"Глубина отображения JSON"});[[1,"1"],[2,"2"],[3,"3"],[4,"4"],[5,"5"],[6,"6"],[null,"Full"]].forEach(function(x){var o=el("option",{value:x[0]===null?"full":String(x[0])},x[1]);if((state.jsonDepth===null&&x[0]===null)||state.jsonDepth===x[0])o.selected=true;sel.appendChild(o);});sel.onchange=function(){state.jsonDepth=this.value==="full"?null:Number(this.value);rerender();};bar.appendChild(sel);content.appendChild(bar);}
 
