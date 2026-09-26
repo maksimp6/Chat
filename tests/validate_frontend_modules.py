@@ -47,7 +47,8 @@ TIMER_PATTERNS = (
     (re.compile(r"\bsetInterval\s*\("), "setInterval"),
     (re.compile(r"\bclearTimeout\s*\("), "clearTimeout"),
     (re.compile(r"\bclearInterval\s*\("), "clearInterval"),
-    (re.compile(r"\b(?:delay|sleep)\s*\("), "delay/sleep"),
+    (re.compile(r"\bdelay\s*\("), "delay"),
+    (re.compile(r"\bsleep\s*\("), "sleep"),
 )
 REPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
