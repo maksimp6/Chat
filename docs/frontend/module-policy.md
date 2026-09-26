@@ -15,6 +15,7 @@ Alice Pro frontend JavaScript is treated as a set of modules with explicit runti
 - TODO/FIXME/XXX/HACK/NOTE markers are rejected from production frontend modules.
 - Suspicious high-entropy or non-printable source is classified as unusual text and rejected.
 - Vendor bundles are excluded from application policy checks and must be isolated explicitly. They are not treated as application modules.
+- `sw.js` is infrastructure, not an application module, because Service Workers require a fetch event handler. Its JavaScript syntax is still validated.
 
 ## Loop and failure safety
 
