@@ -539,4 +539,57 @@ if (
 }
 console.log("Real Dozzle click lifecycle passed");
 
+const sshShim = new BrowserShim(template);
+sshShim.window.AliceDispatcher = {
+  request: async function () {
+    return {
+      ok: true,
+      status: 200,
+      json: async function () {
+        return {};
+      },
+    };
+  },
+};
+const sshRuntime = sshShim.load(
+  [
+    "static/core_api.js",
+    "static/ui_runtime.js",
+    "static/settings/ui_helpers.js",
+    "static/settings/ssh_runtime_modal.js",
+    "static/header_actions.js",
+  ],
+  {
+    AliceDispatcher: sshShim.window.AliceDispatcher,
+  },
+);
+const sshButton = sshRuntime.document.getElementById("ssh-runtime-btn");
+if (!sshButton) throw new Error("real SSH runtime button must exist in index.html");
+sshButton.click();
+const sshModal = sshRuntime.document.getElementById("ssh-runtime-modal-custom");
+const sshClose = sshModal && sshModal.querySelector(".modal-close");
+if (!sshModal || !sshClose) {
+  throw new Error("real SSH runtime modal controls must be created after click");
+}
+if (!sshModal.parentNode || sshModal.parentNode.id !== "app-root") {
+  throw new Error("real SSH runtime modal must mount inside .alice-pro-app");
+}
+if (sshClose.dataset.action !== "modal.close" || sshClose.dataset.modal !== "ssh-runtime-modal-custom") {
+  throw new Error("SSH runtime close must use generic modal.close dispatcher contract");
+}
+if (sshModal.hidden || !sshModal.classList.contains("visible")) {
+  throw new Error("real SSH runtime button click must open modal");
+}
+if (sshModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened SSH runtime modal must expose aria-hidden=false");
+}
+sshClose.click();
+if (!sshModal.hidden || sshModal.classList.contains("visible")) {
+  throw new Error("real SSH runtime close button must close modal");
+}
+if (sshModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed SSH runtime modal must expose aria-hidden=true");
+}
+console.log("Real SSH runtime modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
