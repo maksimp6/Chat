@@ -13,7 +13,7 @@
         var button = document.createElement("button");
         button.type = "button";
         button.textContent = "↩ Вернуть предыдущую тему";
-        button.className = "theme-rollback-button";
+        button.className = "alice-btn theme-rollback-button";
         button.addEventListener("click", function() {
             window.AliceTheme.apply(previousTheme, true);
             button.disabled = true;
