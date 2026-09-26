@@ -33,7 +33,13 @@
                 notification.close();
             };
             
-            setTimeout(() => notification.close(), 5000);
+            if (window.AliceCoreAPI && window.AliceCoreAPI.scheduler) {
+                window.AliceCoreAPI.scheduler.defer(function() {
+                    notification.close();
+                }, 5000);
+            } else {
+                notification.close();
+            }
         },
         
         notifyRequestComplete: function(model) {
