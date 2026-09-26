@@ -11,7 +11,7 @@
         md.style.cssText = "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
         var header = document.createElement("div");
         header.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;";
-        header.innerHTML = '<h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🔐 SSH Runtime</h2><button class="alice-btn" id="set-close-btn" type="button" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>';
+        header.innerHTML = '<h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🔐 SSH Runtime</h2><button class="alice-btn settings-contract-btn" id="set-close-btn" type="button">&times;</button>';
         md.appendChild(header);
         var tabSsh = [
             '<div id="tab-ssh" class="llm-tab-content">',
@@ -34,14 +34,14 @@
             '<div style="margin-top:10px;">' + UI.lbl('Named targets (JSON)') + UI.ta('set-ssh-targets', '', 'height:180px;font-family:monospace;font-size:11px;') + '</div>',
             '<div style="display:flex;gap:8px;align-items:end;margin-top:10px;">',
             '<div style="flex:1;">' + UI.lbl('Проверить target') + UI.inp('set-ssh-test-target', 'text', '', ' placeholder="preview"') + '</div>',
-            '<button class="alice-btn" id="set-ssh-test-btn" type="button" style="padding:8px 12px;background:var(--m-accent,#4a90d9);color:#fff;border:none;border-radius:6px;cursor:pointer;">Проверить</button>',
+            '<button class="alice-btn settings-contract-btn" id="set-ssh-test-btn" type="button">Проверить</button>',
             '</div>',
             '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
             'Приватный ключ и его содержимое никогда не передаются через этот интерфейс. В targets указывается только серверный путь к существующему ключу и known_hosts. ',
             'Проверка подключения выполняет только фиксированную команду true.',
             '</div>',
             '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">',
-            '<button class="alice-btn" id="set-ssh-save-btn" type="button" style="padding:8px 14px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить SSH</button>',
+            '<button class="alice-btn settings-contract-btn" id="set-ssh-save-btn" type="button">Сохранить SSH</button>',
             '</div>',
             '</div>'
         ].join('');
