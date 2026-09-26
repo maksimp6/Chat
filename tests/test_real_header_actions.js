@@ -302,7 +302,12 @@ filesShim.window.AliceDispatcher = {
   },
 };
 const filesRuntime = filesShim.load(
-  ["static/core_api.js", "static/ui_runtime.js", "static/file_manager.js", "static/header_actions.js"],
+  [
+    "static/core_api.js",
+    "static/ui_runtime.js",
+    "static/file_manager.js",
+    "static/header_actions.js",
+  ],
   {
     SettingsUI: filesShim.window.SettingsUI,
     AliceDispatcher: filesShim.window.AliceDispatcher,
@@ -319,7 +324,10 @@ if (!filesModal || !filesClose) {
 if (!filesModal.parentNode || filesModal.parentNode.id !== "app-root") {
   throw new Error("real file manager modal must mount inside .alice-pro-app");
 }
-if (filesClose.dataset.action !== "file-manager.close" || filesClose.dataset.modal !== "file-manager-modal") {
+if (
+  filesClose.dataset.action !== "file-manager.close" ||
+  filesClose.dataset.modal !== "file-manager-modal"
+) {
   throw new Error("file manager close must use dispatcher contract");
 }
 if (filesModal.hidden || !filesModal.classList.contains("visible")) {
