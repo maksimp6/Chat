@@ -223,7 +223,8 @@
               class="header-btn alice-btn"
               title="Управление памятью"
               aria-label="Управление памятью"
-              data-action="header.memory.open"
+              data-action="modal.open"
+              data-modal="memoryModal"
             >
               🧠</button
             ><button
@@ -338,6 +339,8 @@
           class="memory-modal-close alice-btn"
           type="button"
           aria-label="Закрыть"
+          data-action="modal.close"
+          data-modal="memoryModal"
         >
           &times;
         </button>
