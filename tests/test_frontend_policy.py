@@ -68,3 +68,9 @@ def test_direct_transport_access_is_rejected():
 def test_dispatcher_transport_is_allowed():
     errors = errors_for("window.AliceDispatcher.request('/api/chat');")
     assert not any("dispatcher safety violation" in error for error in errors)
+
+
+def test_long_consecutive_source_repetition_is_rejected():
+    source = "var same = 1;\n" * 12
+    errors = errors_for(source)
+    assert any("consecutive run=12" in error for error in errors)
