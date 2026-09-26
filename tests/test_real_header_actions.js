@@ -513,4 +513,30 @@ if (departmentsModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real departments modal click lifecycle passed");
 
+const dozzleShim = new BrowserShim(template);
+const dozzleOpens = [];
+dozzleShim.window.open = function (url, target, features) {
+  dozzleOpens.push({ url, target, features });
+};
+const dozzleRuntime = dozzleShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/dozzle.js", "static/header_actions.js"],
+  {
+    open: dozzleShim.window.open,
+  },
+);
+const dozzleButton = dozzleRuntime.document.getElementById("dozzle-btn");
+if (!dozzleButton) throw new Error("real Dozzle button must exist in index.html");
+dozzleButton.click();
+if (dozzleOpens.length !== 1) {
+  throw new Error("real Dozzle button click must open logs exactly once");
+}
+if (
+  dozzleOpens[0].url !== "/logs/" ||
+  dozzleOpens[0].target !== "_blank" ||
+  dozzleOpens[0].features !== "noopener,noreferrer"
+) {
+  throw new Error("real Dozzle button must open the canonical logs URL safely");
+}
+console.log("Real Dozzle click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
