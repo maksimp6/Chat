@@ -471,7 +471,12 @@ departmentsShim.window.AliceDispatcher = {
   },
 };
 const departmentsRuntime = departmentsShim.load(
-  ["static/core_api.js", "static/ui_runtime.js", "static/departments.js", "static/header_actions.js"],
+  [
+    "static/core_api.js",
+    "static/ui_runtime.js",
+    "static/departments.js",
+    "static/header_actions.js",
+  ],
   {
     AliceDispatcher: departmentsShim.window.AliceDispatcher,
   },
