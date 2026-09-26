@@ -60,6 +60,7 @@ def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
     assert payload["error"] == "invalid_owner_identity"
     assert "invalid authenticated owner token" not in str(payload)
 
+
 def test_create_conversation_hides_provider_exception(monkeypatch):
     import mcp_routes
 
@@ -85,4 +86,3 @@ def test_create_conversation_hides_provider_exception(monkeypatch):
     assert payload["message"] == "Не удалось создать разговор у провайдера"
     assert internal_marker not in str(payload)
     assert payload["trace"]["errors"][0]["error"] == "conversation creation failed"
-
