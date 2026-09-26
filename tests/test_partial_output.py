@@ -325,6 +325,7 @@ class TestActiveChatRoute(unittest.TestCase):
             patch.object(mcp_routes, "AliceClient", lambda _config: fake_client),
             patch.object(mcp_routes, "get_conv_settings", return_value={}),
             patch.object(mcp_routes, "add_message", side_effect=fake_add_message),
+            patch.object(mcp_routes, "maybe_update_conversation_title", return_value=None),
         ):
             app.config["TESTING"] = True
             with app.test_client() as client:
@@ -340,7 +341,7 @@ class TestActiveChatRoute(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         payload = response.get_json()
-        self.assertEqual(fake_client.metadata, test_conversation_metadata)
+        self.assertEqual(fake_client.params["conversation_metadata"], test_conversation_metadata)
         self.assertEqual(payload["partial_output"], "Generated before failure")
         self.assertIn("Generated before failure", payload["reply"])
         self.assertIn("Внутренняя ошибка обработки запроса", payload["reply"])
