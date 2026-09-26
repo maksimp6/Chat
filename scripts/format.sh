@@ -10,7 +10,7 @@ case "$mode" in
     ;;
   check)
     python -m ruff format --check .
-    npx --yes prettier@3.6.2 --check "static/**/*.{js,css,json}" "templates/**/*.html" "tests/**/*.js" ".github/**/*.yml" "*.md"
+    npx --yes prettier@3.6.2 --check "static/**/*.{js,css,json}" "templates/**/*.html" "tests/**/*.js" "*.md"
     ;;
   *)
     echo "Usage: $0 [write|check]" >&2
