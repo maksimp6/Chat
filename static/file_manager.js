@@ -172,7 +172,7 @@ window.fetchVectorStores = function() {
                     var original = this.textContent;
                     this.textContent = 'скопировано!';
                     var self = this;
-                    setTimeout(function() { self.textContent = original; }, 1500);
+                    window.AliceCoreAPI.scheduler.defer(function() { self.textContent = original; }, 1500);
                 });
             });
 
@@ -409,7 +409,7 @@ window.fetchVectorStores = function() {
                     var orig = this.textContent;
                     this.textContent = 'скопировано!';
                     var self = this;
-                    setTimeout(function() { self.textContent = orig; }, 1500);
+                    window.AliceCoreAPI.scheduler.defer(function() { self.textContent = orig; }, 1500);
                 });
             }
         }
