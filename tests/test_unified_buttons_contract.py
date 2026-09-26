@@ -68,7 +68,7 @@ def test_unified_buttons_contract():
 
     # Header geometry belongs to the shared contract, not individual buttons.
     forbidden_geometry = re.compile(
-        r"(?m)^[^{}]*#(?:menu-btn|model-btn|tools-btn|ssh-runtime-btn|mcp-btn|"
+        r"(?m)^[^{}]*#(?:menu-btn|system-status-btn|model-btn|tools-btn|ssh-runtime-btn|mcp-btn|"
         r"settings-btn|file-manager-btn|treasury-btn|dozzle-btn|project-tree-btn|"
         r"departments-btn|update-app-btn|provider-credentials-btn|memory-btn|theme-toggle)"
         r"[^{}]*\{[^{}]*(?:width|height|min-width|min-height|flex-basis)\s*:",
