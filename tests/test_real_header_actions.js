@@ -93,4 +93,50 @@ if (modelModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real model modal click lifecycle passed");
 
+const memoryShim = new BrowserShim(template);
+const memoryRuntime = memoryShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/memory_panel.js"],
+  {
+    AliceDispatcher: {
+      request: async function () {
+        return {
+          ok: true,
+          status: 200,
+          json: async function () {
+            return { config: { enabled: true, max_context_facts: 15 }, facts: [] };
+          },
+        };
+      },
+    },
+    confirm: function () {
+      return true;
+    },
+  },
+);
+const memoryButton = memoryRuntime.document.getElementById("memory-btn");
+const memoryModal = memoryRuntime.document.getElementById("memoryModal");
+const memoryClose = memoryRuntime.document.getElementById("memoryCloseBtn");
+if (!memoryButton || !memoryModal || !memoryClose) {
+  throw new Error("real memory modal controls must exist in index.html");
+}
+if (memoryButton.dataset.action !== "modal.open" || memoryButton.dataset.modal !== "memoryModal") {
+  throw new Error("memory button must use generic modal.open dispatcher contract");
+}
+if (!memoryModal.hidden) throw new Error("real memory modal must start hidden");
+memoryButton.click();
+if (memoryModal.hidden || !memoryModal.classList.contains("visible")) {
+  throw new Error("real memory button click must open memoryModal");
+}
+if (memoryModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened real memory modal must expose aria-hidden=false");
+}
+memoryClose.click();
+if (!memoryModal.hidden || memoryModal.classList.contains("visible")) {
+  throw new Error("real memory modal close button must close memoryModal");
+}
+if (memoryModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed real memory modal must expose aria-hidden=true");
+}
+console.log("Real memory modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
