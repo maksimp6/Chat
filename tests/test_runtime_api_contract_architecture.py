@@ -76,8 +76,8 @@ def test_every_runtime_route_crosses_response_contract_boundary():
         if "_contract_response" not in names:
             offenders.append(node.name)
 
-    assert not offenders, (
-        "runtime routes must return through _contract_response: " + ", ".join(offenders)
+    assert not offenders, "runtime routes must return through _contract_response: " + ", ".join(
+        offenders
     )
 
 
@@ -87,16 +87,12 @@ def test_runtime_routes_cannot_bypass_contract_helpers():
 
     for node, _methods in _runtime_route_functions():
         used = sorted(
-            name
-            for name in {_call_name(call) for call in _calls(node)}
-            if name in forbidden
+            name for name in {_call_name(call) for call in _calls(node)} if name in forbidden
         )
         if used:
             failures[node.name] = used
 
-    assert not failures, (
-        "runtime routes bypass strict API contract helpers: " + repr(failures)
-    )
+    assert not failures, "runtime routes bypass strict API contract helpers: " + repr(failures)
 
 
 def test_runtime_mutation_routes_parse_payload_through_request_contract():
@@ -109,8 +105,7 @@ def test_runtime_mutation_routes_parse_payload_through_request_contract():
             failures.append(node.name)
 
     assert not failures, (
-        "runtime mutation routes must parse bodies through _request_payload: "
-        + ", ".join(failures)
+        "runtime mutation routes must parse bodies through _request_payload: " + ", ".join(failures)
     )
 
 
