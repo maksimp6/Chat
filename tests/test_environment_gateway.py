@@ -70,9 +70,7 @@ def test_environment_gateway_runs_request_in_matching_runtime_thread(tmp_path, m
     second = start_environment(second["environment_id"])
 
     try:
-        response = client.get(
-            f"/environments/{first['environment_id']}/runtime-root?hello=world"
-        )
+        response = client.get(f"/environments/{first['environment_id']}/runtime-root?hello=world")
         assert response.status_code == 200
         payload = response.get_json()
         assert payload["runtime_id"] == first["environment_id"]
@@ -101,9 +99,7 @@ def test_environment_gateway_preserves_streaming_from_runtime_thread(tmp_path, m
     started = start_environment(created["environment_id"])
 
     try:
-        response = client.get(
-            f"/environments/{created['environment_id']}/runtime-stream"
-        )
+        response = client.get(f"/environments/{created['environment_id']}/runtime-stream")
         assert response.status_code == 200
         assert response.data == b"first-second"
     finally:
@@ -122,9 +118,7 @@ def test_environment_gateway_rejects_stopped_runtime_without_transport(tmp_path,
     app = _app()
     client = app.test_client()
     created = create_environment("master")
-    response = client.get(
-        f"/environments/{created['environment_id']}/runtime-root"
-    )
+    response = client.get(f"/environments/{created['environment_id']}/runtime-root")
     assert response.status_code == 503
     assert response.get_json() == {"error": "environment_not_running"}
     delete_environment(created["environment_id"])
