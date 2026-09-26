@@ -52,7 +52,17 @@ class ElementShim extends EventTargetShim {
     getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; }
 setAttribute(name, value) { this.attributes[name] = String(value); }
 removeAttribute(name) { delete this.attributes[name]; }
-hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }\n
+hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }
+    closest(selector) {
+        const selectors = selector.split(",").map((item) => item.trim());
+        let node = this;
+        while (node) {
+            if (selectors.some((item) => matches(node, item))) return node;
+            node = node.parentNode;
+        }
+        return null;
+    }
+
 get id() { return this.attributes.id || ""; }
     set id(value) { this.attributes.id = String(value); }
     get className() { return this.attributes.class || ""; }
