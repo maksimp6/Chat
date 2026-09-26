@@ -44,6 +44,13 @@ When a value can be reused safely, modules should cache it with:
 3. a bounded lifetime or explicit refresh path where freshness matters;
 4. no unbounded cache growth.
 
+## Timers and dispatcher
+
+- Direct setTimeout, setInterval, clearTimeout, clearInterval, delay, and sleep calls are forbidden in frontend modules.
+- Deferred work must use the module dispatcher and lifecycle/event mechanisms. This keeps cancellation, ownership, failure cleanup, and observability centralized.
+- User/application requests must enter through the dispatcher. Modules do not call the transport directly.
+- The dispatcher is the only frontend boundary allowed to reach the transport layer.
+
 ## Runtime contract
 
 Static validation is only the first layer. The module runtime separately validates:
