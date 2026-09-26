@@ -74,7 +74,7 @@ function renderSidebar() {
             e.stopPropagation();
             var newName = prompt("Новое имя диалога:", conv.title);
             if (newName && newName.trim() !== "") {
-                fetch("/api/conversations/" + conv.id, {
+                window.AliceDispatcher.request("/api/conversations/" + conv.id, {
                     method: "PATCH",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({ title: newName.trim() })
@@ -105,7 +105,7 @@ function renderSidebar() {
         delBtn.addEventListener("click", function(e) { 
             e.stopPropagation(); 
             if(confirm("Удалить этот диалог?")) {
-                fetch("/api/conversations/" + conv.id, { method: "DELETE" })
+                window.AliceDispatcher.request("/api/conversations/" + conv.id, { method: "DELETE" })
                 .then(r => {
                     if (!r.ok) throw new Error("Network response was not ok");
                     deleteConv(conv.id);
