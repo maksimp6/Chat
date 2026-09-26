@@ -62,14 +62,14 @@
 
     var NativeEventSource = window.EventSource;
     if (NativeEventSource) {
-        function PatchedEventSource(url, config) {
+        function patchedEventSource(url, config) {
             return new NativeEventSource(prefixUrl(url), config);
         }
-        PatchedEventSource.prototype = NativeEventSource.prototype;
-        PatchedEventSource.CONNECTING = NativeEventSource.CONNECTING;
-        PatchedEventSource.OPEN = NativeEventSource.OPEN;
-        PatchedEventSource.CLOSED = NativeEventSource.CLOSED;
-        window.EventSource = PatchedEventSource;
+        patchedEventSource.prototype = NativeEventSource.prototype;
+        patchedEventSource.CONNECTING = NativeEventSource.CONNECTING;
+        patchedEventSource.OPEN = NativeEventSource.OPEN;
+        patchedEventSource.CLOSED = NativeEventSource.CLOSED;
+        window.EventSource = patchedEventSource;
     }
 
     function cleanupLegacyServiceWorkers() {

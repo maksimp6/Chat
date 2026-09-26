@@ -35,8 +35,19 @@ async function main() {
         id: "test-module",
         version: "1.0.0",
         apiVersion: "1",
+        dependencies: [],
         capabilities: ["storage.read", "network"]
+        , lifecycle: {
+            init: () => "initialized",
+            start: () => "started",
+            stop: () => "stopped",
+            destroy: () => "destroyed"
+        }
     });
+    assert.strictEqual(core.module.init("test-module"), "initialized");
+    assert.strictEqual(core.module.start("test-module"), "started");
+    assert.strictEqual(core.status.snapshot()["test-module"].status, "running");
+    assert.strictEqual(core.module.stop("test-module"), "stopped");
 
     moduleContext.status.set("running", "Тестовая операция token=visible-secret", {
         revocable: true,
@@ -73,6 +84,8 @@ async function main() {
         () => moduleContext.security.require("storage.read"),
         /Capability revoked/
     );
+    assert.throws(() => moduleContext.status.set("running", "must not restore access"), /Module revoked/);
+    assert.strictEqual(core.status.snapshot()["test-module"].status, "revoked");
 
     button.click();
     assert.strictEqual(panel.hasAttribute("hidden"), false);
@@ -87,7 +100,7 @@ async function main() {
     assert.strictEqual(requests, 1);
     assert.ok(JSON.stringify(core.status.snapshot()).includes("network"));
 
-    const networkTrace = core.trace.begin("network-test", {authorization: "secret"});
+    const networkTrace = core.trace.begin("dispatcher", "network-test", {authorization: "secret"});
     networkTrace.event("response", {path: "/api/test", status: 200});
     const networkSnapshot = networkTrace.end("completed");
     assert.strictEqual(networkSnapshot.metadata.authorization, "[REDACTED]");

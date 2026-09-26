@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from validate_frontend_modules import validate_file
+from tests.validate_frontend_modules import validate_file
 
 
 def errors_for(source: str) -> list[str]:

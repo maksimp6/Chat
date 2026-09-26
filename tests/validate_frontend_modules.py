@@ -49,7 +49,8 @@ TIMER_PATTERNS = (
     (re.compile(r"\bsetInterval\s*\("), "setInterval"),
     (re.compile(r"\bclearTimeout\s*\("), "clearTimeout"),
     (re.compile(r"\bclearInterval\s*\("), "clearInterval"),
-    (re.compile(r"\b(?:delay|sleep)\s*\("), "delay/sleep"),
+    (re.compile(r"\bdelay\s*\("), "delay"),
+    (re.compile(r"\bsleep\s*\("), "sleep"),
 )
 REPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
@@ -66,7 +67,8 @@ def entropy(value: str) -> float:
 def is_dispatcher(path: Path) -> bool:
     return path.name == "dispatcher.js"
 
-\ndef is_vendor(path: Path) -> bool:
+
+def is_vendor(path: Path) -> bool:
     return path.name in {"eruda.js"} or "vendor" in path.parts
 
 
@@ -83,7 +85,8 @@ def _timer_errors(text: str, rel: Path) -> list[str]:
             errors.append(f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle")
     return errors
 
-\ndef _loop_errors(text: str, rel: Path) -> list[str]:
+
+def _loop_errors(text: str, rel: Path) -> list[str]:
     errors = []
     for pattern, label in INFINITE_LOOP_PATTERNS:
         if pattern.search(text):
@@ -117,7 +120,7 @@ def _array_errors(text: str, rel: Path) -> list[str]:
 def _cache_errors(text: str, rel: Path) -> list[str]:
     errors = []
     if REPEATED_LOOKUP_RE.search(text) and not re.search(
-        r"\b(?:cache|memo|memoize|Map|WeakMap)\b", text
+        r"(?:cache|memo|memoize|Map|WeakMap)", text, re.IGNORECASE
     ):
         errors.append(
             f"{rel}: cache safety violation: repeated lookup without visible cache/memoization"
@@ -144,8 +147,8 @@ def validate_file(path: Path) -> list[str]:
         if len(line.encode("utf-8")) > MAX_LINE_BYTES:
             errors.append(f"{rel}:{number}: line exceeds {MAX_LINE_BYTES} bytes")
 
-    if not is_dispatcher(path) and re.search(r"\\bfetch\\s*\\(", text):
-        errors.append(f"{rel}: dispatcher safety violation: direct transport access is forbidden")\n
+    if not is_dispatcher(path) and re.search(r"\bfetch\s*\(", text):
+        errors.append(f"{rel}: dispatcher safety violation: direct transport access is forbidden")
     if TEXT_FORBIDDEN.search(text):
         errors.append(f"{rel}: unusual text classification: forbidden control character")
 
@@ -166,7 +169,7 @@ def validate_file(path: Path) -> list[str]:
         counts = Counter(lines)
         repeated = sum(count - 1 for count in counts.values() if count > 1)
         ratio = repeated / len(lines)
-        if max(counts.values()) >= MAX_REPEAT_RUN or ratio > MAX_REPEAT_RATIO:
+        if ratio > MAX_REPEAT_RATIO:
             errors.append(f"{rel}: suspicious repeated source text (ratio={ratio:.2f})")
 
     if len(text) >= 4096:

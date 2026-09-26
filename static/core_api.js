@@ -96,6 +96,23 @@
     descriptor = descriptor || {};
     assertModuleId(descriptor.id);
     if (modules.has(descriptor.id)) throw new Error("Module already registered: " + descriptor.id);
+    if (String(descriptor.apiVersion || "") !== MODULE_API_VERSION) {
+      throw new Error("Unsupported module API version");
+    }
+    if (typeof descriptor.version !== "string" || !descriptor.version) {
+      throw new Error("Module version is required");
+    }
+    if (!Array.isArray(descriptor.dependencies)) {
+      throw new Error("Module dependencies must be declared");
+    }
+    if (!descriptor.lifecycle || typeof descriptor.lifecycle !== "object") {
+      throw new Error("Module lifecycle is required");
+    }
+    ["init", "start", "stop", "destroy"].forEach(function (name) {
+      if (typeof descriptor.lifecycle[name] !== "function") {
+        throw new Error("Module lifecycle." + name + " is required");
+      }
+    });
 
     var capabilities = Array.isArray(descriptor.capabilities)
       ? descriptor.capabilities.map(String)
@@ -105,8 +122,14 @@
       id: descriptor.id,
       version: String(descriptor.version || "0.0.0"),
       apiVersion: String(descriptor.apiVersion || MODULE_API_VERSION),
-      dependencies: Array.isArray(descriptor.dependencies) ? descriptor.dependencies.slice() : [],
-      capabilities: capabilities
+      dependencies: descriptor.dependencies.map(String),
+      capabilities: capabilities,
+      lifecycle: Object.freeze({
+        init: descriptor.lifecycle.init,
+        start: descriptor.lifecycle.start,
+        stop: descriptor.lifecycle.stop,
+        destroy: descriptor.lifecycle.destroy
+      })
     }));
 
     setStatus(descriptor.id, "ready", "Зарегистрирован", {
@@ -119,6 +142,10 @@
     var record = modules.get(moduleId);
     if (!record) throw new Error("Unknown module: " + moduleId);
 
+    function assertActive() {
+      if (isRevoked("module", moduleId)) throw new Error("Module revoked");
+    }
+
     return Object.freeze({
       module: Object.freeze({
         id: record.id,
@@ -127,11 +154,13 @@
       }),
       status: Object.freeze({
         set: function (status, message, metadata) {
+          assertActive();
           return setStatus(moduleId, status, message, metadata);
         }
       }),
       trace: Object.freeze({
         begin: function (operation, metadata) {
+          assertActive();
           return beginTrace(moduleId, operation, metadata);
         }
       }),
@@ -147,6 +176,27 @@
         }
       })
     });
+  }
+
+  function runLifecycle(moduleId, phase) {
+    var record = modules.get(moduleId);
+    if (!record) throw new Error("Unknown module: " + moduleId);
+    if (phase !== "destroy" && isRevoked("module", moduleId)) throw new Error("Module revoked");
+
+    var trace = beginTrace(moduleId, "lifecycle." + phase, {phase: phase});
+    try {
+      var result = record.lifecycle[phase](createModuleContext(moduleId));
+      trace.response({phase: phase});
+      trace.end("completed");
+      if (phase === "start") setStatus(moduleId, "running", "Модуль запущен", {revocable: true});
+      if (phase === "stop" || phase === "destroy") setStatus(moduleId, "stopped", "Модуль остановлен", {revocable: true});
+      return result;
+    } catch (error) {
+      trace.error(error);
+      trace.end("error");
+      setStatus(moduleId, "error", "Ошибка жизненного цикла", {revocable: true});
+      throw error;
+    }
   }
 
   function setStatus(moduleId, status, message, metadata) {
@@ -352,6 +402,10 @@
     module: Object.freeze({
       register: registerModule,
       context: createModuleContext,
+      init: function (moduleId) { return runLifecycle(moduleId, "init"); },
+      start: function (moduleId) { return runLifecycle(moduleId, "start"); },
+      stop: function (moduleId) { return runLifecycle(moduleId, "stop"); },
+      destroy: function (moduleId) { return runLifecycle(moduleId, "destroy"); },
       list: function () {
         return Array.from(modules.values()).map(function (item) {
           return safeData(item);

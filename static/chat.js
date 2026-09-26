@@ -85,12 +85,12 @@ function renderApprovalCard(toolCall, origMsg) {
             card.remove();
             addMessage("Сетевая ошибка при выполнении действия", "bot", false, 0);
         });
-    };
+    });
 
     rejectBtn.addEventListener("click", function() {
         card.remove();
         addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
-    };
+    });
 }
 
 function parseMarkdown(text) {
@@ -236,7 +236,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
             copyBtn.textContent = "✅";
             window.AliceCoreAPI.scheduler.defer(() => copyBtn.textContent = "📋", 2000);
         });
-    };
+    });
     msg.appendChild(copyBtn);
 
     const metaWrap = document.createElement("div");
@@ -341,7 +341,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
                 } else {
                     console.error("[CHAT] Execution Trace Viewer is not loaded");
                 }
-            };
+            });
             metaWrap.appendChild(traceEl);
             metaWrap.appendChild(openTraceBtn);
         }

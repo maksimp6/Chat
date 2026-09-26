@@ -12,6 +12,10 @@ Every module has:
 - declared `capabilities`;
 - lifecycle entry points: `init`, `start`, `stop`, `destroy`.
 
+All fields are mandatory at registration. Core owns lifecycle execution through
+`AliceCoreAPI.module.init/start/stop/destroy`; a module receives only its own
+immutable context, never Core's internal registry or another module's context.
+
 The browser implementation uses `window.AliceCoreAPI`. Its shape is intentionally C-like: stable function tables, explicit boundaries, and capability checks.
 
 ```text
