@@ -421,6 +421,62 @@
     return button;
   }
 
+  function createModal(options) {
+    options = options || {};
+    if (!options.id) throw new Error("UI modal requires id");
+    if (!options.title) throw new Error("UI modal requires title");
+
+    var modal = document.createElement("div");
+    modal.id = String(options.id);
+    modal.className = "modal" + (options.className ? " " + String(options.className).trim() : "");
+    modal.hidden = true;
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-hidden", "true");
+
+    var content = document.createElement("div");
+    content.className = "modal-content" + (options.contentClassName ? " " + String(options.contentClassName).trim() : "");
+
+    var title = document.createElement(options.titleTag || "h2");
+    title.id = modal.id + "-title";
+    title.className = "modal-title";
+    title.textContent = String(options.title);
+    modal.setAttribute("aria-labelledby", title.id);
+
+    var close = createButton({
+      className: "modal-close",
+      label: options.closeLabel || "Закрыть",
+      action: options.closeAction,
+      text: "×"
+    });
+
+    content.appendChild(close);
+    content.appendChild(title);
+    if (options.body) content.appendChild(options.body);
+    modal.appendChild(content);
+    return modal;
+  }
+
+  function openModal(modal) {
+    if (!modal || !modal.classList || !modal.classList.contains("modal")) {
+      throw new Error("Canonical modal root is required");
+    }
+    modal.hidden = false;
+    modal.classList.add("visible");
+    modal.setAttribute("aria-hidden", "false");
+    return modal;
+  }
+
+  function closeModal(modal) {
+    if (!modal || !modal.classList || !modal.classList.contains("modal")) {
+      throw new Error("Canonical modal root is required");
+    }
+    modal.classList.remove("visible");
+    modal.hidden = true;
+    modal.setAttribute("aria-hidden", "true");
+    return modal;
+  }
+
   window.AliceCoreAPI = Object.freeze({
     apiVersion: MODULE_API_VERSION,
     module: Object.freeze({
@@ -455,7 +511,8 @@
     ui: Object.freeze({
       button: createButton,
       actions: Object.freeze({register: registerAction, dispatch: dispatchAction}),
-      events: Object.freeze({mountClicks: mountClickDispatcher})
+      events: Object.freeze({mountClicks: mountClickDispatcher}),
+      modal: Object.freeze({create: createModal, open: openModal, close: closeModal})
     })
   });
 
