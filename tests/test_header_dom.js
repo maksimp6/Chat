@@ -18,6 +18,7 @@ async function flush() {
     const browser = new BrowserShim(html);
     const {document, window, context} = browser.load(["static/project_tree.js"], {
         fetch: async () => {
+            requestCalls += 1;
             return {
                 ok: true,
                 status: 200,
