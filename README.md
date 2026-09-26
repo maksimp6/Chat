@@ -223,7 +223,7 @@ Inspect the complete trace, including tool calls, events, errors, and continuati
 - [API documentation](API_DOCS.md)
 - [Agent architecture](docs/agents/departments.md)
 - [Runtime/serverless](docs/runtime_serverless.md)
-- [MCP architecture](mcp_architecture_documentation.md)
+- [MCP architecture](docs/mcp/architecture.md)
 - [Provider key rotation](docs/provider-key-rotation.md)
 - [Supabase migrations](docs/supabase-migrations-deploy.md)
 - [Sprint workflow](docs/development/sprint-workflow.md)
