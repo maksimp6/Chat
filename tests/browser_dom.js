@@ -15,6 +15,7 @@ class EventTargetShim {
         event.target ||= this;
         event.currentTarget = this;
         for (const handler of [...(this._listeners[event.type] || [])]) handler.call(this, event);
+        if (event.bubbles && this.parentNode) this.parentNode.dispatchEvent(event);
         return true;
     }
 }
@@ -108,7 +109,7 @@ get id() { return this.attributes.id || ""; }
         if (index >= 0) { replacement.parentNode = parent; parent.children[index] = replacement; }
     }
 
-    click() { this.dispatchEvent({type: "click", target: this}); }
+    click() { this.dispatchEvent({type: "click", target: this, bubbles: true}); }
     getBoundingClientRect() { return {...this._rect}; }
 
     querySelectorAll(selector) {
