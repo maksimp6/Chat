@@ -11,9 +11,11 @@ function initModels() {
     });
 
     if (modelBtn) {
-        window.AliceCoreAPI.ui.actions.register("model.prepare", function() {
+        window.AliceCoreAPI.ui.actions.register("model.open", function(payload) {
             window.isCreatingNewChat = false;
             if (typeof renderModelModal === "function") renderModelModal();
+            var modal = document.getElementById(payload.params.modal);
+            if (modal) window.AliceCoreAPI.ui.modal.open(modal);
         });
     }
 }
