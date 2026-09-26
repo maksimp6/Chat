@@ -2,8 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const {
-    DocumentShim,
-    WindowShim,
+    BrowserShim,
     applyHeaderFlexLayout,
 } = require("./browser_dom");
 
@@ -15,9 +14,10 @@ async function flush() {
 (async () => {
     const html = fs.readFileSync("templates/index.html", "utf8");
     const css = fs.readFileSync("static/style.css", "utf8");
-    const document = new DocumentShim(html);
-    const window = new WindowShim(document);
-    const context = {console, document, window, setTimeout, clearTimeout};
+    const browser = new BrowserShim(html);
+    const {document, window, context} = browser.load([], {
+        fetch: async () => ({ok: true, status: 200, json: async () => ({})}),
+    });
 
     applyHeaderFlexLayout(document, css);
 
@@ -67,9 +67,6 @@ async function flush() {
     };
 
     vm.runInNewContext(projectTreeSource, context);
-    document.readyState = "interactive";
-    document.dispatchEvent({type: "DOMContentLoaded"});
-
     const projectTreeButton = document.getElementById("project-tree-btn");
     assert.ok(projectTreeButton);
     projectTreeButton.click();
