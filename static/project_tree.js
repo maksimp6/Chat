@@ -48,19 +48,21 @@
         var existing = document.getElementById("project-tree-modal");
         if (existing) existing.remove();
 
-        var modal = document.createElement("div");
-        modal.id = "project-tree-modal";
-        modal.className = "modal visible";
-
-        var box = document.createElement("div");
-        box.className = "modal-content";
-        box.innerHTML = '<button type="button" class="project-tree-close">&times;</button><h3>🌳 Структура проекта</h3><div class="project-tree-state">Загрузка...</div>';
-        modal.appendChild(box);
+        var UI = window.AliceCoreAPI.ui;
+        var body = document.createElement("div");
+        body.className = "project-tree-state";
+        body.textContent = "Загрузка...";
+        var modal = UI.modal.create({
+            id: "project-tree-modal",
+            title: "🌳 Структура проекта",
+            titleTag: "h3",
+            closeAction: "project-tree.close",
+            body: body
+        });
         (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
+        UI.modal.open(modal);
 
-        box.querySelector(".project-tree-close").addEventListener("click", function () { modal.remove(); });
-
-        var state = box.querySelector(".project-tree-state");
+        var state = body;
         loadProjectTree().then(function (data) {
             state.textContent = data.root;
             var tree = document.createElement("div");
@@ -70,15 +72,26 @@
         }).catch(function (error) {
             log("load_failed", {code: error.code || "PROJECT_TREE_ERROR", message: error.message});
             state.textContent = "Ошибка структуры проекта: " + error.message;
-            var retry = document.createElement("button");
-            retry.type = "button";
-            retry.textContent = "Повторить";
-            retry.addEventListener("click", function () { modal.remove(); openTree(); });
-            box.appendChild(retry);
+            var retry = UI.button({
+                text: "Повторить",
+                action: "project-tree.retry"
+            });
+            modal.querySelector(".modal-content").appendChild(retry);
         });
     }
 
     window.ProjectTree = {load: loadProjectTree, open: openTree};
+
+    var actions = window.AliceCoreAPI.ui.actions;
+    actions.register("project-tree.close", function (payload) {
+        var modal = payload.element.closest(".modal");
+        if (modal) modal.remove();
+    });
+    actions.register("project-tree.retry", function (payload) {
+        var modal = payload.element.closest(".modal");
+        if (modal) modal.remove();
+        openTree();
+    });
 
     document.addEventListener("DOMContentLoaded", function () {
         var button = document.getElementById("project-tree-btn");
