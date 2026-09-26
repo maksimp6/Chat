@@ -24,8 +24,11 @@ def _request_payload(name):
     return payload
 
 
-def _invalid_request(exc):
-    payload = {"error": "invalid_request", "message": str(exc)}
+def _invalid_request(_exc):
+    payload = {
+        "error": "invalid_request",
+        "message": "request payload does not match API contract",
+    }
     return _contract_response("runtime.error.invalid_request", payload, 400)
 
 
@@ -97,10 +100,10 @@ def api_create_invocation(session_id):
             metadata=data.get("metadata"),
             create_missing_session=False,
         )
-    except ValueError as exc:
+    except ValueError:
         return _contract_response(
             "runtime.error.message",
-            {"error": "session_not_found", "message": str(exc)},
+            {"error": "session_not_found", "message": "session not found"},
             404,
         )
     return _contract_response("runtime.invocation.create.response", context.as_dict(), 201)
