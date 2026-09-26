@@ -32,6 +32,19 @@
     return mcpServersCache;
   };
 
+  function closeMcpManagerModal(modal) {
+    if (!modal) return;
+    window.AliceCoreAPI.ui.modal.close(modal);
+    var onClose = modal._onClose;
+    modal._onClose = null;
+    if (typeof onClose === "function") onClose();
+  }
+
+  window.AliceCoreAPI.ui.actions.register("mcp-manager.close", function (payload) {
+    var modalId = payload && payload.params && payload.params.modal;
+    closeMcpManagerModal(modalId ? document.getElementById(modalId) : null);
+  });
+
   function buildMcpTool(srv, approvalOverride) {
     var UI = window.SettingsUI;
     var mcp = { type: "mcp", server_label: srv.server_label || srv.name || "mcp_server" };
@@ -81,39 +94,35 @@
 
   window.openMcpManagerModal = function (onClose) {
     var UI = window.SettingsUI;
+    var CoreUI = window.AliceCoreAPI.ui;
     UI.injectModalStyles();
 
     var existing = document.getElementById("mcp-manager-modal");
     if (existing) existing.remove();
 
-    var ov = document.createElement("div");
-    ov.id = "mcp-manager-modal";
-    ov.style.cssText =
-      "position:fixed;top:0;left:0;width:100%;height:100%;background:var(--m-overlay,rgba(0,0,0,0.6));z-index:10001;display:flex;align-items:center;justify-content:center;";
-
     var md = document.createElement("div");
-    md.style.cssText =
+    md.className = "settings-mcp-body";
+    md.innerHTML =
+      '<button class="alice-btn settings-contract-btn" id="mcp-mgr-add">+ Добавить сервер</button>' +
+      '<div id="mcp-mgr-list"></div>';
+
+    var ov = CoreUI.modal.create({
+      id: "mcp-manager-modal",
+      title: "MCP Серверы",
+      className: "mcp-manager-modal",
+      contentClassName: "settings-mcp-modal-content",
+      closeAction: "mcp-manager.close",
+      body: md,
+    });
+    ov._onClose = onClose;
+    var modalContent = ov.querySelector(".modal-content");
+    modalContent.style.cssText =
       "background:var(--m-bg,#fff);border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px var(--m-shadow,rgba(0,0,0,0.3));color:var(--m-text,#222);";
+    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
+    CoreUI.modal.open(ov);
 
-    var html =
-      '<div style="display:flex;justify-content:space-between;margin-bottom:16px;">' +
-      '<h2 style="margin:0;color:var(--m-text,#222);">MCP Серверы</h2>' +
-      '<button class="alice-btn settings-contract-btn" id="mcp-mgr-close">&times;</button></div>';
-    html +=
-      '<button class="alice-btn settings-contract-btn" id="mcp-mgr-add">+ Добавить сервер</button>';
-    html += '<div id="mcp-mgr-list"></div>';
-
-    md.innerHTML = html;
-    ov.appendChild(md);
-    document.body.appendChild(ov);
-
-    function closeModal() {
-      ov.remove();
-      if (onClose) onClose();
-    }
-    document.getElementById("mcp-mgr-close").addEventListener("click", closeModal);
     ov.addEventListener("click", function (e) {
-      if (e.target === ov) closeModal();
+      if (e.target === ov) closeMcpManagerModal(ov);
     });
 
     function renderList(servers) {
