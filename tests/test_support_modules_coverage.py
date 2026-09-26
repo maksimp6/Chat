@@ -283,7 +283,9 @@ def test_local_logger_writes_jsonl_handles_write_errors_and_flushes(monkeypatch,
     import builtins
 
     real_open = builtins.open
-    monkeypatch.setattr(builtins, "open", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("x")))
+    monkeypatch.setattr(
+        builtins, "open", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("x"))
+    )
     logger.emit("error", "cannot-write")
     monkeypatch.setattr(builtins, "open", real_open)
     assert "[ERROR] cannot-write" in capsys.readouterr().out
