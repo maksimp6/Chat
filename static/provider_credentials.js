@@ -100,7 +100,7 @@ function renderStatus(container, providers) {
 async function fetchStatus(output) {
     output.textContent = "Проверка…";
     try {
-        var response = await fetch("/api/provider-credentials/status", {cache:"no-store", credentials:"same-origin"});
+        var response = await window.AliceDispatcher.request("/api/provider-credentials/status", {cache:"no-store", credentials:"same-origin"});
         var data = await response.json();
         if (!response.ok) throw new Error("HTTP " + response.status);
         renderStatus(output, data.providers);
@@ -145,7 +145,7 @@ function build() {
             var body={};
             if(y) { body.yandex_api_key=y; body.yandex_project_id=project; }
             if(cloudru) body.cloudru_api_key=cloudru;
-            var response=await fetch("/api/provider-credentials",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+            var response=await window.AliceDispatcher.request("/api/provider-credentials",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
             var data=await response.json();
             if(!response.ok){
                 var provider = data && data.provider;
