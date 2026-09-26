@@ -124,12 +124,25 @@ jobs:
             flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
           # 69.96% is the measured production-only baseline after test/support
           # files were removed from coverage accounting. Keep that baseline from
-          # regressing, while requiring 100% coverage for later Python diff lines.
+          # regressing, while requiring 100% coverage for changed Python lines.
           coverage report --fail-under=69.96
-          diff-cover coverage.xml --compare-branch=7b2b87c --fail-under=100
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            DIFF_BASE="origin/$GITHUB_BASE_REF"
+          else
+            DIFF_BASE="$EVENT_BEFORE"
+            if [ -z "$DIFF_BASE" ] || [ "$DIFF_BASE" = "0000000000000000000000000000000000000000" ]; then
+              DIFF_BASE="HEAD^"
+            fi
+          fi
+
+          git rev-parse --verify "$DIFF_BASE^{commit}"
+          diff-cover coverage.xml --compare-branch="$DIFF_BASE" --fail-under=100
 
 
   postgres:
