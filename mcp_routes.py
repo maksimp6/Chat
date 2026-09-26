@@ -324,7 +324,9 @@ def chat():
     except Exception as e:
         logger.exception("[CHAT] Ошибка")
         internal_error_message = str(e)
-        is_temperature_error = isinstance(e, ValueError) and "temperature" in internal_error_message.lower()
+        is_temperature_error = (
+            isinstance(e, ValueError) and "temperature" in internal_error_message.lower()
+        )
         error_message = (
             "Некорректное значение temperature"
             if is_temperature_error
