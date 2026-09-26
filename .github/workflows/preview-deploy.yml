@@ -141,6 +141,41 @@ jobs:
             done
           done
           echo "Preview HTTPS and TLS checks passed (token omitted from logs)."
+      - name: Verify rendered application shell
+        env:
+          KEY: ${{ steps.preview.outputs.key }}
+        run: |
+          base="${PREVIEW_PUBLIC_BASE_URL%/}/${ALICE_SHORT_TOKEN}/preview/${KEY}"
+          html="$(mktemp)"
+          cleanup() { rm -f "$html"; }
+          trap cleanup EXIT
+
+          curl --fail --silent --show-error --location \
+            --connect-timeout 5 --max-time 30 \
+            "$base/" -o "$html"
+
+          grep -F 'id="app-root"' "$html" >/dev/null || {
+            echo "Rendered shell check failed: #app-root is missing"
+            exit 1
+          }
+          grep -F 'id="msg-input"' "$html" >/dev/null || {
+            echo "Rendered shell check failed: #msg-input is missing"
+            exit 1
+          }
+          grep -F "data-base-path=\"/${ALICE_SHORT_TOKEN}/preview/${KEY}\"" "$html" >/dev/null || {
+            echo "Rendered shell check failed: preview base path is wrong"
+            exit 1
+          }
+          grep -F "data-static-base=\"/${ALICE_SHORT_TOKEN}/preview/${KEY}/static\"" "$html" >/dev/null || {
+            echo "Rendered shell check failed: static base path is wrong"
+            exit 1
+          }
+          grep -F "src=\"/${ALICE_SHORT_TOKEN}/preview/${KEY}/static/boot.js" "$html" >/dev/null || {
+            echo "Rendered shell check failed: boot.js is not wired to the preview path"
+            exit 1
+          }
+
+          echo "Rendered application shell contract OK"
       - name: Verify critical web assets
         env:
           KEY: ${{ steps.preview.outputs.key }}
