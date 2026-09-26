@@ -16,7 +16,7 @@ async function flush() {
     const css = fs.readFileSync("static/style.css", "utf8");
     let requestCalls = 0;
     const browser = new BrowserShim(html);
-    const {document, window, context} = browser.load(["static/core_api.js", "static/project_tree.js"], {
+    const {document, window, context} = browser.load(["static/core_api.js", "static/ui_runtime.js", "static/project_tree.js"], {
         AliceDispatcher: {
             request: async () => {
                 requestCalls += 1;
