@@ -88,7 +88,7 @@
             }
         }
 
-        fetch('/api/ssh-runtime/settings')
+        window.AliceDispatcher.request('/api/ssh-runtime/settings')
             .then(function(r) {
                 return r.json().then(function(data) {
                     if (!r.ok) throw new Error(data.error || 'Не удалось загрузить SSH settings');
@@ -135,7 +135,7 @@
             };
 
             setSshStatus('Сохранение...');
-            fetch('/api/ssh-runtime/settings', {
+            window.AliceDispatcher.request('/api/ssh-runtime/settings', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
@@ -159,7 +159,7 @@
                 return;
             }
             setSshStatus('Проверка подключения...');
-            fetch('/api/ssh-runtime/test', {
+            window.AliceDispatcher.request('/api/ssh-runtime/test', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({target: target})
@@ -173,7 +173,7 @@
                     'Подключение успешно: ' + data.target + ' · пользователь ' + data.linux_user +
                     ' · ' + data.duration_ms + ' ms'
                 );
-                fetch('/api/ssh-runtime/settings')
+                window.AliceDispatcher.request('/api/ssh-runtime/settings')
                     .then(function(r) { return r.json(); })
                     .then(populateSshSettings)
                     .catch(function() {});
