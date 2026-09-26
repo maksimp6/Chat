@@ -58,4 +58,39 @@ console.error = originalError;
 if (logged !== 1) throw new Error("first failed click must be logged exactly once");
 if (recovered !== 2) throw new Error("failed click must not disable later clicks");
 
+
+const modelShim = new BrowserShim(template);
+const modelRuntime = modelShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/models.js"],
+  {
+    modelsData: { text: {}, voice: {} },
+    currentModel: "aliceai-llm",
+    conversations: [],
+  },
+);
+const modelButton = modelRuntime.document.getElementById("model-btn");
+const modelModal = modelRuntime.document.getElementById("model-modal");
+const modelClose = modelRuntime.document.getElementById("close-modal");
+if (!modelButton || !modelModal || !modelClose) {
+  throw new Error("real model modal controls must exist in index.html");
+}
+if (modelButton.dataset.action !== "modal.open" || modelButton.dataset.modal !== "model-modal") {
+  throw new Error("model button must use generic modal.open dispatcher contract");
+}
+if (!modelModal.hidden) throw new Error("real model modal must start hidden");
+modelButton.click();
+if (modelModal.hidden || !modelModal.classList.contains("visible")) {
+  throw new Error("real model button click must open model-modal");
+}
+if (modelModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened real model modal must expose aria-hidden=false");
+}
+modelClose.click();
+if (!modelModal.hidden || modelModal.classList.contains("visible")) {
+  throw new Error("real model modal close button must close model-modal");
+}
+if (modelModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed real model modal must expose aria-hidden=true");
+}
+
 console.log("Real header runtime action tests passed");
