@@ -22,7 +22,7 @@ from db import get_conn, init_db as init_runtime_db
 from invocation_context import InvocationContext
 from invocation_trace import create_invocation_trace
 from trace_manager import ExecutionTrace
-from runtime import RuntimeDispatcher
+from runtime import RuntimeDispatcher, RuntimeLoader
 from runtime.request_context import bind_runtime_request
 
 
@@ -39,6 +39,18 @@ _ALLOWED_TRANSITIONS = {
     "FAILED": {"STOPPED", "DELETING"},
     "DELETING": set(),
 }
+
+
+def _invoke_revision_runtime(context, payload):
+    """Dispatcher boundary for code loaded from an immutable revision snapshot."""
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(context.runtime_id)
+    if runtime is None or not runtime.loader.loaded:
+        raise RuntimeError("revision runtime is not loaded")
+    return runtime.loader.invoke(str(payload.get("operation") or ""), payload.get("payload"))
+
+
+_RUNTIME_DISPATCHER.register_operation("revision.invoke", _invoke_revision_runtime)
 
 
 def _now() -> int:
@@ -337,6 +349,12 @@ class EnvironmentRuntime:
         ).resolve()
         self.worktree = self.root / self.runtime_id / "source"
         self.data_dir = self.root / self.runtime_id / "data"
+        self.loader = RuntimeLoader(
+            runtime_id=self.runtime_id,
+            revision=environment["commit_sha"],
+            source_root=self.worktree,
+            dispatcher=_RUNTIME_DISPATCHER,
+        )
         self._jobs: queue.Queue = queue.Queue()
         self._thread = threading.Thread(
             target=self._run,
@@ -370,6 +388,12 @@ class EnvironmentRuntime:
                 text=True,
                 timeout=60,
             )
+        actual_commit = _run_git("rev-parse", "HEAD", cwd=self.worktree)
+        if actual_commit != self.environment["commit_sha"]:
+            raise RuntimeError("runtime worktree does not match the resolved commit")
+        if _run_git("status", "--porcelain", cwd=self.worktree):
+            raise RuntimeError("runtime worktree is not an immutable clean snapshot")
+        self.loader.load()
 
     def start(self) -> int:
         self._prepare()
@@ -557,6 +581,22 @@ def dispatch_environment_operation(
         raise RuntimeError("environment runtime is not running")
     _RUNTIME_DISPATCHER.context(environment_id)
     return runtime.submit(operation, payload, timeout=timeout)
+
+
+def dispatch_environment_revision(
+    environment_id: str,
+    operation: str,
+    payload: Optional[Dict[str, Any]] = None,
+    *,
+    timeout: float = 30.0,
+) -> Any:
+    """Invoke the constrained revision application through its dispatcher scope."""
+    return dispatch_environment_operation(
+        environment_id,
+        "revision.invoke",
+        {"operation": operation, "payload": dict(payload or {})},
+        timeout=timeout,
+    )
 
 
 def dispatch_environment_http(

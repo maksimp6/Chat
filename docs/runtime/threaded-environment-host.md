@@ -64,18 +64,38 @@ Stopping an environment cancels active response streams, joins its worker, and
 unregisters the dispatcher scope. Deleting it additionally removes the immutable
 git worktree and runtime-local data directory.
 
-## Current boundary
+## Branch-safe loader contract
 
-The immutable worktree still records the selected branch/commit and provides a
-runtime-local source root. This slice deliberately does not import arbitrary
-branch Python modules into the shared interpreter. Python modules, globals,
-credentials, and memory are process-wide, so loading mutually incompatible or
-untrusted branch code by manipulating `sys.path` or `sys.modules` would only
-pretend to provide isolation.
+The manager resolves the requested ref before creating an environment, creates
+a detached worktree for that exact commit, and refuses to start from a dirty or
+mismatched snapshot. If the snapshot contains `alice_runtime.py`, `RuntimeLoader`
+loads that single entry point into a private namespace and passes it a stable
+host capability object. It never changes `sys.path`, environment variables, or
+`sys.modules`. Each environment receives a distinct namespace and application
+instance, including when two revisions run simultaneously.
 
-Until a branch-safe application loading contract is implemented, HTTP execution
-uses the host Alice Pro application under the selected runtime context. This is
-an architectural migration step, not a claim that threads are a sandbox.
+The entry point must define `create_runtime(host)` and return an object with
+`invoke(operation, payload)`. Imports (including dynamic import) are rejected in
+this first slice. Host resources are reached only through the supplied API and
+`RuntimeDispatcher`; invocation uses the `revision.invoke` dispatcher operation.
+
+This contract prevents accidental module and module-global collisions; it does
+not make arbitrary or hostile Python safe. Python reflection, native extensions,
+monkey-patching, CPU/memory exhaustion, and process memory cannot be securely
+isolated between threads. Code that needs unrestricted imports or is not trusted
+must not be loaded into this process. HTTP execution continues to use the stable
+host application until a later slice defines a similarly constrained revision
+HTTP contract, so existing streaming remains unchanged.
+
+## Preview CI follow-up (#341)
+
+Preview CI should build/test the requested commit, then authenticate to the
+running Alice Pro host and request creation of an environment for that exact
+commit. It should poll the environment lifecycle and exercise the rendered shell
+through the environment gateway. Cleanup should delete that environment. It
+must not deploy a preview container, wait for a container-local Flask server, or
+discover/use a `runtime_port`. The host response and lifecycle trace should be
+the CI evidence tying the tested commit to the runtime.
 
 The deployment migration that removes one-container-per-preview infrastructure
 is a separate follow-up. Existing public preview deployment remains unchanged
