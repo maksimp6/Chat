@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   format:
@@ -41,15 +41,24 @@ jobs:
       - name: Format sources
         if: steps.guard.outputs.skip != 'true'
         run: bash scripts/format.sh write
-      - name: Commit formatting changes
+      - name: Build formatting artifact
         if: steps.guard.outputs.skip != 'true'
+        id: artifact
         run: |
           if git diff --quiet; then
-            echo "No formatting changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "style: auto-format repository"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git diff --name-only -z > formatted-files.zlist
+          tar --null -T formatted-files.zlist -czf formatted-files.tar.gz
+          git diff --binary > formatted.patch
+      - name: Upload formatting artifact
+        if: steps.artifact.outputs.changed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: formatted-sources-${{ github.event.pull_request.head.sha }}
+          path: |
+            formatted-files.tar.gz
+            formatted.patch
+          if-no-files-found: error
