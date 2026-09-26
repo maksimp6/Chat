@@ -1,0 +1,13 @@
+[run]
+branch = True
+
+[report]
+omit =
+    tests/*
+    scripts/*
+    android/*
+    r/frontend/*
+    setup.py
+    conftest.py
+exclude_also =
+    if TYPE_CHECKING:
