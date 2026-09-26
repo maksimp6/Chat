@@ -38,6 +38,9 @@ class ElementShim extends EventTargetShim {
         this.style = {removeProperty() {}};
         this.dataset = Object.create(null);
         this.classList = new ClassList(this);
+        this.hidden = Object.prototype.hasOwnProperty.call(attributes, "hidden");
+        this.checked = Object.prototype.hasOwnProperty.call(attributes, "checked");
+        this.value = attributes.value || "";
         this._text = "";
         this._rect = {left: 0, top: 0, width: 0, height: 0};
 
