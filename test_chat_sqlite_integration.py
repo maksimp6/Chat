@@ -64,7 +64,8 @@ class TestChatSQLiteIntegration(unittest.TestCase):
                 payload = response.get_json()
                 self.assertEqual(payload["partial_output"], "Generated before failure")
                 self.assertIn("Generated before failure", payload["reply"])
-                self.assertIn("Failure after model response", payload["reply"])
+                self.assertIn("Внутренняя ошибка обработки запроса", payload["reply"])
+                self.assertNotIn("Failure after model response", str(payload))
                 self.assertTrue(payload["trace"]["responses"])
                 self.assertTrue(payload["trace"]["errors"])
 
