@@ -13,28 +13,22 @@
     window.__aliceHeaderActionsBound = true;
 
     var actions = window.AliceCoreAPI.ui.actions;
-    var registrations = [
-      ["header.tools.open", call("openToolsModal")],
-      ["header.ssh.open", call("openSshRuntimeModal", "[SSH Runtime] Modal script is unavailable")],
-      ["header.mcp.open", call("openMcpManagerModal")],
-      ["header.settings.open", call("openSettingsModal")],
-      ["header.files.open", call("openFileManagerModal")],
-      ["header.treasury.open", call("openTreasuryPanel")],
-      ["header.dozzle.open", call("openDozzleLogs")],
-      ["header.departments.open", call("openDepartmentsModal")],
-      ["header.credentials.open", call("openProviderCredentialsModal")],
-      ["header.memory.open", call("openMemoryModal", "[Memory] Modal script is unavailable")],
-      ["header.update.open", function () {
-        if (window.AliceAndroid) {
-          window.AliceAndroid.openUpdater();
-        } else {
-          alert("Обновление APK доступно только в Android-приложении.");
-        }
-      }]
-    ];
-
-    registrations.forEach(function (entry) {
-      actions.register(entry[0], entry[1]);
+    actions.register("header.tools.open", call("openToolsModal"));
+    actions.register("header.ssh.open", call("openSshRuntimeModal", "[SSH Runtime] Modal script is unavailable"));
+    actions.register("header.mcp.open", call("openMcpManagerModal"));
+    actions.register("header.settings.open", call("openSettingsModal"));
+    actions.register("header.files.open", call("openFileManagerModal"));
+    actions.register("header.treasury.open", call("openTreasuryPanel"));
+    actions.register("header.dozzle.open", call("openDozzleLogs"));
+    actions.register("header.departments.open", call("openDepartmentsModal"));
+    actions.register("header.credentials.open", call("openProviderCredentialsModal"));
+    actions.register("header.memory.open", call("openMemoryModal", "[Memory] Modal script is unavailable"));
+    actions.register("header.update.open", function () {
+      if (window.AliceAndroid) {
+        window.AliceAndroid.openUpdater();
+      } else {
+        alert("Обновление APK доступно только в Android-приложении.");
+      }
     });
 
     var upload = document.getElementById("upload-image-btn");
