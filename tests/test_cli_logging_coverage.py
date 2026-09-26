@@ -41,9 +41,7 @@ class FakeResponse:
 
 def test_cli_query_llm_builds_yandex_request(monkeypatch):
     captured = {}
-    response = FakeResponse(
-        {"result": {"alternatives": [{"message": {"text": '{"text":"ok"}'}}]}}
-    )
+    response = FakeResponse({"result": {"alternatives": [{"message": {"text": '{"text":"ok"}'}}]}})
 
     def fake_post(url, headers, json, timeout):
         captured.update(url=url, headers=headers, json=json, timeout=timeout)
