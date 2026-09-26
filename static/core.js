@@ -168,10 +168,7 @@ async function enhanceCore() {
 
             if (typeof window.loadServerConvSettings === "function") {
                 try {
-                    await Promise.race([
-                        window.loadServerConvSettings(currentConvId),
-                        new Promise(function(resolve) { setTimeout(resolve, 5000); })
-                    ]);
+                    await window.loadServerConvSettings(currentConvId);
                 } catch (e) {
                     console.error("[CORE] Failed to sync conversation settings:", e);
                 }
