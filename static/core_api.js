@@ -535,7 +535,17 @@
   }
 
   registerAction("modal.open", function (payload) {
-    return openModal(modalFromPayload(payload));
+    var modal = modalFromPayload(payload);
+    document.dispatchEvent(
+      new CustomEvent("alice:modal:before-open", {
+        detail: Object.freeze({
+          modal: modal,
+          modalId: modal.id,
+          payload: payload,
+        }),
+      }),
+    );
+    return openModal(modal);
   });
 
   registerAction("modal.close", function (payload) {
