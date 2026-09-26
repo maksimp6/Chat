@@ -230,21 +230,13 @@ def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
     second = start_environment(create_environment("master")["environment_id"])
 
     try:
-        first_write = client.post(
-            f"/environments/{first['environment_id']}/runtime-db/alpha"
-        )
-        second_write = client.post(
-            f"/environments/{second['environment_id']}/runtime-db/beta"
-        )
+        first_write = client.post(f"/environments/{first['environment_id']}/runtime-db/alpha")
+        second_write = client.post(f"/environments/{second['environment_id']}/runtime-db/beta")
         assert first_write.status_code == 200
         assert second_write.status_code == 200
 
-        first_read = client.get(
-            f"/environments/{first['environment_id']}/runtime-db"
-        ).get_json()
-        second_read = client.get(
-            f"/environments/{second['environment_id']}/runtime-db"
-        ).get_json()
+        first_read = client.get(f"/environments/{first['environment_id']}/runtime-db").get_json()
+        second_read = client.get(f"/environments/{second['environment_id']}/runtime-db").get_json()
 
         assert first_read["value"] == "alpha"
         assert second_read["value"] == "beta"
