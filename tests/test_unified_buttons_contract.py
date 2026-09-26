@@ -36,7 +36,7 @@ def test_unified_buttons_contract():
 
     header_ids = {
         "menu-btn", "model-btn", "tools-btn", "ssh-runtime-btn", "mcp-btn",
-        "settings-btn", "file-manager-btn", "treasury-btn", "dozzle-btn",
+        "system-status-btn", "settings-btn", "file-manager-btn", "treasury-btn", "dozzle-btn",
         "project-tree-btn", "departments-btn", "update-app-btn",
         "provider-credentials-btn", "memory-btn", "theme-toggle",
     }
