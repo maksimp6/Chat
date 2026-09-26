@@ -30,7 +30,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov playwright
+          pip install pytest pytest-cov
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
@@ -63,7 +63,7 @@ jobs:
           for test in tests/test_file_manager.js tests/test_dozzle_header.js tests/test_frontend_boot.js tests/test_project_tree.js tests/test_header_dom.js tests/test_frontend_smoke.js; do
             node "$test" >> frontend-test.log 2>&1 || true
           done
-      - name: Start Flask for live browser resource validation
+      - name: Start Flask for live resource validation
         env:
           HOST: 127.0.0.1
           PORT: 5678
@@ -79,7 +79,7 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:5678/ >/dev/null
-      - name: Run live Flask resource contract tests without Chromium
+      - name: Run live Flask resource contract tests
         env:
           ALICE_LIVE_BASE_URL: http://127.0.0.1:5678
         run: pytest -q tests/test_live_flask_resources.py
