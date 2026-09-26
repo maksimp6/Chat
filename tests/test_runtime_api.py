@@ -175,6 +175,15 @@ def test_runtime_api_rejects_request_contract_drift(client):
     assert extra_invocation_field.status_code == 400
     validate_api_contract("runtime.error.invalid_request", extra_invocation_field.get_json())
 
+    missing_session = client.post(
+        "/api/sessions/does-not-exist/invocations",
+        json={"conversation_id": "conv"},
+    )
+    assert missing_session.status_code == 404
+    payload = missing_session.get_json()
+    validate_api_contract("runtime.error.message", payload)
+    assert payload == {"error": "session_not_found", "message": "session not found"}
+
 
 def test_session_profile_routes_obey_named_contracts(client):
     response = client.get("/api/session-profiles")
