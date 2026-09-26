@@ -37,7 +37,15 @@ class ElementShim extends EventTargetShim {
         this.children = [];
         this.parentNode = null;
         this.style = {removeProperty() {}};
-        this.dataset = Object.create(null);
+        const self = this;
+        this.dataset = new Proxy(Object.create(null), {
+            set(target, key, value) {
+                target[key] = String(value);
+                const attrName = "data-" + String(key).replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+                self.attributes[attrName] = String(value);
+                return true;
+            }
+        });
         this.classList = new ClassList(this);
         this.hidden = Object.prototype.hasOwnProperty.call(attributes, "hidden");
         this.checked = Object.prototype.hasOwnProperty.call(attributes, "checked");
