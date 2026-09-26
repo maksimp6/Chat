@@ -1,5 +1,5 @@
 window.fetchVectorStores = function() {
-    return fetch('/api/vector-stores')
+    return window.AliceDispatcher.request('/api/vector-stores')
         .then(function(r) {
             return r.json().catch(function() { return {}; }).then(function(data) {
                 if (!r.ok) {
@@ -189,7 +189,7 @@ window.fetchVectorStores = function() {
                     if (!confirm('Удалить векторное хранилище?')) return;
                     button.disabled = true;
                     button.textContent = '...';
-                    fetch('/api/vector-stores/' + encodeURIComponent(vsId), { method: 'DELETE' })
+                    window.AliceDispatcher.request('/api/vector-stores/' + encodeURIComponent(vsId), { method: 'DELETE' })
                         .then(function(response) {
                             if (!response.ok) throw new Error('HTTP ' + response.status);
                             return response.json().catch(function() { return {}; });
@@ -230,7 +230,7 @@ window.fetchVectorStores = function() {
             if (!name) { alert('Введите название'); return; }
             this.disabled = true;
             this.innerText = '...';
-            fetch('/api/vector-stores', {
+            window.AliceDispatcher.request('/api/vector-stores', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name })
@@ -306,7 +306,7 @@ window.fetchVectorStores = function() {
 
             renderAddFilesState('Загрузка...', false);
 
-            fetch('/api/files')
+            window.AliceDispatcher.request('/api/files')
                 .then(function(r) {
                     return r.json().then(function(data) {
                         if (!r.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
@@ -357,7 +357,7 @@ window.fetchVectorStores = function() {
                 confirm.disabled = true;
                 confirm.textContent = 'Добавление...';
 
-                fetch('/api/vector-stores/' + encodeURIComponent(vsId) + '/files', {
+                window.AliceDispatcher.request('/api/vector-stores/' + encodeURIComponent(vsId) + '/files', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ file_ids: checked })
@@ -418,7 +418,7 @@ window.fetchVectorStores = function() {
             var list = document.getElementById('file-list');
             list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--m-muted,#999);">Загрузка списка файлов...</div>';
 
-            fetch('/api/files')
+            window.AliceDispatcher.request('/api/files')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     list.innerHTML = '';
@@ -434,7 +434,7 @@ window.fetchVectorStores = function() {
                             if (!confirm('Удалить файл? Он будет удалён из всех хранилищ.')) return;
                             this.disabled = true;
                             this.innerText = '...';
-                            fetch('/api/files/' + fileId, { method: 'DELETE' })
+                            window.AliceDispatcher.request('/api/files/' + fileId, { method: 'DELETE' })
                                 .then(function(r) { return r.json(); })
                                 .then(function(res) {
                                     if (res.deleted || res.ok) {
@@ -482,7 +482,7 @@ window.fetchVectorStores = function() {
                     formData.append('file', file);
                     formData.append('purpose', 'assistants');
 
-                    fetch('/api/files', { method: 'POST', body: formData })
+                    window.AliceDispatcher.request('/api/files', { method: 'POST', body: formData })
                         .then(function(r) {
                             if (!r.ok) return r.json().then(function(err) { throw new Error(err.error || 'HTTP ' + r.status); });
                             return r.json();
