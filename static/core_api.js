@@ -13,6 +13,12 @@
   var revoked = new Set();
   var traces = new Map();
   var traceCounter = 0;
+  var SYSTEM_MODULES = {
+    core: true,
+    network: true,
+    ui: true,
+    dispatcher: true
+  };
 
   function now() {
     return Date.now();
@@ -145,6 +151,9 @@
 
   function setStatus(moduleId, status, message, metadata) {
     assertModuleId(moduleId);
+    if (!SYSTEM_MODULES[moduleId] && !modules.has(moduleId)) {
+      throw new Error("Module is not registered: " + moduleId);
+    }
     var allowed = {
       ready: true,
       running: true,
