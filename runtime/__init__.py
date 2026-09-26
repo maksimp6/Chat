@@ -10,6 +10,7 @@ from .dispatcher import (
 from .request_context import (
     bind_runtime_request,
     current_runtime_base_path,
+    current_runtime_data_root,
     current_runtime_id,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "RuntimeScopeViolation",
     "bind_runtime_request",
     "current_runtime_base_path",
+    "current_runtime_data_root",
     "current_runtime_id",
 ]
