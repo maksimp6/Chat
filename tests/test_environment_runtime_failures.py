@@ -4,6 +4,7 @@ import time
 
 import pytest
 
+import environment_manager
 import environment_routes
 from environment_manager import (
     EnvironmentRuntime,
@@ -326,3 +327,57 @@ def test_dispatch_helpers_reject_unknown_runtime():
         dispatch_environment_operation("missing-runtime", "test.echo")
     with pytest.raises(RuntimeError, match="not running"):
         dispatch_environment_http("missing-runtime", {})
+
+
+def test_runtime_stop_tolerates_full_stream_queue_during_cancel(tmp_path):
+    runtime = _runtime(tmp_path, "runtime-stop-full-queue")
+    cancel = threading.Event()
+
+    class RefillingQueue:
+        def get_nowait(self):
+            raise queue.Empty
+
+        def put_nowait(self, _event):
+            raise queue.Full
+
+    register_runtime_operation("test.idle", lambda context, payload: None)
+    runtime.start()
+    with runtime._stream_lock:
+        runtime._active_streams[cancel] = RefillingQueue()
+
+    runtime.stop()
+
+    assert cancel.is_set()
+
+
+def test_runtime_worker_encodes_text_and_stops_when_chunk_delivery_is_cancelled(
+    tmp_path, monkeypatch
+):
+    runtime = _runtime(tmp_path, "runtime-text-cancel")
+    closed = []
+    original_stream_put = environment_manager._stream_put
+
+    def controlled_stream_put(events, event, cancel):
+        if event[0] == "chunk":
+            assert event[1] == b"text"
+            return False
+        return original_stream_put(events, event, cancel)
+
+    def http_handler(context, payload):
+        return {
+            "status_code": 200,
+            "headers": [],
+            "body": ["text"],
+            "close": lambda: closed.append(True),
+        }
+
+    monkeypatch.setattr(environment_manager, "_stream_put", controlled_stream_put)
+    register_runtime_operation("http.request", http_handler)
+    runtime.start()
+    try:
+        stream = dispatch_environment_http(runtime.runtime_id, {}, timeout=1)
+        assert list(stream) == []
+        assert closed == [True]
+    finally:
+        _restore_http_handler()
+        runtime.stop()
