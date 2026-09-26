@@ -217,7 +217,7 @@ window.fetchVectorStores = function() {
                         '<div style="padding:12px;color:var(--m-danger,#c33);font-size:12px;">' +
                         '<div style="font-weight:600;margin-bottom:6px;">Не удалось загрузить Vector Stores</div>' +
                         '<div style="margin-bottom:8px;word-break:break-word;">' + window.SettingsUI.escapeHtml(message) + '</div>' +
-                        '<button class="alice-btn" id="btn-retry-vs" style="padding:6px 12px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:12px;color:var(--m-text,#222);">Повторить</button>' +
+                        '<button class="alice-btn file-manager-vs-refresh-btn" id="btn-retry-vs">Повторить</button>' +
                         '</div>';
                     var retry = document.getElementById('btn-retry-vs');
                     if (retry) retry.addEventListener('click', loadVsList);
@@ -385,7 +385,7 @@ window.fetchVectorStores = function() {
                 '    <div style="font-weight:bold;color:var(--m-text,#222);word-break:break-all;">' + UI.escapeHtml(file.filename) + '</div>',
                 '    <div style="font-size:12px;color:var(--m-muted,#666);">' + formatBytes(file.bytes) + ' · ID: <code style="cursor:pointer;color:var(--m-accent,#4a90d9);" class="file-id-copy" data-id="' + UI.escapeHtml(file.id) + '">' + UI.escapeHtml(file.id.substring(0, 12)) + '...</code></div>',
                 '</div>',
-                '<button class="alice-btn fm-delete-btn" data-id="' + UI.escapeHtml(file.id) + '" style="padding:6px 12px;background:var(--m-danger,#c33);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Удалить</button>'
+                '<button class="alice-btn fm-delete-btn" data-id="' + UI.escapeHtml(file.id) + '">Удалить</button>'
             ].join('');
             list.appendChild(div);
 
