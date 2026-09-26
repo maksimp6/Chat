@@ -481,3 +481,174 @@ def test_provider_status_check_hides_internal_exception(monkeypatch):
     assert payload["error"] == "health_check_failed"
     assert payload["detail"] == "Проверка провайдера временно недоступна"
     assert internal_marker not in str(payload)
+
+def test_perform_health_check_classifies_provider_failures(monkeypatch):
+    from types import SimpleNamespace
+
+    credential = SimpleNamespace(project_id="project-test", api_key="runtime-key")
+    monkeypatch.setattr(routes, "_load_credential", lambda _provider: credential)
+
+    class FakeConn:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(routes, "get_conn", lambda: FakeConn())
+    recorded = []
+    monkeypatch.setattr(
+        routes,
+        "record_health_check",
+        lambda _conn, provider, status, error: recorded.append((provider, status, error)),
+    )
+
+    class PermissionDeniedProvider:
+        def validate_key(self, _api_key):
+            raise PermissionError("provider-auth-internal-marker")
+
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider, project_id=None: PermissionDeniedProvider(),
+    )
+    denied = routes._perform_health_check("yandex")
+    assert denied == {"status": "invalid", "error": "authorization_failed"}
+
+    class UnavailableProvider:
+        def validate_key(self, _api_key):
+            raise RuntimeError("provider-health-internal-marker")
+
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider, project_id=None: UnavailableProvider(),
+    )
+    unavailable = routes._perform_health_check("cloudru")
+    assert unavailable == {"status": "unavailable", "error": "provider_unavailable"}
+    assert recorded[-2:] == [
+        ("yandex", "invalid", "authorization_failed"),
+        ("cloudru", "unavailable", "provider_unavailable"),
+    ]
+
+
+def test_cloudru_service_accounts_failure_is_sanitized(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "cloudru-service-account-internal-marker"
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    class FailingIam:
+        def __init__(self, **_kwargs):
+            pass
+
+        def list_service_accounts(self):
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(routes, "CloudRuIamClient", FailingIam)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/service-accounts",
+            data={"iam_key_id": "id", "iam_key_secret": "secret"},
+        )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "cloudru_service_accounts_failed"
+    assert internal_marker not in str(payload)
+
+
+def test_cloudru_bootstrap_failure_is_sanitized(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "cloudru-bootstrap-internal-marker"
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    class FailingIam:
+        def __init__(self, **_kwargs):
+            pass
+
+        def create_api_key(self, **_kwargs):
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(routes, "CloudRuIamClient", FailingIam)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/cloudru/bootstrap",
+            data={
+                "iam_key_id": "id",
+                "iam_key_secret": "secret",
+                "project_id": "project",
+                "service_account_id": "550e8400-e29b-41d4-a716-446655440000",
+            },
+        )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "cloudru_bootstrap_failed"
+    assert internal_marker not in str(payload)
+
+
+def test_provider_update_rejects_invalid_json_without_parser_details(monkeypatch):
+    from flask import Flask
+
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            data="{",
+            content_type="application/json",
+        )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload == {
+        "error": "invalid_json",
+        "detail": "Тело запроса должно содержать корректный JSON",
+    }
+
+
+def test_provider_validation_failure_is_sanitized(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "provider-validation-internal-marker"
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    class FailingProvider:
+        def validate_key(self, _api_key):
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(
+        routes,
+        "_provider_client",
+        lambda provider, project_id=None: FailingProvider(),
+    )
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"cloudru_api_key": "runtime-secret"},
+        )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "provider_health_check_failed"
+    assert payload["provider"] == "cloudru"
+    assert internal_marker not in str(payload)
+
