@@ -48,3 +48,13 @@ def test_repeated_lookup_without_cache_is_rejected():
 def test_repeated_lookup_with_cache_signal_is_allowed():
     errors = errors_for("const cache = new Map(); fetch('/api/models'); fetch('/api/models');")
     assert not any("cache safety violation" in error for error in errors)
+
+
+def test_direct_timers_are_rejected():
+    errors = errors_for("setTimeout(function() {}, 100);")
+    assert any("timer safety violation" in error for error in errors)
+
+
+def test_delay_and_sleep_are_rejected():
+    errors = errors_for("delay(100); sleep(100);")
+    assert sum("timer safety violation" in error for error in errors) == 2
