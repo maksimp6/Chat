@@ -5,12 +5,19 @@ The CI job starts the real Flask app and points ALICE_LIVE_BASE_URL at it.
 
 import os
 import re
+
+import pytest
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 
-BASE_URL = os.environ.get("ALICE_LIVE_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
+LIVE_BASE_URL = os.environ.get("ALICE_LIVE_BASE_URL")
+pytestmark = pytest.mark.skipif(
+    not LIVE_BASE_URL,
+    reason="live Flask resource tests require ALICE_LIVE_BASE_URL",
+)
+BASE_URL = (LIVE_BASE_URL or "").rstrip("/")
 TIMEOUT = 10
 
 
