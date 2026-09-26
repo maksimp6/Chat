@@ -22,7 +22,7 @@ function initSidebar() {
     if (menuBtn) {
         menuBtn.setAttribute("aria-expanded", sidebar ? sidebar.classList.contains("open") ? "true" : "false" : "false");
         menuBtn.setAttribute("aria-controls", "sidebar");
-        menuBtn.addEventListener("click", function() {
+        window.AliceCoreAPI.ui.actions.register("sidebar.toggle", function() {
             if (!sidebar) return;
             sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
         });
