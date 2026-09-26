@@ -3,6 +3,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 import db as database
+from db_backend import is_postgres_configured
 
 
 class DatabaseArchiver:
@@ -18,7 +19,7 @@ class DatabaseArchiver:
 
         conn = (
             database.get_conn()
-            if database.is_postgres_configured()
+            if is_postgres_configured()
             else sqlite3.connect(self.db_path)
         )
         try:
