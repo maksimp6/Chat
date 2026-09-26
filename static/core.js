@@ -91,13 +91,12 @@ window.changeModel = function(newModel, skipPatch) {
 function initializeShell() {
     window.AliceTheme.apply(savedTheme, false);
 
-    var themeToggle = document.getElementById("theme-toggle");
-    if (!themeToggle || themeToggle.dataset.coreBound === "true") return;
-
-    themeToggle.dataset.coreBound = "true";
-    themeToggle.addEventListener("click", function() {
-        window.AliceTheme.cycle();
-    });
+    if (!window.__aliceThemeActionRegistered) {
+        window.AliceCoreAPI.ui.actions.register("theme.cycle", function () {
+            window.AliceTheme.cycle();
+        });
+        window.__aliceThemeActionRegistered = true;
+    }
 }
 
 function loadCachedConversations() {
