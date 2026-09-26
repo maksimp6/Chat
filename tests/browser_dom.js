@@ -128,6 +128,7 @@ class DocumentShim extends ElementShim {
 
     createElement(tagName) { return new ElementShim(tagName); }
     getElementById(id) { return this.querySelector("#" + id); }
+    get documentElement() { return this.body.querySelector("html") || this.body; }
 }
 
 class WindowShim extends EventTargetShim {
