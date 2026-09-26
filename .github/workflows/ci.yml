@@ -47,6 +47,7 @@ jobs:
           NODE_V8_COVERAGE=coverage-js node tests/test_frontend_boot.js
           NODE_V8_COVERAGE=coverage-js node tests/test_project_tree.js
           NODE_V8_COVERAGE=coverage-js node tests/test_header_dom.js
+          NODE_V8_COVERAGE=coverage-js node tests/test_frontend_smoke.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
       - name: Start Flask for live browser resource validation
         env:
