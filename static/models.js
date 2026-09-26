@@ -1,24 +1,13 @@
 function initModels() {
   if (document.documentElement.dataset.modelsInitialized === "true") return;
   document.documentElement.dataset.modelsInitialized = "true";
-  var modelBtn = document.getElementById("model-btn");
-  var closeModalBtn = document.getElementById("close-modal");
 
-  if (closeModalBtn)
-    closeModalBtn.addEventListener("click", function () {
-      window.isCreatingNewChat = false;
-      var modal = document.getElementById("model-modal");
-      if (modal) modal.classList.remove("visible");
-    });
-
-  if (modelBtn) {
-    window.AliceCoreAPI.ui.actions.register("model.open", function (payload) {
-      window.isCreatingNewChat = false;
-      if (typeof renderModelModal === "function") renderModelModal();
-      var modal = document.getElementById(payload.params.modal);
-      if (modal) window.AliceCoreAPI.ui.modal.open(modal);
-    });
-  }
+  document.addEventListener("alice:modal:before-open", function (event) {
+    var detail = event && event.detail;
+    if (!detail || detail.modalId !== "model-modal") return;
+    window.isCreatingNewChat = false;
+    renderModelModal();
+  });
 }
 
 document.addEventListener("DOMContentLoaded", initModels);
@@ -59,7 +48,7 @@ function renderModelModal() {
       if (typeof window.changeModel === "function") {
         window.changeModel(key);
       }
-      if (modelModal) modelModal.classList.remove("visible");
+      if (modelModal) window.AliceCoreAPI.ui.modal.close(modelModal);
       if (window.isCreatingNewChat) {
         createConversation(key);
         window.isCreatingNewChat = false;
