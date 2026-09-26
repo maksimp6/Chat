@@ -62,7 +62,7 @@
         var bgVar = bg === 'accent' ? 'var(--m-accent,#4a90d9)' : bg === 'success' ? 'var(--m-success,#28a745)' : bg === 'danger' ? 'var(--m-danger,#c33)' : 'var(--m-card,#fff)';
         var color = (bg === 'accent' || bg === 'success' || bg === 'danger') ? '#fff' : 'var(--m-text,#222)';
         var border = (bg === 'accent' || bg === 'success' || bg === 'danger') ? 'none' : '1px solid var(--m-border,#ddd)';
-        return '<button id="' + id + '" style="padding:8px 16px;background:' + bgVar + ';color:' + color + ';border:' + border + ';border-radius:6px;cursor:pointer;' + (extra||'') + '">' + text + '</button>';
+        return '<button class="alice-btn" id="' + id + '" style="padding:8px 16px;background:' + bgVar + ';color:' + color + ';border:' + border + ';border-radius:6px;cursor:pointer;' + (extra||'') + '">' + text + '</button>';
     }
     function deepMerge(target, source) {
         for (var key in source) {
