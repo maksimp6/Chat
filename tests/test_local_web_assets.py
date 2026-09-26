@@ -82,7 +82,7 @@ def test_web_boot_and_startup_guards_are_present():
     assert "window.AliceDispatcher.request" in core
     assert "AbortSignal.timeout" in dispatcher
     assert "MAX_TIMEOUT_MS" in dispatcher
-    assert "setTimeout(resolve, 5000)" in core
+    assert "return window.AliceDispatcher.request(input, init, { timeoutMs: timeoutMs });" in core
 
 
 def test_index_response_disables_shell_caching():
