@@ -138,6 +138,7 @@ class DocumentShim extends ElementShim {
     }
 
     createElement(tagName) { return new ElementShim(tagName); }
+    createTextNode(text) { const node = new ElementShim("#text"); node.textContent = text; return node; }
     getElementById(id) { return this.querySelector("#" + id); }
     get documentElement() { return this.body.querySelector("html") || this.body; }
 }
