@@ -4,9 +4,9 @@ Alice Pro frontend JavaScript is treated as a set of modules with explicit runti
 
 ## Mandatory checks
 
-- JavaScript syntax must pass `node --check`.
-- Named function declarations use lower camelCase names. Leading `_`, `$`, and PascalCase names are rejected.
-- Dynamic code execution and common obfuscation primitives are rejected: `eval`, `Function`, `atob`/`btoa`, character-code construction, and long hex escape payloads.
+- JavaScript syntax must pass node --check.
+- Named function declarations use lower camelCase names. Leading _, $, and PascalCase names are rejected.
+- Dynamic code execution and common obfuscation primitives are rejected: eval, Function, atob/btoa, character-code construction, and long hex escape payloads.
 - Binary/control-byte payloads and invalid UTF-8 are rejected.
 - JavaScript files have a 512 KiB source limit.
 - A source line may not exceed 8 KiB.
@@ -16,7 +16,33 @@ Alice Pro frontend JavaScript is treated as a set of modules with explicit runti
 - Suspicious high-entropy or non-printable source is classified as unusual text and rejected.
 - Vendor bundles are excluded from application policy checks and must be isolated explicitly. They are not treated as application modules.
 
-The validator emits only errors. A passing validation therefore means `0 errors, 0 warnings, 0 notes`.
+## Loop and failure safety
+
+Loops are treated as bounded resources, not as decorative syntax.
+
+- Unbounded while (true) and for (;;) loops are rejected.
+- while loops must have a statically visible termination condition.
+- Network operations inside loops require an explicit bounded/cached design and are rejected by the static policy when no cache/memoization signal is visible.
+- Runtime regression tests execute known infinite-loop cases under a hard VM timeout.
+- Failure paths are tested through try/catch/finally to verify that loop cleanup is reached after an exception.
+- Performance tests exercise bounded loops and enforce a runtime budget.
+- New large array allocations are rejected above 4096 elements by the static policy.
+- Runtime tests also verify that pathological array allocation cannot silently pass as an acceptable workload.
+
+A timeout is a safety net, not a loop design. Production code must still have an explicit exit condition, cancellation path, or finite work budget.
+
+## Caching policy
+
+Repeated deterministic or repeatable lookups must not cause unnecessary network/storage work.
+
+The validator looks for repeated fetch, localStorage.getItem, and sessionStorage.getItem operations and requires a visible cache/memoization mechanism (cache, memo, memoize, Map, or WeakMap) in the same source module. This is intentionally a static heuristic and is supplemented by runtime cache tests.
+
+When a value can be reused safely, modules should cache it with:
+
+1. a clear cache key;
+2. an invalidation rule;
+3. a bounded lifetime or explicit refresh path where freshness matters;
+4. no unbounded cache growth.
 
 ## Runtime contract
 
@@ -28,7 +54,8 @@ Static validation is only the first layer. The module runtime separately validat
 4. public events;
 5. public APIs;
 6. lifecycle transitions;
-7. style scope.
+7. style scope;
+8. bounded execution and failure cleanup.
 
 A module must not access another module's private state, DOM, styles, tools, or implementation details.
 
@@ -38,4 +65,8 @@ Run from the repository root:
 
     python tests/validate_frontend_modules.py
 
-The CI pipeline runs this check before frontend regression tests.
+Runtime safety regression tests:
+
+    node tests/test_frontend_runtime_safety.js
+
+The CI pipeline runs both checks before the broader frontend regression suite.
