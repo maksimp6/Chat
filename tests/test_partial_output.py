@@ -325,6 +325,7 @@ class TestActiveChatRoute(unittest.TestCase):
             patch.object(mcp_routes, "AliceClient", lambda _config: fake_client),
             patch.object(mcp_routes, "get_conv_settings", return_value={}),
             patch.object(mcp_routes, "add_message", side_effect=fake_add_message),
+            patch.object(mcp_routes, "maybe_update_conversation_title", return_value=None),
         ):
             app.config["TESTING"] = True
             with app.test_client() as client:
