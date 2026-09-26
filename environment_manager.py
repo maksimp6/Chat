@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from db import get_conn
+from db import get_conn, init_db as init_runtime_db
 from invocation_context import InvocationContext
 from invocation_trace import create_invocation_trace
 from trace_manager import ExecutionTrace
@@ -373,6 +373,12 @@ class EnvironmentRuntime:
 
     def start(self) -> int:
         self._prepare()
+        with bind_runtime_request(
+            self.runtime_id,
+            "",
+            data_root=str(self.data_dir),
+        ):
+            init_runtime_db()
         with _RUNTIME_WORKERS_LOCK:
             if self.runtime_id in _RUNTIME_WORKERS:
                 raise RuntimeError("environment runtime is already running")
