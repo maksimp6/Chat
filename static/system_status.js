@@ -104,7 +104,7 @@
     if (!button || !panel || button.dataset.statusBound === "true") return;
 
     button.dataset.statusBound = "true";
-    button.addEventListener("click", function () {
+    window.AliceCoreAPI.ui.actions.register("system-status.toggle", function () {
       var hidden = panel.hasAttribute("hidden");
       if (hidden) panel.removeAttribute("hidden");
       else panel.setAttribute("hidden", "");
