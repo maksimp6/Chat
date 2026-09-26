@@ -340,7 +340,7 @@ class TestActiveChatRoute(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         payload = response.get_json()
-        self.assertEqual(fake_client.metadata, test_conversation_metadata)
+        self.assertEqual(fake_client.params["conversation_metadata"], test_conversation_metadata)
         self.assertEqual(payload["partial_output"], "Generated before failure")
         self.assertIn("Generated before failure", payload["reply"])
         self.assertIn("Внутренняя ошибка обработки запроса", payload["reply"])
