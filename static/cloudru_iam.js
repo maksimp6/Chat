@@ -54,7 +54,7 @@ function build() {
     box.appendChild(confirmWrap);
     var submit = document.createElement("button");
     submit.textContent = "Выпустить ключ";
-    submit.className = "btn-primary";
+    submit.className = "alice-btn btn-primary";
     submit.addEventListener("click", submitWizard);
     box.appendChild(submit);
     var output = document.createElement("pre");
