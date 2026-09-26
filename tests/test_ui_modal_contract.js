@@ -61,6 +61,18 @@ if (closeCalls !== 1 || !modal.hidden)
 unmount();
 unregister();
 
+const defaultCloseModal = UI.modal.create({
+  id: "default-close-modal",
+  title: "Default close modal",
+  body: document.createElement("div"),
+});
+const defaultCloseButton = defaultCloseModal.querySelector(".modal-close");
+if (!defaultCloseButton) throw new Error("canonical modal factory must create a close button");
+if (defaultCloseButton.dataset.action !== "modal.close")
+  throw new Error("canonical modal close must default to modal.close");
+if (defaultCloseButton.dataset.modal !== "default-close-modal")
+  throw new Error("canonical modal close must carry its modal id");
+
 const dispatcherModal = UI.modal.create({
   id: "dispatcher-modal",
   title: "Dispatcher modal",
