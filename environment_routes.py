@@ -1,7 +1,6 @@
 """REST API for branch-aware application environments."""
 
-from flask import Blueprint, Response, jsonify, request
-import requests
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from environment_manager import (
     create_environment,
@@ -11,6 +10,8 @@ from environment_manager import (
     start_environment,
     stop_environment,
     _get,
+    dispatch_environment_http,
+    register_runtime_operation,
 )
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
@@ -98,48 +99,80 @@ def environments_delete(environment_id):
         return jsonify({"error": str(exc)}), 500
 
 
+def _runtime_http_request(context, payload):
+    app = payload.get("_app")
+    if app is None:
+        raise RuntimeError("runtime application is unavailable")
+
+    path = str(payload.get("path") or "/")
+    headers = list(payload.get("headers") or [])
+    client = app.test_client()
+    response = client.open(
+        path,
+        method=str(payload.get("method") or "GET"),
+        query_string=str(payload.get("query_string") or ""),
+        data=payload.get("body") or b"",
+        headers=headers,
+        follow_redirects=False,
+        buffered=False,
+    )
+    excluded = {"content-length", "connection", "transfer-encoding", "content-encoding"}
+    return {
+        "status_code": response.status_code,
+        "headers": [
+            (key, value)
+            for key, value in response.headers.items()
+            if key.lower() not in excluded
+        ],
+        "body": response.iter_encoded(),
+        "close": response.close,
+    }
+
+
+register_runtime_operation("http.request", _runtime_http_request)
+
+
 def _proxy(environment_id, subpath=""):
     item = _get(environment_id)
     owner = _owner()
     if not item or (owner and item.get("owner_id") not in (None, owner)):
         return jsonify({"error": "environment_not_found"}), 404
-    if item.get("status") != "RUNNING" or not item.get("runtime_port"):
+    if item.get("status") != "RUNNING" or not item.get("runtime_thread_id"):
         return jsonify({"error": "environment_not_running"}), 503
 
-    target = "http://127.0.0.1:" + str(int(item["runtime_port"])) + "/" + subpath.lstrip("/")
+    headers = [
+        (key, value)
+        for key, value in request.headers.items()
+        if key.lower() not in {"host", "content-length", "connection"}
+    ]
+    headers.append(("X-Alice-Proxy-Authenticated", "true"))
     try:
-        upstream = requests.request(
-            request.method,
-            target,
-            params=request.args,
-            data=request.get_data(),
-            headers={
-                key: value
-                for key, value in request.headers.items()
-                if key.lower() not in {"host", "content-length", "connection"}
+        upstream = dispatch_environment_http(
+            environment_id,
+            {
+                "_app": current_app._get_current_object(),
+                "method": request.method,
+                "path": "/" + subpath.lstrip("/"),
+                "query_string": request.query_string.decode("latin-1"),
+                "body": request.get_data(),
+                "headers": headers,
+                "base_path": f"/environments/{environment_id}",
             },
-            cookies=request.cookies,
-            allow_redirects=False,
-            stream=True,
             timeout=30,
         )
-    except requests.RequestException as exc:
-        return jsonify({"error": "environment_runtime_unreachable", "detail": str(exc)}), 502
+    except TimeoutError:
+        return jsonify({"error": "environment_runtime_timeout"}), 504
+    except RuntimeError:
+        return jsonify({"error": "environment_not_running"}), 503
+    except Exception:
+        return jsonify({"error": "environment_runtime_unreachable"}), 502
 
-    excluded = {"content-length", "connection", "transfer-encoding", "content-encoding"}
-    headers = [
-        (key, value) for key, value in upstream.headers.items() if key.lower() not in excluded
-    ]
-
-    def body():
-        try:
-            for chunk in upstream.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
-        finally:
-            upstream.close()
-
-    return Response(body(), status=upstream.status_code, headers=headers)
+    return Response(
+        upstream,
+        status=upstream.status_code,
+        headers=upstream.headers,
+        direct_passthrough=True,
+    )
 
 
 @environment_gateway_bp.route(
