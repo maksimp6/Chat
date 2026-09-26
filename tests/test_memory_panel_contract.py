@@ -58,8 +58,10 @@ def test_memory_button_has_real_binding_path():
     header = (ROOT / "static" / "header_actions.js").read_text(encoding="utf-8")
     panel = (ROOT / "static" / "memory_panel.js").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
-    assert 'data-action="header.memory.open"' in html
+    assert 'data-action="modal.open"' in html
+    assert 'data-modal="memoryModal"' in html
     assert 'id="memoryModal"' in html
-    assert re.search(r'actions\.register\(\s*"header\.memory\.open"', header)
-    assert 'call("openMemoryModal"' in header
+    assert 'data-action="modal.close"' in html
+    assert "header.memory.open" not in header
+    assert "alice:modal:before-open" in panel
     assert "window.loadMemoryData" in panel
