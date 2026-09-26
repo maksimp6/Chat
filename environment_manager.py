@@ -488,7 +488,12 @@ class EnvironmentRuntime:
             if kind == "call":
                 _, operation, payload, result = job
                 try:
-                    value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
+                    with bind_runtime_request(
+                        self.runtime_id,
+                        "",
+                        data_root=str(self.data_dir),
+                    ):
+                        value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
                     result.put(("result", value))
                 except Exception as exc:
                     result.put(("error", exc))
@@ -498,7 +503,11 @@ class EnvironmentRuntime:
             source = None
             try:
                 base_path = str(payload.get("base_path") or "")
-                with bind_runtime_request(self.runtime_id, base_path):
+                with bind_runtime_request(
+                    self.runtime_id,
+                    base_path,
+                    data_root=str(self.data_dir),
+                ):
                     source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
                     status_code = int(source["status_code"])
                     headers = list(source.get("headers") or [])
