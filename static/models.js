@@ -20,9 +20,7 @@ function renderModelModal() {
   var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
   if (Object.keys(allModels).length === 0) {
     var state =
-      typeof modelLoadState === "undefined"
-        ? { status: "idle", message: "" }
-        : modelLoadState;
+      typeof modelLoadState === "undefined" ? { status: "idle", message: "" } : modelLoadState;
     var empty = document.createElement("div");
     empty.className = "model-option model-option-empty";
     empty.setAttribute("role", "status");
@@ -56,6 +54,7 @@ function renderModelModal() {
     var nameWrap = document.createElement("div");
     var name = document.createElement("strong");
     name.textContent = m.name + badges;
+    div.setAttribute("aria-label", m.name + badges);
     nameWrap.appendChild(name);
 
     var price = document.createElement("div");

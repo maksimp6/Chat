@@ -168,7 +168,9 @@ async function loadModels() {
     }
     modelsData = { text: text, voice: voice };
     modelLoadState = { status: "ready", message: "" };
-    reportModelLoad("success", { modelCount: Object.keys(text).length + Object.keys(voice).length });
+    reportModelLoad("success", {
+      modelCount: Object.keys(text).length + Object.keys(voice).length,
+    });
     if (typeof renderModelModal === "function") renderModelModal();
     return modelsData;
   } catch (error) {
