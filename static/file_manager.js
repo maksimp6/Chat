@@ -46,12 +46,18 @@ window.fetchVectorStores = function() {
         var existing = document.getElementById("file-manager-modal");
         if (existing) existing.remove();
 
-        var ov = document.createElement("div");
-        ov.id = "file-manager-modal";
-        ov.className = "modal file-manager-modal";
-
-        var md = document.createElement("div");
-        md.className = "modal-content file-manager-box";
+        var CoreUI = window.AliceCoreAPI.ui;
+        var body = document.createElement("div");
+        body.className = "file-manager-body";
+        var ov = CoreUI.modal.create({
+            id: "file-manager-modal",
+            title: "Менеджер файлов",
+            className: "file-manager-modal",
+            contentClassName: "file-manager-box",
+            closeAction: "file-manager.close",
+            body: body
+        });
+        var md = body;
 
         md.innerHTML = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">',
@@ -81,12 +87,8 @@ window.fetchVectorStores = function() {
             '</div>'
         ].join('');
 
-        ov.appendChild(md);
         (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
-
-        function closeModal() { ov.remove(); }
-        document.getElementById('close-fm-btn').addEventListener('click', closeModal);
-        ov.addEventListener('click', function(e) { if (e.target === ov) closeModal(); });
+        CoreUI.modal.open(ov);
 
         function formatBytes(bytes) {
             if (!bytes || bytes <= 0) return "0 B";
@@ -255,26 +257,18 @@ window.fetchVectorStores = function() {
             var existingBg = document.getElementById('vs-add-files-modal');
             if (existingBg) existingBg.remove();
 
-            var bg = document.createElement('div');
-            bg.id = 'vs-add-files-modal';
-            bg.className = "modal file-manager-add-modal";
-
-            var panel = document.createElement('div');
-            panel.className = "modal-content file-manager-add-box";
-
-            var header = document.createElement('div');
-            header.className = 'file-manager-add-header';
-            var title = document.createElement('h3');
-            title.className = 'file-manager-add-title';
-            title.textContent = 'Файлы → ' + (vsName || vsId.substring(0, 8));
-            var close = document.createElement('button');
-            close.type = 'button';
-            close.id = 'vs-add-close';
-            close.className = 'file-manager-close-btn';
-            close.setAttribute('aria-label', 'Закрыть');
-            close.textContent = '×';
-            header.appendChild(title);
-            header.appendChild(close);
+            var addBody = document.createElement('div');
+            addBody.className = 'file-manager-add-body';
+            var bg = CoreUI.modal.create({
+                id: 'vs-add-files-modal',
+                title: 'Файлы → ' + (vsName || vsId.substring(0, 8)),
+                titleTag: 'h3',
+                className: 'file-manager-add-modal',
+                contentClassName: 'file-manager-add-box',
+                closeAction: 'file-manager.add.close',
+                body: addBody
+            });
+            var panel = addBody;
 
             var fileListEl = document.createElement('div');
             fileListEl.id = 'vs-add-filelist';
@@ -289,12 +283,8 @@ window.fetchVectorStores = function() {
             panel.appendChild(header);
             panel.appendChild(fileListEl);
             panel.appendChild(confirm);
-            bg.appendChild(panel);
             (document.querySelector(".alice-pro-app") || document.body).appendChild(bg);
-
-            function closeAddModal() { bg.remove(); }
-            close.addEventListener('click', closeAddModal);
-            bg.addEventListener('click', function(e) { if (e.target === bg) closeAddModal(); });
+            CoreUI.modal.open(bg);
 
             function renderAddFilesState(message, isError) {
                 fileListEl.replaceChildren();
@@ -509,4 +499,13 @@ window.fetchVectorStores = function() {
         loadVsList();
         loadFiles();
     };
+    window.AliceCoreAPI.ui.actions.register("file-manager.close", function (payload) {
+        var modal = payload.element.closest(".modal");
+        if (modal) modal.remove();
+    });
+    window.AliceCoreAPI.ui.actions.register("file-manager.add.close", function (payload) {
+        var modal = payload.element.closest(".modal");
+        if (modal) modal.remove();
+    });
+
 })();
