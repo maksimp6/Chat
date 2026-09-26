@@ -30,6 +30,7 @@
     var STORAGE_KEY = "alice_pro_settings";
     var SKILLS_BACKUP_KEY = "alice_pro_skills_backup";
     var serverSettingsCache = {};
+    var globalSettingsCache = null;
 
     function convKey(convId) { return STORAGE_KEY + "_conv_" + convId; }
 
@@ -41,7 +42,11 @@
         }
         var base = JSON.parse(JSON.stringify(DEFAULTS));
         try { 
-            var global = localStorage.getItem(STORAGE_KEY); 
+            var global = globalSettingsCache;
+            if (global === null) {
+                global = localStorage.getItem(STORAGE_KEY);
+                globalSettingsCache = global || "";
+            }
             if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global)); 
         } catch(e) {}
         if (convId) { 
@@ -78,7 +83,11 @@
             .then(function(data) {
                 var base = JSON.parse(JSON.stringify(DEFAULTS));
                 try {
-                    var global = localStorage.getItem(STORAGE_KEY);
+                    var global = globalSettingsCache;
+                    if (global === null) {
+                        global = localStorage.getItem(STORAGE_KEY);
+                        globalSettingsCache = global || "";
+                    }
                     if (global) base = window.SettingsUI.deepMerge(base, JSON.parse(global));
                 } catch(e) {}
                 if (data && Object.keys(data).length > 0) {
