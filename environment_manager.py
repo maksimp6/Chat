@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from db import get_conn
+from db import get_conn, init_db as init_runtime_db
 from invocation_context import InvocationContext
 from invocation_trace import create_invocation_trace
 from trace_manager import ExecutionTrace
@@ -373,6 +373,12 @@ class EnvironmentRuntime:
 
     def start(self) -> int:
         self._prepare()
+        with bind_runtime_request(
+            self.runtime_id,
+            "",
+            data_root=str(self.data_dir),
+        ):
+            init_runtime_db()
         with _RUNTIME_WORKERS_LOCK:
             if self.runtime_id in _RUNTIME_WORKERS:
                 raise RuntimeError("environment runtime is already running")
@@ -488,7 +494,12 @@ class EnvironmentRuntime:
             if kind == "call":
                 _, operation, payload, result = job
                 try:
-                    value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
+                    with bind_runtime_request(
+                        self.runtime_id,
+                        "",
+                        data_root=str(self.data_dir),
+                    ):
+                        value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
                     result.put(("result", value))
                 except Exception as exc:
                     result.put(("error", exc))
@@ -498,7 +509,11 @@ class EnvironmentRuntime:
             source = None
             try:
                 base_path = str(payload.get("base_path") or "")
-                with bind_runtime_request(self.runtime_id, base_path):
+                with bind_runtime_request(
+                    self.runtime_id,
+                    base_path,
+                    data_root=str(self.data_dir),
+                ):
                     source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
                     status_code = int(source["status_code"])
                     headers = list(source.get("headers") or [])

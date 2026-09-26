@@ -2,9 +2,11 @@ import os
 import json
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from db_backend import connect_postgres, postgres_url_from_env
 from memory_db import Column, MemoryDatabase
+from runtime.request_context import current_runtime_data_root
 
 
 DB_PATH = os.getenv("ALICE_DB_PATH", "alice_pro.db")
@@ -12,7 +14,18 @@ _MEMORY_DB = MemoryDatabase()
 _MEMORY_INITIALIZED = False
 
 
+def _runtime_db_path():
+    data_root = current_runtime_data_root()
+    if not data_root:
+        return None
+    root = Path(data_root).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return str(root / "alice_pro.db")
+
+
 def is_memory_configured():
+    if current_runtime_data_root():
+        return False
     return os.getenv("ALICE_DB_BACKEND", "").strip().lower() == "memory"
 
 
@@ -81,12 +94,22 @@ def _next_message_id():
 
 
 def get_conn():
-    if is_memory_configured():
-        raise RuntimeError("memory backend does not expose a SQL connection; use db API functions")
-    database_url = postgres_url_from_env()
-    if database_url:
-        return connect_postgres(database_url)
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
+    runtime_db_path = _runtime_db_path()
+    if runtime_db_path:
+        conn = sqlite3.connect(
+            runtime_db_path,
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            timeout=15,
+        )
+    else:
+        if is_memory_configured():
+            raise RuntimeError(
+                "memory backend does not expose a SQL connection; use db API functions"
+            )
+        database_url = postgres_url_from_env()
+        if database_url:
+            return connect_postgres(database_url)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
