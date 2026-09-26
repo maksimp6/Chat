@@ -540,3 +540,59 @@ def test_local_resource_files_are_utf8_when_text_based():
         assert not data.startswith(b"\\xef\\xbb\\xbf"), f"UTF-8 BOM in resource: {path}"
         decoded = data.decode("utf-8")
         assert decoded.encode("utf-8") == data, f"resource is not stable UTF-8: {path}"
+
+
+def test_application_buttons_use_unified_contract():
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    roots = parse_html()
+    buttons = [
+        node for root in roots for node in walk(root)
+        if node.tag == "button" and "alice-pro-app" in source
+    ]
+    assert buttons
+    for button in buttons:
+        classes = set(button.attrs.get("class", "").split())
+        assert "alice-btn" in classes, (
+            f"{button.attrs.get('id')}: every application button must use .alice-btn"
+        )
+        assert button.attrs.get("type", "submit") == "button", (
+            f"{button.attrs.get('id')}: application buttons must explicitly use type=button"
+        )
+
+
+def test_header_buttons_have_one_shared_geometry_contract():
+    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    roots = parse_html()
+    header_buttons = [
+        node for root in roots for node in walk(root)
+        if node.tag == "button"
+        and node.attrs.get("id")
+        and node.attrs.get("id") in {
+            "menu-btn", "model-btn", "tools-btn", "ssh-runtime-btn", "mcp-btn",
+            "settings-btn", "file-manager-btn", "treasury-btn", "dozzle-btn",
+            "project-tree-btn", "departments-btn", "update-app-btn",
+            "provider-credentials-btn", "memory-btn", "theme-toggle",
+        }
+    ]
+    assert len(header_buttons) == 16
+    for button in header_buttons:
+        classes = set(button.attrs.get("class", "").split())
+        assert {"header-btn", "alice-btn"} <= classes
+        assert button.attrs.get("title") or button.attrs.get("aria-label"), (
+            f"{button.attrs.get('id')}: header button needs accessible label"
+        )
+
+
+def test_unified_button_css_owns_common_interaction_contract():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    assert ".alice-pro-app .alice-btn {" in css
+    for declaration in (
+        "box-sizing: border-box",
+        "border: 1px solid transparent",
+        "font: inherit",
+        "cursor: pointer",
+        "user-select: none",
+    ):
+        assert declaration in css
+    assert ".alice-pro-app .alice-btn:focus-visible {" in css
+    assert ".alice-pro-app .alice-btn:disabled" in css
