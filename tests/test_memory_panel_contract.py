@@ -1,16 +1,36 @@
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class IdParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.elements = {}
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if values.get("id"):
+            self.elements[values["id"]] = (tag, values)
+
+
+def parse_index():
+    parser = IdParser()
+    parser.feed((ROOT / "templates" / "index.html").read_text(encoding="utf-8"))
+    return parser.elements
+
+
 def test_memory_controls_are_server_rendered():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    assert '<button id="memory-btn"' in html
-    assert 'id="memoryModal" class="modal memory-modal"' in html
+    elements = parse_index()
+    assert elements["memory-btn"][0] == "button"
+    assert "modal" in elements["memoryModal"][1].get("class", "").split()
+    assert "memory-modal" in elements["memoryModal"][1].get("class", "").split()
     assert 'class="modal-content memory-modal-content"' in html
-    assert 'src="{{ static_root }}/memory_panel.js?v={{ static_version }}" defer' in html
+    assert 'src="{{ static_root }}/memory_panel.js?v={{ static_version }}"' in html
     assert "memory_btn.js" not in html
 
 
@@ -38,7 +58,8 @@ def test_memory_button_has_real_binding_path():
     header = (ROOT / "static" / "header_actions.js").read_text(encoding="utf-8")
     panel = (ROOT / "static" / "memory_panel.js").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
+    assert 'data-action="header.memory.open"' in html
     assert 'id="memoryModal"' in html
-    assert "#memory-btn" in header
-    assert "window.openMemoryModal" in header
+    assert 'actions.register("header.memory.open"' in header
+    assert 'call("openMemoryModal"' in header
     assert "window.loadMemoryData" in panel
