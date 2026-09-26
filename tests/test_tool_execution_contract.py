@@ -22,7 +22,9 @@ class TestLocalToolExecutionContract(unittest.TestCase):
 
     def _call(self, execute):
         trace = ExecutionTrace()
-        with patch.object(registry, "get_universal_definition", return_value=self._definition("test_tool")):
+        with patch.object(
+            registry, "get_universal_definition", return_value=self._definition("test_tool")
+        ):
             with patch.object(registry, "execute", side_effect=execute):
                 result = YandexMcpMixin()._execute_single_tool(
                     {
@@ -36,9 +38,11 @@ class TestLocalToolExecutionContract(unittest.TestCase):
         return result, trace.finalize()
 
     def test_returned_error_is_not_reported_as_success(self):
-        result, trace = self._call(lambda _name, _args, **_kwargs: {
-            "error": "permission denied",
-        })
+        result, trace = self._call(
+            lambda _name, _args, **_kwargs: {
+                "error": "permission denied",
+            }
+        )
 
         self.assertEqual(result["error"], "permission denied")
         self.assertFalse(result["timing"]["success"])

@@ -15,12 +15,25 @@ def make_plan(**overrides):
         "success_criteria": ["tests pass"],
         "context": {"files": ["app.py"]},
         "steps": [
-            PlanStep(id="inspect", action="inspect", target=["app.py"],
-                     success_criteria=["relevant code identified"]),
-            PlanStep(id="implement", action="modify", target=["app.py"],
-                     depends_on=["inspect"], success_criteria=["change is implemented"]),
-            PlanStep(id="verify", action="test", depends_on=["implement"],
-                     success_criteria=["tests pass"]),
+            PlanStep(
+                id="inspect",
+                action="inspect",
+                target=["app.py"],
+                success_criteria=["relevant code identified"],
+            ),
+            PlanStep(
+                id="implement",
+                action="modify",
+                target=["app.py"],
+                depends_on=["inspect"],
+                success_criteria=["change is implemented"],
+            ),
+            PlanStep(
+                id="verify",
+                action="test",
+                depends_on=["implement"],
+                success_criteria=["tests pass"],
+            ),
         ],
     }
     values.update(overrides)
@@ -42,10 +55,12 @@ def test_unknown_dependency_is_rejected():
 
 
 def test_dependency_cycle_is_rejected():
-    plan = make_plan(steps=[
-        PlanStep(id="a", action="inspect", depends_on=["b"]),
-        PlanStep(id="b", action="modify", depends_on=["a"]),
-    ])
+    plan = make_plan(
+        steps=[
+            PlanStep(id="a", action="inspect", depends_on=["b"]),
+            PlanStep(id="b", action="modify", depends_on=["a"]),
+        ]
+    )
     result = PlanValidator().validate(plan)
     assert result.valid is False
     assert any("dependency cycle" in error for error in result.errors)
@@ -67,10 +82,12 @@ def test_replan_increments_counter_and_revalidates():
         plan,
         reason="test failure",
         steps=[
-            PlanStep(id="fix", action="modify", target=["app.py"],
-                     success_criteria=["regression fixed"]),
-            PlanStep(id="verify", action="test", depends_on=["fix"],
-                     success_criteria=["tests pass"]),
+            PlanStep(
+                id="fix", action="modify", target=["app.py"], success_criteria=["regression fixed"]
+            ),
+            PlanStep(
+                id="verify", action="test", depends_on=["fix"], success_criteria=["tests pass"]
+            ),
         ],
     )
     assert result.valid is True

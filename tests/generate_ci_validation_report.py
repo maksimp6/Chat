@@ -13,11 +13,13 @@ FRONTEND_TESTS = [
     "test_frontend_smoke.js",
 ]
 
+
 def _run_status(log: Path, marker: str) -> str:
     if not log.exists():
         return "not run"
     text = log.read_text(encoding="utf-8", errors="replace")
     return "passed" if marker in text else "failed or unavailable"
+
 
 def _js_coverage() -> tuple[int, int]:
     total = covered = 0
@@ -32,6 +34,7 @@ def _js_coverage() -> tuple[int, int]:
                 if any(item.get("count", 0) for item in fn.get("ranges", [])):
                     covered += 1
     return covered, total
+
 
 def main():
     out = Path("ci-validation-report.md")
@@ -48,23 +51,41 @@ def main():
     for test in FRONTEND_TESTS:
         lines.append("- `{}`: **{}**".format(test, _run_status(log, markers[test])))
     covered, total = _js_coverage()
-    lines.append("- V8 JavaScript function coverage observed: **{}/{}**".format(covered, total) if total else "- V8 JavaScript coverage: **not available**")
+    lines.append(
+        "- V8 JavaScript function coverage observed: **{}/{}**".format(covered, total)
+        if total
+        else "- V8 JavaScript coverage: **not available**"
+    )
     lines += ["", "## Backend coverage", ""]
     xml = Path("coverage.xml")
     if xml.exists():
         root = ET.parse(xml).getroot()
-        lines.append("- Line coverage: **{:.2f}%**".format(float(root.attrib.get("line-rate", 0)) * 100))
-        lines.append("- Branch coverage: **{:.2f}%**".format(float(root.attrib.get("branch-rate", 0)) * 100))
+        lines.append(
+            "- Line coverage: **{:.2f}%**".format(float(root.attrib.get("line-rate", 0)) * 100)
+        )
+        lines.append(
+            "- Branch coverage: **{:.2f}%**".format(float(root.attrib.get("branch-rate", 0)) * 100)
+        )
         lines.append("- Files measured: **{}**".format(len(root.findall(".//class"))))
     else:
         lines.append("- Coverage report was not produced.")
     lines += ["", "## Live Flask resource validation", ""]
-    lines.append("- Flask live log: " + ("available" if Path("flask-live.log").exists() else "not available"))
+    lines.append(
+        "- Flask live log: " + ("available" if Path("flask-live.log").exists() else "not available")
+    )
     lines.append("- Resource contract: real HTTP responses from the running Flask server.")
-    lines.append("- Frontend runtime contract: UI behavior is validated by the lightweight BrowserShim test suite.")
-    lines += ["", "## Result", "", "The CI status is authoritative. A failed test means the corresponding contract was not proven."]
+    lines.append(
+        "- Frontend runtime contract: UI behavior is validated by the lightweight BrowserShim test suite."
+    )
+    lines += [
+        "",
+        "## Result",
+        "",
+        "The CI status is authoritative. A failed test means the corresponding contract was not proven.",
+    ]
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(out.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     main()

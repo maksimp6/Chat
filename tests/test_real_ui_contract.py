@@ -49,8 +49,8 @@ def test_real_header_buttons_use_registered_actions():
         for button in parser.header_buttons
         if not button.get("data-action")
     ]
-    assert not missing_actions, (
-        "real header buttons must use data-action: " + ", ".join(missing_actions)
+    assert not missing_actions, "real header buttons must use data-action: " + ", ".join(
+        missing_actions
     )
 
     registered = set()

@@ -1,4 +1,5 @@
 """Startup diagnostics for the optional Supabase trace mirror."""
+
 from __future__ import annotations
 
 import logging
@@ -61,9 +62,7 @@ def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
             if 200 <= response.status < 300:
                 logger.info("Supabase trace mirror: ready")
                 return "ready"
-            logger.warning(
-                "Supabase trace mirror: error (HTTP %s)", response.status
-            )
+            logger.warning("Supabase trace mirror: error (HTTP %s)", response.status)
     except HTTPError as exc:
         detail = _http_error_detail(exc, secret_key)
         logger.warning(

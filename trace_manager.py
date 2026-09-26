@@ -1,4 +1,5 @@
 """Centralized execution trace for the Alice Pro chat pipeline."""
+
 import json
 import time
 import uuid
@@ -7,12 +8,20 @@ from contextvars import ContextVar
 from functools import wraps
 from typing import Any, Dict, Optional, Callable
 
-_current_trace: ContextVar["ExecutionTrace | None"] = ContextVar("alice_execution_trace", default=None)
+_current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
+    "alice_execution_trace", default=None
+)
 
-from trace_security import MAX_DEPTH, MAX_ITEMS, MAX_REPR, SENSITIVE_KEYS, safe_repr, sanitize_trace_value
+from trace_security import (
+    MAX_DEPTH,
+    MAX_ITEMS,
+    MAX_REPR,
+    SENSITIVE_KEYS,
+    safe_repr,
+    sanitize_trace_value,
+)
 from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
 from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
-
 
 
 def get_current_trace() -> Optional["ExecutionTrace"]:
@@ -22,6 +31,7 @@ def get_current_trace() -> Optional["ExecutionTrace"]:
 
 def traced_operation(operation: str, *, include_request: bool = True):
     """Trace an important non-chat operation, including its final HTTP outcome."""
+
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(fn)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
@@ -34,10 +44,13 @@ def traced_operation(operation: str, *, include_request: bool = True):
             if include_request:
                 try:
                     from flask import request as flask_request
-                    payload.update({
-                        "method": flask_request.method,
-                        "path": flask_request.path,
-                    })
+
+                    payload.update(
+                        {
+                            "method": flask_request.method,
+                            "path": flask_request.path,
+                        }
+                    )
                     if flask_request.is_json:
                         payload["body"] = flask_request.get_json(silent=True) or {}
                     elif flask_request.form:
@@ -51,19 +64,26 @@ def traced_operation(operation: str, *, include_request: bool = True):
                 result = fn(*args, **kwargs)
                 try:
                     from flask import has_request_context, make_response
+
                     if has_request_context():
                         response = make_response(result)
-                        trace.add_event("operation_completed", {
-                            "operation": operation,
-                            "http_status": response.status_code,
-                            "success": response.status_code < 400,
-                        })
+                        trace.add_event(
+                            "operation_completed",
+                            {
+                                "operation": operation,
+                                "http_status": response.status_code,
+                                "success": response.status_code < 400,
+                            },
+                        )
                     else:
-                        trace.add_event("operation_completed", {
-                            "operation": operation,
-                            "success": not isinstance(result, int) or result == 0,
-                            "result_type": type(result).__name__,
-                        })
+                        trace.add_event(
+                            "operation_completed",
+                            {
+                                "operation": operation,
+                                "success": not isinstance(result, int) or result == 0,
+                                "result_type": type(result).__name__,
+                            },
+                        )
                 except Exception as exc:
                     trace.record_error(operation, str(exc), exception=exc)
                 return result
@@ -73,7 +93,9 @@ def traced_operation(operation: str, *, include_request: bool = True):
             finally:
                 _current_trace.reset(token)
                 trace.finalize()
+
         return wrapped
+
     return decorator
 
 
@@ -103,10 +125,10 @@ class ExecutionTrace:
                 "currency": "RUB",
                 "provider": "yandex_ai_studio",
                 "pricing_version": "config-v1",
-                "items": []
+                "items": [],
             },
             "provider_key": None,
-            "provider_keys": []
+            "provider_keys": [],
         }
 
     def get_metadata(self) -> Dict[str, str]:
@@ -143,19 +165,30 @@ class ExecutionTrace:
         context["provider_key_id"] = str(key_id)
         billing = self.trace.setdefault("billing", {})
         billing["provider_key_id"] = str(key_id)
-        self.add_event("provider_key_selected", {
-            "key_id": str(key_id),
-            **({"source": source} if source is not None else {}),
-        })
+        self.add_event(
+            "provider_key_selected",
+            {
+                "key_id": str(key_id),
+                **({"source": source} if source is not None else {}),
+            },
+        )
 
-    def set_context(self, invocation_id: Optional[str] = None,
-                    session_id: Optional[str] = None,
-                    conversation_id: Optional[str] = None,
-                    user_id: Optional[str] = None) -> None:
+    def set_context(
+        self,
+        invocation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> None:
         context = self.trace.setdefault("context", {})
-        for key, value in (("invocation_id", invocation_id), ("session_id", session_id),
-                           ("conversation_id", conversation_id), ("user_id", user_id),
-                           ("owner_id", user_id), ("trace_id", self.trace_id)):
+        for key, value in (
+            ("invocation_id", invocation_id),
+            ("session_id", session_id),
+            ("conversation_id", conversation_id),
+            ("user_id", user_id),
+            ("owner_id", user_id),
+            ("trace_id", self.trace_id),
+        ):
             if value is not None:
                 context[key] = str(value)
         billing = self.trace.setdefault("billing", {})
@@ -164,15 +197,17 @@ class ExecutionTrace:
                 billing[key] = context[key]
 
     def set_request(self, payload: Dict[str, Any]) -> None:
-        clean_payload = {
-            k: v for k, v in payload.items()
-            if k not in ("trace", "execution_trace")
-        } if isinstance(payload, dict) else payload
+        clean_payload = (
+            {k: v for k, v in payload.items() if k not in ("trace", "execution_trace")}
+            if isinstance(payload, dict)
+            else payload
+        )
         clean_payload = self._sanitize_trace_value(clean_payload)
         self.trace["request"] = clean_payload
-        self.add_event("request_initialized", {
-            "keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []
-        })
+        self.add_event(
+            "request_initialized",
+            {"keys": list(clean_payload.keys()) if isinstance(clean_payload, dict) else []},
+        )
 
     @classmethod
     def _safe_repr(cls, value: Any, depth: int = 0) -> Any:
@@ -185,14 +220,26 @@ class ExecutionTrace:
         for frame, lineno in traceback.walk_tb(tb):
             locals_snapshot = {}
             for name, value in frame.f_locals.items():
-                if name.lower() in cls._SENSITIVE_KEYS or any(secret in name.lower() for secret in ("api_key", "password", "secret", "token")):
+                if name.lower() in cls._SENSITIVE_KEYS or any(
+                    secret in name.lower() for secret in ("api_key", "password", "secret", "token")
+                ):
                     locals_snapshot[name] = "<redacted>"
                 else:
                     locals_snapshot[name] = cls._safe_repr(value)
-            frames.append({"file": frame.f_code.co_filename, "function": frame.f_code.co_name,
-                           "line": lineno, "locals": locals_snapshot})
-        return {"exception_type": type(exc).__name__, "exception_message": str(exc),
-                "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__), "frames": frames}
+            frames.append(
+                {
+                    "file": frame.f_code.co_filename,
+                    "function": frame.f_code.co_name,
+                    "line": lineno,
+                    "locals": locals_snapshot,
+                }
+            )
+        return {
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "traceback": traceback.format_exception(type(exc), exc, exc.__traceback__),
+            "frames": frames,
+        }
 
     def _request_timing_for_step(self, step_index: int) -> tuple[Optional[float], Optional[float]]:
         return request_timing_for_step(self.trace, step_index)
@@ -204,37 +251,46 @@ class ExecutionTrace:
         """Return a stable correlation identifier for one logical API step."""
         return step_correlation_id(self.trace_id, step_index)
 
-    def add_api_request(self, payload: Dict[str, Any], step_index: int = 1,
-                        start_timestamp: Optional[float] = None,
-                        provider_key_id: Optional[str] = None) -> int:
-        provider_key_id = provider_key_id or (
-            self.trace.get("provider_key") or {}
-        ).get("key_id")
+    def add_api_request(
+        self,
+        payload: Dict[str, Any],
+        step_index: int = 1,
+        start_timestamp: Optional[float] = None,
+        provider_key_id: Optional[str] = None,
+    ) -> int:
+        provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
         correlation_id = self.get_step_correlation_id(step_index)
-        request_entry = {"step": step_index,
-                         "correlation_id": correlation_id,
-                         "timestamp": start_timestamp if start_timestamp is not None else time.time(),
-                         "payload": self._sanitize_trace_value(payload)}
+        request_entry = {
+            "step": step_index,
+            "correlation_id": correlation_id,
+            "timestamp": start_timestamp if start_timestamp is not None else time.time(),
+            "payload": self._sanitize_trace_value(payload),
+        }
         if provider_key_id is not None:
             request_entry["provider_key_id"] = str(provider_key_id)
         self.trace.setdefault("api_requests", []).append(request_entry)
-        self.add_event("api_request_registered", {
-            "step": step_index,
-            "correlation_id": correlation_id,
-            "timestamp": request_entry["timestamp"],
-        })
+        self.add_event(
+            "api_request_registered",
+            {
+                "step": step_index,
+                "correlation_id": correlation_id,
+                "timestamp": request_entry["timestamp"],
+            },
+        )
         return len(self.trace["api_requests"]) - 1
 
     @classmethod
     def _sanitize_trace_value(cls, value: Any, depth: int = 0) -> Any:
         return sanitize_trace_value(value, depth)
 
-    def _update_billing_for_response(self, clean_raw: Dict[str, Any], step_index: int,
-                                     response_id: Optional[str]) -> None:
+    def _update_billing_for_response(
+        self, clean_raw: Dict[str, Any], step_index: int, response_id: Optional[str]
+    ) -> None:
         if not isinstance(clean_raw, dict) or not isinstance(clean_raw.get("usage"), dict):
             return
         try:
             from billing import build_ai_billing_item, aggregate_billing
+
             model = clean_raw.get("model")
             if not model:
                 for request in reversed(self.trace.get("api_requests", [])):
@@ -242,13 +298,23 @@ class ExecutionTrace:
                         payload = request.get("payload") or {}
                         model_uri = payload.get("model")
                         if isinstance(model_uri, str):
-                            model = model_uri.rsplit("/", 2)[-2] if model_uri.count("/") >= 2 else model_uri
+                            model = (
+                                model_uri.rsplit("/", 2)[-2]
+                                if model_uri.count("/") >= 2
+                                else model_uri
+                            )
                         break
             item = build_ai_billing_item(model, clean_raw.get("usage"), step_index, response_id)
             items = self.trace.setdefault("billing", {}).setdefault("items", [])
             key = (item.get("step"), item.get("response_id"))
-            existing = next((i for i, old in enumerate(items)
-                             if (old.get("step"), old.get("response_id")) == key), None)
+            existing = next(
+                (
+                    i
+                    for i, old in enumerate(items)
+                    if (old.get("step"), old.get("response_id")) == key
+                ),
+                None,
+            )
             if existing is None:
                 items.append(item)
             else:
@@ -258,17 +324,21 @@ class ExecutionTrace:
         except Exception as exc:
             self.add_event("billing_error", {"step": step_index, "error": str(exc)})
 
-    def add_response(self, raw_json: Dict[str, Any], step_index: int = 1,
-                     start_timestamp: Optional[float] = None,
-                     end_timestamp: Optional[float] = None,
-                     timing_ms: Optional[float] = None,
-                     kind: str = "response", deduplicate: bool = False,
-                     provider_key_id: Optional[str] = None, **kwargs) -> None:
+    def add_response(
+        self,
+        raw_json: Dict[str, Any],
+        step_index: int = 1,
+        start_timestamp: Optional[float] = None,
+        end_timestamp: Optional[float] = None,
+        timing_ms: Optional[float] = None,
+        kind: str = "response",
+        deduplicate: bool = False,
+        provider_key_id: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Store one logical Responses API operation; polling snapshots stay nested in it."""
         idx = step_index or kwargs.get("call_index", 1)
-        provider_key_id = provider_key_id or (
-            self.trace.get("provider_key") or {}
-        ).get("key_id")
+        provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
         clean_raw = self._sanitize_trace_value(raw_json)
         response_id = clean_raw.get("id") if isinstance(clean_raw, dict) else None
         request_start, _ = self._request_timing_for_step(idx)
@@ -291,7 +361,11 @@ class ExecutionTrace:
 
         if existing_index is None and deduplicate and self.trace["responses"]:
             last = self.trace["responses"][-1]
-            if last.get("step") == idx and last.get("raw") == clean_raw and last.get("kind") == kind:
+            if (
+                last.get("step") == idx
+                and last.get("raw") == clean_raw
+                and last.get("kind") == kind
+            ):
                 return
 
         if existing_index is not None:
@@ -304,21 +378,36 @@ class ExecutionTrace:
                 snapshots.append(previous_raw)
             if not snapshots or snapshots[-1] != clean_raw:
                 snapshots.append(clean_raw)
-            entry.update({"timestamp": end_timestamp, "raw": clean_raw,
-                          "correlation_id": self.get_step_correlation_id(idx),
-                          "response_id": response_id or entry.get("response_id"),
-                          "end_timestamp": end_timestamp, "timing_ms": timing_ms,
-                          "latest_kind": kind})
+            entry.update(
+                {
+                    "timestamp": end_timestamp,
+                    "raw": clean_raw,
+                    "correlation_id": self.get_step_correlation_id(idx),
+                    "response_id": response_id or entry.get("response_id"),
+                    "end_timestamp": end_timestamp,
+                    "timing_ms": timing_ms,
+                    "latest_kind": kind,
+                }
+            )
             if provider_key_id is not None:
                 entry["provider_key_id"] = str(provider_key_id)
-            self._update_billing_for_response(clean_raw, idx, response_id or entry.get("response_id"))
+            self._update_billing_for_response(
+                clean_raw, idx, response_id or entry.get("response_id")
+            )
             return
 
         correlation_id = self.get_step_correlation_id(idx)
-        response_entry = {"step": idx, "correlation_id": correlation_id, "timestamp": end_timestamp, "kind": kind,
-                          "response_id": response_id, "raw": clean_raw,
-                          "start_timestamp": start_timestamp, "end_timestamp": end_timestamp,
-                          "timing_ms": timing_ms}
+        response_entry = {
+            "step": idx,
+            "correlation_id": correlation_id,
+            "timestamp": end_timestamp,
+            "kind": kind,
+            "response_id": response_id,
+            "raw": clean_raw,
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "timing_ms": timing_ms,
+        }
         if provider_key_id is not None:
             response_entry["provider_key_id"] = str(provider_key_id)
         if kind == "poll_response":
@@ -329,17 +418,37 @@ class ExecutionTrace:
                 response_entry["request"] = request_entry.get("payload")
                 break
         self.trace["responses"].append(response_entry)
-        self.add_event("api_response_received", {
-            "step": idx, "correlation_id": correlation_id, "kind": kind, "response_id": response_id,
-            "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
-            "has_output": bool(clean_raw.get("output")) if isinstance(clean_raw, dict) else False,
-            "start_timestamp": start_timestamp, "end_timestamp": end_timestamp, "timing_ms": timing_ms})
+        self.add_event(
+            "api_response_received",
+            {
+                "step": idx,
+                "correlation_id": correlation_id,
+                "kind": kind,
+                "response_id": response_id,
+                "status": clean_raw.get("status") if isinstance(clean_raw, dict) else None,
+                "has_output": bool(clean_raw.get("output"))
+                if isinstance(clean_raw, dict)
+                else False,
+                "start_timestamp": start_timestamp,
+                "end_timestamp": end_timestamp,
+                "timing_ms": timing_ms,
+            },
+        )
         self._update_billing_for_response(clean_raw, idx, response_id)
 
-    def track_tool_execution(self, name: str, arguments: Dict[str, Any], executor_fn, *args,
-                             call_id: Optional[str] = None, parent_id: Optional[str] = None,
-                             step: Optional[int] = None, server: Optional[str] = None,
-                             trace_arguments: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+    def track_tool_execution(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        executor_fn,
+        *args,
+        call_id: Optional[str] = None,
+        parent_id: Optional[str] = None,
+        step: Optional[int] = None,
+        server: Optional[str] = None,
+        trace_arguments: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> Any:
         start_timestamp = time.time()
         started = time.perf_counter()
         error = None
@@ -370,35 +479,56 @@ class ExecutionTrace:
         finally:
             end_timestamp = time.time()
             elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-            entry = {"name": name, "tool_name": name,
-                     "arguments": self._sanitize_trace_value(
-                         trace_arguments if trace_arguments is not None else arguments
-                     ),
-                     "result": self._sanitize_trace_value(result), "error": error,
-                     "timing_ms": elapsed_ms, "timestamp": end_timestamp,
-                     "start_timestamp": start_timestamp, "end_timestamp": end_timestamp}
-            if call_id is not None: entry["call_id"] = str(call_id)
-            if parent_id is not None: entry["parent_id"] = str(parent_id)
-            if step is not None: entry["step"] = step
-            if server is not None: entry["server"] = server
+            entry = {
+                "name": name,
+                "tool_name": name,
+                "arguments": self._sanitize_trace_value(
+                    trace_arguments if trace_arguments is not None else arguments
+                ),
+                "result": self._sanitize_trace_value(result),
+                "error": error,
+                "timing_ms": elapsed_ms,
+                "timestamp": end_timestamp,
+                "start_timestamp": start_timestamp,
+                "end_timestamp": end_timestamp,
+            }
+            if call_id is not None:
+                entry["call_id"] = str(call_id)
+            if parent_id is not None:
+                entry["parent_id"] = str(parent_id)
+            if step is not None:
+                entry["step"] = step
+            if server is not None:
+                entry["server"] = server
             self.trace["tool_calls"].append(entry)
-            self.add_event("tool_executed", {"name": name, "timing_ms": elapsed_ms,
-                                              "success": error is None,
-                                              "start_timestamp": start_timestamp,
-                                              "end_timestamp": end_timestamp,
-                                              **({"call_id": str(call_id)} if call_id is not None else {}),
-                                              **({"parent_id": str(parent_id)} if parent_id is not None else {}),
-                                              **({"step": step} if step is not None else {})})
+            self.add_event(
+                "tool_executed",
+                {
+                    "name": name,
+                    "timing_ms": elapsed_ms,
+                    "success": error is None,
+                    "start_timestamp": start_timestamp,
+                    "end_timestamp": end_timestamp,
+                    **({"call_id": str(call_id)} if call_id is not None else {}),
+                    **({"parent_id": str(parent_id)} if parent_id is not None else {}),
+                    **({"step": step} if step is not None else {}),
+                },
+            )
 
     def set_reasoning_plan(self, plan: Dict[str, Any]) -> None:
         """Attach a sanitized structured reasoning plan to this execution trace."""
         clean_plan = self._sanitize_trace_value(plan)
         self.trace["reasoning_plan"] = clean_plan
-        self.add_event("plan_created", {
-            "plan_id": clean_plan.get("plan_id") if isinstance(clean_plan, dict) else None,
-            "plan_type": clean_plan.get("plan_type") if isinstance(clean_plan, dict) else None,
-            "step_count": len(clean_plan.get("steps", [])) if isinstance(clean_plan, dict) else 0,
-        })
+        self.add_event(
+            "plan_created",
+            {
+                "plan_id": clean_plan.get("plan_id") if isinstance(clean_plan, dict) else None,
+                "plan_type": clean_plan.get("plan_type") if isinstance(clean_plan, dict) else None,
+                "step_count": len(clean_plan.get("steps", []))
+                if isinstance(clean_plan, dict)
+                else 0,
+            },
+        )
 
     def record_reasoning_event(
         self,
@@ -421,22 +551,39 @@ class ExecutionTrace:
     def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
-        self.trace["events"].append({"type": event_type, "timestamp": time.time(), "payload": payload or {}})
+        self.trace["events"].append(
+            {"type": event_type, "timestamp": time.time(), "payload": payload or {}}
+        )
 
-    def record_error(self, source: str, message: str, call_id: Optional[str] = None,
-                     parent_id: Optional[str] = None, step: Optional[int] = None,
-                     error_type: Optional[str] = None, exception: Optional[BaseException] = None) -> None:
+    def record_error(
+        self,
+        source: str,
+        message: str,
+        call_id: Optional[str] = None,
+        parent_id: Optional[str] = None,
+        step: Optional[int] = None,
+        error_type: Optional[str] = None,
+        exception: Optional[BaseException] = None,
+    ) -> None:
         entry = {"source": source, "error": message, "timestamp": time.time()}
-        if error_type: entry["type"] = error_type
-        if call_id is not None: entry["call_id"] = str(call_id)
-        if parent_id is not None: entry["parent_id"] = str(parent_id)
-        if step is not None: entry["step"] = step
-        if exception is not None: entry["python_exception"] = self._capture_exception_state(exception)
+        if error_type:
+            entry["type"] = error_type
+        if call_id is not None:
+            entry["call_id"] = str(call_id)
+        if parent_id is not None:
+            entry["parent_id"] = str(parent_id)
+        if step is not None:
+            entry["step"] = step
+        if exception is not None:
+            entry["python_exception"] = self._capture_exception_state(exception)
         self.trace["errors"].append(entry)
         event_payload = {"source": source, "error": message}
-        if call_id is not None: event_payload["call_id"] = str(call_id)
-        if parent_id is not None: event_payload["parent_id"] = str(parent_id)
-        if step is not None: event_payload["step"] = step
+        if call_id is not None:
+            event_payload["call_id"] = str(call_id)
+        if parent_id is not None:
+            event_payload["parent_id"] = str(parent_id)
+        if step is not None:
+            event_payload["step"] = step
         if exception is not None:
             event_payload["exception_type"] = type(exception).__name__
             event_payload["has_python_state"] = True
@@ -449,8 +596,11 @@ class ExecutionTrace:
             self._finalized = True
         try:
             from billing import aggregate_billing
+
             billing = self.trace.get("billing") or {}
-            self.trace["billing"] = aggregate_billing(billing.get("items", []), self.trace.get("context", {}))
+            self.trace["billing"] = aggregate_billing(
+                billing.get("items", []), self.trace.get("context", {})
+            )
         except Exception as exc:
             self.add_event("billing_error", {"error": str(exc)})
 
@@ -461,9 +611,14 @@ class ExecutionTrace:
                 return self._safe_repr(obj)
             except Exception:
                 return f"<{type(obj).__name__}: safe_repr failed>"
+
         try:
             return json.loads(json.dumps(self.trace, default=_json_default))
         except Exception:
-            return {"trace_id": self.trace_id, "schema_version": self.SCHEMA_VERSION,
-                    "error": "trace_serialization_failed", "timings": self.trace.get("timings", {}),
-                    "errors": [str(e) for e in self.trace.get("errors", [])]}
+            return {
+                "trace_id": self.trace_id,
+                "schema_version": self.SCHEMA_VERSION,
+                "error": "trace_serialization_failed",
+                "timings": self.trace.get("timings", {}),
+                "errors": [str(e) for e in self.trace.get("errors", [])],
+            }

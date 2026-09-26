@@ -48,8 +48,12 @@ def init_runtime_tables() -> None:
         except sqlite3.OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():
                 raise
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_invocations_session ON invocations(session_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_invocations_conversation ON invocations(conversation_id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_invocations_session ON invocations(session_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_invocations_conversation ON invocations(conversation_id)"
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_invocations_trace ON invocations(trace_id)")
         conn.commit()
     finally:

@@ -64,11 +64,11 @@
     try {
       var response = await window.AliceDispatcher.request("/api/memory/config", {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: Boolean(enabled && enabled.checked),
-          max_context_facts: parseInt(limit && limit.value, 10) || 15
-        })
+          max_context_facts: parseInt(limit && limit.value, 10) || 15,
+        }),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       await window.loadMemoryData();
@@ -82,8 +82,8 @@
     try {
       var response = await window.AliceDispatcher.request("/api/memory/clear", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({category: category})
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: category }),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       await window.loadMemoryData();
@@ -96,24 +96,29 @@
     if (window.__aliceMemoryPanelBound === true) return;
     window.__aliceMemoryPanelBound = true;
 
-    document.addEventListener("click", function (event) {
-      var target = event.target && event.target.closest
-        ? event.target.closest("#memoryCloseBtn, #memoryClearBtn")
-        : null;
-      if (!target) return;
+    document.addEventListener(
+      "click",
+      function (event) {
+        var target =
+          event.target && event.target.closest
+            ? event.target.closest("#memoryCloseBtn, #memoryClearBtn")
+            : null;
+        if (!target) return;
 
-      if (target.id === "memoryCloseBtn") {
-        event.preventDefault();
-        window.closeMemoryModal();
-      } else if (target.id === "memoryClearBtn") {
-        event.preventDefault();
-        window.clearMemory(null);
-      }
-    }, true);
+        if (target.id === "memoryCloseBtn") {
+          event.preventDefault();
+          window.closeMemoryModal();
+        } else if (target.id === "memoryClearBtn") {
+          event.preventDefault();
+          window.clearMemory(null);
+        }
+      },
+      true,
+    );
 
     var configBindings = [
       ["memEnabled", "change", window.updateMemoryConfig],
-      ["memLimit", "change", window.updateMemoryConfig]
+      ["memLimit", "change", window.updateMemoryConfig],
     ];
 
     configBindings.forEach(function (binding) {

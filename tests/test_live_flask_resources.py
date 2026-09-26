@@ -45,6 +45,7 @@ def wait_for_app():
         except Exception as exc:
             last_error = exc
             import time
+
             time.sleep(1)
     raise AssertionError(f"Flask app did not become ready: {last_error}")
 
@@ -72,14 +73,19 @@ def test_live_flask_resources_are_local_and_loadable():
     assert parser.resources, "live page contains no browser resources"
 
     for tag, raw_ref in parser.resources:
-        assert "{{" not in raw_ref and "}}" not in raw_ref, f"unrendered template resource: {raw_ref}"
+        assert "{{" not in raw_ref and "}}" not in raw_ref, (
+            f"unrendered template resource: {raw_ref}"
+        )
         parsed = urlparse(raw_ref)
         assert not parsed.scheme, f"external resource scheme: {raw_ref}"
         assert not parsed.netloc, f"external resource host: {raw_ref}"
         assert not raw_ref.startswith("//"), f"protocol-relative resource: {raw_ref}"
 
         resource_url = urljoin(BASE_URL + "/", raw_ref.lstrip("/"))
-        resource_status, resource_headers, resource_body, _ = fetch(urlparse(resource_url).path + (("?" + urlparse(resource_url).query) if urlparse(resource_url).query else ""))
+        resource_status, resource_headers, resource_body, _ = fetch(
+            urlparse(resource_url).path
+            + (("?" + urlparse(resource_url).query) if urlparse(resource_url).query else "")
+        )
         assert resource_status == 200, f"{tag} resource failed: {raw_ref} -> HTTP {resource_status}"
         assert resource_body, f"{tag} resource is empty: {raw_ref}"
 

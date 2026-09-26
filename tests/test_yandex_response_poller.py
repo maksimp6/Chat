@@ -59,11 +59,13 @@ class YandexResponsePollerTests(unittest.TestCase):
     @patch("yandex_response_poller.time.sleep")
     def test_failed_response_raises_client_error(self, sleep):
         session = Mock()
-        session.get.return_value = FakeResponse({
-            "id": "r1",
-            "status": "failed",
-            "error": {"message": "bad request"},
-        })
+        session.get.return_value = FakeResponse(
+            {
+                "id": "r1",
+                "status": "failed",
+                "error": {"message": "bad request"},
+            }
+        )
 
         with self.assertRaisesRegex(RuntimeError, "bad request"):
             wait_for_response(

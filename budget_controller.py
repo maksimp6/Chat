@@ -176,7 +176,9 @@ class BudgetController:
                         "loss_today": str(account.loss_today),
                         "loss_period": account.loss_period,
                         "status": account.status(now).value,
-                        "locked_until": account.locked_until.isoformat() if account.locked_until else None,
+                        "locked_until": account.locked_until.isoformat()
+                        if account.locked_until
+                        else None,
                         "limits": {
                             "max_single_operation": str(account.limits.max_single_operation),
                             "max_daily_loss": str(account.limits.max_daily_loss),
@@ -228,13 +230,9 @@ class BudgetController:
                     actor=requested_by,
                 )
                 raise AuthorizationRequired("policy denied replenishment")
-            return self.allocate(
-                account_type, amount, actor="policy-approved:" + requested_by
-            )
+            return self.allocate(account_type, amount, actor="policy-approved:" + requested_by)
 
-    def reserve(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
-    ) -> Dict[str, Any]:
+    def reserve(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -293,9 +291,7 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def spend(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
-    ) -> Dict[str, Any]:
+    def spend(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -379,9 +375,7 @@ class BudgetController:
             )
             return self.snapshot()
 
-    def refund(
-        self, amount: Any, *, account_type: Optional[AccountType] = None
-    ) -> Dict[str, Any]:
+    def refund(self, amount: Any, *, account_type: Optional[AccountType] = None) -> Dict[str, Any]:
         with self._lock:
             account_type = AccountType(account_type or self.active_account)
             account = self.account(account_type)
@@ -431,7 +425,9 @@ class BudgetController:
                 self._emit("real_mode_denied", account_type="REAL", actor=actor)
                 raise AuthorizationRequired("explicit authorization required for DEMO -> REAL")
             self.active_account = AccountType.REAL
-            self._emit("mode_switch", account_type="REAL", actor=actor, reason="manual_authorization")
+            self._emit(
+                "mode_switch", account_type="REAL", actor=actor, reason="manual_authorization"
+            )
             return self.snapshot()
 
     def convert_demo_to_real(self, amount: Any) -> None:
@@ -474,7 +470,12 @@ class BudgetController:
             account.loss_period = today
             account.loss_today = Decimal("0.00")
             account.locked_until = None
-            self._emit("loss_period_reset", account_type=account.account_type.value, currency=account.currency, amount="0.00")
+            self._emit(
+                "loss_period_reset",
+                account_type=account.account_type.value,
+                currency=account.currency,
+                amount="0.00",
+            )
 
     def _apply_cooldown_if_needed(self, account: BudgetAccount) -> None:
         if account.loss_today >= account.limits.max_daily_loss:

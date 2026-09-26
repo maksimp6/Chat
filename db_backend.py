@@ -3,6 +3,7 @@
 SQLite remains the default local/Termux backend. PostgreSQL is strictly opt-in:
 set ALICE_DATABASE_URL to switch the shared application database to PostgreSQL.
 """
+
 from __future__ import annotations
 
 import os
@@ -17,9 +18,7 @@ except ImportError:  # pragma: no cover - only relevant when PostgreSQL is selec
 
 
 _QMARK_RE = re.compile(r"\?")
-_AUTOINCREMENT_RE = re.compile(
-    r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", re.IGNORECASE
-)
+_AUTOINCREMENT_RE = re.compile(r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", re.IGNORECASE)
 _BEGIN_IMMEDIATE_RE = re.compile(r"\bBEGIN\s+IMMEDIATE\b", re.IGNORECASE)
 _PRAGMA_TABLE_INFO_RE = re.compile(
     r"^\s*PRAGMA\s+table_info\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*;?\s*$",
@@ -30,9 +29,7 @@ _ALTER_ADD_COLUMN_RE = re.compile(
     r"([A-Za-z_][A-Za-z0-9_]*)\s+(.+?)\s*;?\s*$",
     re.IGNORECASE | re.DOTALL,
 )
-_INSERT_OR_IGNORE_RE = re.compile(
-    r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", re.IGNORECASE
-)
+_INSERT_OR_IGNORE_RE = re.compile(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", re.IGNORECASE)
 _UNIQUE_VIOLATION_NAMES = {"UniqueViolation", "UniqueViolationError"}
 
 
@@ -173,9 +170,7 @@ class PGConnection:
 
     def __init__(self, url: str) -> None:
         if psycopg is None:
-            raise RuntimeError(
-                "PostgreSQL backend selected but psycopg is not installed"
-            )
+            raise RuntimeError("PostgreSQL backend selected but psycopg is not installed")
         self._raw = psycopg.connect(url)
         self._row_factory = None
 

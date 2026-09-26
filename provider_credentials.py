@@ -4,6 +4,7 @@ Each provider owns an independent active credential. Plaintext exists only at
 backend boundaries. Persistent records contain encrypted secrets and
 non-secret provider metadata/fingerprints.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -78,7 +79,6 @@ def _fetch_one(db: Any, query: str, params: tuple = ()):
     return db.execute(query, params).fetchone()
 
 
-
 def create_schema(db: Any) -> None:
     db.execute("""
         CREATE TABLE IF NOT EXISTS cloudru_iam_credentials (
@@ -112,24 +112,31 @@ def create_schema(db: Any) -> None:
     """)
 
     iam_columns = {
-        row["name"]
-        for row in db.execute("PRAGMA table_info(cloudru_iam_credentials)").fetchall()
+        row["name"] for row in db.execute("PRAGMA table_info(cloudru_iam_credentials)").fetchall()
     }
     if "expires_at" not in iam_columns:
         db.execute("ALTER TABLE cloudru_iam_credentials ADD COLUMN expires_at TIMESTAMP")
 
     columns = {
-        row["name"]
-        for row in db.execute("PRAGMA table_info(provider_credentials)").fetchall()
+        row["name"] for row in db.execute("PRAGMA table_info(provider_credentials)").fetchall()
     }
 
     migrations = (
-        ("project_id", "ALTER TABLE provider_credentials ADD COLUMN project_id TEXT NOT NULL DEFAULT ''"),
-        ("provider", "ALTER TABLE provider_credentials ADD COLUMN provider TEXT NOT NULL DEFAULT 'yandex'"),
+        (
+            "project_id",
+            "ALTER TABLE provider_credentials ADD COLUMN project_id TEXT NOT NULL DEFAULT ''",
+        ),
+        (
+            "provider",
+            "ALTER TABLE provider_credentials ADD COLUMN provider TEXT NOT NULL DEFAULT 'yandex'",
+        ),
         ("provider_key_id", "ALTER TABLE provider_credentials ADD COLUMN provider_key_id TEXT"),
         ("yandex_key_id", "ALTER TABLE provider_credentials ADD COLUMN yandex_key_id TEXT"),
         ("fingerprint", "ALTER TABLE provider_credentials ADD COLUMN fingerprint TEXT"),
-        ("last_checked_at", "ALTER TABLE provider_credentials ADD COLUMN last_checked_at TIMESTAMP"),
+        (
+            "last_checked_at",
+            "ALTER TABLE provider_credentials ADD COLUMN last_checked_at TIMESTAMP",
+        ),
         ("last_check_status", "ALTER TABLE provider_credentials ADD COLUMN last_check_status TEXT"),
         ("last_check_error", "ALTER TABLE provider_credentials ADD COLUMN last_check_error TEXT"),
     )
@@ -164,7 +171,6 @@ def create_schema(db: Any) -> None:
         CREATE INDEX IF NOT EXISTS idx_provider_credentials_provider_status_expires
         ON provider_credentials (provider, status, expires_at)
     """)
-
 
 
 def _parse_expiry(value: Any) -> Optional[datetime]:
@@ -215,7 +221,8 @@ def save_cloudru_iam_credentials(
         if expires_at <= utcnow():
             raise ValueError("Cloud.ru IAM master key is expired")
     create_schema(db)
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO cloudru_iam_credentials
         (id, key_id, key_secret_encrypted, project_id, service_account_id, expires_at)
         VALUES (1, ?, ?, ?, ?, ?)
@@ -225,7 +232,9 @@ def save_cloudru_iam_credentials(
             project_id = excluded.project_id,
             service_account_id = excluded.service_account_id,
             expires_at = excluded.expires_at
-    """, (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id, expires_at))
+    """,
+        (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id, expires_at),
+    )
     db.commit()
 
 
@@ -257,7 +266,8 @@ def save_cloudru_iam_credentials(
     if not key_id.strip() or not key_secret:
         raise ValueError("Cloud.ru IAM key_id and key_secret are required")
     create_schema(db)
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO cloudru_iam_credentials
         (id, key_id, key_secret_encrypted, project_id, service_account_id)
         VALUES (1, ?, ?, ?, ?)
@@ -266,7 +276,9 @@ def save_cloudru_iam_credentials(
             key_secret_encrypted = excluded.key_secret_encrypted,
             project_id = excluded.project_id,
             service_account_id = excluded.service_account_id
-    """, (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id))
+    """,
+        (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id),
+    )
     db.commit()
 
 
@@ -279,13 +291,17 @@ def get_active_credential(
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError(f"Unsupported provider: {provider}")
 
-    row = _fetch_one(db, """
+    row = _fetch_one(
+        db,
+        """
         SELECT id, api_key_encrypted, provider_key_id, yandex_key_id,
                provider, project_id, issued_at, expires_at
         FROM provider_credentials
         WHERE provider = ? AND status = 'active'
         LIMIT 1
-    """, (provider,))
+    """,
+        (provider,),
+    )
     if not row:
         raise NoActiveCredentialError(f"No active {provider} provider credential")
 
@@ -360,21 +376,24 @@ def bootstrap_credential(
     issued_at, expires_at = issue_window(now, ttl=ttl)
     encrypted = encrypt(api_key)
     key_id = provider_key_id
-    cursor = db.execute("""
+    cursor = db.execute(
+        """
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
          project_id, issued_at, expires_at, status, fingerprint)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
-    """, (
-        encrypted,
-        key_id if provider == YANDEX else None,
-        key_id,
-        provider,
-        project_id,
-        issued_at,
-        expires_at,
-        fingerprint_key(api_key),
-    ))
+    """,
+        (
+            encrypted,
+            key_id if provider == YANDEX else None,
+            key_id,
+            provider,
+            project_id,
+            issued_at,
+            expires_at,
+            fingerprint_key(api_key),
+        ),
+    )
     if hasattr(db, "commit"):
         db.commit()
 
@@ -418,21 +437,24 @@ def replace_active_credential(
         (provider,),
     )
     key_id = provider_key_id
-    cursor = db.execute("""
+    cursor = db.execute(
+        """
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
          project_id, issued_at, expires_at, status, fingerprint)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
-    """, (
-        encrypted,
-        key_id if provider == YANDEX else None,
-        key_id,
-        provider,
-        project_id,
-        issued_at,
-        expires_at,
-        fingerprint_key(api_key),
-    ))
+    """,
+        (
+            encrypted,
+            key_id if provider == YANDEX else None,
+            key_id,
+            provider,
+            project_id,
+            issued_at,
+            expires_at,
+            fingerprint_key(api_key),
+        ),
+    )
     if hasattr(db, "commit"):
         db.commit()
 
@@ -471,9 +493,7 @@ def resolve_client_credential(
             raise CredentialError(
                 f"Active {provider} provider credential exists but encryption is not configured"
             )
-        raise NoActiveCredentialError(
-            f"No global {provider} provider key configured"
-        )
+        raise NoActiveCredentialError(f"No global {provider} provider key configured")
     return get_active_credential(db, decrypt, provider=provider)
 
 
@@ -483,14 +503,17 @@ def list_provider_credentials(
 ) -> list[dict[str, Any]]:
     create_schema(db)
     if provider:
-        rows = db.execute("""
+        rows = db.execute(
+            """
             SELECT id, provider, provider_key_id, yandex_key_id,
                    project_id, issued_at, expires_at, status, created_at,
                    fingerprint, last_checked_at, last_check_status, last_check_error
             FROM provider_credentials
             WHERE provider = ?
             ORDER BY id DESC
-        """, (provider,)).fetchall()
+        """,
+            (provider,),
+        ).fetchall()
     else:
         rows = db.execute("""
             SELECT id, provider, provider_key_id, yandex_key_id,
@@ -525,21 +548,24 @@ def promote_rotated_key(
         "WHERE id = ? AND provider = ? AND status = 'active'",
         (old_id, provider),
     )
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO provider_credentials
         (api_key_encrypted, yandex_key_id, provider_key_id, provider,
          project_id, issued_at, expires_at, status, fingerprint)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
-    """, (
-        encrypted_key,
-        provider_key_id if provider == YANDEX else None,
-        provider_key_id,
-        provider,
-        project_id,
-        issued_at,
-        expires_at,
-        fingerprint,
-    ))
+    """,
+        (
+            encrypted_key,
+            provider_key_id if provider == YANDEX else None,
+            provider_key_id,
+            provider,
+            project_id,
+            issued_at,
+            expires_at,
+            fingerprint,
+        ),
+    )
 
 
 def issue_window(

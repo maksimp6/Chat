@@ -17,7 +17,5 @@ def test_frontend_modules_code_contract():
         timeout=60,
     )
     assert result.returncode == 0, (
-        "frontend module code validation failed:\n"
-        + (result.stdout or "")
-        + (result.stderr or "")
+        "frontend module code validation failed:\n" + (result.stdout or "") + (result.stderr or "")
     )

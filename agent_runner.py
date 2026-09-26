@@ -1,6 +1,7 @@
 import json
 from agent_tools import dispatch_tool, TOOLS_SCHEMA
 
+
 class AgentCore:
     def __init__(self, system_prompt: str = None):
         self.system_prompt = system_prompt or (
@@ -25,7 +26,7 @@ class AgentCore:
             call_id = call.get("id", "call_default")
             func_name = call.get("function", {}).get("name")
             raw_args = call.get("function", {}).get("arguments", {})
-            
+
             if isinstance(raw_args, str):
                 try:
                     args = json.loads(raw_args)
@@ -35,10 +36,8 @@ class AgentCore:
                 args = raw_args
 
             output = self.execute_tool_call(func_name, args)
-            results.append({
-                "tool_call_id": call_id,
-                "output": output
-            })
+            results.append({"tool_call_id": call_id, "output": output})
         return results
+
 
 agent_core = AgentCore()

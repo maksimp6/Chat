@@ -9,6 +9,7 @@ def _sanitize_trace(value: Any) -> Any:
     """Apply the same trace-level secret filtering before API exposure."""
     try:
         from trace_manager import ExecutionTrace
+
         return ExecutionTrace._sanitize_trace_value(value)
     except Exception:
         return value
@@ -56,9 +57,8 @@ def get_invocation_trace(invocation_id: str) -> Optional[Dict[str, Any]]:
     for message in reversed(get_messages(invocation["conversation_id"])):
         trace = message.get("trace") or {}
         context = trace.get("context") or {}
-        if (
-            context.get("invocation_id") == invocation_id
-            or trace.get("trace_id") == invocation.get("trace_id")
+        if context.get("invocation_id") == invocation_id or trace.get("trace_id") == invocation.get(
+            "trace_id"
         ):
             return _sanitize_trace(trace)
 

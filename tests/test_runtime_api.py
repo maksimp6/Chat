@@ -48,7 +48,10 @@ def test_status_endpoint_is_safe_and_not_found_is_stable(client):
     session = client.post("/api/sessions", json={"metadata": {}}).get_json()
     invocation = client.post(
         f"/api/sessions/{session['id']}/invocations",
-        json={"conversation_id": "conversation-status", "metadata": {"authorization": "secret", "kind": "test"}},
+        json={
+            "conversation_id": "conversation-status",
+            "metadata": {"authorization": "secret", "kind": "test"},
+        },
     ).get_json()
 
     response = client.get(f"/api/invocations/{invocation['invocation_id']}/status")
@@ -83,12 +86,14 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
     )
     trace = create_invocation_trace(context)
     trace.set_request({"authorization": "top-secret", "message": "hello"})
-    trace.add_response({
-        "id": "resp-1",
-        "status": "completed",
-        "headers": {"authorization": "secret"},
-        "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}],
-    })
+    trace.add_response(
+        {
+            "id": "resp-1",
+            "status": "completed",
+            "headers": {"authorization": "secret"},
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}],
+        }
+    )
     trace_data = trace.finalize()
 
     conn = db.get_conn()

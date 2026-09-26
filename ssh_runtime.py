@@ -3,6 +3,7 @@
 The runtime uses the system OpenSSH client. The selected SSH account is the
 remote OS identity, so Linux permissions remain the authorization boundary.
 """
+
 from __future__ import annotations
 
 import json
@@ -108,12 +109,18 @@ class SSHRuntime:
                 name=str(name),
                 host=host,
                 port=port,
-                default_user=(str(cfg["default_user"]).strip() if cfg.get("default_user") else None),
+                default_user=(
+                    str(cfg["default_user"]).strip() if cfg.get("default_user") else None
+                ),
                 allowed_users=tuple(str(user).strip() for user in allowed if str(user).strip()),
-                identity_file=(str(cfg["identity_file"]).strip() if cfg.get("identity_file") else None),
+                identity_file=(
+                    str(cfg["identity_file"]).strip() if cfg.get("identity_file") else None
+                ),
                 known_hosts=(str(cfg["known_hosts"]).strip() if cfg.get("known_hosts") else None),
                 identity_map=tuple(normalized_identity_map),
-                workspace_root=(str(cfg["workspace_root"]).strip() if cfg.get("workspace_root") else None),
+                workspace_root=(
+                    str(cfg["workspace_root"]).strip() if cfg.get("workspace_root") else None
+                ),
                 connect_timeout_seconds=float(cfg.get("connect_timeout_seconds", 10.0)),
                 command_timeout_seconds=float(cfg.get("command_timeout_seconds", 30.0)),
                 max_output_bytes=int(cfg.get("max_output_bytes", 1048576)),
@@ -125,7 +132,10 @@ class SSHRuntime:
         value = str(user or "").strip()
         if not value or len(value) > 64:
             raise SSHRuntimeError("Linux user is required and must be <= 64 characters")
-        if any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for ch in value):
+        if any(
+            ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+            for ch in value
+        ):
             raise SSHRuntimeError("Linux user contains unsupported characters")
         return value
 
@@ -211,9 +221,7 @@ class SSHRuntime:
     ) -> list[str]:
         known_hosts = target.known_hosts or self._default_known_hosts
         if not known_hosts:
-            raise SSHRuntimeError(
-                "SSH host-key verification requires configured known_hosts"
-            )
+            raise SSHRuntimeError("SSH host-key verification requires configured known_hosts")
 
         command = [
             "ssh",
@@ -268,9 +276,7 @@ class SSHRuntime:
                 timeout=timeout + 10,
             )
         except subprocess.TimeoutExpired as exc:
-            raise SSHRuntimeError(
-                f"SSH command timed out after {timeout:g}s"
-            ) from exc
+            raise SSHRuntimeError(f"SSH command timed out after {timeout:g}s") from exc
         except OSError as exc:
             raise SSHRuntimeError(f"Unable to start ssh: {exc}") from exc
 
@@ -351,7 +357,7 @@ class SSHRuntime:
             f"tmp=$(mktemp -- {template}); "
             "trap 'rm -f -- \"$tmp\"' EXIT; "
             'cat > "$tmp"; '
-            f"mv -f -- \"$tmp\" {quoted_path}; "
+            f'mv -f -- "$tmp" {quoted_path}; '
             "trap - EXIT"
         )
 
@@ -377,9 +383,7 @@ class SSHRuntime:
                 timeout=timeout + 10,
             )
         except subprocess.TimeoutExpired as exc:
-            raise SSHRuntimeError(
-                f"SSH file write timed out after {timeout:g}s"
-            ) from exc
+            raise SSHRuntimeError(f"SSH file write timed out after {timeout:g}s") from exc
         except OSError as exc:
             raise SSHRuntimeError(f"Unable to start ssh: {exc}") from exc
 

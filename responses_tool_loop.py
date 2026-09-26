@@ -1,4 +1,5 @@
 """Helpers for continuing Yandex Responses API requests after tool calls."""
+
 from __future__ import annotations
 
 import json
@@ -41,9 +42,7 @@ def build_continuation_input(
     calls = extract_function_calls(response)
     values = list(results)
     if len(calls) != len(values):
-        raise ValueError(
-            f"tool call/result count mismatch: {len(calls)} != {len(values)}"
-        )
+        raise ValueError(f"tool call/result count mismatch: {len(calls)} != {len(values)}")
     return [make_function_call_output(call, result) for call, result in zip(calls, values)]
 
 

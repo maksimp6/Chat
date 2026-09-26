@@ -14,13 +14,9 @@ api_logger.setLevel(logging.DEBUG)
 api_logger.propagate = False
 
 if not api_logger.handlers:
-    file_handler = logging.FileHandler(
-        LOG_FILE, encoding="utf-8", mode="a"
-    )
+    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8", mode="a")
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s | %(levelname)-7s | %(message)s")
-    )
+    file_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)-7s | %(message)s"))
     api_logger.addHandler(file_handler)
 
 # Emit a deterministic startup marker immediately after logger initialization.

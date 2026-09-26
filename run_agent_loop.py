@@ -16,14 +16,16 @@ SYSTEM_PROMPT = (
     "Всегда проверяй результаты выполнения команд перед финальным ответом."
 )
 
+
 def build_openai_tools(schemas):
     """Преобразует TOOLS_SCHEMA в формат OpenAI functions."""
     return [{"type": "function", "function": s} for s in schemas]
 
+
 def execute_agent_turn(user_prompt: str, max_turns: int = 8):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt}
+        {"role": "user", "content": user_prompt},
     ]
     tools = build_openai_tools(TOOLS_SCHEMA)
 
@@ -31,20 +33,15 @@ def execute_agent_turn(user_prompt: str, max_turns: int = 8):
 
     for step in range(max_turns):
         print(f"\n[Шаг {step + 1}] Отправка контекста в LLM...")
-        
-        payload = {
-            "model": MODEL_NAME,
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto"
-        }
+
+        payload = {"model": MODEL_NAME, "messages": messages, "tools": tools, "tool_choice": "auto"}
 
         try:
             resp = requests.post(
                 API_URL,
                 headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
                 json=payload,
-                timeout=45
+                timeout=45,
             )
             resp_data = resp.json()
         except Exception as e:
@@ -81,13 +78,16 @@ def execute_agent_turn(user_prompt: str, max_turns: int = 8):
             output = dispatch_tool(func_name, args)
 
             # Передаем результат выполнения обратно в историю сообщений
-            messages.append({
-                "role": "tool",
-                "tool_call_id": call_id,
-                "content": json.dumps(output, ensure_ascii=False)
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": json.dumps(output, ensure_ascii=False),
+                }
+            )
 
     return "Превышен лимит итераций (max_turns) без завершения задачи."
+
 
 if __name__ == "__main__":
     task = "Проверь статус /sdcard/repo/bare и покажи последние коммиты."

@@ -16,6 +16,7 @@ SYSTEM_PROMPT = """Ты — автономный инженерный агент
 {"text": "ответ пользователю"}
 Всегда отвечай только валидным JSON без лишних префиксов."""
 
+
 def dispatch_any_tool(tool_name: str, args: dict):
     if tool_name in GIT_TOOLS:
         return execute_git_tool(tool_name, args)
@@ -23,27 +24,29 @@ def dispatch_any_tool(tool_name: str, args: dict):
         return execute_fs_tool(tool_name, args)
     return {"error": f"Инструмент '{tool_name}' не найден"}
 
+
 def query_yandex(messages):
     payload = {
         "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {"temperature": 0.1, "maxTokens": "2000"},
-        "messages": messages
+        "messages": messages,
     }
     resp = requests.post(
         API_URL,
-        headers={"Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}",
+            "Content-Type": "application/json",
+        },
         json=payload,
-        timeout=45
+        timeout=45,
     )
     resp.raise_for_status()
     data = resp.json()
     return data["result"]["alternatives"][0]["message"]["text"]
 
+
 def run_task(task_text: str, max_turns: int = 6):
-    messages = [
-        {"role": "system", "text": SYSTEM_PROMPT},
-        {"role": "user", "text": task_text}
-    ]
+    messages = [{"role": "system", "text": SYSTEM_PROMPT}, {"role": "user", "text": task_text}]
 
     print(f"🎯 Задача: {task_text}\n")
 
@@ -61,19 +64,25 @@ def run_task(task_text: str, max_turns: int = 6):
         if "tool" in decision:
             fn_name = decision["tool"]
             fn_args = decision.get("args", {})
-            print(f"[Шаг {step+1}] Вызов инструмента: {fn_name}({fn_args})")
-            
+            print(f"[Шаг {step + 1}] Вызов инструмента: {fn_name}({fn_args})")
+
             result = dispatch_any_tool(fn_name, fn_args)
             print(f"  └ Результат: {json.dumps(result, ensure_ascii=False)[:250]}")
 
             messages.append({"role": "assistant", "text": json.dumps(decision, ensure_ascii=False)})
-            messages.append({"role": "user", "text": f"Результат вызова {fn_name}:\n{json.dumps(result, ensure_ascii=False)}"})
+            messages.append(
+                {
+                    "role": "user",
+                    "text": f"Результат вызова {fn_name}:\n{json.dumps(result, ensure_ascii=False)}",
+                }
+            )
         elif "text" in decision:
             return decision["text"]
         else:
             return clean
 
     return "Превышен лимит шагов выполнения."
+
 
 if __name__ == "__main__":
     task = "Проверь статус /sdcard/repo/bare, привяжи его в текущем репозитории как remote 'local_bare' и покажи статус."

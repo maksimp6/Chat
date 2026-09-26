@@ -31,7 +31,13 @@ def test_rotation_promotes_one_global_key_for_12_hours():
         """INSERT INTO provider_credentials
            (api_key_encrypted, yandex_key_id, project_id, issued_at, expires_at, status)
            VALUES (?, ?, ?, ?, ?, 'active')""",
-        ("old-cipher", "aje-old-key", "project-1", now - timedelta(hours=11), now + timedelta(minutes=30)),
+        (
+            "old-cipher",
+            "aje-old-key",
+            "project-1",
+            now - timedelta(hours=11),
+            now + timedelta(minutes=30),
+        ),
     )
     conn.commit()
 

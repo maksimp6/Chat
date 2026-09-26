@@ -1,4 +1,5 @@
 """Encrypted storage boundary for deployment-wide provider credentials."""
+
 from __future__ import annotations
 
 import base64
@@ -24,9 +25,7 @@ def _fernet():
 
     # Accept any non-empty deployment secret. Derive a stable Fernet key
     # instead of requiring callers to provide Fernet's exact key format.
-    derived = base64.urlsafe_b64encode(
-        hashlib.sha256(key.encode("utf-8")).digest()
-    )
+    derived = base64.urlsafe_b64encode(hashlib.sha256(key.encode("utf-8")).digest())
     return Fernet(derived), InvalidToken
 
 

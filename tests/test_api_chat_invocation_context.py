@@ -10,16 +10,16 @@ class ApiChatInvocationContextTests(unittest.TestCase):
     def test_chat_creates_and_completes_invocation_with_trace_context(self):
         client = app.test_client()
         fake_response = {
-            "output": [
-                {"type": "message", "content": [{"type": "output_text", "text": "ok"}]}
-            ],
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}],
             "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
             "status": "completed",
         }
 
-        with patch("mcp_routes.get_conv_settings", return_value={}), \
-             patch("mcp_routes.add_message"), \
-             patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response):
+        with (
+            patch("mcp_routes.get_conv_settings", return_value={}),
+            patch("mcp_routes.add_message"),
+            patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response),
+        ):
             response = client.post(
                 "/api/chat",
                 json={"conversation_id": "conv-test", "message": "hello", "model": "aliceai-llm"},
@@ -36,9 +36,11 @@ class ApiChatInvocationContextTests(unittest.TestCase):
     def test_chat_failure_persists_failed_invocation_and_trace(self):
         client = app.test_client()
 
-        with patch("mcp_routes.get_conv_settings", return_value={}), \
-             patch("mcp_routes.add_message"), \
-             patch("mcp_routes.AliceClient.ask_with_mcp", side_effect=RuntimeError("boom")):
+        with (
+            patch("mcp_routes.get_conv_settings", return_value={}),
+            patch("mcp_routes.add_message"),
+            patch("mcp_routes.AliceClient.ask_with_mcp", side_effect=RuntimeError("boom")),
+        ):
             response = client.post(
                 "/api/chat",
                 json={"conversation_id": "conv-test", "message": "hello"},

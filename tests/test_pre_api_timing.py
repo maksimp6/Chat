@@ -1,4 +1,5 @@
 """Regression tests for the pre-Responses-API timing gap in /api/chat."""
+
 import unittest
 from unittest.mock import patch
 
@@ -10,11 +11,12 @@ from trace_manager import ExecutionTrace
 class TestPreApiTiming(unittest.TestCase):
     def test_pre_api_pipeline_is_recorded_from_request_initialization_to_api_send(self):
         trace = ExecutionTrace()
-        trace.set_request({"conversation_id": "conv", "message": "hello", "model": "aliceai-llm", "params": {}})
+        trace.set_request(
+            {"conversation_id": "conv", "message": "hello", "model": "aliceai-llm", "params": {}}
+        )
 
         request_initialized = next(
-            event for event in trace.trace["events"]
-            if event["type"] == "request_initialized"
+            event for event in trace.trace["events"] if event["type"] == "request_initialized"
         )
         init_ts = request_initialized["timestamp"]
         api_start = init_ts + 0.450
@@ -29,16 +31,18 @@ class TestPreApiTiming(unittest.TestCase):
             "end_timestamp": first_api_start,
             "duration_ms": pre_api_ms,
         }
-        trace.trace.setdefault("events", []).append({
-            "type": "pre_api_pipeline_completed",
-            "timestamp": first_api_start,
-            "payload": {
-                "start_timestamp": request_init_timestamp,
-                "end_timestamp": first_api_start,
-                "timing_ms": pre_api_ms,
-                "step": api_requests[0].get("step", 1),
-            },
-        })
+        trace.trace.setdefault("events", []).append(
+            {
+                "type": "pre_api_pipeline_completed",
+                "timestamp": first_api_start,
+                "payload": {
+                    "start_timestamp": request_init_timestamp,
+                    "end_timestamp": first_api_start,
+                    "timing_ms": pre_api_ms,
+                    "step": api_requests[0].get("step", 1),
+                },
+            }
+        )
 
         finalized = trace.finalize()
         timing = finalized["timings"]["pre_api_pipeline"]
@@ -57,7 +61,8 @@ class TestPreApiTiming(unittest.TestCase):
             def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
                 self.assert_trace(trace)
                 init_ts = next(
-                    e["timestamp"] for e in trace.trace["events"]
+                    e["timestamp"]
+                    for e in trace.trace["events"]
                     if e["type"] == "request_initialized"
                 )
                 api_start = init_ts + 0.450
@@ -84,13 +89,17 @@ class TestPreApiTiming(unittest.TestCase):
             def extract_usage(_response):
                 return None
 
-        with patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()), \
-             patch.object(mcp_routes, "get_conv_settings", return_value={}), \
-             patch.object(mcp_routes, "add_message"), \
-             patch.object(mcp_routes, "settle_billing_to_treasury", return_value={"status": "not_applicable"}), \
-             patch.object(mcp_routes, "persist_invocation_trace"), \
-             patch.object(mcp_routes, "finish_invocation"), \
-             patch.object(mcp_routes, "get_conversation_title", return_value=None):
+        with (
+            patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+            patch.object(mcp_routes, "get_conv_settings", return_value={}),
+            patch.object(mcp_routes, "add_message"),
+            patch.object(
+                mcp_routes, "settle_billing_to_treasury", return_value={"status": "not_applicable"}
+            ),
+            patch.object(mcp_routes, "persist_invocation_trace"),
+            patch.object(mcp_routes, "finish_invocation"),
+            patch.object(mcp_routes, "get_conversation_title", return_value=None),
+        ):
             app.config["TESTING"] = True
             with app.test_client() as client:
                 response = client.post(

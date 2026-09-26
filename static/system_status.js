@@ -9,7 +9,7 @@
     blocked: 3,
     revoked: 4,
     error: 4,
-    stopped: 1
+    stopped: 1,
   };
 
   var labels = {
@@ -20,7 +20,7 @@
     blocked: "Заблокировано",
     revoked: "Доступ отозван",
     error: "Ошибка",
-    stopped: "Остановлено"
+    stopped: "Остановлено",
   };
 
   function getRoot() {
@@ -59,43 +59,45 @@
     if (!list) return;
 
     list.innerHTML = "";
-    Object.keys(snapshot).sort().forEach(function (moduleId) {
-      var item = snapshot[moduleId];
-      var row = document.createElement("div");
-      row.className = "alice-system-status-row";
-      row.dataset.status = item.status;
+    Object.keys(snapshot)
+      .sort()
+      .forEach(function (moduleId) {
+        var item = snapshot[moduleId];
+        var row = document.createElement("div");
+        row.className = "alice-system-status-row";
+        row.dataset.status = item.status;
 
-      var indicator = document.createElement("span");
-      indicator.className = "alice-system-status-indicator";
-      indicator.textContent = statusIcon(item.status);
-      indicator.setAttribute("aria-hidden", "true");
+        var indicator = document.createElement("span");
+        indicator.className = "alice-system-status-indicator";
+        indicator.textContent = statusIcon(item.status);
+        indicator.setAttribute("aria-hidden", "true");
 
-      var text = document.createElement("div");
-      text.className = "alice-system-status-text";
+        var text = document.createElement("div");
+        text.className = "alice-system-status-text";
 
-      var title = document.createElement("strong");
-      title.textContent = moduleId;
-      var detail = document.createElement("span");
-      detail.textContent = labels[item.status] + (item.message ? ": " + item.message : "");
+        var title = document.createElement("strong");
+        title.textContent = moduleId;
+        var detail = document.createElement("span");
+        detail.textContent = labels[item.status] + (item.message ? ": " + item.message : "");
 
-      text.appendChild(title);
-      text.appendChild(detail);
-      row.appendChild(indicator);
-      row.appendChild(text);
+        text.appendChild(title);
+        text.appendChild(detail);
+        row.appendChild(indicator);
+        row.appendChild(text);
 
-      if (item.metadata && item.metadata.revocable === true && item.status !== "revoked") {
-        var revokeButton = document.createElement("button");
-        revokeButton.type = "button";
-        revokeButton.className = "alice-btn alice-system-status-revoke";
-        revokeButton.textContent = "Отозвать";
-        revokeButton.addEventListener("click", function () {
-          window.AliceCoreAPI.revocation.revoke("module", moduleId, "user_requested");
-        });
-        row.appendChild(revokeButton);
-      }
+        if (item.metadata && item.metadata.revocable === true && item.status !== "revoked") {
+          var revokeButton = document.createElement("button");
+          revokeButton.type = "button";
+          revokeButton.className = "alice-btn alice-system-status-revoke";
+          revokeButton.textContent = "Отозвать";
+          revokeButton.addEventListener("click", function () {
+            window.AliceCoreAPI.revocation.revoke("module", moduleId, "user_requested");
+          });
+          row.appendChild(revokeButton);
+        }
 
-      list.appendChild(row);
-    });
+        list.appendChild(row);
+      });
   }
 
   function bind() {
@@ -127,7 +129,7 @@
     });
 
     var unsubscribe = window.AliceCoreAPI.status.subscribe(render);
-    window.AliceCoreAPI.status.set("ui", "ready", "Приборная панель активна", {revocable: false});
+    window.AliceCoreAPI.status.set("ui", "ready", "Приборная панель активна", { revocable: false });
 
     window.addEventListener("alice:revocation", function (event) {
       var detail = event.detail || {};
@@ -136,7 +138,7 @@
       }
     });
 
-    window.addEventListener("beforeunload", unsubscribe, {once: true});
+    window.addEventListener("beforeunload", unsubscribe, { once: true });
   }
 
   function init() {
@@ -148,7 +150,7 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, {once: true});
+    document.addEventListener("DOMContentLoaded", init, { once: true });
   } else {
     init();
   }

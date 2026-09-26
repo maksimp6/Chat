@@ -1,22 +1,19 @@
 """Локальные MCP-инструменты для поиска и чтения статей в Wikipedia."""
+
 import requests
 import logging
 
 logger = logging.getLogger("wikipedia_mcp")
+
 
 def wikipedia_search(arguments: dict, cfg: dict = None) -> dict:
     query = arguments.get("query")
     lang = arguments.get("lang", "ru")
     if not query:
         return {"success": False, "error": "Не указан поисковый запрос (query)"}
-    
+
     url = f"https://{lang}.wikipedia.org/w/api.php"
-    params = {
-        "action": "query",
-        "list": "search",
-        "srsearch": query,
-        "format": "json"
-    }
+    params = {"action": "query", "list": "search", "srsearch": query, "format": "json"}
     try:
         headers = {"User-Agent": "AlicePro/1.0"}
         res = requests.get(url, params=params, headers=headers, timeout=10)
@@ -25,7 +22,9 @@ def wikipedia_search(arguments: dict, cfg: dict = None) -> dict:
         results = [
             {
                 "title": item["title"],
-                "snippet": item["snippet"].replace('<span class="searchmatch">', '').replace('</span>', '')
+                "snippet": item["snippet"]
+                .replace('<span class="searchmatch">', "")
+                .replace("</span>", ""),
             }
             for item in search_results[:5]
         ]
@@ -33,12 +32,13 @@ def wikipedia_search(arguments: dict, cfg: dict = None) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+
 def wikipedia_summary(arguments: dict, cfg: dict = None) -> dict:
     title = arguments.get("title")
     lang = arguments.get("lang", "ru")
     if not title:
         return {"success": False, "error": "Не указан заголовок статьи (title)"}
-    
+
     url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(title)}"
     try:
         headers = {"User-Agent": "AlicePro/1.0"}
@@ -50,10 +50,11 @@ def wikipedia_summary(arguments: dict, cfg: dict = None) -> dict:
             "success": True,
             "title": data.get("title"),
             "extract": data.get("extract"),
-            "url": data.get("content_urls", {}).get("desktop", {}).get("page", "")
+            "url": data.get("content_urls", {}).get("desktop", {}).get("page", ""),
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 TOOL_REGISTRY = {
     "wikipedia_search": {
@@ -63,10 +64,10 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Поисковый запрос"},
-                "lang": {"type": "string", "description": "Язык ('ru', 'en'), по умолчанию 'ru'"}
+                "lang": {"type": "string", "description": "Язык ('ru', 'en'), по умолчанию 'ru'"},
             },
-            "required": ["query"]
-        }
+            "required": ["query"],
+        },
     },
     "wikipedia_summary": {
         "func": wikipedia_summary,
@@ -75,11 +76,11 @@ TOOL_REGISTRY = {
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "Точное название статьи"},
-                "lang": {"type": "string", "description": "Язык ('ru', 'en'), по умолчанию 'ru'"}
+                "lang": {"type": "string", "description": "Язык ('ru', 'en'), по умолчанию 'ru'"},
             },
-            "required": ["title"]
-        }
-    }
+            "required": ["title"],
+        },
+    },
 }
 
 WIKIPEDIA_TOOLS = TOOL_REGISTRY

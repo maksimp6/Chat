@@ -69,7 +69,9 @@ class PersistentRuntimeRecordsTests(unittest.TestCase):
         self.assertEqual(running["status"], "running")
         self.assertIsNotNone(running["started_at"])
 
-        self.assertTrue(finish_invocation(context.invocation_id, {"answer": "ok", "token": "secret"}))
+        self.assertTrue(
+            finish_invocation(context.invocation_id, {"answer": "ok", "token": "secret"})
+        )
         completed = get_invocation(context.invocation_id)
         self.assertEqual(completed["status"], "completed")
         self.assertEqual(completed["result"], {"answer": "ok"})
@@ -78,13 +80,17 @@ class PersistentRuntimeRecordsTests(unittest.TestCase):
 
     def test_failed_and_cancelled_invocations_persist_terminal_status(self):
         failed = create_invocation("session-1", "conversation-1")
-        self.assertTrue(fail_invocation(failed.invocation_id, {"error": "boom", "api_key": "secret"}))
+        self.assertTrue(
+            fail_invocation(failed.invocation_id, {"error": "boom", "api_key": "secret"})
+        )
         failed_record = get_invocation(failed.invocation_id)
         self.assertEqual(failed_record["status"], "failed")
         self.assertEqual(failed_record["error"], {"error": "boom"})
 
         cancelled = create_invocation("session-1", "conversation-1")
-        self.assertTrue(cancel_invocation(cancelled.invocation_id, {"reason": "user", "password": "secret"}))
+        self.assertTrue(
+            cancel_invocation(cancelled.invocation_id, {"reason": "user", "password": "secret"})
+        )
         cancelled_record = get_invocation(cancelled.invocation_id)
         self.assertEqual(cancelled_record["status"], "cancelled")
         self.assertEqual(cancelled_record["error"], {"reason": "user"})
@@ -98,7 +104,10 @@ class PersistentRuntimeRecordsTests(unittest.TestCase):
         self.assertEqual(get_session("session-2")["id"], "session-2")
         self.assertEqual(get_invocation(first.invocation_id)["session_id"], "session-1")
         self.assertEqual(get_invocation(second.invocation_id)["session_id"], "session-2")
-        self.assertNotEqual(get_invocation(first.invocation_id)["trace_id"], get_invocation(second.invocation_id)["trace_id"])
+        self.assertNotEqual(
+            get_invocation(first.invocation_id)["trace_id"],
+            get_invocation(second.invocation_id)["trace_id"],
+        )
 
 
 if __name__ == "__main__":

@@ -70,7 +70,9 @@ def test_ip_validation_rejects_invalid_values():
 
 def test_cloudru_reissue_api_key_uses_same_resource_endpoint():
     client = CloudRuIamClient(key_id="id", key_secret="secret")
-    with patch.object(client, "_request", return_value={"id": "key-1", "secret": "new-secret"}) as req:
+    with patch.object(
+        client, "_request", return_value={"id": "key-1", "secret": "new-secret"}
+    ) as req:
         response = client.reissue_api_key(
             api_key_id="key-1",
             expires_at="2026-10-01T00:00:00Z",
@@ -84,9 +86,12 @@ def test_cloudru_reissue_api_key_uses_same_resource_endpoint():
     )
     assert req.call_args.kwargs["json_body"] == {"expires_at": "2026-10-01T00:00:00Z"}
 
+
 def test_cloudru_service_account_management_uses_documented_resource():
     client = CloudRuIamClient(key_id="id", key_secret="secret")
-    with patch.object(client, "_request", return_value={"service_accounts": [{"id": "sa-1", "name": "Alice Pro"}]}) as req:
+    with patch.object(
+        client, "_request", return_value={"service_accounts": [{"id": "sa-1", "name": "Alice Pro"}]}
+    ) as req:
         accounts = client.list_service_accounts()
     assert accounts == [{"id": "sa-1", "name": "Alice Pro"}]
     req.assert_called_once_with("GET", "/api/v1/service-accounts")

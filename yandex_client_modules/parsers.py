@@ -26,12 +26,7 @@ def extract_reasoning_and_text(data):
         elif item.get("type") == "output_text" and item.get("text"):
             text_parts.append(str(item["text"]))
 
-    final_text = (
-        "".join(text_parts)
-        or data.get("output_text")
-        or data.get("text")
-        or ""
-    )
+    final_text = "".join(text_parts) or data.get("output_text") or data.get("text") or ""
     final_reasoning = "\n\n".join(reasoning_parts)
 
     return final_reasoning, str(final_text)

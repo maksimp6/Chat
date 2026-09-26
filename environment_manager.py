@@ -64,7 +64,9 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
         raise ValueError("branch is required")
     if not value:
         raise ValueError("commit is required")
-    if any(ch in value for ch in ("\x00", "\n", "\r")) or any(ch in branch_value for ch in ("\x00", "\n", "\r")):
+    if any(ch in value for ch in ("\x00", "\n", "\r")) or any(
+        ch in branch_value for ch in ("\x00", "\n", "\r")
+    ):
         raise ValueError("invalid git ref")
     try:
         resolved = _run_git("rev-parse", "--verify", f"{value}^{{commit}}")
@@ -124,12 +126,8 @@ def init_environment_tables() -> None:
             )
             """
         )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_environments_owner ON environments(owner_id)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_environments_status ON environments(status)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_environments_owner ON environments(owner_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_environments_status ON environments(status)")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_environment_events_env ON environment_events(environment_id)"
         )
@@ -197,20 +195,25 @@ def _record_trace(
             session_id=f"environment:{environment['environment_id']}",
             conversation_id=f"environment:{environment['environment_id']}",
         )
-    trace.set_request({
-        "operation": operation,
-        "environment_id": environment["environment_id"],
-        "branch": environment["branch_name"],
-        "commit_sha": environment["commit_sha"],
-    })
-    trace.add_event("environment_lifecycle", {
-        "environment_id": environment["environment_id"],
-        "branch": environment["branch_name"],
-        "commit_sha": environment["commit_sha"],
-        "operation": operation,
-        "status": status,
-        **(extra or {}),
-    })
+    trace.set_request(
+        {
+            "operation": operation,
+            "environment_id": environment["environment_id"],
+            "branch": environment["branch_name"],
+            "commit_sha": environment["commit_sha"],
+        }
+    )
+    trace.add_event(
+        "environment_lifecycle",
+        {
+            "environment_id": environment["environment_id"],
+            "branch": environment["branch_name"],
+            "commit_sha": environment["commit_sha"],
+            "operation": operation,
+            "status": status,
+            **(extra or {}),
+        },
+    )
     if error:
         trace.record_error(operation, error)
     trace.finalize()
@@ -272,7 +275,14 @@ class EnvironmentRuntime:
         self.worktree.parent.mkdir(parents=True, exist_ok=True)
         if not self.worktree.exists():
             subprocess.run(
-                ["git", "worktree", "add", "--detach", str(self.worktree), self.environment["commit_sha"]],
+                [
+                    "git",
+                    "worktree",
+                    "add",
+                    "--detach",
+                    str(self.worktree),
+                    self.environment["commit_sha"],
+                ],
                 cwd=str(_repo_root()),
                 check=True,
                 capture_output=True,
@@ -283,16 +293,18 @@ class EnvironmentRuntime:
         log_path = self.data_dir / "runtime.log"
         log = open(log_path, "ab")
         env = os.environ.copy()
-        env.update({
-            "ALICE_ENV_ID": self.environment["environment_id"],
-            "GIT_BRANCH": self.environment["branch_name"],
-            "GIT_COMMIT_SHA": self.environment["commit_sha"],
-            "ALICE_ENV_NAMESPACE": self.environment["data_namespace"],
-            "ALICE_PREVIEW_BASE_PATH": "/environments/" + self.environment["environment_id"],
-            "ALICE_DB_PATH": str(self.data_dir / "alice_pro.db"),
-            "HOST": "127.0.0.1",
-            "PORT": str(port),
-        })
+        env.update(
+            {
+                "ALICE_ENV_ID": self.environment["environment_id"],
+                "GIT_BRANCH": self.environment["branch_name"],
+                "GIT_COMMIT_SHA": self.environment["commit_sha"],
+                "ALICE_ENV_NAMESPACE": self.environment["data_namespace"],
+                "ALICE_PREVIEW_BASE_PATH": "/environments/" + self.environment["environment_id"],
+                "ALICE_DB_PATH": str(self.data_dir / "alice_pro.db"),
+                "HOST": "127.0.0.1",
+                "PORT": str(port),
+            }
+        )
         process = subprocess.Popen(
             self._command(),
             cwd=str(self.worktree),
@@ -322,6 +334,7 @@ class EnvironmentRuntime:
                 timeout=60,
             )
         import shutil
+
         shutil.rmtree(self.worktree.parent, ignore_errors=True)
 
 
@@ -398,7 +411,9 @@ def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
         conn.close()
 
 
-def start_environment(environment_id: str, owner_id: Optional[str] = None, *, context=None) -> Dict[str, Any]:
+def start_environment(
+    environment_id: str, owner_id: Optional[str] = None, *, context=None
+) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "RUNNING")
     runtime = EnvironmentRuntime(item)
@@ -418,8 +433,18 @@ def start_environment(environment_id: str, owner_id: Optional[str] = None, *, co
             conn.commit()
         finally:
             conn.close()
-        item.update({"status": "RUNNING", "runtime_pid": pid, "runtime_port": port, "started_at": _now(), "error": None})
-        _record_trace(item, "START_ENVIRONMENT", "SUCCESS", context=context, extra={"runtime_port": port})
+        item.update(
+            {
+                "status": "RUNNING",
+                "runtime_pid": pid,
+                "runtime_port": port,
+                "started_at": _now(),
+                "error": None,
+            }
+        )
+        _record_trace(
+            item, "START_ENVIRONMENT", "SUCCESS", context=context, extra={"runtime_port": port}
+        )
         return item
     except Exception as exc:
         conn = get_conn()
@@ -436,7 +461,9 @@ def start_environment(environment_id: str, owner_id: Optional[str] = None, *, co
         raise
 
 
-def stop_environment(environment_id: str, owner_id: Optional[str] = None, *, context=None) -> Dict[str, Any]:
+def stop_environment(
+    environment_id: str, owner_id: Optional[str] = None, *, context=None
+) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "STOPPED")
     EnvironmentRuntime(item).stop(item.get("runtime_pid"))
@@ -454,14 +481,18 @@ def stop_environment(environment_id: str, owner_id: Optional[str] = None, *, con
     return item
 
 
-def restart_environment(environment_id: str, owner_id: Optional[str] = None, *, context=None) -> Dict[str, Any]:
+def restart_environment(
+    environment_id: str, owner_id: Optional[str] = None, *, context=None
+) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     if item["status"] == "RUNNING":
         stop_environment(environment_id, owner_id, context=context)
     return start_environment(environment_id, owner_id, context=context)
 
 
-def delete_environment(environment_id: str, owner_id: Optional[str] = None, *, context=None) -> Dict[str, Any]:
+def delete_environment(
+    environment_id: str, owner_id: Optional[str] = None, *, context=None
+) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     if item["status"] == "RUNNING":
         stop_environment(environment_id, owner_id, context=context)

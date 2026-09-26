@@ -37,8 +37,7 @@ class DatabaseArchiver:
             cursor.execute("DELETE FROM messages WHERE created_at < ?", (cutoff,))
             conn.commit()
             print(
-                f"💼 Successfully archived {len(rows)} records under schema "
-                f"v{self.schema_version}."
+                f"💼 Successfully archived {len(rows)} records under schema v{self.schema_version}."
             )
             return True
 

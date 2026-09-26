@@ -4,6 +4,7 @@
 Run this worker at least hourly. It rotates when the active key has one hour or
 less remaining. The generated replacement is valid for exactly 12 hours.
 """
+
 from __future__ import annotations
 
 import logging

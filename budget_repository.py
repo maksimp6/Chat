@@ -45,9 +45,7 @@ class BudgetRepository:
         conn = get_conn()
         try:
             if not is_postgres_configured():
-                raise BudgetPersistenceError(
-                    "budget persistence requires the PostgreSQL backend"
-                )
+                raise BudgetPersistenceError("budget persistence requires the PostgreSQL backend")
 
             cur = conn.cursor()
             cur.execute(
@@ -74,15 +72,20 @@ class BudgetRepository:
             value = json.loads(row[0]) if isinstance(row[0], str) else row[0]
             trace = get_current_trace() if get_current_trace is not None else None
             if trace is not None:
-                trace.add_event("budget_operation_persisted", {
-                    "budget_id": budget_id,
-                    "account_type": account_type,
-                    "operation_type": operation_type,
-                    "amount": str(amount),
-                    "operation_id": value.get("operation_id") if isinstance(value, dict) else None,
-                    "status": value.get("status") if isinstance(value, dict) else None,
-                    "idempotency_key": idempotency_key,
-                })
+                trace.add_event(
+                    "budget_operation_persisted",
+                    {
+                        "budget_id": budget_id,
+                        "account_type": account_type,
+                        "operation_type": operation_type,
+                        "amount": str(amount),
+                        "operation_id": value.get("operation_id")
+                        if isinstance(value, dict)
+                        else None,
+                        "status": value.get("status") if isinstance(value, dict) else None,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
             return value
         except Exception:
             conn.rollback()

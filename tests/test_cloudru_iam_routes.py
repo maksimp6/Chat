@@ -27,22 +27,28 @@ def test_api_key_creation_route_stores_secret_once(monkeypatch, tmp_path):
 
     monkeypatch.setattr(routes, "CloudRuIamClient", FakeClient)
     captured = {}
+
     def fake_store_secret(**kwargs):
         captured.update(kwargs)
         return SimpleNamespace(key_ref="cloudru_key-1", name=kwargs["name"])
+
     monkeypatch.setattr(routes, "store_secret", fake_store_secret)
 
     from flask import Flask
+
     app = Flask(__name__)
     app.register_blueprint(routes.cloudru_iam_bp)
 
     with app.test_client() as client:
-        response = client.post("/api/cloudru/iam/api-keys", json={
-            "service_account_id": "sa-1",
-            "name": "Alice Pro",
-            "products": ["monaas"],
-            "confirm": True,
-        })
+        response = client.post(
+            "/api/cloudru/iam/api-keys",
+            json={
+                "service_account_id": "sa-1",
+                "name": "Alice Pro",
+                "products": ["monaas"],
+                "confirm": True,
+            },
+        )
 
     assert response.status_code == 200
     payload = response.get_json()

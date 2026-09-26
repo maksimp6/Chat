@@ -24,7 +24,9 @@ def write_plugin(root, plugin_id="demo", entrypoint=None):
 
 def test_discovery_validates_manifest_without_executing_code(tmp_path):
     folder = write_plugin(tmp_path, entrypoint="plugin.py")
-    (folder / "plugin.py").write_text("raise RuntimeError('must not run during discovery')", encoding="utf-8")
+    (folder / "plugin.py").write_text(
+        "raise RuntimeError('must not run during discovery')", encoding="utf-8"
+    )
 
     manager = PluginManager(tmp_path)
     plugins = manager.discover()

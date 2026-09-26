@@ -17,21 +17,26 @@ SYSTEM_PROMPT = """Ты — автономный CLI-ассистент внут
 
 history = [{"role": "system", "text": SYSTEM_PROMPT}]
 
+
 def query_llm(messages):
     payload = {
         "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {"temperature": 0.2, "maxTokens": "2000"},
-        "messages": messages
+        "messages": messages,
     }
     resp = requests.post(
         API_URL,
-        headers={"Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}",
+            "Content-Type": "application/json",
+        },
         json=payload,
-        timeout=60
+        timeout=60,
     )
     resp.raise_for_status()
     data = resp.json()
     return data["result"]["alternatives"][0]["message"]["text"]
+
 
 def run_shell(cmd):
     print(f"\n⚡ Выполняю: {cmd}")
@@ -39,7 +44,7 @@ def run_shell(cmd):
     out = res.stdout.strip()
     err = res.stderr.strip()
     returncode = res.returncode
-    
+
     result_str = f"EXIT_CODE: {returncode}\n"
     if out:
         result_str += f"STDOUT:\n{out}\n"
@@ -49,6 +54,7 @@ def run_shell(cmd):
         result_str += "(нет вывода)\n"
     return result_str
 
+
 print("🚀 Alice Pro CLI Agent активен. Введите запрос (или 'exit' для выхода):\n")
 
 while True:
@@ -56,12 +62,12 @@ while True:
         user_input = input("User > ").strip()
     except (KeyboardInterrupt, EOFError):
         break
-        
+
     if not user_input or user_input.lower() in ("exit", "quit"):
         break
 
     history.append({"role": "user", "text": user_input})
-    
+
     # Цикл выполнения команд и анализа вывода
     while True:
         try:
@@ -80,10 +86,10 @@ while True:
             cmd = action["command"]
             if action.get("explanation"):
                 print(f"ℹ️  {action['explanation']}")
-            
+
             output = run_shell(cmd)
             print(output)
-            
+
             history.append({"role": "assistant", "text": raw_reply})
             history.append({"role": "user", "text": f"Вывод команды:\n{output}"})
         elif "text" in action:

@@ -1,4 +1,5 @@
 """Provider-agnostic gateway for Alice Pro agents."""
+
 from __future__ import annotations
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
@@ -13,15 +14,41 @@ import json
 import time
 
 
-class AgentGatewayError(Exception): pass
-class AgentAlreadyRegistered(AgentGatewayError): pass
-class AgentNotFound(AgentGatewayError): pass
-class AgentInvocationError(AgentGatewayError): pass
-class AgentPermissionError(AgentGatewayError): pass
-class AgentApprovalRequired(AgentGatewayError): pass
-class AgentRateLimitError(AgentGatewayError): pass
-class AgentCircuitOpenError(AgentGatewayError): pass
-class A2AProtocolError(AgentGatewayError): pass
+class AgentGatewayError(Exception):
+    pass
+
+
+class AgentAlreadyRegistered(AgentGatewayError):
+    pass
+
+
+class AgentNotFound(AgentGatewayError):
+    pass
+
+
+class AgentInvocationError(AgentGatewayError):
+    pass
+
+
+class AgentPermissionError(AgentGatewayError):
+    pass
+
+
+class AgentApprovalRequired(AgentGatewayError):
+    pass
+
+
+class AgentRateLimitError(AgentGatewayError):
+    pass
+
+
+class AgentCircuitOpenError(AgentGatewayError):
+    pass
+
+
+class A2AProtocolError(AgentGatewayError):
+    pass
+
 
 AgentHandler = Callable[[Mapping[str, Any]], Any]
 TokenProvider = Callable[[], Optional[str]]
@@ -60,7 +87,9 @@ class A2AClientConfig:
 
 
 class A2AClient:
-    def __init__(self, config: A2AClientConfig, token_provider: Optional[TokenProvider] = None) -> None:
+    def __init__(
+        self, config: A2AClientConfig, token_provider: Optional[TokenProvider] = None
+    ) -> None:
         if not config.endpoint.strip():
             raise ValueError("A2A endpoint must not be empty")
         if config.timeout_seconds <= 0:
@@ -77,8 +106,11 @@ class A2AClient:
         for key in ("configuration", "metadata"):
             if payload.get(key) is not None:
                 params[key] = payload[key]
-        body = json.dumps({"jsonrpc":"2.0","id":request_id,"method":"message/send","params":params}, separators=(",", ":")).encode()
-        headers = {"Content-Type":"application/json","Accept":"application/json"}
+        body = json.dumps(
+            {"jsonrpc": "2.0", "id": request_id, "method": "message/send", "params": params},
+            separators=(",", ":"),
+        ).encode()
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self._token_provider is not None:
             token = self._token_provider()
             if token:
@@ -110,7 +142,12 @@ class A2AClient:
 
 
 class RESTAgentClient:
-    def __init__(self, endpoint: str, token_provider: Optional[TokenProvider] = None, timeout_seconds: float = 30.0) -> None:
+    def __init__(
+        self,
+        endpoint: str,
+        token_provider: Optional[TokenProvider] = None,
+        timeout_seconds: float = 30.0,
+    ) -> None:
         if not endpoint.strip():
             raise ValueError("REST endpoint must not be empty")
         if timeout_seconds <= 0:
@@ -120,12 +157,17 @@ class RESTAgentClient:
         self.token_provider = token_provider
 
     def send(self, payload: Mapping[str, Any]) -> Any:
-        headers = {"Content-Type":"application/json","Accept":"application/json"}
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.token_provider is not None:
             token = self.token_provider()
             if token:
                 headers["Authorization"] = "Bearer " + token
-        req = Request(self.endpoint, data=json.dumps(dict(payload), separators=(",", ":")).encode(), headers=headers, method="POST")
+        req = Request(
+            self.endpoint,
+            data=json.dumps(dict(payload), separators=(",", ":")).encode(),
+            headers=headers,
+            method="POST",
+        )
         try:
             with urlopen(req, timeout=self.timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
@@ -192,7 +234,7 @@ class AgentGateway:
             raise ValueError("agent_id must not be empty")
         if not callable(handler):
             raise TypeError("handler must be callable")
-        if descriptor.risk_level not in {"low","medium","high","critical"}:
+        if descriptor.risk_level not in {"low", "medium", "high", "critical"}:
             raise ValueError("unsupported risk_level")
         with self._lock:
             if descriptor.agent_id in self._agents:
@@ -221,8 +263,12 @@ class AgentGateway:
             items = [a for a in items if capability in a.capabilities]
         return sorted(items, key=lambda a: a.agent_id)
 
-    def _authorize(self, descriptor: AgentDescriptor, user_id: Optional[str], approved: bool) -> None:
-        if descriptor.allowed_users and (user_id is None or user_id not in descriptor.allowed_users):
+    def _authorize(
+        self, descriptor: AgentDescriptor, user_id: Optional[str], approved: bool
+    ) -> None:
+        if descriptor.allowed_users and (
+            user_id is None or user_id not in descriptor.allowed_users
+        ):
             raise AgentPermissionError(f"agent access denied: {descriptor.agent_id}")
         if descriptor.requires_approval and not approved:
             raise AgentApprovalRequired(f"agent approval required: {descriptor.agent_id}")
@@ -267,14 +313,18 @@ class AgentGateway:
             trace.record_error(source, message, call_id=invocation_id)
 
     @staticmethod
-    def _invoke_once(handler: AgentHandler, payload: Mapping[str, Any], timeout_seconds: float) -> Any:
+    def _invoke_once(
+        handler: AgentHandler, payload: Mapping[str, Any], timeout_seconds: float
+    ) -> Any:
         with ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(handler, payload)
             try:
                 return future.result(timeout=timeout_seconds)
             except FutureTimeoutError as exc:
                 future.cancel()
-                raise AgentInvocationError(f"agent invocation timed out after {timeout_seconds:.2f}s") from exc
+                raise AgentInvocationError(
+                    f"agent invocation timed out after {timeout_seconds:.2f}s"
+                ) from exc
 
     def invoke(
         self,
@@ -291,7 +341,9 @@ class AgentGateway:
             raise TypeError("payload must be an object")
         invocation_id = str(uuid4())
         started_at = datetime.now(timezone.utc)
-        timeout = self.default_timeout_seconds if timeout_seconds is None else float(timeout_seconds)
+        timeout = (
+            self.default_timeout_seconds if timeout_seconds is None else float(timeout_seconds)
+        )
         retries = self.default_max_retries if max_retries is None else int(max_retries)
         if timeout <= 0 or retries < 0:
             raise ValueError("invalid timeout/retry configuration")
@@ -307,10 +359,31 @@ class AgentGateway:
                 now = time.monotonic()
                 self._check_circuit(agent_id, now)
                 self._check_rate(agent_id, now)
-            except (AgentPermissionError, AgentApprovalRequired, AgentCircuitOpenError, AgentRateLimitError) as exc:
+            except (
+                AgentPermissionError,
+                AgentApprovalRequired,
+                AgentCircuitOpenError,
+                AgentRateLimitError,
+            ) as exc:
                 self._trace_error(trace, f"agent:{agent_id}", str(exc), invocation_id)
-                return InvocationResult(invocation_id, agent_id, "error", error=str(exc), attempts=0, started_at=started_at.isoformat(), finished_at=datetime.now(timezone.utc).isoformat())
-        self._trace_event(trace, "agent_invocation_started", {"agent_id":agent_id,"invocation_id":invocation_id,"transport":descriptor.transport})
+                return InvocationResult(
+                    invocation_id,
+                    agent_id,
+                    "error",
+                    error=str(exc),
+                    attempts=0,
+                    started_at=started_at.isoformat(),
+                    finished_at=datetime.now(timezone.utc).isoformat(),
+                )
+        self._trace_event(
+            trace,
+            "agent_invocation_started",
+            {
+                "agent_id": agent_id,
+                "invocation_id": invocation_id,
+                "transport": descriptor.transport,
+            },
+        )
         last_error = None
         attempts = 0
         for attempt in range(1, retries + 2):
@@ -319,17 +392,51 @@ class AgentGateway:
                 result = self._invoke_once(handler, payload, timeout)
                 with self._lock:
                     self._record_success(agent_id)
-                self._trace_event(trace, "agent_invocation_completed", {"agent_id":agent_id,"invocation_id":invocation_id,"attempts":attempts,"status":"completed"})
-                return InvocationResult(invocation_id, agent_id, "completed", result=result, attempts=attempts, started_at=started_at.isoformat(), finished_at=datetime.now(timezone.utc).isoformat())
+                self._trace_event(
+                    trace,
+                    "agent_invocation_completed",
+                    {
+                        "agent_id": agent_id,
+                        "invocation_id": invocation_id,
+                        "attempts": attempts,
+                        "status": "completed",
+                    },
+                )
+                return InvocationResult(
+                    invocation_id,
+                    agent_id,
+                    "completed",
+                    result=result,
+                    attempts=attempts,
+                    started_at=started_at.isoformat(),
+                    finished_at=datetime.now(timezone.utc).isoformat(),
+                )
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
                 with self._lock:
                     self._record_failure(agent_id, time.monotonic())
                 self._trace_error(trace, f"agent:{agent_id}", last_error, invocation_id)
-                self._trace_event(trace, "agent_invocation_retry", {"agent_id":agent_id,"invocation_id":invocation_id,"attempt":attempt,"will_retry":attempt <= retries})
+                self._trace_event(
+                    trace,
+                    "agent_invocation_retry",
+                    {
+                        "agent_id": agent_id,
+                        "invocation_id": invocation_id,
+                        "attempt": attempt,
+                        "will_retry": attempt <= retries,
+                    },
+                )
                 if attempt <= retries:
                     continue
-        return InvocationResult(invocation_id, agent_id, "error", error=last_error, attempts=attempts, started_at=started_at.isoformat(), finished_at=datetime.now(timezone.utc).isoformat())
+        return InvocationResult(
+            invocation_id,
+            agent_id,
+            "error",
+            error=last_error,
+            attempts=attempts,
+            started_at=started_at.isoformat(),
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
 
     def route(
         self,
@@ -350,7 +457,9 @@ class AgentGateway:
             raise AgentNotFound(f"no enabled agent for capability: {capability}")
         errors = []
         for descriptor in candidates:
-            result = self.invoke(descriptor.agent_id, payload, user_id=user_id, approved=approved, trace=trace)
+            result = self.invoke(
+                descriptor.agent_id, payload, user_id=user_id, approved=approved, trace=trace
+            )
             if result.status == "completed":
                 return result
             errors.append(result.error or "agent invocation failed")
@@ -358,8 +467,19 @@ class AgentGateway:
 
 
 __all__ = [
-    "A2AClient","A2AClientConfig","A2AProtocolError","RESTAgentClient",
-    "AgentAlreadyRegistered","AgentApprovalRequired","AgentCircuitOpenError",
-    "AgentDescriptor","AgentGateway","AgentGatewayError","AgentInvocationError",
-    "AgentNotFound","AgentPermissionError","AgentRateLimitError","InvocationResult",
+    "A2AClient",
+    "A2AClientConfig",
+    "A2AProtocolError",
+    "RESTAgentClient",
+    "AgentAlreadyRegistered",
+    "AgentApprovalRequired",
+    "AgentCircuitOpenError",
+    "AgentDescriptor",
+    "AgentGateway",
+    "AgentGatewayError",
+    "AgentInvocationError",
+    "AgentNotFound",
+    "AgentPermissionError",
+    "AgentRateLimitError",
+    "InvocationResult",
 ]

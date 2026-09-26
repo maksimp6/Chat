@@ -39,19 +39,15 @@ class UniversalToolDefinition:
                 or {"type": "object", "properties": {}, "additionalProperties": False}
             ),
             output_schema=dict(
-                cfg.get("outputSchema")
-                or cfg.get("output_schema")
-                or {"type": "object"}
+                cfg.get("outputSchema") or cfg.get("output_schema") or {"type": "object"}
             ),
             capabilities=tuple(str(x) for x in (cfg.get("capabilities") or ())),
             risk_level=str(cfg.get("risk_level") or "medium"),
             read_only=bool(cfg.get("read_only", False)),
             requires_approval=bool(cfg.get("requires_approval", True)),
             supported_transports=tuple(
-                str(x) for x in (
-                    cfg.get("supported_transports")
-                    or ("responses_api", "local_agent")
-                )
+                str(x)
+                for x in (cfg.get("supported_transports") or ("responses_api", "local_agent"))
             ),
             executor=dict(cfg.get("executor") or {"type": "local"}),
             metadata=dict(cfg.get("metadata") or {}),
@@ -391,9 +387,11 @@ class UniversalToolExecutor:
             trace_arguments=trace_arguments,
         )
 
-        redact_result_fields = set(
-            dict(definition.metadata or {}).get("trace_redact_result_fields") or ()
-        ) if definition is not None else set()
+        redact_result_fields = (
+            set(dict(definition.metadata or {}).get("trace_redact_result_fields") or ())
+            if definition is not None
+            else set()
+        )
 
         def redact_fields(value):
             if isinstance(value, dict):

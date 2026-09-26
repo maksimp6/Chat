@@ -24,7 +24,7 @@ def test_memory_panel_is_idempotent_and_owns_bindings():
     js = (ROOT / "static" / "memory_panel.js").read_text(encoding="utf-8")
     assert js.count("function bindMemoryPanelEvents()") == 1
     assert 'element.dataset.bound === "true"' in js
-    assert 'replaceChildren()' in js
+    assert "replaceChildren()" in js
 
 
 def test_memory_panel_uses_dispatcher_for_all_transport():
@@ -39,6 +39,6 @@ def test_memory_button_has_real_binding_path():
     panel = (ROOT / "static" / "memory_panel.js").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
     assert 'id="memoryModal"' in html
-    assert '#memory-btn' in header
+    assert "#memory-btn" in header
     assert "window.openMemoryModal" in header
-    assert 'window.loadMemoryData' in panel
+    assert "window.loadMemoryData" in panel

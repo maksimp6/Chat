@@ -57,7 +57,9 @@ def test_memory_backend_title_logic_and_config_string(monkeypatch):
     db.init_db()
     db.create_conversation("c1", "Новый чат", "model")
 
-    assert db.maybe_update_conversation_title("c1", "\n  Первая строка  \nвторая") == "Первая строка"
+    assert (
+        db.maybe_update_conversation_title("c1", "\n  Первая строка  \nвторая") == "Первая строка"
+    )
     assert db.get_conversation_title("c1") == "Первая строка"
     assert db.maybe_update_conversation_title("c1", "другая") == "Первая строка"
     assert db.maybe_update_conversation_title("c1", "   ") == "Первая строка"

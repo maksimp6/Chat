@@ -16,6 +16,7 @@ def test_optional_debug_scripts_do_not_block_dom_ready():
         assert 'data-optional-script="true"' in tag
         assert " defer" not in tag, f"{script} must not hold DOMContentLoaded"
 
+
 def test_critical_shell_is_not_hidden_by_optional_modules():
     html = Path("templates/index.html").read_text(encoding="utf-8")
 

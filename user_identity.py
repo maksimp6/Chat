@@ -5,6 +5,7 @@ credential. Bootstrap also issues a random bearer token; only its SHA-256 hash
 is stored server-side. Sensitive operations resolve ownership from that token
 or another trusted server-side authentication context.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -39,9 +40,7 @@ def _new_auth_token() -> str:
 def _sanitize(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            str(k): _sanitize(v)
-            for k, v in value.items()
-            if not _SENSITIVE_KEY_RE.search(str(k))
+            str(k): _sanitize(v) for k, v in value.items() if not _SENSITIVE_KEY_RE.search(str(k))
         }
     if isinstance(value, list):
         return [_sanitize(v) for v in value]
@@ -64,14 +63,15 @@ def init_user_identity_table() -> None:
                 updated_at INTEGER NOT NULL
             )"""
         )
-        columns = {
-            row["name"]
-            for row in conn.execute("PRAGMA table_info(users)").fetchall()
-        }
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
         if "auth_token_hash" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN auth_token_hash TEXT")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_installation_id ON users(installation_id)")
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_token_hash ON users(auth_token_hash)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_installation_id ON users(installation_id)"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_token_hash ON users(auth_token_hash)"
+        )
         conn.commit()
     finally:
         conn.close()

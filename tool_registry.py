@@ -28,7 +28,9 @@ class ToolRegistry:
         result.setdefault("title", name.replace("_", " ").strip().title())
         result.setdefault(
             "inputSchema",
-            result.get("input_schema") or result.get("parameters") or {
+            result.get("input_schema")
+            or result.get("parameters")
+            or {
                 "type": "object",
                 "properties": {},
                 "required": [],
@@ -47,9 +49,7 @@ class ToolRegistry:
         # must be callable through the MCP adapter; preserve any existing
         # transport declarations while adding MCP rather than requiring every
         # legacy tool implementation to be edited individually.
-        transports = list(
-            result.get("supported_transports") or ("responses_api", "local_agent")
-        )
+        transports = list(result.get("supported_transports") or ("responses_api", "local_agent"))
         if "mcp" not in transports:
             transports.append("mcp")
         result["supported_transports"] = transports
@@ -76,8 +76,16 @@ class ToolRegistry:
     def _load_all(self):
         try:
             from git_mcp_tools import GIT_TOOLS
+
             mcp_read_tools = {"git_status", "git_log", "git_diff", "git_branches"}
-            mcp_write_tools = {"git_add", "git_commit", "git_remote", "git_push", "git_pull", "git_fetch"}
+            mcp_write_tools = {
+                "git_add",
+                "git_commit",
+                "git_remote",
+                "git_push",
+                "git_pull",
+                "git_fetch",
+            }
             for name, cfg in GIT_TOOLS.items():
                 if name in mcp_read_tools:
                     cfg = {
@@ -103,6 +111,7 @@ class ToolRegistry:
 
         try:
             from termux_mcp_tools import TERMUX_TOOLS
+
             for name, cfg in TERMUX_TOOLS.items():
                 self._register("termux", name, cfg)
         except Exception as e:
@@ -110,6 +119,7 @@ class ToolRegistry:
 
         try:
             from termux_system_tools import SYSTEM_TOOLS
+
             for name, cfg in SYSTEM_TOOLS.items():
                 self._register("system", name, cfg)
         except Exception as e:
@@ -117,6 +127,7 @@ class ToolRegistry:
 
         try:
             from filesystem_mcp_tools import FILESYSTEM_TOOLS
+
             for name, cfg in FILESYSTEM_TOOLS.items():
                 self._register("filesystem", name, cfg)
         except Exception as e:
@@ -124,6 +135,7 @@ class ToolRegistry:
 
         try:
             from wikipedia_mcp_tools import WIKIPEDIA_TOOLS
+
             for name, cfg in WIKIPEDIA_TOOLS.items():
                 self._register("wikipedia", name, cfg)
         except Exception as e:
@@ -131,6 +143,7 @@ class ToolRegistry:
 
         try:
             from profiler_tools import PROFILER_TOOLS
+
             for name, cfg in PROFILER_TOOLS.items():
                 self._register("profiler", name, cfg)
         except Exception as e:
@@ -138,6 +151,7 @@ class ToolRegistry:
 
         try:
             from theme_tools import THEME_TOOLS
+
             for name, cfg in THEME_TOOLS.items():
                 self._register("theme", name, cfg)
         except Exception as e:
@@ -145,12 +159,14 @@ class ToolRegistry:
 
         try:
             from runtime_tools import RUNTIME_TOOLS
+
             for name, cfg in RUNTIME_TOOLS.items():
                 self._register("runtime", name, cfg)
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Runtime: {e}")
         try:
             from government import GOVERNMENT_TOOLS
+
             for name, cfg in GOVERNMENT_TOOLS.items():
                 self._register("government", name, cfg)
         except Exception as e:
@@ -158,6 +174,7 @@ class ToolRegistry:
 
         try:
             from partner_relations import PARTNER_TOOLS
+
             for name, cfg in PARTNER_TOOLS.items():
                 self._register("partner", name, cfg)
         except Exception as e:

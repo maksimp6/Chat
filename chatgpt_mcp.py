@@ -135,7 +135,10 @@ def _request_protocol_version(payload: Mapping[str, Any]) -> str:
         return header.strip()
     meta = payload.get("params", {}).get("_meta", {})
     if isinstance(meta, Mapping):
-        return str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip() or DEFAULT_PROTOCOL_VERSION
+        return (
+            str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip()
+            or DEFAULT_PROTOCOL_VERSION
+        )
     return DEFAULT_PROTOCOL_VERSION
 
 
@@ -356,6 +359,7 @@ def _bridge_wrapper(handler):
     def wrapped(arguments: dict[str, Any], cfg: Optional[dict[str, Any]] = None):
         context = (cfg or {}).get("_universal_context") or {}
         return handler(arguments, context.get("user_id"))
+
     return wrapped
 
 
@@ -405,8 +409,6 @@ def _execution_trace(arguments: dict[str, Any], user: Optional[str]) -> dict[str
     return _trace(arguments, owner)
 
 
-
-
 def _project_list(args: dict, _user: Optional[str] = None) -> dict:
     return list_directory({"path": args.get("path") or "."})
 
@@ -415,11 +417,13 @@ def _project_read(args: dict, _user: Optional[str] = None) -> dict:
     path = str(args.get("path") or "").strip()
     if not path:
         raise ValueError("path is required")
-    result = read_file({
-        "path": path,
-        "offset": args.get("offset", 0),
-        "length": min(int(args.get("length", 65536)), 65536),
-    })
+    result = read_file(
+        {
+            "path": path,
+            "offset": args.get("offset", 0),
+            "length": min(int(args.get("length", 65536)), 65536),
+        }
+    )
     if result.get("error"):
         raise ValueError(result["error"])
     return result
@@ -429,11 +433,13 @@ def _project_search(args: dict, _user: Optional[str] = None) -> dict:
     query = str(args.get("query") or "").strip()
     if not query:
         raise ValueError("query is required")
-    return grep_search({
-        "query": query,
-        "file_pattern": args.get("file_pattern") or "*.py",
-        "max_matches": min(int(args.get("max_matches", 50)), 50),
-    })
+    return grep_search(
+        {
+            "query": query,
+            "file_pattern": args.get("file_pattern") or "*.py",
+            "max_matches": min(int(args.get("max_matches", 50)), 50),
+        }
+    )
 
 
 def _register_project_read_tools() -> None:
@@ -504,6 +510,7 @@ def _register_project_read_tools() -> None:
 
 
 _register_project_read_tools()
+
 
 def _register_conversation_tools() -> None:
     tools = [
@@ -584,6 +591,7 @@ def _register_conversation_tools() -> None:
 
 
 _register_conversation_tools()
+
 
 def _register_bridge_tools() -> None:
     bridge_tools = [
@@ -677,19 +685,23 @@ def _tools_list() -> list[dict[str, Any]]:
             "title": definition.get("title") or definition["name"],
             "description": definition.get("description", ""),
             "inputSchema": definition.get("inputSchema") or definition.get("input_schema") or {},
-            "outputSchema": definition.get("outputSchema") or definition.get("output_schema") or {"type": "object"},
+            "outputSchema": definition.get("outputSchema")
+            or definition.get("output_schema")
+            or {"type": "object"},
             "securitySchemes": schemes,
         }
         meta = dict(definition.get("metadata") or {})
-        meta.update({
-            "risk_level": definition.get("risk_level"),
-            "read_only": definition.get("read_only"),
-            "requires_approval": definition.get("requires_approval"),
-            "capabilities": definition.get("capabilities") or [],
-            "openai/toolInvocation/invoking": f"{item['title']}…",
-            "openai/toolInvocation/invoked": f"{item['title']}: готово",
-            "securitySchemes": schemes,
-        })
+        meta.update(
+            {
+                "risk_level": definition.get("risk_level"),
+                "read_only": definition.get("read_only"),
+                "requires_approval": definition.get("requires_approval"),
+                "capabilities": definition.get("capabilities") or [],
+                "openai/toolInvocation/invoking": f"{item['title']}…",
+                "openai/toolInvocation/invoked": f"{item['title']}: готово",
+                "securitySchemes": schemes,
+            }
+        )
         item["_meta"] = meta
         result.append(item)
     return result
@@ -710,13 +722,15 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
     )
     start_invocation(context.invocation_id)
     trace = create_invocation_trace(context)
-    trace.set_request({
-        "transport": "mcp",
-        "method": "tools/call",
-        "tool": name,
-        "arguments": arguments,
-        "call_id": correlation_id,
-    })
+    trace.set_request(
+        {
+            "transport": "mcp",
+            "method": "tools/call",
+            "tool": name,
+            "arguments": arguments,
+            "call_id": correlation_id,
+        }
+    )
 
     call = UniversalToolCall(
         tool_name=name,
@@ -731,11 +745,14 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
 
     try:
         result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
-        trace.add_event("mcp_tool_call_completed", {
-            "tool": name,
-            "call_id": correlation_id,
-            "success": bool(result.get("success")),
-        })
+        trace.add_event(
+            "mcp_tool_call_completed",
+            {
+                "tool": name,
+                "call_id": correlation_id,
+                "success": bool(result.get("success")),
+            },
+        )
         trace_data = trace.finalize()
         persist_invocation_trace(context.invocation_id, trace_data)
 
@@ -815,8 +832,7 @@ def mcp_options() -> Response:
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": (
-                "Content-Type, Authorization, MCP-Protocol-Version, "
-                "Mcp-Method, Mcp-Name"
+                "Content-Type, Authorization, MCP-Protocol-Version, Mcp-Method, Mcp-Name"
             ),
         }
     )

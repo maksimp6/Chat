@@ -4,6 +4,7 @@ Secrets are encrypted at rest and are addressed by an opaque key reference.
 Plaintext values exist only during an explicit read/write operation and are
 never returned by metadata/list operations.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -57,9 +58,7 @@ def _iso(value: datetime) -> str:
 
 def _manager_key() -> bytes:
     raw = (
-        os.getenv("ALICE_KEY_MANAGER_KEY")
-        or os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY")
-        or ""
+        os.getenv("ALICE_KEY_MANAGER_KEY") or os.getenv("ALICE_PROVIDER_CREDENTIAL_KEY") or ""
     ).strip()
     if not raw:
         raise KeyManagerError(
@@ -204,9 +203,7 @@ def store_secret(
             ),
         )
         conn.commit()
-        row = conn.execute(
-            "SELECT * FROM managed_keys WHERE key_ref = ?", (ref,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM managed_keys WHERE key_ref = ?", (ref,)).fetchone()
     finally:
         conn.close()
     return _metadata(row)

@@ -1,4 +1,5 @@
 """Best-effort integration of the Supabase trace mirror."""
+
 from __future__ import annotations
 
 import logging

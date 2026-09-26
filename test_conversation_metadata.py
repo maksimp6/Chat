@@ -2,6 +2,7 @@
 
 These tests replace the HTTP session, so CI never contacts the paid Yandex API.
 """
+
 import unittest
 from unittest.mock import Mock
 

@@ -37,9 +37,7 @@ INFINITE_LOOP_PATTERNS = (
     (re.compile(r"\bfor\s*\(\s*;\s*;\s*\)"), "for(;;)"),
 )
 UNBOUNDED_LOOP_RE = re.compile(r"\bwhile\s*\(\s*[^\n;{}()]+\s*\)\s*\{")
-FETCH_IN_LOOP_RE = re.compile(
-    r"\b(?:while|for)\b[\s\S]{0,400}\b(?:fetch|XMLHttpRequest)\s*\("
-)
+FETCH_IN_LOOP_RE = re.compile(r"\b(?:while|for)\b[\s\S]{0,400}\b(?:fetch|XMLHttpRequest)\s*\(")
 ARRAY_LITERAL_RE = re.compile(r"\[([^\[\]]*)\]", re.DOTALL)
 ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)")
 TIMER_PATTERNS = (
@@ -80,7 +78,9 @@ def _timer_errors(text: str, rel: Path) -> list[str]:
     errors = []
     for pattern, label in TIMER_PATTERNS:
         if pattern.search(text):
-            errors.append(f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle")
+            errors.append(
+                f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle"
+            )
     return errors
 
 

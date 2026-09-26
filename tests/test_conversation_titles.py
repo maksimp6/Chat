@@ -1,5 +1,6 @@
 from pathlib import Path
 
+
 def test_legacy_default_conversation_title_is_migrated(tmp_path, monkeypatch):
     import db
 
@@ -14,7 +15,6 @@ def test_legacy_default_conversation_title_is_migrated(tmp_path, monkeypatch):
     assert conversations[0]["title"] == "Новый чат"
 
 
-
 def test_conversation_title_update_accepts_owner_and_normalizes(tmp_path, monkeypatch):
     import db
 
@@ -27,7 +27,9 @@ def test_conversation_title_update_accepts_owner_and_normalizes(tmp_path, monkey
     assert db.get_conversation_title("conv-title") == "Очень хороший заголовок"
 
 
-def test_default_title_is_replaced_by_first_non_empty_message_and_not_overwritten(tmp_path, monkeypatch):
+def test_default_title_is_replaced_by_first_non_empty_message_and_not_overwritten(
+    tmp_path, monkeypatch
+):
     import db
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "titles.db"))
@@ -35,7 +37,9 @@ def test_default_title_is_replaced_by_first_non_empty_message_and_not_overwritte
     db.create_conversation("conv-auto", "Новый чат", "aliceai-llm")
 
     first = db.maybe_update_conversation_title("conv-auto", "Первая тема диалога\nи детали")
-    second = db.maybe_update_conversation_title("conv-auto", "Поздняя тема, которая не должна затереть первую")
+    second = db.maybe_update_conversation_title(
+        "conv-auto", "Поздняя тема, которая не должна затереть первую"
+    )
 
     assert first == "Первая тема диалога"
     assert second == "Первая тема диалога"

@@ -3,6 +3,7 @@
 ## Цель изменений
 
 Реализация модульной архитектуры с единым реестром инструментов и усилением безопасности. Ключевые изменения:
+
 1. Единый диспетчер `find_tool_registry()` для динамического поиска инструментов.
 2. Режим WAL для SQLite для избежания блокировок базы данных.
 3. Защита от Path Traversal в операциях с файловой системой.
@@ -14,6 +15,7 @@
 Функция `find_tool_registry(func_name: str)` обеспечивает динамический поиск метаданных инструментов по всем подключённым модулям без хардкодинга.
 
 ### Принцип работы
+
 1. Последовательно импортирует реестры из модулей:
    - `git_mcp_tools.TOOL_REGISTRY`
    - `termux_system_tools.SYSTEM_TOOLS`
@@ -25,25 +27,29 @@
 ### Пример использования в `/api/chat`
 
 При обнаружении вызова инструмента с флагом `requires_approval`:
+
 ```python
 tool_config = find_tool_registry(func_name)
 if tool_config and tool_config.get("requires_approval"):
     # Подготовка ответа с требованием подтверждения
-    return jsonify({
-        "requires_approval": True,
-        "tool_call": {
-            "name": func_name,
-            "description": tool_config.get("description", func_name),
-            "arguments": raw_args,
-            "call_id": tc.get("call_id") or tc.get("id") or func_name
-        },
-        "original_message": message
-    })
+    return jsonify(
+        {
+            "requires_approval": True,
+            "tool_call": {
+                "name": func_name,
+                "description": tool_config.get("description", func_name),
+                "arguments": raw_args,
+                "call_id": tc.get("call_id") or tc.get("id") or func_name,
+            },
+            "original_message": message,
+        }
+    )
 ```
 
 ### Пример использования в `/api/mcp/execute-approved`
 
 При выполнении подтверждённого вызова:
+
 ```python
 tool_config = find_tool_registry(func_name)
 if not tool_config:
@@ -62,6 +68,7 @@ exec_res = tool_config["func"](arguments, {})
 ### Изменения в `db.py` и `mcp_storage.py`
 
 В функции `_get_conn()` добавлены следующие настройки:
+
 ```python
 conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10)
 conn.row_factory = sqlite3.Row
@@ -70,6 +77,7 @@ conn.execute("PRAGMA synchronous=NORMAL")
 ```
 
 ### Преимущества
+
 - Параллельные чтение и запись без блокировок.
 - Уменьшение числа ошибок `database is locked`.
 - Улучшение производительности при высокой нагрузке.
@@ -81,6 +89,7 @@ conn.execute("PRAGMA synchronous=NORMAL")
 Функция `_get_abs_path(path: str)` гарантирует, что операции с файлами не выходят за пределы рабочей директории проекта.
 
 ### Реализация
+
 ```python
 def _get_abs_path(path: str) -> str:
     base_dir = os.path.realpath("/storage/emulated/0/alice_pro")
@@ -93,6 +102,7 @@ def _get_abs_path(path: str) -> str:
 ```
 
 ### Как это работает
+
 1. Определяет базовую директорию (`/storage/emulated/0/alice_pro`).
 2. Формирует полный путь к запрашиваемому файлу.
 3. Проверяет, что путь начинается с базовой директории.
@@ -120,18 +130,14 @@ def _get_abs_path(path: str) -> str:
 4. Убедитесь, что все файловые операции используют `_get_abs_path()` для проверки пути.
 
 ### Пример реестра нового инструмента
+
 ```python
 TOOL_REGISTRY = {
     "new_tool": {
         "func": execute_new_tool,
         "description": "Выполняет новую операцию",
         "requires_approval": True,
-        "arguments": {
-            "param1": {
-                "type": "string",
-                "description": "Первый параметр"
-            }
-        }
+        "arguments": {"param1": {"type": "string", "description": "Первый параметр"}},
     }
 }
 ```

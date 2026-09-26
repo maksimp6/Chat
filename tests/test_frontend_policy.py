@@ -5,7 +5,9 @@ from tests.validate_frontend_modules import validate_file
 
 
 def errors_for(source: str) -> list[str]:
-    with tempfile.NamedTemporaryFile("w", suffix=".js", dir=".", delete=False, encoding="utf-8") as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".js", dir=".", delete=False, encoding="utf-8"
+    ) as handle:
         handle.write(source)
         path = Path(handle.name)
     try:

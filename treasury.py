@@ -3,6 +3,7 @@
 This module intentionally supports demo credits only. It does not process
 real payments or store payment credentials.
 """
+
 from datetime import datetime
 from db import get_conn
 
@@ -24,36 +25,58 @@ def init_treasury_tables():
         reference TEXT,
         created_at TEXT NOT NULL
     )""")
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_treasury_ledger_reference ON treasury_ledger(owner_id, reference) WHERE reference IS NOT NULL")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_treasury_ledger_reference ON treasury_ledger(owner_id, reference) WHERE reference IS NOT NULL"
+    )
     conn.commit()
     conn.close()
 
 
-def get_account(owner_id='default'):
+def get_account(owner_id="default"):
     init_treasury_tables()
     conn = get_conn()
     row = conn.execute("SELECT * FROM treasury_accounts WHERE owner_id = ?", (owner_id,)).fetchone()
     if row is None:
         now = datetime.utcnow().isoformat()
-        conn.execute("INSERT INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)", (owner_id, now))
+        conn.execute(
+            "INSERT INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)", (owner_id, now)
+        )
         conn.commit()
-        row = conn.execute("SELECT * FROM treasury_accounts WHERE owner_id = ?", (owner_id,)).fetchone()
-    ledger = conn.execute("SELECT * FROM treasury_ledger WHERE owner_id = ? ORDER BY id DESC", (owner_id,)).fetchall()
+        row = conn.execute(
+            "SELECT * FROM treasury_accounts WHERE owner_id = ?", (owner_id,)
+        ).fetchone()
+    ledger = conn.execute(
+        "SELECT * FROM treasury_ledger WHERE owner_id = ? ORDER BY id DESC", (owner_id,)
+    ).fetchall()
     conn.close()
-    return {"owner_id": row["owner_id"], "balance": row["balance"], "currency": row["currency"],
-            "updated_at": row["updated_at"], "ledger": [dict(item) for item in ledger]}
+    return {
+        "owner_id": row["owner_id"],
+        "balance": row["balance"],
+        "currency": row["currency"],
+        "updated_at": row["updated_at"],
+        "ledger": [dict(item) for item in ledger],
+    }
 
 
-def demo_top_up(owner_id, amount, description='Demo top-up'):
+def demo_top_up(owner_id, amount, description="Demo top-up"):
     amount = float(amount)
     if amount <= 0:
-        raise ValueError('amount must be positive')
+        raise ValueError("amount must be positive")
     init_treasury_tables()
     now = datetime.utcnow().isoformat()
     conn = get_conn()
-    conn.execute("INSERT OR IGNORE INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)", (owner_id, now))
-    conn.execute("UPDATE treasury_accounts SET balance = balance + ?, updated_at = ? WHERE owner_id = ?", (amount, now, owner_id))
-    conn.execute("INSERT INTO treasury_ledger(owner_id, kind, amount, description, created_at) VALUES (?, 'credit', ?, ?, ?)", (owner_id, amount, description, now))
+    conn.execute(
+        "INSERT OR IGNORE INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)",
+        (owner_id, now),
+    )
+    conn.execute(
+        "UPDATE treasury_accounts SET balance = balance + ?, updated_at = ? WHERE owner_id = ?",
+        (amount, now, owner_id),
+    )
+    conn.execute(
+        "INSERT INTO treasury_ledger(owner_id, kind, amount, description, created_at) VALUES (?, 'credit', ?, ?, ?)",
+        (owner_id, amount, description, now),
+    )
     conn.commit()
     conn.close()
     return get_account(owner_id)
@@ -62,9 +85,9 @@ def demo_top_up(owner_id, amount, description='Demo top-up'):
 def record_expense(owner_id, amount, description, reference=None, *, return_status=False):
     amount = float(amount)
     if amount <= 0 or not description:
-        raise ValueError('positive amount and description are required')
+        raise ValueError("positive amount and description are required")
     if not owner_id:
-        raise ValueError('owner identity is required')
+        raise ValueError("owner identity is required")
     init_treasury_tables()
     now = datetime.utcnow().isoformat()
     conn = get_conn()
@@ -86,7 +109,7 @@ def record_expense(owner_id, amount, description, reference=None, *, return_stat
             ).fetchone()
             balance = float(account["balance"]) if account else 0.0
             if balance < amount:
-                raise ValueError('insufficient balance')
+                raise ValueError("insufficient balance")
             conn.execute(
                 "INSERT OR IGNORE INTO treasury_accounts(owner_id, updated_at) VALUES (?, ?)",
                 (owner_id, now),

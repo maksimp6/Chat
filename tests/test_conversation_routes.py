@@ -40,6 +40,7 @@ def test_patch_conversation_model_rejects_unauthorized_conversation(monkeypatch)
     assert response.status_code == 404
     assert response.get_json()["error"] == "conversation_not_found"
 
+
 def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
     from treasury_identity import TreasuryIdentityError
 

@@ -3,6 +3,7 @@
 The mirror is intentionally independent from the main request path. Callers may
 invoke :func:`mirror_trace` without allowing mirror failures to escape.
 """
+
 from __future__ import annotations
 
 import json

@@ -1,4 +1,5 @@
 """Regression tests for InvocationContext ownership in /api/chat."""
+
 from unittest.mock import patch
 
 import mcp_routes
@@ -13,7 +14,9 @@ def test_chat_uses_invocation_context_identifiers():
         def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
             captured["conversation_id"] = conversation_id
             captured["trace"] = trace
-            trace.add_response({"id": "resp-test", "status": "completed", "output": []}, step_index=1)
+            trace.add_response(
+                {"id": "resp-test", "status": "completed", "output": []}, step_index=1
+            )
             return {"output": [], "usage": {}}
 
         @staticmethod
@@ -24,10 +27,22 @@ def test_chat_uses_invocation_context_identifiers():
         def extract_usage(_response):
             return None
 
-    with patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()), patch.object(mcp_routes, "get_conv_settings", return_value={}), patch.object(mcp_routes, "add_message"):
+    with (
+        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "get_conv_settings", return_value={}),
+        patch.object(mcp_routes, "add_message"),
+    ):
         app.config["TESTING"] = True
         with app.test_client() as client:
-            response = client.post("/api/chat", json={"conversation_id": "conv-context-test", "message": "hello", "model": "aliceai-llm", "params": {}})
+            response = client.post(
+                "/api/chat",
+                json={
+                    "conversation_id": "conv-context-test",
+                    "message": "hello",
+                    "model": "aliceai-llm",
+                    "params": {},
+                },
+            )
 
     assert response.status_code == 200
     payload = response.get_json()
@@ -57,11 +72,23 @@ def test_chat_context_is_fresh_for_each_request():
         def extract_usage(_response):
             return None
 
-    with patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()), patch.object(mcp_routes, "get_conv_settings", return_value={}), patch.object(mcp_routes, "add_message"):
+    with (
+        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "get_conv_settings", return_value={}),
+        patch.object(mcp_routes, "add_message"),
+    ):
         app.config["TESTING"] = True
         with app.test_client() as client:
             for message in ("one", "two"):
-                response = client.post("/api/chat", json={"conversation_id": "same-conversation", "message": message, "model": "aliceai-llm", "params": {}})
+                response = client.post(
+                    "/api/chat",
+                    json={
+                        "conversation_id": "same-conversation",
+                        "message": message,
+                        "model": "aliceai-llm",
+                        "params": {},
+                    },
+                )
                 assert response.status_code == 200
 
     assert len(trace_ids) == 2

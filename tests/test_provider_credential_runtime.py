@@ -33,4 +33,7 @@ def test_deployment_workflows_do_not_require_provider_credential_secret():
     production = (ROOT / ".github/workflows/production-deploy.yml").read_text()
     preview = (ROOT / ".github/workflows/preview-deploy.yml").read_text()
     for workflow in (production, preview):
-        assert "ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}" not in workflow
+        assert (
+            "ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}"
+            not in workflow
+        )

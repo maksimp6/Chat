@@ -5,7 +5,8 @@
   var MAX_TRACE_COUNT = 200;
   var MAX_DATA_DEPTH = 6;
   var MAX_STRING_LENGTH = 2048;
-  var SENSITIVE_KEY_RE = /(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)/i;
+  var SENSITIVE_KEY_RE =
+    /(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)/i;
 
   var modules = new Map();
   var statuses = new Map();
@@ -17,7 +18,7 @@
     core: true,
     network: true,
     ui: true,
-    dispatcher: true
+    dispatcher: true,
   };
 
   function now() {
@@ -50,20 +51,25 @@
     }
 
     var result = {};
-    Object.keys(value).slice(0, 128).forEach(function (key) {
-      if (SENSITIVE_KEY_RE.test(key)) {
-        result[key] = "[REDACTED]";
-        return;
-      }
-      result[key] = redact(value[key], depth + 1, seen);
-    });
+    Object.keys(value)
+      .slice(0, 128)
+      .forEach(function (key) {
+        if (SENSITIVE_KEY_RE.test(key)) {
+          result[key] = "[REDACTED]";
+          return;
+        }
+        result[key] = redact(value[key], depth + 1, seen);
+      });
     return result;
   }
 
   function redactString(value) {
     var text = String(value || "").slice(0, MAX_STRING_LENGTH);
     text = text.replace(/(bearer\s+)[a-z0-9._~+/=-]+/gi, "$1[REDACTED]");
-    text = text.replace(/((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]");
+    text = text.replace(
+      /((?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)\s*[:=]\s*)[^\s,;]+/gi,
+      "$1[REDACTED]",
+    );
     return text;
   }
 
@@ -101,16 +107,19 @@
       ? descriptor.capabilities.map(String)
       : [];
 
-    modules.set(descriptor.id, Object.freeze({
-      id: descriptor.id,
-      version: String(descriptor.version || "0.0.0"),
-      apiVersion: String(descriptor.apiVersion || MODULE_API_VERSION),
-      dependencies: Array.isArray(descriptor.dependencies) ? descriptor.dependencies.slice() : [],
-      capabilities: capabilities
-    }));
+    modules.set(
+      descriptor.id,
+      Object.freeze({
+        id: descriptor.id,
+        version: String(descriptor.version || "0.0.0"),
+        apiVersion: String(descriptor.apiVersion || MODULE_API_VERSION),
+        dependencies: Array.isArray(descriptor.dependencies) ? descriptor.dependencies.slice() : [],
+        capabilities: capabilities,
+      }),
+    );
 
     setStatus(descriptor.id, "ready", "Зарегистрирован", {
-      revocable: true
+      revocable: true,
     });
     return createModuleContext(descriptor.id);
   }
@@ -123,29 +132,29 @@
       module: Object.freeze({
         id: record.id,
         version: record.version,
-        apiVersion: record.apiVersion
+        apiVersion: record.apiVersion,
       }),
       status: Object.freeze({
         set: function (status, message, metadata) {
           return setStatus(moduleId, status, message, metadata);
-        }
+        },
       }),
       trace: Object.freeze({
         begin: function (operation, metadata) {
           return beginTrace(moduleId, operation, metadata);
-        }
+        },
       }),
       security: Object.freeze({
         redact: safeData,
         require: function (capability) {
           return assertCapability(moduleId, capability);
-        }
+        },
       }),
       revoke: Object.freeze({
         isRevoked: function () {
           return isRevoked("module", moduleId);
-        }
-      })
+        },
+      }),
     });
   }
 
@@ -162,7 +171,7 @@
       blocked: true,
       revoked: true,
       error: true,
-      stopped: true
+      stopped: true,
     };
     if (!allowed[status]) throw new Error("Unknown status: " + status);
 
@@ -171,7 +180,7 @@
       status: status,
       message: typeof message === "string" ? redactString(message).slice(0, 300) : "",
       metadata: safeData(metadata || {}),
-      timestamp: now()
+      timestamp: now(),
     };
     statuses.set(moduleId, value);
     notify(value);
@@ -185,7 +194,7 @@
       status: "stopped",
       message: "",
       metadata: {},
-      timestamp: now()
+      timestamp: now(),
     });
   }
 
@@ -198,7 +207,7 @@
         console.error("[CORE STATUS]", error);
       }
     });
-    window.dispatchEvent(new CustomEvent("alice:status", {detail: safeValue}));
+    window.dispatchEvent(new CustomEvent("alice:status", { detail: safeValue }));
   }
 
   function subscribeStatus(callback) {
@@ -223,18 +232,20 @@
     if (type === "module") {
       setStatus(String(id), "revoked", "Доступ отозван", {
         reason: typeof reason === "string" ? reason : "revoked",
-        revocable: true
+        revocable: true,
       });
     }
 
-    window.dispatchEvent(new CustomEvent("alice:revocation", {
-      detail: {
-        type: String(type),
-        id: String(id),
-        reason: typeof reason === "string" ? redactString(reason).slice(0, 300) : "revoked",
-        timestamp: now()
-      }
-    }));
+    window.dispatchEvent(
+      new CustomEvent("alice:revocation", {
+        detail: {
+          type: String(type),
+          id: String(id),
+          reason: typeof reason === "string" ? redactString(reason).slice(0, 300) : "revoked",
+          timestamp: now(),
+        },
+      }),
+    );
 
     return true;
   }
@@ -261,7 +272,7 @@
       startedAt: now(),
       events: [],
       errors: [],
-      metadata: safeData(metadata || {})
+      metadata: safeData(metadata || {}),
     };
 
     traces.set(traceId, entry);
@@ -273,7 +284,7 @@
       entry.events.push({
         type: eventType,
         timestamp: now(),
-        data: safeData(payload)
+        data: safeData(payload),
       });
       return traceId;
     }
@@ -299,14 +310,14 @@
         var message = error && error.message ? error.message : String(error || "error");
         entry.errors.push({
           timestamp: now(),
-          message: redactString(message).slice(0, 500)
+          message: redactString(message).slice(0, 500),
         });
         return traceId;
       },
       end: end,
       snapshot: function () {
         return safeData(entry);
-      }
+      },
     });
   }
 
@@ -318,7 +329,11 @@
       queueMicrotask(function () {
         if (!cancelled) callback();
       });
-      return Object.freeze({cancel: function () { cancelled = true; }});
+      return Object.freeze({
+        cancel: function () {
+          cancelled = true;
+        },
+      });
     }
     if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") {
       throw new Error("Scheduler is unavailable: AbortSignal.timeout is required");
@@ -330,12 +345,12 @@
       active = false;
       callback();
     };
-    signal.addEventListener("abort", listener, {once: true});
+    signal.addEventListener("abort", listener, { once: true });
     return Object.freeze({
       cancel: function () {
         active = false;
         signal.removeEventListener("abort", listener);
-      }
+      },
     });
   }
 
@@ -388,7 +403,7 @@
       action: button.dataset.action,
       element: button,
       event: event,
-      params: Object.freeze(actionParams(button))
+      params: Object.freeze(actionParams(button)),
     });
   }
 
@@ -434,7 +449,8 @@
     assertActionName(options.action);
     var button = document.createElement("button");
     button.type = "button";
-    button.className = "alice-btn" + (options.className ? " " + String(options.className).trim() : "");
+    button.className =
+      "alice-btn" + (options.className ? " " + String(options.className).trim() : "");
     button.dataset.action = options.action;
     if (options.id) button.id = String(options.id);
     if (options.params) {
@@ -466,7 +482,9 @@
     modal.setAttribute("aria-hidden", "true");
 
     var content = document.createElement("div");
-    content.className = "modal-content" + (options.contentClassName ? " " + String(options.contentClassName).trim() : "");
+    content.className =
+      "modal-content" +
+      (options.contentClassName ? " " + String(options.contentClassName).trim() : "");
 
     var title = document.createElement(options.titleTag || "h2");
     title.id = modal.id + "-title";
@@ -478,7 +496,7 @@
       className: "modal-close",
       label: options.closeLabel || "Закрыть",
       action: options.closeAction,
-      text: "×"
+      text: "×",
     });
 
     content.appendChild(close);
@@ -533,34 +551,34 @@
         return Array.from(modules.values()).map(function (item) {
           return safeData(item);
         });
-      }
+      },
     }),
     status: Object.freeze({
       set: setStatus,
       clear: clearStatus,
       subscribe: subscribeStatus,
-      snapshot: getStatusSnapshot
+      snapshot: getStatusSnapshot,
     }),
     trace: Object.freeze({
-      begin: beginTrace
+      begin: beginTrace,
     }),
     revocation: Object.freeze({
       revoke: revoke,
       isRevoked: isRevoked,
-      revokeAll: revokeAll
+      revokeAll: revokeAll,
     }),
     security: Object.freeze({
-      redact: safeData
+      redact: safeData,
     }),
     scheduler: Object.freeze({
-      defer: defer
+      defer: defer,
     }),
     ui: Object.freeze({
       button: createButton,
-      actions: Object.freeze({register: registerAction, dispatch: dispatchAction}),
-      events: Object.freeze({mountClicks: mountClickDispatcher}),
-      modal: Object.freeze({create: createModal, open: openModal, close: closeModal})
-    })
+      actions: Object.freeze({ register: registerAction, dispatch: dispatchAction }),
+      events: Object.freeze({ mountClicks: mountClickDispatcher }),
+      modal: Object.freeze({ create: createModal, open: openModal, close: closeModal }),
+    }),
   });
 
   setStatus("core", "running", "Ядро запускается");

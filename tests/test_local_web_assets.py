@@ -22,7 +22,7 @@ def test_index_uses_only_local_ui_resources():
     assert not EXTERNAL_RESOURCE_RE.search(html), "UI resources must be served locally"
     assert "{% set static_root" in html
     assert 'id="alice-boot"' in html
-    assert 'data-base-path="{{ preview_base_path or \'\' }}"' in html
+    assert "data-base-path=\"{{ preview_base_path or '' }}\"" in html
     assert 'data-static-base="{{ static_root }}"' in html
     assert html.index("boot.js") < html.index("core.js") < html.index("eruda_init.js")
     assert '<script src="{{ static_root }}/eruda.js' not in html
@@ -44,7 +44,7 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
     assert response.status_code == 200
     assert 'href="/preview/pr-203/static/style.css?v=' in html
     assert 'src="/preview/pr-203/static/eruda_init.js?v=' in html
-    assert '/preview/pr-203/static/eruda.js?v={{' not in html
+    assert "/preview/pr-203/static/eruda.js?v={{" not in html
     assert 'data-base-path="/preview/pr-203"' in html
     assert 'src="/preview/pr-203/static/memory_panel.js?v=' in html
 
@@ -52,9 +52,7 @@ def test_index_renders_preview_prefixed_assets_and_api_paths(monkeypatch):
 def test_static_stylesheets_have_no_external_asset_urls():
     for css in Path("static").rglob("*.css"):
         content = css.read_text(encoding="utf-8")
-        assert not EXTERNAL_CSS_URL_RE.search(content), (
-            f"External CSS resource found in {css}"
-        )
+        assert not EXTERNAL_CSS_URL_RE.search(content), f"External CSS resource found in {css}"
 
 
 def test_local_eruda_loader_initializes_the_bundled_library():

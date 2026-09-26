@@ -33,7 +33,12 @@ def test_session_restore(runtime_db):
 
 def test_invocation_has_independent_context(runtime_db):
     from session_manager import create_session
-    from invocation_manager import create_invocation, start_invocation, finish_invocation, get_invocation
+    from invocation_manager import (
+        create_invocation,
+        start_invocation,
+        finish_invocation,
+        get_invocation,
+    )
 
     session = create_session()
     first = create_invocation(session["id"], "conversation-a")

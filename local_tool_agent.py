@@ -27,9 +27,7 @@ def _request(
     body = None
     headers = {"Accept": "application/json"}
     if payload is not None:
-        body = json.dumps(
-            payload, ensure_ascii=False, separators=(",", ":")
-        ).encode("utf-8")
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers["Content-Type"] = "application/json"
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -40,12 +38,8 @@ def _request(
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
         if exc.code in {401, 403}:
-            raise PermissionError(
-                f"agent gateway authentication failed: HTTP {exc.code}"
-            ) from exc
-        raise RuntimeError(
-            f"agent gateway HTTP error {exc.code}: {exc.reason}"
-        ) from exc
+            raise PermissionError(f"agent gateway authentication failed: HTTP {exc.code}") from exc
+        raise RuntimeError(f"agent gateway HTTP error {exc.code}: {exc.reason}") from exc
     except (URLError, TimeoutError) as exc:
         raise ConnectionError(f"agent gateway unavailable: {exc}") from exc
 
@@ -112,19 +106,13 @@ class LocalToolAgent:
         self.stop_event = stop_event or threading.Event()
 
     def run_forever(self) -> None:
-        poll_url = (
-            f"{self.gateway_url}/api/local-agents/{self.agent_id}/poll"
-        )
+        poll_url = f"{self.gateway_url}/api/local-agents/{self.agent_id}/poll"
         while not self.stop_event.is_set():
             try:
-                response = _request(
-                    "GET", poll_url, token=self.token, timeout=20
-                )
+                response = _request("GET", poll_url, token=self.token, timeout=20)
                 job = response.get("job") if isinstance(response, Mapping) else None
                 if not job:
-                    delay = float(
-                        response.get("poll_after_seconds", self.poll_interval)
-                    )
+                    delay = float(response.get("poll_after_seconds", self.poll_interval))
                     self.stop_event.wait(max(0.5, delay))
                     continue
                 self._execute_job(job)
@@ -176,9 +164,7 @@ class LocalToolAgent:
         result["metadata"] = {
             "tool": tool_name,
             "agent_id": self.agent_id,
-            "duration_ms": round(
-                (time.monotonic() - started) * 1000, 2
-            ),
+            "duration_ms": round((time.monotonic() - started) * 1000, 2),
         }
         self._submit(job_id, status, result)
 
@@ -192,10 +178,7 @@ class LocalToolAgent:
             return
         _request(
             "POST",
-            (
-                f"{self.gateway_url}/api/local-agents/"
-                f"{self.agent_id}/jobs/{job_id}/result"
-            ),
+            (f"{self.gateway_url}/api/local-agents/{self.agent_id}/jobs/{job_id}/result"),
             token=self.token,
             payload={"status": status, "result": dict(result)},
             timeout=20,

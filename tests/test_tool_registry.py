@@ -11,23 +11,18 @@ class ToolRegistryCategoryTests(unittest.TestCase):
                 "description": "Return repository status",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "path": {"type": "string"}
-                    },
-                    "required": []
+                    "properties": {"path": {"type": "string"}},
+                    "required": [],
                 },
-                "func": lambda arguments: {"ok": True}
+                "func": lambda arguments: {"ok": True},
             },
             "termux_exec": {
                 "description": "Execute a Termux command",
                 "parameters": {"type": "object", "properties": {}},
-                "func": lambda arguments: {"ok": True}
-            }
+                "func": lambda arguments: {"ok": True},
+            },
         }
-        self.registry._categories = {
-            "git": ["git_status"],
-            "termux": ["termux_exec"]
-        }
+        self.registry._categories = {"git": ["git_status"], "termux": ["termux_exec"]}
 
     def test_get_tools_by_category_returns_responses_function_definitions(self):
         tools = self.registry.get_tools_by_category("git")

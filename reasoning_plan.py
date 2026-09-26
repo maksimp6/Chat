@@ -3,6 +3,7 @@
 This module models planning state, validation and replanning only.
 It does not expose or persist a model private chain-of-thought.
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
@@ -99,7 +100,9 @@ class PlanValidator:
         for step in plan.steps:
             missing = sorted(set(step.depends_on) - known)
             if missing:
-                errors.append("step " + repr(step.id) + " depends on unknown steps: " + ", ".join(missing))
+                errors.append(
+                    "step " + repr(step.id) + " depends on unknown steps: " + ", ".join(missing)
+                )
             if step.id in step.depends_on:
                 errors.append(f"step {step.id!r} cannot depend on itself")
 
@@ -123,7 +126,7 @@ class PlanValidator:
 
         def visit(node: str, path: list[str]) -> list[str] | None:
             if node in visiting:
-                return path[path.index(node):] + [node]
+                return path[path.index(node) :] + [node]
             if node in visited:
                 return None
             visiting.add(node)
@@ -164,8 +167,14 @@ class ReasoningPlanner:
             plan.status = PlanStatus.RUNNING
         return result
 
-    def replan(self, plan: ReasoningPlan, *, reason: str, steps: list[PlanStep] | None = None,
-               success_criteria: list[str] | None = None) -> PlanValidation:
+    def replan(
+        self,
+        plan: ReasoningPlan,
+        *,
+        reason: str,
+        steps: list[PlanStep] | None = None,
+        success_criteria: list[str] | None = None,
+    ) -> PlanValidation:
         plan.replan_count += 1
         plan.status = PlanStatus.REPLANNING
         plan.blocked_reason = reason

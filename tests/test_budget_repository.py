@@ -110,9 +110,7 @@ def test_repository_emits_execution_trace_event(monkeypatch):
     monkeypatch.setattr("budget_repository.get_conn", lambda: FakeConn())
     monkeypatch.setattr("budget_repository.get_current_trace", lambda: FakeTrace())
 
-    BudgetRepository().apply(
-        "GAMBLING-001", "DEMO", "WIN", "5", actor="provider"
-    )
+    BudgetRepository().apply("GAMBLING-001", "DEMO", "WIN", "5", actor="provider")
 
     assert events
     event_type, payload = events[-1]

@@ -13,8 +13,20 @@ class ApiChatSessionContextTests(unittest.TestCase):
             "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
             "status": "completed",
         }
-        with patch("mcp_routes.get_conv_settings", return_value={}), patch("mcp_routes.add_message"), patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response):
-            response = client.post("/api/chat", json={"conversation_id": "conv-session-test", "session_id": "session-test", "message": "hello", "model": "aliceai-llm"})
+        with (
+            patch("mcp_routes.get_conv_settings", return_value={}),
+            patch("mcp_routes.add_message"),
+            patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response),
+        ):
+            response = client.post(
+                "/api/chat",
+                json={
+                    "conversation_id": "conv-session-test",
+                    "session_id": "session-test",
+                    "message": "hello",
+                    "model": "aliceai-llm",
+                },
+            )
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["session_id"], "session-test")
@@ -31,8 +43,14 @@ class ApiChatSessionContextTests(unittest.TestCase):
             "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
             "status": "completed",
         }
-        with patch("mcp_routes.get_conv_settings", return_value={}), patch("mcp_routes.add_message"), patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response):
-            response = client.post("/api/chat", json={"conversation_id": "conv-legacy-test", "message": "hello"})
+        with (
+            patch("mcp_routes.get_conv_settings", return_value={}),
+            patch("mcp_routes.add_message"),
+            patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response),
+        ):
+            response = client.post(
+                "/api/chat", json={"conversation_id": "conv-legacy-test", "message": "hello"}
+            )
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["session_id"], "conv-legacy-test")

@@ -128,10 +128,9 @@ def _proxy(environment_id, subpath=""):
 
     excluded = {"content-length", "connection", "transfer-encoding", "content-encoding"}
     headers = [
-        (key, value)
-        for key, value in upstream.headers.items()
-        if key.lower() not in excluded
+        (key, value) for key, value in upstream.headers.items() if key.lower() not in excluded
     ]
+
     def body():
         try:
             for chunk in upstream.iter_content(chunk_size=8192):
@@ -143,8 +142,19 @@ def _proxy(environment_id, subpath=""):
     return Response(body(), status=upstream.status_code, headers=headers)
 
 
-@environment_gateway_bp.route("/environments/<environment_id>", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
-@environment_gateway_bp.route("/environments/<environment_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-@environment_gateway_bp.route("/environments/<environment_id>/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@environment_gateway_bp.route(
+    "/environments/<environment_id>",
+    defaults={"subpath": ""},
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+)
+@environment_gateway_bp.route(
+    "/environments/<environment_id>/",
+    defaults={"subpath": ""},
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
+@environment_gateway_bp.route(
+    "/environments/<environment_id>/<path:subpath>",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
 def environment_gateway(environment_id, subpath):
     return _proxy(environment_id, subpath)

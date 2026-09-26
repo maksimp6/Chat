@@ -26,12 +26,7 @@ class YandexMcpMixin:
             except Exception:
                 args = {}
 
-        call_id = (
-            tc.get("call_id")
-            or tc.get("id")
-            or tc.get("tool_call_id")
-            or name
-        )
+        call_id = tc.get("call_id") or tc.get("id") or tc.get("tool_call_id") or name
 
         start_timestamp = _t.time()
         t_start = _t.perf_counter()
@@ -68,23 +63,16 @@ class YandexMcpMixin:
                 "[LOCAL TOOL RESULT] name=%s call_id=%s\\n%s",
                 name,
                 call_id,
-                json.dumps(
-                    _sanitize_for_log(result),
-                    ensure_ascii=False,
-                    indent=2
-                ) if isinstance(result, (dict, list))
-                else str(result)
+                json.dumps(_sanitize_for_log(result), ensure_ascii=False, indent=2)
+                if isinstance(result, (dict, list))
+                else str(result),
             )
 
         except Exception as exc:
             result = None
             error = str(exc)
 
-            api_logger.exception(
-                "[LOCAL TOOL ERROR] name=%s call_id=%s",
-                name,
-                call_id
-            )
+            api_logger.exception("[LOCAL TOOL ERROR] name=%s call_id=%s", name, call_id)
 
         t_end = _t.perf_counter()
         end_timestamp = _t.time()
@@ -106,7 +94,7 @@ class YandexMcpMixin:
             "server_label": "Local Registry",
             "start_timestamp": start_timestamp,
             "end_timestamp": end_timestamp,
-            "success": error is None
+            "success": error is None,
         }
 
         return {
@@ -115,7 +103,7 @@ class YandexMcpMixin:
             "content": content_str,
             "result": result,
             "error": error,
-            "timing": timing
+            "timing": timing,
         }
 
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
@@ -127,28 +115,46 @@ class YandexMcpMixin:
         all_servers = mcp_storage.list_servers()
         enabled_servers = []
         if conversation_id:
-            try: enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
-            except Exception: enabled_servers = []
+            try:
+                enabled_servers = mcp_storage.get_enabled_servers_for_conv(conversation_id)
+            except Exception:
+                enabled_servers = []
 
         for s in enabled_servers:
             if s.get("server_url") or (s.get("connector_id") or "").startswith("connector_"):
-                mcp_tools.append({
-                    "type": "mcp",
-                    "server_label": s.get("server_label") or s.get("name"),
-                    "server_url": s.get("server_url"),
-                    "connector_id": s.get("connector_id"),
-                    "authorization": s.get("authorization")
-                })
+                mcp_tools.append(
+                    {
+                        "type": "mcp",
+                        "server_label": s.get("server_label") or s.get("name"),
+                        "server_url": s.get("server_url"),
+                        "connector_id": s.get("connector_id"),
+                        "authorization": s.get("authorization"),
+                    }
+                )
 
         active_cats = None
         if conversation_id:
-            try: active_cats = get_conv_settings(conversation_id).get("active_tool_categories") if get_conv_settings(conversation_id) else None
-            except Exception: active_cats = None
+            try:
+                active_cats = (
+                    get_conv_settings(conversation_id).get("active_tool_categories")
+                    if get_conv_settings(conversation_id)
+                    else None
+                )
+            except Exception:
+                active_cats = None
 
         if active_cats is None:
             active_cats = params.get("active_tool_categories")
         if active_cats is None:
-            active_cats = ["git", "termux", "system", "filesystem", "wikipedia", "profiler", "runtime"]
+            active_cats = [
+                "git",
+                "termux",
+                "system",
+                "filesystem",
+                "wikipedia",
+                "profiler",
+                "runtime",
+            ]
 
         hosted_tools = []
         conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
@@ -156,23 +162,40 @@ class YandexMcpMixin:
 
         web_cfg = tools_config.get("web_search") or {}
         if web_cfg.get("enabled"):
-            web_tool = {"type": "web_search", "search_context_size": web_cfg.get("context_size") or "medium"}
+            web_tool = {
+                "type": "web_search",
+                "search_context_size": web_cfg.get("context_size") or "medium",
+            }
             allowed = web_cfg.get("allowed_domains") or ""
             blocked = web_cfg.get("blocked_domains") or ""
-            allowed_domains = [x.strip() for x in allowed.replace("\\n", ",").split(",") if x.strip()]
-            blocked_domains = [x.strip() for x in blocked.replace("\\n", ",").split(",") if x.strip()]
+            allowed_domains = [
+                x.strip() for x in allowed.replace("\\n", ",").split(",") if x.strip()
+            ]
+            blocked_domains = [
+                x.strip() for x in blocked.replace("\\n", ",").split(",") if x.strip()
+            ]
             if allowed_domains or blocked_domains:
                 web_tool["filters"] = {}
-                if allowed_domains: web_tool["filters"]["allowed_domains"] = allowed_domains
-                if blocked_domains: web_tool["filters"]["blocked_domains"] = blocked_domains
+                if allowed_domains:
+                    web_tool["filters"]["allowed_domains"] = allowed_domains
+                if blocked_domains:
+                    web_tool["filters"]["blocked_domains"] = blocked_domains
             hosted_tools.append(web_tool)
 
         file_cfg = tools_config.get("file_search") or {}
         if file_cfg.get("enabled"):
             vector_ids = file_cfg.get("vector_store_ids") or ""
-            vector_store_ids = [x.strip() for x in vector_ids.replace("\\n", ",").split(",") if x.strip()]
+            vector_store_ids = [
+                x.strip() for x in vector_ids.replace("\\n", ",").split(",") if x.strip()
+            ]
             if vector_store_ids:
-                hosted_tools.append({"type": "file_search", "vector_store_ids": vector_store_ids, "max_num_results": int(file_cfg.get("max_results", 20))})
+                hosted_tools.append(
+                    {
+                        "type": "file_search",
+                        "vector_store_ids": vector_store_ids,
+                        "max_num_results": int(file_cfg.get("max_results", 20)),
+                    }
+                )
 
         code_cfg = tools_config.get("code_interpreter") or {}
         if code_cfg.get("enabled"):

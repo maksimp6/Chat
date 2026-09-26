@@ -3,6 +3,7 @@
 It intentionally does not emulate SQL. The application talks to a typed repository-like
 API, while this engine owns tables, constraints and transactions in memory.
 """
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -49,16 +50,16 @@ class Table:
             raise ColumnError(f"duplicate column in {name!r}")
         self.rows: list[dict[str, Any]] = []
 
-    def _validate(self, values: dict[str, Any], existing: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _validate(
+        self, values: dict[str, Any], existing: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         unknown = set(values) - set(self._column_map)
         if unknown:
             raise ColumnError(f"unknown columns: {sorted(unknown)}")
 
         row = {
             column.name: (
-                values[column.name]
-                if column.name in values
-                else deepcopy(column.default)
+                values[column.name] if column.name in values else deepcopy(column.default)
             )
             for column in self.columns
         }
@@ -79,9 +80,7 @@ class Table:
                 continue
             for old in self.rows:
                 if old is not existing and old[column.name] == row[column.name]:
-                    raise ConstraintError(
-                        f"unique constraint failed: {self.name}.{column.name}"
-                    )
+                    raise ConstraintError(f"unique constraint failed: {self.name}.{column.name}")
         return row
 
     def insert(self, values: dict[str, Any]) -> dict[str, Any]:

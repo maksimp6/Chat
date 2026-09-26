@@ -4,6 +4,7 @@ Conversation rows predate multi-user identity, so ownership lives in a small
 side table. This keeps legacy conversation storage compatible while preventing
 the MCP surface from reading another user's conversation by id.
 """
+
 from __future__ import annotations
 
 import time

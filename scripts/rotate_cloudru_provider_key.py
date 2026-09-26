@@ -5,6 +5,7 @@ Cloud.ru reissues the existing API-key resource, changing its secret and
 expiration while retaining the provider key ID. The replacement is validated
 against Foundation Models before the local credential is promoted.
 """
+
 from __future__ import annotations
 
 import logging
@@ -66,6 +67,7 @@ def main() -> int:
             return 2
         if management.get("expires_at"):
             from datetime import datetime, timezone
+
             master_expires = datetime.fromisoformat(management["expires_at"].replace("Z", "+00:00"))
             if master_expires <= datetime.now(timezone.utc):
                 logger.error("Cloud.ru rotation blocked: IAM master key is expired")

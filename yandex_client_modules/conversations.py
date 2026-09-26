@@ -12,6 +12,7 @@ class YandexConversationMixin:
         try:
             if execution_trace is not None:
                 from yandex_client_modules.request_mixin import _resolve_global_provider_credential
+
                 _resolve_global_provider_credential(self, execution_trace)
 
             self._log_request("POST", self.conversations_url, json={})
@@ -29,9 +30,12 @@ class YandexConversationMixin:
                 raise YandexClientError("Yandex conversation ID is not a valid UUID") from exc
             data["id"] = provider_id
             if execution_trace is not None:
-                execution_trace.add_event("conversation_created", {
-                    "provider_conversation_id": provider_id,
-                })
+                execution_trace.add_event(
+                    "conversation_created",
+                    {
+                        "provider_conversation_id": provider_id,
+                    },
+                )
             api_logger.info("[CONV] Created: id=%s", provider_id)
             return data
         except requests.RequestException as exc:
