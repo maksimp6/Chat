@@ -106,7 +106,13 @@ def test_model_modal_complete_dom_shape():
                     ("h3", (("id", "model-modal-title"),), ("Выбор модели",), ()),
                     (
                         "button",
-                        (("class", "alice-btn"), ("id", "close-modal"), ("type", "button")),
+                        (
+                            ("class", "alice-btn"),
+                            ("data-action", "modal.close"),
+                            ("data-modal", "model-modal"),
+                            ("id", "close-modal"),
+                            ("type", "button"),
+                        ),
                         ("×",),
                         (),
                     ),
