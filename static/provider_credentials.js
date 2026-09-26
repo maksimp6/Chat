@@ -109,17 +109,19 @@ async function fetchStatus(output) {
 
 function build() {
     if (document.getElementById("provider-credentials-modal")) return;
-    var modal = document.createElement("div");
-    modal.id = "provider-credentials-modal";
-    modal.className = "modal provider-credentials-modal";
-    var box = document.createElement("div");
-    box.className = "modal-content provider-credentials-box";
-    var close = document.createElement("button");
-    close.textContent = "×"; close.setAttribute("aria-label","Закрыть");
-    close.className = "provider-credentials-close";
-    close.addEventListener("click", function(){ modal.classList.remove("visible"); modal.setAttribute("aria-hidden", "true"); });
-    var title=document.createElement("h3"); title.textContent="Провайдеры"; title.className="provider-credentials-title";
-    box.appendChild(close); box.appendChild(title);
+    var UI = window.AliceCoreAPI.ui;
+    var body = document.createElement("div");
+    body.className = "provider-credentials-body";
+    var modal = UI.modal.create({
+        id: "provider-credentials-modal",
+        title: "Провайдеры",
+        titleTag: "h3",
+        className: "provider-credentials-modal",
+        contentClassName: "provider-credentials-box",
+        closeAction: "provider-credentials.close",
+        body: body
+    });
+    var box = body;
 
     box.appendChild(makeField("provider-yandex-key","Yandex Cloud API key","","Yandex API key","password"));
     box.appendChild(makeField("provider-yandex-project","Yandex Cloud Project ID","Обязателен вместе с Yandex API key.","например: b1g1fekh2198nuan1tnh","text"));
@@ -165,19 +167,18 @@ function build() {
     actions.appendChild(save); box.appendChild(actions);
 
     var output=document.createElement("div"); output.id="provider-credentials-status"; output.className="provider-credentials-status"; box.appendChild(output);
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-labelledby", "provider-credentials-title");
-    modal.setAttribute("aria-hidden", "true");
-    title.id = "provider-credentials-title";
-    modal.appendChild(box);
     var app = document.querySelector(".alice-pro-app");
     (app || document.body).appendChild(modal);
 }
 
+window.AliceCoreAPI.ui.actions.register("provider-credentials.close", function (payload) {
+    var modal = payload.element.closest(".modal");
+    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+});
+
 window.openProviderCredentialsModal=async function(){
     build();
-    var modal=document.getElementById("provider-credentials-modal"); modal.classList.add("visible"); modal.setAttribute("aria-hidden", "false");
+    var modal=document.getElementById("provider-credentials-modal"); window.AliceCoreAPI.ui.modal.open(modal);
     var output=document.getElementById("provider-credentials-status");
     await fetchStatus(output);
 };
