@@ -90,7 +90,7 @@ function renderApprovalCard(toolCall, origMsg) {
     rejectBtn.addEventListener("click", function() {
         card.remove();
         addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
-    };
+    });
 }
 
 function parseMarkdown(text) {
