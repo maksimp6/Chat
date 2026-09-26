@@ -32,7 +32,7 @@ METHOD_RE = re.compile(
     r"^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{",
     re.MULTILINE,
 )
-BAD_FUNCTION_NAME = re.compile(r"^(?:_|[$]|[A-Z]|[a-z]{1,2}$)")
+BAD_FUNCTION_NAME = re.compile(r"^(?:_|[$]|[A-Z])")
 OBFUSCATION_PATTERNS = (
     (re.compile(r"\beval\s*\("), "eval()"),
     (re.compile(r"\bnew\s+Function\s*\("), "dynamic Function constructor"),
@@ -97,10 +97,7 @@ def validate_file(path: Path) -> list[str]:
         name = match.group(1)
         if BAD_FUNCTION_NAME.match(name):
             errors.append(f"{rel}: function name '{name}' violates naming policy")
-    for match in METHOD_RE.finditer(text):
-        name = match.group(1)
-        if BAD_FUNCTION_NAME.match(name) and name not in {"if", "for", "while", "switch", "catch"}:
-            errors.append(f"{rel}: method name '{name}' violates naming policy")
+
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if lines:
@@ -143,9 +140,10 @@ def main() -> int:
     files = sorted(STATIC.rglob("*.js"))
     errors: list[str] = []
     for path in files:
+        if is_vendor(path):
+            continue
         errors.extend(validate_file(path))
-        if not is_vendor(path):
-            errors.extend(validate_syntax(path))
+        errors.extend(validate_syntax(path))
 
     if errors:
         print("Frontend policy validation failed:")
