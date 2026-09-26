@@ -154,8 +154,7 @@ def main() -> int:
         return 1
 
     print(
-        f"Runtime policy validation passed: {len(files)} Python file(s), "
-        "0 dispatcher violations."
+        f"Runtime policy validation passed: {len(files)} Python file(s), 0 dispatcher violations."
     )
     return 0
 
