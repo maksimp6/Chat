@@ -100,7 +100,7 @@ function renderSidebar() {
         });
 
         var delBtn = document.createElement("button");
-        delBtn.className = "delete-btn";
+        delBtn.className = "alice-btn delete-btn";
         delBtn.textContent = "×";
         delBtn.addEventListener("click", function(e) { 
             e.stopPropagation(); 
