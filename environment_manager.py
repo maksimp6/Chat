@@ -544,6 +544,14 @@ def register_runtime_operation(name: str, handler) -> None:
     _RUNTIME_DISPATCHER.register_operation(name, handler)
 
 
+def authorize_environment_runtime(
+    environment_id: str,
+    owner_id: Optional[str],
+) -> None:
+    """Authorize access using the same dispatcher that executes runtime work."""
+    _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
+
+
 def dispatch_environment_operation(
     environment_id: str,
     operation: str,
