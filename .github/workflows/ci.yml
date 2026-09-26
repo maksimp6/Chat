@@ -49,6 +49,13 @@ jobs:
           NODE_V8_COVERAGE=coverage-js node tests/test_header_dom.js
           NODE_V8_COVERAGE=coverage-js node tests/test_frontend_smoke.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
+      - name: Save frontend test log
+        if: always()
+        run: |
+          : > frontend-test.log
+          for test in tests/test_file_manager.js tests/test_dozzle_header.js tests/test_frontend_boot.js tests/test_project_tree.js tests/test_header_dom.js tests/test_frontend_smoke.js; do
+            node "$test" >> frontend-test.log 2>&1 || true
+          done
       - name: Start Flask for live browser resource validation
         env:
           HOST: 127.0.0.1
