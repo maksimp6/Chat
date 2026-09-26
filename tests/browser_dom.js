@@ -138,6 +138,7 @@ class WindowShim extends EventTargetShim {
         this.setTimeout = setTimeout;
         this.clearTimeout = clearTimeout;
         this.Promise = Promise;
+        this.location = {search: "", href: "http://localhost/"};
     }
 }
 
