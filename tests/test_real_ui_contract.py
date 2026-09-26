@@ -57,6 +57,7 @@ def test_real_header_buttons_use_registered_actions():
     register_patterns = (
         re.compile(r'\.actions\.register\(\s*["\']([^"\']+)["\']'),
         re.compile(r'\bactions\.register\(\s*["\']([^"\']+)["\']'),
+        re.compile(r'\bregisterAction\(\s*["\']([^"\']+)["\']'),
     )
     for _path, source in _application_js():
         for register_re in register_patterns:
