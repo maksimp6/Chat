@@ -117,7 +117,6 @@ class TestPreApiTiming(unittest.TestCase):
         self.assertAlmostEqual(trace["timings"]["pre_api_pipeline"]["duration_ms"], 450.0, places=1)
         self.assertTrue(any(e["type"] == "pre_api_pipeline_completed" for e in trace["events"]))
 
-
     def test_chat_survives_treasury_settlement_exception_without_leaking_it(self):
         from app import app
 
