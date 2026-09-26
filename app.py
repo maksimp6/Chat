@@ -20,6 +20,7 @@ from mcp_routes import mcp_bp
 from chatgpt_mcp import chatgpt_mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
+from runtime import current_runtime_base_path
 from runtime_migrations import init_runtime_tables
 from local_agent_gateway import local_agent_bp, init_local_agent_tables
 from cloudru_iam_routes import cloudru_iam_bp
@@ -56,7 +57,10 @@ install_short_token_auth(app)
 
 
 def preview_base_path():
-    """Return the configured URL prefix used by a preview deployment."""
+    """Return the request-scoped preview prefix, falling back to deployment config."""
+    scoped = current_runtime_base_path()
+    if scoped:
+        return scoped
     return os.environ.get("ALICE_PREVIEW_BASE_PATH", "").rstrip("/")
 
 
