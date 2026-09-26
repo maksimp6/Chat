@@ -14,8 +14,11 @@ function response(status, payload) {
 
 async function runWithFetch(mockResponse) {
     const context = {
-        window: {},
-        fetch: async () => mockResponse,
+        window: {
+            AliceDispatcher: {
+                request: async () => mockResponse,
+            },
+        },
         console,
         setTimeout,
         clearTimeout,
