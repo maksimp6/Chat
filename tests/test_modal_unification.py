@@ -540,3 +540,32 @@ def test_local_resource_files_are_utf8_when_text_based():
         assert not data.startswith(b"\\xef\\xbb\\xbf"), f"UTF-8 BOM in resource: {path}"
         decoded = data.decode("utf-8")
         assert decoded.encode("utf-8") == data, f"resource is not stable UTF-8: {path}"
+
+
+def test_dynamic_modal_code_uses_canonical_modal_api():
+    """New dynamic modal roots must come from the shared UI modal factory."""
+    import re
+
+    violations = []
+    for path in sorted((ROOT / "static").rglob("*.js")):
+        if path.name == "core_api.js":
+            continue
+        source = path.read_text(encoding="utf-8")
+        for match in re.finditer(
+            r"""(?:className\s*=\s*['"][^'"]*\bmodal\b|classList\.add\([^)]*['"]modal['"])""",
+            source,
+        ):
+            # Existing legacy modules are reported by this architectural gate until migrated.
+            if "AliceCoreAPI.ui.modal.create" not in source:
+                line = source.count("\n", 0, match.start()) + 1
+                violations.append(f"{path.relative_to(ROOT)}:{line}")
+
+    assert not violations, (
+        "dynamic modal roots must be created through AliceCoreAPI.ui.modal.create():\n"
+        + "\n".join(violations)
+    )
+
+
+def test_modal_runtime_contract_is_wired_into_ci():
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "node tests/test_ui_modal_contract.js" in workflow
