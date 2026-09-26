@@ -56,7 +56,7 @@ def main():
         if total
         else "- V8 JavaScript coverage: **not available**"
     )
-    lines += ["", "## Backend coverage", ""]
+    lines += ["", "## Python coverage", ""]
     xml = Path("coverage.xml")
     if xml.exists():
         root = ET.parse(xml).getroot()
