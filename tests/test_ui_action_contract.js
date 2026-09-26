@@ -13,6 +13,9 @@ const unregister = UI.actions.register("test.click", function(payload) {
     if (!payload || payload.element.id !== "contract-btn") {
         throw new Error("dispatcher must pass the clicked button");
     }
+    if (payload.action !== "test.click") throw new Error("dispatcher must expose the action name");
+    if (payload.event.type !== "click") throw new Error("dispatcher must expose the click event");
+    if (payload.params.itemId !== "42") throw new Error("dispatcher must normalize data-* into params");
 });
 
 const button = UI.button({
@@ -20,12 +23,14 @@ const button = UI.button({
     className: "header-btn",
     label: "Contract button",
     action: "test.click",
+    params: {itemId: 42},
     text: "Run"
 });
 
 if (button.type !== "button") throw new Error("button factory must force type=button");
 if (!button.classList.contains("alice-btn")) throw new Error("button factory must add alice-btn");
 if (button.dataset.action !== "test.click") throw new Error("button factory must bind data-action");
+if (button.dataset.itemId !== "42") throw new Error("button factory must bind action params");
 if (button.getAttribute("aria-label") !== "Contract button") throw new Error("button must expose accessible label");
 
 root.appendChild(button);
