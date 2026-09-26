@@ -1,62 +1,52 @@
 (function () {
-  function bindHeaderActions() {
+  "use strict";
+
+  function call(name, fallbackMessage) {
+    return function () {
+      if (typeof window[name] === "function") return window[name]();
+      if (fallbackMessage) console.error(fallbackMessage);
+    };
+  }
+
+  function registerHeaderActions() {
     if (window.__aliceHeaderActionsBound === true) return;
     window.__aliceHeaderActionsBound = true;
 
-    document.addEventListener("click", function (event) {
-      var target = event.target && event.target.closest
-        ? event.target.closest("#memory-btn")
-        : null;
-      if (!target) return;
-      event.preventDefault();
-      if (typeof window.openMemoryModal === "function") {
-        window.openMemoryModal();
-      } else {
-        console.error("[Memory] Modal script is unavailable");
-      }
-    }, true);
-
-    var bindings = [
-      ["tools-btn", "click", function () { window.openToolsModal(); }],
-      ["ssh-runtime-btn", "click", function () {
-        if (typeof window.openSshRuntimeModal === "function") {
-          window.openSshRuntimeModal();
-        } else {
-          console.error("[SSH Runtime] Modal script is unavailable");
-        }
-      }],
-      ["mcp-btn", "click", function () { window.openMcpManagerModal(); }],
-      ["settings-btn", "click", function () { window.openSettingsModal(); }],
-      ["file-manager-btn", "click", function () { window.openFileManagerModal(); }],
-      ["treasury-btn", "click", function () { window.openTreasuryPanel(); }],
-      ["dozzle-btn", "click", function () { window.openDozzleLogs(); }],
-      ["departments-btn", "click", function () { window.openDepartmentsModal(); }],
-      ["update-app-btn", "click", function () {
+    var actions = window.AliceCoreAPI.ui.actions;
+    var registrations = [
+      ["header.tools.open", call("openToolsModal")],
+      ["header.ssh.open", call("openSshRuntimeModal", "[SSH Runtime] Modal script is unavailable")],
+      ["header.mcp.open", call("openMcpManagerModal")],
+      ["header.settings.open", call("openSettingsModal")],
+      ["header.files.open", call("openFileManagerModal")],
+      ["header.treasury.open", call("openTreasuryPanel")],
+      ["header.dozzle.open", call("openDozzleLogs")],
+      ["header.departments.open", call("openDepartmentsModal")],
+      ["header.credentials.open", call("openProviderCredentialsModal")],
+      ["header.memory.open", call("openMemoryModal", "[Memory] Modal script is unavailable")],
+      ["header.update.open", function () {
         if (window.AliceAndroid) {
           window.AliceAndroid.openUpdater();
         } else {
           alert("Обновление APK доступно только в Android-приложении.");
         }
-      }],
-      ["provider-credentials-btn", "click", function () {
-        if (window.openProviderCredentialsModal) {
-          window.openProviderCredentialsModal();
-        }
-      }],
-      ["upload-image-btn", "click", function () { window.uploadImage(); }]
+      }]
     ];
 
-    bindings.forEach(function (binding) {
-      var element = document.getElementById(binding[0]);
-      if (!element || element.dataset.bound === "true") return;
-      element.addEventListener(binding[1], binding[2]);
-      element.dataset.bound = "true";
+    registrations.forEach(function (entry) {
+      actions.register(entry[0], entry[1]);
     });
+
+    var upload = document.getElementById("upload-image-btn");
+    if (upload && upload.dataset.bound !== "true") {
+      upload.addEventListener("click", function () { window.uploadImage(); });
+      upload.dataset.bound = "true";
+    }
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bindHeaderActions, { once: true });
+    document.addEventListener("DOMContentLoaded", registerHeaderActions, {once: true});
   } else {
-    bindHeaderActions();
+    registerHeaderActions();
   }
 })();
