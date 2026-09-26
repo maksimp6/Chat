@@ -47,6 +47,7 @@ def test_department_admin_is_required_for_mutation():
         finally:
             db.DB_PATH = old
 
+
 def test_department_validation_errors_are_sanitized(monkeypatch):
     old = db.DB_PATH
     with tempfile.TemporaryDirectory() as tmp:
@@ -82,4 +83,3 @@ def test_department_validation_errors_are_sanitized(monkeypatch):
             assert "invalid department id" not in str(update_payload)
         finally:
             db.DB_PATH = old
-
