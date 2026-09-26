@@ -30,7 +30,7 @@
     var STORAGE_KEY = "alice_pro_settings";
     var SKILLS_BACKUP_KEY = "alice_pro_skills_backup";
     var serverSettingsCache = {};
-    var globalSettingsCache = null;
+    var globalSettingsCache = null; // cache
 
     function convKey(convId) { return STORAGE_KEY + "_conv_" + convId; }
 
