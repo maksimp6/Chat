@@ -53,6 +53,7 @@ jobs:
           node tests/test_frontend_runtime_safety.js
           pytest -q tests/test_frontend_policy.py
           pytest -q tests/test_unified_buttons_contract.py
+          pytest -q tests/test_real_ui_contract.py
           pytest -q tests/test_frontend_module_code.py
           node tests/test_system_status.js
           node tests/test_ui_action_contract.js
