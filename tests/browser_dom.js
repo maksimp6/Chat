@@ -131,14 +131,118 @@ class DocumentShim extends ElementShim {
     get documentElement() { return this.body.querySelector("html") || this.body; }
 }
 
+class StorageShim {
+    constructor() { this._data = Object.create(null); }
+    get length() { return Object.keys(this._data).length; }
+    key(index) { return Object.keys(this._data)[index] ?? null; }
+    getItem(key) { return Object.prototype.hasOwnProperty.call(this._data, key) ? this._data[key] : null; }
+    setItem(key, value) { this._data[String(key)] = String(value); }
+    removeItem(key) { delete this._data[String(key)]; }
+    clear() { this._data = Object.create(null); }
+}
+
+class BrowserEvent {
+    constructor(type, options = {}) {
+        this.type = type;
+        this.bubbles = Boolean(options.bubbles);
+        this.cancelable = Boolean(options.cancelable);
+        this.defaultPrevented = false;
+        this.target = null;
+        this.currentTarget = null;
+    }
+    preventDefault() {
+        if (this.cancelable) this.defaultPrevented = true;
+    }
+}
+
+class CustomEventShim extends BrowserEvent {
+    constructor(type, options = {}) {
+        super(type, options);
+        this.detail = options.detail;
+    }
+}
+
 class WindowShim extends EventTargetShim {
     constructor(document) {
         super();
         this.document = document;
+        this.window = this;
+        this.self = this;
+        this.globalThis = this;
+        this.Event = BrowserEvent;
+        this.CustomEvent = CustomEventShim;
+        this.Storage = StorageShim;
         this.setTimeout = setTimeout;
         this.clearTimeout = clearTimeout;
+        this.setInterval = setInterval;
+        this.clearInterval = clearInterval;
+        this.queueMicrotask = queueMicrotask;
         this.Promise = Promise;
-        this.location = {search: "", href: "http://localhost/"};
+        this.location = {
+            search: "",
+            href: "http://localhost/",
+            origin: "http://localhost",
+            pathname: "/",
+            hash: "",
+        };
+        this.localStorage = new StorageShim();
+        this.sessionStorage = new StorageShim();
+        this.fetch = async () => ({ok: true, status: 200, json: async () => ({})});
+    }
+
+    requestAnimationFrame(callback) {
+        return this.setTimeout(() => callback(Date.now()), 0);
+    }
+
+    cancelAnimationFrame(id) {
+        this.clearTimeout(id);
+    }
+}
+
+class BrowserShim {
+    constructor(html = "") {
+        this.document = new DocumentShim(html);
+        this.window = new WindowShim(this.document);
+        this.document.defaultView = this.window;
+        this.window.document = this.document;
+    }
+
+    load(sources = [], extra = {}) {
+        const context = {
+            console,
+            document: this.document,
+            window: this.window,
+            self: this.window,
+            globalThis: this.window,
+            Event: BrowserEvent,
+            CustomEvent: CustomEventShim,
+            localStorage: this.window.localStorage,
+            sessionStorage: this.window.sessionStorage,
+            URLSearchParams,
+            AbortController,
+            setTimeout,
+            clearTimeout,
+            setInterval,
+            clearInterval,
+            queueMicrotask,
+            fetch: this.window.fetch,
+            ...extra,
+        };
+        Object.assign(this.window, extra);
+        vmLoadSources(sources, context);
+        this.document.readyState = "interactive";
+        this.document.dispatchEvent(new BrowserEvent("DOMContentLoaded"));
+        this.document.readyState = "complete";
+        return {document: this.document, window: this.window, context};
+    }
+}
+
+function vmLoadSources(sources, context) {
+    const fs = require("node:fs");
+    const vm = require("node:vm");
+    vm.createContext(context);
+    for (const source of sources) {
+        vm.runInContext(fs.readFileSync(source, "utf8"), context, {filename: source});
     }
 }
 
@@ -254,4 +358,4 @@ function assertLayoutRule(declarations, property, expected) {
     }
 }
 
-module.exports = {DocumentShim, WindowShim, applyHeaderFlexLayout};
+module.exports = {BrowserShim, BrowserEvent, CustomEventShim, DocumentShim, ElementShim, WindowShim, StorageShim, applyHeaderFlexLayout};
