@@ -492,10 +492,13 @@
     title.textContent = String(options.title);
     modal.setAttribute("aria-labelledby", title.id);
 
+    var closeParams = Object.assign({}, options.closeParams || {});
+    if (!closeParams.modal) closeParams.modal = modal.id;
     var close = createButton({
       className: "modal-close",
       label: options.closeLabel || "Закрыть",
-      action: options.closeAction,
+      action: options.closeAction || "modal.close",
+      params: closeParams,
       text: "×",
     });
 
