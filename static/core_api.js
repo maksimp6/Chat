@@ -347,6 +347,80 @@
     return snapshot;
   }
 
+  var uiActions = new Map();
+  var uiClickRoot = null;
+
+  function assertActionName(action) {
+    if (typeof action !== "string" || !/^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(action)) {
+      throw new Error("Invalid UI action");
+    }
+  }
+
+  function registerAction(action, handler) {
+    assertActionName(action);
+    if (typeof handler !== "function") throw new Error("UI action handler must be a function");
+    if (uiActions.has(action)) throw new Error("UI action already registered: " + action);
+    uiActions.set(action, handler);
+    return function () {
+      if (uiActions.get(action) === handler) uiActions.delete(action);
+    };
+  }
+
+  function dispatchAction(action, payload, event) {
+    assertActionName(action);
+    var handler = uiActions.get(action);
+    if (!handler) throw new Error("Unknown UI action: " + action);
+    return handler(payload, event);
+  }
+
+  function findActionButton(target, root) {
+    var node = target;
+    while (node && node !== root) {
+      if (node.tagName === "BUTTON" && node.dataset && node.dataset.action) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function mountClickDispatcher(root) {
+    if (!root || typeof root.addEventListener !== "function") {
+      throw new Error("UI click dispatcher root is required");
+    }
+    if (uiClickRoot === root) return function () {};
+    if (uiClickRoot) throw new Error("UI click dispatcher already mounted");
+
+    function onClick(event) {
+      var button = findActionButton(event.target, root);
+      if (!button || button.disabled) return;
+      dispatchAction(button.dataset.action, {element: button}, event);
+    }
+
+    root.addEventListener("click", onClick);
+    uiClickRoot = root;
+    return function () {
+      if (uiClickRoot !== root) return;
+      root.removeEventListener("click", onClick);
+      uiClickRoot = null;
+    };
+  }
+
+  function createButton(options) {
+    options = options || {};
+    assertActionName(options.action);
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "alice-btn" + (options.className ? " " + String(options.className).trim() : "");
+    button.dataset.action = options.action;
+    if (options.id) button.id = String(options.id);
+    if (options.label) button.setAttribute("aria-label", String(options.label));
+    if (options.title) button.title = String(options.title);
+    if (options.text !== undefined) button.textContent = String(options.text);
+    if (!button.textContent && !button.getAttribute("aria-label") && !button.title) {
+      throw new Error("UI button requires text or an accessible label");
+    }
+    return button;
+  }
+
   window.AliceCoreAPI = Object.freeze({
     apiVersion: MODULE_API_VERSION,
     module: Object.freeze({
@@ -377,6 +451,11 @@
     }),
     scheduler: Object.freeze({
       defer: defer
+    }),
+    ui: Object.freeze({
+      button: createButton,
+      actions: Object.freeze({register: registerAction, dispatch: dispatchAction}),
+      events: Object.freeze({mountClicks: mountClickDispatcher})
     })
   });
 
