@@ -56,6 +56,7 @@ jobs:
           pytest -q tests/test_frontend_module_code.py
           node tests/test_system_status.js
           node tests/test_ui_action_contract.js
+          node tests/test_ui_modal_contract.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
       - name: Save frontend test log
         if: always()
