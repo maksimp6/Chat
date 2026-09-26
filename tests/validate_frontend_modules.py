@@ -70,6 +70,12 @@ def is_dispatcher(path: Path) -> bool:
     return path.name in {"eruda.js"} or "vendor" in path.parts
 
 
+def is_policy_exempt(path: Path) -> bool:
+    # Service workers have a mandatory fetch event handler and are infrastructure,
+    # not application modules. They still undergo JavaScript syntax validation.
+    return path.name == "sw.js"
+
+
 def _timer_errors(text: str, rel: Path) -> list[str]:
     errors = []
     for pattern, label in TIMER_PATTERNS:
@@ -198,9 +204,8 @@ def main() -> int:
     errors: list[str] = []
 
     for path in files:
-        if is_vendor(path):
-            continue
-        errors.extend(validate_file(path))
+        if not is_vendor(path) and not is_policy_exempt(path):
+            errors.extend(validate_file(path))
         errors.extend(validate_syntax(path))
 
     if errors:
