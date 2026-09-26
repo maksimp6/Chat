@@ -284,4 +284,57 @@ if (mcpModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real MCP modal click lifecycle passed");
 
+const filesShim = new BrowserShim(template);
+filesShim.window.SettingsUI = {
+  escapeHtml: function (value) {
+    return String(value || "");
+  },
+};
+filesShim.window.AliceDispatcher = {
+  request: async function () {
+    return {
+      ok: true,
+      status: 200,
+      json: async function () {
+        return { data: [] };
+      },
+    };
+  },
+};
+const filesRuntime = filesShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/file_manager.js", "static/header_actions.js"],
+  {
+    SettingsUI: filesShim.window.SettingsUI,
+    AliceDispatcher: filesShim.window.AliceDispatcher,
+  },
+);
+const filesButton = filesRuntime.document.getElementById("file-manager-btn");
+if (!filesButton) throw new Error("real file manager button must exist in index.html");
+filesButton.click();
+const filesModal = filesRuntime.document.getElementById("file-manager-modal");
+const filesClose = filesModal && filesModal.querySelector(".modal-close");
+if (!filesModal || !filesClose) {
+  throw new Error("real file manager modal controls must be created after click");
+}
+if (!filesModal.parentNode || filesModal.parentNode.id !== "app-root") {
+  throw new Error("real file manager modal must mount inside .alice-pro-app");
+}
+if (filesClose.dataset.action !== "file-manager.close" || filesClose.dataset.modal !== "file-manager-modal") {
+  throw new Error("file manager close must use dispatcher contract");
+}
+if (filesModal.hidden || !filesModal.classList.contains("visible")) {
+  throw new Error("real file manager button click must open file manager modal");
+}
+if (filesModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened file manager modal must expose aria-hidden=false");
+}
+filesClose.click();
+if (!filesModal.hidden || filesModal.classList.contains("visible")) {
+  throw new Error("real file manager close button must close file manager modal");
+}
+if (filesModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed file manager modal must expose aria-hidden=true");
+}
+console.log("Real file manager modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
