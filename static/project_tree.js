@@ -28,7 +28,7 @@
 
     async function loadProjectTree() {
         log("load_started");
-        var response = await window.fetch("/api/project-tree", {credentials: "same-origin", cache: "no-store"});
+        var response = await window.AliceDispatcher.request("/api/project-tree", {credentials: "same-origin", cache: "no-store"});
         if (!response.ok) {
             var error = new Error("Project tree request failed: HTTP " + response.status);
             error.code = "PROJECT_TREE_HTTP_ERROR";
