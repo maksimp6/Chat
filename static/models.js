@@ -10,12 +10,12 @@ function initModels() {
         if (modal) modal.classList.remove("visible");
     });
 
-    if (modelBtn) modelBtn.addEventListener("click", function() {
-        window.isCreatingNewChat = false;
-        if (typeof renderModelModal === "function") renderModelModal();
-        var modal = document.getElementById("model-modal");
-        if (modal) modal.classList.add("visible");
-    });
+    if (modelBtn) {
+        window.AliceCoreAPI.ui.actions.register("model.prepare", function() {
+            window.isCreatingNewChat = false;
+            if (typeof renderModelModal === "function") renderModelModal();
+        });
+    }
 }
 
 document.addEventListener("DOMContentLoaded", initModels);
