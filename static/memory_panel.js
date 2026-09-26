@@ -7,15 +7,14 @@
 
   window.openMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) {
-      modal.hidden = false;
-      window.loadMemoryData();
-    }
+    if (!modal) return;
+    window.AliceCoreAPI.ui.modal.open(modal);
+    window.loadMemoryData();
   };
 
   window.closeMemoryModal = function () {
     var modal = byId("memoryModal");
-    if (modal) modal.hidden = true;
+    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
   };
 
   window.loadMemoryData = async function () {
@@ -105,16 +104,19 @@
             : null;
         if (!target) return;
 
-        if (target.id === "memoryCloseBtn") {
-          event.preventDefault();
-          window.closeMemoryModal();
-        } else if (target.id === "memoryClearBtn") {
+        if (target.id === "memoryClearBtn") {
           event.preventDefault();
           window.clearMemory(null);
         }
       },
       true,
     );
+
+    document.addEventListener("alice:modal:before-open", function (event) {
+      var detail = event && event.detail;
+      if (!detail || detail.modalId !== "memoryModal") return;
+      window.loadMemoryData();
+    });
 
     var configBindings = [
       ["memEnabled", "change", window.updateMemoryConfig],
