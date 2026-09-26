@@ -67,8 +67,8 @@
         };
 
         Promise.all([
-            fetch('/api/tools/categories').then(function(r) { return r.json(); }),
-            currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools').then(function(r) { return r.json(); }) : Promise.resolve({active_tool_categories: null})
+            window.AliceDispatcher.request('/api/tools/categories').then(function(r) { return r.json(); }),
+            currentConvId ? window.AliceDispatcher.request('/api/conversations/' + currentConvId + '/tools').then(function(r) { return r.json(); }) : Promise.resolve({active_tool_categories: null})
         ]).then(function(results) {
             var catData = results[0];
             var activeData = results[1];
@@ -106,7 +106,7 @@
                     max_results: Math.max(1, parseInt(document.getElementById('tools-fs-max').value, 10) || 20)
                 }
             };
-            var localSave = currentConvId ? fetch('/api/conversations/' + currentConvId + '/tools', {
+            var localSave = currentConvId ? window.AliceDispatcher.request('/api/conversations/' + currentConvId + '/tools', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({active_tool_categories: selected})
