@@ -482,6 +482,7 @@ def test_provider_status_check_hides_internal_exception(monkeypatch):
     assert payload["detail"] == "Проверка провайдера временно недоступна"
     assert internal_marker not in str(payload)
 
+
 def test_perform_health_check_classifies_provider_failures(monkeypatch):
     from types import SimpleNamespace
 
@@ -651,4 +652,3 @@ def test_provider_validation_failure_is_sanitized(monkeypatch):
     assert payload["error"] == "provider_health_check_failed"
     assert payload["provider"] == "cloudru"
     assert internal_marker not in str(payload)
-
