@@ -10,7 +10,7 @@
     var head=el("div",{class:"alice-dept-head"}); head.appendChild(el("h3",{},"Departments"));
     var x=el("button",{"aria-label":"Закрыть"},"×"); x.onclick=close; head.appendChild(x); card.appendChild(head);
     var list=el("div",{class:"alice-dept-list"}); list.textContent="Загрузка…"; card.appendChild(list); modal.appendChild(card); document.body.appendChild(modal);
-    fetch("/api/departments",{headers:{"Accept":"application/json"}}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(data){
+    window.AliceDispatcher.request("/api/departments",{headers:{"Accept":"application/json"}}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(data){
       list.textContent="";
       (data.departments||[]).forEach(function(d){
         var row=el("button",{class:"alice-dept-row"});
@@ -21,7 +21,7 @@
           window.openPartnerRelationsModal();
           return;
         }
-        fetch("/api/departments/"+encodeURIComponent(d.id)+"/sessions",{method:"POST",headers:{"Accept":"application/json"}}).then(function(r){return r.json().then(function(x){return {ok:r.ok,data:x};});}).then(function(x){if(!x.ok){alert(x.data.error||"Не удалось начать сессию");return;} row.querySelector("span").textContent="Сессия: "+x.data.session.id;});
+        window.AliceDispatcher.request("/api/departments/"+encodeURIComponent(d.id)+"/sessions",{method:"POST",headers:{"Accept":"application/json"}}).then(function(r){return r.json().then(function(x){return {ok:r.ok,data:x};});}).then(function(x){if(!x.ok){alert(x.data.error||"Не удалось начать сессию");return;} row.querySelector("span").textContent="Сессия: "+x.data.session.id;});
       };
         list.appendChild(row);
       });
