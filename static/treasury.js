@@ -87,27 +87,20 @@
   function ensureTreasuryModal() {
     if (treasuryModal) return;
 
-    treasuryModal = document.createElement('div');
-    treasuryModal.id = 'treasury-modal';
-    treasuryModal.className = 'modal treasury-modal';
-    treasuryModal.setAttribute('role', 'dialog');
-    treasuryModal.setAttribute('aria-modal', 'true');
-    treasuryModal.setAttribute('aria-labelledby', 'treasury-modal-title');
-    treasuryModal.setAttribute('aria-hidden', 'true');
+    const UI = window.AliceCoreAPI.ui;
+    const body = document.createElement('div');
+    body.className = 'treasury-modal-body';
 
-    const content = document.createElement('div');
-    content.className = 'modal-content treasury-modal-content';
-
-    const closeButton = document.createElement('button');
-    closeButton.type = 'button';
-    closeButton.className = 'treasury-modal-close';
-    closeButton.setAttribute('aria-label', 'Закрыть казначейство');
-    closeButton.textContent = '×';
-    closeButton.addEventListener('click', closeTreasuryModal);
-
-    const title = document.createElement('h3');
-    title.id = 'treasury-modal-title';
-    title.textContent = 'Казначейство';
+    treasuryModal = UI.modal.create({
+      id: 'treasury-modal',
+      title: 'Казначейство',
+      titleTag: 'h3',
+      className: 'treasury-modal',
+      contentClassName: 'treasury-modal-content',
+      closeLabel: 'Закрыть казначейство',
+      closeAction: 'treasury.close',
+      body: body
+    });
 
     const balanceCard = document.createElement('div');
     balanceCard.className = 'treasury-balance-card';
@@ -119,15 +112,12 @@
     treasuryBalance = document.createElement('strong');
     treasuryBalance.className = 'treasury-balance-value';
     treasuryBalance.textContent = '…';
-
     balanceCard.append(balanceLabel, treasuryBalance);
 
     const topUpSection = document.createElement('section');
     topUpSection.className = 'treasury-action-section';
-
     const topUpTitle = document.createElement('h4');
     topUpTitle.textContent = 'Пополнение';
-
     const topUpRow = document.createElement('div');
     topUpRow.className = 'treasury-top-up-row';
 
@@ -140,38 +130,29 @@
     treasuryAmount.className = 'treasury-amount-input';
     treasuryAmount.setAttribute('aria-label', 'Сумма DEMO-пополнения');
 
-    const topUpButton = document.createElement('button');
-    topUpButton.type = 'button';
-    topUpButton.className = 'treasury-action-btn';
-    topUpButton.textContent = 'Пополнить DEMO';
-    topUpButton.addEventListener('click', performTreasuryTopUp);
-
+    const topUpButton = UI.button({
+      className: 'treasury-action-btn',
+      text: 'Пополнить DEMO',
+      action: 'treasury.top-up'
+    });
     topUpRow.append(treasuryAmount, topUpButton);
     topUpSection.append(topUpTitle, topUpRow);
 
     const expensesSection = document.createElement('section');
     expensesSection.className = 'treasury-action-section';
-
     const expensesTitle = document.createElement('h4');
     expensesTitle.textContent = 'Расходы';
-
     treasuryExpenses = document.createElement('div');
     treasuryExpenses.className = 'treasury-expenses-list';
     treasuryExpenses.setAttribute('aria-live', 'polite');
     treasuryExpenses.textContent = 'Загрузка…';
-
     expensesSection.append(expensesTitle, treasuryExpenses);
 
     treasuryStatus = document.createElement('div');
     treasuryStatus.className = 'treasury-status';
     treasuryStatus.setAttribute('role', 'status');
 
-    content.append(closeButton, title, balanceCard, topUpSection, expensesSection, treasuryStatus);
-    treasuryModal.appendChild(content);
-    treasuryModal.addEventListener('click', function (event) {
-      if (event.target === treasuryModal) closeTreasuryModal();
-    });
-
+    body.append(balanceCard, topUpSection, expensesSection, treasuryStatus);
     document.querySelector('.alice-pro-app').appendChild(treasuryModal);
   }
 
@@ -254,15 +235,13 @@
 
   function closeTreasuryModal() {
     if (!treasuryModal) return;
-    treasuryModal.classList.remove('visible');
-    treasuryModal.setAttribute('aria-hidden', 'true');
+    window.AliceCoreAPI.ui.modal.close(treasuryModal);
     document.removeEventListener('keydown', treasuryModal._escapeHandler);
   }
 
   async function openTreasuryPanel() {
     ensureTreasuryModal();
-    treasuryModal.classList.add('visible');
-    treasuryModal.setAttribute('aria-hidden', 'false');
+    window.AliceCoreAPI.ui.modal.open(treasuryModal);
     setTreasuryStatus('Загрузка…');
     treasuryBalance.textContent = '…';
     treasuryExpenses.textContent = 'Загрузка…';
@@ -282,6 +261,9 @@
       treasuryExpenses.textContent = 'Не удалось загрузить расходы.';
     }
   }
+
+  window.AliceCoreAPI.ui.actions.register('treasury.close', closeTreasuryModal);
+  window.AliceCoreAPI.ui.actions.register('treasury.top-up', performTreasuryTopUp);
 
   window.openTreasuryPanel = openTreasuryPanel;
 })();
