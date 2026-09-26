@@ -128,7 +128,7 @@ function build() {
     box.appendChild(makeField("provider-cloudru-key","Cloud.ru API key","","Cloud.ru API key","password"));
 
     var actions=document.createElement("div"); actions.className="provider-credentials-actions";
-    var save=document.createElement("button"); save.textContent="Подключить"; save.className="btn-primary";
+    var save=document.createElement("button"); save.textContent="Подключить"; save.className="alice-btn btn-primary";
     save.addEventListener("click", async function(){
         var y=document.getElementById("provider-yandex-key").value.trim();
         var project=document.getElementById("provider-yandex-project").value.trim();
