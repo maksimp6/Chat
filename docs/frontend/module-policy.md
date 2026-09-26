@@ -11,7 +11,7 @@ Alice Pro frontend JavaScript is treated as a set of modules with explicit runti
 - JavaScript files have a 512 KiB source limit.
 - A source line may not exceed 8 KiB.
 - Large embedded base64/data URLs are rejected.
-- Repeated source text above the configured threshold is rejected.
+- Long consecutive runs of identical source lines are rejected.
 - TODO/FIXME/XXX/HACK/NOTE markers are rejected from production frontend modules.
 - Suspicious high-entropy or non-printable source is classified as unusual text and rejected.
 - Vendor bundles are excluded from application policy checks and must be isolated explicitly. They are not treated as application modules.
