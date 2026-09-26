@@ -565,9 +565,7 @@ def test_html_declares_utf8_and_has_no_conflicting_charset():
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     import re
 
-    charsets = re.findall(
-        r"<meta\b[^>]*charset\s*=\s*[\"']?([^\"'\s/>]+)", source, flags=re.I
-    )
+    charsets = re.findall(r"<meta\b[^>]*charset\s*=\s*[\"']?([^\"'\s/>]+)", source, flags=re.I)
     assert charsets, "document must declare a charset"
     assert all(value.lower() == "utf-8" for value in charsets), (
         f"conflicting charset declarations: {charsets!r}"
@@ -742,7 +740,9 @@ def test_dynamic_modal_code_uses_canonical_modal_api():
             source,
         ):
             # Local aliases (for example `const UI = window.AliceCoreAPI.ui`) are canonical too.
-            if not re.search(r"\b(?:window\.AliceCoreAPI\.ui|[A-Za-z_$][\w$]*)\.modal\.create\s*\(", source):
+            if not re.search(
+                r"\b(?:window\.AliceCoreAPI\.ui|[A-Za-z_$][\w$]*)\.modal\.create\s*\(", source
+            ):
                 line = source.count("\n", 0, match.start()) + 1
                 violations.append(f"{path.relative_to(ROOT)}:{line}")
 
