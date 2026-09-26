@@ -138,6 +138,24 @@ def init_environment_tables() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_environment_events_env ON environment_events(environment_id)"
         )
+        running_rows = conn.execute(
+            "SELECT environment_id FROM environments WHERE status = ?",
+            ("RUNNING",),
+        ).fetchall()
+        with _RUNTIME_WORKERS_LOCK:
+            active_runtime_ids = set(_RUNTIME_WORKERS)
+        for row in running_rows:
+            runtime_id = row["environment_id"] if hasattr(row, "keys") else row[0]
+            if runtime_id not in active_runtime_ids:
+                conn.execute(
+                    """
+                    UPDATE environments
+                       SET status = ?, runtime_pid = NULL, runtime_port = NULL,
+                           updated_at = ?, stopped_at = COALESCE(stopped_at, ?)
+                     WHERE environment_id = ?
+                    """,
+                    ("STOPPED", _now(), _now(), runtime_id),
+                )
         conn.commit()
     finally:
         conn.close()
