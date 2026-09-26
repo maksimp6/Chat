@@ -73,7 +73,7 @@
     // Загрузка настроек с сервера при смене диалога
     window.loadServerConvSettings = function(convId) {
         if (!convId) return Promise.resolve(load(convId));
-        return window.AliceDispatcher.request("/api/conversations/" + convId + "/settings")
+        return window.AliceDispatcher.request("/api/conversations/" + convId + "/settings", null, {timeoutMs: 5000})
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 var base = JSON.parse(JSON.stringify(DEFAULTS));
