@@ -11,7 +11,7 @@ def test_file_manager_modal_shell_uses_canonical_modal_api():
     assert 'id: "file-manager-modal"' in source
     assert 'className: "file-manager-modal"' in source
     assert 'contentClassName: "file-manager-box"' in source
-    assert 'id: "file-manager-add-modal"' in source
+    assert 'id: "vs-add-files-modal"' in source
     assert 'className: "file-manager-add-modal"' in source
     assert 'contentClassName: "file-manager-add-box"' in source
     assert "CoreUI.modal.open(" in source
