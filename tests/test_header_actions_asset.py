@@ -11,7 +11,7 @@ def test_header_actions_are_bound_by_local_asset():
 
     assert "header_actions.js?v={{ static_version }}" in html
     assert 'id="tools-btn"' in html
-    assert "addEventListener" in script
+    assert 'actions.register("header.tools.open"' in script
 
     for element_id in (
         "tools-btn",
@@ -37,8 +37,8 @@ def test_header_actions_are_bound_by_local_asset():
         )
 
 
-def test_header_action_bindings_are_idempotent():
+def test_header_action_registration_is_idempotent():
     script = (ROOT / "static" / "header_actions.js").read_text(encoding="utf-8")
 
-    assert 'element.dataset.bound === "true"' in script
-    assert 'element.dataset.bound = "true"' in script
+    assert "window.__aliceHeaderActionsBound === true" in script
+    assert "window.__aliceHeaderActionsBound = true" in script
