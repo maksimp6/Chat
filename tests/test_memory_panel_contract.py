@@ -60,6 +60,6 @@ def test_memory_button_has_real_binding_path():
     assert 'id="memory-btn"' in html
     assert 'data-action="header.memory.open"' in html
     assert 'id="memoryModal"' in html
-    assert 'actions.register("header.memory.open"' in header
+    assert re.search(r'actions\.register\(\s*"header\.memory\.open"', header)
     assert 'call("openMemoryModal"' in header
     assert "window.loadMemoryData" in panel
