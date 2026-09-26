@@ -45,7 +45,7 @@
         document.body.appendChild(overlay);
 
         function load() {
-            return fetch("/api/partners", { headers: { "Accept": "application/json" } })
+            return window.AliceDispatcher.request("/api/partners", { headers: { "Accept": "application/json" } })
                 .then(function (r) {
                     return r.json().then(function (data) {
                         if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
@@ -64,7 +64,7 @@
                         row.appendChild(h("strong", {}, partner.name));
                         row.appendChild(h("span", {}, [partner.organization, partner.status, partner.email].filter(Boolean).join(" · ")));
                         row.onclick = function () {
-                            fetch("/api/partners/" + encodeURIComponent(partner.id), { headers: { "Accept": "application/json" } })
+                            window.AliceDispatcher.request("/api/partners/" + encodeURIComponent(partner.id), { headers: { "Accept": "application/json" } })
                                 .then(function (r) { return r.json().then(function (data) {
                                     if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
                                     return data.partner;
@@ -91,7 +91,7 @@
             });
             var statusButton = h("button", { type: "button" }, "Сохранить статус");
             statusButton.onclick = function () {
-                fetch("/api/partners/" + encodeURIComponent(partner.id) + "/status", {
+                window.AliceDispatcher.request("/api/partners/" + encodeURIComponent(partner.id) + "/status", {
                     method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ status: status.value })
                 }).then(function (r) { return r.json().then(function (data) {
@@ -122,7 +122,7 @@
                 if (followup.status === "open") {
                     var done = h("button", { type: "button" }, "Готово");
                     done.onclick = function () {
-                        fetch("/api/partners/followups/" + encodeURIComponent(followup.id) + "/complete", {
+                        window.AliceDispatcher.request("/api/partners/followups/" + encodeURIComponent(followup.id) + "/complete", {
                             method: "POST", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ status: "completed" })
                         }).then(function (r) { return r.json().then(function (data) {
@@ -140,7 +140,7 @@
         form.addEventListener("submit", function (event) {
             event.preventDefault();
             create.disabled = true;
-            fetch("/api/partners", {
+            window.AliceDispatcher.request("/api/partners", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
