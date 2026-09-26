@@ -142,7 +142,7 @@
             currentTrace = trace;
             var result = original.apply(this, arguments);
             window.requestAnimationFrame(installButton);
-            window.setTimeout(installButton, 50);
+            defer(installButton, 50);
             return result;
         }
         wrapped.__downloadHook = true;
