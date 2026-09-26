@@ -132,6 +132,19 @@ def test_fm_request_raises_after_retries_and_restores_header(monkeypatch):
     assert len(session.calls) == 4
 
 
+def test_fm_request_exhausts_retries_without_multipart_header(monkeypatch):
+    session = FakeSession([requests.exceptions.Timeout() for _ in range(4)])
+    client = Client(session)
+    monkeypatch.setattr(file_manager, "_resolve_global_provider_credential", lambda instance: None)
+    monkeypatch.setattr(file_manager.time, "sleep", lambda delay: None)
+
+    with pytest.raises(YandexClientError, match="Network timeout"):
+        client._fm_request("GET", "https://api.example.test/v1/files")
+
+    assert "Content-Type" not in session.headers
+    assert len(session.calls) == 4
+
+
 @pytest.mark.parametrize(
     ("status", "payload", "text", "expected"),
     [
