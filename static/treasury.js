@@ -16,7 +16,7 @@
   }
 
   async function bootstrapIdentity() {
-    const response = await fetch('/api/users/bootstrap', {
+    const response = await window.AliceDispatcher.request('/api/users/bootstrap', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
@@ -44,7 +44,7 @@
 
   async function requestTreasury(path, options, fallbackMessage) {
     const requestOptions = Object.assign({credentials: 'same-origin'}, options || {});
-    let response = await fetch(path, requestOptions);
+    let response = await window.AliceDispatcher.request(path, requestOptions);
     let data = {};
 
     try {
@@ -62,7 +62,7 @@
     ) {
       await bootstrapIdentity();
 
-      response = await fetch(path, requestOptions);
+      response = await window.AliceDispatcher.request(path, requestOptions);
       try {
         data = await response.json();
       } catch (error) {
