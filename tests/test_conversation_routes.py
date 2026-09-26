@@ -56,4 +56,6 @@ def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
     )
 
     assert response.status_code == 401
-    assert response.get_json()["error"] == "invalid authenticated owner token"
+    payload = response.get_json()
+    assert payload["error"] == "invalid_owner_identity"
+    assert "invalid authenticated owner token" not in str(payload)
