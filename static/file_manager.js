@@ -577,10 +577,10 @@ window.fetchVectorStores = function () {
   };
   window.AliceCoreAPI.ui.actions.register("file-manager.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) modal.remove();
+    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
   });
   window.AliceCoreAPI.ui.actions.register("file-manager.add.close", function (payload) {
     var modal = payload.element.closest(".modal");
-    if (modal) modal.remove();
+    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
   });
 })();
