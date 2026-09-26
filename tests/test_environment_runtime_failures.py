@@ -88,29 +88,32 @@ def test_runtime_dispatch_success_error_timeout_and_duplicate_start(tmp_path):
     runtime.start()
 
     try:
-        assert dispatch_environment_operation(
-            runtime.runtime_id, "test.echo", {"value": 7}
-        ) == {"runtime_id": runtime.runtime_id, "value": 7}
+        assert dispatch_environment_operation(runtime.runtime_id, "test.echo", {"value": 7}) == {
+            "runtime_id": runtime.runtime_id,
+            "value": 7,
+        }
 
         with pytest.raises(ValueError, match="operation failed"):
             dispatch_environment_operation(runtime.runtime_id, "test.fail")
 
         with pytest.raises(TimeoutError, match="operation timed out"):
-            dispatch_environment_operation(
-                runtime.runtime_id, "test.block", timeout=0.001
-            )
+            dispatch_environment_operation(runtime.runtime_id, "test.block", timeout=0.001)
         release.set()
-        assert dispatch_environment_operation(
-            runtime.runtime_id, "test.echo", {"value": 8}
-        )["value"] == 8
+        assert (
+            dispatch_environment_operation(runtime.runtime_id, "test.echo", {"value": 8})["value"]
+            == 8
+        )
 
         duplicate = _runtime(tmp_path, runtime.runtime_id)
         with pytest.raises(RuntimeError, match="already running"):
             duplicate.start()
 
-        assert dispatch_environment_operation(
-            runtime.runtime_id, "test.echo", {"value": 9}
-        )["runtime_id"] == runtime.runtime_id
+        assert (
+            dispatch_environment_operation(runtime.runtime_id, "test.echo", {"value": 9})[
+                "runtime_id"
+            ]
+            == runtime.runtime_id
+        )
     finally:
         release.set()
         runtime.stop()
@@ -208,9 +211,7 @@ def test_runtime_http_client_disconnect_cancels_body(tmp_path):
     register_runtime_operation("test.sync", lambda context, payload: True)
     runtime.start()
     try:
-        stream = dispatch_environment_http(
-            runtime.runtime_id, {"base_path": "/runtime"}, timeout=1
-        )
+        stream = dispatch_environment_http(runtime.runtime_id, {"base_path": "/runtime"}, timeout=1)
         assert body_entered.wait(1)
         stream.close()
         release_body.set()
