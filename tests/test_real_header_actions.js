@@ -219,4 +219,61 @@ if (toolsModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real tools modal click lifecycle passed");
 
+const mcpShim = new BrowserShim(template);
+mcpShim.window.SettingsUI = {
+  injectModalStyles: function () {},
+  escapeHtml: function (value) {
+    return String(value || "");
+  },
+  strToArr: function (value) {
+    return value ? String(value).split(",") : [];
+  },
+};
+mcpShim.window.AliceDispatcher = {
+  request: async function () {
+    return {
+      ok: true,
+      status: 200,
+      json: async function () {
+        return { data: [] };
+      },
+    };
+  },
+};
+const mcpRuntime = mcpShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/settings/settings_mcp.js", "static/header_actions.js"],
+  {
+    SettingsUI: mcpShim.window.SettingsUI,
+    AliceDispatcher: mcpShim.window.AliceDispatcher,
+  },
+);
+const mcpButton = mcpRuntime.document.getElementById("mcp-btn");
+if (!mcpButton) throw new Error("real MCP button must exist in index.html");
+mcpButton.click();
+const mcpModal = mcpRuntime.document.getElementById("mcp-manager-modal");
+const mcpClose = mcpModal && mcpModal.querySelector(".modal-close");
+if (!mcpModal || !mcpClose) {
+  throw new Error("real MCP modal controls must be created after click");
+}
+if (!mcpModal.parentNode || mcpModal.parentNode.id !== "app-root") {
+  throw new Error("real MCP modal must mount inside .alice-pro-app");
+}
+if (mcpClose.dataset.action !== "mcp-manager.close" || mcpClose.dataset.modal !== "mcp-manager-modal") {
+  throw new Error("MCP modal close must use dispatcher contract");
+}
+if (mcpModal.hidden || !mcpModal.classList.contains("visible")) {
+  throw new Error("real MCP button click must open MCP modal");
+}
+if (mcpModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened real MCP modal must expose aria-hidden=false");
+}
+mcpClose.click();
+if (!mcpModal.hidden || mcpModal.classList.contains("visible")) {
+  throw new Error("real MCP close button must close MCP modal");
+}
+if (mcpModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed real MCP modal must expose aria-hidden=true");
+}
+console.log("Real MCP modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
