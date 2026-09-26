@@ -20,13 +20,13 @@ def test_dynamic_header_actions_target_secondary_row():
     diagnostics = Path("static/android_diagnostics.js").read_text(encoding="utf-8")
     html = Path("templates/index.html").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
-    assert 'data-action="header.memory.open"' in html
+    assert 'data-action="modal.open"' in html
+    assert 'data-modal="memoryModal"' in html
     assert 'getElementById("header-actions-2")' in diagnostics
-    assert re.search(r'actions\.register\(\s*"header\.memory\.open"', header)
     assert "window.__aliceHeaderActionsBound === true" in header
-    assert 'call("openMemoryModal"' in header
-    assert "memory-btn" not in memory
+    assert "header.memory.open" not in header
     assert "window.openMemoryModal" in memory
+    assert "alice:modal:before-open" in memory
 
 
 def test_ssh_runtime_panel_is_visible_on_open():
@@ -40,6 +40,6 @@ def test_memory_action_uses_document_delegation_for_dynamic_modal_lifecycle():
     assert "window.__aliceMemoryPanelBound === true" in source
     assert "document.addEventListener(" in source
     assert '"click"' in source
-    assert 'event.target.closest("#memoryCloseBtn, #memoryClearBtn")' in source
+    assert 'event.target.closest("#memoryClearBtn")' in source
     assert "event.preventDefault();" in source
     assert "window.openMemoryModal();" not in source
