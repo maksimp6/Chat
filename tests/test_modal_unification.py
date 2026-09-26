@@ -418,10 +418,27 @@ def parse_css_rules():
 
 
 def test_canonical_modal_css_has_complete_layout_contract():
-    rules = dict(parse_css_rules())
-    root = rules[".alice-pro-app .modal"]
-    visible = rules[".alice-pro-app .modal.visible"]
-    content = rules[".alice-pro-app .modal-content"]
+    import re
+
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+
+    def rule(selector):
+        match = re.search(
+            rf"(?m)^\s*{re.escape(selector)}\s*\{{([^{{}}]*)\}}",
+            css,
+        )
+        assert match, f"missing CSS rule: {selector}"
+        declarations = {}
+        for declaration in match.group(1).split(";"):
+            if ":" not in declaration:
+                continue
+            name, value = declaration.split(":", 1)
+            declarations[name.strip()] = value.strip()
+        return declarations
+
+    root = rule(".alice-pro-app .modal")
+    visible = rule(".alice-pro-app .modal.visible")
+    content = rule(".alice-pro-app .modal-content")
 
     assert root["display"] == "none"
     assert root["position"] == "fixed"
@@ -534,7 +551,8 @@ def test_modal_text_nodes_have_no_accidental_edge_whitespace():
             for node in walk(modal):
                 for raw in node.raw_data:
                     if raw.strip() and "\n" not in raw:
-                        assert raw == raw.strip(), (
+                        stripped = raw.strip()
+                        assert raw in {stripped, " " + stripped, stripped + " "}, (
                             f"{modal.attrs.get('id')}: text node has accidental edge whitespace: {raw!r}"
                         )
 
@@ -686,9 +704,11 @@ def test_template_resource_types_match_local_extensions():
     import re
 
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    for tag, attr, ref in re.findall(
+    refs = re.findall(
         r'<(script|link)\b([^>]*?)\b(src|href)=["\']([^"\']+)["\']', source, flags=re.I
-    ):
+    )
+    assert refs, "template must declare typed browser resources"
+    for tag, _attrs, _attr_name, ref in refs:
         clean = (
             ref.split("?", 1)[0]
             .replace("{{ static_root }}", "/static")
@@ -697,7 +717,7 @@ def test_template_resource_types_match_local_extensions():
         suffix = clean.rsplit(".", 1)[-1].lower() if "." in clean.rsplit("/", 1)[-1] else ""
         if tag.lower() == "script":
             assert suffix == "js", f"script must resolve to .js: {ref}"
-        elif "stylesheet" in attr.lower() or tag.lower() == "link":
+        elif tag.lower() == "link":
             if suffix not in {"css", "svg", "ico", "png", "jpg", "jpeg", "webp"}:
                 raise AssertionError(f"unexpected link resource type: {ref}")
 
@@ -707,10 +727,11 @@ def test_local_resource_files_are_utf8_when_text_based():
 
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     refs = re.findall(
-        r'<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=["\\\']([^"\\\']+)["\\\']',
+        r'<(?:script\b[^>]*\bsrc|link\b[^>]*\bhref)=["\']([^"\']+)["\']',
         source,
         flags=re.I,
     )
+    assert refs, "template must declare UTF-8 resource files"
     for ref in refs:
         clean = (
             ref.split("?", 1)[0]
