@@ -25,7 +25,7 @@
         md.innerHTML = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">',
             ' <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🧰 Инструменты</h2>',
-            ' <button id="tools-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
+            ' <button class="alice-btn" id="tools-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
             '</div>',
             '<div style="font-size:12px;color:var(--m-muted,#666);margin-bottom:12px;">Управление локальными и встроенными инструментами. Отключенные инструменты не передаются модели.</div>',
             '<h3 style="font-size:14px;margin:12px 0 8px;">Локальные инструменты</h3>',
@@ -47,7 +47,7 @@
             '<div style="margin-top:8px;">' + UI.lbl('Максимум результатов') + UI.inp('tools-fs-max', 'number', fs.max_results || 20, ' min="1"') + '</div>',
             '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">Эти инструменты выполняются на стороне Yandex AI Studio. Они независимы от MCP и локального Tool Registry.</div>',
             '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--m-border,#ddd);padding-top:12px;">',
-            ' <button id="tools-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить инструменты</button>',
+            ' <button class="alice-btn" id="tools-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить инструменты</button>',
             '</div>'
         ].join('');
         ov.appendChild(md);
@@ -135,14 +135,14 @@
         var tabsHeader = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">',
             '    <h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">⚙️ Конфигурация LLM & Responses API</h2>',
-            '    <button id="set-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
+            '    <button class="alice-btn" id="set-close-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button>',
             '</div>',
             '<div style="display:flex;gap:6px;border-bottom:1px solid var(--m-border,#ddd);margin-bottom:14px;overflow-x:auto;">',
-            '    <button class="llm-tab-btn active" data-tab="tab-gen" style="padding:8px 12px;border:none;background:none;border-bottom:2px solid var(--m-accent,#4a90d9);color:var(--m-text,#222);font-weight:600;cursor:pointer;white-space:nowrap;">Сэмплинг</button>',
-            '    <button class="llm-tab-btn" data-tab="tab-output" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Формат вывода</button>',
-            '    <button class="llm-tab-btn" data-tab="tab-routing" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Маршрутизация вызовов</button>',
-            '    <button class="llm-tab-btn" data-tab="tab-adv" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Промпты & Кэш</button>',
-            '    <button class="llm-tab-btn" data-tab="tab-theme" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Оформление</button>',
+            '    <button class="alice-btn llm-tab-btn active" data-tab="tab-gen" style="padding:8px 12px;border:none;background:none;border-bottom:2px solid var(--m-accent,#4a90d9);color:var(--m-text,#222);font-weight:600;cursor:pointer;white-space:nowrap;">Сэмплинг</button>',
+            '    <button class="alice-btn llm-tab-btn" data-tab="tab-output" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Формат вывода</button>',
+            '    <button class="alice-btn llm-tab-btn" data-tab="tab-routing" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Маршрутизация вызовов</button>',
+            '    <button class="alice-btn llm-tab-btn" data-tab="tab-adv" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Промпты & Кэш</button>',
+            '    <button class="alice-btn llm-tab-btn" data-tab="tab-theme" style="padding:8px 12px;border:none;background:none;color:var(--m-muted,#666);cursor:pointer;white-space:nowrap;">Оформление</button>',
             '</div>'
         ].join('');
 
@@ -244,8 +244,8 @@ var tabAdv = [
 
 var footer = [
             '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid var(--m-border,#ddd);padding-top:14px;">',
-            '    <button id="set-reset-btn" style="padding:8px 16px;background:var(--m-danger,#c33);color:#fff;border:none;border-radius:6px;cursor:pointer;">Сброс</button>',
-            '    <button id="set-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить параметры</button>',
+            '    <button class="alice-btn" id="set-reset-btn" style="padding:8px 16px;background:var(--m-danger,#c33);color:#fff;border:none;border-radius:6px;cursor:pointer;">Сброс</button>',
+            '    <button class="alice-btn" id="set-save-btn" style="padding:8px 16px;background:var(--m-success,#28a745);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Сохранить параметры</button>',
             '</div>'
         ].join('');
 
