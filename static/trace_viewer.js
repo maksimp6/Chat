@@ -3,7 +3,7 @@
     "use strict";
 
     var state = { trace:null, items:null, selected:null, modal:null, body:null, nav:null, list:null, detail:null, detailTitle:null, listScrollTop:0, jsonDepth:4 };
-    var ESC = String.fromCharCode(27);
+    var ESC = "\u001b";
 
     function el(tag, attrs, text) {
         var node=document.createElement(tag); attrs=attrs||{};
@@ -144,4 +144,5 @@
         state.detail=el("div",{className:"alice-trace-mobile-detail"});var dh=el("div",{className:"alice-trace-mobile-detail-head"}),back=el("button",{className:"alice-trace-mobile-back"},"← Events");back.onclick=hideMobileDetail;state.detailTitle=el("div",{className:"alice-trace-mobile-detail-title"},"");dh.appendChild(back);dh.appendChild(state.detailTitle);state.detail.appendChild(dh);var dc=el("div",{className:"alice-trace-mobile-detail-content"});dc.appendChild(el("div",{className:"alice-trace-inspector"}));state.detail.appendChild(dc);main.appendChild(state.detail);win.appendChild(main);modal.appendChild(win);document.body.appendChild(modal);state.modal=modal;document.addEventListener("keydown",onKey);
     }
     window.openTraceViewer=open;
+    window.dispatchEvent(new CustomEvent("alice:trace-viewer-ready"));
 })();
