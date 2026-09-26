@@ -93,8 +93,7 @@
         openTree();
     });
 
-    document.addEventListener("DOMContentLoaded", function () {
-        var button = document.getElementById("project-tree-btn");
-        if (button) button.addEventListener("click", openTree);
+    actions.register("project-tree.open", function () {
+        openTree();
     });
 })();
