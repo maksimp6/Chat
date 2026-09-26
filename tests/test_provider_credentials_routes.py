@@ -453,6 +453,7 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     assert "yandex-runtime-secret" not in serialized
     assert "cloudru-runtime-secret" not in serialized
 
+
 def test_provider_status_check_hides_internal_exception(monkeypatch):
     from flask import Flask
 
@@ -480,4 +481,3 @@ def test_provider_status_check_hides_internal_exception(monkeypatch):
     assert payload["error"] == "health_check_failed"
     assert payload["detail"] == "Проверка провайдера временно недоступна"
     assert internal_marker not in str(payload)
-
