@@ -269,10 +269,13 @@ def chat():
                 invocation.user_id,
             )
         except Exception as settlement_error:
+            logger.exception("[BILLING] Treasury settlement failed")
             trace.record_error(
-                "treasury_settlement", str(settlement_error), exception=settlement_error
+                "treasury_settlement",
+                "treasury settlement failed",
+                error_type=type(settlement_error).__name__,
             )
-            settlement = {"status": "failed", "reason": str(settlement_error)}
+            settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
             trace_data = trace.finalize()
 
         trace_data.setdefault("billing", {})["settlement"] = settlement
@@ -319,8 +322,14 @@ def chat():
             }
         )
     except Exception as e:
-        logger.exception(f"[CHAT] Ошибка: {e}")
-        error_message = str(e)
+        logger.exception("[CHAT] Ошибка")
+        internal_error_message = str(e)
+        is_temperature_error = isinstance(e, ValueError) and "temperature" in internal_error_message.lower()
+        error_message = (
+            "Некорректное значение temperature"
+            if is_temperature_error
+            else "Внутренняя ошибка обработки запроса"
+        )
 
         try:
             if trace is None:
@@ -332,7 +341,7 @@ def chat():
                     start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
-            if isinstance(e, ValueError) and "temperature" in error_message.lower():
+            if is_temperature_error:
                 trace.add_event(
                     "validation_failed",
                     {
@@ -340,7 +349,11 @@ def chat():
                         "error": error_message,
                     },
                 )
-            trace.record_error("chat_pipeline", error_message, exception=e)
+            trace.record_error(
+                "chat_pipeline",
+                error_message,
+                error_type=type(e).__name__,
+            )
             record_yandex_mcp_activity(trace)
             trace_data = trace.finalize()
             if isinstance(e, ProviderQuotaExceeded):
@@ -391,7 +404,7 @@ def chat():
                 }
             ), 500
 
-        except Exception as inner_e:
+        except Exception:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
             return jsonify(
                 {
@@ -456,7 +469,7 @@ def conversations():
         owner_id = get_current_owner_id(required=False)
     except TreasuryIdentityError as exc:
         logger.warning("[CONVERSATION] Invalid owner identity: %s", exc)
-        return jsonify({"error": str(exc)}), 401
+        return jsonify({"error": "invalid_owner_identity"}), 401
 
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
@@ -474,12 +487,16 @@ def conversations():
             if not conv_id:
                 raise RuntimeError("Yandex conversation creation returned no ID")
         except Exception as exc:
-            creation_trace.record_error("conversation_create", str(exc), exception=exc)
+            creation_trace.record_error(
+                "conversation_create",
+                "conversation creation failed",
+                error_type=type(exc).__name__,
+            )
             logger.exception("[CONVERSATION] Yandex conversation creation failed")
             return jsonify(
                 {
                     "error": "conversation_creation_failed",
-                    "message": str(exc),
+                    "message": "Не удалось создать разговор у провайдера",
                     "trace": creation_trace.finalize(),
                 }
             ), 502
@@ -571,5 +588,6 @@ def execute_approved():
 
         add_message(conv_id, "assistant", reply, cost=cost)
         return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("[TOOL_APPROVAL] Tool execution failed")
+        return jsonify({"error": "tool_execution_failed"}), 500
