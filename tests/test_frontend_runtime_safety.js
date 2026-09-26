@@ -28,8 +28,8 @@ function expectTimeout(source, timeout = 50) {
     const result = runWithBudget(
         "const cache = new Map(); let calls = 0; function getCached(key, loader) { if (cache.has(key)) return cache.get(key); const value = loader(); cache.set(key, value); return value; } const first = getCached('models', () => { calls += 1; return ['lite']; }); const second = getCached('models', () => { calls += 1; return ['broken']; }); [first, second, calls];"
     );
-    assert.deepEqual(result[0], ["lite"]);
-    assert.deepEqual(result[1], ["lite"]);
+    assert.equal(JSON.stringify(result[0]), JSON.stringify(["lite"]));
+    assert.equal(JSON.stringify(result[1]), JSON.stringify(["lite"]));
     assert.equal(result[2], 1, "repeatable lookup must use the cache");
 }
 
