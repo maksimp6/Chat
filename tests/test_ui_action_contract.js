@@ -1,14 +1,11 @@
-const fs = require("fs");
-const vm = require("vm");
 const {BrowserShim} = require("./browser_dom");
 
 const shim = new BrowserShim();
-const context = shim.createContext();
-vm.runInContext(fs.readFileSync("static/core_api.js", "utf8"), context);
+const {window, document} = shim.load(["static/core_api.js"]);
 
-const UI = context.window.AliceCoreAPI.ui;
-const root = context.document.createElement("div");
-context.document.body.appendChild(root);
+const UI = window.AliceCoreAPI.ui;
+const root = document.createElement("div");
+document.body.appendChild(root);
 
 let calls = 0;
 const unregister = UI.actions.register("test.click", function(payload) {
