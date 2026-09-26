@@ -220,7 +220,7 @@ Inspect the complete trace, including tool calls, events, errors, and continuati
 
 ## Documentation map
 
-- [API documentation](API_DOCS.md)
+- [API documentation](docs/api/API_DOCS.md)
 - [Agent architecture](docs/agents/departments.md)
 - [Runtime/serverless](docs/runtime_serverless.md)
 - [MCP architecture](docs/mcp/architecture.md)
