@@ -120,9 +120,7 @@ def _runtime_http_request(context, payload):
     return {
         "status_code": response.status_code,
         "headers": [
-            (key, value)
-            for key, value in response.headers.items()
-            if key.lower() not in excluded
+            (key, value) for key, value in response.headers.items() if key.lower() not in excluded
         ],
         "body": response.iter_encoded(),
         "close": response.close,
