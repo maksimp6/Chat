@@ -81,7 +81,7 @@ async function submitWizard() {
     var headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = "Bearer " + token;
     try {
-        var response = await fetch("/api/cloudru/iam/api-keys", {
+        var response = await window.AliceDispatcher.request("/api/cloudru/iam/api-keys", {
             method: "POST",
             headers: headers,
             body: JSON.stringify({
