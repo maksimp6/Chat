@@ -574,7 +574,10 @@ if (!sshModal || !sshClose) {
 if (!sshModal.parentNode || sshModal.parentNode.id !== "app-root") {
   throw new Error("real SSH runtime modal must mount inside .alice-pro-app");
 }
-if (sshClose.dataset.action !== "modal.close" || sshClose.dataset.modal !== "ssh-runtime-modal-custom") {
+if (
+  sshClose.dataset.action !== "modal.close" ||
+  sshClose.dataset.modal !== "ssh-runtime-modal-custom"
+) {
   throw new Error("SSH runtime close must use generic modal.close dispatcher contract");
 }
 if (sshModal.hidden || !sshModal.classList.contains("visible")) {
