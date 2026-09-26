@@ -79,7 +79,12 @@ def test_unified_buttons_contract():
 
 
 def _static_javascript_sources():
-    return sorted((ROOT / "static").rglob("*.js"))
+    """Application JavaScript only; vendored libraries keep their upstream DOM contract."""
+    vendor_files = {"eruda.js"}
+    return sorted(
+        path for path in (ROOT / "static").rglob("*.js")
+        if path.name not in vendor_files
+    )
 
 
 def test_javascript_created_buttons_use_unified_contract():
