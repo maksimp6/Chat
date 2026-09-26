@@ -127,7 +127,37 @@
         var content=document.createElement("div");
         function pre(value){var wrap=el("div",{className:"alice-trace-json-wrap"});addJsonToolbar(wrap,function(){renderInspector(trace,item,selected,target);});wrap.appendChild(el("pre",{className:"alice-trace-pre"},jsonText(value)));content.appendChild(wrap);}
         if(selected==="Overview"){var grid=el("div",{className:"alice-trace-grid"}),pairs=[];if(item.kind==="tool")pairs=[["Name",item.data.name],["Server",item.data.server||"Local Registry"],["Duration",fmtMs(item.data.timing_ms)],["Status",item.data.error?"error":"success"],["Call ID",item.data.call_id||"—"],["Step",item.data.step||"—"]];else if(item.kind==="response")pairs=[["Step",item.data.step||"—"],["Timestamp",item.data.timestamp?new Date(item.data.timestamp*1000).toLocaleString("ru-RU"):"—"],["Model",item.data.raw&&item.data.raw.model||"—"],["Response ID",item.data.raw&&item.data.raw.id||"—"],["Output items",item.data.raw&&Array.isArray(item.data.raw.output)?item.data.raw.output.length:"—"],["Step interval",Number.isFinite(item.start)&&Number.isFinite(item.end)?fmtMs((item.end-item.start)*1000):"—"]];else if(item.kind==="pipeline")pairs=[["Start",item.data.start_timestamp?new Date(item.data.start_timestamp*1000).toLocaleString("ru-RU"):"—"],["End",item.data.end_timestamp?new Date(item.data.end_timestamp*1000).toLocaleString("ru-RU"):"—"],["Duration",fmtMs(item.data.duration_ms)]];else pairs=[["Type",item.data.type||"event"],["Timestamp",item.data.timestamp?new Date(item.data.timestamp*1000).toLocaleString("ru-RU"):"—"]];pairs.forEach(function(p){var c=el("div",{className:"alice-trace-card"});c.appendChild(el("div",{className:"alice-trace-card-label"},p[0]));c.appendChild(el("div",{className:"alice-trace-card-value"},String(p[1])));grid.appendChild(c);});content.appendChild(grid);if(item.kind==="tool"&&item.data.error)content.appendChild(el("div",{className:"alice-trace-notice"},"⚠ "+String(item.data.error)));if(item.kind==="event")pre(item.data.payload!==undefined?item.data.payload:item.data);}
-        else if(selected==="Text"){var text=responseText(item); if(text) content.appendChild(el("div",{style:"white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.55;color:var(--text-main,#1c1c1e);background:var(--bg-sidebar,#fff);padding:12px;border:1px solid var(--border-color,#e5e5ea);border-radius:9px;"},text)); else content.appendChild(el("div",{className:"alice-trace-notice"},"Ответ с текстом в этом response не найден."));}\n        else if(selected==="Request")pre(item.kind==="response"?(item.data.request||trace.request||{}):trace.request||{});else if(selected==="Raw Response")pre(rawFor(item));else if(selected==="Payload")pre(item.data.payload!==undefined?item.data.payload:item.data);else if(selected==="Raw")pre(rawFor(item));else if(selected==="Arguments")pre(item.data.arguments||{});else if(selected==="Result")pre(item.data.error?{error:item.data.error,result:item.data.result}:item.data.result);else if(selected==="Metadata")pre(item.kind==="response"?(item.data.raw&&item.data.raw.metadata):{call_id:item.data.call_id,server:item.data.server,step:item.data.step,start_timestamp:item.data.start_timestamp,end_timestamp:item.data.end_timestamp});else if(selected==="Output")pre(item.data.raw&&item.data.raw.output||[]);else if(selected==="Usage")pre(item.data.raw&&item.data.raw.usage||{});else if(selected==="Tools")pre(item.data.raw&&item.data.raw.tools||trace.tool_calls||[]);else if(selected==="Reasoning")pre(item.data.raw&&item.data.raw.reasoning||null);
+        else if(selected==="Text"){
+            var responseBodyText=responseText(item);
+            if(responseBodyText){
+                content.appendChild(el("div",{style:"white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.55;color:var(--text-main,#1c1c1e);background:var(--bg-sidebar,#fff);padding:12px;border:1px solid var(--border-color,#e5e5ea);border-radius:9px;"},responseBodyText));
+            } else {
+                content.appendChild(el("div",{className:"alice-trace-notice"},"Ответ с текстом в этом response не найден."));
+            }
+        }
+        else if(selected==="Request"){
+            pre(item.kind==="response" ? (item.data.request || trace.request || {}) : (trace.request || {}));
+        } else if(selected==="Raw Response"){
+            pre(rawFor(item));
+        } else if(selected==="Payload"){
+            pre(item.data.payload!==undefined ? item.data.payload : item.data);
+        } else if(selected==="Raw"){
+            pre(rawFor(item));
+        } else if(selected==="Arguments"){
+            pre(item.data.arguments || {});
+        } else if(selected==="Result"){
+            pre(item.data.error ? {error:item.data.error,result:item.data.result} : item.data.result);
+        } else if(selected==="Metadata"){
+            pre(item.kind==="response" ? (item.data.raw && item.data.raw.metadata) : {call_id:item.data.call_id,server:item.data.server,step:item.data.step,start_timestamp:item.data.start_timestamp,end_timestamp:item.data.end_timestamp});
+        } else if(selected==="Output"){
+            pre((item.data.raw && item.data.raw.output) || []);
+        } else if(selected==="Usage"){
+            pre((item.data.raw && item.data.raw.usage) || {});
+        } else if(selected==="Tools"){
+            pre((item.data.raw && item.data.raw.tools) || trace.tool_calls || []);
+        } else if(selected==="Reasoning"){
+            pre((item.data.raw && item.data.raw.reasoning) || null);
+        }
         inner.appendChild(content);
         if(item.correlation_id && state.items){
             var related = state.items.filter(function(other){
