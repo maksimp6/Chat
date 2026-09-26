@@ -28,12 +28,12 @@ function renderApprovalCard(toolCall, origMsg) {
 
     const approveBtn = document.createElement("button");
     approveBtn.type = "button";
-    approveBtn.className = "approval-btn approval-btn-approve";
+    approveBtn.className = "alice-btn approval-btn approval-btn-approve";
     approveBtn.textContent = "✓ Разрешить";
 
     const rejectBtn = document.createElement("button");
     rejectBtn.type = "button";
-    rejectBtn.className = "approval-btn approval-btn-reject";
+    rejectBtn.className = "alice-btn approval-btn approval-btn-reject";
     rejectBtn.textContent = "✗ Отклонить";
 
     actions.appendChild(approveBtn);
@@ -227,7 +227,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
     msg.appendChild(bubble);
 
     const copyBtn = document.createElement("button");
-    copyBtn.className = "copy-btn";
+    copyBtn.className = "alice-btn copy-btn";
     copyBtn.textContent = "📋";
     copyBtn.title = "Копировать";
 
@@ -329,7 +329,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
             traceEl.dataset.traceViewerDirect = "1";
             const openTraceBtn = document.createElement("button");
             openTraceBtn.type = "button";
-            openTraceBtn.className = "alice-trace-open-viewer";
+            openTraceBtn.className = "alice-btn alice-trace-open-viewer";
             openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
             openTraceBtn.title = "Открыть Execution Trace viewer";
 
