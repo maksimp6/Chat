@@ -182,8 +182,14 @@ async function enhanceCore() {
             updateModelButton();
         }
         if (typeof updateUIForModel === "function") updateUIForModel();
+        if (window.AliceCoreAPI && window.AliceCoreAPI.status) {
+            window.AliceCoreAPI.status.set("core", "ready", "Ядро готово", {revocable: false});
+        }
     } catch (error) {
         console.error("[CORE] Enhancement initialization error:", error);
+        if (window.AliceCoreAPI && window.AliceCoreAPI.status) {
+            window.AliceCoreAPI.status.set("core", "degraded", "Расширенная инициализация завершилась ошибкой", {revocable: false});
+        }
         if (!conversations.length) applyConversationCache();
         if (typeof updateUIForModel === "function") updateUIForModel();
         if (typeof updateModelButton === "function") updateModelButton();
@@ -195,6 +201,9 @@ function initCore() {
     coreInitialized = true;
 
     console.log("[CORE] Shell initialization. currentConvId:", currentConvId);
+    if (window.AliceCoreAPI && window.AliceCoreAPI.status) {
+        window.AliceCoreAPI.status.set("core", "running", "Ядро выполняет инициализацию", {revocable: false});
+    }
     initializeShell();
     applyConversationCache();
     if (typeof updateUIForModel === "function") updateUIForModel();
