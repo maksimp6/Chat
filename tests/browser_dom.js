@@ -45,6 +45,14 @@ class ClassList {
     values.forEach((value) => set.delete(value));
     this._write(set);
   }
+  toggle(value, force) {
+    const set = this._set();
+    const shouldAdd = force === undefined ? !set.has(value) : Boolean(force);
+    if (shouldAdd) set.add(value);
+    else set.delete(value);
+    this._write(set);
+    return shouldAdd;
+  }
 }
 
 class ElementShim extends EventTargetShim {
@@ -54,6 +62,7 @@ class ElementShim extends EventTargetShim {
     this.attributes = { ...attributes };
     this.children = [];
     this.parentNode = null;
+    this.ownerDocument = null;
     this.style = { removeProperty() {} };
     const self = this;
     this.dataset = new Proxy(Object.create(null), {
@@ -136,8 +145,22 @@ class ElementShim extends EventTargetShim {
   appendChild(child) {
     if (child.parentNode) child.parentNode.removeChild(child);
     child.parentNode = this;
+    child.ownerDocument =
+      this.ownerDocument || (this.tagName === "#DOCUMENT" ? this : child.ownerDocument);
     this.children.push(child);
     return child;
+  }
+
+  append(...nodes) {
+    for (const node of nodes) {
+      if (node instanceof ElementShim) {
+        this.appendChild(node);
+        continue;
+      }
+      const text = new ElementShim("#text");
+      text.textContent = String(node);
+      this.appendChild(text);
+    }
   }
 
   removeChild(child) {
@@ -182,6 +205,17 @@ class ElementShim extends EventTargetShim {
       defaultPrevented: false,
     });
   }
+
+  focus() {
+    if (this.ownerDocument) this.ownerDocument.activeElement = this;
+  }
+
+  blur() {
+    if (this.ownerDocument && this.ownerDocument.activeElement === this) {
+      this.ownerDocument.activeElement = this.ownerDocument.body;
+    }
+  }
+
   getBoundingClientRect() {
     return { ...this._rect };
   }
@@ -221,14 +255,18 @@ class DocumentShim extends ElementShim {
     this.readyState = "loading";
     this.body = new ElementShim("body");
     this.appendChild(this.body);
+    this.activeElement = this.body;
     parseHTML(html, this.body);
   }
 
   createElement(tagName) {
-    return new ElementShim(tagName);
+    const node = new ElementShim(tagName);
+    node.ownerDocument = this;
+    return node;
   }
   createTextNode(text) {
     const node = new ElementShim("#text");
+    node.ownerDocument = this;
     node.textContent = text;
     return node;
   }
