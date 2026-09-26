@@ -87,7 +87,7 @@ async function main() {
     assert.strictEqual(requests, 1);
     assert.ok(JSON.stringify(core.status.snapshot()).includes("network"));
 
-    const networkTrace = core.trace.begin("network-test", {authorization: "secret"});
+    const networkTrace = moduleContext.trace.begin("network-test", {authorization: "secret"});
     networkTrace.event("response", {path: "/api/test", status: 200});
     const networkSnapshot = networkTrace.end("completed");
     assert.strictEqual(networkSnapshot.metadata.authorization, "[REDACTED]");
