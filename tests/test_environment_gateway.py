@@ -203,6 +203,11 @@ def test_environment_gateway_maps_runtime_failures(monkeypatch, error, status_co
         },
     )
     monkeypatch.setattr(environment_routes, "_owner", lambda: None)
+    monkeypatch.setattr(
+        environment_routes,
+        "authorize_environment_runtime",
+        lambda _environment_id, _owner_id: None,
+    )
 
     def fail_dispatch(*_args, **_kwargs):
         raise error
