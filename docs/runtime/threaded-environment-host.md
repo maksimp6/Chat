@@ -33,6 +33,18 @@ The worker executes operations only after `RuntimeDispatcher` binds that
 runtime id. Cross-runtime resource access remains subject to the dispatcher
 policy in `runtime-dispatcher-policy.md`.
 
+### Database scope
+
+The runtime data root is carried with the worker through request-local
+`ContextVar` state. `db.get_conn()` detects that scope and opens
+`<runtime-data-root>/alice_pro.db` instead of the process database.
+
+This rule also applies when the host is configured for PostgreSQL or the
+in-memory backend: a preview runtime does not silently inherit either shared
+backend. Its SQLite schema is initialized inside the runtime scope before the
+worker starts. The environment control-plane database remains outside that
+scope.
+
 ## Request-local URL state
 
 Runtime URL prefixes are held in `ContextVar` state for the duration of the
