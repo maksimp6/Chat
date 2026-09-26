@@ -28,19 +28,26 @@
   function modal() {
     let node = document.getElementById("environments-modal");
     if (node) return node;
-    node = document.createElement("div");
-    node.id = "environments-modal";
-    node.className = "environments-modal";
-    node.innerHTML = [
-      '<div class="environments-box" role="dialog" aria-modal="true" aria-labelledby="environments-title">',
-      '<button class="alice-btn environments-close" type="button" aria-label="Закрыть">&times;</button>',
-      '<div class="environments-head"><div><h2 id="environments-title">Environments</h2><p>Immutable branch runtimes</p></div>',
+
+    const UI = window.AliceCoreAPI.ui;
+    const body = document.createElement("div");
+    body.className = "environments-body";
+    body.innerHTML = [
+      '<div class="environments-head"><div><p>Immutable branch runtimes</p></div>',
       '<button class="alice-btn environments-refresh" type="button">Обновить</button></div>',
       '<form class="environments-create"><input name="branch" placeholder="feature/my-branch" autocomplete="off" required><button class="alice-btn" type="submit">Создать</button></form>',
-      '<div class="environments-status" aria-live="polite" hidden></div><div class="environments-list"></div></div>',
+      '<div class="environments-status" aria-live="polite" hidden></div><div class="environments-list"></div>',
     ].join("");
-    document.body.appendChild(node);
-    node.querySelector(".environments-close").onclick = () => node.classList.remove("visible");
+
+    node = UI.modal.create({
+      id: "environments-modal",
+      title: "Environments",
+      className: "environments-modal",
+      contentClassName: "environments-box",
+      closeAction: "environments.close",
+      body: body,
+    });
+    (document.querySelector(".alice-pro-app") || document.body).appendChild(node);
     node.querySelector(".environments-refresh").onclick = load;
     node.querySelector(".environments-create").onsubmit = async (event) => {
       event.preventDefault();
@@ -142,9 +149,14 @@
   }
 
   function open() {
-    modal().classList.add("visible");
+    window.AliceCoreAPI.ui.modal.open(modal());
     load();
   }
+
+  window.AliceCoreAPI.ui.actions.register("environments.close", function (payload) {
+    const node = payload.element.closest(".modal");
+    if (node) window.AliceCoreAPI.ui.modal.close(node);
+  });
 
   window.AliceEnvironments = { open, load };
 
