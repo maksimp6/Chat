@@ -57,11 +57,7 @@ const savedTheme = window.AliceTheme.getStored();
 window.AliceTheme.apply(savedTheme, false);
 
 function fetchWithTimeout(input, init, timeoutMs) {
-    if (typeof AbortController === "undefined") return fetch(input, init);
-    var controller = new AbortController();
-    var options = Object.assign({}, init || {}, {signal: controller.signal});
-    var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
-    return fetch(input, options).finally(function() { clearTimeout(timer); });
+    return window.AliceDispatcher.request(input, init, {timeoutMs: timeoutMs});
 }
 
 window.changeModel = function(newModel, skipPatch) {
@@ -76,7 +72,7 @@ window.changeModel = function(newModel, skipPatch) {
     localStorage.setItem("current_model", currentModel);
 
     if (!skipPatch && currentConvId) {
-        fetch("/api/conversations/" + currentConvId, {
+        window.AliceDispatcher.request("/api/conversations/" + currentConvId, {
             method: "PATCH",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({model: newModel})
