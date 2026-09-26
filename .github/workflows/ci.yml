@@ -50,6 +50,7 @@ jobs:
           NODE_V8_COVERAGE=coverage-js node tests/test_project_tree.js
           NODE_V8_COVERAGE=coverage-js node tests/test_header_dom.js
           NODE_V8_COVERAGE=coverage-js node tests/test_frontend_smoke.js
+          node tests/test_frontend_runtime_safety.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
       - name: Save frontend test log
         if: always()
