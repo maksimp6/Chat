@@ -349,6 +349,7 @@
 
   var uiActions = new Map();
   var uiClickRoot = null;
+  var uiClickUnmount = null;
 
   function assertActionName(action) {
     if (typeof action !== "string" || !/^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(action)) {
@@ -386,7 +387,7 @@
     if (!root || typeof root.addEventListener !== "function") {
       throw new Error("UI click dispatcher root is required");
     }
-    if (uiClickRoot === root) return function () {};
+    if (uiClickRoot === root) return uiClickUnmount;
     if (uiClickRoot) throw new Error("UI click dispatcher already mounted");
 
     function onClick(event) {
@@ -401,11 +402,13 @@
 
     root.addEventListener("click", onClick);
     uiClickRoot = root;
-    return function () {
+    uiClickUnmount = function () {
       if (uiClickRoot !== root) return;
       root.removeEventListener("click", onClick);
       uiClickRoot = null;
+      uiClickUnmount = null;
     };
+    return uiClickUnmount;
   }
 
   function createButton(options) {
