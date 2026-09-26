@@ -16,7 +16,6 @@ MAX_JS_BYTES = 512 * 1024
 MAX_LINE_BYTES = 8 * 1024
 MAX_BASE64_BYTES = 4096
 MAX_REPEAT_RUN = 12
-MAX_REPEAT_RATIO = 0.35
 MAX_ARRAY_LITERAL_ITEMS = 4096
 MAX_ARRAY_CONSTRUCTOR_ITEMS = 4096
 
@@ -165,12 +164,15 @@ def validate_file(path: Path) -> list[str]:
             errors.append(f"{rel}: function name '{name}' violates naming policy")
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if lines:
-        counts = Counter(lines)
-        repeated = sum(count - 1 for count in counts.values() if count > 1)
-        ratio = repeated / len(lines)
-        if max(counts.values()) >= MAX_REPEAT_RUN or ratio > MAX_REPEAT_RATIO:
-            errors.append(f"{rel}: suspicious repeated source text (ratio={ratio:.2f})")
+    run = 1
+    for previous, current in zip(lines, lines[1:]):
+        if current == previous:
+            run += 1
+            if run >= MAX_REPEAT_RUN:
+                errors.append(f"{rel}: suspicious repeated source text (consecutive run={run})")
+                break
+        else:
+            run = 1
 
     if len(text) >= 4096:
         printable = sum(ch.isprintable() or ch in "\n\r\t" for ch in text)
