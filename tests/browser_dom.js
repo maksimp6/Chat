@@ -109,7 +109,7 @@ get id() { return this.attributes.id || ""; }
         if (index >= 0) { replacement.parentNode = parent; parent.children[index] = replacement; }
     }
 
-    click() { this.dispatchEvent({type: "click", target: this, bubbles: true}); }
+    click() { this.dispatchEvent({type: "click", target: this, bubbles: true, preventDefault() { this.defaultPrevented = true; }, defaultPrevented: false}); }
     getBoundingClientRect() { return {...this._rect}; }
 
     querySelectorAll(selector) {
