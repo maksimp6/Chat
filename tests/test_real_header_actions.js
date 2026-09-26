@@ -195,7 +195,10 @@ const toolsClose = toolsModal && toolsModal.querySelector(".modal-close");
 if (!toolsModal || !toolsClose) {
   throw new Error("real tools modal controls must be created after click");
 }
-if (toolsClose.dataset.action !== "modal.close" || toolsClose.dataset.modal !== "tools-modal-custom") {
+if (
+  toolsClose.dataset.action !== "modal.close" ||
+  toolsClose.dataset.modal !== "tools-modal-custom"
+) {
   throw new Error("tools modal close must use generic modal.close dispatcher contract");
 }
 if (!toolsModal.parentNode || toolsModal.parentNode.id !== "app-root") {
