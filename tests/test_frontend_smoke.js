@@ -65,6 +65,8 @@ function click(element) {
         ["static/core.js", "static/models.js"],
         '<button id="model-btn"></button><div id="model-modal" class="modal"><div class="modal-content"><button id="close-modal"></button><div id="model-list"></div></div></div>'
     );
+    vm.runInContext(`modelsData = { text: { lite: {name: "Lite", input: "1", output: "2", multimodal: true}, full: {name: "Full", input: "3", output: "4"} }, voice: { voice: {name: "Voice", input: "5", output: "6"} } }; currentModel = "lite";`, context);
+    /* removed host-side lexical assignments */
     context.modelsData = {
         text: {
             lite: {name: "Lite", input: "1", output: "2", multimodal: true},
@@ -74,7 +76,6 @@ function click(element) {
             voice: {name: "Voice", input: "5", output: "6"}
         }
     };
-    context.currentModel = "lite";
     window.changeModel = (model) => { context.currentModel = model; };
 
     context.renderModelModal();
@@ -99,8 +100,7 @@ function click(element) {
         ["static/core.js", "static/sidebar.js"],
         '<button id="menu-btn"></button><button id="close-sidebar-btn"></button><div id="overlay"></div><aside id="sidebar"></aside><button id="new-chat-btn"></button><div id="conv-list"></div>'
     );
-    context.conversations = [{id: "c1", title: "Первый чат", model: "lite"}];
-    context.currentConvId = "c1";
+    vm.runInContext(`conversations = [{id: "c1", title: "Первый чат", model: "lite"}]; currentConvId = "c1";`, context);
     context.renderSidebar();
 
     const item = document.getElementById("conv-list").querySelector(".conv-item");
