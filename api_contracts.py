@@ -174,15 +174,9 @@ TRACE = _object(
 CONTRACTS = {
     "runtime.profile.list.response": _object({"profiles": _list(SESSION_PROFILE)}),
     "runtime.profile.response": SESSION_PROFILE,
-    "runtime.profile.clone.request": _object(
-        optional={"name": _nullable(NONEMPTY_STRING)}
-    ),
-    "runtime.profile.clone.response": _object(
-        {"session": SESSION, "profile": SESSION_PROFILE}
-    ),
-    "runtime.session.create.request": _object(
-        optional={"metadata": _nullable(JSON_OBJECT)}
-    ),
+    "runtime.profile.clone.request": _object(optional={"name": _nullable(NONEMPTY_STRING)}),
+    "runtime.profile.clone.response": _object({"session": SESSION, "profile": SESSION_PROFILE}),
+    "runtime.session.create.request": _object(optional={"metadata": _nullable(JSON_OBJECT)}),
     "runtime.session.response": SESSION,
     "runtime.session.detail.response": SESSION_DETAIL,
     "runtime.invocation.create.request": _object(
@@ -194,9 +188,7 @@ CONTRACTS = {
     "runtime.invocation.status.response": INVOCATION_STATUS,
     "runtime.invocation.trace.response": TRACE,
     "runtime.error.basic": _object({"error": NONEMPTY_STRING}),
-    "runtime.error.message": _object(
-        {"error": NONEMPTY_STRING, "message": NONEMPTY_STRING}
-    ),
+    "runtime.error.message": _object({"error": NONEMPTY_STRING, "message": NONEMPTY_STRING}),
     "runtime.error.invalid_request": _object(
         {
             "error": _enum("invalid_request"),
