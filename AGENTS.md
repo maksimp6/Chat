@@ -22,11 +22,16 @@ Use the smallest independent change that satisfies an issue or subtask.
 - Android changes must preserve system-bar safety and stable debug/release signing boundaries.
 - PostgreSQL is an optional runtime backend selected only by ALICE_DATABASE_URL; SQLite remains the default local/Termux backend.
 - Database schema changes must keep both SQLite and PostgreSQL paths working.
+- Preview/runtime modules under `runtime/` must use `RuntimeDispatcher` for shared database, filesystem, network, process, MCP/tool-registry, event, and cross-runtime resource access.
+- A preview runtime must never access another runtime's resources directly. Preserve the caller `runtime_id` and fail cross-runtime access with `RuntimeScopeViolation`.
+- Python threads are execution units, not isolation boundaries. Do not use process-global mutable runtime state as a substitute for `RuntimeContext` or dispatcher-owned scoped resources.
+- When delegating runtime/preview work to an AI agent, apply `docs/agents/runtime-dispatcher-contract.md` and keep `docs/runtime/runtime-dispatcher-policy.md` authoritative.
 
 ## Validation
 
 Backend:
 `python -m compileall -q .`
+`python tests/validate_runtime_modules.py`
 `pytest -q`
 
 Android:
