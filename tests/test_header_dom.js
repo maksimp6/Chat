@@ -14,10 +14,9 @@ async function flush() {
 (async () => {
     const html = fs.readFileSync("templates/index.html", "utf8");
     const css = fs.readFileSync("static/style.css", "utf8");
-    const projectTreeSource = fs.readFileSync("static/project_tree.js", "utf8");
     let fetchCalls = 0;
     const browser = new BrowserShim(html);
-    const {document, window, context} = browser.load([], {
+    const {document, window, context} = browser.load(["static/project_tree.js"], {
         fetch: async () => {
             fetchCalls += 1;
             return {
@@ -41,8 +40,6 @@ async function flush() {
             };
         },
     });
-    vm.runInNewContext(projectTreeSource, context);
-
     applyHeaderFlexLayout(document, css);
 
     const header = document.getElementById("header");
