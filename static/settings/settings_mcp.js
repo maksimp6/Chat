@@ -6,7 +6,7 @@
 
     window.fetchMcpServers = function() {
         if (mcpFetchPromise) return mcpFetchPromise;
-        mcpFetchPromise = fetch('/api/mcp-servers')
+        mcpFetchPromise = window.AliceDispatcher.request('/api/mcp-servers')
             .then(function(r) {
                 if (!r.ok) { console.warn("[MCP] Server returned " + r.status); return { data: [] }; }
                 return r.json();
@@ -124,7 +124,7 @@
                 btn.addEventListener('click', function() {
                     var sid = this.getAttribute('data-id');
                     if (!confirm("Удалить MCP сервер?")) return;
-                    fetch('/api/mcp-servers/' + sid, { method: 'DELETE' })
+                    window.AliceDispatcher.request('/api/mcp-servers/' + sid, { method: 'DELETE' })
                         .then(function() { refreshList(); })
                         .catch(function(e) { alert("Ошибка: " + e); });
                 });
@@ -215,7 +215,7 @@
                 }
                 var method = isNew ? 'POST' : 'PUT';
                 var url = isNew ? '/api/mcp-servers' : '/api/mcp-servers/' + srv.id;
-                fetch(url, { method: method, headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) })
+                window.AliceDispatcher.request(url, { method: method, headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) })
                     .then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
                     .then(function() { editorEl.remove(); editorEl = null; refreshList(); })
                     .catch(function(e) { alert("Ошибка: " + e.message); });
