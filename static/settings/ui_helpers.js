@@ -150,8 +150,18 @@
   }
   function deepMerge(target, source) {
     for (var key in source) {
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+      if (key === "__proto__" || key === "prototype" || key === "constructor") continue;
+
       if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
-        target[key] = deepMerge(target[key] || {}, source[key]);
+        var current =
+          Object.prototype.hasOwnProperty.call(target, key) &&
+          target[key] &&
+          typeof target[key] === "object" &&
+          !Array.isArray(target[key])
+            ? target[key]
+            : {};
+        target[key] = deepMerge(current, source[key]);
       } else {
         target[key] = source[key];
       }
