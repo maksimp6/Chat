@@ -55,7 +55,7 @@ def _memory_setup():
 
 def reset_memory_db():
     global _MEMORY_INITIALIZED
-    _MEMORY_DB.clear()
+    _MEMORY_DB.reset()
     _MEMORY_INITIALIZED = False
     _memory_setup()
 
