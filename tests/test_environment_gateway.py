@@ -266,3 +266,25 @@ def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
         stop_environment(second["environment_id"])
         delete_environment(first["environment_id"])
         delete_environment(second["environment_id"])
+
+
+def test_environment_gateway_rejects_cross_owner_before_runtime_dispatch(monkeypatch):
+    app = Flask(__name__)
+    app.register_blueprint(environment_gateway_bp)
+    monkeypatch.setattr(environment_routes, "_owner", lambda: "alice")
+
+    def reject(_environment_id, _owner_id):
+        raise environment_routes.RuntimeOwnerViolation("runtime-b")
+
+    monkeypatch.setattr(environment_routes, "authorize_environment_runtime", reject)
+    calls = []
+
+    def record_dispatch(*args, **kwargs):
+        calls.append((args, kwargs))
+        return None
+
+    monkeypatch.setattr(environment_routes, "dispatch_environment_http", record_dispatch)
+    response = app.test_client().get("/environments/runtime-b/runtime-root")
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "environment_not_found"}
+    assert calls == []
