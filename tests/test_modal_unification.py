@@ -148,6 +148,8 @@ def test_memory_modal_complete_dom_shape():
                         (
                             ("aria-label", "Закрыть"),
                             ("class", "memory-modal-close alice-btn"),
+                            ("data-action", "modal.close"),
+                            ("data-modal", "memoryModal"),
                             ("id", "memoryCloseBtn"),
                             ("type", "button"),
                         ),
