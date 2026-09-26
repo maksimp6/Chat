@@ -52,4 +52,54 @@ if (closeCalls !== 1 || !modal.hidden) throw new Error("close click must dispatc
 
 unmount();
 unregister();
+
+const dispatcherModal = UI.modal.create({
+    id: "dispatcher-modal",
+    title: "Dispatcher modal",
+    closeAction: "modal.close",
+    body: document.createElement("div")
+});
+document.body.appendChild(dispatcherModal);
+
+const openButton = UI.button({
+    id: "dispatcher-modal-open",
+    text: "Open",
+    action: "modal.open",
+    params: {modal: "dispatcher-modal"}
+});
+document.body.appendChild(openButton);
+
+const dispatcherClose = dispatcherModal.querySelector(".modal-close");
+dispatcherClose.dataset.modal = "dispatcher-modal";
+
+const unmountModalDispatcher = UI.events.mountClicks(document.body);
+openButton.click();
+if (dispatcherModal.hidden) throw new Error("modal.open must resolve data-modal through dispatcher params");
+
+dispatcherClose.click();
+if (!dispatcherModal.hidden) throw new Error("modal.close must resolve data-modal through dispatcher params");
+
+const brokenOpen = UI.button({
+    id: "broken-modal-open",
+    text: "Broken open",
+    action: "modal.open",
+    params: {modal: "missing-modal"}
+});
+document.body.appendChild(brokenOpen);
+const originalError = console.error;
+let modalErrors = 0;
+console.error = function() { modalErrors += 1; };
+brokenOpen.click();
+if (modalErrors !== 1) throw new Error("broken modal action must be isolated by click dispatcher");
+if (!dispatcherModal.hidden) throw new Error("failed modal action must not corrupt another modal state");
+
+brokenOpen.dataset.modal = "dispatcher-modal";
+brokenOpen.click();
+console.error = originalError;
+if (dispatcherModal.hidden) throw new Error("same button must remain usable after a failed modal action");
+
+dispatcherClose.click();
+if (!dispatcherModal.hidden) throw new Error("modal must still close after recovery from action failure");
+
+unmountModalDispatcher();
 console.log("UI modal contract tests passed");
