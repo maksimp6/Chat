@@ -8,6 +8,12 @@ function runWithBudget(source, timeout = 100) {
     return vm.runInContext(source, context, {timeout});
 }
 
+function measure(source) {
+    const start = performance.now();
+    runWithBudget(source, 100);
+    return performance.now() - start;
+}
+
 function expectTimeout(source, timeout = 50) {
     const bounded = runWithBudget("const items = new Array(1024).fill(0); items.length;");
     assert.equal(bounded, 1024);
