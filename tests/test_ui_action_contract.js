@@ -48,6 +48,28 @@ button.click();
 if (calls !== 2) throw new Error("remount must restore exactly one click handler");
 unmountAgain();
 
+let healthyCalls = 0;
+const unregisterBroken = UI.actions.register("test.broken", function() {
+    throw new Error("expected action failure");
+});
+const unregisterHealthy = UI.actions.register("test.healthy", function() {
+    healthyCalls += 1;
+});
+const brokenButton = UI.button({text: "Broken", action: "test.broken"});
+const healthyButton = UI.button({text: "Healthy", action: "test.healthy"});
+root.appendChild(brokenButton);
+root.appendChild(healthyButton);
+const originalError = console.error;
+console.error = function() {};
+const unmountFailureTest = UI.events.mountClicks(root);
+brokenButton.click();
+healthyButton.click();
+console.error = originalError;
+if (healthyCalls !== 1) throw new Error("handler failure must not break the shared click dispatcher");
+unmountFailureTest();
+unregisterBroken();
+unregisterHealthy();
+
 unregister();
 let unknownFailed = false;
 try {
