@@ -88,6 +88,13 @@ get id() { return this.attributes.id || ""; }
         return child;
     }
 
+    replaceChildren(...nodes) {
+        for (const child of [...this.children]) child.parentNode = null;
+        this.children = [];
+        this._text = "";
+        for (const node of nodes) this.appendChild(node);
+    }
+
     remove() { if (this.parentNode) this.parentNode.removeChild(this); }
 
     replaceWith(replacement) {
