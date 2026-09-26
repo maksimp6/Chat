@@ -118,5 +118,122 @@ class TestPreApiTiming(unittest.TestCase):
         self.assertTrue(any(e["type"] == "pre_api_pipeline_completed" for e in trace["events"]))
 
 
+    def test_chat_survives_treasury_settlement_exception_without_leaking_it(self):
+        from app import app
+
+        db.init_db()
+        internal_marker = "treasury-settlement-internal-marker"
+
+        class FakeClient:
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+                trace.add_response(
+                    {"id": "resp-test", "status": "completed", "output": []},
+                    step_index=1,
+                )
+                return {"output": [], "usage": {}}
+
+            @staticmethod
+            def extract_reasoning_and_text(_response):
+                return "", "reply"
+
+            @staticmethod
+            def extract_usage(_response):
+                return None
+
+        with (
+            patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+            patch.object(mcp_routes, "get_conv_settings", return_value={}),
+            patch.object(mcp_routes, "add_message"),
+            patch.object(
+                mcp_routes,
+                "settle_billing_to_treasury",
+                side_effect=RuntimeError(internal_marker),
+            ),
+            patch.object(mcp_routes, "persist_invocation_trace"),
+            patch.object(mcp_routes, "finish_invocation"),
+            patch.object(mcp_routes, "get_conversation_title", return_value=None),
+        ):
+            app.config["TESTING"] = True
+            with app.test_client() as client:
+                response = client.post(
+                    "/api/chat",
+                    json={
+                        "conversation_id": "settlement-failure-test",
+                        "message": "hello",
+                        "model": "aliceai-llm",
+                        "params": {},
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(
+            payload["trace"]["billing"]["settlement"],
+            {"status": "failed", "reason": "treasury_settlement_failed"},
+        )
+        self.assertNotIn(internal_marker, str(payload))
+
+    def test_chat_error_fallback_survives_trace_persistence_failure(self):
+        from app import app
+
+        db.init_db()
+
+        class FailingClient:
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+                raise RuntimeError("pipeline-internal-marker")
+
+        with (
+            patch.object(mcp_routes, "AliceClient", lambda _config: FailingClient()),
+            patch.object(mcp_routes, "get_conv_settings", return_value={}),
+            patch.object(mcp_routes, "add_message"),
+            patch.object(
+                mcp_routes,
+                "persist_invocation_trace",
+                side_effect=RuntimeError("trace-persist-internal-marker"),
+            ),
+        ):
+            app.config["TESTING"] = True
+            with app.test_client() as client:
+                response = client.post(
+                    "/api/chat",
+                    json={
+                        "conversation_id": "trace-persist-failure-test",
+                        "message": "hello",
+                        "model": "aliceai-llm",
+                        "params": {},
+                    },
+                )
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json()
+        self.assertEqual(payload["error"], "Внутренняя ошибка обработки запроса")
+        self.assertEqual(payload["reply"], "⚠️ Ошибка: Внутренняя ошибка обработки запроса")
+        self.assertNotIn("pipeline-internal-marker", str(payload))
+        self.assertNotIn("trace-persist-internal-marker", str(payload))
+
+    def test_execute_approved_hides_unexpected_internal_exception(self):
+        from app import app
+
+        with patch.object(
+            mcp_routes.registry,
+            "get_tool_meta",
+            side_effect=RuntimeError("tool-approval-internal-marker"),
+        ):
+            app.config["TESTING"] = True
+            with app.test_client() as client:
+                response = client.post(
+                    "/api/mcp/execute-approved",
+                    json={
+                        "conversation_id": "conv",
+                        "name": "broken-tool",
+                        "arguments": {},
+                    },
+                )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.get_json(), {"error": "tool_execution_failed"})
+        self.assertNotIn("tool-approval-internal-marker", response.get_data(as_text=True))
+
+
 if __name__ == "__main__":
     unittest.main()
