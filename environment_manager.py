@@ -293,9 +293,7 @@ class RuntimeHTTPStream:
             self._cancel.set()
 
 
-def _stream_put(
-    events: queue.Queue, event: tuple, cancel: threading.Event
-) -> bool:
+def _stream_put(events: queue.Queue, event: tuple, cancel: threading.Event) -> bool:
     while not cancel.is_set():
         try:
             events.put(event, timeout=0.1)
@@ -463,9 +461,7 @@ class EnvironmentRuntime:
             if kind == "call":
                 _, operation, payload, result = job
                 try:
-                    value = _RUNTIME_DISPATCHER.dispatch(
-                        self.runtime_id, operation, payload
-                    )
+                    value = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
                     result.put(("result", value))
                 except Exception as exc:
                     result.put(("error", exc))
@@ -476,23 +472,17 @@ class EnvironmentRuntime:
             try:
                 base_path = str(payload.get("base_path") or "")
                 with bind_runtime_request(self.runtime_id, base_path):
-                    source = _RUNTIME_DISPATCHER.dispatch(
-                        self.runtime_id, operation, payload
-                    )
+                    source = _RUNTIME_DISPATCHER.dispatch(self.runtime_id, operation, payload)
                     status_code = int(source["status_code"])
                     headers = list(source.get("headers") or [])
-                    if not _stream_put(
-                        events, ("start", status_code, headers), cancel
-                    ):
+                    if not _stream_put(events, ("start", status_code, headers), cancel):
                         continue
                     for chunk in source.get("body") or ():
                         if cancel.is_set():
                             break
                         if isinstance(chunk, str):
                             chunk = chunk.encode("utf-8")
-                        if chunk and not _stream_put(
-                            events, ("chunk", bytes(chunk)), cancel
-                        ):
+                        if chunk and not _stream_put(events, ("chunk", bytes(chunk)), cancel):
                             break
             except Exception as exc:
                 _stream_put(events, ("error", exc), cancel)
