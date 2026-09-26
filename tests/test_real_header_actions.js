@@ -58,7 +58,6 @@ console.error = originalError;
 if (logged !== 1) throw new Error("first failed click must be logged exactly once");
 if (recovered !== 2) throw new Error("failed click must not disable later clicks");
 
-
 const modelShim = new BrowserShim(template);
 const modelRuntime = modelShim.load(
   ["static/core_api.js", "static/ui_runtime.js", "static/models.js"],
