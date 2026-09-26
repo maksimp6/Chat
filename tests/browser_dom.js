@@ -126,6 +126,15 @@ get id() { return this.attributes.id || ""; }
     }
 
     querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+
+    contains(node) {
+        let current = node;
+        while (current) {
+            if (current === this) return true;
+            current = current.parentNode;
+        }
+        return false;
+    }
 }
 
 class DocumentShim extends ElementShim {
