@@ -452,3 +452,32 @@ def test_update_accepts_yandex_and_cloudru_keys_together(monkeypatch, tmp_path):
     serialized = str(payload)
     assert "yandex-runtime-secret" not in serialized
     assert "cloudru-runtime-secret" not in serialized
+
+def test_provider_status_check_hides_internal_exception(monkeypatch):
+    from flask import Flask
+
+    internal_marker = "provider-internal-marker-should-not-leak"
+
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+
+    def fail_health_check(_provider):
+        raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(routes, "_perform_health_check", fail_health_check)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/provider-credentials/status/check",
+            json={"provider": "cloudru"},
+        )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "health_check_failed"
+    assert payload["detail"] == "Проверка провайдера временно недоступна"
+    assert internal_marker not in str(payload)
+
