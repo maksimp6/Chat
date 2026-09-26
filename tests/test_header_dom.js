@@ -14,10 +14,34 @@ async function flush() {
 (async () => {
     const html = fs.readFileSync("templates/index.html", "utf8");
     const css = fs.readFileSync("static/style.css", "utf8");
+    const projectTreeSource = fs.readFileSync("static/project_tree.js", "utf8");
+    let fetchCalls = 0;
     const browser = new BrowserShim(html);
     const {document, window, context} = browser.load([], {
-        fetch: async () => ({ok: true, status: 200, json: async () => ({})}),
+        fetch: async () => {
+            fetchCalls += 1;
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    root: "/alice-pro",
+                    nodes: [{
+                        name: "src",
+                        path: "src",
+                        kind: "directory",
+                        icon: "📁",
+                        children: [{
+                            name: "app.py",
+                            path: "src/app.py",
+                            kind: "file",
+                            icon: "📄",
+                        }],
+                    }],
+                }),
+            };
+        },
     });
+    vm.runInNewContext(projectTreeSource, context);
 
     applyHeaderFlexLayout(document, css);
 
@@ -41,32 +65,6 @@ async function flush() {
     assert.equal(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size, 1);
     assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 1);
 
-    const projectTreeSource = fs.readFileSync("static/project_tree.js", "utf8");
-    let fetchCalls = 0;
-    window.fetch = async () => {
-        fetchCalls += 1;
-        return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-                root: "/alice-pro",
-                nodes: [{
-                    name: "src",
-                    path: "src",
-                    kind: "directory",
-                    icon: "📁",
-                    children: [{
-                        name: "app.py",
-                        path: "src/app.py",
-                        kind: "file",
-                        icon: "📄",
-                    }],
-                }],
-            }),
-        };
-    };
-
-    vm.runInNewContext(projectTreeSource, context);
     const projectTreeButton = document.getElementById("project-tree-btn");
     assert.ok(projectTreeButton);
     projectTreeButton.click();
