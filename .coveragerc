@@ -2,6 +2,7 @@
 branch = True
 
 [report]
+precision = 2
 omit =
     tests/*
     scripts/*
