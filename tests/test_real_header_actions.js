@@ -139,4 +139,27 @@ if (memoryModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real memory modal click lifecycle passed");
 
+const settingsShim = new BrowserShim(template);
+let settingsOpenCalls = 0;
+settingsShim.window.SettingsUI = {
+  injectModalStyles: function () {},
+};
+settingsShim.window.openSettingsModal = function () {
+  settingsOpenCalls += 1;
+};
+const settingsRuntime = settingsShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/settings.js", "static/header_actions.js"],
+  {
+    SettingsUI: settingsShim.window.SettingsUI,
+    openSettingsModal: settingsShim.window.openSettingsModal,
+  },
+);
+const settingsButton = settingsRuntime.document.getElementById("settings-btn");
+if (!settingsButton) throw new Error("real settings button must exist in index.html");
+settingsButton.click();
+if (settingsOpenCalls !== 1) {
+  throw new Error("real settings button click must open settings exactly once");
+}
+console.log("Real settings dispatcher click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
