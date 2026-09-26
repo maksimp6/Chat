@@ -68,7 +68,7 @@ jobs:
           HOST: 127.0.0.1
           PORT: 5678
           FLASK_DEBUG: "0"
-          ALICE_DATABASE_URL: sqlite:///alice_pro_ci_live.db
+          ALICE_DB_PATH: alice_pro_ci_live.db
         run: |
           python app.py > flask-live.log 2>&1 &
           echo $! > flask-live.pid
