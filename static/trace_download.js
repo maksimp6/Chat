@@ -115,7 +115,7 @@
             var button = document.createElement("button");
             button.id = buttonId;
             button.type = "button";
-            button.className = "alice-trace-btn";
+            button.className = "alice-btn alice-trace-btn";
             button.title = "Скачать полный трейс в JSON";
             button.setAttribute("aria-label", "Скачать трейс в JSON");
             button.textContent = "⇩ JSON";
@@ -126,7 +126,7 @@
             var uploadButton = document.createElement("button");
             uploadButton.id = uploadButtonId;
             uploadButton.type = "button";
-            uploadButton.className = "alice-trace-btn";
+            uploadButton.className = "alice-btn alice-trace-btn";
             uploadButton.title = "Загрузить трейс в файловый менеджер";
             uploadButton.setAttribute("aria-label", "Загрузить трейс в файловый менеджер");
             uploadButton.textContent = "☁ Файлы";
