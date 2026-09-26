@@ -54,9 +54,13 @@ def test_real_header_buttons_use_registered_actions():
     )
 
     registered = set()
-    register_re = re.compile(r'\.actions\.register\(\s*["\']([^"\']+)["\']')
+    register_patterns = (
+        re.compile(r'\.actions\.register\(\s*["\']([^"\']+)["\']'),
+        re.compile(r'\bactions\.register\(\s*["\']([^"\']+)["\']'),
+    )
     for _path, source in _application_js():
-        registered.update(register_re.findall(source))
+        for register_re in register_patterns:
+            registered.update(register_re.findall(source))
 
     unresolved = {
         button["id"]: button["data-action"]
