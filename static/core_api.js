@@ -30,9 +30,7 @@
     if (depth > MAX_DATA_DEPTH) return "[MAX_DEPTH]";
     if (value === null || value === undefined) return value;
     if (typeof value === "string") {
-      return value.length > MAX_STRING_LENGTH
-        ? value.slice(0, MAX_STRING_LENGTH) + "…"
-        : value;
+      return redactString(value);
     }
     if (typeof value !== "object") return value;
 
