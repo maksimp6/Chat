@@ -180,6 +180,11 @@ class MemoryDatabase:
             for table in self._tables.values():
                 table.rows.clear()
 
+    def reset(self) -> None:
+        with self._lock:
+            self._tables.clear()
+            self._snapshots.clear()
+
     def _require_table(self, name: str) -> Table:
         try:
             return self._tables[name]
