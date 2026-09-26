@@ -16,7 +16,11 @@ from environment_manager import (
 )
 import environment_routes
 from environment_routes import environment_bp, environment_gateway_bp
-from runtime import current_runtime_base_path, current_runtime_id
+from runtime import (
+    current_runtime_base_path,
+    current_runtime_data_root,
+    current_runtime_id,
+)
 
 
 def _setup_repo(tmp_path):
@@ -41,6 +45,39 @@ def _app():
                 "runtime_id": current_runtime_id(),
                 "base_path": current_runtime_base_path(),
                 "thread_id": threading.get_ident(),
+            }
+        )
+
+    @app.post("/runtime-db/<value>")
+    def runtime_db_write(value):
+        conn = db.get_conn()
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS runtime_probe (value TEXT NOT NULL)")
+            conn.execute("DELETE FROM runtime_probe")
+            conn.execute("INSERT INTO runtime_probe (value) VALUES (?)", (value,))
+            conn.commit()
+        finally:
+            conn.close()
+        return jsonify(
+            {
+                "runtime_id": current_runtime_id(),
+                "data_root": current_runtime_data_root(),
+                "value": value,
+            }
+        )
+
+    @app.get("/runtime-db")
+    def runtime_db_read():
+        conn = db.get_conn()
+        try:
+            row = conn.execute("SELECT value FROM runtime_probe").fetchone()
+        finally:
+            conn.close()
+        return jsonify(
+            {
+                "runtime_id": current_runtime_id(),
+                "data_root": current_runtime_data_root(),
+                "value": row["value"],
             }
         )
 
@@ -175,3 +212,65 @@ def test_environment_gateway_maps_runtime_failures(monkeypatch, error, status_co
     response = app.test_client().get("/environments/runtime-a/runtime-root")
     assert response.status_code == status_code
     assert response.get_json() == payload
+
+
+def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
+    repo = _setup_repo(tmp_path)
+    control_db = tmp_path / "control.db"
+    runtime_root = tmp_path / "runtimes"
+    monkeypatch.setattr(db, "DB_PATH", str(control_db))
+    monkeypatch.setenv("ALICE_ENV_REPO_ROOT", str(repo))
+    monkeypatch.setenv("ALICE_ENV_RUNTIME_ROOT", str(runtime_root))
+    db.init_db()
+    init_environment_tables()
+
+    app = _app()
+    client = app.test_client()
+    first = start_environment(create_environment("master")["environment_id"])
+    second = start_environment(create_environment("master")["environment_id"])
+
+    try:
+        first_write = client.post(
+            f"/environments/{first['environment_id']}/runtime-db/alpha"
+        )
+        second_write = client.post(
+            f"/environments/{second['environment_id']}/runtime-db/beta"
+        )
+        assert first_write.status_code == 200
+        assert second_write.status_code == 200
+
+        first_read = client.get(
+            f"/environments/{first['environment_id']}/runtime-db"
+        ).get_json()
+        second_read = client.get(
+            f"/environments/{second['environment_id']}/runtime-db"
+        ).get_json()
+
+        assert first_read["value"] == "alpha"
+        assert second_read["value"] == "beta"
+        assert first_read["runtime_id"] == first["environment_id"]
+        assert second_read["runtime_id"] == second["environment_id"]
+        assert first_read["data_root"] != second_read["data_root"]
+
+        first_db = runtime_root / first["environment_id"] / "data" / "alice_pro.db"
+        second_db = runtime_root / second["environment_id"] / "data" / "alice_pro.db"
+        assert first_db.is_file()
+        assert second_db.is_file()
+        assert first_db != second_db
+
+        control_conn = db.get_conn()
+        try:
+            tables = {
+                row["name"]
+                for row in control_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+        finally:
+            control_conn.close()
+        assert "runtime_probe" not in tables
+    finally:
+        stop_environment(first["environment_id"])
+        stop_environment(second["environment_id"])
+        delete_environment(first["environment_id"])
+        delete_environment(second["environment_id"])
