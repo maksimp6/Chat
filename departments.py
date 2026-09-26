@@ -189,16 +189,16 @@ def departments_create():
         return jsonify({"error": "department admin authorization required"}), 401
     try:
         return jsonify({"department": upsert_department(request.get_json(silent=True) or {})}), 201
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        return jsonify({"error": "invalid_department_request"}), 400
 
 
 @departments_bp.get("/<department_id>")
 def departments_get(department_id: str):
     try:
         department = get_department(department_id)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        return jsonify({"error": "invalid_department_id"}), 400
     if not department:
         return jsonify({"error": "department_not_found"}), 404
     return jsonify({"department": department})
@@ -212,8 +212,8 @@ def departments_update(department_id: str):
         return jsonify(
             {"department": upsert_department(request.get_json(silent=True) or {}, department_id)}
         )
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        return jsonify({"error": "invalid_department_request"}), 400
 
 
 @departments_bp.delete("/<department_id>")
