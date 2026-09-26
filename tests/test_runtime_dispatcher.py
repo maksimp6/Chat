@@ -106,3 +106,19 @@ def test_nested_dispatch_restores_outer_runtime_context():
     dispatcher.register_operation("outer", outer)
 
     assert dispatcher.dispatch("runtime-a", "outer") == ("runtime-a", "runtime-a")
+
+
+def test_dispatch_cleanup_tolerates_handler_clearing_thread_binding():
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a")
+
+    def handler(context, payload):
+        del dispatcher._local.runtime_id
+        return context.runtime_id
+
+    dispatcher.register_operation("clear-binding", handler)
+
+    assert dispatcher.dispatch("runtime-a", "clear-binding") == "runtime-a"
+
+    with pytest.raises(RuntimeNotFound):
+        dispatcher.current_context()
