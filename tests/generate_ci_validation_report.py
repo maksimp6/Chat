@@ -58,10 +58,10 @@ def main():
         lines.append("- Files measured: **{}**".format(len(root.findall(".//class"))))
     else:
         lines.append("- Coverage report was not produced.")
-    lines += ["", "## Live Flask/browser resource validation", ""]
+    lines += ["", "## Live Flask resource validation", ""]
     lines.append("- Flask live log: " + ("available" if Path("flask-live.log").exists() else "not available"))
     lines.append("- Resource contract: real HTTP responses from the running Flask server.")
-    lines.append("- Browser contract: Chromium network responses observed while exercising UI controls.")
+    lines.append("- Frontend runtime contract: UI behavior is validated by the lightweight BrowserShim test suite.")
     lines += ["", "## Result", "", "The CI status is authoritative. A failed test means the corresponding contract was not proven."]
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(out.read_text(encoding="utf-8"))
