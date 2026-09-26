@@ -236,7 +236,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
             copyBtn.textContent = "✅";
             window.AliceCoreAPI.scheduler.defer(() => copyBtn.textContent = "📋", 2000);
         });
-    };
+    });
     msg.appendChild(copyBtn);
 
     const metaWrap = document.createElement("div");
