@@ -59,3 +59,30 @@ def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
     payload = response.get_json()
     assert payload["error"] == "invalid_owner_identity"
     assert "invalid authenticated owner token" not in str(payload)
+
+def test_create_conversation_hides_provider_exception(monkeypatch):
+    import mcp_routes
+
+    internal_marker = "provider-create-internal-marker"
+
+    class FailingClient:
+        def create_conversation(self, execution_trace=None):
+            assert execution_trace is not None
+            raise RuntimeError(internal_marker)
+
+    monkeypatch.setattr(mcp_routes, "AliceClient", lambda _config: FailingClient())
+    monkeypatch.setattr(mcp_routes, "get_current_owner_id", lambda required=False: None)
+
+    client = app_module.app.test_client()
+    response = client.post(
+        "/api/conversations",
+        json={"model": "aliceai-llm", "title": "Test"},
+    )
+
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "conversation_creation_failed"
+    assert payload["message"] == "Не удалось создать разговор у провайдера"
+    assert internal_marker not in str(payload)
+    assert payload["trace"]["errors"][0]["error"] == "conversation creation failed"
+
