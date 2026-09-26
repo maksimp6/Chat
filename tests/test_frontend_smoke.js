@@ -43,6 +43,7 @@ function click(element) {
         const {document, window} = load(["static/core.js"], '<button id="theme-toggle"></button>');
         assert.equal(window.AliceTheme.getStored(), "light");
         assert.equal(window.AliceTheme.apply("dark", true), "dark");
+        document.dispatchEvent({type: "DOMContentLoaded"});
         assert.equal(document.documentElement.getAttribute("data-theme"), "dark");
         assert.equal(window.localStorage.getItem("theme"), "dark");
         click(document.getElementById("theme-toggle"));
