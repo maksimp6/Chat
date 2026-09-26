@@ -56,7 +56,7 @@ def entropy(value: str) -> float:
     return -sum((count / n) * math.log2(count / n) for count in counts.values())
 
 
-def is_vendor(path: Path) -> bool:
+def is_dispatcher(path: Path) -> bool:\n    return path.name == "dispatcher.js"\n\n\ndef is_vendor(path: Path) -> bool:
     return path.name in {"eruda.js"} or "vendor" in path.parts
 
 
@@ -121,7 +121,7 @@ def validate_file(path: Path) -> list[str]:
         if len(line.encode("utf-8")) > MAX_LINE_BYTES:
             errors.append(f"{rel}:{number}: line exceeds {MAX_LINE_BYTES} bytes")
 
-    if TEXT_FORBIDDEN.search(text):
+    if not is_dispatcher(path) and re.search(r"\\bfetch\\s*\\(", text):\n        errors.append(f"{rel}: dispatcher safety violation: direct transport access is forbidden")\n\n    if TEXT_FORBIDDEN.search(text):
         errors.append(f"{rel}: unusual text classification: forbidden control character")
 
     for pattern, label in OBFUSCATION_PATTERNS:
