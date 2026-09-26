@@ -162,4 +162,52 @@ if (settingsOpenCalls !== 1) {
 }
 console.log("Real settings dispatcher click lifecycle passed");
 
+const toolsShim = new BrowserShim(template);
+toolsShim.window.AliceDispatcher = {
+  request: async function () {
+    return {
+      ok: true,
+      status: 200,
+      json: async function () {
+        return { categories: {} };
+      },
+    };
+  },
+};
+const toolsRuntime = toolsShim.load(
+  [
+    "static/core_api.js",
+    "static/ui_runtime.js",
+    "static/settings/ui_helpers.js",
+    "static/settings/settings_storage.js",
+    "static/settings/settings_modal.js",
+    "static/header_actions.js",
+  ],
+  {
+    AliceDispatcher: toolsShim.window.AliceDispatcher,
+  },
+);
+const toolsButton = toolsRuntime.document.getElementById("tools-btn");
+if (!toolsButton) throw new Error("real tools button must exist in index.html");
+toolsButton.click();
+const toolsModal = toolsRuntime.document.getElementById("tools-modal-custom");
+const toolsClose = toolsRuntime.document.getElementById("tools-close-btn");
+if (!toolsModal || !toolsClose) {
+  throw new Error("real tools modal controls must be created after click");
+}
+if (toolsModal.hidden || !toolsModal.classList.contains("visible")) {
+  throw new Error("real tools button click must open tools modal");
+}
+if (toolsModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened real tools modal must expose aria-hidden=false");
+}
+toolsClose.click();
+if (!toolsModal.hidden || toolsModal.classList.contains("visible")) {
+  throw new Error("real tools close button must close tools modal");
+}
+if (toolsModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed real tools modal must expose aria-hidden=true");
+}
+console.log("Real tools modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
