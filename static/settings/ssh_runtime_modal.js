@@ -2,21 +2,9 @@
   "use strict";
   window.openSshRuntimeModal = function () {
     var UI = window.SettingsUI;
+    var CoreUI = window.AliceCoreAPI.ui;
     var existing = document.getElementById("ssh-runtime-modal-custom");
     if (existing) existing.remove();
-    var ov = document.createElement("div");
-    ov.id = "ssh-runtime-modal-custom";
-    ov.style.cssText =
-      "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;";
-    var md = document.createElement("div");
-    md.style.cssText =
-      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
-    var header = document.createElement("div");
-    header.style.cssText =
-      "display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;";
-    header.innerHTML =
-      '<h2 style="margin:0;font-size:18px;color:var(--m-text,#222);">🔐 SSH Runtime</h2><button class="alice-btn settings-contract-btn" id="set-close-btn" type="button">&times;</button>';
-    md.appendChild(header);
     var tabSsh = [
       '<div id="tab-ssh" class="llm-tab-content">',
       UI.section("SSH Runtime"),
@@ -81,10 +69,22 @@
     ].join("");
 
     var content = document.createElement("div");
+    content.className = "ssh-runtime-body";
     content.innerHTML = tabSsh;
-    md.appendChild(content);
-    ov.appendChild(md);
-    document.body.appendChild(ov);
+
+    var ov = CoreUI.modal.create({
+      id: "ssh-runtime-modal-custom",
+      title: "🔐 SSH Runtime",
+      className: "ssh-runtime-modal-custom",
+      contentClassName: "ssh-runtime-modal-content",
+      body: content,
+    });
+    var modalContent = ov.querySelector(".modal-content");
+    modalContent.style.cssText =
+      "background:var(--m-bg,#fff);border-radius:12px;padding:20px;max-width:720px;width:94%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:var(--m-text,#222);";
+    (document.querySelector(".alice-pro-app") || document.body).appendChild(ov);
+    CoreUI.modal.open(ov);
+
     var sshStatusEl = document.getElementById("ssh-settings-status");
     var sshTestTargetEl = document.getElementById("set-ssh-test-target");
 
@@ -245,13 +245,8 @@
         });
     });
 
-    function closeModal() {
-      ov.remove();
-    }
-    var closeButton = document.getElementById("set-close-btn");
-    if (closeButton) closeButton.addEventListener("click", closeModal);
     ov.addEventListener("click", function (e) {
-      if (e.target === ov) closeModal();
+      if (e.target === ov) CoreUI.modal.close(ov);
     });
   };
 })();
