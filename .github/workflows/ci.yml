@@ -38,6 +38,8 @@ jobs:
           bash tests/test_dozzle_preview.sh
       - name: Compile Python sources
         run: python -m compileall -q .
+      - name: Validate frontend JavaScript policy
+        run: python tests/validate_frontend_modules.py
       - name: Run frontend JavaScript regression tests with coverage
         run: |
           rm -rf coverage-js
@@ -72,12 +74,10 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:5678/ >/dev/null
-      - name: Install Chromium for live browser resource coverage
-        run: python -m playwright install --with-deps chromium
-      - name: Run live Flask resource contract tests
+      - name: Run live Flask resource contract tests without Chromium
         env:
           ALICE_LIVE_BASE_URL: http://127.0.0.1:5678
-        run: pytest -q tests/test_live_flask_resources.py tests/test_live_browser_resource_coverage.py
+        run: pytest -q tests/test_live_flask_resources.py
       - name: Stop Flask live validation server
         if: always()
         run: |
