@@ -2,8 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const {
-    DocumentShim,
-    WindowShim,
+    BrowserShim,
     applyHeaderFlexLayout,
 } = require("./browser_dom");
 
@@ -15,10 +14,32 @@ async function flush() {
 (async () => {
     const html = fs.readFileSync("templates/index.html", "utf8");
     const css = fs.readFileSync("static/style.css", "utf8");
-    const document = new DocumentShim(html);
-    const window = new WindowShim(document);
-    const context = {console, document, window, setTimeout, clearTimeout};
-
+    let fetchCalls = 0;
+    const browser = new BrowserShim(html);
+    const {document, window, context} = browser.load(["static/project_tree.js"], {
+        fetch: async () => {
+            fetchCalls += 1;
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    root: "/alice-pro",
+                    nodes: [{
+                        name: "src",
+                        path: "src",
+                        kind: "directory",
+                        icon: "📁",
+                        children: [{
+                            name: "app.py",
+                            path: "src/app.py",
+                            kind: "file",
+                            icon: "📄",
+                        }],
+                    }],
+                }),
+            };
+        },
+    });
     applyHeaderFlexLayout(document, css);
 
     const header = document.getElementById("header");
@@ -40,35 +61,6 @@ async function flush() {
     }
     assert.equal(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size, 1);
     assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 1);
-
-    const projectTreeSource = fs.readFileSync("static/project_tree.js", "utf8");
-    let fetchCalls = 0;
-    window.fetch = async () => {
-        fetchCalls += 1;
-        return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-                root: "/alice-pro",
-                nodes: [{
-                    name: "src",
-                    path: "src",
-                    kind: "directory",
-                    icon: "📁",
-                    children: [{
-                        name: "app.py",
-                        path: "src/app.py",
-                        kind: "file",
-                        icon: "📄",
-                    }],
-                }],
-            }),
-        };
-    };
-
-    vm.runInNewContext(projectTreeSource, context);
-    document.readyState = "interactive";
-    document.dispatchEvent({type: "DOMContentLoaded"});
 
     const projectTreeButton = document.getElementById("project-tree-btn");
     assert.ok(projectTreeButton);

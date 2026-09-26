@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_memory_controls_are_server_rendered():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     assert '<button id="memory-btn"' in html
-    assert 'id="memoryModal" class="memory-modal"' in html
+    assert 'id="memoryModal" class="modal memory-modal"' in html
+    assert 'class="modal-content memory-modal-content"' in html
     assert 'src="{{ static_root }}/memory_panel.js?v={{ static_version }}" defer' in html
     assert "memory_btn.js" not in html
 

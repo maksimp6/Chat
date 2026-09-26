@@ -28,7 +28,7 @@ function build() {
     modal.id = "cloudru-iam-modal";
     modal.className = "modal cloudru-iam-modal";
     var box = document.createElement("div");
-    box.className = "cloudru-iam-box";
+    box.className = "modal-content cloudru-iam-box";
     var close = document.createElement("button");
     close.textContent = "×";
     close.className = "cloudru-iam-close";

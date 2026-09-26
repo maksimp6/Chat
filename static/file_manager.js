@@ -51,7 +51,7 @@ window.fetchVectorStores = function() {
         ov.className = "modal file-manager-modal";
 
         var md = document.createElement("div");
-        md.className = "file-manager-box";
+        md.className = "modal-content file-manager-box";
 
         md.innerHTML = [
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">',
@@ -260,7 +260,7 @@ window.fetchVectorStores = function() {
             bg.className = "modal file-manager-add-modal";
 
             var panel = document.createElement('div');
-            panel.className = "file-manager-add-box";
+            panel.className = "modal-content file-manager-add-box";
 
             var header = document.createElement('div');
             header.className = 'file-manager-add-header';

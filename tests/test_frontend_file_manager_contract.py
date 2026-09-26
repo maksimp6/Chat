@@ -8,10 +8,10 @@ def read(path):
 def test_file_manager_modal_shell_uses_css_classes():
     source = read("static/file_manager.js")
     assert 'className = "modal file-manager-modal"' in source
-    assert 'className = "file-manager-box"' in source
+    assert 'className = "modal-content file-manager-box"' in source
     assert 'className = "modal file-manager-add-modal"' in source
-    assert 'className = "file-manager-add-box"' in source
-    assert "style.cssText" in source  # File upload rendering remains in the next isolated slice.
+    assert 'className = "modal-content file-manager-add-box"' in source
+    assert "style.cssText" in source
 
 
 def test_file_manager_overlays_are_scoped_to_app_shell():

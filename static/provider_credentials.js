@@ -113,7 +113,7 @@ function build() {
     modal.id = "provider-credentials-modal";
     modal.className = "modal provider-credentials-modal";
     var box = document.createElement("div");
-    box.className = "provider-credentials-box";
+    box.className = "modal-content provider-credentials-box";
     var close = document.createElement("button");
     close.textContent = "×"; close.setAttribute("aria-label","Закрыть");
     close.className = "provider-credentials-close";
