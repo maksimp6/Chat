@@ -64,6 +64,7 @@ jobs:
           node tests/test_ui_action_contract.js
           node tests/test_real_header_actions.js
           node tests/test_model_catalog_diagnostics.js
+          node tests/test_settings_ui_security.js
           node tests/test_ui_modal_contract.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
       - name: Save frontend test log
