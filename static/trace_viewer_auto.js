@@ -25,7 +25,7 @@
             var isError = !!(message && message.classList.contains("bot") && /(^|\s)⚠️\s*Ошибка/.test(message.textContent));
             var button = document.createElement("button");
             button.type = "button";
-            button.className = "trace-viewer-auto-button";
+            button.className = "alice-btn trace-viewer-auto-button";
             button.textContent = isError ? "🔍 Трейс ошибки" : summaryText;
             button.title = isError ? "Открыть Execution Trace ошибки" : "Открыть Execution Trace viewer";
             button.onclick = function (event) {
