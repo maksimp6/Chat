@@ -374,11 +374,11 @@
   }
 
   function findActionButton(target, root) {
-    var node = target;
-    while (node && node !== root) {
-      if (node.tagName === "BUTTON" && node.dataset && node.dataset.action) return node;
-      node = node.parentNode;
-    }
+    if (!target || typeof target.closest !== "function") return null;
+    var button = target.closest("button[data-action]");
+    if (!button) return null;
+    if (root === document.body) return button;
+    if (typeof root.contains === "function" && root.contains(button)) return button;
     return null;
   }
 
