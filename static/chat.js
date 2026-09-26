@@ -341,7 +341,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
                 } else {
                     console.error("[CHAT] Execution Trace Viewer is not loaded");
                 }
-            };
+            });
             metaWrap.appendChild(traceEl);
             metaWrap.appendChild(openTraceBtn);
         }
