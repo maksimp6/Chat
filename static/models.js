@@ -19,16 +19,34 @@ function renderModelModal() {
   modelList.replaceChildren();
   var allModels = Object.assign({}, modelsData.text || {}, modelsData.voice || {});
   if (Object.keys(allModels).length === 0) {
+    var state =
+      typeof modelLoadState === "undefined" ? { status: "idle", message: "" } : modelLoadState;
     var empty = document.createElement("div");
     empty.className = "model-option model-option-empty";
-    empty.textContent = "Модели временно недоступны. Интерфейс продолжает работать.";
+    empty.setAttribute("role", "status");
+    empty.setAttribute("aria-live", "polite");
+    empty.textContent =
+      state.status === "loading"
+        ? state.message
+        : state.message || "Модели временно недоступны. Интерфейс продолжает работать.";
     modelList.appendChild(empty);
+    if (state.status === "error") {
+      var retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "alice-btn model-option-retry";
+      retry.textContent = "Повторить";
+      retry.addEventListener("click", function () {
+        if (window.AliceModelCatalog) window.AliceModelCatalog.load().catch(function () {});
+      });
+      modelList.appendChild(retry);
+    }
     return;
   }
   Object.keys(allModels).forEach(function (key) {
     var m = allModels[key];
-    var div = document.createElement("div");
-    div.className = "model-option" + (key === currentModel ? " active" : "");
+    var div = document.createElement("button");
+    div.type = "button";
+    div.className = "alice-btn model-option" + (key === currentModel ? " active" : "");
     var priceText = m.input && m.output ? m.input + " / " + m.output + " \u20bd/1K" : "";
     var badges = "";
     if (modelsData.voice && modelsData.voice[key]) badges += " \uD83C\uDFA4";
@@ -36,6 +54,7 @@ function renderModelModal() {
     var nameWrap = document.createElement("div");
     var name = document.createElement("strong");
     name.textContent = m.name + badges;
+    div.setAttribute("aria-label", m.name + badges);
     nameWrap.appendChild(name);
 
     var price = document.createElement("div");

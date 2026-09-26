@@ -1,0 +1,11 @@
+{
+  "name": "alice-pro-dev-tools",
+  "private": true,
+  "devDependencies": {
+    "prettier": "3.6.2"
+  },
+  "scripts": {
+    "format": "bash scripts/format.sh write",
+    "format:check": "bash scripts/format.sh check"
+  }
+}

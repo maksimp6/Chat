@@ -1,0 +1,8 @@
+# Development and CI tooling.
+# Keep these versions aligned with .github/workflows/ci.yml behavior so local/Codex checks
+# use the same toolchain as GitHub Actions whenever the packages are available locally.
+pytest==9.1.1
+pytest-cov==7.1.0
+coverage==7.16.1
+ruff==0.16.9
+diff-cover==10.6.0
