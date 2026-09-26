@@ -88,7 +88,7 @@
                 var s = Math.max(-1, Math.min(1, input[i]));
                 pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
-            fetch("/api/voice/audio?session_id=" + sessionId, {
+            window.AliceDispatcher.request("/api/voice/audio?session_id=" + sessionId, {
                 method: "POST",
                 headers: {"Content-Type": "application/octet-stream"},
                 body: pcm.buffer
@@ -200,7 +200,7 @@
         if (audioContext) { audioContext.close(); audioContext = null; }
         if (eventSource) { eventSource.close(); eventSource = null; }
         if (sessionId) {
-            fetch("/api/voice/close", {
+            window.AliceDispatcher.request("/api/voice/close", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({session_id: sessionId})
@@ -223,7 +223,7 @@
         setStatus("Подключение...");
 
         try {
-            var res = await fetch("/api/voice/session", {
+            var res = await window.AliceDispatcher.request("/api/voice/session", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
