@@ -100,7 +100,7 @@
       function (event) {
         var target =
           event.target && event.target.closest
-            ? event.target.closest("#memoryCloseBtn, #memoryClearBtn")
+            ? event.target.closest("#memoryClearBtn")
             : null;
         if (!target) return;
 
