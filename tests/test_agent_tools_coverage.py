@@ -185,9 +185,7 @@ def test_git_commit_adds_default_target_and_commits(monkeypatch):
         return {"success": True, "stdout": "ok"}
 
     monkeypatch.setattr(agent_tools.ToolExecutor, "_run_git", classmethod(fake_run))
-    result = agent_tools.ToolExecutor.git_commit(
-        "message", repo_path="/repo", work_tree="/work"
-    )
+    result = agent_tools.ToolExecutor.git_commit("message", repo_path="/repo", work_tree="/work")
     assert result["success"] is True
     assert calls[0][0] == ["add", "."]
     assert calls[1][0] == ["commit", "-m", "message"]
@@ -197,7 +195,11 @@ def test_git_commit_adds_default_target_and_commits(monkeypatch):
     ("action", "url", "expected"),
     [
         ("list", None, ["remote", "-v"]),
-        ("add", "https://example/repo.git", ["remote", "add", "upstream", "https://example/repo.git"]),
+        (
+            "add",
+            "https://example/repo.git",
+            ["remote", "add", "upstream", "https://example/repo.git"],
+        ),
         (
             "set_url",
             "https://example/new.git",
@@ -289,9 +291,7 @@ def test_file_replace_text_missing_not_found_and_success(tmp_path):
     assert result["success"] is False
     assert "old_text" in result["error"]
 
-    result = agent_tools.ToolExecutor.file_replace_text(
-        str(path), "one\r\ntwo", "alpha\r\nbeta"
-    )
+    result = agent_tools.ToolExecutor.file_replace_text(str(path), "one\r\ntwo", "alpha\r\nbeta")
     assert result == {"success": True, "file": str(path)}
     assert path.read_text(encoding="utf-8") == "alpha\nbeta\n"
 
@@ -328,9 +328,7 @@ def test_shell_execute_success_timeout_and_exception(monkeypatch):
     monkeypatch.setattr(
         agent_tools.subprocess,
         "run",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            subprocess.TimeoutExpired("command", 20)
-        ),
+        lambda *args, **kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired("command", 20)),
     )
     assert "лимит времени" in agent_tools.ToolExecutor.shell_execute("sleep")["error"]
 
