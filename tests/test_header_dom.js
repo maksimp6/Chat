@@ -14,11 +14,10 @@ async function flush() {
 (async () => {
     const html = fs.readFileSync("templates/index.html", "utf8");
     const css = fs.readFileSync("static/style.css", "utf8");
-    let fetchCalls = 0;
+    let requestCalls = 0;
     const browser = new BrowserShim(html);
     const {document, window, context} = browser.load(["static/project_tree.js"], {
         fetch: async () => {
-            fetchCalls += 1;
             return {
                 ok: true,
                 status: 200,
@@ -67,7 +66,7 @@ async function flush() {
     projectTreeButton.click();
     await flush();
 
-    assert.equal(fetchCalls, 1);
+    assert.equal(requestCalls, 1);
     const modal = document.getElementById("project-tree-modal");
     assert.ok(modal);
     assert.equal(modal.classList.contains("visible"), true);
@@ -75,7 +74,7 @@ async function flush() {
     assert.equal(modal.querySelectorAll(".project-tree-row").length, 2);
     assert.equal(modal.querySelector(".project-tree-row").querySelector(".project-tree-icon").textContent, "📁");
 
-    window.fetch = async () => ({ok: false, status: 503});
+    window.AliceDispatcher.request = async () => ({ok: false, status: 503});
     modal.remove();
     projectTreeButton.click();
     await flush();
