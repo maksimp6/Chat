@@ -83,8 +83,8 @@
 
         var html = '<div style="display:flex;justify-content:space-between;margin-bottom:16px;">' +
             '<h2 style="margin:0;color:var(--m-text,#222);">MCP Серверы</h2>' +
-            '<button class="alice-btn" id="mcp-mgr-close" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);">&times;</button></div>';
-        html += '<button class="alice-btn" id="mcp-mgr-add" style="padding:8px 16px;background:var(--m-accent,#4a90d9);color:#fff;border:none;border-radius:6px;cursor:pointer;margin-bottom:12px;">+ Добавить сервер</button>';
+            '<button class="alice-btn settings-contract-btn" id="mcp-mgr-close">&times;</button></div>';
+        html += '<button class="alice-btn settings-contract-btn" id="mcp-mgr-add">+ Добавить сервер</button>';
         html += '<div id="mcp-mgr-list"></div>';
 
         md.innerHTML = html;
@@ -107,8 +107,8 @@
                     '<div><div style="font-weight:bold;font-size:14px;color:var(--m-text,#222);">' + UI.escapeHtml(srv.name) + '</div>' +
                     '<div style="font-size:12px;color:var(--m-muted,#666);">' + UI.escapeHtml(connInfo) + '</div></div>' +
                     '<div style="display:flex;gap:6px;">' +
-                    '<button class="alice-btn mcp-edit-btn" data-id="' + UI.escapeHtml(srv.id) + '" style="padding:4px 10px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:12px;color:var(--m-text,#222);">Изменить</button>' +
-                    '<button class="alice-btn mcp-del-btn" data-id="' + UI.escapeHtml(srv.id) + '" style="padding:4px 10px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:12px;color:var(--m-danger,#c33);">Удалить</button>' +
+                    '<button class="alice-btn mcp-edit-btn settings-contract-btn" data-id="' + UI.escapeHtml(srv.id) + '">Изменить</button>' +
+                    '<button class="alice-btn mcp-del-btn settings-contract-btn" data-id="' + UI.escapeHtml(srv.id) + '">Удалить</button>' +
                     '</div></div>';
             }).join('');
 
