@@ -41,7 +41,7 @@
         };
         script.onerror = function () {
             attempts += 1;
-            if (attempts < maxAttempts) setTimeout(loadEruda, attempts * 250);
+            if (attempts < maxAttempts) window.AliceCoreAPI.scheduler.defer(loadEruda, attempts * 250);
             else console.warn("[ERUDA] Local Eruda bundle failed to load");
         };
         document.head.appendChild(script);
@@ -49,7 +49,7 @@
 
     function start() {
         // Let the application finish its critical DOM startup first.
-        setTimeout(loadEruda, 0);
+        window.AliceCoreAPI.scheduler.defer(loadEruda, 0);
     }
 
     if (document.readyState === "loading") {
