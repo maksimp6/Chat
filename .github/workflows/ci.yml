@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  code-quality: write
 
 jobs:
   backend:
@@ -22,6 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -107,6 +109,13 @@ jobs:
         run: |
           python tests/generate_ci_validation_report.py | tee ci-validation-report.md
           cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage to GitHub Code Quality
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage.xml
+          language: Python
+          label: code-coverage/pytest
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v7
