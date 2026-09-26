@@ -5,6 +5,7 @@ import db
 from environment_manager import (
     create_environment,
     delete_environment,
+    dispatch_environment_revision,
     init_environment_tables,
     list_environments,
     start_environment,
@@ -21,6 +22,7 @@ def _git_repo(tmp_path):
     subprocess.run(["git", "config", "user.email", "ci@example.test"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "CI"], cwd=repo, check=True)
     (repo / "marker.txt").write_text("master\\n", encoding="utf-8")
+    _write_runtime(repo, "master")
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "master"], cwd=repo, check=True, capture_output=True)
     master_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
@@ -28,6 +30,7 @@ def _git_repo(tmp_path):
         ["git", "switch", "-c", "feature/one"], cwd=repo, check=True, capture_output=True
     )
     (repo / "marker.txt").write_text("feature-one\\n", encoding="utf-8")
+    _write_runtime(repo, "one")
     subprocess.run(
         ["git", "commit", "-am", "feature one"], cwd=repo, check=True, capture_output=True
     )
@@ -36,11 +39,26 @@ def _git_repo(tmp_path):
         ["git", "switch", "-c", "feature/two"], cwd=repo, check=True, capture_output=True
     )
     (repo / "marker.txt").write_text("feature-two\\n", encoding="utf-8")
+    _write_runtime(repo, "two")
     subprocess.run(
         ["git", "commit", "-am", "feature two"], cwd=repo, check=True, capture_output=True
     )
     two_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
     return repo, master_sha, one_sha, two_sha
+
+
+def _write_runtime(repo, revision):
+    (repo / "alice_runtime.py").write_text(
+        f'''STATE = []
+class Application:
+    def invoke(self, operation, payload):
+        STATE.append(payload["value"])
+        return {{"revision": "{revision}", "state": list(STATE)}}
+def create_runtime(host):
+    return Application()
+''',
+        encoding="utf-8",
+    )
 
 
 def _setup(tmp_path, monkeypatch):
@@ -76,6 +94,26 @@ def test_two_branch_environments_are_immutable_and_isolated(tmp_path, monkeypatc
     assert first["runtime_thread_id"] != second["runtime_thread_id"]
     assert first["runtime_thread_id"] != threading.get_ident()
     assert second["runtime_thread_id"] != threading.get_ident()
+
+    barrier = threading.Barrier(2)
+    results = {}
+
+    def invoke(name, environment_id, value):
+        barrier.wait()
+        results[name] = dispatch_environment_revision(environment_id, "record", {"value": value})
+
+    callers = [
+        threading.Thread(target=invoke, args=("one", first["environment_id"], "first")),
+        threading.Thread(target=invoke, args=("two", second["environment_id"], "second")),
+    ]
+    for caller in callers:
+        caller.start()
+    for caller in callers:
+        caller.join()
+    assert results == {
+        "one": {"revision": "one", "state": ["first"]},
+        "two": {"revision": "two", "state": ["second"]},
+    }
 
     stop_environment(first["environment_id"])
     stop_environment(second["environment_id"])
