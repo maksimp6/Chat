@@ -20,7 +20,7 @@
 
   window.loadMemoryData = async function () {
     try {
-      var response = await fetch("/api/memory/manage");
+      var response = await window.AliceDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
       var data = await response.json();
       var enabled = byId("memEnabled");
@@ -62,7 +62,7 @@
     var enabled = byId("memEnabled");
     var limit = byId("memLimit");
     try {
-      var response = await fetch("/api/memory/config", {
+      var response = await window.AliceDispatcher.request("/api/memory/config", {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -80,7 +80,7 @@
   window.clearMemory = async function (category) {
     if (!confirm("Очистить память?")) return;
     try {
-      var response = await fetch("/api/memory/clear", {
+      var response = await window.AliceDispatcher.request("/api/memory/clear", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({category: category})
