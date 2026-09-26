@@ -58,7 +58,7 @@ function renderApprovalCard(toolCall, origMsg) {
         if (toolCall.name === "set_ui_theme" && window.AliceTheme) {
             approvalPayload.current_theme = window.AliceTheme.getStored();
         }
-        fetch("/api/mcp/execute-approved", {
+        window.AliceDispatcher.request("/api/mcp/execute-approved", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(approvalPayload)
@@ -356,7 +356,7 @@ function loadHistory(convId) {
     const chatbox = document.getElementById("chatbox");
     if (!chatbox) return;
     chatbox.replaceChildren();
-    fetch(`/api/conversations/${convId}/messages`)
+    window.AliceDispatcher.request(`/api/conversations/${convId}/messages`)
         .then(r => r.json())
         .then(data => {
             try {
@@ -408,7 +408,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const params = (typeof window.getResponsesParams === "function") ? window.getResponsesParams() : {};
         const t0 = performance.now();
 
-        fetch("/api/chat", {
+        window.AliceDispatcher.request("/api/chat", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({message: text, conversation_id: currentConvId, model: currentModel, params: params})
