@@ -345,4 +345,57 @@ if (filesModal.getAttribute("aria-hidden") !== "true") {
 }
 console.log("Real file manager modal click lifecycle passed");
 
+const treasuryShim = new BrowserShim(template);
+treasuryShim.window.AliceDispatcher = {
+  request: async function (url) {
+    if (url === "/api/treasury/account") {
+      return {
+        ok: true,
+        status: 200,
+        json: async function () {
+          return { balance: 100, currency: "RUB", ledger: [] };
+        },
+      };
+    }
+    throw new Error("unexpected treasury request: " + url);
+  },
+};
+const treasuryRuntime = treasuryShim.load(
+  ["static/core_api.js", "static/ui_runtime.js", "static/treasury.js", "static/header_actions.js"],
+  {
+    AliceDispatcher: treasuryShim.window.AliceDispatcher,
+  },
+);
+const treasuryButton = treasuryRuntime.document.getElementById("treasury-btn");
+if (!treasuryButton) throw new Error("real treasury button must exist in index.html");
+treasuryButton.click();
+const treasuryModal = treasuryRuntime.document.getElementById("treasury-modal");
+const treasuryClose = treasuryModal && treasuryModal.querySelector(".modal-close");
+if (!treasuryModal || !treasuryClose) {
+  throw new Error("real treasury modal controls must be created after click");
+}
+if (!treasuryModal.parentNode || treasuryModal.parentNode.id !== "app-root") {
+  throw new Error("real treasury modal must mount inside .alice-pro-app");
+}
+if (
+  treasuryClose.dataset.action !== "treasury.close" ||
+  treasuryClose.dataset.modal !== "treasury-modal"
+) {
+  throw new Error("treasury modal close must use dispatcher contract");
+}
+if (treasuryModal.hidden || !treasuryModal.classList.contains("visible")) {
+  throw new Error("real treasury button click must open treasury modal");
+}
+if (treasuryModal.getAttribute("aria-hidden") !== "false") {
+  throw new Error("opened treasury modal must expose aria-hidden=false");
+}
+treasuryClose.click();
+if (!treasuryModal.hidden || treasuryModal.classList.contains("visible")) {
+  throw new Error("real treasury close button must close treasury modal");
+}
+if (treasuryModal.getAttribute("aria-hidden") !== "true") {
+  throw new Error("closed treasury modal must expose aria-hidden=true");
+}
+console.log("Real treasury modal click lifecycle passed");
+
 console.log("Real header runtime action tests passed");
