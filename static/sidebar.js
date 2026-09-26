@@ -152,10 +152,7 @@ function selectConv(id, updateHistory) {
         }
     }
 if (typeof window.loadServerConvSettings === "function") {
-    Promise.race([
-        window.loadServerConvSettings(id),
-        new Promise(function(resolve) { setTimeout(resolve, 5000); })
-    ]).catch(function(error) {
+    window.loadServerConvSettings(id).catch(function(error) {
         console.warn("[SIDEBAR] Settings load failed:", error);
     });
 }
