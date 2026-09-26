@@ -238,7 +238,7 @@ def _validate(spec: Mapping[str, Any], value: Any, path: str) -> None:
     if kind == "string":
         if not isinstance(value, str):
             raise ContractViolation(f"{path}: expected string, got {type(value).__name__}")
-        if spec.get("min_length") and len(value) < spec["min_length"]:
+        if spec.get("min_length") and len(value.strip()) < spec["min_length"]:
             raise ContractViolation(f"{path}: string must not be empty")
         return
 
