@@ -60,12 +60,10 @@ window.fetchVectorStores = function() {
         var md = body;
 
         md.innerHTML = [
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">',
-            '    <h2 style="margin:0;color:var(--m-text,#222);">Менеджер файлов</h2>',
-            '    <div style="display:flex;gap:8px;align-items:center;">',
+            '<div class="file-manager-toolbar">',
+            '    <div class="file-manager-toolbar-actions">',
             '        <label for="file-upload" style="cursor:pointer;padding:8px 16px;background:var(--m-accent,#4a90d9);color:#fff;border-radius:6px;font-size:13px;">Загрузить файлы</label>',
             '        <input type="file" id="file-upload" style="display:none" multiple>',
-            '        <button id="close-fm-btn" style="border:none;background:none;font-size:24px;cursor:pointer;color:var(--m-muted,#666);line-height:1;">&times;</button>',
             '    </div>',
             '</div>',
             // === Секция Vector Stores ===
@@ -74,8 +72,8 @@ window.fetchVectorStores = function() {
             '        <h3 style="margin:0;font-size:15px;color:var(--m-text,#222);">Vector Stores</h3>',
             '        <div style="display:flex;gap:8px;">',
             '            <input id="vs-name-input" type="text" placeholder="Название..." style="padding:6px 10px;border:1px solid var(--m-border,#ddd);border-radius:4px;font-size:12px;background:var(--m-input-bg,#fff);color:var(--m-text,#222);width:160px;">',
-            '            <button id="btn-create-vs" style="padding:6px 12px;background:var(--m-accent,#4a90d9);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">+ Создать</button>',
-            '            <button id="btn-refresh-vs" style="padding:6px 12px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:12px;color:var(--m-text,#222);">Обновить</button>',
+            '            <button id="btn-create-vs" type="button" class="alice-btn" style="padding:6px 12px;background:var(--m-accent,#4a90d9);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">+ Создать</button>',
+            '            <button id="btn-refresh-vs" type="button" class="alice-btn" style="padding:6px 12px;border:1px solid var(--m-border,#ddd);background:var(--m-card,#fff);border-radius:4px;cursor:pointer;font-size:12px;color:var(--m-text,#222);">Обновить</button>',
             '        </div>',
             '    </div>',
             '    <div id="vs-manager-list" style="max-height:200px;overflow-y:auto;"></div>',
