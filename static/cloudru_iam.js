@@ -24,20 +24,19 @@ function value(id) {
 
 function build() {
     if (document.getElementById("cloudru-iam-modal")) return;
-    var modal = document.createElement("div");
-    modal.id = "cloudru-iam-modal";
-    modal.className = "modal cloudru-iam-modal";
-    var box = document.createElement("div");
-    box.className = "modal-content cloudru-iam-box";
-    var close = document.createElement("button");
-    close.textContent = "×";
-    close.className = "cloudru-iam-close";
-    close.setAttribute("aria-label", "Закрыть");
-    close.addEventListener("click", function () { modal.classList.remove("visible"); modal.setAttribute("aria-hidden", "true"); });
-    var title = document.createElement("h3");
-    title.textContent = "Cloud.ru IAM: выпуск API-ключа";
-    box.appendChild(close);
-    box.appendChild(title);
+    var UI = window.AliceCoreAPI.ui;
+    var body = document.createElement("div");
+    body.className = "cloudru-iam-body";
+    var modal = UI.modal.create({
+        id: "cloudru-iam-modal",
+        title: "Cloud.ru IAM: выпуск API-ключа",
+        titleTag: "h3",
+        className: "cloudru-iam-modal",
+        contentClassName: "cloudru-iam-box",
+        closeAction: "cloudru-iam.close",
+        body: body
+    });
+    var box = body;
     box.appendChild(makeInput("cloudru-iam-admin-token", "Admin token (для удалённого deployment)", "password", "не нужен на localhost"));
     box.appendChild(makeInput("cloudru-iam-service-account", "Service account ID", "text", "UUID"));
     box.appendChild(makeInput("cloudru-iam-name", "Название ключа", "text", "Alice Pro"));
@@ -62,10 +61,6 @@ function build() {
     output.id = "cloudru-iam-output";
     output.className = "cloudru-iam-output";
     box.appendChild(output);
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-hidden", "true");
-    modal.appendChild(box);
     (document.querySelector(".alice-pro-app") || document.body).appendChild(modal);
 }
 
@@ -102,11 +97,15 @@ async function submitWizard() {
     }
 }
 
+window.AliceCoreAPI.ui.actions.register("cloudru-iam.close", function (payload) {
+    var modal = payload.element.closest(".modal");
+    if (modal) window.AliceCoreAPI.ui.modal.close(modal);
+});
+
 window.openCloudRuIamWizard = function () {
     build();
     var modal = document.getElementById("cloudru-iam-modal");
-    modal.classList.add("visible");
-    modal.setAttribute("aria-hidden", "false");
+    window.AliceCoreAPI.ui.modal.open(modal);
 };
 document.addEventListener("DOMContentLoaded", build);
 })();
