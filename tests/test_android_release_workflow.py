@@ -41,5 +41,5 @@ def test_release_verifies_identity_and_metadata_before_publish() -> None:
     assert "--print-certs" in workflow
     assert 'test "$APK_CERT_SHA256" = "$KEYSTORE_CERT_SHA256"' in workflow
     assert "EXPECTED_APPLICATION_ID: com.alicepro.mobile" in workflow
-    assert 'versionCode=\'$GITHUB_RUN_NUMBER\'' in workflow
-    assert 'versionName=\'${GITHUB_REF_NAME#v}\'' in workflow
+    assert "versionCode='$GITHUB_RUN_NUMBER'" in workflow
+    assert "versionName='${GITHUB_REF_NAME#v}'" in workflow
