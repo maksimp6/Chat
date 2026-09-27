@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 from typing import Any
 
 from ssh_runtime import SSHRuntime, SSHRuntimeError
@@ -54,6 +56,124 @@ def _runtime_args(args: dict, cfg: dict | None) -> dict:
         "identity_id": _trusted_identity(cfg),
         "timeout_seconds": args.get("timeout_seconds"),
     }
+
+
+def _limit_local_output(value: str | bytes | None, max_bytes: int = 1048576) -> str:
+    if value is None:
+        return ""
+    text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
+    raw = text.encode("utf-8", errors="replace")
+    if len(raw) <= max_bytes:
+        return text
+    suffix = "\n...[output truncated]"
+    suffix_bytes = suffix.encode("utf-8")
+    budget = max(0, max_bytes - len(suffix_bytes))
+    return raw[:budget].decode("utf-8", errors="ignore") + suffix
+
+
+def local_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
+    """Execute a shell command on the host running the Alice Pro backend."""
+    command = str(args.get("command") or "").strip()
+    if not command:
+        raise ValueError("Command is required")
+
+    raw_timeout = args.get("timeout_seconds")
+    timeout = 30.0 if raw_timeout is None else float(raw_timeout)
+    if timeout < 1 or timeout > 300:
+        raise ValueError("timeout_seconds must be between 1 and 300")
+
+    raw_cwd = args.get("cwd")
+    cwd = os.path.abspath(os.path.expanduser(str(raw_cwd))) if raw_cwd else os.getcwd()
+    if not os.path.isdir(cwd):
+        raise ValueError(f"Working directory does not exist: {cwd}")
+
+    _trace_event(
+        cfg,
+        "runtime_started",
+        {
+            "runtime": "local",
+            "operation": "execute",
+            "cwd": cwd,
+        },
+    )
+
+    try:
+        completed = subprocess.run(
+            ["/bin/bash", "-lc", command],
+            shell=False,
+            check=False,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        result = {
+            "success": False,
+            "error": f"Local command timed out after {timeout:g}s",
+            "stdout": _limit_local_output(exc.stdout),
+            "stderr": _limit_local_output(exc.stderr),
+            "exit_code": None,
+            "cwd": cwd,
+            "timeout_seconds": timeout,
+        }
+        _trace_event(
+            cfg,
+            "runtime_failed",
+            {
+                "runtime": "local",
+                "operation": "execute",
+                "cwd": cwd,
+                "error": result["error"],
+            },
+        )
+        return result
+    except OSError as exc:
+        result = {
+            "success": False,
+            "error": f"Unable to start local shell: {exc}",
+            "stdout": "",
+            "stderr": "",
+            "exit_code": None,
+            "cwd": cwd,
+            "timeout_seconds": timeout,
+        }
+        _trace_event(
+            cfg,
+            "runtime_failed",
+            {
+                "runtime": "local",
+                "operation": "execute",
+                "cwd": cwd,
+                "error": result["error"],
+            },
+        )
+        return result
+
+    result = {
+        "success": completed.returncode == 0,
+        "stdout": _limit_local_output(completed.stdout),
+        "stderr": _limit_local_output(completed.stderr),
+        "exit_code": completed.returncode,
+        "cwd": cwd,
+        "timeout_seconds": timeout,
+    }
+    if completed.returncode != 0:
+        result["error"] = f"Local command exited with code {completed.returncode}"
+
+    _trace_event(
+        cfg,
+        "runtime_finished",
+        {
+            "runtime": "local",
+            "operation": "execute",
+            "cwd": cwd,
+            "exit_code": completed.returncode,
+            "success": completed.returncode == 0,
+        },
+    )
+    return result
 
 
 def ssh_runtime_exec(args: dict, cfg: dict | None = None) -> dict[str, Any]:
@@ -212,6 +332,44 @@ def _schema(extra: dict) -> dict:
 
 
 RUNTIME_TOOLS = {
+    "local_runtime_exec": {
+        "title": "Local Runtime Execute",
+        "description": (
+            "Execute a shell command on the same Linux host that runs the Alice Pro backend. "
+            "Use this for server-local diagnostics, maintenance and repository commands without SSH."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "minLength": 1, "maxLength": 20000},
+                "cwd": {
+                    "anyOf": [
+                        {"type": "string", "minLength": 1, "maxLength": 4096},
+                        {"type": "null"},
+                    ]
+                },
+                "timeout_seconds": {
+                    "anyOf": [
+                        {"type": "number", "minimum": 1, "maximum": 300},
+                        {"type": "null"},
+                    ]
+                },
+            },
+            "required": ["command", "cwd", "timeout_seconds"],
+            "additionalProperties": False,
+        },
+        "capabilities": ["runtime", "linux", "local_execution"],
+        "risk_level": "high",
+        "read_only": False,
+        "requires_approval": True,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "metadata": {
+            "trace_redact_arguments": ["command"],
+            "trace_redact_result_fields": ["stdout", "stderr"],
+        },
+        "func": local_runtime_exec,
+    },
     "ssh_runtime_exec": {
         "title": "SSH Runtime Execute",
         "description": (
