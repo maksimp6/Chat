@@ -10,7 +10,8 @@ def test_core_initialization_is_named_and_idempotent():
 
     assert "function initCore()" in source
     assert "coreInitialized" in source
-    assert 'document.addEventListener("DOMContentLoaded", initCore);' in source
+    assert "initCore();" in source
+    assert "window.AliceBoot.markShellReady()" in source
 
 
 def test_core_remote_enhancement_isolated_from_shell_initialization():
