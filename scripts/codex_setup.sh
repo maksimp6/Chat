@@ -56,7 +56,7 @@ fi
 if ! command -v cloud >/dev/null 2>&1; then
   bash scripts/install_cloud_cli.sh
 fi
-cloud --version
+cloud configure set --cli-agree-privacy-statement=true
 
 echo "Codex repository environment ready"
 echo "Maintenance installed: $INSTALL_DIR/codex_maintenance.sh"
