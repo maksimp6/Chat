@@ -3,6 +3,7 @@
 import logging
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -28,6 +29,35 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
 SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
+
+
+
+def get_donation_url():
+    """Return the optional public donation page URL, or None when disabled.
+
+    Only absolute http/https URLs without embedded credentials are accepted so
+    the header button can never be turned into a script or credential carrier.
+    """
+    raw = (os.getenv("ALICE_DONATION_URL") or "").strip()
+    if not raw:
+        return None
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in raw):
+        logger.warning("ALICE_DONATION_URL ignored: contains whitespace or control characters")
+        return None
+    try:
+        parts = urlsplit(raw)
+        hostname = parts.hostname
+    except ValueError:
+        logger.warning("ALICE_DONATION_URL ignored: malformed URL")
+        return None
+    if parts.scheme.lower() not in {"http", "https"} or not hostname:
+        logger.warning("ALICE_DONATION_URL ignored: only absolute http/https URLs are allowed")
+        return None
+    if parts.username is not None or parts.password is not None:
+        logger.warning("ALICE_DONATION_URL ignored: URLs with embedded credentials are not allowed")
+        return None
+    return raw
+
 
 HOST = "0.0.0.0"
 PORT = 8080

@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import os
 import logging
 import json
-from config import TEXT_MODELS, VOICE_MODELS
+from config import TEXT_MODELS, VOICE_MODELS, get_donation_url
 from model_discovery import ModelDiscoveryError, get_model_discovery, static_model_catalog
 from db import (
     init_db, get_conversations, create_conversation, update_conversation_title,
@@ -134,6 +134,7 @@ def index():
         static_version=STATIC_ASSET_VERSION,
         selected_conversation=selected_conversation,
         selected_messages=selected_messages,
+        donation_url=get_donation_url(),
     )
 
 

@@ -205,6 +205,15 @@ html, body {
     display: flex; align-items: center; justify-content: center;
 }
 
+.alice-pro-app a.header-btn {
+    text-decoration: none;
+}
+
+.alice-pro-app .donate-btn img {
+    display: block;
+    pointer-events: none;
+}
+
 .alice-pro-app .model-btn {
     width: 38px; height: 38px; padding: 0;
     flex: 0 0 38px; font-size: 20px;
