@@ -16,6 +16,40 @@ Alice Pro frontend JavaScript is treated as a set of modules with explicit runti
 - Suspicious high-entropy or non-printable source is classified as unusual text and rejected.
 - Vendor bundles are excluded from application policy checks and must be isolated explicitly. They are not treated as application modules.
 
+## Source repetition classification
+
+The repetition heuristic ignores blank lines and lines containing only structural
+delimiters (`{}`, `()`, `[]`, semicolons, commas and whitespace). Such lines recur
+naturally in formatted functions, objects and callbacks. Statements, operators,
+comments and quoted literals are still counted. This is a source heuristic, not
+a JavaScript parser or a proof of semantic duplication.
+
+Both numerator and denominator of the duplicate ratio use substantive lines, so
+padding a repeated payload with delimiter-only lines cannot dilute its ratio.
+The existing limits are unchanged: 12 consecutive equal substantive lines, or a
+duplicate ratio strictly greater than 0.35. Scattered occurrences of a common
+statement are not a consecutive run. The ratio check still detects repeated
+multiline blocks even when no individual run reaches 12.
+
+### Issue #227 regression baseline
+
+At `de8f97c8342c8c073c84885bf8f301bba5692b33`, `static/boot.js` had 16 standalone
+closing-brace lines and a whole-file repeat ratio of approximately 0.22. The old
+validator rejected it because it compared whole-file occurrence counts against
+the consecutive-run limit. Formatting delimiters also inflated the ratio in
+ordinary arrays and callbacks. This behavior was introduced by `303dbc95`, which
+replaced the consecutive-run implementation in `90ce4d90`.
+
+Regression tests first reproduce these false positives, then preserve rejection
+of long runs, repeated blocks, obfuscated/base64 payloads and control bytes. Run:
+
+    pytest -q tests/test_frontend_policy.py
+
+No application JavaScript, transport boundaries or dependencies are changed by
+this correction. Static checks do not establish UI behavior: BrowserShim/VM and
+live Flask HTTP resource tests remain separate acceptance checks. Emulation does
+not establish Android rendering, paint timing or real-network blank-screen behavior.
+
 ## Loop and failure safety
 
 Loops are treated as bounded resources, not as decorative syntax.
