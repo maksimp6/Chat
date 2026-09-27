@@ -18,6 +18,12 @@ Runtime modules under `runtime/` must use `RuntimeDispatcher.dispatch(...)` for 
 
 The dispatcher is the only runtime boundary allowed to reach those capabilities.
 
+The built-in `filesystem.read_text` and `filesystem.write_text` operations resolve
+relative paths beneath `RuntimeContext.root`. Absolute paths, traversal, symlink
+escapes, and runtimes without a configured root fail with
+`RuntimeScopeViolation`; filesystem access never falls back to the host working
+directory.
+
 ## Scope rule
 
 Every resource operation has a caller `runtime_id`. If a resource has a runtime owner, its `resource_runtime_id` must equal the caller runtime.
