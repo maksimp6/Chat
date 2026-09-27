@@ -33,6 +33,12 @@ from conversation_ownership import list_owned_conversations, get_owned_conversat
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from filesystem_mcp_tools import grep_search, list_directory, read_file
+from runtime import (
+    RuntimeDispatcher,
+    RuntimeNotFound,
+    RuntimeOperationNotFound,
+    RuntimeScopeViolation,
+)
 
 
 MCP_PATH = "/mcp"
@@ -46,6 +52,21 @@ SERVER_NAME = "Alice Pro"
 SERVER_VERSION = os.getenv("ALICE_VERSION", "dev")
 OAUTH_SCOPE = os.getenv("ALICE_MCP_OAUTH_SCOPE", "alice.read")
 PUBLIC_BASE_URL = os.getenv("ALICE_MCP_PUBLIC_URL", "").rstrip("/")
+MCP_RUNTIME_ID_KEY = "alice/runtime_id"
+MCP_RESOURCE_RUNTIME_ID_KEY = "alice/resource_runtime_id"
+
+
+_MCP_RUNTIME_DISPATCHER = RuntimeDispatcher()
+
+
+def _execute_runtime_tool(_context, payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Execute an MCP tool only after the dispatcher has bound its runtime."""
+    return UniversalToolExecutor(registry).execute_with_trace(
+        payload["call"], payload["trace"]
+    )
+
+
+_MCP_RUNTIME_DISPATCHER.register_operation("mcp.tool.execute", _execute_runtime_tool)
 
 
 def _truthy(value: str | None) -> bool:
@@ -707,7 +728,25 @@ def _tools_list() -> list[dict[str, Any]]:
     return result
 
 
-def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, Any]:
+def _runtime_scope(params: Mapping[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    meta = params.get("_meta") or {}
+    if not isinstance(meta, Mapping):
+        raise ValueError("params._meta must be an object")
+    runtime_id = str(meta.get(MCP_RUNTIME_ID_KEY) or "").strip() or None
+    resource_runtime_id = str(meta.get(MCP_RESOURCE_RUNTIME_ID_KEY) or "").strip() or None
+    if resource_runtime_id and not runtime_id:
+        raise ValueError(f"{MCP_RUNTIME_ID_KEY} is required for runtime resources")
+    return runtime_id, resource_runtime_id
+
+
+def _handle_call(
+    name: str,
+    arguments: Any,
+    user: Optional[str],
+    *,
+    runtime_id: Optional[str] = None,
+    resource_runtime_id: Optional[str] = None,
+) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise ValueError("arguments must be an object")
 
@@ -717,7 +756,7 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
     context = create_invocation(
         f"mcp:{correlation_id}",
         f"mcp:{correlation_id}",
-        metadata={"source": "chatgpt_mcp", "tool": name},
+        metadata={"source": "chatgpt_mcp", "tool": name, "runtime_id": runtime_id},
         user_id=user,
     )
     start_invocation(context.invocation_id)
@@ -729,6 +768,8 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
             "tool": name,
             "arguments": arguments,
             "call_id": correlation_id,
+            "runtime_id": runtime_id,
+            "resource_runtime_id": resource_runtime_id,
         }
     )
 
@@ -740,11 +781,20 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
         trace_id=context.trace_id,
         invocation_id=context.invocation_id,
         user_id=user,
-        metadata={"source": "chatgpt_mcp"},
+        metadata={"source": "chatgpt_mcp", "runtime_id": runtime_id},
     )
 
     try:
-        result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
+        if runtime_id:
+            result = _MCP_RUNTIME_DISPATCHER.dispatch(
+                runtime_id,
+                "mcp.tool.execute",
+                {"call": call, "trace": trace},
+                resource_runtime_id=resource_runtime_id,
+                caller_owner_id=user,
+            )
+        else:
+            result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
         trace.add_event(
             "mcp_tool_call_completed",
             {
@@ -799,6 +849,30 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
                 "invocation_id": context.invocation_id,
             },
         }
+    except RuntimeScopeViolation as exc:
+        trace.add_event(
+            "mcp_runtime_scope_violation",
+            {"tool": name, "runtime_id": runtime_id, "error": str(exc)},
+        )
+        trace.record_error("mcp_runtime_scope", str(exc), exception=exc)
+        persist_invocation_trace(context.invocation_id, trace.finalize())
+        fail_invocation(
+            context.invocation_id,
+            error={"tool": name, "error": str(exc), "phase": "authorization"},
+        )
+        raise PermissionError(str(exc)) from exc
+    except (RuntimeNotFound, RuntimeOperationNotFound) as exc:
+        trace.add_event(
+            "mcp_runtime_connector_unavailable",
+            {"tool": name, "runtime_id": runtime_id},
+        )
+        trace.record_error("mcp_runtime_connector", "Runtime connector is unavailable")
+        persist_invocation_trace(context.invocation_id, trace.finalize())
+        fail_invocation(
+            context.invocation_id,
+            error={"tool": name, "error": "Runtime connector is unavailable", "phase": "lookup"},
+        )
+        raise LookupError("Runtime connector is unavailable") from exc
     except (LookupError, PermissionError, ValueError, RuntimeError):
         raise
     except Exception as exc:
@@ -924,10 +998,15 @@ def mcp_post() -> Response:
     if method == "tools/call":
         params = payload.get("params") or {}
         try:
+            if not isinstance(params, Mapping):
+                raise ValueError("params must be an object")
+            runtime_id, resource_runtime_id = _runtime_scope(params)
             result = _handle_call(
                 str(params.get("name") or ""),
                 params.get("arguments") or {},
                 user,
+                runtime_id=runtime_id,
+                resource_runtime_id=resource_runtime_id,
             )
         except LookupError as exc:
             return _error_response(request_id, -32602, str(exc), status=404)

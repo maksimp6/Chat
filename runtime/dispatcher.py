@@ -28,6 +28,7 @@ class RuntimeContext:
 
 
 RuntimeHandler = Callable[[RuntimeContext, Mapping[str, Any]], Any]
+_OWNER_UNSET = object()
 
 
 class RuntimeDispatcher:
@@ -97,8 +98,13 @@ class RuntimeDispatcher:
         payload: Mapping[str, Any] | None = None,
         *,
         resource_runtime_id: str | None = None,
+        caller_owner_id: str | None | object = _OWNER_UNSET,
     ) -> Any:
         context = self.context(runtime_id)
+        if caller_owner_id is not _OWNER_UNSET and context.owner_id != caller_owner_id:
+            raise RuntimeScopeViolation(
+                f"owner is not authorized for runtime {runtime_id!r}"
+            )
         target_runtime_id = resource_runtime_id or runtime_id
         if target_runtime_id != runtime_id:
             raise RuntimeScopeViolation(

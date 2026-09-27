@@ -44,6 +44,25 @@ def test_dispatcher_rejects_cross_runtime_resource_access():
         )
 
 
+def test_dispatcher_rejects_owner_mismatch_when_owner_is_propagated():
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a", owner_id="owner-a")
+    dispatcher.register_operation("read", lambda context, payload: payload)
+
+    with pytest.raises(RuntimeScopeViolation, match="owner is not authorized"):
+        dispatcher.dispatch(
+            "runtime-a",
+            "read",
+            caller_owner_id="owner-b",
+        )
+
+    assert dispatcher.dispatch(
+        "runtime-a",
+        "read",
+        caller_owner_id="owner-a",
+    ) == {}
+
+
 def test_dispatcher_rejects_unknown_runtime():
     dispatcher = RuntimeDispatcher()
     dispatcher.register_operation("read", lambda context, payload: payload)

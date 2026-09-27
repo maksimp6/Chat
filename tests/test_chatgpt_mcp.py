@@ -362,6 +362,84 @@ def test_mcp_initialize_handshake_is_supported(client):
     assert result["serverInfo"]["name"] == "Alice Pro"
 
 
+def test_mcp_rejects_malformed_call_params(client):
+    response = mcp_request(client, "tools/call", ["not-an-object"])
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32602
+    assert response.get_json()["error"]["message"] == "params must be an object"
+
+
+def test_mcp_runtime_scope_is_dispatched_for_owner(client, monkeypatch):
+    dispatcher = chatgpt_mcp._MCP_RUNTIME_DISPATCHER
+    dispatcher.register_runtime("mcp-runtime-success", owner_id=None)
+    try:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {
+                "name": "alice_get_system_status",
+                "arguments": {},
+                "_meta": {chatgpt_mcp.MCP_RUNTIME_ID_KEY: "mcp-runtime-success"},
+            },
+        )
+    finally:
+        dispatcher.unregister_runtime("mcp-runtime-success")
+
+    assert response.status_code == 200
+    assert response.get_json()["result"]["structuredContent"]["status"] == "ok"
+
+
+def test_mcp_denies_cross_runtime_resource_and_traces_violation(client, monkeypatch):
+    dispatcher = chatgpt_mcp._MCP_RUNTIME_DISPATCHER
+    dispatcher.register_runtime("mcp-runtime-a", owner_id=None)
+    dispatcher.register_runtime("mcp-runtime-b", owner_id=None)
+    persisted = []
+    monkeypatch.setattr(
+        chatgpt_mcp,
+        "persist_invocation_trace",
+        lambda invocation_id, trace: persisted.append(trace) or True,
+    )
+    try:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {
+                "name": "alice_get_system_status",
+                "arguments": {},
+                "_meta": {
+                    chatgpt_mcp.MCP_RUNTIME_ID_KEY: "mcp-runtime-a",
+                    chatgpt_mcp.MCP_RESOURCE_RUNTIME_ID_KEY: "mcp-runtime-b",
+                },
+            },
+        )
+    finally:
+        dispatcher.unregister_runtime("mcp-runtime-a")
+        dispatcher.unregister_runtime("mcp-runtime-b")
+
+    assert response.status_code == 403
+    assert any(
+        event.get("type") == "mcp_runtime_scope_violation"
+        for trace in persisted
+        for event in trace["events"]
+    )
+
+
+def test_mcp_reports_unavailable_runtime_connector(client):
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_system_status",
+            "arguments": {},
+            "_meta": {chatgpt_mcp.MCP_RUNTIME_ID_KEY: "missing-runtime"},
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"]["message"] == "Runtime connector is unavailable"
+
+
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
     import db
     from runtime_migrations import init_runtime_tables
