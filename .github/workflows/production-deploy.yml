@@ -24,6 +24,7 @@ jobs:
     name: Deploy Alice Pro production
     environment: production
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       PREVIEW_SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
       PREVIEW_SSH_USER: ${{ secrets.PREVIEW_SSH_USER }}
@@ -64,7 +65,7 @@ jobs:
       - name: Resolve remote deployment directory
         id: remote
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
           test -n "$remote_dir"
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "mkdir -p \"$remote_dir/incoming\" \"$remote_dir/production\" \"$remote_dir/traefik\""
@@ -75,7 +76,7 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" deploy/production/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/production-server.sh"
           "${scp_cmd[@]}" production.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/production.tar.gz"
@@ -83,12 +84,12 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' ensure-traefik"
       - name: Verify Traefik configuration before production deploy
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" '
             set -e
             docker inspect alice-preview-traefik >/dev/null
@@ -106,7 +107,7 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          printf '%s\n%s\n%s\n' "$ALICE_SHORT_TOKEN" "$SUPABASE_URL" "$SUPABASE_SECRET_KEY" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; read -r supabase_url; read -r supabase_secret_key; export ALICE_SHORT_TOKEN=\"$token\" SUPABASE_URL=\"$supabase_url\" SUPABASE_SECRET_KEY=\"$supabase_secret_key\"; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
+          printf '%s\n%s\n%s\n' "$ALICE_SHORT_TOKEN" "$SUPABASE_URL" "$SUPABASE_SECRET_KEY" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; read -r supabase_url; read -r supabase_secret_key; export ALICE_SHORT_TOKEN=\"$token\" SUPABASE_URL=\"$supabase_url\" SUPABASE_SECRET_KEY=\"$supabase_secret_key\"; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
       - name: Wait for trusted HTTPS certificate and health
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do
