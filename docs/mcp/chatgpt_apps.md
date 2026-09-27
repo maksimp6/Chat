@@ -14,6 +14,19 @@ MCP authentication is enforced unless local anonymous mode is explicitly enabled
 
 The HTTP transport remains stateless. Each `tools/call` creates a short-lived Alice Pro `Invocation` with a persisted `ExecutionTrace`; the response returns the `invocation_id` and `trace_id` for correlation. This keeps MCP connection state out of the web process while retaining an auditable application-level execution record.
 
+## Runtime-scoped calls
+
+Clients targeting a preview runtime put `alice/runtime_id` in the `tools/call`
+`params._meta` object. If the resource is runtime-owned, they also provide
+`alice/resource_runtime_id`. Alice validates the authenticated owner and equal
+caller/resource scopes through `RuntimeDispatcher` before the existing
+`UniversalToolExecutor` boundary runs the tool. Missing connectors, owner
+mismatches, and cross-runtime attempts return the same credential-free error;
+the correlated `ExecutionTrace` records the violation category for operators.
+
+These fields carry opaque identifiers, never credentials. Clients cannot
+select or enumerate an unrestricted tool registry through this contract.
+
 ## Exposed tools
 
 The MCP endpoint exposes the following audited tools through the Universal Tool Registry/Executor:

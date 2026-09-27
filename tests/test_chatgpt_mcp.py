@@ -128,6 +128,83 @@ def test_tools_call_returns_structured_content(client):
     assert result["server"]["name"] == "Alice Pro"
 
 
+def test_tools_call_rejects_malformed_params(client):
+    response = mcp_request(client, "tools/call", ["not", "an", "object"])
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32602
+
+
+def test_runtime_scoped_tool_call_executes_through_dispatcher(client, monkeypatch):
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "owner-a")
+    runtime_id = "mcp-test-runtime-success"
+    chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(runtime_id, owner_id="owner-a")
+    try:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {
+                "name": "alice_get_system_status",
+                "arguments": {},
+                "_meta": {
+                    "alice/runtime_id": runtime_id,
+                    "alice/resource_runtime_id": runtime_id,
+                },
+            },
+        )
+    finally:
+        chatgpt_mcp.mcp_runtime_dispatcher.unregister_runtime(runtime_id)
+
+    assert response.status_code == 200
+    assert response.get_json()["result"]["structuredContent"]["status"] == "ok"
+
+
+def test_runtime_scoped_tool_call_denies_cross_runtime_access(client, monkeypatch):
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "owner-a")
+    caller = "mcp-test-runtime-a"
+    target = "mcp-test-runtime-b"
+    chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(caller, owner_id="owner-a")
+    chatgpt_mcp.mcp_runtime_dispatcher.register_runtime(target, owner_id="owner-a")
+    try:
+        response = mcp_request(
+            client,
+            "tools/call",
+            {
+                "name": "alice_get_system_status",
+                "arguments": {},
+                "_meta": {
+                    "alice/runtime_id": caller,
+                    "alice/resource_runtime_id": target,
+                },
+            },
+        )
+    finally:
+        chatgpt_mcp.mcp_runtime_dispatcher.unregister_runtime(caller)
+        chatgpt_mcp.mcp_runtime_dispatcher.unregister_runtime(target)
+
+    assert response.status_code == 403
+    body = response.get_json()
+    assert body["error"]["code"] == -32003
+    assert body["error"]["message"] == "Runtime scope is unavailable"
+    assert caller not in json.dumps(body)
+    assert target not in json.dumps(body)
+
+
+def test_runtime_scoped_tool_call_hides_unavailable_runtime(client, monkeypatch):
+    monkeypatch.setenv("ALICE_MCP_USER_ID", "owner-a")
+    response = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "alice_get_system_status",
+            "arguments": {},
+            "_meta": {"alice/runtime_id": "missing-runtime"},
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"]["message"] == "Runtime scope is unavailable"
+
+
 def test_standard_mcp_request_does_not_require_nonstandard_headers(client):
     payload = {
         "jsonrpc": "2.0",

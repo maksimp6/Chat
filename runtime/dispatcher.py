@@ -108,8 +108,11 @@ class RuntimeDispatcher:
         payload: Mapping[str, Any] | None = None,
         *,
         resource_runtime_id: str | None = None,
+        caller_owner_id: str | None = None,
     ) -> Any:
         context = self.context(runtime_id)
+        if caller_owner_id is not None and context.owner_id != caller_owner_id:
+            raise RuntimeScopeViolation("runtime owner does not match the authenticated caller")
         target_runtime_id = resource_runtime_id or runtime_id
         if target_runtime_id != runtime_id:
             raise RuntimeScopeViolation(

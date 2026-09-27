@@ -33,6 +33,12 @@ from conversation_ownership import list_owned_conversations, get_owned_conversat
 from tool_registry import registry
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from filesystem_mcp_tools import grep_search, list_directory, read_file
+from runtime import (
+    RuntimeDispatcher,
+    RuntimeNotFound,
+    RuntimeOperationNotFound,
+    RuntimeScopeViolation,
+)
 
 
 MCP_PATH = "/mcp"
@@ -46,6 +52,11 @@ SERVER_NAME = "Alice Pro"
 SERVER_VERSION = os.getenv("ALICE_VERSION", "dev")
 OAUTH_SCOPE = os.getenv("ALICE_MCP_OAUTH_SCOPE", "alice.read")
 PUBLIC_BASE_URL = os.getenv("ALICE_MCP_PUBLIC_URL", "").rstrip("/")
+
+# Runtime-scoped MCP calls enter the same dispatcher boundary as preview code.
+# Deployment code registers available runtimes on this dispatcher; credentials
+# and the unrestricted registry are deliberately not exposed through MCP.
+mcp_runtime_dispatcher = RuntimeDispatcher()
 
 
 def _truthy(value: str | None) -> bool:
@@ -707,7 +718,21 @@ def _tools_list() -> list[dict[str, Any]]:
     return result
 
 
-def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, Any]:
+def _execute_mcp_tool(_runtime_context: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
+    return UniversalToolExecutor(registry).execute_with_trace(payload["call"], payload["trace"])
+
+
+mcp_runtime_dispatcher.register_operation("mcp.tool.call", _execute_mcp_tool)
+
+
+def _handle_call(
+    name: str,
+    arguments: Any,
+    user: Optional[str],
+    *,
+    runtime_id: str | None = None,
+    resource_runtime_id: str | None = None,
+) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise ValueError("arguments must be an object")
 
@@ -729,6 +754,8 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
             "tool": name,
             "arguments": arguments,
             "call_id": correlation_id,
+            "runtime_id": runtime_id,
+            "resource_runtime_id": resource_runtime_id,
         }
     )
 
@@ -740,11 +767,20 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
         trace_id=context.trace_id,
         invocation_id=context.invocation_id,
         user_id=user,
-        metadata={"source": "chatgpt_mcp"},
+        metadata={"source": "chatgpt_mcp", "runtime_id": runtime_id},
     )
 
     try:
-        result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
+        if runtime_id:
+            result = mcp_runtime_dispatcher.dispatch(
+                runtime_id,
+                "mcp.tool.call",
+                {"call": call, "trace": trace},
+                resource_runtime_id=resource_runtime_id,
+                caller_owner_id=user,
+            )
+        else:
+            result = UniversalToolExecutor(registry).execute_with_trace(call, trace)
         trace.add_event(
             "mcp_tool_call_completed",
             {
@@ -799,6 +835,14 @@ def _handle_call(name: str, arguments: Any, user: Optional[str]) -> dict[str, An
                 "invocation_id": context.invocation_id,
             },
         }
+    except (RuntimeScopeViolation, RuntimeNotFound, RuntimeOperationNotFound) as exc:
+        # Persist the violation for operators, but return a stable error that
+        # cannot reveal runtime ids, owners, connector names, or credentials.
+        trace.add_event("mcp_runtime_access_denied", {"reason": type(exc).__name__})
+        trace.record_error("mcp_runtime_dispatch", type(exc).__name__)
+        persist_invocation_trace(context.invocation_id, trace.finalize())
+        fail_invocation(context.invocation_id, error={"tool": name, "error": "runtime unavailable"})
+        raise PermissionError("Runtime scope is unavailable") from exc
     except (LookupError, PermissionError, ValueError, RuntimeError):
         raise
     except Exception as exc:
@@ -922,12 +966,31 @@ def mcp_post() -> Response:
         )
 
     if method == "tools/call":
-        params = payload.get("params") or {}
+        params = payload.get("params")
+        if not isinstance(params, dict):
+            return _error_response(request_id, -32602, "tools/call params must be an object")
+        call_meta = params.get("_meta") or {}
+        if not isinstance(call_meta, dict):
+            return _error_response(request_id, -32602, "tools/call _meta must be an object")
+        runtime_id = call_meta.get("alice/runtime_id")
+        resource_runtime_id = call_meta.get("alice/resource_runtime_id")
+        if runtime_id is not None and (not isinstance(runtime_id, str) or not runtime_id.strip()):
+            return _error_response(
+                request_id, -32602, "alice/runtime_id must be a non-empty string"
+            )
+        if resource_runtime_id is not None and (
+            not isinstance(resource_runtime_id, str) or not resource_runtime_id.strip()
+        ):
+            return _error_response(
+                request_id, -32602, "alice/resource_runtime_id must be a non-empty string"
+            )
         try:
             result = _handle_call(
                 str(params.get("name") or ""),
-                params.get("arguments") or {},
+                params.get("arguments", {}),
                 user,
+                runtime_id=runtime_id,
+                resource_runtime_id=resource_runtime_id,
             )
         except LookupError as exc:
             return _error_response(request_id, -32602, str(exc), status=404)
