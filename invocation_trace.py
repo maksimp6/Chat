@@ -12,6 +12,8 @@ def create_invocation_trace(context: InvocationContext) -> ExecutionTrace:
         session_id=context.session_id,
         conversation_id=context.conversation_id,
         user_id=context.user_id,
+        agent_id=context.agent_id,
+        runtime_id=context.runtime_id,
     )
     return trace
 

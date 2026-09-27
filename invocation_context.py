@@ -20,6 +20,8 @@ class InvocationContext:
     trace_id: str
     user_id: Optional[str] = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    agent_id: Optional[str] = None
+    runtime_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.session_id or not self.conversation_id:
@@ -35,6 +37,8 @@ class InvocationContext:
         conversation_id: str,
         *,
         user_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        runtime_id: Optional[str] = None,
         metadata: Optional[Mapping[str, Any]] = None,
     ) -> "InvocationContext":
         """Create a fresh invocation context with unique correlation IDs."""
@@ -44,6 +48,8 @@ class InvocationContext:
             invocation_id=str(uuid.uuid4()),
             trace_id=str(uuid.uuid4()),
             user_id=user_id,
+            agent_id=agent_id,
+            runtime_id=runtime_id,
             metadata=metadata or {},
         )
 
@@ -53,7 +59,7 @@ class InvocationContext:
         return result
 
     def as_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "session_id": self.session_id,
             "conversation_id": self.conversation_id,
             "invocation_id": self.invocation_id,
@@ -61,6 +67,13 @@ class InvocationContext:
             "user_id": self.user_id,
             "metadata": dict(self.metadata),
         }
+        # Keep the serialized shape used by existing callers unchanged until
+        # they opt in to conversation-agent routing.
+        if self.agent_id is not None:
+            result["agent_id"] = self.agent_id
+        if self.runtime_id is not None:
+            result["runtime_id"] = self.runtime_id
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "InvocationContext":
@@ -74,5 +87,7 @@ class InvocationContext:
             invocation_id=str(data["invocation_id"]),
             trace_id=str(data["trace_id"]),
             user_id=str(data["user_id"]) if data.get("user_id") else None,
+            agent_id=str(data["agent_id"]) if data.get("agent_id") else None,
+            runtime_id=str(data["runtime_id"]) if data.get("runtime_id") else None,
             metadata=dict(data.get("metadata") or {}),
         )
