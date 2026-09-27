@@ -600,11 +600,16 @@ class ExecutionTrace:
             self._finalized = True
         try:
             from billing import aggregate_billing
+            from compute_resources import build_compute_billing_item
 
             billing = self.trace.get("billing") or {}
-            self.trace["billing"] = aggregate_billing(
-                billing.get("items", []), self.trace.get("context", {})
-            )
+            items = billing.get("items", [])
+
+            compute_item = build_compute_billing_item(self.trace)
+            if compute_item:
+                items.append(compute_item)
+
+            self.trace["billing"] = aggregate_billing(items, self.trace.get("context", {}))
         except Exception as exc:
             self.add_event("billing_error", {"error": str(exc)})
 

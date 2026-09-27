@@ -85,27 +85,34 @@ def build_ai_billing_item(
 
 
 def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    ai_items = [item for item in items if item.get("type") == "ai"]
+    compute_items = [item for item in items if item.get("type") == "compute"]
     known = [item for item in items if item.get("cost_status") == "calculated"]
+
     total = round(sum(float(item.get("total_cost") or 0) for item in known), 6)
-    input_cost = round(sum(float(item.get("input_cost") or 0) for item in known), 6)
-    output_cost = round(sum(float(item.get("output_cost") or 0) for item in known), 6)
-    cached_cost = round(sum(float(item.get("cached_input_cost") or 0) for item in known), 6)
-    cache_savings = round(sum(float(item.get("cache_savings") or 0) for item in known), 6)
+    input_cost = round(sum(float(item.get("input_cost") or 0) for item in ai_items), 6)
+    output_cost = round(sum(float(item.get("output_cost") or 0) for item in ai_items), 6)
+    cached_cost = round(sum(float(item.get("cached_input_cost") or 0) for item in ai_items), 6)
+    cache_savings = round(sum(float(item.get("cache_savings") or 0) for item in ai_items), 6)
+    tool_cost = round(sum(float(item.get("tool_cost") or 0) for item in compute_items), 6)
+    compute_cost = round(sum(float(item.get("total_compute_cost") or 0) for item in compute_items), 6)
     unknown = sum(1 for item in items if item.get("cost_status") == "unknown")
+
     result = {
         "currency": PRICING_CURRENCY,
         "provider": PROVIDER,
         "pricing_version": PRICING_VERSION,
-        "input_tokens": sum(int(item.get("input_tokens") or 0) for item in items),
-        "output_tokens": sum(int(item.get("output_tokens") or 0) for item in items),
-        "cached_input_tokens": sum(int(item.get("cached_input_tokens") or 0) for item in items),
-        "total_tokens": sum(int(item.get("total_tokens") or 0) for item in items),
+        "input_tokens": sum(int(item.get("input_tokens") or 0) for item in ai_items),
+        "output_tokens": sum(int(item.get("output_tokens") or 0) for item in ai_items),
+        "cached_input_tokens": sum(int(item.get("cached_input_tokens") or 0) for item in ai_items),
+        "total_tokens": sum(int(item.get("total_tokens") or 0) for item in ai_items),
         "input_cost": input_cost,
         "output_cost": output_cost,
         "cached_input_cost": cached_cost,
-        "tool_cost": 0.0,
-        "total_cost": total,
+        "tool_cost": tool_cost,
+        "compute_cost": compute_cost,
         "cache_savings": cache_savings,
+        "total_cost": total,
         "cost_status": "partial" if unknown else "calculated",
         "unknown_cost_items": unknown,
         "items": items,
