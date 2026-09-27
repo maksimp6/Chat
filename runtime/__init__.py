@@ -5,8 +5,10 @@ from .dispatcher import (
     RuntimeDispatcher,
     RuntimeNotFound,
     RuntimeOperationNotFound,
+    RuntimeOwnerViolation,
     RuntimeScopeViolation,
 )
+from .loader import RuntimeHostAPI, RuntimeLoadError, RuntimeLoader
 from .request_context import (
     bind_runtime_request,
     current_runtime_base_path,
@@ -19,7 +21,11 @@ __all__ = [
     "RuntimeDispatcher",
     "RuntimeNotFound",
     "RuntimeOperationNotFound",
+    "RuntimeOwnerViolation",
     "RuntimeScopeViolation",
+    "RuntimeHostAPI",
+    "RuntimeLoadError",
+    "RuntimeLoader",
     "bind_runtime_request",
     "current_runtime_base_path",
     "current_runtime_data_root",

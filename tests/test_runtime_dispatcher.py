@@ -4,6 +4,7 @@ from runtime import (
     RuntimeDispatcher,
     RuntimeNotFound,
     RuntimeOperationNotFound,
+    RuntimeOwnerViolation,
     RuntimeScopeViolation,
 )
 
@@ -122,3 +123,18 @@ def test_dispatch_cleanup_tolerates_handler_clearing_thread_binding():
 
     with pytest.raises(RuntimeNotFound):
         dispatcher.current_context()
+
+
+def test_runtime_authorization_hides_cross_owner_scope():
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a", owner_id="alice")
+    dispatcher.register_runtime("runtime-b", owner_id="bob")
+
+    assert dispatcher.authorize("runtime-a", "alice").runtime_id == "runtime-a"
+    assert dispatcher.authorize("runtime-a", None).runtime_id == "runtime-a"
+
+    with pytest.raises(RuntimeOwnerViolation):
+        dispatcher.authorize("runtime-b", "alice")
+
+    with pytest.raises(RuntimeNotFound):
+        dispatcher.authorize("missing", "alice")
