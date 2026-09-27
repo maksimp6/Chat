@@ -28,6 +28,7 @@ concurrency:
 jobs:
   claude:
     name: Respond to @claude
+    environment: production
     if: |
       (github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@claude') &&
