@@ -31,6 +31,10 @@ class RuntimeOperationNotFound(KeyError):
     """Raised when a runtime operation is not registered."""
 
 
+class RuntimeOwnerViolation(PermissionError):
+    """Raised when a caller is not allowed to access a runtime."""
+
+
 FILESYSTEM_READ_TEXT = "filesystem.read_text"
 FILESYSTEM_WRITE_TEXT = "filesystem.write_text"
 
@@ -224,6 +228,13 @@ class RuntimeDispatcher:
             raise RuntimeNotFound("no runtime is bound to this thread")
         return self.context(runtime_id)
 
+    def authorize(self, runtime_id: str, owner_id: str | None) -> RuntimeContext:
+        """Resolve a runtime without exposing cross-owner access."""
+        context = self.context(runtime_id)
+        if owner_id and context.owner_id not in (None, owner_id):
+            raise RuntimeOwnerViolation(runtime_id)
+        return context
+
     def dispatch(
         self,
         runtime_id: str,
@@ -231,8 +242,11 @@ class RuntimeDispatcher:
         payload: Mapping[str, Any] | None = None,
         *,
         resource_runtime_id: str | None = None,
+        caller_owner_id: str | None = None,
     ) -> Any:
         context = self.context(runtime_id)
+        if caller_owner_id is not None and context.owner_id != caller_owner_id:
+            raise RuntimeScopeViolation("runtime owner does not match the authenticated caller")
         target_runtime_id = resource_runtime_id or runtime_id
         if target_runtime_id != runtime_id:
             raise RuntimeScopeViolation(
