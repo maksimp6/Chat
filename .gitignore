@@ -19,3 +19,6 @@ app.log
 .safe_backups/
 execution_logs/
 alice_pro_files.tar.gz
+
+# Local tooling
+node_modules/
