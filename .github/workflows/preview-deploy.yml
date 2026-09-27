@@ -37,7 +37,7 @@ jobs:
   deploy:
     name: Deploy isolated preview
     environment: production
-    if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.action != 'closed')
+    if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || (github.event.action != 'closed' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     env:
       PREVIEW_SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
@@ -70,7 +70,7 @@ jobs:
           echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
           printf "SUPABASE_SECRET_KEY=%s\n" "$SUPABASE_ACCESS_TOKEN" >> "$GITHUB_ENV"
       - name: Check out ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.PREVIEW_REF }}
           fetch-depth: 1
@@ -186,7 +186,7 @@ jobs:
   cleanup_pr:
     name: Cleanup closed pull request preview
     environment: production
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     env:
       PREVIEW_SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
@@ -195,7 +195,7 @@ jobs:
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
@@ -227,7 +227,7 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
