@@ -1,72 +1,75 @@
-# Branch-aware environments
+# Окружения веток
 
-Alice Pro treats a branch environment as an immutable application runtime created
-from one exact Git commit. It is infrastructure state, not a Session,
-Conversation, or InvocationContext.
+Окружение связывает точный Git-коммит, runtime scope и собственные изменяемые
+данные. Это инфраструктурная сущность, не диалог, сессия или InvocationContext.
+Описание относится к базе из [интеграционного реестра](integration/current-scope.md).
 
-## Control plane
+## Действующая модель
 
-The Environment Manager stores:
+`EnvironmentManager` создаёт detached worktree и каталог данных, регистрирует
+`RuntimeContext` в `RuntimeDispatcher` и управляет рабочим потоком внутри
+процесса Alice Pro. Новый коммит ветки не изменяет уже созданное окружение;
+перезапуск не означает обновление исходников.
 
-- environment id;
-- branch name;
-- immutable commit SHA;
-- lifecycle status;
-- environment URL;
-- runtime PID/port;
-- unique data namespace;
-- owner;
-- timestamps and errors.
+Окружения не получают отдельные Flask-процессы, localhost-порты или контейнеры.
+`runtime_pid` и `runtime_port` остаются legacy-полями и не являются идентичностью
+потокового runtime; для работающего потока используется `runtime_thread_id`.
 
-REST:
+Подробный контракт загрузки, БД и streaming:
+[потоковый host](runtime/threaded-environment-host.md).
 
-- GET /api/environments
-- POST /api/environments with { "branch": "feature/x", "commit_sha": "optional" }
-- GET /api/environments/<id>
-- POST /api/environments/<id>/start
-- POST /api/environments/<id>/stop
-- POST /api/environments/<id>/restart
-- DELETE /api/environments/<id>
+## API управления
 
-A branch is resolved to a 40-character commit SHA at creation. Runtime code is
-then checked out into a detached Git worktree at that SHA. Existing environments
-are never updated when a branch advances.
+Маршруты определены в [environment_routes.py](../environment_routes.py).
 
-## Isolation
+| Метод | Путь | Действие |
+| --- | --- | --- |
+| GET | `/api/environments` | Список окружений |
+| POST | `/api/environments` | Создание по `branch` и необязательному `commit_sha` |
+| GET | `/api/environments/<id>` | Метаданные окружения |
+| POST | `/api/environments/<id>/start` | Запуск |
+| POST | `/api/environments/<id>/stop` | Остановка |
+| POST | `/api/environments/<id>/restart` | Перезапуск |
+| DELETE | `/api/environments/<id>` | Удаление runtime-ресурсов и данных окружения |
 
-Each environment receives its own worktree, process, runtime data directory,
-SQLite database, environment id, namespace, branch and commit metadata.
+Доступ к приложению идёт через `/environments/<id>/...`. Gateway проверяет
+runtime/owner и состояние. Для неработающего доступного окружения предусмотрен
+ответ `503`; отсутствующее или недоступное окружение не должно раскрываться
+постороннему пользователю.
 
-master remains a separate production deployment. The existing GitHub Preview
-Deployment workflow continues to provide public tokenized PR/branch previews.
-The Environment Manager is the persistent application control plane and does not
-replace that deployment mechanism.
+Наличие owner-aware проверок в коде не заменяет настройку аутентификации
+публичного host. Не передавайте произвольный `owner_id` от клиента как доверенный
+и не размещайте control plane в публичном доступе без проверки его защиты.
 
-## Lifecycle and traces
+## Данные и завершение
 
-Valid lifecycle transitions are:
+У runtime собственный каталог данных и SQLite. Он не должен неявно обращаться
+к production-БД host, даже когда на host выбран PostgreSQL.
 
-CREATING -> STOPPED -> RUNNING -> STOPPED -> DELETING
+Остановка завершает потоки ответа, рабочий поток и регистрацию runtime.
+Удаление дополнительно очищает worktree и каталог данных. Это операция с потерей
+данных окружения, а не способ автоматически «убрать ветку».
 
-A failed start transitions to FAILED. There is no automatic deletion when a Git
-branch disappears. Deletion is explicit.
+Удаление Git-ветки не является разрешением удалить её runtime-данные. Операции
+жизненного цикла и их ошибки должны оставаться наблюдаемыми через trace.
 
-Every lifecycle operation creates an ExecutionTrace containing environment id,
-branch, commit, operation and status. The sanitized trace is persisted in
-environment_events.
+## Граница revision-specific поведения
 
-## Runtime configuration
+`RuntimeLoader` загружает ограниченный `alice_runtime.py` и предоставляет
+`revision.invoke`. Текущий HTTP gateway использует приложение host. Поэтому
+коммит в метаданных и успешный `healthz` ещё не доказывают, что весь frontend и
+API исполняются из выбранной ветки.
 
-- ALICE_ENV_REPO_ROOT: repository root, default current working directory.
-- ALICE_ENV_RUNTIME_ROOT: isolated runtime storage, default .alice-environments.
-- ALICE_ENV_RUNTIME_COMMAND: command inside the immutable worktree, default
-  python app.py.
-- ALICE_ENV_PUBLIC_BASE_URL: public origin used to construct environment URLs.
+Не используйте старый `ALICE_ENV_RUNTIME_COMMAND=python app.py` как инструкцию
+запуска отдельного процесса. Для текущих параметров проверяйте
+[EnvironmentManager](../environment_manager.py) и
+[preview workflow](../.github/workflows/preview-deploy.yml).
 
-Runtime configuration is server-side. Git input is passed as argument arrays and
-never through a shell command.
+## Preview и история
 
-## Relationship to #4
+[Host-managed preview](preview-deployments.md) проверяет окружение через
+существующий host и имеет отдельный gate включения. Код workflow уже вошёл в
+master; фактическое развёртывание и работоспособность проверяются отдельно.
 
-Session and InvocationContext are request/user-level concepts. Branch
-Environment is the immutable infrastructure box containing those contexts.
+[Ревью ранней процессной архитектуры](architecture/branch-environments.md)
+сохранено как историческая ссылка, а не как действующий план реализации.

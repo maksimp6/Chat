@@ -1,251 +1,181 @@
 # Alice Pro
 
-Alice Pro is a self-hosted AI assistant platform built around Yandex AI Studio, MCP/local tools, agent orchestration, Execution Trace, file handling, billing/treasury controls, and an Android WebView client.
+Alice Pro предназначена для самостоятельного размещения AI-ассистента на базе
+Yandex AI Studio. В проект входят веб-чат, local/MCP-инструменты, агенты,
+Execution Trace, работа с файлами, внутренний биллинг и Android WebView-клиент.
 
-The project is actively evolving. Some components are production-oriented, while agent, provider, runtime, and Android capabilities may still be experimental.
+**[Документация](docs/README.md) · [Архитектура](docs/architecture/overview.md) ·
+[Состояние интеграции](docs/integration/current-scope.md)**
 
-## What it does
+Проект развивается. Наличие модуля или слитого PR не означает готовность всей
+функции к production. Подтверждённые изменения, открытые задачи и известные
+блокеры отделены друг от друга в интеграционном реестре.
 
-- **AI chat** with Yandex AI Studio Responses API integration.
-- **MCP and local tools** with a unified execution boundary.
-- **Execution Trace** for provider requests, polling, tool execution, errors, timing, billing, and correlation.
-- **Agent Gateway and runtime** for isolated invocation/session workflows, including an optional SSH Runtime that executes commands and file operations as configured Linux users.
-- **Files and knowledge** through the file manager and vector-knowledge integrations.
-- **Treasury and billing** for internal usage accounting and demo balances.
-- **Departments** for domain-specific agent capabilities.
-- **Android client** with WebView integration, update handling, logging, and a stable debug-build workflow.
-- **Optional PostgreSQL backend** for shared deployments; SQLite remains the default local/Termux database.
-- **Supabase trace mirror** as an optional operational/diagnostic integration.
+## Компоненты
 
-## Architecture
+- Чат с Yandex AI Studio Responses API и циклом инструментов.
+- `UniversalToolExecutor` для общего исполнения local/MCP-вызовов.
+- `InvocationContext` и `ExecutionTrace` для корреляции запросов, polling,
+  инструментов, ошибок, времени и стоимости.
+- Agent Gateway, управляемые runtime-окружения и отдельный опциональный SSH Runtime.
+- Файловый менеджер, память, знания, департаменты и основы агентной маршрутизации.
+- Казначейство и биллинг для внутреннего учёта использования.
+- SQLite по умолчанию; PostgreSQL включается явно через `ALICE_DATABASE_URL`.
+- Опциональный Supabase trace mirror для диагностики.
+- Android-клиент с WebView, диагностикой и механизмами обновления.
 
-The main execution path is deliberately explicit:
+## Архитектура
 
-```mermaid
-flowchart TD
-    U[User] --> C[Chat / Web UI]
-    C --> O[Invocation / Orchestrator]
-    O --> Y[Yandex AI Responses API]
-    O --> T[UniversalToolExecutor]
-    T --> M[MCP / Local Tools]
-    O --> A[Agent Gateway / Runtime]
-    O --> R[SSH Runtime]
-    R --> L[Linux user / permissions]
-    R --> X[ExecutionTrace]
-    O --> X[ExecutionTrace]
-    X --> B[Billing]
-    X --> S[Optional Supabase Trace Mirror]
+```text
+Клиент -> Flask -> InvocationContext + ExecutionTrace
+    -> Yandex Responses API
+    -> UniversalToolExecutor -> local/MCP-инструменты
+    -> ответ и расчёт стоимости
+
+Окружения веток:
+EnvironmentManager -> RuntimeLoader -> RuntimeDispatcher
+    -> управляемые потоки и собственные данные внутри одного процесса
 ```
 
-Requests, tool calls, polling and continuations carry scoped correlation information through `InvocationContext` and `ExecutionTrace`. Secrets are sanitized before persistent traces and logs.
+Runtime-окружение не является отдельным Flask-сервером или контейнером на каждое
+preview. Потоки не являются защитной песочницей для недоверенного Python.
+Текущий gateway использует HTTP-приложение host; наличие worktree выбранного
+коммита ещё не доказывает обслуживание всего интерфейса кодом этой ветки.
+Подробности и границы: [обзор архитектуры](docs/architecture/overview.md).
 
-## Current status
+## Состояние проекта
 
-The repository currently has a working backend/CI path and a buildable Android debug path.
+Документированный срез от 27 сентября 2026 года относится к `master`
+`de8f97c8342c8c073c84885bf8f301bba5692b33`. На этой базе были зафиксированы сбои CI
+и Android-сборки. Поэтому README не обещает зелёный pipeline или готовый APK.
+Точные run, причины и незавершённые PR приведены в
+[реестре](docs/integration/current-scope.md).
 
-Core areas already integrated include:
+Новый контракт `make_snapshot()` / `finalize()` пока описан как требование #401,
+а не готовая возможность текущего `master`. Локальный storage-адаптер не
+равнозначен подключённому Google Drive. Согласованные возможности и проверенный
+production-деплой не следует смешивать.
 
-- unified tool execution through `UniversalToolExecutor`;
-- execution/session recovery tests;
-- correlated trace viewer events;
-- trace timing/correlation helpers;
-- global provider-key lifecycle and rotation;
-- anonymous first-launch identity bootstrap;
-- Departments registry/API/UI;
-- Agent Gateway with retry/rate/circuit controls;
-- Supabase production migration workflow.
+## Локальный запуск backend
 
-Treat advanced agent runtimes, branch environments, per-user provider credentials/quotas, Government workflows, Partner Relations, Kwork integration, and some AI-assisted UI features as roadmap/experimental work unless their corresponding issue is marked complete.
-
-## Quick start
-
-### Prerequisites
-
-For the current validated development path:
-
-- Python 3.12 for backend CI-compatible development.
-- Java 17 for Android builds.
-- Android SDK with API 37 installed for the current Android compile toolchain.
-- Git.
-- Optional: PostgreSQL 17 for shared deployments. Omit ALICE_DATABASE_URL for the default SQLite/Termux mode.
-- Optional: a Supabase project for trace mirroring and production migrations.
-- Optional: a non-production SSH target with a verified known_hosts file for Runtime Preview checks.
-
-### Backend
-
-Create a virtual environment:
+Выполняйте команды из корня репозитория. Для пути, соответствующего backend CI,
+используется Python 3.12. Версии и команды проверок задаются исходниками и
+[workflow CI](.github/workflows/ci.yml).
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-```
-
-Install the repository dependencies:
-
-```bash
 python -m pip install -r requirements.txt
+test -f .env || cp .env.example .env
 ```
 
-Create a local environment file:
+Заполните локальный `.env` по [.env.example](.env.example). Для провайдера нужны
+свои `YANDEX_API_KEY` и `YANDEX_PROJECT_ID`; также настройте `SECRET_KEY` и
+параметры идентичности владельца согласно выбранному режиму. Не публикуйте
+значения этих переменных.
+
+Для запуска только на локальном интерфейсе:
 
 ```bash
-cp .env.example .env
+HOST=127.0.0.1 PORT=8080 python app.py
 ```
 
-At minimum, configure:
+Откройте `http://127.0.0.1:8080`. Доступ к публичному host требует отдельной
+настройки аутентификации, сети и секретов; локальный запуск не является
+инструкцией безопасного production-развёртывания.
 
-```env
-YANDEX_API_KEY=<your-yandex-api-key>
-YANDEX_PROJECT_ID=<your-yandex-project-id>
-YANDEX_BASE_URL=https://ai.api.cloud.yandex.net/v1
-HOST=0.0.0.0
-PORT=8080
-SECRET_KEY=<random-secret>
-ALICE_OWNER_ID=<stable-owner-id>
-```
+SQLite используется по умолчанию. PostgreSQL выбирается через
+`ALICE_DATABASE_URL`; подробности в [описании БД](docs/database.md).
+Supabase mirror настраивается отдельно на backend и не заменяет основную БД.
+См. [миграции и настройку Supabase](docs/supabase-migrations-deploy.md).
 
-Start the application:
+## Android
 
-```bash
-python app.py
-```
+Исходники [Android-модуля](android/) задают Java 17, `compileSdk 37`,
+`targetSdk 35`, `minSdk 26` и встроенный Python 3.13. В проверенной ревизии нет
+`android/gradlew`; CI использует установленный Gradle 9.5.0. Команда с
+несуществующим wrapper не является рабочей инструкцией.
 
-Open:
-
-```
-http://localhost:8080
-```
-
-### Optional Supabase trace mirror
-
-Configure the backend only:
-
-```env
-SUPABASE_URL=https://<your-project-ref>.supabase.co
-SUPABASE_SECRET_KEY=<runtime-key-resolved-by-ci>
-```
-
-The mirror is best-effort. A Supabase mirror failure must not become a failure of the main chat request.
-
-### Android
-
-The current Android module uses Java 17, compileSdk 37, targetSdk 35, and minSdk 26.
-
-From the Android project:
+При подготовленном Android SDK, Python и Gradle:
 
 ```bash
 cd android
-./gradlew :app:testDebugUnitTest :app:assembleDebug
-```
-
-CI also accepts build metadata:
-
-```bash
-./gradlew --no-daemon \
-  -PaliceBuildNumber=<build-number> \
-  -PaliceCommitHash=<commit-sha> \
+python scripts/stage_python.py
+: "${ALICE_BUILD_NUMBER:?Задайте номер сборки для versionCode}"
+gradle --no-daemon \
+  -PaliceBuildNumber="$ALICE_BUILD_NUMBER" \
+  -PaliceCommitHash="$(git rev-parse HEAD)" \
   :app:testDebugUnitTest :app:assembleDebug
 ```
 
-The debug APK produced by CI is intended for development/testing. Release signing keys must never be committed.
+Номер сборки должен соответствовать политике обновления установленного APK.
+Для обновления поверх предыдущей установки важны также package и сертификат
+подписи. Debug- и release-ключи нельзя смешивать, коммитить или публиковать в
+артефактах. [Android README](android/README.md) содержит дополнительные детали;
+фактический успех сборки подтверждается CI и проверкой артефакта.
 
-## Configuration and secrets
+## Разработка и проверки
 
-Use `.env` or the deployment secret manager for credentials.
-
-Never commit:
-
-- Yandex API keys or IAM tokens;
-- Supabase service-role keys;
-- Cloud.ru credentials;
-- MCP bearer tokens;
-- signing keys/passwords;
-- user passwords or session secrets.
-
-Provider credentials are handled at the backend boundary. The current provider-key lifecycle is deployment-wide rather than per-user. See [provider key rotation](docs/provider-key-rotation.md).
-
-For security-sensitive reports, follow [SECURITY.md](SECURITY.md).
-
-## Development workflow
-
-Production changes use:
-
-```
-Issue → branch → implementation → tests → PR → CI → merge → post-merge verification
+```text
+Issue -> ветка от свежего master -> изменение -> проверки -> PR
+    -> CI и review -> принятие -> слияние -> проверка результата
 ```
 
-Keep changes small enough to validate independently. Use the repository's Definition of Ready / Definition of Done and sprint workflow in [docs/development/sprint-workflow.md](docs/development/sprint-workflow.md).
+Используйте [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) и
+[спринтовый процесс](docs/development/sprint-workflow.md). Не считайте локальный
+коммит или подготовленное описание PR опубликованным результатом.
 
-See [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for repository conventions.
-
-## Testing
-
-Backend:
+Проверки backend из корня репозитория при установленных тестовых зависимостях:
 
 ```bash
 python -m compileall -q .
+python tests/validate_runtime_modules.py
 pytest -q
 ```
 
-Android:
+Для frontend используются BrowserShim/VM и HTTP-контракты. Для изменений схемы
+проверяются SQLite и PostgreSQL. Изменения только документации проверяются по
+ссылкам, командам и форматированию; обязательный CI не отключается.
 
-```bash
-cd android
-./gradlew :app:testDebugUnitTest :app:assembleDebug
-```
+## Конфигурация и безопасность
 
-For database changes, keep the shared database path optional: SQLite is the default for local/Termux runs, while PostgreSQL is selected only with `ALICE_DATABASE_URL`. Supabase remains a separate backup/diagnostic concern.
+Секреты находятся в локальном `.env` или защищённом хранилище среды исполнения.
+Нельзя помещать в Git, issue, PR, trace или логи API-ключи, IAM/bearer-токены,
+пароли, cookies, SSH/GPG-ключи и Android keystore.
 
-## Troubleshooting
+Ключи провайдеров обрабатываются на backend. Документ о
+[ротации ключей](docs/provider-key-rotation.md) описывает отдельную подсистему;
+он не даёт клиенту права выбирать доверенного владельца биллинга.
 
-### Yandex returns 401/403
+Сообщения об уязвимостях направляйте по [SECURITY.md](SECURITY.md).
 
-Check the project ID, API key permissions, model availability, and backend environment variables. Do not put provider credentials into frontend configuration.
+## Диагностика
 
-### Supabase reports a migration or table error
+**Ошибка Yandex 401/403:** сверяйте URI модели, права проекта и конфигурацию
+backend. Сохраняйте безопасную исходную причину в trace, не публикуя ключ.
 
-Check the migration history and the production migration workflow logs. Do not invent ad-hoc destructive rollbacks. Follow [docs/supabase-migrations-deploy.md](docs/supabase-migrations-deploy.md).
+**Ошибка таблицы или mirror Supabase:** проверяйте миграции и соответствующий run,
+не выполняйте разрушительный rollback ради устранения сообщения.
 
-### Android APK says the package conflicts
+**Конфликт установки APK:** проверяйте application ID `com.alicepro.mobile`,
+`versionCode` и сертификат подписи. Ошибки перекрытия интерфейса системными
+панелями проверяйте на целевом устройстве, не только в тестовом эмуляторе DOM.
 
-Check the installed package name and version code. The current application ID is `com.alicepro.mobile`, and CI build numbers are propagated into `versionCode`.
+**В trace нет инструмента:** проверяйте `tool_calls`, события, ошибки и продолжения
+операции. Текст ответа ассистента не является доказательством выполнения.
+Подробнее: [Execution Trace и биллинг](docs/architecture/execution_trace.md).
 
-### Android UI is covered by system bars
+## Документация и дальнейшая работа
 
-Check the current window/insets handling in `MainActivity.kt` and test the APK on the affected Android version before changing WebView padding or fullscreen flags.
+[Центральный указатель](docs/README.md) ведёт к API, MCP, runtime, frontend,
+агентам, БД и правилам сопровождения. GitHub Issues остаются источником
+требований и критериев готовности. Реестр отделяет вошедшие foundation-изменения
+от оставшейся работы над агентами, облачным хранилищем, preview, биллингом и
+публичными Android-релизами.
 
-### Trace does not show a tool execution
+[Поддержка](SUPPORT.md) · [Участие](CONTRIBUTING.md) ·
+[Кодекс поведения](CODE_OF_CONDUCT.md)
 
-Inspect the complete trace, including tool calls, events, errors, and continuation steps. Tool execution should pass through `UniversalToolExecutor`. Do not use only the user-visible assistant message as evidence of whether a tool ran.
+## Лицензия
 
-## Documentation map
-
-- [API documentation](docs/api/API_DOCS.md)
-- [Agent architecture](docs/agents/departments.md)
-- [Runtime/serverless](docs/runtime_serverless.md)
-- [MCP architecture](docs/mcp/architecture.md)
-- [Provider key rotation](docs/provider-key-rotation.md)
-- [Supabase migrations](docs/supabase-migrations-deploy.md)
-- [Sprint workflow](docs/development/sprint-workflow.md)
-- [Security policy](SECURITY.md)
-- [Support](SUPPORT.md)
-- [Contributing](CONTRIBUTING.md)
-
-## Roadmap
-
-Major roadmap areas include:
-
-- branch-aware preview environments;
-- separate user agents and reusable AI sessions;
-- Government Department workflows;
-- Partner Relations;
-- per-user provider credentials, quotas and rate limits;
-- richer theme/voice assistance;
-- resilient backup/failover providers;
-- public release automation and versioned Android releases.
-
-GitHub Issues are the source of truth for scope and acceptance criteria.
-
-## License
-
-Alice Pro is licensed under the MIT License. See [LICENSE](LICENSE).
+MIT. См. [LICENSE](LICENSE).

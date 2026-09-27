@@ -1,102 +1,86 @@
-# Threaded environment host
+# Потоковый host окружений
 
-Alice Pro application environments run inside one Python process. Each running
-environment owns a managed worker thread and an immutable `RuntimeContext`.
+Окружения приложения Alice Pro выполняются внутри одного Python-процесса.
+Работающее окружение имеет управляемый рабочий поток и собственный
+`RuntimeContext`. База описания указана в
+[интеграционном реестре](../integration/current-scope.md).
 
-## Request path
+## Путь HTTP-запроса
 
 ```text
-HTTP request
-    -> environment gateway
-    -> environment worker queue
-    -> RuntimeDispatcher
-    -> scoped operation
-    -> streamed response queue
-    -> HTTP response
+HTTP -> environment gateway -> проверка owner/runtime
+    -> очередь рабочего потока -> RuntimeDispatcher -> операция
+    -> ограниченная очередь ответа -> HTTP response
 ```
 
-The gateway does not proxy to a localhost port and the manager does not spawn a
-Flask process for each environment. Runtime HTTP responses are streamed through
-a bounded queue so slow clients apply backpressure instead of forcing the whole
-response into memory.
+Gateway не обращается к localhost-порту другого Flask-процесса. Ограниченная
+очередь ответа обеспечивает backpressure, чтобы медленный клиент не требовал
+полной буферизации ответа в памяти. Контракт включает streaming, отмену и очистку.
 
-## Scope
+## Scope и данные
 
-Each environment registers exactly one dispatcher scope containing:
+В диспетчере регистрируются `runtime_id`, `owner_id`, namespace и собственный
+корневой каталог данных. Общие ресурсы доступны только через
+[RuntimeDispatcher](runtime-dispatcher-policy.md); прямой доступ к данным другого
+runtime не является допустимым обходом.
 
-- `runtime_id`;
-- `owner_id`;
-- data namespace;
-- runtime-local data root.
+Runtime root переносится через request-local `ContextVar`.
+`db.get_conn()` выбирает `<runtime-data-root>/alice_pro.db`, а не базу host.
+Это правило действует и при PostgreSQL или in-memory backend на host.
+Схема runtime SQLite подготавливается до начала работы потока. База control plane
+остаётся отдельно от runtime scope.
 
-The worker executes operations only after `RuntimeDispatcher` binds that
-runtime id. Cross-runtime resource access remains subject to the dispatcher
-policy in `runtime-dispatcher-policy.md`.
+Runtime URL-prefix также переносится request-local. Не меняйте
+`ALICE_PREVIEW_BASE_PATH` в общем окружении процесса для переключения одного
+runtime: это не механизм изоляции параллельных запросов.
 
-### Database scope
+## Жизненный цикл
 
-The runtime data root is carried with the worker through request-local
-`ContextVar` state. `db.get_conn()` detects that scope and opens
-`<runtime-data-root>/alice_pro.db` instead of the process database.
+`EnvironmentManager` хранит постоянные записи окружений. Legacy-поля
+`runtime_pid` и `runtime_port` не используются как адрес потокового runtime;
+его работа отражается через `runtime_thread_id`.
 
-This rule also applies when the host is configured for PostgreSQL or the
-in-memory backend: a preview runtime does not silently inherit either shared
-backend. Its SQLite schema is initialized inside the runtime scope before the
-worker starts. The environment control-plane database remains outside that
-scope.
+Остановка отменяет активные потоки ответа, завершает worker и снимает runtime
+с регистрации в диспетчере. Удаление дополнительно очищает detached worktree
+и собственный каталог данных. Ошибки и неполное завершение очистки должны
+оставаться видимыми, а не считаться успешным удалением только по запросу API.
 
-## Request-local URL state
+## Загрузка ревизии
 
-Runtime URL prefixes are held in `ContextVar` state for the duration of the
-worker request. The host no longer needs to mutate
-`ALICE_PREVIEW_BASE_PATH` per environment. The environment value therefore
-cannot leak from one worker thread into another through process-global
-environment variables.
+Менеджер разрешает ref в точный commit и создаёт detached worktree. Несоответствие
+SHA или грязная рабочая копия не должны допускаться к запуску.
+`RuntimeLoader` загружает ограниченную точку входа `alice_runtime.py` в отдельное
+пространство имён без изменения общих `sys.path` или `sys.modules`.
 
-## Lifecycle
+Точка входа определяет `create_runtime(host)` и возвращает объект с
+`invoke(operation, payload)`. В этой реализации импорты, включая динамические,
+ограничены; shared-ресурсы доступны через host capabilities и диспетчер.
+Вызов ревизии использует операцию `revision.invoke`.
 
-`EnvironmentManager` keeps the existing persistent environment records, but
-`runtime_pid` and `runtime_port` are no longer runtime identities. They stay
-null for threaded runtimes. The API exposes the live `runtime_thread_id` from
-the in-process worker registry.
+Потоки разделяют память интерпретатора. Этот контракт предотвращает случайное
+смешение состояния, но не защищает от враждебного Python, reflection,
+monkey-patching, native extensions и исчерпания ресурсов. Недоверенный код
+нельзя считать безопасным для загрузки в этот процесс.
 
-Stopping an environment cancels active response streams, joins its worker, and
-unregisters the dispatcher scope. Deleting it additionally removes the immutable
-git worktree and runtime-local data directory.
+## Ограничение HTTP-приложения
 
-## Branch-safe loader contract
+В [environment_routes.py](../../environment_routes.py) HTTP-операция использует
+приложение host через `app.test_client()`. Загрузка `alice_runtime.py` не заменяет
+весь Flask HTTP/asset-путь кодом выбранной ветки.
 
-The manager resolves the requested ref before creating an environment, creates
-a detached worktree for that exact commit, and refuses to start from a dirty or
-mismatched snapshot. If the snapshot contains `alice_runtime.py`, `RuntimeLoader`
-loads that single entry point into a private namespace and passes it a stable
-host capability object. It never changes `sys.path`, environment variables, or
-`sys.modules`. Each environment receives a distinct namespace and application
-instance, including when two revisions run simultaneously.
+Поэтому различайте: проверку exact-commit worktree, выполнение ограниченной
+revision-операции и полноценное обслуживание HTML/API/assets выбранной ревизией.
+Последнее нельзя объявлять реализованным по одному `healthz` или записи SHA.
 
-The entry point must define `create_runtime(host)` and return an object with
-`invoke(operation, payload)`. Imports (including dynamic import) are rejected in
-this first slice. Host resources are reached only through the supplied API and
-`RuntimeDispatcher`; invocation uses the `revision.invoke` dispatcher operation.
+## Preview workflow и развёртывание
 
-This contract prevents accidental module and module-global collisions; it does
-not make arbitrary or hostile Python safe. Python reflection, native extensions,
-monkey-patching, CPU/memory exhaustion, and process memory cannot be securely
-isolated between threads. Code that needs unrestricted imports or is not trusted
-must not be loaded into this process. HTTP execution continues to use the stable
-host application until a later slice defines a similarly constrained revision
-HTTP contract, so existing streaming remains unchanged.
+Host-managed workflow вошёл в `master` через
+[#359](https://github.com/maksimp6/Chat/pull/359); runtime-фундамент #347/#349
+вошёл через [#363](https://github.com/maksimp6/Chat/pull/363).
+Это уже не очередь ожидающих реализации foundation PR.
 
-## Preview CI follow-up (#341)
-
-Preview CI should build/test the requested commit, then authenticate to the
-running Alice Pro host and request creation of an environment for that exact
-commit. It should poll the environment lifecycle and exercise the rendered shell
-through the environment gateway. Cleanup should delete that environment. It
-must not deploy a preview container, wait for a container-local Flask server, or
-discover/use a `runtime_port`. The host response and lifecycle trace should be
-the CI evidence tying the tested commit to the runtime.
-
-The deployment migration that removes one-container-per-preview infrastructure
-is a separate follow-up. Existing public preview deployment remains unchanged
-until that follow-up has its own health, rollback, and routing coverage.
+Развёртывание совместимого host, аутентификация и фактический запуск preview
+проверяются отдельно. Workflow остаётся ограничен
+`ALICE_HOST_PREVIEW_ENABLED`. Пропущенная проверка не означает успешного деплоя.
+Точные параметры и пределы доказательства описаны в
+[preview-документе](../preview-deployments.md).

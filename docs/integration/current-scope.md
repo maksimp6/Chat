@@ -1,83 +1,88 @@
-# Current-scope integration staging
+# Интеграционный реестр
 
-This is the canonical staging ledger for the focused work coordinated by
-[#351](https://github.com/maksimp6/Chat/issues/351). It records dependency and
-admission decisions; it is not a replacement for focused pull requests and it
-does not authorize automatic merging.
+**Дата среза:** 27 сентября 2026 года. **Проверенная база `master`:**
+`de8f97c8342c8c073c84885bf8f301bba5692b33`.
 
-The architecture decisions in
-[#350](https://github.com/maksimp6/Chat/issues/350) remain authoritative, while
-[#343](https://github.com/maksimp6/Chat/issues/343) coordinates execution. The
-detailed ownership and ordering rules live in
-[Architecture integration coordination](../architecture/integration-coordination.md).
+Это датированный реестр, а не автоматически обновляемый статус GitHub.
+Перед новым действием повторно проверьте refs, PR и CI. Требования ведутся в
+[#343](https://github.com/maksimp6/Chat/issues/343),
+[#350](https://github.com/maksimp6/Chat/issues/350) и
+[#351](https://github.com/maksimp6/Chat/issues/351).
+[Границы интеграции](../architecture/integration-coordination.md) не дублируют
+эту таблицу.
 
-## Admission rules
+## Что уже вошло в master
 
-A focused pull request may be staged only when it:
+«Слито» ниже означает факт включения кода. Это не подтверждение деплоя, зелёного
+CI текущего `master` или выполнения всех критериев родительской задачи.
 
-1. is updated from current `master` after its dependencies;
-2. has completed required review and has green required checks;
-3. preserves the host-managed `RuntimeLoader` and dispatcher-owned runtime
-   resource model;
-4. does not introduce a per-preview Flask process or container, localhost
-   proxying, `runtime_port` transport, or process-global preview paths;
-5. keeps tool execution behind `UniversalToolExecutor` and runtime resources
-   behind `RuntimeDispatcher`; and
-6. remains independently reviewable on its own branch.
-
-Failures found in combined testing belong in the focused pull request that owns
-the behavior whenever practical. Integration-only workarounds must not be used
-to admit red work. Conflict resolutions must follow #350 rather than combine
-competing abstractions mechanically.
-
-## Foundation baseline
-
-Runtime foundation [#363](https://github.com/maksimp6/Chat/pull/363) is merged.
-The authoritative baseline is `master` commit
-`64611a1900891aad0f421c94e73ffc7162942fc3`, which contains both the #347
-runtime-owner policy and the #349 `RuntimeLoader` foundation. Those changes are
-dependencies of the remaining runtime work, not pending staging candidates.
-
-Repository cleanup on `master` is also authoritative. Integration must not
-restore removed root files or `runtime_marker.txt`.
-
-## Candidate ledger
-
-Status recorded on 2026-09-27 against the foundation baseline above. Live CI,
-review, and mergeability must still be checked immediately before admission.
-
-| Order | Candidate | Staging decision / required action |
+| PR | Изменение | Статус |
 | --- | --- | --- |
-| 1 | #364 staging ledger and #365 architecture coordination | Replace the two stale documentation heads with one synchronized documentation change containing this ledger and the architecture coordination document. |
-| 2 | #359 host-managed preview lifecycle | Rebase on #363 and adapt to `RuntimeLoader`; reject container-per-preview, localhost proxying, `runtime_port`, and process-global preview paths. |
-| 3 | #360 degraded frontend shell | Rebase independently; retain BrowserShim/VM coverage and repository-local assets, with no Playwright or CDN dependency. |
-| 4 | #361 MCP dispatcher-scoped calls | Use the merged dispatcher and `UniversalToolExecutor`; do not introduce another dispatcher or tool execution boundary. |
-| 5 | #366 storage | Consume dispatcher-scoped storage after #361 where tool/MCP behavior overlaps. |
-| 6 | #369 conversation-agent foundation | Extend existing conversation identity and execution boundaries rather than creating a parallel agent system. |
-| 7 | #370 runtime tool/MCP isolation | Reconcile with #361. Keep one executor and one dispatcher abstraction; the narrower accepted contract survives if the implementations compete. |
-| 8 | #377 plugin execution contract | Map plugin capabilities onto the accepted executor and dispatcher contracts. |
-| 9 | #378 filesystem isolation | Use dispatcher-owned runtime scope and coordinate with storage rather than adding direct filesystem access. |
-| Independent | #374 Android release hardening | May synchronize independently while preserving debug/release signing separation and keeping secrets outside Git. |
+| [#363](https://github.com/maksimp6/Chat/pull/363) | Runtime owner policy и `RuntimeLoader` из #347/#349 | Слит; исторический merge-коммит `64611a1900891aad0f421c94e73ffc7162942fc3` |
+| [#359](https://github.com/maksimp6/Chat/pull/359) | Host-managed preview workflow | Слит; включение и развёртывание проверяются отдельно |
+| [#360](https://github.com/maksimp6/Chat/pull/360) | Поведение оболочки при сбое bootstrap | Слит; полная задача #227 не завершена этим PR |
+| [#361](https://github.com/maksimp6/Chat/pull/361) | MCP-вызовы в dispatcher scope | Слит |
+| [#366](https://github.com/maksimp6/Chat/pull/366) | Runtime-scoped storage contract и локальный адаптер | Слит; это не готовая интеграция Google Drive |
+| [#369](https://github.com/maksimp6/Chat/pull/369) | Основа маршрутизации агентов диалога | Слит; это не весь пользовательский интерфейс #116 |
+| [#370](https://github.com/maksimp6/Chat/pull/370) | Изоляция tool/MCP-выполнения | Слит |
+| [#374](https://github.com/maksimp6/Chat/pull/374) | Проверки подписываемого Android release | Слит; рабочий выпуск APK ещё требует отдельного подтверждения |
+| [#377](https://github.com/maksimp6/Chat/pull/377) | Контракт исполнения плагинов | Слит; не объявляет всю платформу #254 завершённой |
+| [#378](https://github.com/maksimp6/Chat/pull/378) | Dispatcher-scoped filesystem | Слит |
+| [#396](https://github.com/maksimp6/Chat/pull/396) | Наблюдаемость локального runtime в trace | Слит; вершина проверенной базы |
 
-If two candidates materially overlap, select the implementation that consumes
-the merged foundation and has the narrowest authoritative ownership boundary.
-Document why the other candidate is superseded instead of stacking both.
+Старые coordination PR
+[#364](https://github.com/maksimp6/Chat/pull/364) и
+[#365](https://github.com/maksimp6/Chat/pull/365), а также staging/sync PR
+[#355](https://github.com/maksimp6/Chat/pull/355) и
+[#356](https://github.com/maksimp6/Chat/pull/356) закрыты без слияния.
+Не ставьте их заново в очередь и не подменяйте статус «закрыт» статусом «слит».
 
-## Combined validation
+## Незавершённая работа
 
-After every admitted candidate, record its pull request and exact commit here.
-Run its focused tests, then the repository checks:
+| Задача / PR | Зафиксированное состояние | Следующая проверка |
+| --- | --- | --- |
+| [#398](https://github.com/maksimp6/Chat/pull/398) / #397 | Открыт; head `b3f7f30cae46ec66ed13ddcb57f940eec842bc0e`; включает привязку Claude job к `production` | Review, CI и реальная доступность OAuth в корректном окружении |
+| [#399](https://github.com/maksimp6/Chat/pull/399) / #227 | Открыт; head `ad246e32e99dd90279d26272473137cb8a090a94`; исправляет ложные срабатывания валидатора | Остальные frontend-контракты и общий CI |
+| [#400](https://github.com/maksimp6/Chat/pull/400) | Открыт; head `30f01211a09be327415ada94d161b0c675617476`; документация Cloud.ru skill | Проверка skill и обязательных checks; не является облачным backend |
+| [#401](https://github.com/maksimp6/Chat/issues/401) | Контракт snapshot/finalize согласован; опубликованная реализация этой задачи не подтверждена | Восстановить запуск исполнителя, затем проверить код и billing invariant |
 
-```console
-python -m compileall -q .
-python tests/validate_runtime_modules.py
-pytest -q
-bash scripts/format.sh check
-git diff --check
-```
+Документационная уборка не закрывает задачи #116, #195, #227, #254, #340 или #401.
+Наличие foundation-кода не подменяет их полные критерии готовности.
 
-Run frontend validation for frontend changes and the prescribed Android unit
-test and debug assembly for Android or shared release changes. Schema changes
-must validate both SQLite and PostgreSQL. Security-sensitive changes require
-authorization, isolation, cleanup, and secret-redaction regression coverage.
+## Зафиксированные блокеры
 
+| Проверка | Наблюдение | Доказательство |
+| --- | --- | --- |
+| CI базового master | Frontend policy останавливается на 16 сообщениях о повторяющемся тексте; Android не находит `cryptography==50.0.1` для выбранной Android/Python-сборки | [CI 36322568803](https://github.com/maksimp6/Chat/actions/runs/36322568803) |
+| Security базового master | Zizmor сообщает о незакреплённых Actions в `ci.yml` и сохранении checkout credentials | [Security 36322568775](https://github.com/maksimp6/Chat/actions/runs/36322568775) |
+| CI #399 | Frontend policy проходит для 42 JS-файлов, но следующая проверка падает: `Dozzle declarative action missing` | [CI 36328517593](https://github.com/maksimp6/Chat/actions/runs/36328517593) |
+| Исполнитель #401 | Claude Action завершился до исполнения задачи: отсутствуют доступные credentials | [Claude 36331058134](https://github.com/maksimp6/Chat/actions/runs/36331058134) |
+| Preview | Workflow содержит gate `ALICE_HOST_PREVIEW_ENABLED`; пропуск проверки не доказывает рабочий host или деплой | [Workflow](../../.github/workflows/preview-deploy.yml) |
+
+Это сведения об указанных запусках, не утверждение о неизменности внешних
+сервисов. Не исправляйте Android простым понижением версии криптографии без
+отдельной проверки совместимости и безопасности.
+
+## Порядок продолжения
+
+1. Устранить общие блокеры проверки: frontend в своей области, Android и Actions
+   security в соответствующих сфокусированных изменениях. Не отключать проверки.
+2. Довести #398 до принятия. После изменения workflow в `master` запуск задачи
+   должен использовать новую версию workflow; старый failed run не служит
+   доказательством исправления. Проверять фактические логи авторизации и работы.
+3. Выполнить #401 с [контрактом trace](../architecture/execution_trace.md),
+   опубликовать PR и проверить отсутствие повторных начислений.
+4. Продолжать остальные подсистемы по зависимостям, не повторяя уже слитые
+   foundation PR и не смешивая документацию skill с реализацией облачных сервисов.
+
+## Обновление реестра
+
+Для следующего среза фиксируйте дату, проверенный SHA `master`, head каждого
+активного PR, результат checks и ссылку на доказательство. Отдельно указывайте
+статусы кода, CI и развёртывания. Не публикуйте токены, приватные ключи или
+секретные URL с credential-префиксом.
+
+Изменения проверяются от дешёвых к дорогим. Markdown требует проверки ссылок,
+команд и форматирования; runtime требует поведенческих тестов; изменение схемы
+требует SQLite/PostgreSQL. Полный обязательный GitHub CI не заменяется локальным
+отчётом. Слияние и деплой не разрешаются этой страницей автоматически.
