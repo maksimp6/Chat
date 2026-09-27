@@ -5,14 +5,13 @@ umask 077
 INSTALL_DIR="$HOME/.local/lib/alice-pro"
 BIN_DIR="$HOME/.local/bin"
 
-# Install the recovery/maintenance path first, before dependency setup can fail.
+# The Codex setup hook runs from the freshly cloned checkout.
+# Do not require a Git remote here: some setup environments have no origin yet.
 mkdir -p "$INSTALL_DIR" "$BIN_DIR"
-git fetch origin master
 
 for name in codex_setup.sh codex_maintenance.sh; do
-  git show "origin/master:scripts/$name" > "$INSTALL_DIR/$name.next"
-  chmod 700 "$INSTALL_DIR/$name.next"
-  mv "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"
+  test -f "scripts/$name"
+  install -m 700 "scripts/$name" "$INSTALL_DIR/$name"
 done
 
 cat > "$BIN_DIR/alice-pro-maintenance.next" <<'EOF'
@@ -44,4 +43,3 @@ cloud --version
 
 echo "Codex repository environment ready"
 echo "Maintenance launcher: $BIN_DIR/alice-pro-maintenance"
-echo "SSH/GPG credentials are supplied separately by Codex Environment secrets."
