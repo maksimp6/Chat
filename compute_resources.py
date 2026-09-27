@@ -82,7 +82,9 @@ def build_compute_billing_item(
     if wall_seconds:
         item["cpu_utilization"] = round(min(cpu_seconds / wall_seconds, 1.0), 4)
     if price is None:
-        item.update({"cost_status": "not_billed", "cost_reason": "electricity_price_not_configured"})
+        item.update(
+            {"cost_status": "not_billed", "cost_reason": "electricity_price_not_configured"}
+        )
         return item
     item.update(
         {
