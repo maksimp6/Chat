@@ -125,3 +125,85 @@ def test_local_runtime_exec_uses_existing_approval_and_trace_pipeline(tmp_path):
     ]
     assert runtime_events[0]["payload"]["runtime"] == "local"
     assert runtime_events[1]["payload"]["exit_code"] == 0
+
+
+def test_local_output_limit_handles_none_and_truncates():
+    import runtime_tools
+
+    assert runtime_tools._limit_local_output(None, max_bytes=32) == ""
+    truncated = runtime_tools._limit_local_output("x" * 100, max_bytes=32)
+    assert truncated.endswith("...[output truncated]")
+    assert len(truncated.encode("utf-8")) <= 32
+
+
+def test_local_runtime_exec_validates_command_timeout_and_cwd(tmp_path):
+    import runtime_tools
+
+    try:
+        runtime_tools.local_runtime_exec(
+            {"command": "", "cwd": str(tmp_path), "timeout_seconds": 5}
+        )
+    except ValueError as exc:
+        assert str(exc) == "Command is required"
+    else:
+        raise AssertionError("empty command must be rejected")
+
+    try:
+        runtime_tools.local_runtime_exec(
+            {"command": "pwd", "cwd": str(tmp_path), "timeout_seconds": 301}
+        )
+    except ValueError as exc:
+        assert str(exc) == "timeout_seconds must be between 1 and 300"
+    else:
+        raise AssertionError("invalid timeout must be rejected")
+
+    missing = tmp_path / "missing"
+    try:
+        runtime_tools.local_runtime_exec(
+            {"command": "pwd", "cwd": str(missing), "timeout_seconds": 5}
+        )
+    except ValueError as exc:
+        assert "Working directory does not exist" in str(exc)
+    else:
+        raise AssertionError("missing cwd must be rejected")
+
+
+def test_local_runtime_exec_reports_shell_start_failure(tmp_path):
+    import runtime_tools
+
+    with patch("runtime_tools.subprocess.run", side_effect=OSError("no shell")):
+        result = runtime_tools.local_runtime_exec(
+            {
+                "command": "pwd",
+                "cwd": str(tmp_path),
+                "timeout_seconds": 5,
+            }
+        )
+
+    assert result["success"] is False
+    assert result["exit_code"] is None
+    assert result["error"] == "Unable to start local shell: no shell"
+
+
+def test_local_runtime_exec_reports_nonzero_exit(tmp_path):
+    import runtime_tools
+
+    completed = subprocess.CompletedProcess(
+        args=["/bin/bash", "-lc", "false"],
+        returncode=7,
+        stdout="",
+        stderr="failed",
+    )
+    with patch("runtime_tools.subprocess.run", return_value=completed):
+        result = runtime_tools.local_runtime_exec(
+            {
+                "command": "false",
+                "cwd": str(tmp_path),
+                "timeout_seconds": 5,
+            }
+        )
+
+    assert result["success"] is False
+    assert result["exit_code"] == 7
+    assert result["stderr"] == "failed"
+    assert result["error"] == "Local command exited with code 7"
