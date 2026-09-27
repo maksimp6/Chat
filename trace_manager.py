@@ -179,6 +179,8 @@ class ExecutionTrace:
         session_id: Optional[str] = None,
         conversation_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        runtime_id: Optional[str] = None,
     ) -> None:
         context = self.trace.setdefault("context", {})
         for key, value in (
@@ -187,6 +189,8 @@ class ExecutionTrace:
             ("conversation_id", conversation_id),
             ("user_id", user_id),
             ("owner_id", user_id),
+            ("agent_id", agent_id),
+            ("runtime_id", runtime_id),
             ("trace_id", self.trace_id),
         ):
             if value is not None:
