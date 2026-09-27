@@ -975,7 +975,7 @@ def mcp_post() -> Response:
         runtime_id = call_meta.get("alice/runtime_id")
         resource_runtime_id = call_meta.get("alice/resource_runtime_id")
         if runtime_id is not None and (not isinstance(runtime_id, str) or not runtime_id.strip()):
-            return _error_response(request_id, -32602, "alice/runtime_id must be a non-empty string")
+            return _error_response(\n                request_id, -32602, "alice/runtime_id must be a non-empty string"\n            )
         if resource_runtime_id is not None and (
             not isinstance(resource_runtime_id, str) or not resource_runtime_id.strip()
         ):
