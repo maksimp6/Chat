@@ -1,12 +1,14 @@
+import os
 from pathlib import Path
 import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "deploy" / "preview" / "server.sh"
+SCRIPT = ROOT / "deploy" / "preview" / "environment_lifecycle.sh"
+WORKFLOW = ROOT / ".github" / "workflows" / "preview-deploy.yml"
 
 
-def test_preview_server_script_is_valid_bash():
+def test_environment_lifecycle_script_is_valid_bash():
     result = subprocess.run(
         ["bash", "-n", str(SCRIPT)],
         capture_output=True,
@@ -16,44 +18,67 @@ def test_preview_server_script_is_valid_bash():
     assert result.returncode == 0, result.stderr
 
 
-def test_preview_server_uses_tokenized_path_routing_and_strip():
-    source = SCRIPT.read_text(encoding="utf-8")
-    assert 'local tokenized_prefix="/$ALICE_SHORT_TOKEN${base_path}"' in source
-    assert "local tokenized_rule=" in source
-    assert "PathPrefix(" in source
-    assert "$tokenized_prefix" in source
-    assert 'local http_router="${container}-http"' in source
-    assert 'local https_ru_router="${container}-https-ru"' in source
-    assert 'local https_online_router="${container}-https-online"' in source
-    assert "https_ru_rule" in source and "maxxxpavlov.ru" in source
-    assert "https_online_rule" in source and "maxxxpavlov.online" in source
-    assert "traefik.http.routers.${http_router}.entrypoints=web" in source
-    assert "traefik.http.routers.${https_ru_router}.entrypoints=websecure" in source
-    assert "traefik.http.routers.${https_online_router}.entrypoints=websecure" in source
-    assert "traefik.http.routers.${https_ru_router}.tls.certresolver=letsencrypt" in source
-    assert "traefik.http.routers.${https_online_router}.tls.certresolver=letsencrypt" in source
-    assert 'ALICE_SHORT_TOKEN="$ALICE_SHORT_TOKEN"' in source
-    assert 'ALICE_PREVIEW_BASE_PATH="/$ALICE_SHORT_TOKEN$base_path"' in source
-    assert "--entrypoints.websecure.address=:443" in source
-    assert "--providers.file.directory=/etc/traefik/dynamic" in source
-    assert 'ACME_DIR="$ROOT_DIR/keys/letsencrypt"' in source
-    assert 'ACME_FILE="$ACME_DIR/acme.json"' in source
-    assert "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json" in source
-    assert "--certificatesresolvers.letsencrypt.acme.httpchallenge=true" in source
-    assert "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web" in source
-    assert '--certificatesresolvers.letsencrypt.acme.email="$ACME_EMAIL"' in source
-    assert '"$ACME_DIR:/letsencrypt"' in source
-    assert 'chmod 600 "$ACME_FILE"' in source
-    assert "ensure-traefik" in source
+def test_preview_workflow_uses_host_environment_api_only():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "environment_lifecycle.sh" in workflow
+    assert "if: vars.ALICE_HOST_PREVIEW_ENABLED == 'true'" in workflow
+    assert "PREVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}" in workflow
+    assert "ALICE_ENVIRONMENT_HOST_URL" in workflow
+    for obsolete_transport in (
+        "docker",
+        "scp ",
+        "ssh ",
+        "server.sh",
+        "runtime_port",
+        "127.0.0.1",
+    ):
+        assert obsolete_transport not in workflow.lower()
 
 
-def test_preview_workflow_passes_runtime_token_to_vps_deployer():
-    workflow = (ROOT / ".github" / "workflows" / "preview-deploy.yml").read_text(encoding="utf-8")
-    assert "deploy/preview/server.sh" in workflow
-    assert "PREVIEW_SSH_HOST" in workflow
-    assert "PREVIEW_PUBLIC_BASE_URL" in workflow
-    assert "ALICE_SHORT_TOKEN" in workflow
-    assert "printf" in workflow and "ALICE_SHORT_TOKEN" in workflow
-    assert "Path-prefix" not in workflow
-    assert 'printf "%s/alice-preview" "$HOME"' in workflow
-    assert "Verify VPS routing" in workflow
+def test_lifecycle_uses_exact_commit_gateway_and_cleanup(tmp_path):
+    calls = tmp_path / "calls"
+    fake_curl = tmp_path / "curl"
+    fake_curl.write_text(
+        """#!/usr/bin/env bash
+set -eu
+printf '%s\\n' "$*" >> "$CALLS"
+case "$*" in
+  *'/api/environments/env-test/start'*)
+    printf '{"status":"RUNNING","runtime_pid":null,"runtime_port":null}' ;;
+  *'/environments/env-test/healthz'*) printf 'ok' ;;
+  *'/api/environments/env-test'*) printf '{}' ;;
+  *'/api/environments '*|*'/api/environments')
+    printf '{"environment_id":"env-test","commit_sha":"%s"}' "$PREVIEW_COMMIT" ;;
+  *) exit 2 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    fake_curl.chmod(0o755)
+    commit = "a" * 40
+    env = {
+        **os.environ,
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "CALLS": str(calls),
+        "ALICE_ENVIRONMENT_HOST_URL": "https://preview.invalid/token",
+        "PREVIEW_BRANCH": "feature/runtime",
+        "PREVIEW_COMMIT": commit,
+    }
+
+    result = subprocess.run(
+        [str(SCRIPT)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    requests = calls.read_text(encoding="utf-8")
+    assert f'"commit_sha":"{commit}"' in requests
+    assert "POST https://preview.invalid/token/api/environments/env-test/start" in requests
+    assert "https://preview.invalid/token/environments/env-test/healthz" in requests
+    assert "DELETE https://preview.invalid/token/api/environments/env-test" in requests
+    assert "127.0.0.1" not in requests
