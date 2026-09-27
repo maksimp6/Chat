@@ -39,6 +39,7 @@ jobs:
     environment: production
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || (github.event.action != 'closed' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       PREVIEW_SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
       PREVIEW_SSH_USER: ${{ secrets.PREVIEW_SSH_USER }}
@@ -84,7 +85,7 @@ jobs:
       - name: Resolve remote preview directory
         id: remote
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
           test -n "$remote_dir"
           "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'mkdir -p "$HOME/alice-preview/incoming" "$HOME/alice-preview/previews"'
@@ -109,8 +110,8 @@ jobs:
           TTL_HOURS: ${{ steps.preview.outputs.ttl_hours }}
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
-          scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
+          scp_cmd=(scp -P "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           "${scp_cmd[@]}" deploy/preview/server.sh "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/server.sh"
           "${scp_cmd[@]}" preview.tar.gz "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST:$REMOTE_BASE_DIR/incoming/$KEY.tar.gz"
           printf '%s\n%s\n%s\n' "$ALICE_SHORT_TOKEN" "$SUPABASE_URL" "$SUPABASE_SECRET_KEY" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; read -r supabase_url; read -r supabase_secret_key; export ALICE_SHORT_TOKEN="\$token" SUPABASE_URL="\$supabase_url" SUPABASE_SECRET_KEY="\$supabase_secret_key"; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' deploy '$KEY' '$BASE_PATH' '$REMOTE_BASE_DIR/incoming/$KEY.tar.gz' '$TTL_HOURS'"
@@ -118,7 +119,7 @@ jobs:
         env:
           KEY: ${{ steps.preview.outputs.key }}
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           printf '%s\n' "$ALICE_SHORT_TOKEN" | "${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; curl --fail --silent --show-error --max-time 5 -H \"Host: maxxxpavlov.ru\" \"http://127.0.0.1/\$token/preview/$KEY/\" >/dev/null"
       - name: Public HTTPS health and TLS check
         env:
@@ -206,7 +207,7 @@ jobs:
       - name: Resolve remote preview directory
         id: remote
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
           test -n "$remote_dir"
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
@@ -214,7 +215,7 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'; fi"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup 'pr-$PR_NUMBER'; fi"
 
   cleanup_expired:
     name: Cleanup expired previews
@@ -238,7 +239,7 @@ jobs:
       - name: Resolve remote preview directory
         id: remote
         run: |
-          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes)
+          ssh_cmd=(ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10)
           remote_dir="$("${ssh_cmd[@]}" "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" 'printf "%s/alice-preview" "$HOME"')"
           test -n "$remote_dir"
           echo "base_dir=$remote_dir" >> "$GITHUB_OUTPUT"
@@ -246,4 +247,4 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup-expired; fi"
+          ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "if [ -f '$REMOTE_BASE_DIR/server.sh' ]; then PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/server.sh' cleanup-expired; fi"
