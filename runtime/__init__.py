@@ -13,6 +13,7 @@ from .request_context import (
     current_runtime_data_root,
     current_runtime_id,
 )
+from .storage import RuntimeStorage
 
 __all__ = [
     "RuntimeContext",
@@ -20,6 +21,7 @@ __all__ = [
     "RuntimeNotFound",
     "RuntimeOperationNotFound",
     "RuntimeScopeViolation",
+    "RuntimeStorage",
     "bind_runtime_request",
     "current_runtime_base_path",
     "current_runtime_data_root",
