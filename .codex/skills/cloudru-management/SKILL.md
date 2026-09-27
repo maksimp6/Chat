@@ -45,6 +45,24 @@ issues, or chat output.
   purposes: recommend reissuing or rotating it, but never rotate or revoke it
   without explicit user direction.
 
+## Evolution DNS
+
+- Use the Evolution DNS API endpoint `https://dns.api.cloud.ru`. Its documented
+  client-credentials exchange is `https://id.cloud.ru/auth/system/openid/token`;
+  do not assume a bearer token issued for another Cloud.ru service is accepted.
+- Start by listing direct, reverse, public, or private zones and their records.
+  Report the zone type, record name, type, value, TTL, and current delegation or
+  validation state before proposing a change.
+- Treat creation, update, deletion, activation, deactivation, VPC attachment,
+  and changes to A, AAAA, CNAME, MX, NS, TXT, SPF, or PTR records as mutating
+  operations that require explicit confirmation immediately before the request.
+- For a public zone, verify domain ownership and delegation status before
+  publishing records. For a private zone, verify the target VPC and avoid
+  altering a VPC attachment without the user's explicit scope.
+- Validate the intended result after an approved change with an authoritative
+  DNS lookup or the API's returned state. Explain that DNS propagation and TTL
+  can delay observed results.
+
 ## Alice Pro integration
 
 - Put configuration in server-side environment variables or the encrypted
