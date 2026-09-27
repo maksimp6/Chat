@@ -81,3 +81,12 @@ def test_memory_backend_non_string_message_and_invalid_json(monkeypatch):
     message = db.get_messages("c1")[0]
     assert message["timings"] == []
     assert message["trace"] == {}
+
+
+def test_memory_backend_conv_settings_missing_or_corrupt(monkeypatch):
+    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    db.init_db()
+    assert db.get_conv_settings("c1") is None
+    db.save_conv_settings("c1", {"temperature": 0.2})
+    db._MEMORY_DB.update("conv_settings", lambda r: True, settings_json="{bad")
+    assert db.get_conv_settings("c1") is None
