@@ -26,9 +26,7 @@ def test_runtime_filesystems_are_isolated_during_concurrent_access(tmp_path):
             FILESYSTEM_WRITE_TEXT,
             {"path": "state/value.txt", "content": value},
         )
-        return dispatcher.dispatch(
-            runtime_id, FILESYSTEM_READ_TEXT, {"path": "state/value.txt"}
-        )
+        return dispatcher.dispatch(runtime_id, FILESYSTEM_READ_TEXT, {"path": "state/value.txt"})
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         first = pool.submit(write_and_read, "runtime-a", "first")
@@ -72,9 +70,7 @@ def test_runtime_filesystem_rejects_symlink_escape(tmp_path):
     assert not (outside / "secret.txt").exists()
 
 
-def test_runtime_filesystem_never_falls_back_to_process_working_directory(
-    tmp_path, monkeypatch
-):
+def test_runtime_filesystem_never_falls_back_to_process_working_directory(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime-without-root")

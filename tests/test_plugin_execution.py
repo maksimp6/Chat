@@ -68,9 +68,7 @@ def invocation():
 
 def test_permission_denial_never_reaches_registry(tmp_path):
     registry = Registry()
-    gateway = PluginExecutionGateway(
-        manager_for(tmp_path, []), registry, RuntimeDispatcher()
-    )
+    gateway = PluginExecutionGateway(manager_for(tmp_path, []), registry, RuntimeDispatcher())
     result = gateway.execute("demo", "echo", {"text": "hello"}, invocation())
     assert result["success"] is False
     assert result["metadata"]["phase"] == "authorization"
@@ -100,3 +98,21 @@ def test_disabled_plugin_cannot_execute(tmp_path):
     gateway = PluginExecutionGateway(manager, Registry(), RuntimeDispatcher())
     with pytest.raises(PluginError, match="not enabled"):
         gateway.execute("demo", "echo", {"text": "hello"}, invocation())
+
+
+def test_tool_capability_outside_plugin_manifest_is_denied(tmp_path):
+    class WideRegistry(Registry):
+        def get_universal_definition(self, name):
+            definition = super().get_universal_definition(name)
+            definition["capabilities"] = ["messages.read", "files.write"]
+            return definition
+
+    registry = WideRegistry()
+    gateway = PluginExecutionGateway(
+        manager_for(tmp_path, ["tool:echo"]), registry, RuntimeDispatcher()
+    )
+    result = gateway.execute("demo", "echo", {"text": "hello"}, invocation())
+    assert result["success"] is False
+    assert result["metadata"]["phase"] == "authorization"
+    assert "capability denied: files.write" in result["error"]
+    assert registry.calls == []

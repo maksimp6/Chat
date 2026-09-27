@@ -86,15 +86,18 @@ function response(payload, status = 200) {
   assert.equal(vm.runInContext("modelsData.text.recovered.name", runtime.context), "Recovered");
 
   let retryRequests = 0;
+  let online = false;
   const retry = await createRuntime((url) => {
     if (url === "/api/conversations") return Promise.resolve(response({ conversations: [] }));
     retryRequests += 1;
-    if (retryRequests === 1) return Promise.reject(new TypeError("offline"));
+    if (!online) return Promise.reject(new TypeError("offline"));
     return Promise.resolve(
       response({ text: { recovered: { name: "Recovered model" } }, voice: {} }),
     );
   });
   await assert.rejects(retry.runtime.window.AliceModelCatalog.load());
+  // core.js also loads the catalog on startup; let that request settle first.
+  for (let i = 0; i < 10; i += 1) await new Promise((resolve) => setImmediate(resolve));
 
   // Re-rendering and repeated initialization replace the state rather than
   // accumulating controls or event listeners.
@@ -113,10 +116,16 @@ function response(payload, status = 200) {
   assert.equal(retryButton.type, "button");
   assert.equal(retryButton.textContent, "Повторить");
 
+  const requestsBeforeRetry = retryRequests;
+  online = true;
   retryButton.click();
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(retryRequests, 2, "one real retry click must issue exactly one additional request");
+  assert.equal(
+    retryRequests,
+    requestsBeforeRetry + 1,
+    "one real retry click must issue exactly one additional request",
+  );
   assert.equal(modelList.querySelector('[role="status"]'), null, "success must clear error state");
   retryButtons = modelList.querySelectorAll("button");
   assert.equal(retryButtons.length, 1, "success must replace retry with the loaded model");

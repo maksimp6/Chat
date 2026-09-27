@@ -82,9 +82,7 @@ class RuntimeDispatcher:
         """Resolve a relative path without permitting escape from the data root."""
 
         if not context.root:
-            raise RuntimeScopeViolation(
-                f"runtime {context.runtime_id!r} has no filesystem root"
-            )
+            raise RuntimeScopeViolation(f"runtime {context.runtime_id!r} has no filesystem root")
         relative = Path(str(value or ""))
         if not value or relative.is_absolute():
             raise RuntimeScopeViolation("runtime filesystem paths must be relative")
@@ -97,15 +95,11 @@ class RuntimeDispatcher:
             )
         return target
 
-    def _read_runtime_text(
-        self, context: RuntimeContext, payload: Mapping[str, Any]
-    ) -> str:
+    def _read_runtime_text(self, context: RuntimeContext, payload: Mapping[str, Any]) -> str:
         path = self._runtime_path(context, payload.get("path"))
         return path.read_text(encoding="utf-8")
 
-    def _write_runtime_text(
-        self, context: RuntimeContext, payload: Mapping[str, Any]
-    ) -> None:
+    def _write_runtime_text(self, context: RuntimeContext, payload: Mapping[str, Any]) -> None:
         path = self._runtime_path(context, payload.get("path"))
         content = payload.get("content")
         if not isinstance(content, str):
@@ -134,7 +128,11 @@ class RuntimeDispatcher:
             self._runtimes[runtime_id] = context
             # A reused id must never inherit capabilities from an earlier runtime.
             self._tool_boundaries.pop(runtime_id, None)
-            self._storage_providers = {key: provider for key, provider in self._storage_providers.items() if key[0] != runtime_id}
+            self._storage_providers = {
+                key: provider
+                for key, provider in self._storage_providers.items()
+                if key[0] != runtime_id
+            }
         return context
 
     def unregister_runtime(self, runtime_id: str) -> None:
@@ -179,10 +177,14 @@ class RuntimeDispatcher:
         with self._lock:
             self._operations[name] = handler
 
-    def set_storage_credential_resolver(self, resolver: Callable[[RuntimeContext, str], object | None] | None) -> None:
+    def set_storage_credential_resolver(
+        self, resolver: Callable[[RuntimeContext, str], object | None] | None
+    ) -> None:
         self._storage_credentials = resolver
 
-    def register_storage_provider(self, runtime_id: str, provider: StorageProvider, *, owner_id: str | None = None) -> None:
+    def register_storage_provider(
+        self, runtime_id: str, provider: StorageProvider, *, owner_id: str | None = None
+    ) -> None:
         context = self.context(runtime_id)
         scoped_owner = context.owner_id if owner_id is None else owner_id
         if scoped_owner != context.owner_id:
@@ -190,7 +192,15 @@ class RuntimeDispatcher:
         with self._lock:
             self._storage_providers[(runtime_id, scoped_owner, provider.name)] = provider
 
-    def dispatch_storage(self, runtime_id: str, provider_name: str, action: str, payload: Mapping[str, Any] | None = None, *, resource_runtime_id: str | None = None) -> Any:
+    def dispatch_storage(
+        self,
+        runtime_id: str,
+        provider_name: str,
+        action: str,
+        payload: Mapping[str, Any] | None = None,
+        *,
+        resource_runtime_id: str | None = None,
+    ) -> Any:
         context = self.context(runtime_id)
         if (resource_runtime_id or runtime_id) != runtime_id:
             raise RuntimeScopeViolation("Storage resources cannot cross runtime scopes")
@@ -198,13 +208,17 @@ class RuntimeDispatcher:
             provider = self._storage_providers.get((runtime_id, context.owner_id, provider_name))
         if provider is None:
             raise StorageProviderUnavailable("Storage provider is not configured")
-        credentials = self._storage_credentials(context, provider_name) if self._storage_credentials else None
+        credentials = (
+            self._storage_credentials(context, provider_name) if self._storage_credentials else None
+        )
         if provider.requires_credentials and credentials is None:
             raise StorageCredentialsMissing("Storage provider credentials are not configured")
         values = dict(payload or {})
         try:
             if action == "upload":
-                return provider.upload(values["object_id"], values["content"], credentials=credentials)
+                return provider.upload(
+                    values["object_id"], values["content"], credentials=credentials
+                )
             if action == "download":
                 return provider.download(values["object_id"], credentials=credentials)
             if action == "list":
@@ -271,9 +285,7 @@ class RuntimeDispatcher:
             else:
                 self._local.runtime_id = previous
 
-    def _execute_tool(
-        self, context: RuntimeContext, payload: Mapping[str, Any]
-    ) -> dict[str, Any]:
+    def _execute_tool(self, context: RuntimeContext, payload: Mapping[str, Any]) -> dict[str, Any]:
         with self._lock:
             boundary = self._tool_boundaries.get(context.runtime_id)
         if boundary is None:

@@ -17,7 +17,6 @@ jobs:
     name: Build and publish release
     runs-on: ubuntu-latest
     env:
-      ALICE_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/alice-release.jks
       ALICE_RELEASE_STORE_PASSWORD: ${{ secrets.ALICE_RELEASE_STORE_PASSWORD }}
       ALICE_RELEASE_KEY_ALIAS: ${{ secrets.ALICE_RELEASE_KEY_ALIAS }}
       ALICE_RELEASE_KEY_PASSWORD: ${{ secrets.ALICE_RELEASE_KEY_PASSWORD }}
@@ -73,6 +72,9 @@ jobs:
           ALICE_RELEASE_KEYSTORE_BASE64: ${{ secrets.ALICE_RELEASE_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
+          # The runner context is not available in job-level env; export the path for later steps.
+          ALICE_RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/alice-release.jks"
+          echo "ALICE_RELEASE_KEYSTORE_PATH=$ALICE_RELEASE_KEYSTORE_PATH" >> "$GITHUB_ENV"
           printf '%s' "$ALICE_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$ALICE_RELEASE_KEYSTORE_PATH"
           chmod 600 "$ALICE_RELEASE_KEYSTORE_PATH"
           test -s "$ALICE_RELEASE_KEYSTORE_PATH"

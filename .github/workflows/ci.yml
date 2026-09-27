@@ -14,32 +14,42 @@ permissions:
 
 jobs:
   backend:
-    name: Backend tests
+    name: Application tests
     runs-on: ubuntu-latest
     env:
       YANDEX_API_KEY: ci-test-placeholder
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.12"
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
           cache: pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov playwright
+          pip install -r requirements-dev.txt
+          npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Check source formatting
+        run: bash scripts/format.sh check
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
           bash -n deploy/production/server.sh
           bash tests/test_dozzle_preview.sh
-      - name: Compile Python sources
-        run: python -m compileall -q .
+      - name: Compile tracked Python sources
+        run: git ls-files '*.py' -z | xargs -0 -r python -m py_compile
       - name: Validate frontend JavaScript policy
         run: python tests/validate_frontend_modules.py
+      - name: Validate runtime Python policy
+        run: python tests/validate_runtime_modules.py
+      - name: Run runtime dispatcher regression tests
+        run: pytest -q tests/test_runtime_policy.py tests/test_runtime_dispatcher.py
       - name: Run frontend JavaScript regression tests with coverage
         run: |
           rm -rf coverage-js
@@ -52,6 +62,16 @@ jobs:
           NODE_V8_COVERAGE=coverage-js node tests/test_frontend_smoke.js
           node tests/test_frontend_runtime_safety.js
           pytest -q tests/test_frontend_policy.py
+          pytest -q tests/test_unified_buttons_contract.py
+          pytest -q tests/test_real_ui_contract.py
+          pytest -q tests/test_frontend_module_code.py
+          node tests/test_system_status.js
+          node tests/test_ui_action_contract.js
+          node tests/test_real_header_actions.js
+          node tests/test_model_catalog_diagnostics.js
+          node tests/test_settings_ui_security.js
+          node tests/test_ui_modal_contract.js
+          node tests/test_voice_recording.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
       - name: Save frontend test log
         if: always()
@@ -60,12 +80,12 @@ jobs:
           for test in tests/test_file_manager.js tests/test_dozzle_header.js tests/test_frontend_boot.js tests/test_project_tree.js tests/test_header_dom.js tests/test_frontend_smoke.js; do
             node "$test" >> frontend-test.log 2>&1 || true
           done
-      - name: Start Flask for live browser resource validation
+      - name: Start Flask for live resource validation
         env:
           HOST: 127.0.0.1
           PORT: 5678
           FLASK_DEBUG: "0"
-          ALICE_DATABASE_URL: sqlite:///alice_pro_ci_live.db
+          ALICE_DB_PATH: alice_pro_ci_live.db
         run: |
           python app.py > flask-live.log 2>&1 &
           echo $! > flask-live.pid
@@ -76,7 +96,7 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:5678/ >/dev/null
-      - name: Run live Flask resource contract tests without Chromium
+      - name: Run live Flask resource contract tests
         env:
           ALICE_LIVE_BASE_URL: http://127.0.0.1:5678
         run: pytest -q tests/test_live_flask_resources.py
@@ -86,15 +106,16 @@ jobs:
           if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
-      - name: Run tests with backend coverage
-        run: pytest --cov=. --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json --cov-fail-under=100 -q
+      - name: Run Python application tests with coverage
+        run: pytest --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
       - name: Generate validation report
         if: always()
         run: |
           python tests/generate_ci_validation_report.py | tee ci-validation-report.md
           cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v7
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-${{ github.run_number }}
           path: |
@@ -103,7 +124,27 @@ jobs:
             coverage-js/
             ci-validation-report.md
             flask-live.log
-          if-no-files-found: error
+          if-no-files-found: warn
+      - name: Enforce coverage quality gates
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          # 69.96% is the measured production-only baseline after test/support
+          # files were removed from coverage accounting. Keep that baseline from
+          # regressing, while requiring 100% coverage for changed Python lines.
+          coverage report --fail-under=69.96
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            DIFF_BASE="origin/$GITHUB_BASE_REF"
+          else
+            DIFF_BASE="$EVENT_BEFORE"
+            if [ -z "$DIFF_BASE" ] || [ "$DIFF_BASE" = "0000000000000000000000000000000000000000" ]; then
+              DIFF_BASE="HEAD^"
+            fi
+          fi
+
+          git rev-parse --verify "$DIFF_BASE^{commit}"
+          diff-cover coverage.xml --compare-branch="$DIFF_BASE" --fail-under=100
 
 
   postgres:
@@ -127,11 +168,13 @@ jobs:
           --health-retries=12
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.12"
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
           cache: pip
       - name: Install dependencies
         run: |
@@ -152,22 +195,24 @@ jobs:
       ALICE_DEBUG_KEY_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEY_PASSWORD }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "25"
           cache: gradle
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.13"
       - name: Stage Python runtime
         working-directory: android
         run: python scripts/stage_python.py
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           gradle-version: "9.5.0"
       - name: Materialize stable debug keystore
@@ -195,7 +240,7 @@ jobs:
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload debug APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: alice-pro-debug-apk-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk

@@ -10,7 +10,9 @@ TraceSink = Callable[[str, Mapping[str, Any]], None]
 
 
 class RuntimeStorage:
-    def __init__(self, dispatcher: RuntimeDispatcher, runtime_id: str, *, trace: TraceSink | None = None) -> None:
+    def __init__(
+        self, dispatcher: RuntimeDispatcher, runtime_id: str, *, trace: TraceSink | None = None
+    ) -> None:
         self._dispatcher = dispatcher
         self._runtime_id = runtime_id
         self._trace = trace

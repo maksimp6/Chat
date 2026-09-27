@@ -2,9 +2,11 @@ import os
 import json
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from db_backend import connect_postgres, postgres_url_from_env
 from memory_db import Column, MemoryDatabase
+from runtime.request_context import current_runtime_data_root
 
 
 DB_PATH = os.getenv("ALICE_DB_PATH", "alice_pro.db")
@@ -12,7 +14,18 @@ _MEMORY_DB = MemoryDatabase()
 _MEMORY_INITIALIZED = False
 
 
+def _runtime_db_path():
+    data_root = current_runtime_data_root()
+    if not data_root:
+        return None
+    root = Path(data_root).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return str(root / "alice_pro.db")
+
+
 def is_memory_configured():
+    if current_runtime_data_root():
+        return False
     return os.getenv("ALICE_DB_BACKEND", "").strip().lower() == "memory"
 
 
@@ -20,42 +33,57 @@ def _memory_setup():
     global _MEMORY_INITIALIZED
     if _MEMORY_INITIALIZED:
         return
-    _MEMORY_DB.create_table("conversations", [
-        Column("id", str, nullable=False, unique=True),
-        Column("title", str, nullable=False),
-        Column("model", str, nullable=False),
-        Column("created_at", int, nullable=False),
-        Column("updated_at", int, nullable=False),
-    ])
-    _MEMORY_DB.create_table("messages", [
-        Column("id", int, nullable=False, unique=True),
-        Column("conversation_id", str, nullable=False),
-        Column("role", str, nullable=False),
-        Column("content", str, nullable=False),
-        Column("created_at", int, nullable=False),
-        Column("cost", (int, float), nullable=False, default=0.0),
-        Column("timings_json", str, nullable=False, default="[]"),
-        Column("trace_json", str, nullable=False, default="{}"),
-    ])
-    _MEMORY_DB.create_table("conv_settings", [
-        Column("conversation_id", str, nullable=False, unique=True),
-        Column("settings_json", str, nullable=False),
-        Column("updated_at", int, nullable=False),
-    ])
-    _MEMORY_DB.create_table("configs", [
-        Column("key", str, nullable=False, unique=True),
-        Column("value", str, nullable=False),
-    ])
-    _MEMORY_DB.create_table("conv_yandex_map", [
-        Column("local_id", str, nullable=False, unique=True),
-        Column("yandex_id", str, nullable=False),
-    ])
+    _MEMORY_DB.create_table(
+        "conversations",
+        [
+            Column("id", str, nullable=False, unique=True),
+            Column("title", str, nullable=False),
+            Column("model", str, nullable=False),
+            Column("created_at", int, nullable=False),
+            Column("updated_at", int, nullable=False),
+        ],
+    )
+    _MEMORY_DB.create_table(
+        "messages",
+        [
+            Column("id", int, nullable=False, unique=True),
+            Column("conversation_id", str, nullable=False),
+            Column("role", str, nullable=False),
+            Column("content", str, nullable=False),
+            Column("created_at", int, nullable=False),
+            Column("cost", (int, float), nullable=False, default=0.0),
+            Column("timings_json", str, nullable=False, default="[]"),
+            Column("trace_json", str, nullable=False, default="{}"),
+        ],
+    )
+    _MEMORY_DB.create_table(
+        "conv_settings",
+        [
+            Column("conversation_id", str, nullable=False, unique=True),
+            Column("settings_json", str, nullable=False),
+            Column("updated_at", int, nullable=False),
+        ],
+    )
+    _MEMORY_DB.create_table(
+        "configs",
+        [
+            Column("key", str, nullable=False, unique=True),
+            Column("value", str, nullable=False),
+        ],
+    )
+    _MEMORY_DB.create_table(
+        "conv_yandex_map",
+        [
+            Column("local_id", str, nullable=False, unique=True),
+            Column("yandex_id", str, nullable=False),
+        ],
+    )
     _MEMORY_INITIALIZED = True
 
 
 def reset_memory_db():
     global _MEMORY_INITIALIZED
-    _MEMORY_DB.clear()
+    _MEMORY_DB.reset()
     _MEMORY_INITIALIZED = False
     _memory_setup()
 
@@ -66,16 +94,27 @@ def _next_message_id():
 
 
 def get_conn():
-    if is_memory_configured():
-        raise RuntimeError("memory backend does not expose a SQL connection; use db API functions")
-    database_url = postgres_url_from_env()
-    if database_url:
-        return connect_postgres(database_url)
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
+    runtime_db_path = _runtime_db_path()
+    if runtime_db_path:
+        conn = sqlite3.connect(
+            runtime_db_path,
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            timeout=15,
+        )
+    else:
+        if is_memory_configured():
+            raise RuntimeError(
+                "memory backend does not expose a SQL connection; use db API functions"
+            )
+        database_url = postgres_url_from_env()
+        if database_url:
+            return connect_postgres(database_url)
+        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
+
 
 def init_db():
     if is_memory_configured():
@@ -159,8 +198,19 @@ def init_db():
 def get_conversations():
     if is_memory_configured():
         _memory_setup()
-        rows = sorted(_MEMORY_DB.select("conversations"), key=lambda r: r["updated_at"], reverse=True)
-        return [{"id": r["id"], "title": r["title"], "model": r["model"], "created_at": r["created_at"], "updated_at": r["updated_at"]} for r in rows]
+        rows = sorted(
+            _MEMORY_DB.select("conversations"), key=lambda r: r["updated_at"], reverse=True
+        )
+        return [
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "model": r["model"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+            }
+            for r in rows
+        ]
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM conversations ORDER BY updated_at DESC")
@@ -182,9 +232,23 @@ def create_conversation(conv_id, title, model):
     now = int(datetime.utcnow().timestamp())
     if is_memory_configured():
         _memory_setup()
-        updated = _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, title=title, model=model, created_at=now, updated_at=now)
+        updated = _MEMORY_DB.update(
+            "conversations",
+            lambda r: r["id"] == conv_id,
+            title=title,
+            model=model,
+            created_at=now,
+            updated_at=now,
+        )
         if not updated:
-            _MEMORY_DB.insert("conversations", id=conv_id, title=title, model=model, created_at=now, updated_at=now)
+            _MEMORY_DB.insert(
+                "conversations",
+                id=conv_id,
+                title=title,
+                model=model,
+                created_at=now,
+                updated_at=now,
+            )
         return
     conn = get_conn()
     cur = conn.cursor()
@@ -231,7 +295,12 @@ def update_conversation_title(conv_id, title, owner_id=None):
     """Persist an explicit title; owner authorization is enforced by the route layer."""
     normalized = normalize_conversation_title(title)
     if is_memory_configured():
-        _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, title=normalized, updated_at=int(datetime.utcnow().timestamp()))
+        _MEMORY_DB.update(
+            "conversations",
+            lambda r: r["id"] == conv_id,
+            title=normalized,
+            updated_at=int(datetime.utcnow().timestamp()),
+        )
         return
     conn = get_conn()
     cur = conn.cursor()
@@ -286,7 +355,12 @@ def maybe_update_conversation_title(conv_id, source_text):
 
 def update_conversation_model(conv_id, model):
     if is_memory_configured():
-        _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, model=model, updated_at=int(datetime.utcnow().timestamp()))
+        _MEMORY_DB.update(
+            "conversations",
+            lambda r: r["id"] == conv_id,
+            model=model,
+            updated_at=int(datetime.utcnow().timestamp()),
+        )
         return
     conn = get_conn()
     cur = conn.cursor()
@@ -315,14 +389,30 @@ def delete_conversation(conv_id):
 
 def get_messages(conv_id):
     if is_memory_configured():
-        rows = sorted(_MEMORY_DB.select("messages", lambda r: r["conversation_id"] == conv_id), key=lambda r: r["id"])
+        rows = sorted(
+            _MEMORY_DB.select("messages", lambda r: r["conversation_id"] == conv_id),
+            key=lambda r: r["id"],
+        )
         result = []
         for r in rows:
-            try: timings = json.loads(r["timings_json"])
-            except Exception: timings = []
-            try: trace = json.loads(r["trace_json"])
-            except Exception: trace = {}
-            result.append({"role": r["role"], "text": r["content"], "cost": r["cost"], "created_at": r["created_at"], "timings": timings, "trace": trace})
+            try:
+                timings = json.loads(r["timings_json"])
+            except Exception:
+                timings = []
+            try:
+                trace = json.loads(r["trace_json"])
+            except Exception:
+                trace = {}
+            result.append(
+                {
+                    "role": r["role"],
+                    "text": r["content"],
+                    "cost": r["cost"],
+                    "created_at": r["created_at"],
+                    "timings": timings,
+                    "trace": trace,
+                }
+            )
         return result
     conn = get_conn()
     cur = conn.cursor()
@@ -347,14 +437,16 @@ def get_messages(conv_id):
         except Exception:
             parsed_trace = {}
 
-        res.append({
-            "role": r["role"],
-            "text": r["content"],
-            "cost": r["cost"],
-            "created_at": r["created_at"],
-            "timings": parsed_timings,
-            "trace": parsed_trace,
-        })
+        res.append(
+            {
+                "role": r["role"],
+                "text": r["content"],
+                "cost": r["cost"],
+                "created_at": r["created_at"],
+                "timings": parsed_timings,
+                "trace": parsed_trace,
+            }
+        )
     return res
 
 
@@ -373,7 +465,17 @@ def add_message(
     if is_memory_configured():
         if not isinstance(content, str):
             content = json.dumps(content, ensure_ascii=False) if content is not None else ""
-        _MEMORY_DB.insert("messages", id=_next_message_id(), conversation_id=conv_id, role=role, content=content, created_at=now, cost=cost, timings_json=json.dumps(timings or [], ensure_ascii=False), trace_json=json.dumps(trace or {}, ensure_ascii=False))
+        _MEMORY_DB.insert(
+            "messages",
+            id=_next_message_id(),
+            conversation_id=conv_id,
+            role=role,
+            content=content,
+            created_at=now,
+            cost=cost,
+            timings_json=json.dumps(timings or [], ensure_ascii=False),
+            trace_json=json.dumps(trace or {}, ensure_ascii=False),
+        )
         _MEMORY_DB.update("conversations", lambda r: r["id"] == conv_id, updated_at=now)
         return
     if not isinstance(content, str):
@@ -404,9 +506,16 @@ def save_conv_settings(conv_id, settings_dict):
     now = int(datetime.utcnow().timestamp())
     if is_memory_configured():
         payload = json.dumps(settings_dict, ensure_ascii=False)
-        updated = _MEMORY_DB.update("conv_settings", lambda r: r["conversation_id"] == conv_id, settings_json=payload, updated_at=now)
+        updated = _MEMORY_DB.update(
+            "conv_settings",
+            lambda r: r["conversation_id"] == conv_id,
+            settings_json=payload,
+            updated_at=now,
+        )
         if not updated:
-            _MEMORY_DB.insert("conv_settings", conversation_id=conv_id, settings_json=payload, updated_at=now)
+            _MEMORY_DB.insert(
+                "conv_settings", conversation_id=conv_id, settings_json=payload, updated_at=now
+            )
         return
     settings_json = json.dumps(settings_dict, ensure_ascii=False)
     conn = get_conn()
@@ -430,8 +539,10 @@ def get_conv_settings(conv_id):
         rows = _MEMORY_DB.select("conv_settings", lambda r: r["conversation_id"] == conv_id)
         if not rows:
             return None
-        try: return json.loads(rows[0]["settings_json"])
-        except Exception: return None
+        try:
+            return json.loads(rows[0]["settings_json"])
+        except Exception:
+            return None
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -470,9 +581,12 @@ def get_config(key: str, default=None):
     init_config_table()
     if is_memory_configured():
         rows = _MEMORY_DB.select("configs", lambda r: r["key"] == key)
-        if not rows: return default
-        try: return json.loads(rows[0]["value"])
-        except Exception: return rows[0]["value"]
+        if not rows:
+            return default
+        try:
+            return json.loads(rows[0]["value"])
+        except Exception:
+            return rows[0]["value"]
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT value FROM configs WHERE key = ?", (key,))

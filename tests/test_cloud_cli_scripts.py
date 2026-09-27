@@ -63,7 +63,8 @@ def test_installer_download_is_pinned_to_github_release() -> None:
 def test_only_cache_helper_contains_official_download_host() -> None:
     official_host = "sbc-cli.obs.ru-moscow-1.hc.sbercloud.ru"
     scripts_with_host = {
-        path.name for path in (ROOT / "scripts").iterdir()
+        path.name
+        for path in (ROOT / "scripts").iterdir()
         if path.is_file() and official_host in path.read_text(errors="ignore")
     }
     assert scripts_with_host == {"cache_cloud_cli.sh"}

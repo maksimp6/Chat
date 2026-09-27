@@ -39,7 +39,9 @@ class StorageProvider(Protocol):
     name: str
     requires_credentials: bool
 
-    def upload(self, object_id: str, content: bytes, *, credentials: object | None) -> StorageObject: ...
+    def upload(
+        self, object_id: str, content: bytes, *, credentials: object | None
+    ) -> StorageObject: ...
     def download(self, object_id: str, *, credentials: object | None) -> bytes: ...
     def list(self, prefix: str, *, credentials: object | None) -> list[StorageObject]: ...
 
@@ -83,7 +85,9 @@ class LocalDirectoryStorage:
             location=f"local:{relative.as_posix()}",
         )
 
-    def upload(self, object_id: str, content: bytes, *, credentials: object | None = None) -> StorageObject:
+    def upload(
+        self, object_id: str, content: bytes, *, credentials: object | None = None
+    ) -> StorageObject:
         relative, path = self._path(object_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(bytes(content))
@@ -101,5 +105,10 @@ class LocalDirectoryStorage:
         base = self._root if relative == PurePosixPath(".") else self._path(prefix)[1]
         if not base.exists():
             return []
-        files = [base] if base.is_file() else sorted(path for path in base.rglob("*") if path.is_file())
-        return [self._object(PurePosixPath(path.relative_to(self._root).as_posix()), path) for path in files]
+        files = (
+            [base] if base.is_file() else sorted(path for path in base.rglob("*") if path.is_file())
+        )
+        return [
+            self._object(PurePosixPath(path.relative_to(self._root).as_posix()), path)
+            for path in files
+        ]

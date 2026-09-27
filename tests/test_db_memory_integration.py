@@ -57,11 +57,13 @@ def test_memory_backend_title_logic_and_config_string(monkeypatch):
     db.init_db()
     db.create_conversation("c1", "Новый чат", "model")
 
-    assert db.maybe_update_conversation_title("c1", "\n  Первая строка  \nвторая") == "Первая строка"
+    assert (
+        db.maybe_update_conversation_title("c1", "\n  Первая строка  \nвторая") == "Первая строка"
+    )
     assert db.get_conversation_title("c1") == "Первая строка"
     assert db.maybe_update_conversation_title("c1", "другая") == "Первая строка"
     assert db.maybe_update_conversation_title("c1", "   ") == "Первая строка"
-    assert db.maybe_update_conversation_title("missing", "текст") == "текст"
+    assert db.maybe_update_conversation_title("missing", "текст") is None
 
     db.set_config("plain", "hello")
     assert db.get_config("plain") == "hello"
@@ -79,3 +81,12 @@ def test_memory_backend_non_string_message_and_invalid_json(monkeypatch):
     message = db.get_messages("c1")[0]
     assert message["timings"] == []
     assert message["trace"] == {}
+
+
+def test_memory_backend_conv_settings_missing_or_corrupt(monkeypatch):
+    monkeypatch.setenv("ALICE_DB_BACKEND", "memory")
+    db.init_db()
+    assert db.get_conv_settings("c1") is None
+    db.save_conv_settings("c1", {"temperature": 0.2})
+    db._MEMORY_DB.update("conv_settings", lambda r: True, settings_json="{bad")
+    assert db.get_conv_settings("c1") is None

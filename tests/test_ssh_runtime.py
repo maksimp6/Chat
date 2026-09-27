@@ -180,12 +180,8 @@ class SSHRuntimeTests(unittest.TestCase):
 
         self.assertTrue(result["success"])
         traced_call = trace.trace["tool_calls"][0]
-        self.assertEqual(
-            traced_call["arguments"]["command"], "deploy --token=<redacted>"
-        )
-        self.assertEqual(
-            traced_call["result"]["data"]["stdout"], "<redacted>"
-        )
+        self.assertEqual(traced_call["arguments"]["command"], "deploy --token=<redacted>")
+        self.assertEqual(traced_call["result"]["data"]["stdout"], "<redacted>")
         self.assertEqual(
             traced_call["result"]["data"]["stderr"],
             "<redacted>",
