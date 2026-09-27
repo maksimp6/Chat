@@ -28,6 +28,7 @@ jobs:
     if: vars.ALICE_HOST_PREVIEW_ENABLED == 'true'
     environment: production
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # Include the short-token path prefix in this secret when host auth requires it.
       ALICE_ENVIRONMENT_HOST_URL: ${{ secrets.ALICE_ENVIRONMENT_HOST_URL }}
@@ -35,13 +36,14 @@ jobs:
       PREVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Check out exact commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ env.PREVIEW_COMMIT }}
           fetch-depth: 1
       - name: Run repository validation
         run: |
-          python -m compileall -q .
+          git ls-files '*.py' -z | xargs -0 -r python -m py_compile
           python tests/validate_runtime_modules.py
           pytest -q
       - name: Request, exercise, and clean up host environment
