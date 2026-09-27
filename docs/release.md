@@ -22,7 +22,7 @@ git push origin v0.1.0
 - `ALICE_RELEASE_KEY_ALIAS`
 - `ALICE_RELEASE_KEY_PASSWORD`
 
-The keystore is decoded only in the runner workspace and is not uploaded as a standalone artifact.
+The keystore is decoded only in the runner's temporary directory, removed by an unconditional cleanup step, and never uploaded as an artifact.
 
 ## Build metadata
 
@@ -43,5 +43,12 @@ Every release should have:
 - a signed APK attached to the GitHub Release;
 - a SHA-256 checksum;
 - release metadata containing tag, commit and build number.
+
+Before publishing, CI also verifies that the APK signer matches the configured
+release keystore, the application ID remains `com.alicepro.mobile`, and the APK's
+version name and code match the tag and workflow run number. Before changing the
+release keystore, compare its certificate SHA-256 fingerprint with a previously
+published production APK (or the registered upload certificate when using Play
+App Signing); a different certificate breaks direct-update compatibility.
 
 The workflow intentionally fails when signing secrets are absent instead of silently publishing a debug or unsigned APK as a production release.
