@@ -5,9 +5,9 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
-      day: monday
     open-pull-requests-limit: 5
     labels: [dependencies]
     commit-message:
@@ -23,9 +23,9 @@ updates:
     directory: "/android"
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
-      day: monday
     open-pull-requests-limit: 5
     labels: [dependencies, android]
     commit-message:
