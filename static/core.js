@@ -277,12 +277,17 @@ function initCore() {
   applyConversationCache();
   if (typeof updateUIForModel === "function") updateUIForModel();
   if (typeof updateModelButton === "function") updateModelButton();
+  if (window.AliceBoot && typeof window.AliceBoot.markShellReady === "function") {
+    window.AliceBoot.markShellReady();
+  }
 
   // Network/API enhancement is deliberately separate from shell startup.
   void enhanceCore();
 }
 
-document.addEventListener("DOMContentLoaded", initCore);
+// Deferred scripts run after HTML parsing. Starting here keeps later optional
+// resources from delaying the usable shell until DOMContentLoaded.
+initCore();
 
 function getMessages(id) {
   try {
