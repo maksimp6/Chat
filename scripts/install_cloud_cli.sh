@@ -6,7 +6,7 @@ set -euo pipefail
 readonly RELEASE_TAG="cloud-cli-mirror-2026-09-27"
 readonly RELEASE_BASE_URL="https://github.com/maksimp6/Chat/releases/download/$RELEASE_TAG"
 readonly CACHE_DIR="${CLOUD_CLI_CACHE_DIR:-$HOME/.cache/alice-pro/cloud-cli}"
-readonly INSTALL_DIR="${CLOUD_CLI_INSTALL_DIR:-/usr/local/bin}"
+readonly INSTALL_DIR="${CLOUD_CLI_INSTALL_DIR:-$HOME/.local/bin}"
 
 if command -v cloud >/dev/null 2>&1; then
     echo "Cloud.ru CLI is already installed at $(command -v cloud)."
