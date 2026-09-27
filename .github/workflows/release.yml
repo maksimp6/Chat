@@ -17,7 +17,7 @@ jobs:
     name: Build and publish release
     runs-on: ubuntu-latest
     env:
-      ALICE_RELEASE_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release-signing.keystore
+      ALICE_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/alice-release.jks
       ALICE_RELEASE_STORE_PASSWORD: ${{ secrets.ALICE_RELEASE_STORE_PASSWORD }}
       ALICE_RELEASE_KEY_ALIAS: ${{ secrets.ALICE_RELEASE_KEY_ALIAS }}
       ALICE_RELEASE_KEY_PASSWORD: ${{ secrets.ALICE_RELEASE_KEY_PASSWORD }}
@@ -94,13 +94,36 @@ jobs:
             :app:assembleRelease
 
       - name: Verify release APK
+        env:
+          EXPECTED_PACKAGE: com.alicepro.mobile
+          EXPECTED_VERSION_NAME: ${{ github.ref_name }}
+          EXPECTED_VERSION_CODE: ${{ github.run_number }}
         run: |
           set -euo pipefail
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
           test -n "$APKSIGNER"
-          "$APKSIGNER" verify --verbose "$APK"
+          test -n "$AAPT"
+
+          SIGNATURE_REPORT="$("$APKSIGNER" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$SIGNATURE_REPORT"
+          APK_CERT_SHA256="$(printf '%s\n' "$SIGNATURE_REPORT" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+          KEYSTORE_CERT_SHA256="$(keytool -J-Duser.language=en -list -v \
+            -keystore "$ALICE_RELEASE_KEYSTORE_PATH" \
+            -storepass "$ALICE_RELEASE_STORE_PASSWORD" \
+            -alias "$ALICE_RELEASE_KEY_ALIAS" | sed -n 's/^[[:space:]]*SHA256: //p' | head -1 | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+          test -n "$APK_CERT_SHA256"
+          test "$APK_CERT_SHA256" = "$KEYSTORE_CERT_SHA256"
+
+          PACKAGE_REPORT="$("$AAPT" dump badging "$APK" | head -1)"
+          printf '%s\n' "$PACKAGE_REPORT"
+          VERSION_NAME="${EXPECTED_VERSION_NAME#v}"
+          [[ "$PACKAGE_REPORT" == *"name='$EXPECTED_PACKAGE'"* ]]
+          [[ "$PACKAGE_REPORT" == *"versionCode='$EXPECTED_VERSION_CODE'"* ]]
+          [[ "$PACKAGE_REPORT" == *"versionName='$VERSION_NAME'"* ]]
+
           sha256sum "$APK" | tee "$APK.sha256"
           {
             echo "tag=$GITHUB_REF_NAME"
@@ -122,3 +145,7 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk \
             android/app/build/outputs/apk/release/app-release.apk.sha256 \
             android/release-metadata.txt
+
+      - name: Remove release keystore
+        if: always()
+        run: rm -f "$ALICE_RELEASE_KEYSTORE_PATH"
