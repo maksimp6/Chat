@@ -200,6 +200,8 @@ jobs:
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
@@ -232,6 +234,8 @@ jobs:
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
