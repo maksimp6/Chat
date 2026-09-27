@@ -3,6 +3,7 @@
 from .dispatcher import (
     FILESYSTEM_READ_TEXT,
     FILESYSTEM_WRITE_TEXT,
+    TOOL_EXECUTE_OPERATION,
     RuntimeContext,
     RuntimeDispatcher,
     RuntimeNotFound,
@@ -21,6 +22,7 @@ from .request_context import (
 __all__ = [
     "FILESYSTEM_READ_TEXT",
     "FILESYSTEM_WRITE_TEXT",
+    "TOOL_EXECUTE_OPERATION",
     "RuntimeContext",
     "RuntimeDispatcher",
     "RuntimeNotFound",

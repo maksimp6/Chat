@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import RLock, local
 from typing import Any, Callable, Mapping
+
+from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+
+
+TOOL_EXECUTE_OPERATION = "tools.execute"
 
 
 class RuntimeScopeViolation(PermissionError):
@@ -33,6 +38,14 @@ class RuntimeContext:
 
 
 RuntimeHandler = Callable[[RuntimeContext, Mapping[str, Any]], Any]
+RuntimeToolPolicy = Callable[[RuntimeContext, Any, UniversalToolCall], Any]
+
+
+@dataclass(frozen=True)
+class _RuntimeToolBoundary:
+    executor: UniversalToolExecutor
+    policy: RuntimeToolPolicy | None = None
+    approval: RuntimeToolPolicy | None = None
 
 
 class RuntimeDispatcher:
@@ -46,9 +59,11 @@ class RuntimeDispatcher:
         self._lock = RLock()
         self._runtimes: dict[str, RuntimeContext] = {}
         self._operations: dict[str, RuntimeHandler] = {}
+        self._tool_boundaries: dict[str, _RuntimeToolBoundary] = {}
         self._local = local()
         self.register_operation(FILESYSTEM_READ_TEXT, self._read_runtime_text)
         self.register_operation(FILESYSTEM_WRITE_TEXT, self._write_runtime_text)
+        self.register_operation(TOOL_EXECUTE_OPERATION, self._execute_tool)
 
     @staticmethod
     def _runtime_path(context: RuntimeContext, value: Any) -> Path:
@@ -105,11 +120,42 @@ class RuntimeDispatcher:
         )
         with self._lock:
             self._runtimes[runtime_id] = context
+            # A reused id must never inherit capabilities from an earlier runtime.
+            self._tool_boundaries.pop(runtime_id, None)
         return context
 
     def unregister_runtime(self, runtime_id: str) -> None:
         with self._lock:
             self._runtimes.pop(runtime_id, None)
+            self._tool_boundaries.pop(runtime_id, None)
+
+    def register_tool_executor(
+        self,
+        runtime_id: str,
+        executor: UniversalToolExecutor,
+        *,
+        policy: RuntimeToolPolicy | None = None,
+        approval: RuntimeToolPolicy | None = None,
+    ) -> None:
+        """Bind one policy-controlled tool executor to an existing runtime.
+
+        Runtime code receives only the ``tools.execute`` dispatcher operation;
+        the registry, MCP connectors, and credentials owned by the executor stay
+        behind this boundary.
+        """
+        self.context(runtime_id)
+        if not isinstance(executor, UniversalToolExecutor):
+            raise TypeError("executor must be a UniversalToolExecutor")
+        if policy is not None and not callable(policy):
+            raise TypeError("tool policy must be callable")
+        if approval is not None and not callable(approval):
+            raise TypeError("tool approval must be callable")
+        with self._lock:
+            self._tool_boundaries[runtime_id] = _RuntimeToolBoundary(
+                executor=executor,
+                policy=policy,
+                approval=approval,
+            )
 
     def register_operation(self, name: str, handler: RuntimeHandler) -> None:
         name = str(name or "").strip()
@@ -165,3 +211,61 @@ class RuntimeDispatcher:
                     pass
             else:
                 self._local.runtime_id = previous
+
+    def _execute_tool(
+        self, context: RuntimeContext, payload: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        with self._lock:
+            boundary = self._tool_boundaries.get(context.runtime_id)
+        if boundary is None:
+            raise RuntimeOperationNotFound(
+                f"{TOOL_EXECUTE_OPERATION} is not configured for {context.runtime_id!r}"
+            )
+
+        raw_call = payload.get("call")
+        if isinstance(raw_call, UniversalToolCall):
+            call = raw_call
+        elif isinstance(raw_call, Mapping):
+            call = UniversalToolCall(
+                tool_name=str(raw_call.get("tool_name") or raw_call.get("name") or ""),
+                arguments=dict(raw_call.get("arguments") or {}),
+                call_id=raw_call.get("call_id"),
+                transport=str(raw_call.get("transport") or "internal"),
+                trace_id=raw_call.get("trace_id"),
+                invocation_id=raw_call.get("invocation_id"),
+                user_id=raw_call.get("user_id"),
+                approved=bool(raw_call.get("approved")),
+                metadata=dict(raw_call.get("metadata") or {}),
+            )
+        else:
+            raise TypeError("tools.execute requires a call mapping")
+
+        if context.owner_id is not None and call.user_id not in {None, context.owner_id}:
+            raise RuntimeScopeViolation(
+                f"runtime {context.runtime_id!r} cannot execute tools as another owner"
+            )
+        call = replace(
+            call,
+            user_id=context.owner_id or call.user_id,
+            metadata={
+                **dict(call.metadata),
+                "runtime_id": context.runtime_id,
+                "runtime_namespace": context.namespace,
+            },
+        )
+
+        def apply_policy(definition, tool_call):
+            if boundary.policy is None:
+                return True
+            return boundary.policy(context, definition, tool_call)
+
+        def apply_approval(definition, tool_call):
+            if boundary.approval is None:
+                return False
+            return boundary.approval(context, definition, tool_call)
+
+        return boundary.executor.execute(
+            call,
+            policy=apply_policy,
+            approval=apply_approval,
+        )
