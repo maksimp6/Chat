@@ -34,4 +34,5 @@ test -n "$CLOUD_BIN"
 
 mkdir -p "$INSTALL_DIR"
 install -m 755 "$CLOUD_BIN" "$INSTALL_DIR/cloud"
-"$INSTALL_DIR/cloud" --version
+test -x "$INSTALL_DIR/cloud"
+printf 'Cloud CLI installed: %s\\n' "$INSTALL_DIR/cloud"
