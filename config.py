@@ -31,7 +31,6 @@ SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
 SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
 
 
-
 def get_donation_url():
     """Return the optional public donation page URL, or None when disabled.
 

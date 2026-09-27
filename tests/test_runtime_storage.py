@@ -28,9 +28,7 @@ def test_local_provider_upload_download_and_list(tmp_path):
     assert saved.object_id == "reports/result.txt"
     assert saved.location == "local:reports/result.txt"
     assert storage.download("local", saved.object_id) == b"result"
-    assert [item.object_id for item in storage.list("local", "reports")] == [
-        "reports/result.txt"
-    ]
+    assert [item.object_id for item in storage.list("local", "reports")] == ["reports/result.txt"]
 
 
 def test_provider_registration_is_runtime_and_owner_scoped(tmp_path):
@@ -42,9 +40,7 @@ def test_provider_registration_is_runtime_and_owner_scoped(tmp_path):
     with pytest.raises(StorageProviderUnavailable):
         RuntimeStorage(dispatcher, "runtime-b").list("local")
     with pytest.raises(RuntimeScopeViolation):
-        dispatcher.dispatch_storage(
-            "runtime-a", "local", "list", resource_runtime_id="runtime-b"
-        )
+        dispatcher.dispatch_storage("runtime-a", "local", "list", resource_runtime_id="runtime-b")
     with pytest.raises(RuntimeScopeViolation):
         dispatcher.register_storage_provider(
             "runtime-a", LocalDirectoryStorage(tmp_path / "other"), owner_id="owner-b"
@@ -97,7 +93,9 @@ def test_provider_errors_are_sanitized(tmp_path):
 def test_trace_has_lifecycle_but_no_object_data_or_credentials(tmp_path):
     dispatcher, _ = configured_storage(tmp_path)
     events = []
-    storage = RuntimeStorage(dispatcher, "runtime-a", trace=lambda kind, data: events.append((kind, data)))
+    storage = RuntimeStorage(
+        dispatcher, "runtime-a", trace=lambda kind, data: events.append((kind, data))
+    )
 
     storage.upload("local", "private/name.txt", b"secret-content")
 
@@ -111,7 +109,9 @@ def test_trace_has_lifecycle_but_no_object_data_or_credentials(tmp_path):
     assert "secret-content" not in repr(events)
 
 
-@pytest.mark.parametrize("name", ["../secret", "folder/../../secret", "/absolute", "folder\\..\\secret"])
+@pytest.mark.parametrize(
+    "name", ["../secret", "folder/../../secret", "/absolute", "folder\\..\\secret"]
+)
 def test_local_provider_rejects_path_traversal(tmp_path, name):
     _, storage = configured_storage(tmp_path)
     with pytest.raises(StorageError, match="Invalid storage object name"):

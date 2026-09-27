@@ -2,7 +2,12 @@ import pytest
 
 from invocation_context import InvocationContext
 from invocation_trace import create_invocation_trace
-from runtime import ConversationAgent, ConversationAgentRouter, RuntimeDispatcher, RuntimeScopeViolation
+from runtime import (
+    ConversationAgent,
+    ConversationAgentRouter,
+    RuntimeDispatcher,
+    RuntimeScopeViolation,
+)
 
 
 def context(runtime_id: str, agent_id: str = "agent-a") -> InvocationContext:
@@ -30,7 +35,9 @@ def configured_router():
     router = ConversationAgentRouter(dispatcher)
     for runtime_id in ("runtime-a", "runtime-b"):
         router.register(
-            ConversationAgent(runtime_id, "conversation-1", "agent-a", config={"nested": {"value": runtime_id}})
+            ConversationAgent(
+                runtime_id, "conversation-1", "agent-a", config={"nested": {"value": runtime_id}}
+            )
         )
         router.register(ConversationAgent(runtime_id, "conversation-1", "agent-b"))
     return router, calls
@@ -42,7 +49,9 @@ def test_two_agents_handoff_and_tool_call_are_correlated_and_traced():
     trace = create_invocation_trace(invocation)
 
     target = router.handoff(invocation, "agent-a", "agent-b", trace)
-    result = router.invoke_tool(invocation, target, "documents.read", {"secret": "not-traced"}, trace)
+    result = router.invoke_tool(
+        invocation, target, "documents.read", {"secret": "not-traced"}, trace
+    )
 
     assert result == {"runtime_id": "runtime-a", "tool": "documents.read"}
     assert calls[0][1]["invocation_id"] == invocation.invocation_id
@@ -50,7 +59,9 @@ def test_two_agents_handoff_and_tool_call_are_correlated_and_traced():
     events = trace.trace["events"]
     assert [event["type"] for event in events].count("conversation_agent_selected") == 2
     assert "conversation_agent_handoff" in [event["type"] for event in events]
-    tool_event = next(event for event in events if event["type"] == "conversation_agent_tool_invoked")
+    tool_event = next(
+        event for event in events if event["type"] == "conversation_agent_tool_invoked"
+    )
     assert tool_event["payload"]["agent_id"] == "agent-b"
     assert "arguments" not in tool_event["payload"]
     assert "secret" not in str(tool_event)
@@ -74,7 +85,9 @@ def test_cross_runtime_agent_invocation_is_rejected_before_dispatch():
     router, calls = configured_router()
     invocation_a = context("runtime-a")
     trace_a = create_invocation_trace(invocation_a)
-    agent_b = router.select(context("runtime-b"), "agent-a", create_invocation_trace(context("runtime-b")))
+    agent_b = router.select(
+        context("runtime-b"), "agent-a", create_invocation_trace(context("runtime-b"))
+    )
 
     with pytest.raises(RuntimeScopeViolation):
         router.invoke_tool(invocation_a, agent_b, "documents.read", {}, trace_a)

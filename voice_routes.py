@@ -1,4 +1,5 @@
 """Voice assistant HTTP pipeline for SpeechKit STT/TTS and Alice chat."""
+
 from __future__ import annotations
 
 import base64
@@ -89,7 +90,11 @@ def _check_owner(session: VoiceSession) -> None:
     current_owner = get_current_owner_id(required=False)
     if session.owner_id and current_owner != session.owner_id:
         raise PermissionError("voice session access denied")
-    if session.conversation_id and current_owner and not check_access(session.conversation_id, current_owner):
+    if (
+        session.conversation_id
+        and current_owner
+        and not check_access(session.conversation_id, current_owner)
+    ):
         raise PermissionError("conversation access denied")
 
 
@@ -123,7 +128,9 @@ def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
         timeout=30,
     )
     if response.status_code != 200:
-        raise RuntimeError(f"SpeechKit STT failed: HTTP {response.status_code}: {response.text[:500]}")
+        raise RuntimeError(
+            f"SpeechKit STT failed: HTTP {response.status_code}: {response.text[:500]}"
+        )
     result = response.json().get("result", "")
     if not isinstance(result, str):
         raise RuntimeError("SpeechKit STT returned an invalid result")
@@ -133,7 +140,9 @@ def _stt(audio: bytes, content_type: str = "application/octet-stream") -> str:
 def _chat(text: str, conversation_id: str | None, model: str) -> str:
     if not conversation_id:
         raise ValueError("conversation_id is required for voice chat")
-    text_model = model if model in TEXT_MODELS else os.getenv("ALICE_VOICE_CHAT_MODEL", "aliceai-llm")
+    text_model = (
+        model if model in TEXT_MODELS else os.getenv("ALICE_VOICE_CHAT_MODEL", "aliceai-llm")
+    )
     client = AliceClient(Config)
     response = client.ask_with_mcp(
         message=text,
@@ -162,7 +171,9 @@ def _tts(text: str, voice: str) -> bytes:
         timeout=30,
     )
     if response.status_code != 200:
-        raise RuntimeError(f"SpeechKit TTS failed: HTTP {response.status_code}: {response.text[:500]}")
+        raise RuntimeError(
+            f"SpeechKit TTS failed: HTTP {response.status_code}: {response.text[:500]}"
+        )
     return response.content
 
 
@@ -172,7 +183,9 @@ def _process(session: VoiceSession) -> None:
         transcript = _stt(bytes(session.audio), session.audio_content_type)
         if not transcript:
             raise ValueError("speech was not recognized")
-        _emit(session, "conversation.item.input_audio_transcription.completed", transcript=transcript)
+        _emit(
+            session, "conversation.item.input_audio_transcription.completed", transcript=transcript
+        )
 
         reply = _chat(transcript, session.conversation_id, session.model)
         if session.response_mode in {"text", "both", "audio"}:
@@ -180,7 +193,11 @@ def _process(session: VoiceSession) -> None:
 
         if session.response_mode in {"audio", "both"}:
             session.output_audio = _tts(reply, session.voice)
-            _emit(session, "response.output_audio.ready", audio_url=f"/api/voice/output?session_id={session.session_id}")
+            _emit(
+                session,
+                "response.output_audio.ready",
+                audio_url=f"/api/voice/output?session_id={session.session_id}",
+            )
 
         _emit(session, "response.done")
     except Exception as exc:
@@ -257,7 +274,11 @@ def voice_events():
             if event.get("type") == "response.done":
                 break
 
-    return Response(stream(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return Response(
+        stream(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @voice_bp.get("/api/voice/output")

@@ -52,7 +52,9 @@ class ConversationAgentRouter:
         key = (agent.runtime_id, agent.conversation_id, agent.agent_id)
         self._agents[key] = agent
 
-    def select(self, context: InvocationContext, agent_id: str, trace: ExecutionTrace) -> ConversationAgent:
+    def select(
+        self, context: InvocationContext, agent_id: str, trace: ExecutionTrace
+    ) -> ConversationAgent:
         self._validate_context(context)
         key = (context.runtime_id or "", context.conversation_id, str(agent_id))
         try:
@@ -61,7 +63,11 @@ class ConversationAgentRouter:
             raise KeyError("agent is not registered in this runtime and conversation") from exc
         trace.add_event(
             "conversation_agent_selected",
-            {"runtime_id": agent.runtime_id, "conversation_id": agent.conversation_id, "agent_id": agent.agent_id},
+            {
+                "runtime_id": agent.runtime_id,
+                "conversation_id": agent.conversation_id,
+                "agent_id": agent.agent_id,
+            },
         )
         return agent
 
@@ -76,8 +82,12 @@ class ConversationAgentRouter:
         target = self.select(context, target_agent_id, trace)
         trace.add_event(
             "conversation_agent_handoff",
-            {"runtime_id": target.runtime_id, "conversation_id": target.conversation_id,
-             "source_agent_id": source.agent_id, "target_agent_id": target.agent_id},
+            {
+                "runtime_id": target.runtime_id,
+                "conversation_id": target.conversation_id,
+                "source_agent_id": source.agent_id,
+                "target_agent_id": target.agent_id,
+            },
         )
         return target
 
@@ -90,12 +100,21 @@ class ConversationAgentRouter:
         trace: ExecutionTrace,
     ) -> Any:
         self._validate_context(context)
-        if (agent.runtime_id, agent.conversation_id) != (context.runtime_id, context.conversation_id):
-            raise RuntimeScopeViolation("agent does not belong to the invocation runtime and conversation")
+        if (agent.runtime_id, agent.conversation_id) != (
+            context.runtime_id,
+            context.conversation_id,
+        ):
+            raise RuntimeScopeViolation(
+                "agent does not belong to the invocation runtime and conversation"
+            )
         trace.add_event(
             "conversation_agent_tool_invoked",
-            {"runtime_id": agent.runtime_id, "conversation_id": agent.conversation_id,
-             "agent_id": agent.agent_id, "tool_name": str(tool_name)},
+            {
+                "runtime_id": agent.runtime_id,
+                "conversation_id": agent.conversation_id,
+                "agent_id": agent.agent_id,
+                "tool_name": str(tool_name),
+            },
         )
         return self._dispatcher.dispatch(
             agent.runtime_id,

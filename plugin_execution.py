@@ -92,9 +92,7 @@ class PluginExecutionGateway:
                 raise PermissionError(f"plugin permission denied: {required_permission}")
             missing = set(definition.capabilities) - set(record.manifest.capabilities)
             if missing:
-                raise PermissionError(
-                    "plugin capability denied: " + ", ".join(sorted(missing))
-                )
+                raise PermissionError("plugin capability denied: " + ", ".join(sorted(missing)))
             return True
 
         result = self.executor.execute_with_trace(
