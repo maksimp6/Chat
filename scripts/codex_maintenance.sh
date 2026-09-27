@@ -117,7 +117,7 @@ if ! command -v cloud >/dev/null 2>&1; then
   run_timed 180s bash scripts/install_cloud_cli.sh
 fi
 test -x "$BIN_DIR/cloud"
-log "Cloud CLI installed at $BIN_DIR/cloud; first-use privacy consent is intentionally deferred"
+run_timed 30s cloud --version
 
 git config --global commit.gpgsign true
 git config --global tag.gpgsign true
