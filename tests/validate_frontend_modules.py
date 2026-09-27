@@ -43,7 +43,7 @@ FETCH_IN_LOOP_RE = re.compile(
     r"\b(?:while|for)\b[\s\S]{0,400}\b(?:fetch|XMLHttpRequest)\s*\("
 )
 ARRAY_LITERAL_RE = re.compile(r"\[([^\[\]]*)\]", re.DOTALL)
-ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)\s*\)")
+ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)")
 REPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
     r"[\s\S]{0,250}\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\("
