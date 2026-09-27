@@ -23,14 +23,17 @@ git config --global commit.gpgsign true
 git config --global tag.gpgsign true
 git config --global gpg.program gpg
 
-# Refresh installed control scripts from origin/master for the next run.
-git fetch origin master
-mkdir -p "$INSTALL_DIR" "$BIN_DIR"
-for name in codex_setup.sh codex_maintenance.sh; do
-  git show "origin/master:scripts/$name" > "$INSTALL_DIR/$name.next"
-  chmod 700 "$INSTALL_DIR/$name.next"
-  mv "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"
-done
+# Prefer current master when a usable origin exists. Otherwise keep the
+# already installed recovery copies instead of making maintenance unusable.
+if git remote get-url origin >/dev/null 2>&1; then
+  git fetch origin master
+  mkdir -p "$INSTALL_DIR" "$BIN_DIR"
+  for name in codex_setup.sh codex_maintenance.sh; do
+    git show "origin/master:scripts/$name" > "$INSTALL_DIR/$name.next"
+    chmod 700 "$INSTALL_DIR/$name.next"
+    mv "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"
+  done
+fi
 
 cat > "$BIN_DIR/alice-pro-maintenance.next" <<'EOF'
 #!/usr/bin/env bash
