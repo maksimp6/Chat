@@ -13,6 +13,7 @@ from .dispatcher import (
 )
 from .loader import RuntimeHostAPI, RuntimeLoadError, RuntimeLoader
 from .conversation_agents import ConversationAgent, ConversationAgentRouter
+from .storage import RuntimeStorage
 from .request_context import (
     bind_runtime_request,
     current_runtime_base_path,
@@ -35,6 +36,7 @@ __all__ = [
     "RuntimeLoader",
     "ConversationAgent",
     "ConversationAgentRouter",
+    "RuntimeStorage",
     "bind_runtime_request",
     "current_runtime_base_path",
     "current_runtime_data_root",

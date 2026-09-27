@@ -33,6 +33,11 @@ def test_direct_tool_registry_access_is_rejected():
     assert any("direct import from tool_registry is forbidden" in error for error in errors)
 
 
+def test_direct_storage_provider_access_is_rejected():
+    errors = errors_for("from storage import LocalDirectoryStorage\n")
+    assert any("direct import from storage is forbidden" in error for error in errors)
+
+
 def test_dispatcher_access_is_allowed():
     errors = errors_for(
         "from runtime import RuntimeDispatcher\n"

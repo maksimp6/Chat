@@ -83,6 +83,26 @@ Every new runtime capability must include:
 
 A green HTTP health check is not sufficient proof of runtime isolation.
 
+## Storage providers
+
+Runtime code accesses external or local durable storage only through
+`RuntimeStorage`, which delegates to the dispatcher-owned provider registry.
+Providers are registered for one `(runtime_id, owner_id, provider)` tuple, so a
+provider configured for one preview is not a process-global capability and is
+not visible to another preview.
+
+The `local` provider is a sandboxed directory adapter. Its returned locations
+use an explicit `local:` prefix; these are local application paths, not cloud
+URLs and must not be presented as remotely shared artifacts. Cloud adapters
+implement the same upload/download/list contract and retain provider-specific
+metadata behind it.
+
+Credential lookup belongs to the dispatcher credential resolver. Runtime code,
+provider metadata, errors, and trace events must never expose credential values.
+Storage trace events contain only the action, provider name, and runtime id—not
+object names, contents, SDK exceptions, or credentials. Provider exceptions are
+translated to stable public storage errors at the dispatcher boundary.
+
 ## Commands
 
 ```bash
