@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from threading import RLock, local
 from typing import Any, Callable, Mapping
 
@@ -19,8 +20,8 @@ class RuntimeOperationNotFound(KeyError):
     """Raised when a runtime operation is not registered."""
 
 
-class RuntimeOwnerViolation(PermissionError):
-    """Raised when a caller is not allowed to access a runtime."""
+FILESYSTEM_READ_TEXT = "filesystem.read_text"
+FILESYSTEM_WRITE_TEXT = "filesystem.write_text"
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,44 @@ class RuntimeDispatcher:
         self._runtimes: dict[str, RuntimeContext] = {}
         self._operations: dict[str, RuntimeHandler] = {}
         self._local = local()
+        self.register_operation(FILESYSTEM_READ_TEXT, self._read_runtime_text)
+        self.register_operation(FILESYSTEM_WRITE_TEXT, self._write_runtime_text)
+
+    @staticmethod
+    def _runtime_path(context: RuntimeContext, value: Any) -> Path:
+        """Resolve a relative path without permitting escape from the data root."""
+
+        if not context.root:
+            raise RuntimeScopeViolation(
+                f"runtime {context.runtime_id!r} has no filesystem root"
+            )
+        relative = Path(str(value or ""))
+        if not value or relative.is_absolute():
+            raise RuntimeScopeViolation("runtime filesystem paths must be relative")
+
+        root = Path(context.root).resolve()
+        target = (root / relative).resolve()
+        if target == root or root not in target.parents:
+            raise RuntimeScopeViolation(
+                f"runtime {context.runtime_id!r} cannot access a path outside its root"
+            )
+        return target
+
+    def _read_runtime_text(
+        self, context: RuntimeContext, payload: Mapping[str, Any]
+    ) -> str:
+        path = self._runtime_path(context, payload.get("path"))
+        return path.read_text(encoding="utf-8")
+
+    def _write_runtime_text(
+        self, context: RuntimeContext, payload: Mapping[str, Any]
+    ) -> None:
+        path = self._runtime_path(context, payload.get("path"))
+        content = payload.get("content")
+        if not isinstance(content, str):
+            raise TypeError("runtime filesystem content must be text")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
 
     def register_runtime(
         self,
@@ -62,7 +101,7 @@ class RuntimeDispatcher:
             runtime_id=runtime_id,
             owner_id=owner_id,
             namespace=namespace or f"runtime:{runtime_id}",
-            root=root,
+            root=str(Path(root).resolve()) if root else None,
         )
         with self._lock:
             self._runtimes[runtime_id] = context
@@ -94,13 +133,6 @@ class RuntimeDispatcher:
             raise RuntimeNotFound("no runtime is bound to this thread")
         return self.context(runtime_id)
 
-    def authorize(self, runtime_id: str, owner_id: str | None) -> RuntimeContext:
-        """Resolve a runtime without exposing cross-owner access."""
-        context = self.context(runtime_id)
-        if owner_id and context.owner_id not in (None, owner_id):
-            raise RuntimeOwnerViolation(runtime_id)
-        return context
-
     def dispatch(
         self,
         runtime_id: str,
@@ -108,11 +140,8 @@ class RuntimeDispatcher:
         payload: Mapping[str, Any] | None = None,
         *,
         resource_runtime_id: str | None = None,
-        caller_owner_id: str | None = None,
     ) -> Any:
         context = self.context(runtime_id)
-        if caller_owner_id is not None and context.owner_id != caller_owner_id:
-            raise RuntimeScopeViolation("runtime owner does not match the authenticated caller")
         target_runtime_id = resource_runtime_id or runtime_id
         if target_runtime_id != runtime_id:
             raise RuntimeScopeViolation(

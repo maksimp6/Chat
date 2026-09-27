@@ -1,12 +1,92 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from runtime import (
+    FILESYSTEM_READ_TEXT,
+    FILESYSTEM_WRITE_TEXT,
     RuntimeDispatcher,
     RuntimeNotFound,
     RuntimeOperationNotFound,
     RuntimeOwnerViolation,
     RuntimeScopeViolation,
 )
+
+
+def test_runtime_filesystems_are_isolated_during_concurrent_access(tmp_path):
+    dispatcher = RuntimeDispatcher()
+    root_a = tmp_path / "runtime-a"
+    root_b = tmp_path / "runtime-b"
+    dispatcher.register_runtime("runtime-a", root=str(root_a))
+    dispatcher.register_runtime("runtime-b", root=str(root_b))
+
+    def write_and_read(runtime_id, value):
+        dispatcher.dispatch(
+            runtime_id,
+            FILESYSTEM_WRITE_TEXT,
+            {"path": "state/value.txt", "content": value},
+        )
+        return dispatcher.dispatch(
+            runtime_id, FILESYSTEM_READ_TEXT, {"path": "state/value.txt"}
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(write_and_read, "runtime-a", "first")
+        second = pool.submit(write_and_read, "runtime-b", "second")
+
+    assert first.result() == "first"
+    assert second.result() == "second"
+    assert (root_a / "state/value.txt").read_text() == "first"
+    assert (root_b / "state/value.txt").read_text() == "second"
+
+
+@pytest.mark.parametrize("path", ["../runtime-b/secret.txt", "/tmp/secret.txt"])
+def test_runtime_filesystem_rejects_paths_outside_root(tmp_path, path):
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a", root=str(tmp_path / "runtime-a"))
+
+    with pytest.raises(RuntimeScopeViolation):
+        dispatcher.dispatch(
+            "runtime-a",
+            FILESYSTEM_WRITE_TEXT,
+            {"path": path, "content": "not written"},
+        )
+
+
+def test_runtime_filesystem_rejects_symlink_escape(tmp_path):
+    runtime_root = tmp_path / "runtime-a"
+    outside = tmp_path / "outside"
+    runtime_root.mkdir()
+    outside.mkdir()
+    (runtime_root / "escape").symlink_to(outside, target_is_directory=True)
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a", root=str(runtime_root))
+
+    with pytest.raises(RuntimeScopeViolation):
+        dispatcher.dispatch(
+            "runtime-a",
+            FILESYSTEM_WRITE_TEXT,
+            {"path": "escape/secret.txt", "content": "not written"},
+        )
+
+    assert not (outside / "secret.txt").exists()
+
+
+def test_runtime_filesystem_never_falls_back_to_process_working_directory(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-without-root")
+
+    with pytest.raises(RuntimeScopeViolation, match="no filesystem root"):
+        dispatcher.dispatch(
+            "runtime-without-root",
+            FILESYSTEM_WRITE_TEXT,
+            {"path": "global.txt", "content": "not written"},
+        )
+
+    assert not (tmp_path / "global.txt").exists()
 
 
 def test_dispatcher_executes_operation_in_own_runtime_scope():
