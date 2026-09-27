@@ -6,13 +6,23 @@ const source = fs.readFileSync("static/boot.js", "utf8");
 
 const listeners = {};
 const logs = [];
+const bootstrapNotice = { hidden: true };
+const documentElementAttributes = {};
 const context = {
   console: {
     info: (...args) => logs.push(["info", ...args]),
     error: (...args) => logs.push(["error", ...args]),
     warn: (...args) => logs.push(["warn", ...args]),
   },
-  document: { currentScript: { dataset: {} } },
+  document: {
+    currentScript: { dataset: {} },
+    documentElement: {
+      setAttribute: (name, value) => {
+        documentElementAttributes[name] = value;
+      },
+    },
+    getElementById: (id) => (id === "bootstrap-status" ? bootstrapNotice : null),
+  },
   window: {
     addEventListener: (name, fn) => {
       listeners[name] = fn;
@@ -61,5 +71,19 @@ assert.equal(diagnostic.detail.message, "boom");
 listeners.unhandledrejection({ reason: new Error("promise boom") });
 assert.equal(diagnostic.detail.event, "unhandled_rejection");
 assert.equal(diagnostic.detail.message, "promise boom");
+
+listeners.error({ target: { dataset: { criticalScript: "dispatcher" } } });
+assert.equal(documentElementAttributes["data-bootstrap-state"], "degraded");
+assert.equal(bootstrapNotice.hidden, false);
+assert.equal(diagnostic.detail.event, "critical_script_failure");
+assert.equal(diagnostic.detail.module, "dispatcher");
+assert.equal(diagnostic.detail.failureType, "download");
+
+bootstrapNotice.hidden = true;
+listeners.error({ filename: "https://example.invalid/static/core.js?version=secret" });
+assert.equal(bootstrapNotice.hidden, false);
+assert.equal(diagnostic.detail.module, "core");
+assert.equal(diagnostic.detail.failureType, "runtime");
+assert.equal("filename" in diagnostic.detail, false);
 
 console.log("boot observability regression checks passed");

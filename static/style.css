@@ -1714,3 +1714,19 @@ body {
   background: var(--m-card, #fff);
   color: var(--m-text, #222);
 }
+
+/* The server-rendered shell remains legible when critical enhancement scripts fail. */
+.bootstrap-status {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #d6a700;
+  background: #fff4c2;
+  color: #3d3300;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+html[data-bootstrap-state="degraded"] .bootstrap-status[hidden] {
+  display: block;
+}

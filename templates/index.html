@@ -23,9 +23,26 @@
       data-static-base="{{ static_root }}"
       data-static-version="{{ static_version }}"
     ></script>
-    <script src="{{ static_root }}/core_api.js?v={{ static_version }}" defer></script>
-    <script src="{{ static_root }}/ui_runtime.js?v={{ static_version }}" defer></script>
-    <script src="{{ static_root }}/dispatcher.js?v={{ static_version }}" defer></script>
+    <script
+      src="{{ static_root }}/core_api.js?v={{ static_version }}"
+      defer
+      data-critical-script="core-api"
+    ></script>
+    <script
+      src="{{ static_root }}/ui_runtime.js?v={{ static_version }}"
+      defer
+      data-critical-script="ui-runtime"
+    ></script>
+    <script
+      src="{{ static_root }}/dispatcher.js?v={{ static_version }}"
+      defer
+      data-critical-script="dispatcher"
+    ></script>
+    <script
+      src="{{ static_root }}/core.js?v={{ static_version }}"
+      defer
+      data-critical-script="core"
+    ></script>
     <script src="{{ static_root }}/system_status.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/file_manager.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/treasury.js?v={{ static_version }}" defer></script>
@@ -44,7 +61,6 @@
       defer
     ></script>
     <script src="{{ static_root }}/settings.js?v={{ static_version }}" defer></script>
-    <script src="{{ static_root }}/core.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/project_tree.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/theme_assistant.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/sidebar.js?v={{ static_version }}" defer></script>
@@ -75,6 +91,15 @@
     <script src="{{ static_root }}/environments.js?v={{ static_version }}" defer></script>
   </head>
   <body>
+    <div id="bootstrap-status" class="bootstrap-status" role="status" hidden>
+      Дополнительные возможности не загрузились. Базовый интерфейс остаётся доступен; обновите
+      страницу, чтобы повторить попытку.
+    </div>
+    <noscript>
+      <div class="bootstrap-status" role="status">
+        JavaScript отключён. Доступны сохранённый разговор и базовый интерфейс.
+      </div>
+    </noscript>
     <div id="app-root" class="alice-pro-app">
       <div id="sidebar">
         <div id="sidebar-header">

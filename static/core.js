@@ -282,7 +282,7 @@ function initCore() {
   void enhanceCore();
 }
 
-document.addEventListener("DOMContentLoaded", initCore);
+initCore();
 
 function getMessages(id) {
   try {

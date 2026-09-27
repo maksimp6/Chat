@@ -92,3 +92,23 @@ def test_boot_is_first_and_project_tree_module_is_loaded():
     assert boot < project_tree
     assert 'id="project-tree-btn"' in html
     assert "Структура проекта" in html
+
+
+def test_critical_bootstrap_chain_precedes_enhancements():
+    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    critical = ["core_api.js", "ui_runtime.js", "dispatcher.js", "core.js"]
+    positions = [html.index(f"/{name}?") for name in critical]
+
+    assert positions == sorted(positions)
+    assert positions[-1] < html.index("/system_status.js?")
+    for module in ("core-api", "ui-runtime", "dispatcher", "core"):
+        assert f'data-critical-script="{module}"' in html
+
+
+def test_server_rendered_shell_exposes_degraded_and_no_js_notices():
+    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="bootstrap-status"' in html
+    assert 'role="status"' in html
+    assert "<noscript>" in html
+    assert "Базовый интерфейс" in html
