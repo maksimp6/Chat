@@ -70,7 +70,7 @@ jobs:
           echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
           printf "SUPABASE_SECRET_KEY=%s\n" "$SUPABASE_ACCESS_TOKEN" >> "$GITHUB_ENV"
       - name: Check out ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.PREVIEW_REF }}
           fetch-depth: 1
@@ -195,7 +195,7 @@ jobs:
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"
@@ -227,7 +227,7 @@ jobs:
       PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
       PREVIEW_SSH_KNOWN_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure SSH
         run: |
           install -d -m 700 "$HOME/.ssh"

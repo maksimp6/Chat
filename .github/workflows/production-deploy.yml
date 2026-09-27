@@ -50,7 +50,7 @@ jobs:
           echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
           printf "SUPABASE_SECRET_KEY=%s\n" "$SUPABASE_ACCESS_TOKEN" >> "$GITHUB_ENV"
       - name: Check out ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.DEPLOY_REF }}
           fetch-depth: 1
