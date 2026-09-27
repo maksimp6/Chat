@@ -50,7 +50,7 @@ fi
 if ! command -v cloud >/dev/null 2>&1; then
   bash scripts/install_cloud_cli.sh
 fi
-cloud --version
+cloud configure set --cli-agree-privacy-statement=true
 
 git config --global commit.gpgsign true
 git config --global tag.gpgsign true
