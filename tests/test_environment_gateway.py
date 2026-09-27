@@ -297,25 +297,23 @@ def test_environment_gateway_rejects_cross_owner_before_runtime_dispatch(monkeyp
 
 
 def test_authorize_environment_runtime_preserves_missing_runtime(monkeypatch):
-    def missing(_environment_id, _owner_id):
-        raise environment_manager.RuntimeNotFound("missing")
-
-    monkeypatch.setattr(environment_manager._RUNTIME_DISPATCHER, "authorize", missing)
     monkeypatch.setattr(environment_manager, "_get", lambda _environment_id: None)
 
     with pytest.raises(environment_manager.RuntimeNotFound):
         environment_manager.authorize_environment_runtime("missing", "alice")
 
 
-def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monkeypatch):
-    def missing_active_context(_environment_id, _owner_id):
-        raise environment_manager.RuntimeNotFound("stopped")
-
+def test_authorize_environment_runtime_allows_owned_stopped_runtime(monkeypatch):
     monkeypatch.setattr(
-        environment_manager._RUNTIME_DISPATCHER,
-        "authorize",
-        missing_active_context,
+        environment_manager,
+        "_get",
+        lambda _environment_id: {"owner_id": "alice", "status": "STOPPED"},
     )
+
+    environment_manager.authorize_environment_runtime("runtime-a", "alice")
+
+
+def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monkeypatch):
     monkeypatch.setattr(
         environment_manager,
         "_get",
