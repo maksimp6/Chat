@@ -41,10 +41,14 @@ jobs:
           distribution: temurin
           java-version: "25"
 
-      - name: Run Codex setup exactly
+      - name: Run Codex setup exactly as configured
         shell: bash
-        run: bash scripts/codex_setup.sh
+        run: |
+          set -o pipefail
+          gh api "repos/maksimp6/Chat/contents/scripts/codex_setup.sh?ref=master" --jq .content | base64 -d | bash
 
-      - name: Run cached maintenance exactly
+      - name: Run Codex maintenance exactly as configured
         shell: bash
-        run: bash scripts/codex_maintenance.sh
+        run: |
+          set -o pipefail
+          gh api "repos/maksimp6/Chat/contents/scripts/codex_maintenance.sh?ref=master" --jq .content | base64 -d | bash
