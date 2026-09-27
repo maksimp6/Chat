@@ -15,6 +15,7 @@ from environment_manager import (
     stop_environment,
 )
 import environment_routes
+import environment_manager
 from environment_routes import environment_bp, environment_gateway_bp
 from runtime import (
     current_runtime_base_path,
@@ -203,6 +204,11 @@ def test_environment_gateway_maps_runtime_failures(monkeypatch, error, status_co
         },
     )
     monkeypatch.setattr(environment_routes, "_owner", lambda: None)
+    monkeypatch.setattr(
+        environment_routes,
+        "authorize_environment_runtime",
+        lambda _environment_id, _owner_id: None,
+    )
 
     def fail_dispatch(*_args, **_kwargs):
         raise error
@@ -266,3 +272,55 @@ def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
         stop_environment(second["environment_id"])
         delete_environment(first["environment_id"])
         delete_environment(second["environment_id"])
+
+
+def test_environment_gateway_rejects_cross_owner_before_runtime_dispatch(monkeypatch):
+    app = Flask(__name__)
+    app.register_blueprint(environment_gateway_bp)
+    monkeypatch.setattr(environment_routes, "_owner", lambda: "alice")
+
+    def reject(_environment_id, _owner_id):
+        raise environment_routes.RuntimeOwnerViolation("runtime-b")
+
+    monkeypatch.setattr(environment_routes, "authorize_environment_runtime", reject)
+    calls = []
+
+    def record_dispatch(*args, **kwargs):
+        calls.append((args, kwargs))
+        return None
+
+    monkeypatch.setattr(environment_routes, "dispatch_environment_http", record_dispatch)
+    response = app.test_client().get("/environments/runtime-b/runtime-root")
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "environment_not_found"}
+    assert calls == []
+
+
+def test_authorize_environment_runtime_preserves_missing_runtime(monkeypatch):
+    def missing(_environment_id, _owner_id):
+        raise environment_manager.RuntimeNotFound("missing")
+
+    monkeypatch.setattr(environment_manager._RUNTIME_DISPATCHER, "authorize", missing)
+    monkeypatch.setattr(environment_manager, "_get", lambda _environment_id: None)
+
+    with pytest.raises(environment_manager.RuntimeNotFound):
+        environment_manager.authorize_environment_runtime("missing", "alice")
+
+
+def test_authorize_environment_runtime_rejects_cross_owner_stopped_runtime(monkeypatch):
+    def missing_active_context(_environment_id, _owner_id):
+        raise environment_manager.RuntimeNotFound("stopped")
+
+    monkeypatch.setattr(
+        environment_manager._RUNTIME_DISPATCHER,
+        "authorize",
+        missing_active_context,
+    )
+    monkeypatch.setattr(
+        environment_manager,
+        "_get",
+        lambda _environment_id: {"owner_id": "bob", "status": "STOPPED"},
+    )
+
+    with pytest.raises(environment_manager.RuntimeOwnerViolation):
+        environment_manager.authorize_environment_runtime("runtime-b", "alice")

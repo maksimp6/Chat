@@ -10,9 +10,11 @@ from environment_manager import (
     start_environment,
     stop_environment,
     _get,
+    authorize_environment_runtime,
     dispatch_environment_http,
     register_runtime_operation,
 )
+from runtime import RuntimeNotFound, RuntimeOwnerViolation
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
@@ -131,9 +133,13 @@ register_runtime_operation("http.request", _runtime_http_request)
 
 
 def _proxy(environment_id, subpath=""):
+    try:
+        authorize_environment_runtime(environment_id, _owner())
+    except (RuntimeNotFound, RuntimeOwnerViolation):
+        return jsonify({"error": "environment_not_found"}), 404
+
     item = _get(environment_id)
-    owner = _owner()
-    if not item or (owner and item.get("owner_id") not in (None, owner)):
+    if not item:
         return jsonify({"error": "environment_not_found"}), 404
     if item.get("status") != "RUNNING" or not item.get("runtime_thread_id"):
         return jsonify({"error": "environment_not_running"}), 503

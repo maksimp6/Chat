@@ -19,6 +19,10 @@ class RuntimeOperationNotFound(KeyError):
     """Raised when a runtime operation is not registered."""
 
 
+class RuntimeOwnerViolation(PermissionError):
+    """Raised when a caller is not allowed to access a runtime."""
+
+
 @dataclass(frozen=True)
 class RuntimeContext:
     runtime_id: str
@@ -89,6 +93,13 @@ class RuntimeDispatcher:
         if runtime_id is None:
             raise RuntimeNotFound("no runtime is bound to this thread")
         return self.context(runtime_id)
+
+    def authorize(self, runtime_id: str, owner_id: str | None) -> RuntimeContext:
+        """Resolve a runtime without exposing cross-owner access."""
+        context = self.context(runtime_id)
+        if owner_id and context.owner_id not in (None, owner_id):
+            raise RuntimeOwnerViolation(runtime_id)
+        return context
 
     def dispatch(
         self,
