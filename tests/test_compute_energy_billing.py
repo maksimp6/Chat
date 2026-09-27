@@ -81,24 +81,30 @@ def test_calculated_compute_cost_is_added_to_total():
     assert result["energy_wh"] == pytest.approx(10.0)
 
 
+def _burn_cpu(seconds):
+    deadline = time.thread_time() + seconds
+    while time.thread_time() < deadline:
+        pass
+
+
 def test_waiting_is_not_billed_as_compute():
     from trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     time.sleep(0.2)
-    billing = trace.finalize()["billing"]
+    trace.add_event("work_done")
+    result = trace.finalize()
 
-    assert billing["cpu_seconds"] < 0.1
-    assert trace.trace["timings"]["total_duration_ms"] >= 200
+    assert result["billing"]["cpu_seconds"] < 0.1
+    assert result["timings"]["billable_wall_ms"] >= 200
 
 
-def test_cpu_work_is_measured():
+def test_cpu_work_is_measured_at_recorded_work():
     from trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
-    deadline = time.thread_time() + 0.05
-    while time.thread_time() < deadline:
-        pass
+    _burn_cpu(0.05)
+    trace.add_event("work_done")
     billing = trace.finalize()["billing"]
 
     assert billing["cpu_seconds"] >= 0.05
@@ -110,23 +116,53 @@ def test_repeated_finalize_bills_compute_once(monkeypatch):
     from trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
+    trace.add_event("work_done")
     first = trace.finalize()["billing"]
     second = trace.finalize()["billing"]
 
     compute_items = [i for i in second["items"] if i.get("type") == "compute"]
     assert len(compute_items) == 1
-    assert second["compute_cost"] == first["compute_cost"]
+    assert second == first
 
 
-def test_finalize_from_other_thread_is_not_attributed():
+def test_reading_snapshots_is_not_billed(monkeypatch):
+    monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
     from trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
-    result = {}
-    worker = threading.Thread(target=lambda: result.update(trace.finalize()))
+    _burn_cpu(0.02)
+    trace.add_event("work_done")
+    first = trace.make_snapshot()["billing"]
+    for _ in range(100):
+        assert trace.make_snapshot()["billing"] == first
+    _burn_cpu(0.02)  # not followed by recorded work
+
+    assert trace.finalize()["billing"] == first
+    assert not [i for i in trace.trace["billing"]["items"] if i.get("type") == "compute"]
+
+
+def test_new_work_after_snapshot_is_billed():
+    from trace_manager import ExecutionTrace
+
+    trace = ExecutionTrace()
+    trace.add_event("work_done")
+    snapshot = trace.make_snapshot()["billing"]
+    _burn_cpu(0.03)
+    trace.add_event("more_work_done")
+    final = trace.finalize()["billing"]
+
+    assert final["cpu_seconds"] >= snapshot["cpu_seconds"] + 0.03
+
+
+def test_work_recorded_on_other_thread_is_not_attributed():
+    from trace_manager import ExecutionTrace
+
+    trace = ExecutionTrace()
+    worker = threading.Thread(target=lambda: trace.add_event("worker_event"))
     worker.start()
     worker.join()
 
+    result = trace.finalize()
     compute = [i for i in result["billing"]["items"] if i.get("type") == "compute"][0]
     assert compute["cost_reason"] == "cpu_time_unmeasured"
 
@@ -149,9 +185,18 @@ def test_compute_billing_failure_does_not_break_finalize(monkeypatch):
 
     monkeypatch.setattr(compute_resources, "build_compute_billing_item", broken)
     trace = ExecutionTrace()
+    trace.add_event("work_done")
+    events_before = list(trace.trace["events"])
     result = trace.finalize()
 
+    compute = [i for i in result["billing"]["items"] if i.get("type") == "compute"]
+    assert compute == [
+        {
+            "type": "compute",
+            "cost_status": "not_billed",
+            "cost_reason": "compute_billing_failed",
+            "total_cost": 0.0,
+        }
+    ]
     assert result["billing"]["cost_status"] == "calculated"
-    assert not [i for i in result["billing"]["items"] if i.get("type") == "compute"]
-    errors = [e for e in trace.trace["events"] if e["type"] == "billing_error"]
-    assert errors[0]["payload"]["error"] == "pricing unavailable"
+    assert trace.trace["events"] == events_before
