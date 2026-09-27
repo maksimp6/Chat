@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TAG="${CLOUD_CLI_MIRROR_TAG:-cloud-cli-mirror-2026-09-27}"
-REPO="${CLOUD_CLI_MIRROR_REPO:-maksimp6/Chat}"
+RELEASE_TAG="cloud-cli-mirror-2026-09-27"
 INSTALL_DIR="${CLOUD_CLI_INSTALL_DIR:-$HOME/.local/bin}"
+CACHE_DIR="${CLOUD_CLI_CACHE_DIR:-$HOME/.cache/alice-pro/cloud-cli}"
 
 case "$(uname -m)" in
   x86_64|amd64)
@@ -21,11 +21,16 @@ case "$(uname -m)" in
 esac
 
 ASSET="cloud-cli-linux-$ARCH.tar.gz"
-URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
+URL="https://github.com/maksimp6/Chat/releases/download/$RELEASE_TAG/$ASSET"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-curl --fail --location --retry 3 --output "$TMP_DIR/$ASSET" "$URL"
+CACHED="$CACHE_DIR/$ASSET"
+if [[ -s "$CACHED" ]] && printf '%s  %s\n' "$SHA256" "$CACHED" | sha256sum --check --status -; then
+  cp "$CACHED" "$TMP_DIR/$ASSET"
+else
+  curl --fail --location --retry 3 --output "$TMP_DIR/$ASSET" "$URL"
+fi
 printf '%s  %s\n' "$SHA256" "$TMP_DIR/$ASSET" | sha256sum --check -
 
 tar -xzf "$TMP_DIR/$ASSET" -C "$TMP_DIR"
