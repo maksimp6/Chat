@@ -1,0 +1,160 @@
+name: Alice
+
+# Alice Pro works on her own code from a GitHub issue.
+# Trigger: a maintainer (OWNER/MEMBER/COLLABORATOR) mentions "@alice" in an
+# issue or issue comment, or adds the "alice" label.
+# Alice only gets her filesystem tools inside this checkout; this workflow
+# checks the diff, commits it to alice/issue-<N> and opens a draft pull request.
+#
+# Repository secrets (Settings -> Secrets and variables -> Actions):
+#   YANDEX_API_KEY, YANDEX_PROJECT_ID  - Yandex AI Studio credentials for Alice
+#   ALICE_GITHUB_TOKEN                 - personal fine-grained token of the maintainer
+#                                        (Contents + Pull requests + Issues: read/write,
+#                                        this repository only); PRs opened with it run CI.
+# Optional repository variable: ALICE_AGENT_MODEL (default aliceai-llm).
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, labeled]
+
+permissions: {}
+
+concurrency:
+  group: alice-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  alice:
+    name: Alice works on the issue
+    if: |
+      !github.event.issue.pull_request && (
+        (github.event_name == 'issue_comment' &&
+          contains(github.event.comment.body, '@alice') &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+        (github.event_name == 'issues' && github.event.action == 'opened' &&
+          (contains(github.event.issue.body, '@alice') || contains(github.event.issue.title, '@alice')) &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
+        (github.event_name == 'issues' && github.event.action == 'labeled' &&
+          github.event.label.name == 'alice'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Save issue text
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          printf '%s\n' "$ISSUE_TITLE" > "$RUNNER_TEMP/title.txt"
+          {
+            printf '%s\n' "$ISSUE_BODY"
+            if [ -n "$COMMENT_BODY" ]; then
+              printf '\n--- maintainer comment ---\n%s\n' "$COMMENT_BODY"
+            fi
+          } > "$RUNNER_TEMP/body.txt"
+
+      - name: Run Alice
+        env:
+          YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
+          ALICE_AGENT_MODEL: ${{ vars.ALICE_AGENT_MODEL }}
+        run: |
+          set -euo pipefail
+          ALICE_PROVIDER_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          export ALICE_PROVIDER_CREDENTIAL_KEY
+          export ALICE_DB_PATH="$RUNNER_TEMP/alice.db"
+          # A failed run is still reported on the issue by the last step.
+          python alice_agent_runner.py \
+            --issue "$ISSUE_NUMBER" \
+            --title-file "$RUNNER_TEMP/title.txt" \
+            --body-file "$RUNNER_TEMP/body.txt" \
+            --out "$RUNNER_TEMP/result.json" || echo "Alice runner reported a failure"
+
+      - name: Guard the diff
+        run: |
+          set -euo pipefail
+          git status --porcelain --untracked-files=all | cut -c4- > "$RUNNER_TEMP/files.txt"
+          cat "$RUNNER_TEMP/files.txt"
+          if grep -E '^(\.github/|\.env|.*\.(pem|key|jks|keystore)$)' "$RUNNER_TEMP/files.txt"; then
+            echo "::error::Alice may not change workflows, env files or keys."
+            exit 1
+          fi
+          if [ "$(wc -l < "$RUNNER_TEMP/files.txt")" -gt 20 ]; then
+            echo "::error::Alice changed more than 20 files."
+            exit 1
+          fi
+
+      - name: Fast checks
+        run: |
+          set -euo pipefail
+          if [ -s "$RUNNER_TEMP/files.txt" ]; then
+            python -m compileall -q .
+            python tests/validate_runtime_modules.py
+            python tests/validate_frontend_modules.py
+          fi
+
+      - name: Open pull request and report
+        env:
+          GH_TOKEN: ${{ secrets.ALICE_GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo "::error::ALICE_GITHUB_TOKEN is not configured."; exit 1; }
+          python - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
+          import json, sys
+          r = json.load(open(sys.argv[1], encoding="utf-8"))
+          # Comments are posted with a maintainer token: never echo "@alice" back.
+          for key in ("summary",):
+              if r.get(key):
+                  r[key] = r[key].replace("@", "@\u200b")
+          b = r.get("billing", {})
+          print(f"Alice ({r.get('model')}) finished with status **{r['status']}**.\n")
+          if r.get("summary"):
+              print(r["summary"] + "\n")
+          if r.get("pending_tools"):
+              print("Stopped: these tools need a maintainer's approval: " + ", ".join(r["pending_tools"]) + "\n")
+          cost = b.get("total_cost")
+          print(f"Cost: {cost} {b.get('currency', 'RUB')} ({b.get('cost_status', 'unknown')}), "
+                f"tokens: {b.get('total_tokens', 0)}, trace: `{r.get('trace_id')}`")
+          PY
+          if [ -s "$RUNNER_TEMP/files.txt" ]; then
+            branch="alice/issue-$ISSUE_NUMBER-$GITHUB_RUN_ID"
+            gh auth setup-git
+            git config user.name "Alice Pro"
+            git config user.email "alice-pro@users.noreply.github.com"
+            git checkout -b "$branch"
+            git add -A
+            git commit -m "Alice: work on issue #$ISSUE_NUMBER" -m "Closes #$ISSUE_NUMBER"
+            git push origin "$branch"
+            {
+              cat "$RUNNER_TEMP/report.md"
+              printf '\nCloses #%s\n' "$ISSUE_NUMBER"
+            } > "$RUNNER_TEMP/pr.md"
+            url="$(gh pr create --repo "$REPOSITORY" --draft --head "$branch" \
+              --title "Alice: issue #$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/pr.md")"
+            printf '\nPull request: %s\n' "$url" >> "$RUNNER_TEMP/report.md"
+          fi
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPOSITORY" --body-file "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
