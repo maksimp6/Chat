@@ -8,6 +8,12 @@ from threading import RLock, local
 from typing import Any, Callable, Mapping
 
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from storage import (
+    StorageCredentialsMissing,
+    StorageError,
+    StorageProvider,
+    StorageProviderUnavailable,
+)
 
 
 TOOL_EXECUTE_OPERATION = "tools.execute"
@@ -60,6 +66,8 @@ class RuntimeDispatcher:
         self._runtimes: dict[str, RuntimeContext] = {}
         self._operations: dict[str, RuntimeHandler] = {}
         self._tool_boundaries: dict[str, _RuntimeToolBoundary] = {}
+        self._storage_providers: dict[tuple[str, str | None, str], StorageProvider] = {}
+        self._storage_credentials: Callable[[RuntimeContext, str], object | None] | None = None
         self._local = local()
         self.register_operation(FILESYSTEM_READ_TEXT, self._read_runtime_text)
         self.register_operation(FILESYSTEM_WRITE_TEXT, self._write_runtime_text)
@@ -122,6 +130,7 @@ class RuntimeDispatcher:
             self._runtimes[runtime_id] = context
             # A reused id must never inherit capabilities from an earlier runtime.
             self._tool_boundaries.pop(runtime_id, None)
+            self._storage_providers = {key: provider for key, provider in self._storage_providers.items() if key[0] != runtime_id}
         return context
 
     def unregister_runtime(self, runtime_id: str) -> None:
@@ -165,6 +174,42 @@ class RuntimeDispatcher:
             raise TypeError("operation handler must be callable")
         with self._lock:
             self._operations[name] = handler
+
+    def set_storage_credential_resolver(self, resolver: Callable[[RuntimeContext, str], object | None] | None) -> None:
+        self._storage_credentials = resolver
+
+    def register_storage_provider(self, runtime_id: str, provider: StorageProvider, *, owner_id: str | None = None) -> None:
+        context = self.context(runtime_id)
+        scoped_owner = context.owner_id if owner_id is None else owner_id
+        if scoped_owner != context.owner_id:
+            raise RuntimeScopeViolation("Storage provider owner does not match runtime owner")
+        with self._lock:
+            self._storage_providers[(runtime_id, scoped_owner, provider.name)] = provider
+
+    def dispatch_storage(self, runtime_id: str, provider_name: str, action: str, payload: Mapping[str, Any] | None = None, *, resource_runtime_id: str | None = None) -> Any:
+        context = self.context(runtime_id)
+        if (resource_runtime_id or runtime_id) != runtime_id:
+            raise RuntimeScopeViolation("Storage resources cannot cross runtime scopes")
+        with self._lock:
+            provider = self._storage_providers.get((runtime_id, context.owner_id, provider_name))
+        if provider is None:
+            raise StorageProviderUnavailable("Storage provider is not configured")
+        credentials = self._storage_credentials(context, provider_name) if self._storage_credentials else None
+        if provider.requires_credentials and credentials is None:
+            raise StorageCredentialsMissing("Storage provider credentials are not configured")
+        values = dict(payload or {})
+        try:
+            if action == "upload":
+                return provider.upload(values["object_id"], values["content"], credentials=credentials)
+            if action == "download":
+                return provider.download(values["object_id"], credentials=credentials)
+            if action == "list":
+                return provider.list(values.get("prefix", ""), credentials=credentials)
+            raise StorageError("Unsupported storage operation")
+        except StorageError:
+            raise
+        except Exception as exc:
+            raise StorageError("Storage provider operation failed") from exc
 
     def context(self, runtime_id: str) -> RuntimeContext:
         with self._lock:

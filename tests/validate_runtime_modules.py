@@ -17,6 +17,7 @@ FORBIDDEN_IMPORT_ROOTS = {
     "httpx",
     "socket",
     "sqlite3",
+    "storage",
     "subprocess",
     "tool_registry",
     "urllib.request",
