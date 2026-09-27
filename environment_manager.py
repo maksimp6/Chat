@@ -548,19 +548,12 @@ def authorize_environment_runtime(
     environment_id: str,
     owner_id: Optional[str],
 ) -> None:
-    """Authorize gateway access without exposing another owner's environment."""
-    try:
-        _RUNTIME_DISPATCHER.authorize(environment_id, owner_id)
-        return
-    except RuntimeNotFound:
-        # Stopped environments intentionally have no dispatcher context.  Keep
-        # owner checks centralized here so the gateway can distinguish a
-        # stopped owned environment (503) from a missing/cross-owner one (404).
-        item = _get(environment_id)
-        if not item:
-            raise
-        if owner_id and item.get("owner_id") not in (None, owner_id):
-            raise RuntimeOwnerViolation(environment_id) from None
+    """Authorize gateway access against persistent environment ownership."""
+    item = _get(environment_id)
+    if not item:
+        raise RuntimeNotFound(environment_id)
+    if not _owned(item, owner_id):
+        raise RuntimeOwnerViolation(environment_id)
 
 
 def dispatch_environment_operation(
