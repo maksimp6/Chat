@@ -138,3 +138,20 @@ def test_tool_call_records_cpu_ms():
     trace.track_tool_execution("noop", {}, lambda: {"ok": True})
 
     assert trace.trace["tool_calls"][0]["cpu_ms"] >= 0
+
+
+def test_compute_billing_failure_does_not_break_finalize(monkeypatch):
+    import compute_resources
+    from trace_manager import ExecutionTrace
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("pricing unavailable")
+
+    monkeypatch.setattr(compute_resources, "build_compute_billing_item", broken)
+    trace = ExecutionTrace()
+    result = trace.finalize()
+
+    assert result["billing"]["cost_status"] == "calculated"
+    assert not [i for i in result["billing"]["items"] if i.get("type") == "compute"]
+    errors = [e for e in trace.trace["events"] if e["type"] == "billing_error"]
+    assert errors[0]["payload"]["error"] == "pricing unavailable"
