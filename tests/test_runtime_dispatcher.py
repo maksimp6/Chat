@@ -108,6 +108,21 @@ def test_nested_dispatch_restores_outer_runtime_context():
     assert dispatcher.dispatch("runtime-a", "outer") == ("runtime-a", "runtime-a")
 
 
+def test_nested_dispatch_cannot_impersonate_another_runtime():
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a")
+    dispatcher.register_runtime("runtime-b")
+    dispatcher.register_operation("inner", lambda context, payload: context.runtime_id)
+
+    def outer(context, payload):
+        return dispatcher.dispatch("runtime-b", "inner")
+
+    dispatcher.register_operation("outer", outer)
+
+    with pytest.raises(RuntimeScopeViolation, match="cannot dispatch as"):
+        dispatcher.dispatch("runtime-a", "outer")
+
+
 def test_dispatch_cleanup_tolerates_handler_clearing_thread_binding():
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime-a")

@@ -75,20 +75,80 @@ def test_loader_rejects_imports_instead_of_claiming_thread_isolation(tmp_path):
         loader.load()
 
 
-def test_host_api_dispatches_through_runtime_dispatcher():
+def test_host_api_exposes_only_runtime_bound_dispatch(tmp_path):
     dispatcher = RuntimeDispatcher()
     dispatcher.register_runtime("runtime")
     dispatcher.register_operation(
         "echo",
         lambda context, payload: {"runtime": context.runtime_id, "payload": dict(payload or {})},
     )
-    from runtime import RuntimeHostAPI
-
-    host = RuntimeHostAPI("runtime", dispatcher)
-    assert host.dispatch("echo", {"value": 1}) == {
+    root = tmp_path / "revision"
+    root.mkdir()
+    (root / "alice_runtime.py").write_text(
+        """class Application:
+    def __init__(self, host):
+        self.host = host
+    def invoke(self, operation, payload):
+        if operation == "raw_dispatcher":
+            return self.host.dispatcher
+        return self.host.dispatch(operation, payload)
+def create_runtime(host):
+    return Application(host)
+""",
+        encoding="utf-8",
+    )
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="1" * 40, source_root=root, dispatcher=dispatcher
+    )
+    assert loader.load()
+    assert loader.invoke("echo", {"value": 1}) == {
         "runtime": "runtime",
         "payload": {"value": 1},
     }
+    with pytest.raises(AttributeError, match="dispatcher"):
+        loader.invoke("raw_dispatcher")
+
+
+def test_loader_uses_restricted_immutable_builtins(tmp_path):
+    root = tmp_path / "revision"
+    root.mkdir()
+    (root / "alice_runtime.py").write_text(
+        """class Application:
+    def invoke(self, operation, payload):
+        if operation == "open":
+            return open
+        __builtins__["open"] = object()
+def create_runtime(host):
+    return Application()
+""",
+        encoding="utf-8",
+    )
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="2" * 40, source_root=root, dispatcher=dispatcher
+    )
+    assert loader.load()
+    with pytest.raises(NameError, match="open"):
+        loader.invoke("open")
+    with pytest.raises(TypeError, match="mappingproxy"):
+        loader.invoke("mutate")
+
+
+def test_loader_rejects_symlink_entrypoint(tmp_path):
+    root = tmp_path / "revision"
+    root.mkdir()
+    external = tmp_path / "external.py"
+    external.write_text("def create_runtime(host): pass\n", encoding="utf-8")
+    (root / "alice_runtime.py").symlink_to(external)
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime")
+    loader = RuntimeLoader(
+        runtime_id="runtime", revision="3" * 40, source_root=root, dispatcher=dispatcher
+    )
+
+    with pytest.raises(RuntimeLoadError, match="symbolic link"):
+        loader.load()
 
 
 def test_loader_reports_digest_and_missing_entrypoint(tmp_path):
@@ -131,7 +191,7 @@ def test_loader_rejects_unreadable_entrypoint(tmp_path, monkeypatch):
         ("def create_runtime(:\n    pass\n", "invalid runtime entry point"),
         (
             "def create_runtime(host):\n    eval('1')\n",
-            "revision call to eval\(\) is not supported",
+            r"revision call to eval\(\) is not supported",
         ),
     ],
 )
