@@ -31,11 +31,11 @@ class TraceSecurityTests(unittest.TestCase):
 
     def test_sanitize_trace_value_redacts_inline_secrets_but_keeps_context(self):
         value = sanitize_trace_value(
-            "deploy --api-key=key-value; authorization: Bearer bearer-value"
+            "deploy --api-key=key-value --token credential-value; authorization: ******"
         )
         self.assertEqual(
             value,
-            "deploy --api-key=<redacted>; authorization: <redacted>",
+            "deploy --api-key=<redacted> --token <redacted>; authorization: <redacted>",
         )
 
 

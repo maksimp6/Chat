@@ -229,9 +229,9 @@ RUNTIME_TOOLS = {
         "requires_approval": True,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        # Commands and results remain in the access-controlled execution trace
-        # for auditability. The shared trace sanitizer removes inline credentials.
-        "metadata": {},
+        # Keep command traces for auditability, but redact remote process output
+        # fields because stdout/stderr are untrusted text.
+        "metadata": {"trace_redact_result_fields": ["stdout", "stderr"]},
         "func": ssh_runtime_exec,
     },
     "ssh_runtime_read_file": {

@@ -28,12 +28,16 @@ MAX_ITEMS = 50
 _INLINE_SECRET = re.compile(
     r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization)\b\s*(?:=|:)\s*)((?:bearer\s+)?[^\s;&|]+)"
 )
+_INLINE_CLI_SECRET = re.compile(
+    r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization))\s+)([^\s;&|]+)"
+)
 _BEARER_SECRET = re.compile(r"(?i)(\bbearer\s+)([^\s;&|]+)")
 
 
 def _sanitize_string(value: str) -> str:
     """Retain useful trace text while removing common inline credentials."""
     value = _INLINE_SECRET.sub(r"\1<redacted>", value)
+    value = _INLINE_CLI_SECRET.sub(r"\1<redacted>", value)
     return _BEARER_SECRET.sub(r"\1<redacted>", value)
 
 

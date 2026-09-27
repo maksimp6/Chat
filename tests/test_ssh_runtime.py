@@ -184,11 +184,11 @@ class SSHRuntimeTests(unittest.TestCase):
             traced_call["arguments"]["command"], "deploy --token=<redacted>"
         )
         self.assertEqual(
-            traced_call["result"]["data"]["stdout"], "deployed release-42\\n"
+            traced_call["result"]["data"]["stdout"], "<redacted>"
         )
         self.assertEqual(
             traced_call["result"]["data"]["stderr"],
-            "authorization: <redacted>",
+            "<redacted>",
         )
         self.assertEqual(
             [
