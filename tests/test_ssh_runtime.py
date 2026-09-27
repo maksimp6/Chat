@@ -142,7 +142,7 @@ class SSHRuntimeTests(unittest.TestCase):
             runtime.execute(target="preview", command="id -un")
 
     @patch("ssh_runtime.subprocess.run")
-    def test_runtime_tool_trace_redacts_command(self, run):
+    def test_runtime_tool_trace_preserves_audit_details_and_redacts_secrets(self, run):
         from trace_manager import ExecutionTrace
         from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
         from tool_registry import ToolRegistry
@@ -155,15 +155,19 @@ class SSHRuntimeTests(unittest.TestCase):
         trace = ExecutionTrace()
         call = UniversalToolCall(
             tool_name="ssh_runtime_exec",
-            arguments={"target": "preview", "timeout_seconds": 10, "command": "echo secret"},
+            arguments={
+                "target": "preview",
+                "timeout_seconds": 10,
+                "command": "deploy --token=credential-value",
+            },
             transport="responses_api",
             call_id="call-1",
             user_id="owner-1",
             approved=True,
         )
         run.return_value.returncode = 0
-        run.return_value.stdout = "ok\\n"
-        run.return_value.stderr = ""
+        run.return_value.stdout = "deployed release-42\\n"
+        run.return_value.stderr = "authorization: Bearer output-secret"
         # Use the real executor, but point the runtime tool at a test-local runtime.
         import runtime_tools
 
@@ -175,8 +179,17 @@ class SSHRuntimeTests(unittest.TestCase):
             runtime_tools.runtime = original
 
         self.assertTrue(result["success"])
-        self.assertEqual(trace.trace["tool_calls"][0]["arguments"]["command"], "<redacted>")
-        self.assertEqual(trace.trace["tool_calls"][0]["result"]["data"]["stdout"], "<redacted>")
+        traced_call = trace.trace["tool_calls"][0]
+        self.assertEqual(
+            traced_call["arguments"]["command"], "deploy --token=<redacted>"
+        )
+        self.assertEqual(
+            traced_call["result"]["data"]["stdout"], "deployed release-42\\n"
+        )
+        self.assertEqual(
+            traced_call["result"]["data"]["stderr"],
+            "authorization: <redacted>",
+        )
         self.assertEqual(
             [
                 event["type"]

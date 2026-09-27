@@ -4,6 +4,7 @@ Kept independent from ExecutionTrace so request/response capture code can be
 split out incrementally without changing the existing public class API.
 """
 
+import re
 from typing import Any, Set
 
 
@@ -24,13 +25,26 @@ MAX_REPR = 4000
 MAX_DEPTH = 12
 MAX_ITEMS = 50
 
+_INLINE_SECRET = re.compile(
+    r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization)\b\s*(?:=|:)\s*)((?:bearer\s+)?[^\s;&|]+)"
+)
+_BEARER_SECRET = re.compile(r"(?i)(\bbearer\s+)([^\s;&|]+)")
+
+
+def _sanitize_string(value: str) -> str:
+    """Retain useful trace text while removing common inline credentials."""
+    value = _INLINE_SECRET.sub(r"\1<redacted>", value)
+    return _BEARER_SECRET.sub(r"\1<redacted>", value)
+
 
 def safe_repr(value: Any, depth: int = 0) -> Any:
     if depth > MAX_DEPTH:
         return "<max-depth>"
     if value is None or isinstance(value, (bool, int, float, str)):
-        if isinstance(value, str) and len(value) > MAX_REPR:
-            return value[:MAX_REPR] + "... <truncated>"
+        if isinstance(value, str):
+            value = _sanitize_string(value)
+            if len(value) > MAX_REPR:
+                return value[:MAX_REPR] + "... <truncated>"
         return value
     if isinstance(value, dict):
         result = {}
@@ -63,8 +77,10 @@ def sanitize_trace_value(value: Any, depth: int = 0) -> Any:
     if depth > MAX_DEPTH:
         return "<max-depth>"
     if value is None or isinstance(value, (bool, int, float, str)):
-        if isinstance(value, str) and len(value) > MAX_REPR:
-            return value[:MAX_REPR] + "... <truncated>"
+        if isinstance(value, str):
+            value = _sanitize_string(value)
+            if len(value) > MAX_REPR:
+                return value[:MAX_REPR] + "... <truncated>"
         return value
     if isinstance(value, dict):
         result = {}

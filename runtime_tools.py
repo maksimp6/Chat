@@ -229,10 +229,9 @@ RUNTIME_TOOLS = {
         "requires_approval": True,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "metadata": {
-            "trace_redact_arguments": ["command"],
-            "trace_redact_result_fields": ["stdout", "stderr", "command"],
-        },
+        # Commands and results remain in the access-controlled execution trace
+        # for auditability. The shared trace sanitizer removes inline credentials.
+        "metadata": {},
         "func": ssh_runtime_exec,
     },
     "ssh_runtime_read_file": {
