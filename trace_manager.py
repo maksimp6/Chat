@@ -1,7 +1,7 @@
 """Centralized execution trace for the Alice Pro chat pipeline."""
 
+import copy
 import json
-import threading
 import time
 import uuid
 import traceback
@@ -111,9 +111,8 @@ class ExecutionTrace:
     def __init__(self, trace_id: Optional[str] = None):
         self.trace_id = trace_id or str(uuid.uuid4())
         self.start_perf = time.perf_counter()
-        self._start_thread_cpu = time.thread_time()
-        self._owner_thread = threading.get_ident()
         self._finalized = False
+        self._final_result: Optional[Dict[str, Any]] = None
         self.trace: Dict[str, Any] = {
             "trace_id": self.trace_id,
             "schema_version": self.SCHEMA_VERSION,
@@ -134,6 +133,14 @@ class ExecutionTrace:
             "provider_keys": [],
         }
 
+    @property
+    def finalized(self) -> bool:
+        return self._finalized
+
+    def _ensure_mutable(self) -> None:
+        if self._finalized:
+            raise RuntimeError("ExecutionTrace is finalized and cannot be changed")
+
     def get_metadata(self) -> Dict[str, str]:
         return {"trace_id": str(self.trace_id)}
 
@@ -148,6 +155,7 @@ class ExecutionTrace:
         source: Optional[str] = None,
     ) -> None:
         """Bind a non-secret provider-key identity to this trace."""
+        self._ensure_mutable()
         entry = {"key_id": str(key_id)}
         for name, value in (
             ("fingerprint", fingerprint),
@@ -185,6 +193,7 @@ class ExecutionTrace:
         agent_id: Optional[str] = None,
         runtime_id: Optional[str] = None,
     ) -> None:
+        self._ensure_mutable()
         context = self.trace.setdefault("context", {})
         for key, value in (
             ("invocation_id", invocation_id),
@@ -204,6 +213,7 @@ class ExecutionTrace:
                 billing[key] = context[key]
 
     def set_request(self, payload: Dict[str, Any]) -> None:
+        self._ensure_mutable()
         clean_payload = (
             {k: v for k, v in payload.items() if k not in ("trace", "execution_trace")}
             if isinstance(payload, dict)
@@ -265,6 +275,7 @@ class ExecutionTrace:
         start_timestamp: Optional[float] = None,
         provider_key_id: Optional[str] = None,
     ) -> int:
+        self._ensure_mutable()
         provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
         correlation_id = self.get_step_correlation_id(step_index)
         request_entry = {
@@ -344,6 +355,7 @@ class ExecutionTrace:
         **kwargs,
     ) -> None:
         """Store one logical Responses API operation; polling snapshots stay nested in it."""
+        self._ensure_mutable()
         idx = step_index or kwargs.get("call_index", 1)
         provider_key_id = provider_key_id or (self.trace.get("provider_key") or {}).get("key_id")
         clean_raw = self._sanitize_trace_value(raw_json)
@@ -456,9 +468,9 @@ class ExecutionTrace:
         trace_arguments: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> Any:
+        self._ensure_mutable()
         start_timestamp = time.time()
         started = time.perf_counter()
-        started_cpu = time.thread_time()
         error = None
         result = None
         try:
@@ -496,7 +508,6 @@ class ExecutionTrace:
                 "result": self._sanitize_trace_value(result),
                 "error": error,
                 "timing_ms": elapsed_ms,
-                "cpu_ms": round(max(time.thread_time() - started_cpu, 0.0) * 1000, 3),
                 "timestamp": end_timestamp,
                 "start_timestamp": start_timestamp,
                 "end_timestamp": end_timestamp,
@@ -526,6 +537,7 @@ class ExecutionTrace:
 
     def set_reasoning_plan(self, plan: Dict[str, Any]) -> None:
         """Attach a sanitized structured reasoning plan to this execution trace."""
+        self._ensure_mutable()
         clean_plan = self._sanitize_trace_value(plan)
         self.trace["reasoning_plan"] = clean_plan
         self.add_event(
@@ -545,6 +557,7 @@ class ExecutionTrace:
         payload: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Record explicit planning state without storing private model reasoning."""
+        self._ensure_mutable()
         allowed = {
             "reasoning_started",
             "context_collected",
@@ -558,6 +571,7 @@ class ExecutionTrace:
         self.add_event(event_type, self._sanitize_trace_value(payload or {}))
 
     def add_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
+        self._ensure_mutable()
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
         self.trace["events"].append(
@@ -574,6 +588,7 @@ class ExecutionTrace:
         error_type: Optional[str] = None,
         exception: Optional[BaseException] = None,
     ) -> None:
+        self._ensure_mutable()
         entry = {"source": source, "error": message, "timestamp": time.time()}
         if error_type:
             entry["type"] = error_type
@@ -598,49 +613,48 @@ class ExecutionTrace:
             event_payload["has_python_state"] = True
         self.add_event("error_occurred", event_payload)
 
-    def finalize(self) -> Dict[str, Any]:
-        if not self._finalized:
-            wall_seconds = time.perf_counter() - self.start_perf
-            self.trace["timings"]["total_duration_ms"] = round(wall_seconds * 1000, 2)
-            # thread_time is per-thread; a finalize from another thread cannot be attributed.
-            cpu_seconds = None
-            if threading.get_ident() == self._owner_thread:
-                cpu_seconds = max(time.thread_time() - self._start_thread_cpu, 0.0)
-                self.trace["timings"]["cpu_time_ms"] = round(cpu_seconds * 1000, 3)
-            self._finalized = True
-            try:
-                from compute_resources import build_compute_billing_item
+    @staticmethod
+    def _json_default(obj: Any) -> Any:
+        if isinstance(obj, ExecutionTrace):
+            return {"trace_id": obj.trace_id, "<circular_ref>": True}
+        return safe_repr(obj)
 
-                items = self.trace.setdefault("billing", {}).setdefault("items", [])
-                items[:] = [item for item in items if item.get("type") != "compute"]
-                items.append(build_compute_billing_item(cpu_seconds, wall_seconds))
-            except Exception as exc:
-                self.add_event("billing_error", {"error": str(exc)})
-        try:
-            from billing import aggregate_billing
+    def _snapshot_copy(self, trace: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a JSON-safe independent trace copy, without altering the source."""
+        return json.loads(json.dumps(trace, default=self._json_default))
 
-            billing = self.trace.get("billing") or {}
-            self.trace["billing"] = aggregate_billing(
-                billing.get("items", []), self.trace.get("context", {})
+    def _build_snapshot(self, *, end_perf: Optional[float] = None) -> Dict[str, Any]:
+        """Build a read-only view and derive billing solely from source billing items."""
+        snapshot = self._snapshot_copy(self.trace)
+        if end_perf is not None:
+            snapshot.setdefault("timings", {})["total_duration_ms"] = round(
+                max(0.0, end_perf - self.start_perf) * 1000, 2
             )
-        except Exception as exc:
-            self.add_event("billing_error", {"error": str(exc)})
 
-        def _json_default(obj):
-            if isinstance(obj, ExecutionTrace):
-                return {"trace_id": obj.trace_id, "<circular_ref>": True}
-            try:
-                return self._safe_repr(obj)
-            except Exception:
-                return f"<{type(obj).__name__}: safe_repr failed>"
+        from billing import aggregate_billing
 
-        try:
-            return json.loads(json.dumps(self.trace, default=_json_default))
-        except Exception:
-            return {
-                "trace_id": self.trace_id,
-                "schema_version": self.SCHEMA_VERSION,
-                "error": "trace_serialization_failed",
-                "timings": self.trace.get("timings", {}),
-                "errors": [str(e) for e in self.trace.get("errors", [])],
-            }
+        billing = snapshot.get("billing") or {}
+        # Billing items are source facts.  Never use a previously generated total
+        # as an input to a later calculation.
+        snapshot["billing"] = aggregate_billing(
+            copy.deepcopy(billing.get("items", [])), snapshot.get("context", {})
+        )
+        return self._snapshot_copy(snapshot)
+
+    def make_snapshot(self) -> Dict[str, Any]:
+        """Return an independent, non-persisting snapshot of the current trace."""
+        if self._finalized:
+            return copy.deepcopy(self._final_result)
+        return self._build_snapshot()
+
+    def finalize(self) -> Dict[str, Any]:
+        """Freeze one validated terminal snapshot; repeated calls are idempotent."""
+        if self._finalized:
+            return copy.deepcopy(self._final_result)
+
+        # Build before changing terminal state, so a failed rebuild leaves the
+        # live trace open for diagnosis or retry. The snapshot is already JSON-safe.
+        final = self._build_snapshot(end_perf=time.perf_counter())
+        self._final_result = final
+        self._finalized = True
+        return copy.deepcopy(final)

@@ -104,6 +104,15 @@ class AliceClient(YandexResponsesClient):
         return response
 
 
+def _append_post_final_error(trace_data, source, message, error_type):
+    """Record an error raised after ExecutionTrace.finalize() in the returned copy only."""
+    import time
+
+    trace_data.setdefault("errors", []).append(
+        {"source": source, "error": message, "type": error_type, "timestamp": time.time()}
+    )
+
+
 @mcp_bp.route("/api/chat", methods=["POST"])
 def chat():
     import time as _time
@@ -270,13 +279,13 @@ def chat():
             )
         except Exception as settlement_error:
             logger.exception("[BILLING] Treasury settlement failed")
-            trace.record_error(
+            _append_post_final_error(
+                trace_data,
                 "treasury_settlement",
                 "treasury settlement failed",
-                error_type=type(settlement_error).__name__,
+                type(settlement_error).__name__,
             )
             settlement = {"status": "failed", "reason": "treasury_settlement_failed"}
-            trace_data = trace.finalize()
 
         trace_data.setdefault("billing", {})["settlement"] = settlement
         billing = trace_data.get("billing") or {}
@@ -343,31 +352,39 @@ def chat():
                     start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
-            if is_temperature_error:
-                trace.add_event(
-                    "validation_failed",
-                    {
-                        "field": "temperature",
-                        "error": error_message,
-                    },
-                )
-            trace.record_error(
-                "chat_pipeline",
-                error_message,
-                error_type=type(e).__name__,
-            )
-            record_yandex_mcp_activity(trace)
-            trace_data = trace.finalize()
-            if isinstance(e, ProviderQuotaExceeded):
-                trace.add_event(
-                    "provider_quota_http_response",
-                    {
-                        "status_code": 429,
-                        "reason": e.reason,
-                        "user_id": e.user_id,
-                    },
-                )
+            if trace.finalized:
+                # The failure happened after the trace was frozen (e.g. while
+                # persisting the reply); report it only in the returned copy.
                 trace_data = trace.finalize()
+                _append_post_final_error(
+                    trace_data, "chat_pipeline", error_message, type(e).__name__
+                )
+            else:
+                if is_temperature_error:
+                    trace.add_event(
+                        "validation_failed",
+                        {
+                            "field": "temperature",
+                            "error": error_message,
+                        },
+                    )
+                trace.record_error(
+                    "chat_pipeline",
+                    error_message,
+                    error_type=type(e).__name__,
+                )
+                record_yandex_mcp_activity(trace)
+                if isinstance(e, ProviderQuotaExceeded):
+                    trace.add_event(
+                        "provider_quota_http_response",
+                        {
+                            "status_code": 429,
+                            "reason": e.reason,
+                            "user_id": e.user_id,
+                        },
+                    )
+                trace_data = trace.finalize()
+            if isinstance(e, ProviderQuotaExceeded):
                 if invocation is not None:
                     persist_invocation_trace(invocation.invocation_id, trace_data)
                     fail_invocation(invocation.invocation_id, error=e.to_dict()["error"])
