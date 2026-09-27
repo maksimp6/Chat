@@ -1,250 +1,153 @@
 # Alice Pro
 
-Alice Pro is a self-hosted AI assistant platform built around Yandex AI Studio, MCP/local tools, agent orchestration, Execution Trace, file handling, billing/treasury controls, and an Android WebView client.
+Alice Pro — self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces, billing and an Android WebView client.
 
-The project is actively evolving. Some components are production-oriented, while agent, provider, runtime, and Android capabilities may still be experimental.
+The repository is actively evolving. This README separates shipped behavior from open scope: Issues define implementation scope and acceptance criteria; docs define contracts and operating rules; Discussions capture questions and decisions.
 
-## What it does
+## What is shipped
 
-- **AI chat** with Yandex AI Studio Responses API integration.
-- **MCP and local tools** with a unified execution boundary.
-- **Execution Trace** for provider requests, polling, tool execution, errors, timing, billing, and correlation.
-- **Agent Gateway and runtime** for isolated invocation/session workflows, including an optional SSH Runtime that executes commands and file operations as configured Linux users.
-- **Files and knowledge** through the file manager and vector-knowledge integrations.
-- **Treasury and billing** for internal usage accounting and demo balances.
-- **Departments** for domain-specific agent capabilities.
-- **Android client** with WebView integration, update handling, logging, and a stable debug-build workflow.
-- **Optional PostgreSQL backend** for shared deployments; SQLite remains the default local/Termux database.
-- **Supabase trace mirror** as an optional operational/diagnostic integration.
+- **Yandex AI Studio Responses API** as the primary provider through the backend chat path.
+- **Unified tool execution** through `UniversalToolExecutor`, including MCP and local tools.
+- **Invocation context and execution trace** for provider requests, polling, tool calls, errors, timing, continuations and billing correlation.
+- **Deterministic trace lifecycle**: snapshots are read-only and finalization is idempotent; see [execution trace lifecycle](docs/execution-trace-lifecycle.md).
+- **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The target architecture is one Python process with managed threads/contexts; threads are not a hostile-code security boundary.
+- **Alice GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Alice GitHub agent](docs/agents/alice-github-agent.md).
+- **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
+- **Treasury and billing controls**, internal usage accounting and demo balances.
+- **Files, knowledge and Departments** integrations, with optional Supabase trace mirroring.
+- **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
+- **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
 
 ## Architecture
 
-The main execution path is deliberately explicit:
-
 ```mermaid
 flowchart TD
-    U[User] --> C[Chat / Web UI]
-    C --> O[Invocation / Orchestrator]
-    O --> Y[Yandex AI Responses API]
-    O --> T[UniversalToolExecutor]
+    U[User / Android] --> O[Chat API / Orchestrator]
+    O --> C[InvocationContext]
+    C --> Y[Yandex Responses API]
+    C --> T[UniversalToolExecutor]
     T --> M[MCP / Local Tools]
-    O --> A[Agent Gateway / Runtime]
-    O --> R[SSH Runtime]
-    R --> L[Linux user / permissions]
+    C --> R[RuntimeDispatcher]
     R --> X[ExecutionTrace]
-    O --> X[ExecutionTrace]
-    X --> B[Billing]
-    X --> S[Optional Supabase Trace Mirror]
+    X --> B[Billing / Supabase Mirror]
 ```
 
-Requests, tool calls, polling and continuations carry scoped correlation information through `InvocationContext` and `ExecutionTrace`. Secrets are sanitized before persistent traces and logs.
+Secrets are sanitized at the trace/log boundary. Provider requests, continuations and tool calls retain scoped correlation through `InvocationContext` and `ExecutionTrace`.
 
 ## Current status
 
-The repository currently has a working backend/CI path and a buildable Android debug path.
+The current `master` contains the merged trace, billing and Alice-agent work from PRs [#404](https://github.com/maksimp6/Chat/pull/404), [#407](https://github.com/maksimp6/Chat/pull/407), [#402](https://github.com/maksimp6/Chat/pull/402) and [#405](https://github.com/maksimp6/Chat/pull/405), plus the later restoration of the #407 tree. Master is protected: production changes go through a PR, CI/status checks, review and post-merge verification. The configured protection currently has the status-check gate enabled; named required check contexts must be added when the repository's CI check names are finalized.
 
-Core areas already integrated include:
+Still experimental or roadmap unless the corresponding issue is complete:
 
-- unified tool execution through `UniversalToolExecutor`;
-- execution/session recovery tests;
-- correlated trace viewer events;
-- trace timing/correlation helpers;
-- global provider-key lifecycle and rotation;
-- anonymous first-launch identity bootstrap;
-- Departments registry/API/UI;
-- Agent Gateway with retry/rate/circuit controls;
-- Supabase production migration workflow.
-
-Treat advanced agent runtimes, branch environments, per-user provider credentials/quotas, Government workflows, Partner Relations, Kwork integration, and some AI-assisted UI features as roadmap/experimental work unless their corresponding issue is marked complete.
+- advanced branch-aware preview/runtime isolation;
+- cloud and local browsing with Browser Emulator/BrowserShim self-testing;
+- per-user provider credentials, quotas and rate limits;
+- Government workflows, Partner Relations and Kwork integration;
+- richer theme/voice assistance;
+- resilient backup/failover providers;
+- public release automation and versioned Android releases.
 
 ## Quick start
 
 ### Prerequisites
 
-For the current validated development path:
-
-- Python 3.12 for backend CI-compatible development.
-- Java 17 for Android builds.
-- Android SDK with API 37 installed for the current Android compile toolchain.
-- Git.
-- Optional: PostgreSQL 17 for shared deployments. Omit ALICE_DATABASE_URL for the default SQLite/Termux mode.
-- Optional: a Supabase project for trace mirroring and production migrations.
-- Optional: a non-production SSH target with a verified known_hosts file for Runtime Preview checks.
+- Python 3.12
+- Java 17
+- Android SDK with API 37
+- Git
+- Optional PostgreSQL 17
+- Optional Supabase project for trace mirroring/migrations
 
 ### Backend
-
-Create a virtual environment:
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-```
-
-Install the repository dependencies:
-
-```bash
 python -m pip install -r requirements.txt
-```
-
-Create a local environment file:
-
-```bash
 cp .env.example .env
-```
-
-At minimum, configure:
-
-```env
-YANDEX_API_KEY=<your-yandex-api-key>
-YANDEX_PROJECT_ID=<your-yandex-project-id>
-YANDEX_BASE_URL=https://ai.api.cloud.yandex.net/v1
-HOST=0.0.0.0
-PORT=8080
-SECRET_KEY=<random-secret>
-ALICE_OWNER_ID=<stable-owner-id>
-```
-
-Start the application:
-
-```bash
 python app.py
 ```
 
-Open:
+Open `http://localhost:8080`.
 
-```
-http://localhost:8080
-```
+At minimum, configure `YANDEX_API_KEY`, `YANDEX_PROJECT_ID`, `YANDEX_BASE_URL`, `SECRET_KEY` and `ALICE_OWNER_ID`. Do not put provider credentials in frontend configuration.
 
-### Optional Supabase trace mirror
-
-Configure the backend only:
-
-```env
-SUPABASE_URL=https://<your-project-ref>.supabase.co
-SUPABASE_SECRET_KEY=<runtime-key-resolved-by-ci>
-```
-
-The mirror is best-effort. A Supabase mirror failure must not become a failure of the main chat request.
+SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL` only when selecting PostgreSQL.
 
 ### Android
-
-The current Android module uses Java 17, compileSdk 37, targetSdk 35, and minSdk 26.
-
-From the Android project:
 
 ```bash
 cd android
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-CI also accepts build metadata:
+The debug APK is for development/testing. Release signing keys must never be committed.
 
-```bash
-./gradlew --no-daemon \
-  -PaliceBuildNumber=<build-number> \
-  -PaliceCommitHash=<commit-sha> \
-  :app:testDebugUnitTest :app:assembleDebug
-```
+## Configuration and security
 
-The debug APK produced by CI is intended for development/testing. Release signing keys must never be committed.
-
-## Configuration and secrets
-
-Use `.env` or the deployment secret manager for credentials.
-
-Never commit:
+Use `.env` or a deployment secret manager. Never commit:
 
 - Yandex API keys or IAM tokens;
 - Supabase service-role keys;
-- Cloud.ru credentials;
-- MCP bearer tokens;
+- Cloud.ru credentials or MCP bearer tokens;
 - signing keys/passwords;
 - user passwords or session secrets.
 
-Provider credentials are handled at the backend boundary. The current provider-key lifecycle is deployment-wide rather than per-user. See [provider key rotation](docs/provider-key-rotation.md).
-
-For security-sensitive reports, follow [SECURITY.md](SECURITY.md).
+For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Runtime tools must respect approval boundaries and the repository's sandbox rules; do not use browser profiles, cookies or hidden credentials as test fixtures.
 
 ## Development workflow
 
-Production changes use:
-
 ```
-Issue → branch → implementation → tests → PR → CI → merge → post-merge verification
+Issue → branch → implementation → tests → PR → CI → review → merge → verification
 ```
 
-Keep changes small enough to validate independently. Use the repository's Definition of Ready / Definition of Done and sprint workflow in [docs/development/sprint-workflow.md](docs/development/sprint-workflow.md).
-
-See [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for repository conventions.
+Keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
 
 ## Testing
-
-Backend:
 
 ```bash
 python -m compileall -q .
 pytest -q
+cd android && ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Android:
-
-```bash
-cd android
-./gradlew :app:testDebugUnitTest :app:assembleDebug
-```
-
-For database changes, keep the shared database path optional: SQLite is the default for local/Termux runs, while PostgreSQL is selected only with `ALICE_DATABASE_URL`. Supabase remains a separate backup/diagnostic concern.
-
-## Troubleshooting
-
-### Yandex returns 401/403
-
-Check the project ID, API key permissions, model availability, and backend environment variables. Do not put provider credentials into frontend configuration.
-
-### Supabase reports a migration or table error
-
-Check the migration history and the production migration workflow logs. Do not invent ad-hoc destructive rollbacks. Follow [docs/supabase-migrations-deploy.md](docs/supabase-migrations-deploy.md).
-
-### Android APK says the package conflicts
-
-Check the installed package name and version code. The current application ID is `com.alicepro.mobile`, and CI build numbers are propagated into `versionCode`.
-
-### Android UI is covered by system bars
-
-Check the current window/insets handling in `MainActivity.kt` and test the APK on the affected Android version before changing WebView padding or fullscreen flags.
-
-### Trace does not show a tool execution
-
-Inspect the complete trace, including tool calls, events, errors, and continuation steps. Tool execution should pass through `UniversalToolExecutor`. Do not use only the user-visible assistant message as evidence of whether a tool ran.
+For frontend/runtime work, preserve the progressive-enhancement path and BrowserShim/VM tests. Do not introduce Playwright as a runtime dependency. Browser Emulator/self-testing work is tracked in [#409](https://github.com/maksimp6/Chat/issues/409).
 
 ## Documentation map
 
-- [API documentation](docs/api/API_DOCS.md)
-- [Agent architecture](docs/agents/departments.md)
-- [Runtime/serverless](docs/runtime_serverless.md)
-- [MCP architecture](docs/mcp/architecture.md)
+- [Documentation index](docs/README.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Integration coordination](docs/architecture/integration-coordination.md)
+- [Current scope](docs/current-scope.md)
+- [API overview](docs/api/overview.md)
+- [MCP overview](docs/mcp/overview.md)
+- [Agent architecture](docs/agents/overview.md)
+- [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
+- [Alice GitHub agent](docs/agents/alice-github-agent.md)
+- [Compute energy billing](docs/compute-energy-billing.md)
+- [Execution trace lifecycle](docs/execution-trace-lifecycle.md)
 - [Provider key rotation](docs/provider-key-rotation.md)
 - [Supabase migrations](docs/supabase-migrations-deploy.md)
-- [Sprint workflow](docs/development/sprint-workflow.md)
 - [Security policy](SECURITY.md)
 - [Support](SUPPORT.md)
-- [Contributing](CONTRIBUTING.md)
 
-## Roadmap
+## Active issues and expected work
 
-Major roadmap areas include:
+The main coordination issue is [#343](https://github.com/maksimp6/Chat/issues/343). Related scope includes:
 
-- branch-aware preview environments;
-- separate user agents and reusable AI sessions;
-- Government Department workflows;
-- Partner Relations;
-- per-user provider credentials, quotas and rate limits;
-- richer theme/voice assistance;
-- resilient backup/failover providers;
-- public release automation and versioned Android releases.
+- [#350](https://github.com/maksimp6/Chat/issues/350) — canonical one-process runtime architecture;
+- [#351](https://github.com/maksimp6/Chat/issues/351) — integration staging and dependency order;
+- [#227](https://github.com/maksimp6/Chat/issues/227) and [#223](https://github.com/maksimp6/Chat/issues/223) — frontend progressive enhancement;
+- [#326](https://github.com/maksimp6/Chat/issues/326) and [#238](https://github.com/maksimp6/Chat/issues/238) — MCP/ChatGPT compatibility;
+- [#254](https://github.com/maksimp6/Chat/issues/254) and [#256](https://github.com/maksimp6/Chat/issues/256) — plugin platform and autonomous development;
+- [#340](https://github.com/maksimp6/Chat/issues/340) — provider-neutral cloud storage, Google Drive first;
+- [#116](https://github.com/maksimp6/Chat/issues/116) — conversation agents;
+- [#195](https://github.com/maksimp6/Chat/issues/195) — Android/release safety;
+- [#104](https://github.com/maksimp6/Chat/issues/104) — public release;
+- [#409](https://github.com/maksimp6/Chat/issues/409) — cloud/local browsing and self-testing.
 
-GitHub Issues are the source of truth for scope and acceptance criteria.
+Relevant Discussions include [Cloud.ru CLI Q&A #406](https://github.com/maksimp6/Chat/discussions/406) and [repository cleanup #393](https://github.com/maksimp6/Chat/discussions/393). They document open questions and decisions; they do not by themselves mark a feature complete.
 
 ## License
 
