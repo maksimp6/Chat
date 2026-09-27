@@ -1,0 +1,3 @@
+interface:
+  display_name: "Cloud.ru management"
+  short_description: "Manage Cloud.ru resources and IAM safely"
