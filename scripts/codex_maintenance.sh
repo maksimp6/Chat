@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euxo pipefail
 umask 077
 
 INSTALL_DIR="$HOME/.local/lib/alice-pro"
