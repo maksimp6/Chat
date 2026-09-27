@@ -35,4 +35,11 @@ test -n "$CLOUD_BIN"
 mkdir -p "$INSTALL_DIR"
 install -m 755 "$CLOUD_BIN" "$INSTALL_DIR/cloud"
 test -x "$INSTALL_DIR/cloud"
-printf 'Cloud CLI installed: %s\\n' "$INSTALL_DIR/cloud"
+
+# Accept Cloud CLI's first-run privacy prompt non-interactively so Codex
+# bootstrap never waits for terminal input. The user explicitly opted in.
+if command -v timeout >/dev/null 2>&1; then
+  printf 'y\\n' | timeout --foreground 30s "$INSTALL_DIR/cloud" --version
+else
+  printf 'y\\n' | "$INSTALL_DIR/cloud" --version
+fi
