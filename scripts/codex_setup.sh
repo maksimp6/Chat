@@ -2,25 +2,16 @@
 set -euo pipefail
 umask 077
 
-REPO="git@github.com:maksimp6/Chat.git"
 INSTALL_DIR="$HOME/.local/lib/alice-pro"
 BIN_DIR="$HOME/.local/bin"
 
 mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
-if git remote get-url origin >/dev/null 2>&1; then
-  git remote set-url origin "$REPO"
-else
-  git remote add origin "$REPO"
-fi
-
-git fetch origin master
-
-# Install both control scripts immediately so maintenance survives cached checkouts.
+# Setup runs from the checkout Codex already prepared. Network access and a
+# configured Git remote are not prerequisites: install the scripts we have.
 for name in codex_setup.sh codex_maintenance.sh; do
-  git show "origin/master:scripts/$name" > "$INSTALL_DIR/$name.next"
-  chmod 700 "$INSTALL_DIR/$name.next"
-  mv "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"
+  test -f "scripts/$name"
+  install -m 700 "scripts/$name" "$INSTALL_DIR/$name"
 done
 
 python --version | grep -q '3.14'
@@ -39,7 +30,9 @@ git config --global tag.gpgsign true
 git config --global gpg.program gpg
 
 export PATH="$BIN_DIR:$PATH"
-bash scripts/install_cloud_cli.sh
+if ! command -v cloud >/dev/null 2>&1; then
+  bash scripts/install_cloud_cli.sh
+fi
 cloud --version
 
 echo "Codex repository environment ready"
