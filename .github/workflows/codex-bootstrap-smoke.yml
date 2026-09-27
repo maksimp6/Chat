@@ -1,0 +1,50 @@
+name: Codex bootstrap smoke
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "scripts/codex_setup.sh"
+      - "scripts/codex_maintenance.sh"
+      - "scripts/install_cloud_cli.sh"
+      - ".github/workflows/codex-bootstrap-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codex-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Set up Java 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Run Codex setup exactly
+        shell: bash
+        run: bash scripts/codex_setup.sh
+
+      - name: Run cached maintenance exactly
+        shell: bash
+        run: bash scripts/codex_maintenance.sh
