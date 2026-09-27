@@ -15,21 +15,6 @@ Use the smallest independent change that satisfies an issue or subtask.
 9. Merge only after required checks and review policy are satisfied.
 10. Never rewrite `master` directly and never commit secrets.
 
-## Agent dispatch
-
-Describe the task with the "Agent task" issue template, then mention exactly one
-agent in a comment:
-
-- `@claude` — multi-file changes and investigations (`.github/workflows/claude.yml`).
-- `@codex` — tasks for the Codex connector; uses `scripts/codex_setup.sh`.
-- `@copilot` — assign the issue to Copilot; it also reviews pull requests
-  (`.github/copilot-instructions.md`).
-- `@alice` — Alice Pro working on her own code through her filesystem tools
-  (`.github/workflows/alice.yml`, `docs/agents/alice-github-agent.md`).
-
-Every agent opens one focused pull request per issue. Only a maintainer merges,
-after green CI; agents never push to `master`.
-
 ## Architecture rules
 
 - Treat `UniversalToolExecutor` as the execution boundary for tool calls.
