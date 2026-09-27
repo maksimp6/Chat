@@ -9,6 +9,9 @@ The project is actively evolving. Some components are production-oriented, while
 - **AI chat** with Yandex AI Studio Responses API integration.
 - **MCP and local tools** with a unified execution boundary.
 - **Execution Trace** for provider requests, polling, tool execution, errors, timing, billing, and correlation.
+- **GitHub agent dispatch** — @alice, @claude, @codex, and @copilot agents take issues autonomously and open pull requests.
+  - @alice runs headless (filesystem tools only, no git/shell) for safe autonomous code edits.
+  - Shared agent dispatch system with task templates and architecture rules.
 - **Agent Gateway and runtime** for isolated invocation/session workflows, including an optional SSH Runtime that executes commands and file operations as configured Linux users.
 - **Files and knowledge** through the file manager and vector-knowledge integrations.
 - **Treasury and billing** for internal usage accounting and demo balances.
@@ -53,9 +56,12 @@ Core areas already integrated include:
 - anonymous first-launch identity bootstrap;
 - Departments registry/API/UI;
 - Agent Gateway with retry/rate/circuit controls;
-- Supabase production migration workflow.
+- Supabase production migration workflow;
+- **GitHub agent dispatch** (@alice headless runner, @claude/codex workflows, shared task templates);
+- **@alice autonomous code editing** (filesystem-only tools, diff guards, draft PR automation with maintainer token);
+- **@claude mention workflow** for multi-file investigations and implementations.
 
-Treat advanced agent runtimes, branch environments, per-user provider credentials/quotas, Government workflows, Partner Relations, Kwork integration, and some AI-assisted UI features as roadmap/experimental work unless their corresponding issue is marked complete.
+Treat advanced agent runtimes (tool routing, approval-gated capabilities), branch environments, per-user provider credentials/quotas, Government workflows, Partner Relations, Kwork integration, and some AI-assisted UI features as roadmap/experimental work unless their corresponding issue is marked complete.
 
 ## Quick start
 
@@ -178,6 +184,19 @@ Keep changes small enough to validate independently. Use the repository's Defini
 
 See [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for repository conventions.
 
+### GitHub agent dispatch
+
+Alice, Copilot, and other agents can take GitHub issues autonomously. Use the `.github/ISSUE_TEMPLATE/agent_task.md` template to describe the task, then mention the agent in a comment:
+
+- `@alice` — Alice works on her own code through filesystem tools only (headless runner, no git/shell/network access).
+- `@claude` — Claude handles multi-file investigations and implementations (uses `.github/workflows/claude.yml`).
+- `@codex` — Codex connector tasks (uses `scripts/codex_setup.sh`).
+- `@copilot` — Copilot reviews and writes code (also assigned as PR reviewer).
+
+Each agent opens one focused pull request per issue. Maintainers review and merge after CI passes; agents never push to `master`.
+
+See [AGENTS.md](AGENTS.md) for agent dispatch rules and architecture principles. See `.github/copilot-instructions.md` for detailed guidance on agent patterns and constraints.
+
 ## Testing
 
 Backend:
@@ -220,6 +239,10 @@ Inspect the complete trace, including tool calls, events, errors, and continuati
 
 ## Documentation map
 
+- [Agent dispatch and repository workflow](AGENTS.md) — @alice, @claude, @codex, @copilot task dispatch; architecture rules.
+- [Agent task template](.github/ISSUE_TEMPLATE/agent_task.md) — structure for describing tasks for agents.
+- [Copilot instructions](.github/copilot-instructions.md) — detailed guidance on @alice architecture, constraints, testing, and debugging.
+- [Alice as a GitHub agent](docs/agents/alice-github-agent.md) — setup and operation guide for the headless @alice runner.
 - [API documentation](docs/api/API_DOCS.md)
 - [Agent architecture](docs/agents/departments.md)
 - [Runtime/serverless](docs/runtime_serverless.md)
@@ -235,6 +258,8 @@ Inspect the complete trace, including tool calls, events, errors, and continuati
 
 Major roadmap areas include:
 
+- **Agent tool routing** — smart tool category selection per request (experimental; privacy implications being evaluated).
+- **Advanced agent runtimes** — approval-gated tool execution, conditional tool routing, integration with external decision models.
 - branch-aware preview environments;
 - separate user agents and reusable AI sessions;
 - Government Department workflows;
@@ -244,7 +269,7 @@ Major roadmap areas include:
 - resilient backup/failover providers;
 - public release automation and versioned Android releases.
 
-GitHub Issues are the source of truth for scope and acceptance criteria.
+GitHub Issues and `.claude/plans/` are the source of truth for scope and acceptance criteria. See [AGENTS.md](AGENTS.md) for current agent dispatch guidelines.
 
 ## License
 
