@@ -2,6 +2,7 @@
 
 import copy
 import json
+import threading
 import time
 import uuid
 import traceback
@@ -111,6 +112,8 @@ class ExecutionTrace:
     def __init__(self, trace_id: Optional[str] = None):
         self.trace_id = trace_id or str(uuid.uuid4())
         self.start_perf = time.perf_counter()
+        self._start_thread_cpu = time.thread_time()
+        self._owner_thread = threading.get_ident()
         self._finalized = False
         self._final_result: Optional[Dict[str, Any]] = None
         self.trace: Dict[str, Any] = {
@@ -471,6 +474,7 @@ class ExecutionTrace:
         self._ensure_mutable()
         start_timestamp = time.time()
         started = time.perf_counter()
+        started_cpu = time.thread_time()
         error = None
         result = None
         try:
@@ -508,6 +512,7 @@ class ExecutionTrace:
                 "result": self._sanitize_trace_value(result),
                 "error": error,
                 "timing_ms": elapsed_ms,
+                "cpu_ms": round(max(time.thread_time() - started_cpu, 0.0) * 1000, 3),
                 "timestamp": end_timestamp,
                 "start_timestamp": start_timestamp,
                 "end_timestamp": end_timestamp,
@@ -577,6 +582,42 @@ class ExecutionTrace:
         self.trace["events"].append(
             {"type": event_type, "timestamp": time.time(), "payload": payload or {}}
         )
+        self._checkpoint_compute()
+
+    def _checkpoint_compute(self) -> None:
+        """Record the billable compute boundary as a source fact at recorded work.
+
+        thread_time() is per thread, so only work on the thread that owns the
+        trace is attributable to this invocation.
+        """
+        if threading.get_ident() != self._owner_thread:
+            return
+        timings = self.trace["timings"]
+        timings["billable_cpu_ms"] = round(
+            max(time.thread_time() - self._start_thread_cpu, 0.0) * 1000, 3
+        )
+        timings["billable_wall_ms"] = round(
+            max(time.perf_counter() - self.start_perf, 0.0) * 1000, 3
+        )
+
+    @staticmethod
+    def _compute_billing_item(timings: Dict[str, Any]) -> Dict[str, Any]:
+        cpu_ms = timings.get("billable_cpu_ms")
+        wall_ms = timings.get("billable_wall_ms")
+        try:
+            from compute_resources import build_compute_billing_item
+
+            return build_compute_billing_item(
+                None if cpu_ms is None else cpu_ms / 1000,
+                None if wall_ms is None else wall_ms / 1000,
+            )
+        except Exception:
+            return {
+                "type": "compute",
+                "cost_status": "not_billed",
+                "cost_reason": "compute_billing_failed",
+                "total_cost": 0.0,
+            }
 
     def record_error(
         self,
@@ -635,10 +676,15 @@ class ExecutionTrace:
 
         billing = snapshot.get("billing") or {}
         # Billing items are source facts.  Never use a previously generated total
-        # as an input to a later calculation.
-        snapshot["billing"] = aggregate_billing(
-            copy.deepcopy(billing.get("items", [])), snapshot.get("context", {})
-        )
+        # as an input to a later calculation.  The compute item is derived from
+        # the recorded compute boundary, so reading a snapshot is never billed.
+        items = [
+            item
+            for item in copy.deepcopy(billing.get("items", []))
+            if item.get("type") != "compute"
+        ]
+        items.append(self._compute_billing_item(snapshot.get("timings") or {}))
+        snapshot["billing"] = aggregate_billing(items, snapshot.get("context", {}))
         return self._snapshot_copy(snapshot)
 
     def make_snapshot(self) -> Dict[str, Any]:

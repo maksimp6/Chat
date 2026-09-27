@@ -92,6 +92,10 @@ def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[s
     cached_cost = round(sum(float(item.get("cached_input_cost") or 0) for item in known), 6)
     cache_savings = round(sum(float(item.get("cache_savings") or 0) for item in known), 6)
     unknown = sum(1 for item in items if item.get("cost_status") == "unknown")
+    compute = [item for item in items if item.get("type") == "compute"]
+    compute_cost = round(
+        sum(float(item.get("total_cost") or 0) for item in compute if item in known), 6
+    )
     result = {
         "currency": PRICING_CURRENCY,
         "provider": PROVIDER,
@@ -104,6 +108,9 @@ def aggregate_billing(items, context: Optional[Dict[str, Any]] = None) -> Dict[s
         "output_cost": output_cost,
         "cached_input_cost": cached_cost,
         "tool_cost": 0.0,
+        "compute_cost": compute_cost,
+        "cpu_seconds": round(sum(float(item.get("cpu_seconds") or 0) for item in compute), 6),
+        "energy_wh": round(sum(float(item.get("energy_wh") or 0) for item in compute), 9),
         "total_cost": total,
         "cache_savings": cache_savings,
         "cost_status": "partial" if unknown else "calculated",

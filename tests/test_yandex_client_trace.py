@@ -84,7 +84,8 @@ class TestExecutionTraceResponses(unittest.TestCase):
         first = trace.finalize()
         second = trace.finalize()
         billing = first["billing"]
-        self.assertEqual(len(billing["items"]), 2)
+        self.assertEqual(len([i for i in billing["items"] if i["type"] == "ai"]), 2)
+        self.assertEqual(len([i for i in second["billing"]["items"] if i["type"] == "compute"]), 1)
         self.assertEqual(billing["input_tokens"], 1500)
         self.assertEqual(billing["output_tokens"], 150)
         self.assertEqual(billing["total_tokens"], 1650)

@@ -39,7 +39,7 @@ def test_final_billing_matches_snapshot_and_finalize_is_idempotent():
 
     assert first_final["billing"] == snapshot["billing"]
     assert second_final == first_final
-    assert len(first_final["billing"]["items"]) == 1
+    assert [item["type"] for item in first_final["billing"]["items"]] == ["ai", "compute"]
 
 
 def test_snapshot_and_final_results_are_deep_independent():
