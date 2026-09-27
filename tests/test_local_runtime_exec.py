@@ -113,8 +113,8 @@ def test_local_runtime_exec_uses_existing_approval_and_trace_pipeline(tmp_path):
 
     assert result["success"] is True
     tool_call = trace.trace["tool_calls"][0]
-    assert tool_call["arguments"]["command"] == "<redacted>"
-    assert tool_call["result"]["data"]["stdout"] == "<redacted>"
+    assert tool_call["arguments"]["command"] == "printf secret"
+    assert tool_call["result"]["data"]["stdout"] == "secret"
 
     runtime_events = [
         event for event in trace.trace["events"] if event["type"].startswith("runtime_")
