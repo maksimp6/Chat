@@ -11,10 +11,11 @@ Alice Pro frontend JavaScript is treated as a set of modules with explicit runti
 - JavaScript files have a 512 KiB source limit.
 - A source line may not exceed 8 KiB.
 - Large embedded base64/data URLs are rejected.
-- Repeated source text above the configured threshold is rejected.
+- Long consecutive runs of identical source lines are rejected.
 - TODO/FIXME/XXX/HACK/NOTE markers are rejected from production frontend modules.
 - Suspicious high-entropy or non-printable source is classified as unusual text and rejected.
 - Vendor bundles are excluded from application policy checks and must be isolated explicitly. They are not treated as application modules.
+- `sw.js` is infrastructure, not an application module, because Service Workers require a fetch event handler. Its JavaScript syntax is still validated.
 
 ## Loop and failure safety
 
@@ -43,6 +44,13 @@ When a value can be reused safely, modules should cache it with:
 2. an invalidation rule;
 3. a bounded lifetime or explicit refresh path where freshness matters;
 4. no unbounded cache growth.
+
+## Timers and dispatcher
+
+- Direct setTimeout, setInterval, clearTimeout, clearInterval, delay, and sleep calls are forbidden in frontend modules.
+- Deferred work must use the module dispatcher and lifecycle/event mechanisms. This keeps cancellation, ownership, failure cleanup, and observability centralized.
+- User/application requests must enter through the dispatcher. Modules do not call the transport directly.
+- The dispatcher is the only frontend boundary allowed to reach the transport layer.
 
 ## Runtime contract
 

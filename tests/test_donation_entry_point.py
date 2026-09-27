@@ -100,10 +100,12 @@ def test_donation_url_query_is_html_escaped(monkeypatch):
 
 def test_donation_icon_is_repository_local(monkeypatch):
     html = _render_index(monkeypatch, VALID_URL)
-    icon = re.search(r'<a[^>]*id="donate-btn"[^>]*>(.*?)</a>', html, re.S).group(1)
+    icon = re.search(r'<a[^>]*id="donate-btn"[^>]*>(.*?)</a\s*>', html, re.S).group(1)
     assert re.search(r'src="/static/icons/donate\.svg\?v=[^"]+"', icon)
-    svg = (app_module.app.static_folder and
-           open(f"{app_module.app.static_folder}/icons/donate.svg", encoding="utf-8").read())
+    svg = (
+        app_module.app.static_folder
+        and open(f"{app_module.app.static_folder}/icons/donate.svg", encoding="utf-8").read()
+    )
     assert "<svg" in svg
     assert "http://" not in svg.replace("http://www.w3.org/2000/svg", "")
     assert "https://" not in svg

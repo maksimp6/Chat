@@ -1,11 +1,13 @@
 import tempfile
 from pathlib import Path
 
-from validate_frontend_modules import validate_file
+from tests.validate_frontend_modules import validate_file
 
 
 def errors_for(source: str) -> list[str]:
-    with tempfile.NamedTemporaryFile("w", suffix=".js", dir=".", delete=False, encoding="utf-8") as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".js", dir=".", delete=False, encoding="utf-8"
+    ) as handle:
         handle.write(source)
         path = Path(handle.name)
     try:
@@ -48,3 +50,29 @@ def test_repeated_lookup_without_cache_is_rejected():
 def test_repeated_lookup_with_cache_signal_is_allowed():
     errors = errors_for("const cache = new Map(); fetch('/api/models'); fetch('/api/models');")
     assert not any("cache safety violation" in error for error in errors)
+
+
+def test_direct_timers_are_rejected():
+    errors = errors_for("setTimeout(function() {}, 100);")
+    assert any("timer safety violation" in error for error in errors)
+
+
+def test_delay_and_sleep_are_rejected():
+    errors = errors_for("delay(100); sleep(100);")
+    assert sum("timer safety violation" in error for error in errors) == 2
+
+
+def test_direct_transport_access_is_rejected():
+    errors = errors_for("fetch('/api/chat');")
+    assert any("dispatcher safety violation" in error for error in errors)
+
+
+def test_dispatcher_transport_is_allowed():
+    errors = errors_for("window.AliceDispatcher.request('/api/chat');")
+    assert not any("dispatcher safety violation" in error for error in errors)
+
+
+def test_long_consecutive_source_repetition_is_rejected():
+    source = "var same = 1;\n" * 12
+    errors = errors_for(source)
+    assert any("consecutive run=12" in error for error in errors)

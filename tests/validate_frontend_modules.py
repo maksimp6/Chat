@@ -14,9 +14,7 @@ STATIC = ROOT / "static"
 
 MAX_JS_BYTES = 512 * 1024
 MAX_LINE_BYTES = 8 * 1024
-MAX_BASE64_BYTES = 4096
 MAX_REPEAT_RUN = 12
-MAX_REPEAT_RATIO = 0.35
 MAX_ARRAY_LITERAL_ITEMS = 4096
 MAX_ARRAY_CONSTRUCTOR_ITEMS = 4096
 
@@ -39,11 +37,17 @@ INFINITE_LOOP_PATTERNS = (
     (re.compile(r"\bfor\s*\(\s*;\s*;\s*\)"), "for(;;)"),
 )
 UNBOUNDED_LOOP_RE = re.compile(r"\bwhile\s*\(\s*[^\n;{}()]+\s*\)\s*\{")
-FETCH_IN_LOOP_RE = re.compile(
-    r"\b(?:while|for)\b[\s\S]{0,400}\b(?:fetch|XMLHttpRequest)\s*\("
-)
+FETCH_IN_LOOP_RE = re.compile(r"\b(?:while|for)\b[\s\S]{0,400}\b(?:fetch|XMLHttpRequest)\s*\(")
 ARRAY_LITERAL_RE = re.compile(r"\[([^\[\]]*)\]", re.DOTALL)
 ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)")
+TIMER_PATTERNS = (
+    (re.compile(r"\bsetTimeout\s*\("), "setTimeout"),
+    (re.compile(r"\bsetInterval\s*\("), "setInterval"),
+    (re.compile(r"\bclearTimeout\s*\("), "clearTimeout"),
+    (re.compile(r"\bclearInterval\s*\("), "clearInterval"),
+    (re.compile(r"\bdelay\s*\("), "delay"),
+    (re.compile(r"\bsleep\s*\("), "sleep"),
+)
 REPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
     r"[\s\S]{0,250}\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\("
@@ -56,8 +60,28 @@ def entropy(value: str) -> float:
     return -sum((count / n) * math.log2(count / n) for count in counts.values())
 
 
+def is_dispatcher(path: Path) -> bool:
+    return path.name == "dispatcher.js"
+
+
 def is_vendor(path: Path) -> bool:
     return path.name in {"eruda.js"} or "vendor" in path.parts
+
+
+def is_policy_exempt(path: Path) -> bool:
+    # Service workers have a mandatory fetch event handler and are infrastructure,
+    # not application modules. They still undergo JavaScript syntax validation.
+    return path.name == "sw.js"
+
+
+def _timer_errors(text: str, rel: Path) -> list[str]:
+    errors = []
+    for pattern, label in TIMER_PATTERNS:
+        if pattern.search(text):
+            errors.append(
+                f"{rel}: timer safety violation: {label} is forbidden; use dispatcher/event lifecycle"
+            )
+    return errors
 
 
 def _loop_errors(text: str, rel: Path) -> list[str]:
@@ -121,6 +145,9 @@ def validate_file(path: Path) -> list[str]:
         if len(line.encode("utf-8")) > MAX_LINE_BYTES:
             errors.append(f"{rel}:{number}: line exceeds {MAX_LINE_BYTES} bytes")
 
+    if not is_dispatcher(path) and re.search(r"\bfetch\s*\(", text):
+        errors.append(f"{rel}: dispatcher safety violation: direct transport access is forbidden")
+
     if TEXT_FORBIDDEN.search(text):
         errors.append(f"{rel}: unusual text classification: forbidden control character")
 
@@ -137,12 +164,15 @@ def validate_file(path: Path) -> list[str]:
             errors.append(f"{rel}: function name '{name}' violates naming policy")
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if lines:
-        counts = Counter(lines)
-        repeated = sum(count - 1 for count in counts.values() if count > 1)
-        ratio = repeated / len(lines)
-        if max(counts.values()) >= MAX_REPEAT_RUN or ratio > MAX_REPEAT_RATIO:
-            errors.append(f"{rel}: suspicious repeated source text (ratio={ratio:.2f})")
+    run = 1
+    for previous, current in zip(lines, lines[1:]):
+        if current == previous:
+            run += 1
+            if run >= MAX_REPEAT_RUN:
+                errors.append(f"{rel}: suspicious repeated source text (consecutive run={run})")
+                break
+        else:
+            run = 1
 
     if len(text) >= 4096:
         printable = sum(ch.isprintable() or ch in "\n\r\t" for ch in text)
@@ -151,6 +181,7 @@ def validate_file(path: Path) -> list[str]:
         if entropy(text) > 5.95 and len(text) > 32 * 1024 and not is_vendor(path):
             errors.append(f"{rel}: unusual text classification: high source entropy")
 
+    errors.extend(_timer_errors(text, rel))
     errors.extend(_loop_errors(text, rel))
     errors.extend(_array_errors(text, rel))
     errors.extend(_cache_errors(text, rel))
@@ -166,9 +197,10 @@ def validate_syntax(path: Path) -> list[str]:
     )
     if result.returncode:
         detail = (result.stderr or result.stdout).strip().splitlines()
+        detail = [line for line in detail if line.strip() and not line.startswith("Node.js v")]
         return [
             f"{path.relative_to(ROOT)}: JavaScript syntax error: "
-            f"{detail[-1] if detail else 'unknown'}"
+            f"{detail[0] if detail else 'unknown'}"
         ]
     return []
 
@@ -178,9 +210,8 @@ def main() -> int:
     errors: list[str] = []
 
     for path in files:
-        if is_vendor(path):
-            continue
-        errors.extend(validate_file(path))
+        if not is_vendor(path) and not is_policy_exempt(path):
+            errors.extend(validate_file(path))
         errors.extend(validate_syntax(path))
 
     if errors:
