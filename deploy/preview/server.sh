@@ -218,8 +218,8 @@ assert any(
     and event.get("payload", {}).get("linux_user") == "alice-runtime"
     for event in exec_trace.trace["events"]
 )
-assert exec_trace.trace["tool_calls"][0]["arguments"]["command"] == "<redacted>"
-assert exec_trace.trace["tool_calls"][0]["result"]["data"]["stdout"] == "<redacted>"
+assert exec_trace.trace["tool_calls"][0]["arguments"]["command"] == "id -un"
+assert exec_trace.trace["tool_calls"][0]["result"]["data"]["stdout"].strip() == "alice-runtime"
 
 write_result, write_trace = invoke(
     "ssh_runtime_write_file",

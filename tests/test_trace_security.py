@@ -29,6 +29,15 @@ class TraceSecurityTests(unittest.TestCase):
         self.assertTrue(value.endswith("... <truncated>"))
         self.assertEqual(len(value), 4000 + len("... <truncated>"))
 
+    def test_sanitize_trace_value_redacts_inline_secrets_but_keeps_context(self):
+        value = sanitize_trace_value(
+            "deploy --api-key=key-value --token credential-value; authorization: ******"
+        )
+        self.assertEqual(
+            value,
+            "deploy --api-key=<redacted> --token <redacted>; authorization: <redacted>",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
