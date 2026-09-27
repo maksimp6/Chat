@@ -6,12 +6,12 @@ Alice Pro keeps debug and release signing separate.
 
 Configure these repository secrets before running `Android release APK`:
 
-- `ANDROID_RELEASE_KEYSTORE_BASE64`: base64-encoded release keystore.
-- `ANDROID_RELEASE_KEY_ALIAS`: key alias.
-- `ANDROID_RELEASE_STORE_PASSWORD`: keystore password.
-- `ANDROID_RELEASE_KEY_PASSWORD`: private-key password.
+- `ALICE_RELEASE_KEYSTORE_BASE64`: base64-encoded release keystore.
+- `ALICE_RELEASE_KEY_ALIAS`: key alias.
+- `ALICE_RELEASE_STORE_PASSWORD`: keystore password.
+- `ALICE_RELEASE_KEY_PASSWORD`: private-key password.
 
-The keystore is materialized only for the release job and removed in the cleanup step. It is never committed to Git and must not be placed in an issue, pull request, log, trace, or chat message.
+The keystore is materialized under the GitHub runner's temporary directory only for the release job and removed in an unconditional cleanup step. It is never committed to Git and must not be placed in an issue, pull request, log, trace, or chat message.
 
 ## Generate the keystore once
 
@@ -45,16 +45,17 @@ On macOS, use `base64 < alice-pro-release.keystore | tr -d '\\n'` instead.
 
 ## Release flow
 
-The `Android release APK` workflow runs manually or for tags matching `v*`.
+The canonical `Release` workflow runs for semantic version tags matching `vMAJOR.MINOR.PATCH`.
 
 It:
 
 1. materializes the keystore from the protected GitHub secret;
 2. builds `assembleRelease` with the release signing configuration;
 3. verifies the resulting APK with `apksigner`;
-4. prints only certificate identity/fingerprint and the APK SHA-256;
-5. uploads the signed APK as a CI artifact;
-6. deletes the temporary keystore.
+4. checks that the APK signer is the certificate from the configured release keystore;
+5. checks the package name, tag-derived `versionName`, and run-derived `versionCode`;
+6. publishes the APK, SHA-256 checksum, and release metadata;
+7. deletes the temporary keystore even when an earlier step fails.
 
 Debug CI continues to use the standard Android debug signing configuration.
 
