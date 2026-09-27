@@ -34,4 +34,4 @@ test -n "$CLOUD_BIN"
 
 mkdir -p "$INSTALL_DIR"
 install -m 755 "$CLOUD_BIN" "$INSTALL_DIR/cloud"
-printf 'y\n' | "$INSTALL_DIR/cloud" --version
+"$INSTALL_DIR/cloud" configure set --cli-agree-privacy-statement=true
