@@ -481,11 +481,11 @@ function parseHTML(html, root) {
 function decodeEntities(value) {
   return value
     .replace(/&times;/g, "×")
-    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 function serialize(element) {
