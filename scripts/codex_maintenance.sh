@@ -24,6 +24,29 @@ python -m pip install --disable-pip-version-check \
 npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 
 export PATH="$BIN_DIR:$PATH"
+
+# GitHub CLI is the agent-facing tool for issues, PRs, releases and API calls.
+# GITHUB_TOKEN is supplied by the Codex environment and is never persisted here.
+if ! command -v gh >/dev/null 2>&1; then
+  GH_VERSION="${GH_VERSION:-2.80.0}"
+  case "$(uname -m)" in
+    x86_64|amd64) GH_ARCH=amd64 ;;
+    aarch64|arm64) GH_ARCH=arm64 ;;
+    *) echo "Unsupported architecture for GitHub CLI: $(uname -m)" >&2; exit 1 ;;
+  esac
+  GH_TMP="$(mktemp -d)"
+  trap 'rm -rf "$GH_TMP"' EXIT
+  curl --fail --location --retry 3 \
+    "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" \
+    -o "$GH_TMP/gh.tar.gz"
+  tar -xzf "$GH_TMP/gh.tar.gz" -C "$GH_TMP"
+  install -m 755 "$GH_TMP/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh" "$BIN_DIR/gh"
+fi
+
+gh --version
+if test -n "${GITHUB_TOKEN:-}"; then
+  GH_TOKEN="$GITHUB_TOKEN" gh auth status >/dev/null
+fi
 if ! command -v cloud >/dev/null 2>&1; then
   bash scripts/install_cloud_cli.sh
 fi
