@@ -1,5 +1,6 @@
 """Regression tests for the pre-Responses-API timing gap in /api/chat."""
 
+import contextlib
 import unittest
 from unittest.mock import patch
 
@@ -171,6 +172,101 @@ class TestPreApiTiming(unittest.TestCase):
             {"status": "failed", "reason": "treasury_settlement_failed"},
         )
         self.assertNotIn(internal_marker, str(payload))
+        self.assertIn(
+            "treasury_settlement", [error["source"] for error in payload["trace"]["errors"]]
+        )
+
+    def _post_chat(self, client_factory, **patches):
+        from app import app
+
+        db.init_db()
+        defaults = {
+            "get_conv_settings": {"return_value": {}},
+            "add_message": {},
+            "persist_invocation_trace": {},
+            "finish_invocation": {},
+            "fail_invocation": {},
+            "settle_billing_to_treasury": {"return_value": {"status": "skipped"}},
+            "get_conversation_title": {"return_value": None},
+        }
+        defaults.update(patches)
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch.object(mcp_routes, "AliceClient", client_factory))
+            for name, kwargs in defaults.items():
+                stack.enter_context(patch.object(mcp_routes, name, **kwargs))
+            app.config["TESTING"] = True
+            with app.test_client() as client:
+                return client.post(
+                    "/api/chat",
+                    json={
+                        "conversation_id": "post-finalize-test",
+                        "message": "hello",
+                        "model": "aliceai-llm",
+                        "params": {},
+                    },
+                )
+
+    def test_provider_quota_response_is_recorded_before_trace_is_frozen(self):
+        from provider_quotas import ProviderQuotaExceeded
+
+        class QuotaClient:
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+                raise ProviderQuotaExceeded(
+                    reason="rate_limit",
+                    user_id="user-1",
+                    period_start=0,
+                    period_reset_at=60,
+                    used_requests=1,
+                    max_requests=1,
+                    rate_window_start=0,
+                    rate_reset_at=60,
+                    used_rate_requests=1,
+                    max_rate_requests=1,
+                )
+
+        response = self._post_chat(lambda _config: QuotaClient())
+
+        self.assertEqual(response.status_code, 429)
+        events = [event["type"] for event in response.get_json()["trace"]["events"]]
+        self.assertIn("provider_quota_http_response", events)
+
+    def test_failure_after_trace_is_frozen_keeps_trace_in_response(self):
+        class ReplyClient:
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+                trace.add_response({"id": "resp-late", "status": "completed", "output": []})
+                return {"output": [], "usage": {}}
+
+            @staticmethod
+            def extract_reasoning_and_text(_response):
+                return "", "reply"
+
+            @staticmethod
+            def extract_usage(_response):
+                return None
+
+        response = self._post_chat(
+            lambda _config: ReplyClient(),
+            finish_invocation={"side_effect": RuntimeError("late-internal-marker")},
+        )
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json()
+        self.assertEqual(payload["trace"]["responses"][0]["response_id"], "resp-late")
+        self.assertIn("chat_pipeline", [error["source"] for error in payload["trace"]["errors"]])
+        self.assertNotIn("late-internal-marker", str(payload))
+
+    def test_temperature_error_is_recorded_as_validation_failure(self):
+        class TemperatureClient:
+            def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
+                raise ValueError("temperature must be between 0 and 1")
+
+        response = self._post_chat(lambda _config: TemperatureClient())
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json()
+        self.assertEqual(payload["error"], "Некорректное значение temperature")
+        events = [event["type"] for event in payload["trace"]["events"]]
+        self.assertIn("validation_failed", events)
 
     def test_chat_error_fallback_survives_trace_persistence_failure(self):
         from app import app
