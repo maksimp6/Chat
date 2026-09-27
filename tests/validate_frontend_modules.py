@@ -43,7 +43,7 @@ FETCH_IN_LOOP_RE = re.compile(
     r"\b(?:while|for)\b[\s\S]{0,400}\b(?:fetch|XMLHttpRequest)\s*\("
 )
 ARRAY_LITERAL_RE = re.compile(r"\[([^\[\]]*)\]", re.DOTALL)
-ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)")
+ARRAY_CONSTRUCTOR_RE = re.compile(r"\bnew\s+Array\s*\(\s*(\d{4,})\s*\)\s*\)")
 REPEATED_LOOKUP_RE = re.compile(
     r"\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\([^\n]*\)"
     r"[\s\S]{0,250}\b(?:fetch|localStorage\.getItem|sessionStorage\.getItem)\s*\("
@@ -102,6 +102,33 @@ def _cache_errors(text: str, rel: Path) -> list[str]:
     return errors
 
 
+def _repetition_errors(text: str, rel: Path) -> list[str]:
+    # Formatting delimiters recur in ordinary functions, objects and callbacks.
+    # Keep statements, operators, comments and literals in the payload heuristic.
+    lines = [
+        line
+        for raw_line in text.splitlines()
+        if (line := raw_line.strip()) and not re.fullmatch(r"[{}()\[\];,\s]+", line)
+    ]
+    if not lines:
+        return []
+
+    counts = Counter(lines)
+    repeated = sum(count - 1 for count in counts.values() if count > 1)
+    ratio = repeated / len(lines)
+    run = longest_run = 1
+    for previous, current in zip(lines, lines[1:]):
+        run = run + 1 if current == previous else 1
+        longest_run = max(longest_run, run)
+
+    if longest_run >= MAX_REPEAT_RUN or ratio > MAX_REPEAT_RATIO:
+        return [
+            f"{rel}: suspicious repeated source text "
+            f"(ratio={ratio:.2f}, consecutive run={longest_run})"
+        ]
+    return []
+
+
 def validate_file(path: Path) -> list[str]:
     errors: list[str] = []
     raw = path.read_bytes()
@@ -136,13 +163,7 @@ def validate_file(path: Path) -> list[str]:
         if BAD_FUNCTION_NAME.match(name):
             errors.append(f"{rel}: function name '{name}' violates naming policy")
 
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if lines:
-        counts = Counter(lines)
-        repeated = sum(count - 1 for count in counts.values() if count > 1)
-        ratio = repeated / len(lines)
-        if max(counts.values()) >= MAX_REPEAT_RUN or ratio > MAX_REPEAT_RATIO:
-            errors.append(f"{rel}: suspicious repeated source text (ratio={ratio:.2f})")
+    errors.extend(_repetition_errors(text, rel))
 
     if len(text) >= 4096:
         printable = sum(ch.isprintable() or ch in "\n\r\t" for ch in text)
