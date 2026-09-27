@@ -6,4 +6,4 @@ websockets>=17.1
 python-dotenv>=1.2.3
 # Chaquopy only publishes Android wheels for cryptography 42.0.8; the server pin in
 # ../requirements.txt is newer and must not be copied here.
-cryptography==42.0.8
+cryptography==50.0.0
