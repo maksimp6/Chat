@@ -44,6 +44,15 @@ def test_dispatcher_rejects_cross_runtime_resource_access():
         )
 
 
+def test_dispatcher_rejects_authenticated_owner_mismatch():
+    dispatcher = RuntimeDispatcher()
+    dispatcher.register_runtime("runtime-a", owner_id="owner-a")
+    dispatcher.register_operation("read", lambda context, payload: payload)
+
+    with pytest.raises(RuntimeScopeViolation, match="owner"):
+        dispatcher.dispatch("runtime-a", "read", caller_owner_id="owner-b")
+
+
 def test_dispatcher_rejects_unknown_runtime():
     dispatcher = RuntimeDispatcher()
     dispatcher.register_operation("read", lambda context, payload: payload)
