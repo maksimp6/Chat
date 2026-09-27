@@ -74,3 +74,17 @@ def test_mutation_after_finalization_is_rejected_and_cannot_change_frozen_result
         trace.add_response({"id": "late", "usage": {"input_tokens": 1}})
 
     assert trace.make_snapshot() == frozen
+
+
+def test_snapshot_serializes_non_json_values_safely():
+    class Opaque:
+        def __repr__(self):
+            return "<opaque>"
+
+    trace = _trace()
+    trace.trace["request"]["opaque"] = Opaque()
+
+    snapshot = trace.make_snapshot()
+
+    assert isinstance(snapshot["request"]["opaque"], str)
+    assert trace.finalize()["request"]["opaque"] == snapshot["request"]["opaque"]

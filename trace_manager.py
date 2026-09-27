@@ -133,6 +133,10 @@ class ExecutionTrace:
             "provider_keys": [],
         }
 
+    @property
+    def finalized(self) -> bool:
+        return self._finalized
+
     def _ensure_mutable(self) -> None:
         if self._finalized:
             raise RuntimeError("ExecutionTrace is finalized and cannot be changed")
@@ -648,13 +652,9 @@ class ExecutionTrace:
         if self._finalized:
             return copy.deepcopy(self._final_result)
 
-        # Build and serialize before changing terminal state, so a failed rebuild
-        # leaves the live trace open for diagnosis or retry.
-        def _json_default(obj):
-            return self._json_default(obj)
-
+        # Build before changing terminal state, so a failed rebuild leaves the
+        # live trace open for diagnosis or retry. The snapshot is already JSON-safe.
         final = self._build_snapshot(end_perf=time.perf_counter())
-        final = json.loads(json.dumps(final, default=_json_default))
         self._final_result = final
         self._finalized = True
         return copy.deepcopy(final)
