@@ -1,6 +1,7 @@
 """Centralized execution trace for the Alice Pro chat pipeline."""
 
 import json
+import threading
 import time
 import uuid
 import traceback
@@ -110,6 +111,8 @@ class ExecutionTrace:
     def __init__(self, trace_id: Optional[str] = None):
         self.trace_id = trace_id or str(uuid.uuid4())
         self.start_perf = time.perf_counter()
+        self._start_thread_cpu = time.thread_time()
+        self._owner_thread = threading.get_ident()
         self._finalized = False
         self.trace: Dict[str, Any] = {
             "trace_id": self.trace_id,
@@ -455,6 +458,7 @@ class ExecutionTrace:
     ) -> Any:
         start_timestamp = time.time()
         started = time.perf_counter()
+        started_cpu = time.thread_time()
         error = None
         result = None
         try:
@@ -492,6 +496,7 @@ class ExecutionTrace:
                 "result": self._sanitize_trace_value(result),
                 "error": error,
                 "timing_ms": elapsed_ms,
+                "cpu_ms": round(max(time.thread_time() - started_cpu, 0.0) * 1000, 3),
                 "timestamp": end_timestamp,
                 "start_timestamp": start_timestamp,
                 "end_timestamp": end_timestamp,
@@ -595,9 +600,22 @@ class ExecutionTrace:
 
     def finalize(self) -> Dict[str, Any]:
         if not self._finalized:
-            total_ms = round((time.perf_counter() - self.start_perf) * 1000, 2)
-            self.trace["timings"]["total_duration_ms"] = total_ms
+            wall_seconds = time.perf_counter() - self.start_perf
+            self.trace["timings"]["total_duration_ms"] = round(wall_seconds * 1000, 2)
+            # thread_time is per-thread; a finalize from another thread cannot be attributed.
+            cpu_seconds = None
+            if threading.get_ident() == self._owner_thread:
+                cpu_seconds = max(time.thread_time() - self._start_thread_cpu, 0.0)
+                self.trace["timings"]["cpu_time_ms"] = round(cpu_seconds * 1000, 3)
             self._finalized = True
+            try:
+                from compute_resources import build_compute_billing_item
+
+                items = self.trace.setdefault("billing", {}).setdefault("items", [])
+                items[:] = [item for item in items if item.get("type") != "compute"]
+                items.append(build_compute_billing_item(cpu_seconds, wall_seconds))
+            except Exception as exc:
+                self.add_event("billing_error", {"error": str(exc)})
         try:
             from billing import aggregate_billing
 
