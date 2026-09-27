@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import hashlib
 import importlib.machinery
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from .dispatcher import RuntimeDispatcher
 
@@ -22,10 +23,42 @@ class RuntimeHostAPI:
     """Stable capability passed to revision code instead of imported host modules."""
 
     runtime_id: str
-    dispatcher: RuntimeDispatcher
+    _dispatch_operation: Callable[[str, Mapping[str, Any] | None], Any]
 
     def dispatch(self, operation: str, payload: Mapping[str, Any] | None = None) -> Any:
-        return self.dispatcher.dispatch(self.runtime_id, operation, payload)
+        return self._dispatch_operation(operation, payload)
+
+
+_SAFE_BUILTIN_NAMES = (
+    "__build_class__",
+    "abs",
+    "all",
+    "any",
+    "bool",
+    "bytes",
+    "dict",
+    "enumerate",
+    "Exception",
+    "float",
+    "int",
+    "isinstance",
+    "issubclass",
+    "len",
+    "list",
+    "max",
+    "min",
+    "object",
+    "range",
+    "reversed",
+    "set",
+    "sorted",
+    "str",
+    "sum",
+    "tuple",
+    "ValueError",
+    "zip",
+)
+_SAFE_BUILTINS = MappingProxyType({name: getattr(builtins, name) for name in _SAFE_BUILTIN_NAMES})
 
 
 class RuntimeLoader:
@@ -64,26 +97,42 @@ class RuntimeLoader:
 
     def load(self) -> bool:
         path = self.source_root / self.ENTRYPOINT
-        if not path.is_file():
+        if path.is_symlink():
+            raise RuntimeLoadError("runtime entry point must not be a symbolic link")
+        if not path.exists():
             return False
+        try:
+            resolved_path = path.resolve(strict=True)
+            resolved_path.relative_to(self.source_root)
+        except (OSError, ValueError) as exc:
+            raise RuntimeLoadError("runtime entry point must be inside source_root") from exc
+        if not resolved_path.is_file():
+            raise RuntimeLoadError("runtime entry point must be a regular file")
         loader = importlib.machinery.SourceFileLoader(
-            f"_alice_revision_{self.revision}_{self.runtime_id}", str(path)
+            f"_alice_revision_{self.revision}_{self.runtime_id}", str(resolved_path)
         )
         source = loader.get_source(loader.name)
         if source is None:
             raise RuntimeLoadError("runtime entry point could not be read")
-        self._validate(source, str(path))
+        self._validate(source, str(resolved_path))
         namespace: dict[str, Any] = {
-            "__builtins__": __builtins__,
-            "__file__": str(path),
+            "__builtins__": _SAFE_BUILTINS,
+            "__file__": str(resolved_path),
             "__name__": loader.name,
             "__package__": "",
         }
-        exec(compile(source, str(path), "exec"), namespace)
+        exec(compile(source, str(resolved_path), "exec"), namespace)
         factory = namespace.get("create_runtime")
         if not callable(factory):
             raise RuntimeLoadError("alice_runtime.py must define create_runtime(host)")
-        application = factory(RuntimeHostAPI(self.runtime_id, self._dispatcher))
+        application = factory(
+            RuntimeHostAPI(
+                self.runtime_id,
+                lambda operation, payload=None: self._dispatcher.dispatch(
+                    self.runtime_id, operation, payload
+                ),
+            )
+        )
         if not callable(getattr(application, "invoke", None)):
             raise RuntimeLoadError("runtime application must define invoke(operation, payload)")
         self._application = application

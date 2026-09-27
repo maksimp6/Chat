@@ -98,6 +98,11 @@ class RuntimeDispatcher:
         *,
         resource_runtime_id: str | None = None,
     ) -> Any:
+        bound_runtime_id = getattr(self._local, "runtime_id", None)
+        if bound_runtime_id is not None and bound_runtime_id != runtime_id:
+            raise RuntimeScopeViolation(
+                f"runtime {bound_runtime_id!r} cannot dispatch as {runtime_id!r}"
+            )
         context = self.context(runtime_id)
         target_runtime_id = resource_runtime_id or runtime_id
         if target_runtime_id != runtime_id:
