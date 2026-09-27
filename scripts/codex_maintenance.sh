@@ -116,7 +116,8 @@ log "Preparing Cloud.ru CLI"
 if ! command -v cloud >/dev/null 2>&1; then
   run_timed 180s bash scripts/install_cloud_cli.sh
 fi
-cloud --version
+test -x "$BIN_DIR/cloud"
+log "Cloud CLI installed at $BIN_DIR/cloud; first-use privacy consent is intentionally deferred"
 
 git config --global commit.gpgsign true
 git config --global tag.gpgsign true
