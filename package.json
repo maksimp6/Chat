@@ -1,6 +1,9 @@
 {
   "name": "alice-pro-dev-tools",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "devDependencies": {
     "prettier": "3.6.2"
   },
