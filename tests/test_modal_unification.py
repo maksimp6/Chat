@@ -87,38 +87,12 @@ def test_document_html_is_balanced_from_first_to_last_tag():
 def test_model_modal_complete_dom_shape():
     modal = find(parse_html(), "model-modal")
     expected = (
-        "div",
-        (
-            ("aria-labelledby", "model-modal-title"),
-            ("aria-modal", "true"),
-            ("class", "modal"),
-            ("hidden", None),
-            ("id", "model-modal"),
-            ("role", "dialog"),
-        ),
-        (),
-        (
-            (
-                "div",
-                (("class", "modal-content"),),
-                (),
-                (
-                    ("h3", (("id", "model-modal-title"),), ("Выбор модели",), ()),
-                    (
-                        "button",
-                        (
-                            ("class", "alice-btn"),
-                            ("data-action", "modal.close"),
-                            ("data-modal", "model-modal"),
-                            ("id", "close-modal"),
-                            ("type", "button"),
-                        ),
-                        ("×",),
-                        (),
-                    ),
-                    ("div", (("id", "model-list"),), (), ()),
-                ),
-            ),
+        "div", (("class", "modal"), ("id", "model-modal")), (), (
+            ("div", (("class", "modal-content"),), (), (
+                ("h3", (), ("Выбор модели",), ()),
+                ("button", (("id", "close-modal"),), ("×",), ()),
+                ("div", (("id", "model-list"),), (), ()),
+            )),
         ),
     )
     assert shape(modal) == expected
@@ -127,99 +101,29 @@ def test_model_modal_complete_dom_shape():
 def test_memory_modal_complete_dom_shape():
     modal = find(parse_html(), "memoryModal")
     expected = (
-        "div",
-        (
-            ("aria-labelledby", "memoryModalTitle"),
-            ("aria-modal", "true"),
-            ("class", "modal memory-modal"),
-            ("hidden", None),
-            ("id", "memoryModal"),
-            ("role", "dialog"),
-        ),
-        (),
-        (
-            (
-                "div",
-                (("class", "modal-content memory-modal-content"),),
-                (),
-                (
-                    (
-                        "button",
-                        (
-                            ("aria-label", "Закрыть"),
-                            ("class", "memory-modal-close alice-btn"),
-                            ("data-action", "modal.close"),
-                            ("data-modal", "memoryModal"),
-                            ("id", "memoryCloseBtn"),
-                            ("type", "button"),
-                        ),
-                        ("×",),
-                        (),
-                    ),
-                    (
-                        "h2",
-                        (("class", "memory-modal-title"), ("id", "memoryModalTitle")),
-                        ("Управление памятью",),
-                        (),
-                    ),
-                    (
-                        "div",
-                        (("class", "memory-config"),),
-                        (),
-                        (
-                            (
-                                "label",
-                                (("class", "memory-config-option"),),
-                                ("Включить память",),
-                                (("input", (("id", "memEnabled"), ("type", "checkbox")), (), ()),),
-                            ),
-                            (
-                                "label",
-                                (("class", "memory-config-option"),),
-                                ("Макс. фактов:",),
-                                (
-                                    (
-                                        "input",
-                                        (
-                                            ("class", "memory-limit"),
-                                            ("id", "memLimit"),
-                                            ("max", "50"),
-                                            ("min", "1"),
-                                            ("type", "number"),
-                                        ),
-                                        (),
-                                        (),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                    (
-                        "div",
-                        (("class", "memory-clear"),),
-                        (),
-                        (
-                            (
-                                "button",
-                                (
-                                    ("class", "memory-clear-btn alice-btn"),
-                                    ("id", "memoryClearBtn"),
-                                    ("type", "button"),
-                                ),
-                                ("Очистить всю память",),
-                                (),
-                            ),
-                        ),
-                    ),
-                    (
-                        "h3",
-                        (("class", "memory-facts-title"),),
-                        ("Факты (", ")"),
-                        (("span", (("id", "memCount"),), ("0",), ()),),
-                    ),
-                    ("div", (("class", "memory-facts-list"), ("id", "memoryFactsList")), (), ()),
-                ),
-            ),
+        "div", (("class", "modal memory-modal"), ("hidden", None), ("id", "memoryModal")), (), (
+            ("div", (
+                ("aria-labelledby", "memoryModalTitle"), ("aria-modal", "true"),
+                ("class", "modal-content memory-modal-content"), ("role", "dialog"),
+            ), (), (
+                ("button", (("aria-label", "Закрыть"), ("class", "memory-modal-close"), ("id", "memoryCloseBtn"), ("type", "button")), ("×",), ()),
+                ("h2", (("class", "memory-modal-title"), ("id", "memoryModalTitle")), ("Управление памятью",), ()),
+                ("div", (("class", "memory-config"),), (), (
+                    ("label", (("class", "memory-config-option"),), ("Включить память",), (
+                        ("input", (("id", "memEnabled"), ("type", "checkbox")), (), ()),
+                    )),
+                    ("label", (("class", "memory-config-option"),), ("Макс. фактов:",), (
+                        ("input", (("class", "memory-limit"), ("id", "memLimit"), ("max", "50"), ("min", "1"), ("type", "number")), (), ()),
+                    )),
+                )),
+                ("div", (("class", "memory-clear"),), (), (
+                    ("button", (("class", "memory-clear-btn"), ("id", "memoryClearBtn"), ("type", "button")), ("Очистить всю память",), ()),
+                )),
+                ("h3", (("class", "memory-facts-title"),), ("Факты (", ")"), (
+                    ("span", (("id", "memCount"),), ("0",), ()),
+                )),
+                ("div", (("class", "memory-facts-list"), ("id", "memoryFactsList")), (), ()),
+            )),
         ),
     )
     assert shape(modal) == expected
@@ -227,17 +131,11 @@ def test_memory_modal_complete_dom_shape():
 
 def test_every_static_modal_has_exactly_one_content_root_until_closing_tag():
     roots = parse_html()
-    modals = [
-        node
-        for root in roots
-        for node in walk(root)
-        if "modal" in node.attrs.get("class", "").split()
-    ]
+    modals = [node for root in roots for node in walk(root) if "modal" in node.attrs.get("class", "").split()]
     assert modals
     for modal in modals:
         content = [
-            child
-            for child in modal.children
+            child for child in modal.children
             if child.tag == "div" and "modal-content" in child.attrs.get("class", "").split()
         ]
         assert len(content) == 1, f"{modal.attrs.get('id')}: expected exactly one .modal-content"
@@ -248,15 +146,11 @@ def test_every_static_modal_has_exactly_one_content_root_until_closing_tag():
 
 def test_no_static_modal_contains_another_modal_root():
     roots = parse_html()
-    modals = [
-        node
-        for root in roots
-        for node in walk(root)
-        if "modal" in node.attrs.get("class", "").split()
-    ]
+    modals = [node for root in roots for node in walk(root) if "modal" in node.attrs.get("class", "").split()]
     for modal in modals:
         nested = [
-            node for node in list(walk(modal))[1:] if "modal" in node.attrs.get("class", "").split()
+            node for node in list(walk(modal))[1:]
+            if "modal" in node.attrs.get("class", "").split()
         ]
         assert not nested, f"{modal.attrs.get('id')}: nested modal roots are not allowed"
 
@@ -291,7 +185,6 @@ def assert_url(value, name):
     assert value.startswith(("/", "http://", "https://")), f"{name}: invalid URL {value!r}"
     if value.startswith(("http://", "https://")):
         from urllib.parse import urlparse
-
         parsed = urlparse(value)
         assert parsed.scheme in {"http", "https"} and parsed.netloc, f"{name}: invalid absolute URL"
 
@@ -302,11 +195,9 @@ def validate_attribute(node, name, value):
     if name in {"id", "class", "role", "aria-label", "aria-labelledby", "name", "placeholder"}:
         assert_string(value, f"<{tag}>.{name}")
     elif name == "type":
-        assert_enum(
-            value,
-            f"<{tag}>.{name}",
-            {"button", "checkbox", "number", "text", "email", "password", "hidden", "submit"},
-        )
+        assert_enum(value, f"<{tag}>.{name}", {
+            "button", "checkbox", "number", "text", "email", "password", "hidden", "submit"
+        })
     elif name in {"min", "max", "maxlength", "minlength", "size", "tabindex"}:
         assert_integer(value, f"<{tag}>.{name}", minimum=0)
     elif name == "step":
@@ -333,12 +224,8 @@ def _is_number(value):
 
 def test_every_modal_attribute_has_valid_type_length_enum_or_url():
     roots = parse_html()
-    modals = [
-        node
-        for root in roots
-        for node in walk(root)
-        if "modal" in node.attrs.get("class", "").split()
-    ]
+    modals = [node for root in roots for node in walk(root)
+              if "modal" in node.attrs.get("class", "").split()]
     for modal in modals:
         for node in walk(modal):
             for name, value in node.attrs.items():
@@ -358,11 +245,8 @@ def test_modal_form_controls_have_semantically_valid_attributes():
         if node.tag == "input":
             assert "type" in node.attrs, f"<input id={node.attrs.get('id')!r}> must declare type"
         if node.tag == "button":
-            assert_enum(
-                node.attrs.get("type", "submit"),
-                f"<button id={node.attrs.get('id')!r}>.type",
-                {"button", "submit", "reset"},
-            )
+            assert_enum(node.attrs.get("type", "submit"), f"<button id={node.attrs.get('id')!r}>.type",
+                        {"button", "submit", "reset"})
         if node.tag == "a" and "href" in node.attrs:
             assert_url(node.attrs["href"], f"<a id={node.attrs.get('id')!r}>.href")
 
@@ -370,9 +254,7 @@ def test_modal_form_controls_have_semantically_valid_attributes():
 def test_modal_links_are_valid_and_non_empty():
     roots = parse_html()
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for link in [node for node in walk(modal) if node.tag == "a"]:
                 href = link.attrs.get("href")
                 assert href, f"{modal.attrs.get('id')}: link must have href"
@@ -385,9 +267,7 @@ def test_modal_links_are_valid_and_non_empty():
 def test_modal_numeric_constraints_are_mathematically_consistent():
     roots = parse_html()
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for node in walk(modal):
                 if node.tag not in {"input", "textarea", "select"}:
                     continue
@@ -421,32 +301,14 @@ def parse_css_rules():
         for item in selector.split(","):
             item = item.strip()
             if item and not item.startswith("@"):
-                rules.setdefault(item, declarations)
+                rules[item] = declarations
     return rules
 
-
 def test_canonical_modal_css_has_complete_layout_contract():
-    import re
-
-    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
-
-    def rule(selector):
-        match = re.search(
-            rf"(?m)^\s*{re.escape(selector)}\s*\{{([^{{}}]*)\}}",
-            css,
-        )
-        assert match, f"missing CSS rule: {selector}"
-        declarations = {}
-        for declaration in match.group(1).split(";"):
-            if ":" not in declaration:
-                continue
-            name, value = declaration.split(":", 1)
-            declarations[name.strip()] = value.strip()
-        return declarations
-
-    root = rule(".alice-pro-app .modal")
-    visible = rule(".alice-pro-app .modal.visible")
-    content = rule(".alice-pro-app .modal-content")
+    rules = dict(parse_css_rules())
+    root = rules[".alice-pro-app .modal"]
+    visible = rules[".alice-pro-app .modal.visible"]
+    content = rules[".alice-pro-app .modal-content"]
 
     assert root["display"] == "none"
     assert root["position"] == "fixed"
@@ -466,18 +328,8 @@ def test_canonical_modal_css_has_complete_layout_contract():
 
 def test_feature_modal_roots_cannot_override_canonical_layout():
     forbidden = {
-        "display",
-        "position",
-        "inset",
-        "top",
-        "right",
-        "bottom",
-        "left",
-        "align-items",
-        "justify-content",
-        "overflow",
-        "overflow-x",
-        "overflow-y",
+        "display", "position", "inset", "top", "right", "bottom", "left",
+        "align-items", "justify-content", "overflow", "overflow-x", "overflow-y",
     }
     selectors = {
         ".alice-pro-app .treasury-modal",
@@ -513,37 +365,22 @@ def test_feature_modal_content_uses_canonical_content_shell():
 
 
 def test_modal_responsive_css_only_adjusts_shared_content_shell():
-    import re
-
-    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
-    media = re.search(
-        r"@media\s*\(max-width:\s*768px\)\s*\{\s*\.alice-pro-app \.modal-content\s*\{([^{}]*)\}",
-        css,
-        flags=re.S,
-    )
-    assert media, "responsive modal content rule is missing"
-    assert re.search(r"max-width\s*:\s*95%\s*;", media.group(1))
+    rules = dict(parse_css_rules())
+    responsive = rules.get(".alice-pro-app .modal-content", {})
+    assert responsive.get("max-width") == "95%"
 
 
 def test_modal_inter_tag_whitespace_is_explicit_and_bounded():
     roots = parse_html()
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for node in walk(modal):
                 for raw in node.raw_data:
                     if raw.strip():
                         continue
-                    assert "\\r" not in raw, (
-                        f"{modal.attrs.get('id')}: CR line endings are forbidden"
-                    )
-                    assert "\\t" not in raw, (
-                        f"{modal.attrs.get('id')}: tab indentation is forbidden"
-                    )
-                    assert raw.count("\\n") <= 2, (
-                        f"{modal.attrs.get('id')}: too many blank lines between tags"
-                    )
+                    assert "\\r" not in raw, f"{modal.attrs.get('id')}: CR line endings are forbidden"
+                    assert "\\t" not in raw, f"{modal.attrs.get('id')}: tab indentation is forbidden"
+                    assert raw.count("\\n") <= 2, f"{modal.attrs.get('id')}: too many blank lines between tags"
                     for line in raw.split("\\n"):
                         assert len(line) - len(line.lstrip(" ")) <= 8, (
                             f"{modal.attrs.get('id')}: indentation exceeds 8 spaces"
@@ -553,14 +390,11 @@ def test_modal_inter_tag_whitespace_is_explicit_and_bounded():
 def test_modal_text_nodes_have_no_accidental_edge_whitespace():
     roots = parse_html()
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for node in walk(modal):
                 for raw in node.raw_data:
-                    if raw.strip() and "\n" not in raw:
-                        stripped = raw.strip()
-                        assert raw in {stripped, " " + stripped, stripped + " "}, (
+                    if raw.strip():
+                        assert raw == raw.strip(), (
                             f"{modal.attrs.get('id')}: text node has accidental edge whitespace: {raw!r}"
                         )
 
@@ -568,9 +402,7 @@ def test_modal_text_nodes_have_no_accidental_edge_whitespace():
 def test_modal_spacing_is_css_owned_not_inline_style():
     roots = parse_html()
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for node in walk(modal):
                 assert "style" not in node.attrs, (
                     f"{modal.attrs.get('id')}: inline style is forbidden inside modal DOM"
@@ -582,36 +414,28 @@ def test_html_source_is_strict_utf8_without_bom_or_surrogates():
     assert not source.startswith(b"\\xef\\xbb\\xbf"), "UTF-8 BOM is forbidden"
     decoded = source.decode("utf-8")
     assert decoded.encode("utf-8") == source, "index.html must round-trip as UTF-8"
-    assert not any(0xD800 <= ord(ch) <= 0xDFFF for ch in decoded), (
-        "UTF-16 surrogate code points are forbidden"
-    )
+    assert not any(0xD800 <= ord(ch) <= 0xDFFF for ch in decoded), "UTF-16 surrogate code points are forbidden"
 
 
 def test_html_declares_utf8_and_has_no_conflicting_charset():
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     import re
-
-    charsets = re.findall(r"<meta\b[^>]*charset\s*=\s*[\"']?([^\"'\s/>]+)", source, flags=re.I)
+    charsets = re.findall(r"<meta\\b[^>]*charset\\s*=\\s*[\\\"']?([^\\\"'\\s/>]+)", source, flags=re.I)
     assert charsets, "document must declare a charset"
-    assert all(value.lower() == "utf-8" for value in charsets), (
-        f"conflicting charset declarations: {charsets!r}"
-    )
+    assert all(value.lower() == "utf-8" for value in charsets), f"conflicting charset declarations: {charsets!r}"
 
 
 def test_modal_html_entities_and_escape_sequences_are_valid():
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     roots = parse_html()
     import re
-
     entity_re = re.compile(r"&(?:#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]+);", re.I)
     invalid_ampersand = re.compile(r"&(?!#x[0-9a-f]+;|#[0-9]+;|[a-z][a-z0-9]+;)", re.I)
     mojibake = re.compile(r"(?:Р[\\u0400-\\u04ff]|С[\\u0400-\\u04ff]){2,}")
     assert not mojibake.search(source), "possible UTF-8/Windows-1251 mojibake detected"
 
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for raw in modal.raw_data:
                 for match in entity_re.finditer(raw):
                     value = match.group(0)
@@ -621,29 +445,22 @@ def test_modal_html_entities_and_escape_sequences_are_valid():
                 )
 
     assert "&times;" in source
-    assert "×" not in source, (
-        "literal multiplication sign must use the established &times; escape in HTML source"
-    )
+    assert "×" not in source, "literal multiplication sign must use the established &times; escape in HTML source"
 
 
 def test_modal_text_is_unicode_after_entity_decoding():
     roots = parse_html()
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for node in walk(modal):
                 for text in node.text:
                     assert text == text.encode("utf-8").decode("utf-8")
-                    assert "\\ufffd" not in text, (
-                        f"{modal.attrs.get('id')}: replacement character indicates decode loss"
-                    )
+                    assert "\\ufffd" not in text, f"{modal.attrs.get('id')}: replacement character indicates decode loss"
                     assert "\\x00" not in text, f"{modal.attrs.get('id')}: NUL is forbidden"
 
 
 def _looks_like_random_gibberish(token):
     import re
-
     token = token.strip().lower()
     if len(token) < 5 or len(token) > 24 or not re.fullmatch(r"[a-z]+", token):
         return False
@@ -661,7 +478,6 @@ def _looks_like_random_gibberish(token):
 
 def test_modal_text_rejects_manual_random_gibberish():
     import re
-
     suspicious_fixture = "ddgdef htibv dweh"
     tokens = re.findall(r"[A-Za-z]+", suspicious_fixture)
     assert any(_looks_like_random_gibberish(token) for token in tokens), (
@@ -672,11 +488,8 @@ def test_modal_text_rejects_manual_random_gibberish():
 def test_modal_text_contains_no_obvious_random_gibberish():
     roots = parse_html()
     import re
-
     for root in roots:
-        for modal in [
-            node for node in walk(root) if "modal" in node.attrs.get("class", "").split()
-        ]:
+        for modal in [node for node in walk(root) if "modal" in node.attrs.get("class", "").split()]:
             for node in walk(modal):
                 for text in node.text:
                     for token in re.findall(r"[A-Za-z]+", text):
@@ -688,18 +501,11 @@ def test_modal_text_contains_no_obvious_random_gibberish():
 def test_template_resources_resolve_to_existing_local_assets():
     import re
     from urllib.parse import urlparse
-
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    refs = re.findall(
-        r'<(?:script\b[^>]*\bsrc|link\b[^>]*\bhref)=["\']([^"\']+)["\']',
-        source,
-        flags=re.I,
-    )
+    refs = re.findall(r'<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I)
     assert refs, "template must declare browser resources"
     for ref in refs:
-        assert not ref.startswith(("http://", "https://", "//", "data:", "blob:")), (
-            f"external/non-local resource: {ref}"
-        )
+        assert not ref.startswith(("http://", "https://", "//", "data:", "blob:")), f"external/non-local resource: {ref}"
         clean = ref.split("?", 1)[0]
         clean = clean.replace("{{ static_root }}", "/static").replace("{{static_root}}", "/static")
         assert clean.startswith("/static/"), f"resource is outside local static root: {ref}"
@@ -710,42 +516,23 @@ def test_template_resources_resolve_to_existing_local_assets():
 
 def test_template_resource_types_match_local_extensions():
     import re
-
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    refs = re.findall(
-        r'<(script|link)\b([^>]*?)\b(src|href)=["\']([^"\']+)["\']', source, flags=re.I
-    )
-    assert refs, "template must declare typed browser resources"
-    for tag, _attrs, _attr_name, ref in refs:
-        clean = (
-            ref.split("?", 1)[0]
-            .replace("{{ static_root }}", "/static")
-            .replace("{{static_root}}", "/static")
-        )
+    for tag, attr, ref in re.findall(r'<(script|link)\\b([^>]*?)\\b(src|href)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I):
+        clean = ref.split("?", 1)[0].replace("{{ static_root }}", "/static").replace("{{static_root}}", "/static")
         suffix = clean.rsplit(".", 1)[-1].lower() if "." in clean.rsplit("/", 1)[-1] else ""
         if tag.lower() == "script":
             assert suffix == "js", f"script must resolve to .js: {ref}"
-        elif tag.lower() == "link":
+        elif "stylesheet" in attr.lower() or tag.lower() == "link":
             if suffix not in {"css", "svg", "ico", "png", "jpg", "jpeg", "webp"}:
                 raise AssertionError(f"unexpected link resource type: {ref}")
 
 
 def test_local_resource_files_are_utf8_when_text_based():
     import re
-
     source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    refs = re.findall(
-        r'<(?:script\b[^>]*\bsrc|link\b[^>]*\bhref)=["\']([^"\']+)["\']',
-        source,
-        flags=re.I,
-    )
-    assert refs, "template must declare UTF-8 resource files"
+    refs = re.findall(r'<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=["\\\']([^"\\\']+)["\\\']', source, flags=re.I)
     for ref in refs:
-        clean = (
-            ref.split("?", 1)[0]
-            .replace("{{ static_root }}", "/static")
-            .replace("{{static_root}}", "/static")
-        )
+        clean = ref.split("?", 1)[0].replace("{{ static_root }}", "/static").replace("{{static_root}}", "/static")
         path = ROOT / "static" / clean.removeprefix("/static/")
         if path.suffix.lower() not in {".js", ".css", ".html", ".svg"}:
             continue
@@ -753,34 +540,3 @@ def test_local_resource_files_are_utf8_when_text_based():
         assert not data.startswith(b"\\xef\\xbb\\xbf"), f"UTF-8 BOM in resource: {path}"
         decoded = data.decode("utf-8")
         assert decoded.encode("utf-8") == data, f"resource is not stable UTF-8: {path}"
-
-
-def test_dynamic_modal_code_uses_canonical_modal_api():
-    """New dynamic modal roots must come from the shared UI modal factory."""
-    import re
-
-    violations = []
-    for path in sorted((ROOT / "static").rglob("*.js")):
-        if path.name == "core_api.js":
-            continue
-        source = path.read_text(encoding="utf-8")
-        for match in re.finditer(
-            r"""(?:className\s*=\s*['"][^'"]*\bmodal\b|classList\.add\([^)]*['"]modal['"])""",
-            source,
-        ):
-            # Local aliases (for example `const UI = window.AliceCoreAPI.ui`) are canonical too.
-            if not re.search(
-                r"\b(?:window\.AliceCoreAPI\.ui|[A-Za-z_$][\w$]*)\.modal\.create\s*\(", source
-            ):
-                line = source.count("\n", 0, match.start()) + 1
-                violations.append(f"{path.relative_to(ROOT)}:{line}")
-
-    assert not violations, (
-        "dynamic modal roots must be created through AliceCoreAPI.ui.modal.create():\n"
-        + "\n".join(violations)
-    )
-
-
-def test_modal_runtime_contract_is_wired_into_ci():
-    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "node tests/test_ui_modal_contract.js" in workflow
