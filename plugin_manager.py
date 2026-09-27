@@ -1,14 +1,12 @@
 """First-class plugin lifecycle and manifest management for Alice Pro.
 
 Plugins are discovered from a configured local directory. The manager validates
-manifests before loading anything and never executes plugin code during
-discovery. Optional Python lifecycle hooks are loaded only after an explicit
-enable operation and are isolated behind exception handling.
+declarative manifests and never imports or executes plugin code. Privileged work
+must be requested through the separate scoped execution gateway.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import os
@@ -21,7 +19,16 @@ logger = logging.getLogger("plugin_manager")
 MANIFEST_NAME = "plugin.json"
 SUPPORTED_MANIFEST_VERSION = 1
 VALID_STATES = {"discovered", "enabled", "disabled", "failed"}
-VALID_HOOKS = {"on_enable", "on_disable", "on_configure"}
+ALLOWED_MANIFEST_FIELDS = {
+    "api_version",
+    "id",
+    "name",
+    "version",
+    "description",
+    "capabilities",
+    "permissions",
+    "config_schema",
+}
 
 
 class PluginError(ValueError):
@@ -34,7 +41,6 @@ class PluginManifest:
     name: str
     version: str
     api_version: int
-    entrypoint: str | None = None
     capabilities: tuple[str, ...] = ()
     permissions: tuple[str, ...] = ()
     config_schema: Mapping[str, Any] = field(default_factory=dict)
@@ -42,6 +48,11 @@ class PluginManifest:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "PluginManifest":
+        if not isinstance(data, Mapping):
+            raise PluginError("manifest must be a JSON object")
+        unknown = sorted(set(data) - ALLOWED_MANIFEST_FIELDS)
+        if unknown:
+            raise PluginError(f"manifest contains unknown fields: {', '.join(unknown)}")
         required = ("id", "name", "version")
         missing = [key for key in required if not str(data.get(key) or "").strip()]
         if missing:
@@ -55,21 +66,24 @@ class PluginManifest:
         if api_version != SUPPORTED_MANIFEST_VERSION:
             raise PluginError(f"unsupported plugin api_version: {api_version}")
 
-        entrypoint = data.get("entrypoint")
-        if entrypoint is not None:
-            entrypoint = str(entrypoint).strip() or None
-            if entrypoint and (Path(entrypoint).is_absolute() or ".." in Path(entrypoint).parts):
-                raise PluginError("entrypoint must remain inside the plugin directory")
+        capabilities = _string_list(data.get("capabilities"), "capabilities")
+        permissions = _string_list(data.get("permissions"), "permissions")
+        invalid_permissions = [item for item in permissions if not item.startswith("tool:")]
+        if invalid_permissions:
+            raise PluginError("permissions must use the 'tool:<name>' namespace")
+
+        config_schema = data.get("config_schema", {})
+        if not isinstance(config_schema, Mapping):
+            raise PluginError("config_schema must be an object")
 
         return cls(
             id=plugin_id,
             name=str(data["name"]).strip(),
             version=str(data["version"]).strip(),
             api_version=api_version,
-            entrypoint=entrypoint,
-            capabilities=tuple(str(x) for x in (data.get("capabilities") or [])),
-            permissions=tuple(str(x) for x in (data.get("permissions") or [])),
-            config_schema=dict(data.get("config_schema") or {}),
+            capabilities=capabilities,
+            permissions=permissions,
+            config_schema=dict(config_schema),
             description=str(data.get("description") or ""),
         )
 
@@ -117,26 +131,12 @@ class PluginManager:
         record = self.get(plugin_id)
         if record.state == "enabled":
             return self._public(record)
-        try:
-            module = self._load_entrypoint(record)
-            self._call_hook(module, "on_enable", record.config)
-            record.state, record.error = "enabled", None
-        except Exception as exc:
-            record.state, record.error = "failed", str(exc)
-            logger.exception("Plugin %s failed to enable", plugin_id)
-            raise PluginError(f"plugin enable failed: {plugin_id}") from exc
+        record.state, record.error = "enabled", None
         return self._public(record)
 
     def disable(self, plugin_id: str) -> dict[str, Any]:
         record = self.get(plugin_id)
-        try:
-            module = self._load_entrypoint(record, required=False)
-            self._call_hook(module, "on_disable", record.config)
-            record.state, record.error = "disabled", None
-        except Exception as exc:
-            record.state, record.error = "failed", str(exc)
-            logger.exception("Plugin %s failed to disable", plugin_id)
-            raise PluginError(f"plugin disable failed: {plugin_id}") from exc
+        record.state, record.error = "disabled", None
         return self._public(record)
 
     def configure(self, plugin_id: str, config: Mapping[str, Any]) -> dict[str, Any]:
@@ -144,43 +144,7 @@ class PluginManager:
         if not isinstance(config, Mapping):
             raise PluginError("plugin config must be an object")
         record.config = dict(config)
-        try:
-            module = self._load_entrypoint(record, required=False)
-            self._call_hook(module, "on_configure", record.config)
-        except Exception as exc:
-            record.error = str(exc)
-            record.state = "failed"
-            logger.exception("Plugin %s failed to configure", plugin_id)
-            raise PluginError(f"plugin configure failed: {plugin_id}") from exc
         return self._public(record)
-
-    def _load_entrypoint(self, record: PluginRecord, required: bool = True):
-        if not record.manifest.entrypoint:
-            if required:
-                return None
-            return None
-        target = (record.path / record.manifest.entrypoint).resolve()
-        if record.path.resolve() not in target.parents or target == record.path.resolve():
-            raise PluginError("plugin entrypoint escapes plugin directory")
-        if not target.is_file():
-            raise PluginError(f"plugin entrypoint not found: {record.manifest.entrypoint}")
-        module_name = "alice_plugin_" + record.manifest.id.replace("-", "_").replace(".", "_")
-        spec = importlib.util.spec_from_file_location(module_name, target)
-        if spec is None or spec.loader is None:
-            raise PluginError("unable to load plugin entrypoint")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-
-    @staticmethod
-    def _call_hook(module: Any, hook: str, config: Mapping[str, Any]) -> None:
-        if module is None:
-            return
-        if hook not in VALID_HOOKS:
-            raise PluginError(f"unsupported plugin hook: {hook}")
-        callback = getattr(module, hook, None)
-        if callback is not None:
-            callback(dict(config))
 
     @staticmethod
     def _public(record: PluginRecord) -> dict[str, Any]:
@@ -199,3 +163,16 @@ class PluginManager:
 
 
 plugin_manager = PluginManager()
+
+
+def _string_list(value: Any, field_name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item.strip() for item in value
+    ):
+        raise PluginError(f"{field_name} must be an array of non-empty strings")
+    normalized = tuple(item.strip() for item in value)
+    if len(set(normalized)) != len(normalized):
+        raise PluginError(f"{field_name} must not contain duplicates")
+    return normalized

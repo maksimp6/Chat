@@ -5,7 +5,6 @@
   "version": "1.0.0",
   "description": "Reference plugin demonstrating the local lifecycle contract.",
   "capabilities": ["example"],
-  "permissions": ["read"],
-  "config_schema": {},
-  "entrypoint": "plugin.py"
+  "permissions": [],
+  "config_schema": {}
 }

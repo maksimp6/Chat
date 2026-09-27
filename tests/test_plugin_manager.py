@@ -5,7 +5,7 @@ import pytest
 from plugin_manager import PluginError, PluginManager
 
 
-def write_plugin(root, plugin_id="demo", entrypoint=None):
+def write_plugin(root, plugin_id="demo", **overrides):
     folder = root / plugin_id
     folder.mkdir()
     manifest = {
@@ -14,16 +14,15 @@ def write_plugin(root, plugin_id="demo", entrypoint=None):
         "name": "Demo Plugin",
         "version": "1.0.0",
         "capabilities": ["demo"],
-        "permissions": ["read"],
+        "permissions": ["tool:echo"],
     }
-    if entrypoint:
-        manifest["entrypoint"] = entrypoint
+    manifest.update(overrides)
     (folder / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
     return folder
 
 
 def test_discovery_validates_manifest_without_executing_code(tmp_path):
-    folder = write_plugin(tmp_path, entrypoint="plugin.py")
+    folder = write_plugin(tmp_path)
     (folder / "plugin.py").write_text(
         "raise RuntimeError('must not run during discovery')", encoding="utf-8"
     )
@@ -36,32 +35,35 @@ def test_discovery_validates_manifest_without_executing_code(tmp_path):
     assert plugins[0].state == "discovered"
 
 
-def test_enable_and_disable_isolated_hook_failure(tmp_path):
-    folder = write_plugin(tmp_path, entrypoint="plugin.py")
-    (folder / "plugin.py").write_text(
-        "def on_enable(config):\n"
-        "    raise RuntimeError('boom')\n"
-        "def on_disable(config):\n"
-        "    pass\n",
-        encoding="utf-8",
-    )
-
+def test_enable_and_disable_are_declarative_state_transitions(tmp_path):
+    write_plugin(tmp_path)
     manager = PluginManager(tmp_path)
     manager.discover()
-
-    with pytest.raises(PluginError, match="plugin enable failed"):
-        manager.enable("demo")
-    assert manager.get("demo").state == "failed"
-    assert manager.get("demo").error == "boom"
+    assert manager.enable("demo")["state"] == "enabled"
+    assert manager.disable("demo")["state"] == "disabled"
 
 
-def test_discovery_rejects_entrypoint_escape(tmp_path):
-    write_plugin(tmp_path, entrypoint="../outside.py")
+def test_discovery_rejects_executable_entrypoint(tmp_path):
+    write_plugin(tmp_path, entrypoint="plugin.py")
     manager = PluginManager(tmp_path)
 
     assert manager.discover() == []
     with pytest.raises(PluginError, match="unknown plugin"):
         manager.enable("demo")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"permissions": ["read"]},
+        {"capabilities": "demo"},
+        {"permissions": ["tool:echo", "tool:echo"]},
+        {"config_schema": []},
+    ],
+)
+def test_discovery_rejects_invalid_manifest_contract(tmp_path, overrides):
+    write_plugin(tmp_path, **overrides)
+    assert PluginManager(tmp_path).discover() == []
 
 
 def test_config_is_persisted_in_record(tmp_path):

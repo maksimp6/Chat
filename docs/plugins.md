@@ -15,13 +15,15 @@ Each plugin directory contains `plugin.json`:
   "version": "1.0.0",
   "description": "Example extension",
   "capabilities": ["example"],
-  "permissions": ["read"],
-  "config_schema": {},
-  "entrypoint": "plugin.py"
+  "permissions": ["tool:alice_search_project"],
+  "config_schema": {}
 }
 ```
 
-Discovery validates the manifest but **does not execute plugin code**.
+Discovery validates the manifest but **does not execute plugin code**. Version 1
+is deliberately declarative: executable entry points and unknown fields are
+rejected. This prevents a manifest from becoming an implicit Python import with
+access to host globals.
 
 ## Lifecycle
 
@@ -33,18 +35,23 @@ configure -> configured state retained by the manager
 failure  -> failed
 ```
 
-Lifecycle hook failures are contained and move the plugin to `failed` instead of
-taking down the main request path.
+Lifecycle operations are declarative state transitions. Plugins do not run
+in-process lifecycle hooks.
 
 ## Security boundary
 
-- Entry points must remain inside the plugin directory.
-- Discovery never imports plugin code.
-- Capabilities and permissions are declared in the manifest.
-- Plugin exceptions are caught at the lifecycle boundary.
-- Plugins do not receive application secrets implicitly.
-- Future privileged capabilities must be mapped to the existing Tool Registry,
-  Policy/Governance and approval pipeline rather than bypassing it.
+- Discovery never imports plugin code and rejects executable entry points.
+- Capabilities describe what a plugin may request. Permissions use explicit
+  `tool:<registered-tool-name>` grants; undeclared tools are denied.
+- `PluginExecutionGateway` gives plugins only tool names and JSON-like arguments.
+  It creates a per-invocation `plugin:<id>:<invocation-id>` runtime scope through
+  `RuntimeDispatcher`, then uses
+  `UniversalToolExecutor` for schema validation, authorization, policy, approval,
+  and execution.
+- The caller's invocation and trace IDs are preserved in every tool call and the
+  result audit metadata includes the plugin and runtime IDs.
+- Plugins never receive application globals, secrets, database handles, connector
+  clients, the tool registry, or the dispatcher.
 
 ## HTTP API
 
@@ -54,6 +61,7 @@ taking down the main request path.
 - `POST /api/plugins/<id>/disable` disables a plugin.
 - `PUT /api/plugins/<id>/config` updates plugin configuration.
 
-This first slice establishes the stable manifest/lifecycle boundary. Plugin package
-installation, persistent database configuration, and richer capability adapters
-build on this contract.
+This foundation is a prerequisite for the autonomous-development work in #256.
+Package installation, persistent configuration, and out-of-process plugin hosts
+can build on this contract without weakening its execution boundary. Related
+platform work is tracked in #350, #326, and #238.
