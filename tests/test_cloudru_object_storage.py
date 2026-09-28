@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import traceback
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -223,7 +224,7 @@ class FakeSession:
         (requests.ConnectionError("boom " + SECRET), StorageProviderUnavailable),
         (FakeResponse(503, b"internal " + SECRET.encode()), StorageProviderUnavailable),
         (FakeResponse(401), StorageCredentialsMissing),
-        (FakeResponse(409, b"<Error>detail</Error>"), StorageError),
+        (FakeResponse(409, b"<Error>response-body-marker</Error>"), StorageError),
     ],
 )
 def test_api_errors_are_mapped_without_details(result, error):
@@ -232,16 +233,18 @@ def test_api_errors_are_mapped_without_details(result, error):
     with pytest.raises(error) as excinfo:
         storage.download("a.txt", credentials=CREDS)
 
-    assert SECRET not in str(excinfo.value)
-    assert "detail" not in str(excinfo.value)
+    formatted = "".join(traceback.format_exception(excinfo.value))
+    assert SECRET not in formatted
+    assert "response-body-marker" not in formatted
 
 
 def test_invalid_list_xml_is_a_safe_error():
     session = FakeSession(FakeResponse(200, b"not xml"))
     storage = CloudRuObjectStorage("bucket", session=session)
 
-    with pytest.raises(StorageError):
+    with pytest.raises(StorageError) as excinfo:
         storage.list("", credentials=CREDS)
+    assert excinfo.value.__cause__ is None
     method, url, kwargs = session.calls[0]
     assert method == "GET"
     assert url == "https://s3.cloud.ru/bucket?list-type=2&prefix="

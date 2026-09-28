@@ -228,8 +228,9 @@ class CloudRuObjectStorage:
             response = self._session.request(
                 method, url, data=body or None, headers=headers, timeout=self._timeout
             )
-        except requests.RequestException as exc:
-            raise StorageProviderUnavailable("Storage provider is unavailable") from exc
+        except requests.RequestException:
+            # ``from None``: request exceptions may echo URLs or headers into tracebacks.
+            raise StorageProviderUnavailable("Storage provider is unavailable") from None
         status = int(response.status_code)
         if status == 404:
             raise StorageObjectNotFound("Storage object was not found")
@@ -276,8 +277,8 @@ class CloudRuObjectStorage:
             response = self._request("GET", query=query, credentials=credentials)
             try:
                 tree = ET.fromstring(response.content)
-            except ET.ParseError as exc:
-                raise StorageError("Storage provider operation failed") from exc
+            except ET.ParseError:
+                raise StorageError("Storage provider operation failed") from None
             for item in tree:
                 if _local_name(item.tag) != "Contents":
                     continue
