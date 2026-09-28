@@ -25,21 +25,37 @@ Alice Pro can take a GitHub issue and work on her own code. The workflow is
 Add these repository secrets under Settings → Secrets and variables → Actions.
 Never paste a token into an issue, a chat or a commit.
 
-| Secret               | Value                                                    |
-| -------------------- | -------------------------------------------------------- |
-| `YANDEX_API_KEY`     | Yandex AI Studio API key for Alice                       |
-| `YANDEX_PROJECT_ID`  | Yandex AI Studio project (folder) ID                     |
-| `ALICE_GITHUB_TOKEN` | The maintainer's personal fine-grained token (see below) |
+| Secret                  | Value                                          |
+| ----------------------- | ---------------------------------------------- |
+| `YANDEX_API_KEY`        | Yandex AI Studio API key for Alice             |
+| `YANDEX_PROJECT_ID`     | Yandex AI Studio project (folder) ID           |
+| `ALICE_APP_PRIVATE_KEY` | Private key of the "Alice Pro" GitHub App      |
 
-Create `ALICE_GITHUB_TOKEN` under GitHub → Settings → Developer settings →
-Fine-grained tokens:
+And this repository variable:
 
-- Repository access: only `maksimp6/Chat`.
-- Permissions: Contents, Pull requests and Issues set to read and write.
-- A short expiry, rotated regularly.
+| Variable              | Value                                   |
+| --------------------- | --------------------------------------- |
+| `ALICE_APP_CLIENT_ID` | Client ID of the "Alice Pro" GitHub App |
 
-Pull requests and comments then appear under the maintainer's account. Unlike
-`GITHUB_TOKEN`, they trigger CI.
+Alice posts under her own name through the "Alice Pro" GitHub App. Create it
+under GitHub → Settings → Developer settings → GitHub Apps → New GitHub App:
+
+- Name: `Alice Pro`. Homepage: the repository URL. Webhook: off.
+- Repository permissions: Contents, Issues and Pull requests set to read and
+  write. Nothing else.
+- Where can this app be installed: only on this account.
+- After creating it, copy the Client ID into `ALICE_APP_CLIENT_ID`, generate a
+  private key and paste the whole `.pem` into `ALICE_APP_PRIVATE_KEY`, then
+  delete the downloaded file.
+- Install the App on `maksimp6/Chat` only.
+
+Commits, pull requests and comments then appear as `alice-pro[bot]`, and,
+unlike `GITHUB_TOKEN`, they trigger CI.
+
+Until the App exists, the workflow falls back to `ALICE_GITHUB_TOKEN`, a
+fine-grained personal token of the maintainer (only `maksimp6/Chat`; Contents,
+Pull requests and Issues read and write). Its posts appear under the
+maintainer's name. Delete that secret once the App works.
 
 Optional repository variable `ALICE_AGENT_MODEL` selects the model key from
 `config.py` (default `aliceai-llm`).
@@ -53,7 +69,7 @@ can never land without review.
   16 tool rounds.
 - The issue text is passed to the model as task data after `AGENTS.md`. Only
   maintainers can trigger a run.
-- Alice's reports escape `@` mentions, so a comment posted with the maintainer's
-  token cannot trigger her again.
+- Alice's reports escape `@` mentions, so her own comments cannot trigger her
+  again.
 - The run uses a temporary database and a per-run credential encryption key.
   Nothing is settled to Treasury; the cost is only reported.
