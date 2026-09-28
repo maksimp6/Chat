@@ -43,13 +43,16 @@ jobs:
           set -euo pipefail
           auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           # Start from the last published mirror so unchanged pages are detected.
-          # Only a branch that does not exist yet is skipped; any other failure stops the run
-          # so a partial crawl never replaces the published mirror.
-          # A plain assignment, so a failed ls-remote stops the step under set -e.
-          heads="$(git -c http.https://github.com/.extraheader="$auth" ls-remote --heads origin "$MIRROR_BRANCH")"
-          if [ -z "$heads" ]; then
+          # --exit-code returns 2 only when the branch does not exist yet; any other
+          # failure stops the run so a partial crawl never replaces the published mirror.
+          rc=0
+          git -c http.https://github.com/.extraheader="$auth" ls-remote --exit-code --heads origin "$MIRROR_BRANCH" >/dev/null || rc=$?
+          if [ "$rc" -eq 2 ]; then
             echo "No published mirror yet; starting fresh."
             exit 0
+          elif [ "$rc" -ne 0 ]; then
+            echo "ls-remote failed with exit code $rc" >&2
+            exit "$rc"
           fi
           git -c http.https://github.com/.extraheader="$auth" fetch --depth 1 origin "$MIRROR_BRANCH"
           git checkout FETCH_HEAD -- docs/mirrors/cloudru

@@ -31,6 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default=str(ROOT / "docs" / "mirrors" / "cloudru"))
     parser.add_argument("--max-pages", type=int, default=20000)
     parser.add_argument("--delay", type=float, default=0.5, help="seconds between requests")
+    parser.add_argument(
+        "--max-errors",
+        type=int,
+        default=0,
+        help="fail when more fetches than this fail (404/410 pages only count as missing)",
+    )
     args = parser.parse_args(argv)
 
     if args.service:
@@ -57,12 +63,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     stats = mirror.crawl(seeds, max_pages=args.max_pages)
     errors = [e for e in stats.events if e["result"] == "error"]
+    failures = [e for e in errors if e["error"] not in {"HTTP 404", "HTTP 410"}]
     print(
         json.dumps(
             {"summary": stats.as_dict(), "errors": errors[:50]}, ensure_ascii=False, indent=2
         )
     )
-    return 0
+    # A failed fetch leaves the mirror incomplete; a non-zero exit stops publication.
+    return 1 if len(failures) > args.max_errors else 0
 
 
 if __name__ == "__main__":

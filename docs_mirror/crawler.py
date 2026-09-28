@@ -83,6 +83,13 @@ def _safe_segment(segment: str) -> str:
     return f"{safe.strip('.') or '_'}-{digest}"
 
 
+def _web_url(href: str, base: str) -> str | None:
+    """``href`` resolved against ``base`` if it is an http(s) URL, else None."""
+    url = urljoin(base, href.strip())
+    parts = urlsplit(url)
+    return url if parts.scheme in {"http", "https"} and parts.netloc else None
+
+
 def url_to_path(url: str, strip_prefix: str = "/docs") -> str:
     """Safe relative Markdown path for a canonical URL (never escapes the mirror root)."""
     path = urlsplit(url).path
@@ -92,7 +99,10 @@ def url_to_path(url: str, strip_prefix: str = "/docs") -> str:
         path = ""
     segments = [_safe_segment(s) for s in path.split("/") if s]
     if not segments:
-        segments = ["index"]
+        segments = ["index"]  # the docs root
+    elif segments == ["index"]:
+        # An explicit top-level /index page must not share the root's file.
+        segments = [f"index-{hashlib.sha256(b'index').hexdigest()[:8]}"]
     return str(PurePosixPath(*segments)) + ".md"
 
 
@@ -187,17 +197,18 @@ class _MarkdownParser(HTMLParser):
             self._emit("*")
         elif tag == "a":
             href = attrs.get("href")
-            # Links with other schemes (javascript:, mailto:, ...) become plain text.
-            target = normalize_url(href, base=self.page_url) if href else None
+            # The rendered link keeps the source's query and fragment; the crawl queue
+            # canonicalizes separately. Other schemes (javascript:, mailto:) become text.
+            target = _web_url(href, self.page_url) if href else None
             self._href.append(target)
             if target:
                 self._emit("[")
         elif tag == "img":
             alt = (attrs.get("alt") or "").strip()
             src = attrs.get("src")
-            target = urljoin(self.page_url, src) if src else ""
+            target = _web_url(src, self.page_url) if src else None
             # Only http(s) images are kept; data:, javascript: and the like are dropped.
-            if urlsplit(target).scheme in {"http", "https"}:
+            if target:
                 self._emit(f"![{alt}]({target})")
         elif tag == "table":
             self._table = []

@@ -91,7 +91,7 @@ def test_html_to_markdown_keeps_content_and_drops_chrome():
     assert "- one" in md and "- two" in md and "1. first" in md
     assert "```\ncurl -X POST \\\n  https://x\n```" in md
     assert "| A | B |" in md and "| 1 | 2\\|3 |" in md
-    assert "[B page](https://cloud.ru/docs/svc/ug/b)" in md
+    assert "[B page](https://cloud.ru/docs/svc/ug/b.html)" in md
     assert "menu" not in md and "foot" not in md and "x{}" not in md
     assert "/docs/svc/ug/b.html" in links
 
@@ -369,3 +369,61 @@ def test_title_is_not_repeated_in_body_without_main():
     )
     assert title == "Only once"
     assert "Only once" not in md
+
+
+def test_rendered_links_keep_query_and_fragment():
+    html = (
+        '<main><a href="/docs/svc/ug/b#setup">B</a> '
+        '<a href="https://example.com/download?file=x">dl</a></main>'
+    )
+    _, md, links = html_to_markdown(html, f"{BASE}/a")
+    assert "[B](https://cloud.ru/docs/svc/ug/b#setup)" in md
+    assert "[dl](https://example.com/download?file=x)" in md
+    assert normalize_url(links[0], base=f"{BASE}/a") == f"{BASE}/b"
+
+
+def test_docs_root_and_explicit_index_do_not_collide():
+    root = url_to_path("https://cloud.ru/docs")
+    explicit = url_to_path("https://cloud.ru/docs/index")
+    assert root == "index.md"
+    assert explicit != root and explicit.startswith("index-")
+    assert url_to_path("https://cloud.ru/docs/svc/index") == "svc/index.md"
+
+
+def _mirror_script():
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "cloudru_docs_mirror.py"
+    spec = importlib.util.spec_from_file_location("cloudru_docs_mirror_script", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize(
+    ("errors", "argv", "code"),
+    [
+        ([], [], 0),
+        (["HTTP 404", "HTTP 410"], [], 0),
+        (["HTTP 503"], [], 1),
+        (["ConnectionError"], ["--max-errors", "1"], 0),
+    ],
+)
+def test_cli_exit_code_reflects_fetch_failures(monkeypatch, tmp_path, capsys, errors, argv, code):
+    script = _mirror_script()
+
+    class FakeMirror:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def crawl(self, seeds, max_pages):
+            stats = crawler.CrawlStats()
+            stats.events = [{"url": "u", "result": "error", "error": e} for e in errors]
+            return stats
+
+    monkeypatch.setattr(script, "Mirror", FakeMirror)
+    monkeypatch.setattr(script, "requests_fetcher", lambda: None)
+    assert script.main(["--out", str(tmp_path), *argv]) == code
+    assert json.loads(capsys.readouterr().out)["errors"] == [
+        {"url": "u", "result": "error", "error": e} for e in errors
+    ]
