@@ -16,13 +16,15 @@
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
+- [Cloud.ru Object Storage](integrations/cloudru-object-storage.md) — S3-адаптер, настройки и границы credentials
 - [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
+- [Наблюдатель за работой агентов](agents/agent-observer.md) — ежечасная сводка GitHub без dispatch/merge
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
 - [База данных](database/overview.md) — модели данных и схема БД
+- [Production deployment](production-deployment.md) — TLS, short token, PostgreSQL backup/restore и бюджет Cloud.ru
 - [Безопасность](security/overview.md) — меры защиты и безопасность системы
 - [Журнал изменений](changelog.md) — история релизов и изменений
 - [Синхронизация с bare-репозиторием](bare_sync.md) — процесс зеркалирования изменений в `local_bare`
-- [Работа с памятью](memory/overview.md) — управление данными в оперативной памяти
-
 - [Структура репозитория](architecture/repository-layout.md) — правила размещения модулей и план очистки корня
+- [Работа с памятью](memory/overview.md) — управление данными в оперативной памяти

@@ -17,6 +17,9 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
 - **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
+- **Provider-neutral storage** with the local directory adapter and a Cloud.ru Evolution Object Storage adapter selected through `ALICE_STORAGE_PROVIDER`.
+- **Cloud.ru operations controls**: billing-based monthly budget status/blocking and PostgreSQL dump/restore verification tooling.
+- **Hourly agent-office observer** that builds issue/PR timelines and maintains one GitHub tracking digest without dispatching or merging work.
 
 ## Architecture
 
@@ -36,9 +39,9 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-09-28, `master` includes the `invocation/` and `browser/` package moves, canonical CLI and GitHub-agent lifecycle work, removal of unused agent loops and Supabase, GitHub App identity support for Alice, and optional GitHub sign-in ([changelog](docs/changelog.md)). These are repository changes, not evidence that the public deployment or external MCP connection has been verified. Master is protected: production changes go through a PR, CI/status checks, review and post-merge verification. The configured protection currently has the status-check gate enabled; named required check contexts must be added when the repository's CI check names are finalized.
+As of 2026-09-28, `master` includes the `invocation/` and `browser/` package moves, canonical CLI and GitHub-agent lifecycle work, removal of unused agent loops and Supabase, GitHub App identity support for Alice, optional GitHub sign-in, the Cloud.ru Object Storage adapter, the cloud budget/backup controls and the agent-office observer ([changelog](docs/changelog.md)). These are repository changes, not evidence that the public deployment or external MCP connection has been verified. Master is protected: production changes go through a PR, CI/status checks, review and post-merge verification. The configured protection currently has the status-check gate enabled; named required check contexts must be added when the repository's CI check names are finalized.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Container Apps deployment, Object Storage, durable background workers and complete PostgreSQL compatibility remain work in progress; an open implementation PR does not establish production readiness.
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). The Object Storage adapter, billing budget guard and PostgreSQL backup verifier are implemented, but production wiring/verification, Container Apps deployment, durable background workers and complete PostgreSQL compatibility remain work in progress; an open implementation PR does not establish production readiness.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -126,6 +129,9 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [Agent architecture](docs/agents/overview.md)
 - [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
 - [Alice GitHub agent](docs/agents/alice-github-agent.md)
+- [Agent-office observer](docs/agents/agent-observer.md)
+- [Cloud.ru Object Storage adapter](docs/integrations/cloudru-object-storage.md)
+- [Production deployment, backups and cloud budget](docs/production-deployment.md)
 - [Compute energy billing](docs/compute-energy-billing.md)
 - [Execution trace lifecycle](docs/execution-trace-lifecycle.md)
 - [Provider key rotation](docs/provider-key-rotation.md)

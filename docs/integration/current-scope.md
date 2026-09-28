@@ -30,34 +30,40 @@ the behavior whenever practical. Integration-only workarounds must not be used
 to admit red work. Conflict resolutions must follow #350 rather than combine
 competing abstractions mechanically.
 
-## Foundation baseline
+## Integrated baseline
 
 Runtime foundation [#363](https://github.com/maksimp6/Chat/pull/363) is merged.
-The authoritative baseline is `master` commit
-`64611a1900891aad0f421c94e73ffc7162942fc3`, which contains both the #347
-runtime-owner policy and the #349 `RuntimeLoader` foundation. Those changes are
-dependencies of the remaining runtime work, not pending staging candidates.
+It introduced commit `64611a1900891aad0f421c94e73ffc7162942fc3`, containing
+the #347 runtime-owner policy and the #349 `RuntimeLoader` foundation. That SHA
+is the historical foundation, not the current head.
 
 Repository cleanup on `master` is also authoritative. Integration must not
 restore removed root files or `runtime_marker.txt`.
 
-## Candidate ledger
+## Integration ledger
 
-Status recorded on 2026-09-27 against the foundation baseline above. Live CI,
-review, and mergeability must still be checked immediately before admission.
+Status verified on 2026-09-28 against `master` commit
+`db69a2dd1d0213c6b7e01462c1ff21ce1e1a9e6f`. The former candidates below are
+already merged; they must not be described as pending staging work.
 
-| Order | Candidate | Staging decision / required action |
+| Pull request | Merged commit | Integrated responsibility |
 | --- | --- | --- |
-| 1 | #364 staging ledger and #365 architecture coordination | Replace the two stale documentation heads with one synchronized documentation change containing this ledger and the architecture coordination document. |
-| 2 | #359 host-managed preview lifecycle | Rebase on #363 and adapt to `RuntimeLoader`; reject container-per-preview, localhost proxying, `runtime_port`, and process-global preview paths. |
-| 3 | #360 degraded frontend shell | Rebase independently; retain BrowserShim/VM coverage and repository-local assets, with no Playwright or CDN dependency. |
-| 4 | #361 MCP dispatcher-scoped calls | Use the merged dispatcher and `UniversalToolExecutor`; do not introduce another dispatcher or tool execution boundary. |
-| 5 | #366 storage | Consume dispatcher-scoped storage after #361 where tool/MCP behavior overlaps. |
-| 6 | #369 conversation-agent foundation | Extend existing conversation identity and execution boundaries rather than creating a parallel agent system. |
-| 7 | #370 runtime tool/MCP isolation | Reconcile with #361. Keep one executor and one dispatcher abstraction; the narrower accepted contract survives if the implementations compete. |
-| 8 | #377 plugin execution contract | Map plugin capabilities onto the accepted executor and dispatcher contracts. |
-| 9 | #378 filesystem isolation | Use dispatcher-owned runtime scope and coordinate with storage rather than adding direct filesystem access. |
-| Independent | #374 Android release hardening | May synchronize independently while preserving debug/release signing separation and keeping secrets outside Git. |
+| [#359](https://github.com/maksimp6/Chat/pull/359) | `e6b2dfe` | Host-managed preview lifecycle on `RuntimeLoader`. |
+| [#360](https://github.com/maksimp6/Chat/pull/360) | `b90ac6a` | Degraded frontend shell with repository-local assets. |
+| [#361](https://github.com/maksimp6/Chat/pull/361) | `3214182` | Dispatcher-scoped MCP/tool calls. |
+| [#366](https://github.com/maksimp6/Chat/pull/366) | `b6ca3ea` | Runtime-scoped storage provider abstraction. |
+| [#369](https://github.com/maksimp6/Chat/pull/369) | `e72eed4` | Conversation-scoped agent routing foundation. |
+| [#370](https://github.com/maksimp6/Chat/pull/370) | `be17e2f` | Runtime isolation for tool and MCP execution. |
+| [#374](https://github.com/maksimp6/Chat/pull/374) | `5f1db0f` | Android release artifact verification. |
+| [#377](https://github.com/maksimp6/Chat/pull/377) | `c667e8e` | Scoped plugin execution contract. |
+| [#378](https://github.com/maksimp6/Chat/pull/378) | `9cf0b66` | Dispatcher-scoped filesystem isolation. |
+| [#382](https://github.com/maksimp6/Chat/pull/382) | `7412314` | Stable stopped-environment gateway status. |
+| [#383](https://github.com/maksimp6/Chat/pull/383) | `b177607` | `RuntimeLoader` revision isolation. |
+| [#390](https://github.com/maksimp6/Chat/pull/390) | `0e2d0f3` | Local runtime command execution through the accepted boundary. |
+
+The old documentation PRs #364 and #365 were closed without merge. Their
+intended ledger/coordination content was superseded by the synchronized docs
+now present on `master`; do not revive those branches.
 
 If two candidates materially overlap, select the implementation that consumes
 the merged foundation and has the narrowest authoritative ownership boundary.
@@ -80,4 +86,3 @@ Run frontend validation for frontend changes and the prescribed Android unit
 test and debug assembly for Android or shared release changes. Schema changes
 must validate both SQLite and PostgreSQL. Security-sensitive changes require
 authorization, isolation, cleanup, and secret-redaction regression coverage.
-

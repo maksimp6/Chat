@@ -1,90 +1,86 @@
-# Общая архитектура проекта Alice Pro
+# Общая архитектура Alice Pro
 
-## Высокоуровневая схема
+Этот документ описывает код в текущем `master`. Планы и открытые интеграции
+указаны отдельно и не считаются production-возможностями.
 
-```
-Пользователь
-  │
-  ▼
-Браузер
-  │
-  ▼
-Flask / app.py
-  │
-  ├──────────────► SQLite / db.py
-  │
-  ├──────────────► Yandex AI Studio
-  │               │
-  │               ▼
-  │          AI Responses API
-  │
-  ├──────────────► MCP
-  │               │
-  │               ├── filesystem
-  │               ├── git
-  │               └── другие инструменты
-  │
-  └──────────────► Files / Vector Stores
+## Канонический путь запроса
+
+```mermaid
+flowchart TD
+    A[Web / Android / CLI / MCP / Voice] --> B[Flask routes and adapters]
+    B --> C[InvocationContext]
+    C --> D[Yandex provider / Responses loop]
+    D --> E[UniversalToolExecutor + ToolRegistry]
+    E --> F[RuntimeDispatcher]
+    C --> G[ExecutionTrace + billing]
+    B --> H[SQLite or PostgreSQL]
+    F --> I[Local or Cloud.ru storage]
 ```
 
-## Основные компоненты
+Новый интерфейс подключается как адаптер к этому пути и не создаёт отдельный
+цикл «модель → инструменты → модель». Подробный контракт зафиксирован в
+[AI execution pipeline](ai-execution-pipeline.md).
 
-### 1. Веб‑интерфейс (static/)
-* `chat.js` — обработка чата и Markdown;
-* `core.js` — основная логика фронтенда;
-* `sidebar.js` — боковая панель;
-* `models.js` — работа с моделями;
-* `voice.js` — голосовые функции;
-* `style.css` — стили.
+## Слои и фактические модули
 
-### 2. Бэкенд (Flask)
-* `app.py` — главный файл приложения;
-* `db.py` — работа с SQLite;
-* `config.py` — конфигурация;
-* `logger.py` — система логирования;
-* `file_routes.py` — маршруты работы с файлами;
-* `mcp_routes.py` — маршруты MCP.
+### Интерфейсы и транспортные адаптеры
 
-### 3. MCP‑инструменты
-* `filesystem_mcp_tools.py` — работа с файловой системой;
-* `git_mcp_tools.py` — Git‑операции;
-* `profiler_tools.py` — профайлинг;
-* `archiver.py` — архивация;
-* `file_manager.py` — управление файлами.
+- `app.py` и route-модули — Flask-приложение и HTTP API;
+- `static/` и `templates/` — web UI без React/Vite в основном runtime;
+- `android/` — Android WebView-клиент;
+- `cli_agent.py` — CLI/Termux-клиент к backend API, без собственного model loop;
+- `voice_routes.py` — SpeechKit STT/TTS и передача распознанного текста в общий
+  чат-клиент;
+- `mcp_routes.py` и `chatgpt_mcp.py` — MCP/ChatGPT transport;
+- `alice_agent_runner.py` — GitHub issue adapter с invocation и финальным trace.
 
-### 4. AI‑адаптеры и агенты
-* `cli_agent.py` — CLI/Termux‑адаптер к каноническому backend runtime;
-* `alice_agent_runner.py` — GitHub issue adapter;
-* `local_tool_agent.py` — Android/local tool adapter;
-* Yandex AI Studio подключается через общий provider/Responses pipeline, а не напрямую из интерфейсных адаптеров.
+### Выполнение модели и инструментов
 
-### 5. Система хранения
-* **SQLite** (`db.py`) — основное хранилище данных;
-* файловая система — векторные хранилища и файлы.
+- `invocation/` хранит идентичность и жизненный цикл запуска;
+- `yandex_client.py`, `yandex_client_modules/` и `responses_tool_loop.py`
+  реализуют основной provider path;
+- `tool_registry.py` нормализует локальные, MCP и cloud tools;
+- `universal_tool_platform.py` — единая граница выполнения tool calls, approvals
+  и policy;
+- `runtime/dispatcher.py` владеет runtime-scoped доступом к БД, filesystem,
+  network/process, MCP/tool registry и storage.
 
-## Взаимодействие компонентов
+Python threads — единицы выполнения, а не security boundary. Runtime-код не
+может обходить dispatcher и напрямую брать ресурсы другого runtime; правила и
+проверки описаны в [Runtime Dispatcher policy](../runtime/runtime-dispatcher-policy.md).
 
-1. **Пользовательский запрос**:
-   * браузер загружает статические файлы из `static/`;
-   * `chat.js` отправляет запрос на `app.py`.
+### Данные и storage
 
-2. **Обработка на бэкенде**:
-   * `app.py` маршрутизирует запрос;
-   * при необходимости обращается к Yandex AI Studio;
-   * использует MCP‑инструменты для файловых операций.
+- `db.py` использует SQLite по умолчанию и PostgreSQL только при заданном
+  `ALICE_DATABASE_URL`;
+- conversations, settings, invocations, provider credentials и traces хранятся
+  через backend data layer; Supabase из runtime удалён;
+- `storage.py` задаёт provider-neutral `StorageProvider` и локальный sandboxed
+  adapter;
+- `cloud/cloudru/object_storage.py` реализует S3-compatible Cloud.ru adapter.
+  Наличие адаптера не означает, что production уже переключён на него: provider
+  и dispatcher credential resolver должны быть настроены явно.
 
-3. **Хранение данных**:
-   * структурированные данные — в SQLite (`db.py`);
-   * файлы и векторные данные — в файловой системе.
+### Наблюдаемость и эксплуатация
 
-4. **Логирование**:
-   * все действия записываются в соответствующие лог‑файлы (`logs/`).
+- `trace_manager.py` и `invocation/trace.py` связывают provider requests, tool
+  calls, ошибки, timing и billing; snapshot не финализирует trace;
+- `logger.py` пишет ротируемые файлы в `logs/`, но логи не заменяют
+  `ExecutionTrace`;
+- `cloud/tools.py` предоставляет provider-neutral cloud tools и budget guard;
+- `scripts/pg_backup.sh` выполняет PostgreSQL backup, verify и explicit-target
+  restore;
+- `agent_office/observer.py` формирует GitHub-сводку о работе агентов, но ничего
+  не dispatch/merge.
 
-## Технологический стек
+## Что ещё не подтверждено как production
 
-* **Бэкенд**: Python, Flask;
-* **База данных**: SQLite;
-* **Фронтенд**: HTML, JavaScript, CSS (без React/Vite в основной версии);
-* **AI**: Yandex AI Studio;
-* **MCP**: собственные инструменты на Python;
-* **Логирование**: `logger.py` с ротацией файлов.
+- успешный публичный deploy текущего `master` и внешний MCP smoke test;
+- Container Apps baseline из открытого PR;
+- отдельный durable worker для фоновых задач;
+- полная PostgreSQL-нейтральность всего приложения;
+- автоматическое подключение Cloud.ru Object Storage к каждому runtime;
+- Cloud.ru A2A adapter из открытого PR.
+
+Текущий статус изменений репозитория приведён в [журнале](../changelog.md), а
+операционный runbook — в [production deployment](../production-deployment.md).

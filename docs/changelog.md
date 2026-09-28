@@ -26,10 +26,26 @@
   Это отдельная интеграция от GitHub App, используемого workflow Alice.
 - Уточнены инструкции установки, порт backend/CLI, источник ключей провайдера,
   Android toolchain и ссылки навигации.
+- Добавлен адаптер Cloud.ru Evolution Object Storage с отдельными S3-настройками,
+  безопасным отображением ошибок и dispatcher-owned resolver credentials:
+  [#458](https://github.com/maksimp6/Chat/pull/458). Это реализация
+  storage-контракта, а не подтверждение, что production уже переключён на
+  Object Storage.
+- Добавлены чтение расходов Cloud.ru, месячный budget guard для создающих
+  расходы compute-операций и скрипт PostgreSQL backup/verify/restore:
+  [#459](https://github.com/maksimp6/Chat/pull/459). Ошибка billing переводит
+  статус в `unknown` и не создаёт жёсткую блокировку; production restore требует
+  отдельной целевой базы и одобрения владельца.
+- Добавлен ежечасный GitHub observer, который собирает хронологию задач агентов,
+  выявляет зависшие PR и обновляет одну tracking issue, но не комментирует PR,
+  не вызывает агентов и не выполняет merge:
+  [#460](https://github.com/maksimp6/Chat/pull/460).
 
 Этот раздел фиксирует изменения кода и документации, а не подтверждённый
 production-деплой. Переход на Cloud.ru отслеживается отдельно в
-[#440](https://github.com/maksimp6/Chat/issues/440).
+[#440](https://github.com/maksimp6/Chat/issues/440). Успешный production deploy
+после этих изменений пока не подтверждён; исправление правил Traefik и отдельный
+SSH timeout отслеживаются в [#464](https://github.com/maksimp6/Chat/pull/464).
 
 ## Ранее
 

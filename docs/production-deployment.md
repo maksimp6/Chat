@@ -2,6 +2,14 @@
 
 Production uses the existing VPS reverse proxy and Docker network already used by Preview.
 
+This document describes the intended deployment contract and recovery runbook;
+it is not a live-health statement. As of 2026-09-28, a successful production
+deployment of the current `master` has not been verified. The Traefik rule fix
+is still under review in [#464](https://github.com/maksimp6/Chat/pull/464), and
+that PR explicitly does not resolve the separate SSH connection timeout. Do not
+describe either public domain as deployed until a post-merge workflow run and
+the checks below succeed.
+
 ## Domains and DNS
 
 Point both domains to the Alice Pro VM public address:

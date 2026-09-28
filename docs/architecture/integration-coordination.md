@@ -36,44 +36,42 @@ access. In-process Python threads are execution units, not security sandboxes.
 - Repository cleanup is authoritative. Removed root files and
   `runtime_marker.txt` must not be restored by a rebase or conflict resolution.
 
-## Required order after #363
+## Integrated order after #363
 
-1. **Documentation coordination (#364/#365).** Keep exactly one staging ledger
-   and this architecture coordination guide, synchronized to the merged
-   foundation.
-2. **Host-managed preview lifecycle (#359).** Adapt lifecycle and gateway
-   behavior to the merged loader and owner policy. Do not restore obsolete
-   preview deployment or transport mechanisms.
-3. **Degraded frontend shell (#360).** Preserve progressive enhancement using
-   BrowserShim/VM tests and repository-local assets. This may be reviewed after
-   synchronization without redefining runtime transport.
-4. **Dispatcher-scoped runtime resources.** Stage #361, #366, #369, #370,
-   #377, and #378 only after resolving ownership overlap. There must be one
-   `RuntimeDispatcher` and one `UniversalToolExecutor`, not competing tool or
-   dispatcher abstractions.
-5. **Android release hardening (#374).** This is independent of the runtime
-   sequence, subject to signing-boundary and secret-handling requirements.
+The integration sequence below is complete on `master`; the exact merge commits
+are recorded in the [current-scope ledger](../integration/current-scope.md).
 
-No candidate is admitted merely because it merges cleanly. Its focused checks,
-full suite, validators, formatting, hosted CI, and mergeability must be green.
-No step in this sequence should be auto-merged.
+1. **Host-managed preview lifecycle (#359)** was integrated on top of the
+   loader/owner foundation without restoring per-preview containers or
+   `runtime_port` transport.
+2. **Degraded frontend shell (#360)** retained BrowserShim/VM coverage and
+   repository-local assets.
+3. **Dispatcher-scoped runtime resources (#361, #366, #369, #370, #377 and
+   #378)** converged on one `RuntimeDispatcher` and one
+   `UniversalToolExecutor`.
+4. **Android release hardening (#374)** merged independently while preserving
+   the signing and secret boundaries.
+5. **Runtime follow-ups (#382, #383 and #390)** completed stopped-state,
+   revision-isolation and local-command behavior through the accepted runtime
+   boundaries.
 
-## Overlap ownership
+New follow-up work must start from current `master`; #363 is a historical
+foundation SHA, not a branch target. No new candidate is admitted merely
+because it merges cleanly. Its focused checks, validators, formatting, hosted
+CI and mergeability must be green.
 
-- **#361 and #370:** #361 owns routing MCP calls through dispatcher scope;
-  #370 should add isolation guarantees on that same route. If #370 contains a
-  second registry, dispatcher, or executor, retain #361's shared-boundary
-  approach and port only non-duplicative isolation tests or behavior.
-- **#366 and #378:** #366 owns the storage contract; #378 owns runtime
-  filesystem isolation. Filesystem-backed storage must use dispatcher scope,
-  without a second direct-access path.
-- **#369 and #377:** conversation agents and plugins both invoke capabilities
-  through the existing executor. Neither owns a new agent/tool execution
-  universe.
+## Integrated ownership decisions
 
-When implementations still compete after rebase, prefer the smaller change
-that directly consumes #363 and preserves correlation and runtime scope.
-Supersede the alternative explicitly rather than layering both.
+- **#361 and #370:** MCP calls use the shared dispatcher route; #370 adds
+  isolation guarantees without a second registry, dispatcher or executor.
+- **#366 and #378:** #366 owns the storage contract and #378 owns runtime
+  filesystem isolation. Filesystem-backed storage uses dispatcher scope without
+  a second direct-access path.
+- **#369 and #377:** conversation agents and plugins invoke capabilities through
+  the existing executor; neither owns a separate agent/tool execution universe.
+
+Future implementations that overlap these boundaries must extend the integrated
+owner instead of reviving a competing abstraction.
 
 ## Readiness gates
 
@@ -109,4 +107,3 @@ resolution:
 Useful requirements from older proposals belong behind the accepted host,
 loader, dispatcher, executor, and trace contracts rather than behind obsolete
 deployment mechanisms.
-
