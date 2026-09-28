@@ -6,6 +6,7 @@ import os
 from typing import Any
 
 from cloud.base import CloudProviderError
+from cloud.cloudru.billing import parse_consumption_total
 from cloud.cloudru.client import CloudRuClient
 from cloud.models import normalize_resource, normalize_resources
 from cloudru_iam import CloudRuIamClient
@@ -476,6 +477,8 @@ class CloudRuProvider:
             path,
             params={k: v for k, v in {"period": period, "group_by": group_by}.items() if v},
         )
+        totals = parse_consumption_total(payload)
+        total_cost = totals["total_cost"]
         return {
             "provider": self.name,
             "period": period,
@@ -483,4 +486,7 @@ class CloudRuProvider:
             "summary": payload.get("summary")
             if isinstance(payload.get("summary"), dict)
             else payload,
+            "total_cost": str(total_cost) if total_cost is not None else None,
+            "currency": totals["currency"]
+            or os.getenv("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
         }

@@ -15,6 +15,7 @@ READ_ONLY_TOOLS = {
     "cloud.logs.query",
     "cloud.metrics.query",
     "cloud.costs.summary",
+    "cloud.budget.status",
 }
 
 
