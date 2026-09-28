@@ -211,15 +211,32 @@ def test_deploy_patches_existing_service_with_new_image():
 
 
 def test_status_is_condensed_and_reports_missing():
-    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient([_app()]))
+    client = RecordingClient([_app()])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
     status = apps.status("alice-pro")
     assert status["public_uri"] == "alice.containers.cloud.ru"
     assert status["image"] == "img"
+    assert client.calls[0][:4] == (
+        "container_apps",
+        "GET",
+        "/v2/containers/alice-pro",
+        {"projectId": "p1"},
+    )
 
     missing = CloudRuContainerAppsClient(
         project_id="p1", client=RecordingClient([CloudProviderError("nf", http_status=404)])
     )
     assert missing.status("alice-pro")["status"] == "NOT_FOUND"
+
+
+def test_get_uses_current_container_services_detail_endpoint():
+    client = RecordingClient([_app()])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    assert apps.get("alice-pro")["name"] == "alice-pro"
+    assert client.calls == [
+        ("container_apps", "GET", "/v2/containers/alice-pro", {"projectId": "p1"}, None)
+    ]
 
 
 def test_wait_until_ready_waits_for_new_image_and_fails_fast():

@@ -4,9 +4,9 @@ Evolution has no separate Functions product that runs a Docker image; Container
 Apps is the serverless runtime that pulls images from Artifact Registry.
 
 Endpoints follow the Container Apps public API (``https://containers.api.cloud.ru``):
-https://cloud.ru/docs/container-apps-evolution/ug/topics/api-ref . The rendered
-reference is not machine-readable, so field names were cross-checked against a
-working community client; confirm them on the first real deploy.
+https://cloud.ru/docs/container-apps-evolution/ug/topics/api-ref . The current
+Container Services API uses the v2 resource paths; the v1 detail path returns a
+non-standard error on the live service.
 """
 
 from __future__ import annotations
@@ -157,7 +157,7 @@ class CloudRuContainerAppsClient:
             return self.client.request(
                 SERVICE,
                 "GET",
-                f"/v1/containers/{self._name(name)}",
+                f"/v2/containers/{self._name(name)}",
                 params={"projectId": self._project()},
             )
         except CloudProviderError as exc:
