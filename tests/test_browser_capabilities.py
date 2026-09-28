@@ -1,6 +1,6 @@
 import pytest
 
-from browser_capabilities import (
+from browser.capabilities import (
     BROWSER_CAPABILITY_CONTRACTS,
     BrowserAction,
     BrowserCapabilityContract,
