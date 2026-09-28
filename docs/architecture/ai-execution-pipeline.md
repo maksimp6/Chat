@@ -57,10 +57,11 @@ response
 - `run_agent.py`;
 - `run_agent_loop.py`;
 - `yandex_agent_loop.py`;
-- `agent_runner.py`.
+- `agent_runner.py`;
+- `agent_context.py`;
+- `agent_tools.py`.
 
-Они напрямую вызывали старые completion/OpenAI-compatible endpoints и имели собственные
-tool protocols, поэтому обходили единые invocation, approval, trace и billing contracts.
+Старые loop-модули напрямую вызывали completion/OpenAI-compatible endpoints и обходили единые invocation, approval, trace и billing contracts. `agent_tools.py` дублировал Git/filesystem/shell execution вне ToolRegistry и содержал прямой `shell=True`; `agent_context.py` был неиспользуемой параллельной сборкой prompt+memory.
 
 ## Уже переведено на canonical runtime
 

@@ -3,31 +3,10 @@ import runpy
 import sqlite3
 from datetime import datetime, timezone
 
-import agent_context
 import archiver
 import sdk
 import send_logs
 import yc_logging
-
-
-def test_agent_context_builds_memory_prompt_and_limits_history(monkeypatch):
-    monkeypatch.setattr(agent_context, "get_global_memory_summary", lambda: "GLOBAL")
-    history = [{"role": "user", "text": f"message-{index}"} for index in range(12)]
-    history[-2]["role"] = "assistant"
-    history[-1]["role"] = "ai"
-    monkeypatch.setattr(agent_context, "get_messages", lambda conversation_id: history)
-
-    messages = agent_context.build_prompt_with_memory("conv-1", "SYSTEM")
-
-    assert messages[0] == {"role": "system", "text": "SYSTEM\nGLOBAL"}
-    assert len(messages) == 11
-    assert messages[1]["text"] == "message-2"
-    assert messages[-2]["role"] == "assistant"
-    assert messages[-1]["role"] == "assistant"
-
-    monkeypatch.setattr(agent_context, "get_messages", lambda conversation_id: [])
-    default_prompt = agent_context.build_prompt_with_memory("conv-2")
-    assert "Alice Pro" in default_prompt[0]["text"]
 
 
 def _create_archive_database(path, rows=()):
