@@ -66,9 +66,7 @@ def test_registry_sanitizes_successful_result():
 
 
 def test_registry_classifies_adapter_errors_and_bad_results():
-    failing = BrowserAdapterRegistry(
-        {"browser_cloud": FakeAdapter(error=RuntimeError("offline"))}
-    )
+    failing = BrowserAdapterRegistry({"browser_cloud": FakeAdapter(error=RuntimeError("offline"))})
     invalid = BrowserAdapterRegistry({"browser_local": FakeAdapter(result=["bad"])})
 
     failure = failing.execute(BrowserAction("browser_cloud", "navigate", "url"))
