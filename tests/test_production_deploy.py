@@ -37,3 +37,12 @@ def test_production_deployment_uses_runtime_secret_not_traefik_labels():
     assert "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json" in source
     docker_block = source.split("docker run -d", 1)[1].split("-e HOST=", 1)[0]
     assert "ALICE_SHORT_TOKEN" not in docker_block
+
+
+def test_production_workflow_uses_a_separate_runtime_supabase_key():
+    workflow = (ROOT / ".github" / "workflows" / "production-deploy.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}" in workflow
+    assert 'test -n "$SUPABASE_SECRET_KEY"' in workflow
+    assert "SUPABASE_ACCESS_TOKEN" not in workflow

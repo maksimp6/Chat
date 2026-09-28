@@ -6,7 +6,7 @@ The workflow `.github/workflows/supabase-migrations.yml` applies committed SQL m
 
 Configure a GitHub **production environment** with:
 
-- Secret `SUPABASE_ACCESS_TOKEN`: a Supabase access token with permission to link and migrate the project.
+- Secret `SUPABASE_ACCESS_TOKEN`: a Supabase personal access token for the CLI, in the `sbp_...` format, with permission to link and migrate the project. Do not use the project runtime API key here.
 - Variable `SUPABASE_PROJECT_ID`: the production Supabase project reference.
 
 Do not commit tokens, database passwords, or connection strings.
