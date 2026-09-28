@@ -74,6 +74,8 @@ jobs:
           node tests/test_ui_modal_contract.js
           node tests/test_voice_recording.js
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
+      - name: Report frontend coverage
+        run: python tests/report_frontend_coverage.py coverage-js frontend-coverage.json
       - name: Save frontend test log
         if: always()
         run: |
@@ -123,6 +125,7 @@ jobs:
             coverage.xml
             coverage.json
             coverage-js/
+            frontend-coverage.json
             ci-validation-report.md
             flask-live.log
           if-no-files-found: warn
