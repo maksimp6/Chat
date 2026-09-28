@@ -9,6 +9,16 @@ from flask import request
 from .protocol import OAUTH_SCOPE, _jsonrpc_error, _public_base_url
 
 
+def _permission_error_message(exc: PermissionError) -> str:
+    if exc.args and isinstance(exc.args[0], str):
+        message = exc.args[0]
+    else:
+        message = "Unauthorized"
+    if "Traceback (most recent call last):" in message:
+        return "Unauthorized"
+    return message.splitlines()[0]
+
+
 def _truthy(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -113,7 +123,7 @@ def _require_auth(request_id: Any) -> tuple[Optional[str], Optional[Any]]:
         return None, _jsonrpc_error(
             request_id,
             -32001,
-            str(exc),
+            _permission_error_message(exc),
             status=401,
             headers={"WWW-Authenticate": _www_authenticate()},
         )

@@ -21,6 +21,17 @@ from .tools import _tools_list
 chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
 
 
+def _client_error_message(exc: Exception, fallback: str) -> str:
+    if exc.args and isinstance(exc.args[0], str):
+        message = exc.args[0]
+    else:
+        message = fallback
+    if "Traceback (most recent call last):" in message:
+        return fallback
+    message = message.splitlines()[0].strip()
+    return message or fallback
+
+
 @chatgpt_mcp_bp.route("/.well-known/oauth-protected-resource", methods=["GET"])
 def oauth_protected_resource() -> Response:
     issuer = os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
@@ -158,11 +169,25 @@ def mcp_post() -> Response:
                 resource_runtime_id=resource_runtime_id,
             )
         except LookupError as exc:
-            return _error_response(request_id, -32602, str(exc), status=404)
+            return _error_response(
+                request_id,
+                -32602,
+                _client_error_message(exc, "Requested resource was not found"),
+                status=404,
+            )
         except PermissionError as exc:
-            return _error_response(request_id, -32003, str(exc), status=403)
+            return _error_response(
+                request_id,
+                -32003,
+                _client_error_message(exc, "Tool authorization denied"),
+                status=403,
+            )
         except (TypeError, ValueError) as exc:
-            return _error_response(request_id, -32602, str(exc))
+            return _error_response(
+                request_id,
+                -32602,
+                _client_error_message(exc, "Tool input validation failed"),
+            )
         except Exception:
             return _error_response(request_id, -32603, "Tool execution failed", status=500)
 
