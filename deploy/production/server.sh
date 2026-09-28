@@ -121,6 +121,8 @@ deploy() {
     --label "traefik.http.services.alice-production.loadbalancer.server.port=8080" \
     -e HOST=0.0.0.0 \
     -e PORT=8080 \
+    -e CLOUDRU_MONTHLY_BUDGET=10000 \
+    -e CLOUDRU_BILLING_CURRENCY=RUB \
     "$IMAGE_NAME" >/dev/null
 
   local health_status
