@@ -93,7 +93,11 @@ CLOUD_BROWSING = BrowserCapabilityContract(
     name="browser_cloud",
     mode="cloud",
     allowed_scopes=("approved_cloud_session",),
-    metadata={"credentials_model_visible": False, "real_profile_access": False},
+    metadata={
+        "credentials_model_visible": False,
+        "real_profile_access": False,
+        "trace_redact_arguments": ["value"],
+    },
 )
 
 LOCAL_BROWSING = BrowserCapabilityContract(
@@ -101,7 +105,11 @@ LOCAL_BROWSING = BrowserCapabilityContract(
     mode="local",
     allowed_scopes=("project_runtime",),
     requires_emulator=True,
-    metadata={"credentials_model_visible": False, "real_profile_access": False},
+    metadata={
+        "credentials_model_visible": False,
+        "real_profile_access": False,
+        "trace_redact_arguments": ["value"],
+    },
 )
 
 BROWSER_CAPABILITY_CONTRACTS = {
