@@ -21,7 +21,9 @@ Describe the task with the "Agent task" issue template, then mention exactly one
 agent in a comment:
 
 - `@claude` — multi-file changes and investigations (`.github/workflows/claude.yml`).
-- `@codex` — tasks for the Codex connector; uses `scripts/codex_setup.sh`.
+- `@codex` — test engineer: checks each pull request's tests and proposes the
+  missing regression tests; also takes focused, test-heavy issues. Uses
+  `scripts/codex_setup.sh`.
 - `@copilot` — assign the issue to Copilot; it also reviews pull requests
   (`.github/copilot-instructions.md`).
 - `@alice` — Alice Pro working on her own code through her filesystem tools
