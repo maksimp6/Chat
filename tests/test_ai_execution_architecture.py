@@ -17,3 +17,10 @@ def test_cli_adapter_uses_canonical_backend_runtime():
 
 def test_pruned_agent_runner_stays_deleted():
     assert not (ROOT / "agent_runner.py").exists()
+
+
+def test_github_agent_runs_as_packaged_module():
+    workflow = (ROOT / ".github" / "workflows" / "alice.yml").read_text(encoding="utf-8")
+
+    assert "python -m agents.github_runner" in workflow
+    assert "python alice_agent_runner.py" not in workflow
