@@ -34,9 +34,7 @@ def test_removed_external_backend_does_not_return():
         if REMOVED_VENDOR in text.lower() or REMOVED_PREFIX in text:
             offenders.append(str(path.relative_to(ROOT)))
 
-    assert not offenders, "Removed backend dependency reintroduced: " + ", ".join(
-        sorted(offenders)
-    )
+    assert not offenders, "Removed backend dependency reintroduced: " + ", ".join(sorted(offenders))
 
 
 def test_removed_external_backend_paths_stay_absent():
@@ -44,6 +42,4 @@ def test_removed_external_backend_paths_stay_absent():
     assert not (ROOT / f"{REMOVED_VENDOR}_trace_mirror.py").exists()
     assert not (ROOT / f"{REMOVED_VENDOR}_startup_check.py").exists()
     assert not (ROOT / "trace_mirror_integration.py").exists()
-    assert not (
-        ROOT / ".github" / "workflows" / f"{REMOVED_VENDOR}-migrations.yml"
-    ).exists()
+    assert not (ROOT / ".github" / "workflows" / f"{REMOVED_VENDOR}-migrations.yml").exists()
