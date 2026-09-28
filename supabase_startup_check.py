@@ -50,8 +50,8 @@ def check_supabase_trace_mirror(*, timeout: float = 3.0) -> str:
     request = Request(
         endpoint,
         headers={
+            # Supabase secret API keys are opaque, not JWTs. Send via apikey only.
             "apikey": secret_key,
-            "Authorization": f"Bearer {secret_key}",
             "Accept": "application/json",
         },
         method="GET",
