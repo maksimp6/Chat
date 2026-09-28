@@ -102,7 +102,10 @@ def _patch_runtime_bridge(monkeypatch, *, result=None, exc=None):
 
 def test_auth_helpers_cover_permission_modes_and_challenge(monkeypatch, mcp_app):
     assert auth._permission_error_message(PermissionError()) == "Unauthorized"
-    assert auth._permission_error_message(PermissionError("Traceback (most recent call last): boom")) == "Unauthorized"
+    assert (
+        auth._permission_error_message(PermissionError("Traceback (most recent call last): boom"))
+        == "Unauthorized"
+    )
     assert auth._permission_error_message(PermissionError("nope\nextra")) == "nope"
 
     monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
@@ -117,7 +120,10 @@ def test_auth_helpers_cover_permission_modes_and_challenge(monkeypatch, mcp_app)
     assert auth._auth_mode() == "anonymous"
 
     monkeypatch.setenv("ALICE_MCP_PUBLIC_URL", "https://alice.example/")
-    assert auth._protected_resource_url() == "https://alice.example/.well-known/oauth-protected-resource"
+    assert (
+        auth._protected_resource_url()
+        == "https://alice.example/.well-known/oauth-protected-resource"
+    )
     assert auth._www_authenticate().startswith("Bearer ")
     assert (
         'resource_metadata="https://alice.example/.well-known/oauth-protected-resource"'
@@ -163,7 +169,9 @@ def test_auth_helpers_cover_permission_modes_and_challenge(monkeypatch, mcp_app)
 
 
 def test_require_auth_wraps_permission_errors(monkeypatch):
-    monkeypatch.setattr(auth, "_auth_user_from_request", lambda: (_ for _ in ()).throw(PermissionError("boom")))
+    monkeypatch.setattr(
+        auth, "_auth_user_from_request", lambda: (_ for _ in ()).throw(PermissionError("boom"))
+    )
     user, error = auth._require_auth("req-1")
     assert user is None
     assert error.status_code == 401
@@ -228,7 +236,10 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
 
 def test_protocol_helpers_sanitize_payloads_and_version_selection(mcp_app):
     assert protocol._sanitize_error_string(None) == ""
-    assert protocol._sanitize_error_string("Traceback (most recent call last): nope") == "Internal error"
+    assert (
+        protocol._sanitize_error_string("Traceback (most recent call last): nope")
+        == "Internal error"
+    )
     assert protocol._sanitize_error_string("first line\nsecond line") == "first line"
     assert protocol._sanitize_error_payload(
         {"k": ["Traceback (most recent call last): nope", ("line 1\nline 2", 1)]}
@@ -251,15 +262,23 @@ def test_protocol_helpers_sanitize_payloads_and_version_selection(mcp_app):
     with mcp_app.test_request_context("/mcp", headers={"MCP-Protocol-Version": " 2025-06-18 "}):
         assert protocol._request_protocol_version({}) == "2025-06-18"
     with mcp_app.test_request_context("/mcp"):
-        assert protocol._request_protocol_version(
-            {"params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2025-03-26"}}}
-        ) == "2025-03-26"
-        assert protocol._request_protocol_version({"params": {"_meta": []}}) == protocol.DEFAULT_PROTOCOL_VERSION
+        assert (
+            protocol._request_protocol_version(
+                {"params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2025-03-26"}}}
+            )
+            == "2025-03-26"
+        )
+        assert (
+            protocol._request_protocol_version({"params": {"_meta": []}})
+            == protocol.DEFAULT_PROTOCOL_VERSION
+        )
 
 
 def test_runtime_bridge_authorization_and_owner_resolution(monkeypatch):
     assert runtime_bridge._owner_id_from_invocation({"metadata": "bad"}) is None
-    assert runtime_bridge._owner_id_from_invocation({"metadata": {"user_id": " user-1 "}}) == "user-1"
+    assert (
+        runtime_bridge._owner_id_from_invocation({"metadata": {"user_id": " user-1 "}}) == "user-1"
+    )
 
     monkeypatch.setattr("mcp_server.auth._auth_mode", lambda: "anonymous")
     runtime_bridge._authorize_invocation({"metadata": {"user_id": "user-1"}}, "user-1")
@@ -275,14 +294,22 @@ def test_runtime_bridge_authorization_and_owner_resolution(monkeypatch):
 @pytest.mark.parametrize(
     ("result", "expected_type", "expected_text"),
     [
-        ({"success": False, "error": "bad transport", "metadata": {"phase": "transport"}}, LookupError, "bad transport"),
+        (
+            {"success": False, "error": "bad transport", "metadata": {"phase": "transport"}},
+            LookupError,
+            "bad transport",
+        ),
         (
             {"success": False, "error": "denied", "metadata": {"phase": "authorization"}},
             PermissionError,
             "denied",
         ),
         (
-            {"success": False, "error": "LookupError: missing session", "metadata": {"phase": "execution"}},
+            {
+                "success": False,
+                "error": "LookupError: missing session",
+                "metadata": {"phase": "execution"},
+            },
             LookupError,
             "missing session",
         ),
@@ -294,7 +321,9 @@ def test_runtime_bridge_authorization_and_owner_resolution(monkeypatch):
         ({"success": False, "error": "boom", "metadata": {"phase": "other"}}, RuntimeError, "boom"),
     ],
 )
-def test_handle_call_maps_executor_failure_phases(monkeypatch, result, expected_type, expected_text):
+def test_handle_call_maps_executor_failure_phases(
+    monkeypatch, result, expected_type, expected_text
+):
     calls, trace = _patch_runtime_bridge(monkeypatch, result=result)
     with pytest.raises(expected_type, match=expected_text):
         runtime_bridge._handle_call("tool-name", {}, "user-1")
@@ -318,7 +347,9 @@ def test_handle_call_records_unexpected_executor_errors(monkeypatch):
 
 
 def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
-    descriptor, handler = tools._tool("tool-name", "Tool title", "desc", {"type": "object"}, lambda args, user: {})
+    descriptor, handler = tools._tool(
+        "tool-name", "Tool title", "desc", {"type": "object"}, lambda args, user: {}
+    )
     assert descriptor["name"] == "tool-name"
     assert descriptor["_meta"]["openai/toolInvocation/invoked"] == "Tool title: готово"
     assert handler({}, None) == {}
@@ -354,18 +385,45 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
         ]
     }
 
-    monkeypatch.setattr(tools, "get_session", lambda session_id: None if session_id == "missing" else {"id": session_id, "status": "done", "created_at": 1, "updated_at": 2})
+    monkeypatch.setattr(
+        tools,
+        "get_session",
+        lambda session_id: (
+            None
+            if session_id == "missing"
+            else {"id": session_id, "status": "done", "created_at": 1, "updated_at": 2}
+        ),
+    )
     with pytest.raises(LookupError, match="Session not found"):
         tools._session({"session_id": "missing"}, None)
     assert tools._session({"session_id": "session-1"}, None)["session"]["id"] == "session-1"
 
-    monkeypatch.setattr(tools, "get_invocation_status", lambda invocation_id: None if invocation_id == "missing" else {"metadata": {"user_id": "user-1"}, "id": invocation_id})
-    monkeypatch.setattr(tools, "_authorize_invocation", lambda invocation, user: invocation.update({"authorized_as": user}))
+    monkeypatch.setattr(
+        tools,
+        "get_invocation_status",
+        lambda invocation_id: (
+            None
+            if invocation_id == "missing"
+            else {"metadata": {"user_id": "user-1"}, "id": invocation_id}
+        ),
+    )
+    monkeypatch.setattr(
+        tools,
+        "_authorize_invocation",
+        lambda invocation, user: invocation.update({"authorized_as": user}),
+    )
     with pytest.raises(LookupError, match="Invocation not found"):
         tools._invocation({"invocation_id": "missing"}, "user-1")
-    assert tools._invocation({"invocation_id": "inv-1"}, "user-1")["invocation"]["authorized_as"] == "user-1"
+    assert (
+        tools._invocation({"invocation_id": "inv-1"}, "user-1")["invocation"]["authorized_as"]
+        == "user-1"
+    )
 
-    monkeypatch.setattr(tools, "get_invocation_trace", lambda invocation_id: None if invocation_id == "missing-trace" else {"id": invocation_id})
+    monkeypatch.setattr(
+        tools,
+        "get_invocation_trace",
+        lambda invocation_id: None if invocation_id == "missing-trace" else {"id": invocation_id},
+    )
     with pytest.raises(LookupError, match="Invocation not found"):
         tools._trace({"invocation_id": "missing"}, "user-1")
     with pytest.raises(LookupError, match="Invocation trace not found"):
@@ -393,8 +451,16 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
     with pytest.raises(LookupError, match="Conversation not found"):
         tools._conversation_messages({"conversation_id": "conversation-1"}, "user-1")
 
-    monkeypatch.setattr(tools, "_invocation", lambda arguments, user: {"invocation": {"id": arguments["invocation_id"], "user": user}})
-    monkeypatch.setattr(tools, "_trace", lambda arguments, user: {"trace": {"id": arguments["invocation_id"], "user": user}})
+    monkeypatch.setattr(
+        tools,
+        "_invocation",
+        lambda arguments, user: {"invocation": {"id": arguments["invocation_id"], "user": user}},
+    )
+    monkeypatch.setattr(
+        tools,
+        "_trace",
+        lambda arguments, user: {"trace": {"id": arguments["invocation_id"], "user": user}},
+    )
     assert tools._execution({"invocation_id": "inv-1"}, "user-1") == {
         "execution": {"id": "inv-1", "user": "user-1"}
     }
@@ -404,7 +470,9 @@ def test_tools_helpers_cover_lookup_validation_and_wrappers(monkeypatch):
 
     with pytest.raises(ValueError, match="path is required"):
         tools._project_read({}, None)
-    monkeypatch.setattr(tools, "read_file", lambda payload: {"error": "bad path", "payload": payload})
+    monkeypatch.setattr(
+        tools, "read_file", lambda payload: {"error": "bad path", "payload": payload}
+    )
     with pytest.raises(ValueError, match="bad path"):
         tools._project_read({"path": "chatgpt_mcp.py"}, None)
 
@@ -476,7 +544,12 @@ def test_transport_routes_cover_public_metadata_and_non_post_methods(monkeypatch
     assert response.get_data(as_text=True) == "Alice Pro MCP endpoint accepts POST requests only."
 
     assert transport._client_error_message(Exception(), "fallback") == "fallback"
-    assert transport._client_error_message(Exception("Traceback (most recent call last): boom"), "fallback") == "fallback"
+    assert (
+        transport._client_error_message(
+            Exception("Traceback (most recent call last): boom"), "fallback"
+        )
+        == "fallback"
+    )
 
 
 def test_transport_post_covers_protocol_errors_and_helper_methods(monkeypatch, mcp_client):
@@ -536,7 +609,10 @@ def test_transport_post_covers_protocol_errors_and_helper_methods(monkeypatch, m
         params={"_meta": {"alice/resource_runtime_id": "   "}},
     )
     assert response.status_code == 400
-    assert response.get_json()["error"]["message"] == "alice/resource_runtime_id must be a non-empty string"
+    assert (
+        response.get_json()["error"]["message"]
+        == "alice/resource_runtime_id must be a non-empty string"
+    )
 
 
 @pytest.mark.parametrize(
@@ -548,7 +624,9 @@ def test_transport_post_covers_protocol_errors_and_helper_methods(monkeypatch, m
         (RuntimeError("boom"), 500, -32603, "Tool execution failed"),
     ],
 )
-def test_transport_tools_call_error_mapping(monkeypatch, mcp_client, raised, status_code, code, message):
+def test_transport_tools_call_error_mapping(
+    monkeypatch, mcp_client, raised, status_code, code, message
+):
     monkeypatch.setattr(transport, "_require_auth", lambda request_id: ("user-1", None))
     monkeypatch.setattr(
         transport,
