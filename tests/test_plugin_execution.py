@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from invocation_context import InvocationContext
+from invocation.context import InvocationContext
 from plugin_execution import PluginExecutionGateway
 from plugin_manager import PluginError, PluginManager
 from runtime import RuntimeDispatcher
