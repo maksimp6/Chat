@@ -123,3 +123,36 @@ def test_issue_text_is_saved_verbatim_and_report_does_not_mention_alice(tmp_path
     assert "@alice" not in report
     assert "0.12 RUB (calculated)" in report
     assert "delete_path" in report
+
+
+def test_app_token_is_preferred_over_personal_token():
+    step = WORKFLOW.split("      - name: Create Alice Pro app token", 1)[1].split(
+        "      - name:", 1
+    )[0]
+    assert "id: app-token" in step
+    assert "if: vars.ALICE_APP_CLIENT_ID != ''" in step
+    assert re.search(r"uses: actions/create-github-app-token@[0-9a-f]{40}", step)
+    assert "client-id: ${{ vars.ALICE_APP_CLIENT_ID }}" in step
+    assert "private-key: ${{ secrets.ALICE_APP_PRIVATE_KEY }}" in step
+    permissions = sorted(re.findall(r"permission-([\w-]+): (\w+)", step))
+    assert permissions == [("contents", "write"), ("issues", "write"), ("pull-requests", "write")]
+    assert WORKFLOW.count("secrets.ALICE_APP_PRIVATE_KEY") == 1
+
+    publish = WORKFLOW.split("      - name: Open pull request and report", 1)[1]
+    assert "GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}" in publish
+    assert "APP_SLUG: ${{ steps.app-token.outputs.app-slug }}" in publish
+
+
+def test_app_commits_use_the_bot_identity():
+    script = _step_run("Open pull request and report")
+    assert 'bot="$APP_SLUG[bot]"' in script
+    assert 'gh api "users/$bot" --jq .id' in script
+    assert 'git config user.email "$bot_id+$bot@users.noreply.github.com"' in script
+
+
+def test_personal_token_commits_use_fallback_identity():
+    script = _step_run("Open pull request and report")
+    app_branch = script.split('if [ -n "$APP_SLUG" ]; then', 1)[1]
+    fallback = app_branch.split("\n  else\n", 1)[1].split("\n  fi\n", 1)[0]
+    assert 'git config user.name "Alice Pro"' in fallback
+    assert 'git config user.email "alice-pro@users.noreply.github.com"' in fallback

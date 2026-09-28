@@ -8,9 +8,12 @@ name: Alice
 #
 # Repository secrets (Settings -> Secrets and variables -> Actions):
 #   YANDEX_API_KEY, YANDEX_PROJECT_ID  - Yandex AI Studio credentials for Alice
-#   ALICE_GITHUB_TOKEN                 - personal fine-grained token of the maintainer
-#                                        (Contents + Pull requests + Issues: read/write,
-#                                        this repository only); PRs opened with it run CI.
+#   ALICE_APP_PRIVATE_KEY              - private key of the "Alice Pro" GitHub App, so
+#                                        Alice commits, opens PRs and comments under her
+#                                        own name; PRs opened with it run CI.
+# Repository variable ALICE_APP_CLIENT_ID - client ID of that GitHub App.
+# Fallback until the App exists: ALICE_GITHUB_TOKEN, a personal fine-grained token
+# of the maintainer (posts appear under the maintainer's name).
 # Optional repository variable: ALICE_AGENT_MODEL (default aliceai-llm).
 
 on:
@@ -115,17 +118,29 @@ jobs:
             python tests/validate_frontend_modules.py
           fi
 
+      - name: Create Alice Pro app token
+        id: app-token
+        if: vars.ALICE_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ALICE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ALICE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Open pull request and report
         env:
-          GH_TOKEN: ${{ secrets.ALICE_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          test -n "$GH_TOKEN" || { echo "::error::ALICE_GITHUB_TOKEN is not configured."; exit 1; }
+          test -n "$GH_TOKEN" || { echo "::error::Neither the Alice Pro GitHub App (ALICE_APP_CLIENT_ID + ALICE_APP_PRIVATE_KEY) nor ALICE_GITHUB_TOKEN is configured."; exit 1; }
           python - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
           import json, sys
           r = json.load(open(sys.argv[1], encoding="utf-8"))
-          # Comments are posted with a maintainer token: never echo "@alice" back.
+          # Never echo "@alice" back: a comment must not re-trigger this workflow.
           for key in ("summary",):
               if r.get(key):
                   r[key] = r[key].replace("@", "@\u200b")
@@ -142,8 +157,16 @@ jobs:
           if [ -s "$RUNNER_TEMP/files.txt" ]; then
             branch="alice/issue-$ISSUE_NUMBER-$GITHUB_RUN_ID"
             gh auth setup-git
-            git config user.name "Alice Pro"
-            git config user.email "alice-pro@users.noreply.github.com"
+            if [ -n "$APP_SLUG" ]; then
+              # Commits link to the App's bot account only with its exact name and ID email.
+              bot="$APP_SLUG[bot]"
+              bot_id="$(gh api "users/$bot" --jq .id)"
+              git config user.name "$bot"
+              git config user.email "$bot_id+$bot@users.noreply.github.com"
+            else
+              git config user.name "Alice Pro"
+              git config user.email "alice-pro@users.noreply.github.com"
+            fi
             git checkout -b "$branch"
             git add -A
             git commit -m "Alice: work on issue #$ISSUE_NUMBER" -m "Closes #$ISSUE_NUMBER"
