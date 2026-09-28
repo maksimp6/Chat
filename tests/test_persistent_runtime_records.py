@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 import db
-from invocation_manager import (
+from invocation.manager import (
     cancel_invocation,
     create_invocation,
     fail_invocation,
