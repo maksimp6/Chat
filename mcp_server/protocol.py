@@ -107,7 +107,8 @@ def _request_protocol_version(payload: Mapping[str, Any]) -> str:
     header = request.headers.get("MCP-Protocol-Version")
     if header:
         return header.strip()
-    meta = payload.get("params", {}).get("_meta", {})
+    params = payload.get("params")
+    meta = params.get("_meta") if isinstance(params, Mapping) else None
     if isinstance(meta, Mapping):
         return (
             str(meta.get("io.modelcontextprotocol/protocolVersion") or "").strip()

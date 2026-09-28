@@ -63,10 +63,10 @@ def _auth_user_from_request() -> Optional[str]:
 
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
-        raise PermissionError("****** token required")
+        raise PermissionError("Bearer access token required")
     token = authorization[7:].strip()
     if not token:
-        raise PermissionError("****** token required")
+        raise PermissionError("Bearer access token required")
 
     if mode == "bearer":
         expected = os.getenv("ALICE_MCP_BEARER_TOKEN", "")

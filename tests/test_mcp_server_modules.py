@@ -141,7 +141,7 @@ def test_auth_helpers_cover_permission_modes_and_challenge(monkeypatch, mcp_app)
 
     with mcp_app.test_request_context("/mcp", headers={"Authorization": "Bearer   "}):
         monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
-        with pytest.raises(PermissionError, match="token required"):
+        with pytest.raises(PermissionError, match="Bearer access token required"):
             auth._auth_user_from_request()
 
     with mcp_app.test_request_context("/mcp", headers={"Authorization": "Bearer " + "supplied"}):
@@ -271,6 +271,9 @@ def test_protocol_helpers_sanitize_payloads_and_version_selection(mcp_app):
         assert (
             protocol._request_protocol_version({"params": {"_meta": []}})
             == protocol.DEFAULT_PROTOCOL_VERSION
+        )
+        assert (
+            protocol._request_protocol_version({"params": []}) == protocol.DEFAULT_PROTOCOL_VERSION
         )
 
 
