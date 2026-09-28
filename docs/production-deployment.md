@@ -123,7 +123,7 @@ For an immediate service stop, remove the `alice-production` container on the VP
 
 ## Backups and restore
 
-Production data lives in Cloud.ru Managed PostgreSQL once `ALICE_DATABASE_URL` points at it. Two layers protect it:
+The Cloud.ru Container Apps path requires `ALICE_DATABASE_URL`, but the current VPS production workflow and `deploy/production/server.sh` do not pass that variable into `alice-production`. A live PostgreSQL production database and its backup configuration have not been verified. Before using this runbook, identify the database actually used by the running service and verify its persistence; the commands below apply only after production is explicitly connected to Managed PostgreSQL. Two layers can protect that database:
 
 1. **Managed backups.** In the Cloud.ru console, enable scheduled automatic backups for the cluster and keep point-in-time recovery on. This is the first choice for disaster recovery: restore the cluster (or a new cluster) to a moment before the incident, then point `ALICE_DATABASE_URL` at it.
 2. **Logical dumps.** `scripts/pg_backup.sh` makes a portable `pg_dump` archive that can be restored into any PostgreSQL, including a local one. Use it before risky migrations and for off-cluster copies.
@@ -140,11 +140,11 @@ CI runs `backup` and `verify` against the full application schema on every pull 
 
 ### Restore runbook
 
-1. Stop writes: scale the Container App to zero instances or stop the production container.
+1. Stop writes on the current VPS deployment: on the production VM, run `docker stop alice-production`, then verify `docker inspect -f '{{.State.Running}}' alice-production` prints `false`. Check for any other processes writing to the same database before restoring. The Container Apps deployment path is separate and has not been verified as the live production service.
 2. Pick the source: a managed backup / point-in-time moment (preferred), or a dump file.
-3. Managed backup: restore into a **new** cluster from the console, run `scripts/pg_backup.sh verify` against a fresh dump of it if time allows, then switch `ALICE_DATABASE_URL` to the new cluster.
+3. Managed backup: restore into a **new** cluster from the console and verify a fresh dump of it if time allows. Configure the production deployment to use the new cluster through its approved secret path; the current VPS script does not forward `ALICE_DATABASE_URL`, so changing a GitHub secret alone will not switch its database.
 4. Dump file: create an empty database, then run `ALICE_RESTORE_TARGET_URL=postgresql://... scripts/pg_backup.sh restore <dump>`. `restore` only writes to `ALICE_RESTORE_TARGET_URL` and never defaults to production.
-5. Start the app and check `/healthz`, sign-in, and the latest conversations.
+5. Start the app using the deployment path verified to point at the restored database. Check `/healthz`, sign-in, and the latest conversations. Do not resume writes until the running service's database target is confirmed.
 6. Keep the old cluster until the restored one has run for a day.
 
 Changing production data or `ALICE_DATABASE_URL` needs the owner's approval (see `AGENTS.md`).
