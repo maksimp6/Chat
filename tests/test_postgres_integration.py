@@ -131,9 +131,10 @@ def test_postgres_observability_migration_is_idempotent():
     assert len(rows) == 1
 
 
-def test_postgres_github_sign_in_promotes_anonymous_user_once():
+def test_postgres_github_sign_in_promotes_anonymous_user_once(monkeypatch):
     _require_postgres()
     import threading
+    import time
     import uuid
 
     from user_identity import (
@@ -144,30 +145,53 @@ def test_postgres_github_sign_in_promotes_anonymous_user_once():
         sign_in_with_github,
     )
 
+    import user_identity
+
     init_github_accounts_table()  # app.py creates the table at startup
-    suffix = uuid.uuid4().hex
-    anon = register_anonymous_user(f"pg-installation-{suffix}", {})
-    base = int(uuid.uuid4().int % 10**12)
-    github_ids = (base, base + 1)
+    anon = register_anonymous_user(f"pg-installation-{uuid.uuid4().hex}", {})
+    # The idempotent DDL takes a table lock that would queue the second sign-in
+    # before it reads the row; skip it so the second one reaches the promotion.
+    monkeypatch.setattr(user_identity, "init_github_accounts_table", lambda: None)
+    github_id = int(uuid.uuid4().int % 10**12)
+
+    # A first callback has claimed the anonymous row but not committed yet.
+    first = db.get_conn()
+    first.execute(
+        "UPDATE users SET status = 'github' WHERE id = ? AND status = 'anonymous'",
+        (anon["user_id"],),
+    )
+
     results = []
-    barrier = threading.Barrier(len(github_ids))
+    second = threading.Thread(
+        target=lambda: results.append(
+            sign_in_with_github(github_id, "second-account", anon["user_id"])
+        )
+    )
+    second.start()
 
-    def sign_in(github_id):
-        barrier.wait()
-        results.append(sign_in_with_github(github_id, f"login-{github_id}", anon["user_id"]))
+    # Wait until the second callback is blocked on the row lock, then commit
+    # the first claim so the second must re-check the row's status.
+    probe = db.get_conn()
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            waiting = probe.execute(
+                "SELECT count(*) AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+            ).fetchone()["n"]
+            probe.commit()
+            if waiting:
+                break
+            time.sleep(0.05)
+        assert waiting, "second sign-in never waited on the claimed row"
+    finally:
+        probe.close()
+    first.commit()
+    first.close()
+    second.join(timeout=10)
 
-    threads = [threading.Thread(target=sign_in, args=(gid,)) for gid in github_ids]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    assert len(results) == 2
-    promoted = [r for r in results if r["user_id"] == anon["user_id"]]
-    assert len(promoted) == 1
-    assert get_github_login(anon["user_id"]) == promoted[0]["github_login"]
-    for result in results:
-        assert authenticate_user_token(result["auth_token"]) == result["user_id"]
-
-    again = sign_in_with_github(promoted[0]["github_login"].split("-")[1], "renamed")
-    assert again["user_id"] == anon["user_id"]
+    assert len(results) == 1
+    identity = results[0]
+    assert identity["user_id"] != anon["user_id"]
+    assert identity["new_user"] is True
+    assert get_github_login(anon["user_id"]) is None
+    assert authenticate_user_token(identity["auth_token"]) == identity["user_id"]
