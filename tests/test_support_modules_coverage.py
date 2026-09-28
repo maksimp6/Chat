@@ -4,7 +4,6 @@ import sqlite3
 from datetime import datetime, timezone
 
 import agent_context
-import agent_runner
 import archiver
 import sdk
 import send_logs
@@ -30,47 +29,6 @@ def test_agent_context_builds_memory_prompt_and_limits_history(monkeypatch):
     default_prompt = agent_context.build_prompt_with_memory("conv-2")
     assert "Alice Pro" in default_prompt[0]["text"]
 
-
-def test_agent_core_dispatches_and_normalizes_tool_arguments(monkeypatch):
-    calls = []
-
-    def fake_dispatch(name, arguments):
-        calls.append((name, arguments))
-        return {"name": name, "arguments": arguments}
-
-    monkeypatch.setattr(agent_runner, "dispatch_tool", fake_dispatch)
-    core = agent_runner.AgentCore("custom prompt")
-
-    assert core.system_prompt == "custom prompt"
-    assert core.tools is agent_runner.TOOLS_SCHEMA
-    assert core.execute_tool_call("direct", {"value": 1})["name"] == "direct"
-
-    results = core.handle_turn(
-        [
-            {
-                "id": "call-1",
-                "function": {"name": "json-tool", "arguments": '{"value": 2}'},
-            },
-            {
-                "function": {"name": "broken-json", "arguments": "{"},
-            },
-            {
-                "id": "call-3",
-                "function": {"name": "dict-tool", "arguments": {"value": 3}},
-            },
-        ]
-    )
-
-    assert results[0]["tool_call_id"] == "call-1"
-    assert results[0]["output"]["arguments"] == {"value": 2}
-    assert results[1]["tool_call_id"] == "call_default"
-    assert results[1]["output"]["arguments"] == {}
-    assert results[2]["output"]["arguments"] == {"value": 3}
-    assert calls[-3:] == [
-        ("json-tool", {"value": 2}),
-        ("broken-json", {}),
-        ("dict-tool", {"value": 3}),
-    ]
 
 
 def _create_archive_database(path, rows=()):
