@@ -197,7 +197,11 @@ jobs:
         run: |
           mkdir -p /tmp/alice-backup
           chmod 777 /tmp/alice-backup
+          $PSQL "$ALICE_DATABASE_URL" -v ON_ERROR_STOP=1 -q \
+            -c "CREATE TABLE backup_check (id int); INSERT INTO backup_check VALUES (1), (2)"
           scripts/pg_backup.sh backup /tmp/alice-backup/alice.dump
+          # Writes after the dump must not fail verification of the dump.
+          $PSQL "$ALICE_DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "INSERT INTO backup_check VALUES (3)"
           scripts/pg_backup.sh verify /tmp/alice-backup/alice.dump
 
   android:

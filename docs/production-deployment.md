@@ -126,9 +126,9 @@ scripts/pg_backup.sh backup alice-$(date +%F).dump
 scripts/pg_backup.sh verify alice-$(date +%F).dump
 ```
 
-`verify` restores the dump into a scratch database, compares exact row counts of every user table with the source, and drops the scratch database. Managed PostgreSQL users often cannot `CREATE DATABASE`; in that case create an empty database in the console and pass it as `ALICE_RESTORE_CHECK_URL`. Client tools must be at least the server's major version; set `PG_DUMP`, `PG_RESTORE` and `PSQL` to a matching client (the CI job uses the `postgres:17-alpine` image).
+`verify` restores the dump into a scratch database, compares exact row counts of every user table with the data inside the dump (so writes to production after the dump do not matter), and drops the scratch database. Managed PostgreSQL users often cannot `CREATE DATABASE`; in that case create an empty database in the console and pass it as `ALICE_RESTORE_CHECK_URL`. Client tools must be at least the server's major version; set `PG_DUMP`, `PG_RESTORE` and `PSQL` to a matching client (the CI job uses the `postgres:17-alpine` image).
 
-CI runs `backup` and `verify` against the full application schema on every pull request (job **PostgreSQL integration**), so a schema change that breaks restore fails before merge.
+CI runs `backup` and `verify` against the full application schema on every pull request (job **PostgreSQL integration**), including a write after the dump, so a schema change that breaks restore fails before merge.
 
 ### Restore runbook
 

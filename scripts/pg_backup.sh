@@ -2,7 +2,7 @@
 # Logical backup and restore check for the Alice Pro PostgreSQL backend.
 #
 #   scripts/pg_backup.sh backup <dump-file>   # pg_dump -Fc of ALICE_DATABASE_URL
-#   scripts/pg_backup.sh verify <dump-file>   # restore into a scratch DB, compare row counts
+#   scripts/pg_backup.sh verify <dump-file>   # restore into a scratch DB, compare row counts with the dump
 #   scripts/pg_backup.sh restore <dump-file>  # restore into ALICE_RESTORE_TARGET_URL
 #
 # Environment:
@@ -45,6 +45,22 @@ ORDER BY 1
 SQL
 }
 
+dump_counts() {
+  # Per-table row counts from the dump's own data, i.e. the pg_dump snapshot.
+  # Output matches row_counts: "schema.table count", sorted.
+  $PG_RESTORE --data-only --file=- "$1" | awk '
+    /^COPY .* FROM stdin;$/ {
+      name = $0
+      sub(/^COPY /, "", name)
+      sub(/ (\(.*\) )?FROM stdin;$/, "", name)
+      gsub(/"/, "", name)
+      rows = 0; in_copy = 1; next
+    }
+    in_copy && $0 == "\\." { print name " " rows; in_copy = 0; next }
+    in_copy { rows++ }
+  ' | LC_ALL=C sort
+}
+
 cmd_backup() {
   local out=$1
   require_url ALICE_DATABASE_URL
@@ -73,12 +89,13 @@ cmd_verify() {
   fi
   restore_into "$dump" "$target"
   local expected actual
-  expected=$(row_counts "$ALICE_DATABASE_URL")
-  actual=$(row_counts "$target")
-  [[ -n "$expected" ]] || die "source database has no user tables"
+  # Compare with the dump itself, not the live source, which may have changed since.
+  expected=$(dump_counts "$dump")
+  actual=$(row_counts "$target" | LC_ALL=C sort)
+  [[ -n "$expected" ]] || die "dump contains no table data"
   if [[ "$expected" != "$actual" ]]; then
     diff <(echo "$expected") <(echo "$actual") >&2 || true
-    die "restored row counts differ from the source"
+    die "restored row counts differ from the dump"
   fi
   echo "pg_backup: restore verified, $(echo "$expected" | wc -l) tables match"
 }
