@@ -149,7 +149,7 @@ Alice reads real spend from the Cloud.ru billing API (`organization.api.cloud.ru
 | --- | --- |
 | `CLOUDRU_BILLING_ENDPOINT` | `https://organization.api.cloud.ru` |
 | `CLOUDRU_BILLING_SUMMARY_PATH` | consumption method path, may include query parameters such as `customer_id` or dates |
-| `CLOUDRU_MONTHLY_BUDGET` | monthly limit; unset disables the guard |
+| `CLOUDRU_MONTHLY_BUDGET` | monthly limit; unset disables the guard. Production sets `10000` (RUB) in `deploy/production/server.sh` |
 | `CLOUDRU_BUDGET_WARN_RATIO` | warning threshold as a share of the limit, default `0.80` |
 | `CLOUDRU_BILLING_CURRENCY` | limit currency, default `RUB` |
 
