@@ -58,16 +58,22 @@ def test_core_db_schema_and_conversations_work_on_sqlite(monkeypatch, tmp_path):
 class _FakeRawCursor:
     def __init__(self, log, rows=()):
         self._log = log
-        self._rows = list(rows)
+        # ``rows`` is a fixed result, or a function of the executed SQL.
+        self._source = rows
+        self._rows = []
         self.description = None
         self.rowcount = 0
 
     def execute(self, sql, params=()):
         self._log.append(sql)
+        self._rows = list(self._source(sql) if callable(self._source) else self._source)
         self.description = [type("Desc", (), {"name": "tablename"})()]
 
     def fetchall(self):
         return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
 
 
 class _FakeRawConnection:
@@ -199,10 +205,23 @@ def test_postgres_integrity_errors_use_backend_neutral_type():
         db_backend.psycopg = original
 
 
-def test_runtime_tables_drop_legacy_conversation_key_on_postgres(monkeypatch):
+def test_runtime_tables_skip_constraint_ddl_when_already_dropped(monkeypatch):
     import runtime_migrations
 
     pg = _fake_pg_connection()
+    monkeypatch.setattr(runtime_migrations, "get_conn", lambda: pg)
+    runtime_migrations.init_runtime_tables()
+    # Invocations call this on every request: no ALTER once the key is gone.
+    assert not any("DROP CONSTRAINT" in sql for sql in pg._raw.log)
+
+
+def test_runtime_tables_drop_legacy_conversation_key_on_postgres(monkeypatch):
+    import runtime_migrations
+
+    def rows(sql):
+        return [(1,)] if "table_constraints" in sql else []
+
+    pg = _fake_pg_connection(rows=rows)
     monkeypatch.setattr(runtime_migrations, "get_conn", lambda: pg)
     runtime_migrations.init_runtime_tables()
     assert any(
@@ -242,3 +261,20 @@ def test_delete_conversation_removes_messages_and_settings(monkeypatch, tmp_path
     assert db.get_conversations() == []
     assert db.get_messages("doomed") == []
     assert db.get_conv_settings("doomed") is None
+
+
+def test_conv_settings_timestamp_column_is_converted_on_postgres():
+    def rows(sql):
+        return [("timestamp without time zone",)] if "information_schema.columns" in sql else []
+
+    pg = _fake_pg_connection(rows=rows)
+    db._migrate_conv_settings_updated_at(pg)
+    assert any("ALTER COLUMN updated_at TYPE INTEGER" in sql for sql in pg._raw.log)
+
+    converted = _fake_pg_connection(rows=lambda sql: [("integer",)])
+    db._migrate_conv_settings_updated_at(converted)
+    assert not any("ALTER" in sql for sql in converted._raw.log)
+
+    sqlite_conn = sqlite3.connect(":memory:")
+    db._migrate_conv_settings_updated_at(sqlite_conn)
+    sqlite_conn.close()

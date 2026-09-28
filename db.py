@@ -4,7 +4,12 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from db_backend import add_column_if_missing, connect_postgres, postgres_url_from_env
+from db_backend import (
+    PGConnection,
+    add_column_if_missing,
+    connect_postgres,
+    postgres_url_from_env,
+)
 from memory_db import Column, MemoryDatabase
 from runtime.request_context import current_runtime_data_root
 
@@ -116,6 +121,29 @@ def get_conn():
     return conn
 
 
+def _migrate_conv_settings_updated_at(conn):
+    """Convert a PostgreSQL conv_settings.updated_at created as TIMESTAMP.
+
+    save_conv_settings writes Unix seconds, which PostgreSQL rejects for a
+    TIMESTAMP column. SQLite stores the integers as-is and needs no change.
+    """
+    if not isinstance(conn, PGConnection):
+        return
+    row = conn.execute(
+        """
+        SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+        """,
+        ("conv_settings", "updated_at"),
+    ).fetchone()
+    if row and str(row[0]).startswith("timestamp"):
+        conn.execute(
+            "ALTER TABLE conv_settings ALTER COLUMN updated_at DROP DEFAULT, "
+            "ALTER COLUMN updated_at TYPE INTEGER "
+            "USING EXTRACT(EPOCH FROM updated_at)::INTEGER"
+        )
+
+
 def init_db():
     if is_memory_configured():
         _memory_setup()
@@ -177,6 +205,7 @@ def init_db():
         )
     """)
 
+    _migrate_conv_settings_updated_at(conn)
     create_provider_credentials_schema(conn)
     create_key_manager_schema(conn)
 

@@ -4,6 +4,19 @@ from db import get_conn
 from db_backend import PGConnection, add_column_if_missing
 
 
+def _has_legacy_conversation_key(conn) -> bool:
+    # A catalog read takes no table lock, unlike ALTER TABLE. This runs on
+    # every invocation, so only issue DDL while the old key still exists.
+    row = conn.execute(
+        """
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_schema = 'public' AND table_name = ? AND constraint_name = ?
+        """,
+        ("invocations", "invocations_conversation_id_fkey"),
+    ).fetchone()
+    return row is not None
+
+
 def init_runtime_tables() -> None:
     conn = get_conn()
     try:
@@ -38,7 +51,7 @@ def init_runtime_tables() -> None:
         """)
         # Existing installations created before trace persistence need the additive migration.
         add_column_if_missing(conn, "invocations", "trace_json", "TEXT NOT NULL DEFAULT '{}'")
-        if isinstance(conn, PGConnection):
+        if isinstance(conn, PGConnection) and _has_legacy_conversation_key(conn):
             # Invocations may belong to conversations that have no row in
             # ``conversations`` (MCP calls, GitHub agent runs). SQLite never
             # enforced this key; drop it where PostgreSQL created it earlier.

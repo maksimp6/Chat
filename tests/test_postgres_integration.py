@@ -248,3 +248,27 @@ def test_postgres_github_sign_in_promotes_anonymous_user_once():
     assert identity["new_user"] is True
     assert get_github_login(anon["user_id"]) is None
     assert authenticate_user_token(identity["auth_token"]) == identity["user_id"]
+
+
+def test_postgres_converts_legacy_conv_settings_timestamp_column():
+    _require_postgres()
+    conn = db.get_conn()
+    try:
+        conn.execute("DROP TABLE IF EXISTS conv_settings")
+        conn.execute(
+            """
+            CREATE TABLE conv_settings (
+                conversation_id TEXT PRIMARY KEY,
+                settings_json TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    db.init_db()
+    db.save_conv_settings("legacy-settings", {"active_tool_categories": ["web"]})
+
+    assert db.get_conv_settings("legacy-settings") == {"active_tool_categories": ["web"]}
