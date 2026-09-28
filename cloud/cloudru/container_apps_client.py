@@ -3,10 +3,9 @@
 Evolution has no separate Functions product that runs a Docker image; Container
 Apps is the serverless runtime that pulls images from Artifact Registry.
 
-Endpoints follow the Container Apps public API (``https://containers.api.cloud.ru``):
-https://cloud.ru/docs/container-apps-evolution/ug/topics/api-ref . The current
-Container Services API uses the v2 resource paths; the v1 detail path returns a
-non-standard error on the live service.
+Endpoints follow the Container Apps public v2 API (``https://containers.api.cloud.ru``):
+https://cloud.ru/docs/api/specs/container-apps-evolution/ug/_specs/openapi.yaml .
+The request/response contract was checked against that schema on 2026-09-28.
 """
 
 from __future__ import annotations
@@ -105,13 +104,43 @@ def estimate_monthly_cost(
     }
 
 
-_READONLY_FIELDS = ("status", "id", "createdAt", "updatedAt")
+_PATCH_FIELDS = ("name", "description", "configuration", "template")
+_PATCH_CONFIGURATION_FIELDS = ("ingress", "autoDeployments", "ssh", "loggingService")
+_PATCH_INGRESS_FIELDS = (
+    "publiclyAccessible",
+    "corsPolicy",
+    "additionalPortMappings",
+    "accessSettings",
+    "customDomains",
+)
+_TEMPLATE_FIELDS = (
+    "timeout",
+    "idleTimeout",
+    "protocol",
+    "scaling",
+    "containers",
+    "initContainers",
+    "volumes",
+)
 
 
 def _writable(app: dict[str, Any]) -> dict[str, Any]:
-    body = copy.deepcopy(app)
-    for readonly in _READONLY_FIELDS:
-        body.pop(readonly, None)
+    """Project a ContainerResponse onto the documented PatchContainerRequest."""
+    body = {key: copy.deepcopy(app[key]) for key in _PATCH_FIELDS if key in app}
+    if "configuration" in body:
+        config = body["configuration"]
+        body["configuration"] = {
+            key: config[key] for key in _PATCH_CONFIGURATION_FIELDS if key in config
+        }
+        if "ingress" in body["configuration"]:
+            ingress = body["configuration"]["ingress"]
+            ingress = {key: ingress[key] for key in _PATCH_INGRESS_FIELDS if key in ingress}
+            for mapping in ingress.get("additionalPortMappings") or []:
+                mapping.pop("url", None)
+            body["configuration"]["ingress"] = ingress
+    if "template" in body:
+        template = body["template"]
+        body["template"] = {key: template[key] for key in _TEMPLATE_FIELDS if key in template}
     return body
 
 
@@ -152,16 +181,63 @@ class CloudRuContainerAppsClient:
 
     # Read -------------------------------------------------------------------
 
+    def list_containers(self) -> list[dict[str, Any]]:
+        """Read every inventory page; incomplete/invalid responses are errors."""
+        params = {"projectId": self._project(), "pageSize": 100}
+        containers: list[dict[str, Any]] = []
+        seen_tokens: set[str] = set()
+        while True:
+            body = self.client.request(SERVICE, "GET", "/v2/containers", params=dict(params))
+            items = body.get("data")
+            if not isinstance(items, list) or any(
+                not isinstance(item, dict)
+                or not isinstance(item.get("name"), str)
+                or not item["name"]
+                for item in items
+            ):
+                raise CloudProviderError(
+                    "Cloud.ru returned invalid container inventory", code="invalid_response"
+                )
+            containers.extend(items)
+            token = body.get("nextPageToken")
+            if token is None or token == "":
+                total = body.get("total")
+                if total is not None:
+                    try:
+                        incomplete = int(total) > len(containers)
+                    except (TypeError, ValueError, OverflowError):
+                        incomplete = True
+                    if incomplete:
+                        raise CloudProviderError(
+                            "Cloud.ru returned incomplete container inventory",
+                            code="invalid_response",
+                        )
+                return containers
+            if not isinstance(token, str) or token in seen_tokens:
+                raise CloudProviderError(
+                    "Cloud.ru returned invalid inventory pagination", code="invalid_response"
+                )
+            seen_tokens.add(token)
+            params["pageToken"] = token
+
     def get(self, name: str) -> dict[str, Any] | None:
+        name = self._name(name)
         try:
             return self.client.request(
                 SERVICE,
                 "GET",
-                f"/v2/containers/{self._name(name)}",
+                f"/v2/containers/{name}",
                 params={"projectId": self._project()},
             )
         except CloudProviderError as exc:
             if exc.http_status == 404:
+                return None
+            # Live v2 returns 499 for a missing name in an empty project. Only
+            # successful, complete inventory can establish absence in that case;
+            # a 499 for an existing app must still fail, never trigger creation.
+            if exc.http_status == 499 and not any(
+                app["name"] == name for app in self.list_containers()
+            ):
                 return None
             raise
 
@@ -215,6 +291,7 @@ class CloudRuContainerAppsClient:
         if current is None:
             raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
         body = _writable(current)
+        body["projectId"] = self._project()
         body.setdefault("configuration", {}).setdefault("ingress", {})["publiclyAccessible"] = (
             spec.public
         )
@@ -231,18 +308,18 @@ class CloudRuContainerAppsClient:
             SERVICE,
             "PATCH",
             f"/v2/containers/{spec.name}",
-            params={"projectId": self._project()},
             json_body=body,
         )
 
     def restore(self, name: str, previous: dict[str, Any]) -> dict[str, Any]:
         """Roll out a revision with exactly the configuration captured in ``previous``."""
+        body = _writable(previous)
+        body["projectId"] = self._project()
         return self.client.request(
             SERVICE,
             "PATCH",
             f"/v2/containers/{self._name(name)}",
-            params={"projectId": self._project()},
-            json_body=_writable(previous),
+            json_body=body,
         )
 
     def deploy(self, spec: ContainerSpec) -> dict[str, Any]:

@@ -204,7 +204,8 @@ def test_deploy_patches_existing_service_with_new_image():
 
     assert result["action"] == "update"
     _, method, path, params, body = client.calls[2]
-    assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", {"projectId": "p1"})
+    assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", None)
+    assert body["projectId"] == "p1"
     assert body["template"]["containers"][0]["image"] == "new@sha"
     assert body["template"]["scaling"]["minInstanceCount"] == 0
     assert "status" not in body and "id" not in body
@@ -708,7 +709,12 @@ def test_deploy_verified_restores_config_even_with_same_image():
         apps.deploy_verified(ContainerSpec(name="alice-pro", image="same", cpu="1"))
     patches = [c for c in apps.client.calls if c[1] == "PATCH"]
     assert len(patches) == 2
-    assert patches[1][4] == {k: v for k, v in previous.items() if k not in {"status", "id"}}
+    assert patches[1][4] == {
+        "name": "alice-pro",
+        "projectId": "p1",
+        "configuration": {"ingress": {"publiclyAccessible": True}},
+        "template": previous["template"],
+    }
 
 
 def test_deploy_verified_without_previous_image_just_raises():
