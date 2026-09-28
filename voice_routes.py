@@ -294,14 +294,19 @@ def voice_events():
 
     queue = get_task_queue()
 
+    # EventSource resends the last seen id on reconnect; resume after it so
+    # events such as output_audio.ready are not replayed.
+    resume_after = request.headers.get("Last-Event-ID", "")
+    start_seq = int(resume_after) if resume_after.isdigit() else 0
+
     @stream_with_context
     def stream():
-        seq = 0
+        seq = start_seq
         last_write = time.monotonic()
         while True:
             batch = queue.events(session.session_id, after=seq)
             for seq, event in batch:
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                yield f"id: {seq}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
                 if event.get("type") == "response.done":
                     return
             if batch:
@@ -353,23 +358,30 @@ def close_voice_session():
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
-    if session.closed:
-        return _closed_error()
-
+    with _sessions_lock:
+        if session.closed:
+            return _closed_error()
+        session.closed = True
+    # The job id is the session id, so events and output survive a web restart.
+    # The session (and its audio) is dropped only once the job is persisted, so a
+    # failed enqueue can be retried with the same audio.
+    try:
+        enqueue(
+            VOICE_TASK,
+            {
+                "owner_id": session.owner_id,
+                "conversation_id": session.conversation_id,
+                "model": session.model,
+                "voice": session.voice,
+                "response_mode": session.response_mode,
+                "audio_content_type": session.audio_content_type,
+                "audio_b64": base64.b64encode(bytes(session.audio)).decode("ascii"),
+            },
+            job_id=session.session_id,
+        )
+    except Exception as exc:
+        session.closed = False
+        return jsonify({"error": f"voice queue is unavailable: {str(exc)[:200]}"}), 503
     with _sessions_lock:
         _sessions.pop(session.session_id, None)
-    # The job id is the session id, so events and output survive a web restart.
-    enqueue(
-        VOICE_TASK,
-        {
-            "owner_id": session.owner_id,
-            "conversation_id": session.conversation_id,
-            "model": session.model,
-            "voice": session.voice,
-            "response_mode": session.response_mode,
-            "audio_content_type": session.audio_content_type,
-            "audio_b64": base64.b64encode(bytes(session.audio)).decode("ascii"),
-        },
-        job_id=session.session_id,
-    )
     return jsonify({"status": "processing"})

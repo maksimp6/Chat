@@ -18,7 +18,15 @@ from tasks import (
     reset_task_queue,
     run_worker,
 )
-from tasks.queue import DONE, FAILED, LEASE_EXPIRED_ERROR, QUEUED, RUNNING, TaskQueue
+from tasks.queue import (
+    DONE,
+    FAILED,
+    DuplicateJobError,
+    LEASE_EXPIRED_ERROR,
+    QUEUED,
+    RUNNING,
+    TaskQueue,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -60,6 +68,15 @@ def test_claim_complete_and_stale_lease_holder(queue):
     done = queue.get("job-a")
     assert (done.status, done.result, done.error) == (DONE, {"ok": True}, None)
     assert queue.complete(job, {"ok": False}) is False
+
+
+def test_duplicate_job_id_is_rejected_and_runs_once(queue):
+    queue.enqueue("demo", {"n": 1}, job_id="same")
+    with pytest.raises(DuplicateJobError):
+        queue.enqueue("demo", {"n": 2}, job_id="same")
+    job = queue.claim("w", 60)
+    assert (job.id, job.payload) == ("same", {"n": 1})
+    assert queue.claim("w", 60) is None
 
 
 def test_fail_records_error(queue):

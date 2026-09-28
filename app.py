@@ -49,6 +49,7 @@ from ssh_runtime_settings import public_settings, save_settings, test_connection
 from plugin_routes import plugin_bp
 from project_tree import project_tree_bp
 from voice_routes import voice_bp
+from tasks import get_task_queue
 from observability_migrations import apply_observability_migrations
 
 app = Flask(__name__)
@@ -143,6 +144,7 @@ ensure_partner_department()
 init_government_tables()
 ensure_government_department()
 init_environment_tables()
+get_task_queue().prepare()
 apply_observability_migrations()
 logger.info("[BOOT] hello: database initialization completed")
 

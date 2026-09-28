@@ -289,3 +289,54 @@ def test_voice_events_report_failed_job_and_keep_alive(client, monkeypatch):
     assert "input_audio_buffer.speech_stopped" in body
     assert '"message": "worker lease expired too many times"' in body
     assert body.rstrip().endswith('data: {"type": "response.done"}')
+
+
+def test_voice_close_keeps_audio_when_enqueue_fails(client, monkeypatch):
+    monkeypatch.setattr(voice_routes, "_stt", lambda audio, content_type="x": audio.decode())
+    monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: text)
+    session_id = client.post("/api/voice/session", json={"response_mode": "text"}).get_json()[
+        "session_id"
+    ]
+    client.post(f"/api/voice/audio?session_id={session_id}", data=b"original")
+    real_enqueue = voice_routes.enqueue
+
+    def enqueue_down(*args, **kwargs):
+        raise ConnectionError("redis is down")
+
+    monkeypatch.setattr(voice_routes, "enqueue", enqueue_down)
+    failed = client.post("/api/voice/close", json={"session_id": session_id})
+    assert failed.status_code == 503
+    assert "redis is down" in failed.get_json()["error"]
+
+    monkeypatch.setattr(voice_routes, "enqueue", real_enqueue)
+    assert client.post("/api/voice/close", json={"session_id": session_id}).status_code == 200
+    run_worker(drain=True)
+    events = _sse_events(client.get(f"/api/voice/events?session_id={session_id}"))
+    assert {"type": "response.output_text.done", "text": "original"} in events
+
+
+def test_voice_events_resume_after_last_event_id(client, monkeypatch):
+    monkeypatch.setattr(voice_routes, "_stt", lambda audio, content_type="x": "тест")
+    monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: "ответ")
+    session_id = _closed_session(client)
+    run_worker(drain=True)
+
+    full = client.get(f"/api/voice/events?session_id={session_id}").get_data(as_text=True)
+    assert "id: 1\n" in full
+    resumed = client.get(
+        f"/api/voice/events?session_id={session_id}", headers={"Last-Event-ID": "2"}
+    )
+    body = resumed.get_data(as_text=True)
+    assert "id: 1\n" not in body and "id: 2\n" not in body
+    assert [event["type"] for event in _sse_events(resumed)] == [
+        "response.output_text.done",
+        "response.done",
+    ]
+
+
+def test_voice_closed_session_is_scoped_to_owner(client, monkeypatch):
+    monkeypatch.setattr(voice_routes, "get_current_owner_id", lambda required=False: "alice")
+    session_id = _closed_session(client)
+    monkeypatch.setattr(voice_routes, "get_current_owner_id", lambda required=False: "mallory")
+    assert client.get(f"/api/voice/output?session_id={session_id}").status_code == 403
+    assert client.post("/api/voice/close", json={"session_id": session_id}).status_code == 403

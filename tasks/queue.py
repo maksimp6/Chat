@@ -2,7 +2,8 @@
 
 Every backend has the same contract:
 
-- ``enqueue`` stores a job before returning, so it survives a web restart.
+- ``enqueue`` stores a job before returning, so it survives a web restart. An
+  explicit ``job_id`` that already exists raises ``DuplicateJobError``.
 - ``claim`` leases one job to a worker. A job whose lease expired (the worker
   died) is handed out again until ``max_attempts`` is spent, then marked failed.
 - ``complete``/``fail`` only succeed for the lease holder.
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import threading
 import time
 import uuid
@@ -28,6 +30,10 @@ RUNNING = "running"
 DONE = "done"
 FAILED = "failed"
 LEASE_EXPIRED_ERROR = "worker lease expired too many times"
+
+
+class DuplicateJobError(ValueError):
+    """A job with this id already exists; it is never enqueued twice."""
 
 
 def _now_ms() -> int:
@@ -51,6 +57,9 @@ class Job:
 
 class TaskQueue:
     """Interface shared by all queue backends."""
+
+    def prepare(self) -> None:
+        """Create storage the backend needs. Called once at process startup."""
 
     def enqueue(
         self,
@@ -109,6 +118,8 @@ class MemoryTaskQueue(TaskQueue):
             updated_at=now,
         )
         with self._lock:
+            if job.id in self._jobs:
+                raise DuplicateJobError(job.id)
             self._jobs[job.id] = job
             self._events.setdefault(job.id, [])
         return job.id
@@ -212,7 +223,10 @@ class SqlTaskQueue(TaskQueue):
         self._schema_ready = False
         self._schema_lock = threading.Lock()
 
-    def _conn(self):
+    def prepare(self) -> None:
+        self._connect_prepared().close()
+
+    def _connect_prepared(self):
         conn = self._connect()
         if not self._schema_ready:
             with self._schema_lock:
@@ -221,6 +235,11 @@ class SqlTaskQueue(TaskQueue):
                 conn.commit()
                 self._schema_ready = True
         return conn
+
+    def _conn(self):
+        # prepare() runs at web and worker startup; this fallback only matters
+        # for a queue used before startup (tests, scripts).
+        return self._connect_prepared()
 
     @staticmethod
     def _row_to_job(row) -> Job:
@@ -244,15 +263,18 @@ class SqlTaskQueue(TaskQueue):
         now = _now_ms()
         conn = self._conn()
         try:
-            conn.execute(
-                """
+            try:
+                conn.execute(
+                    """
                 INSERT INTO task_jobs
                 (job_id, kind, payload_json, status, attempts, max_attempts,
                  created_at, updated_at)
                 VALUES (?, ?, ?, ?, 0, ?, ?, ?)
                 """,
-                (job_id, kind, json.dumps(payload), QUEUED, max_attempts, now, now),
-            )
+                    (job_id, kind, json.dumps(payload), QUEUED, max_attempts, now, now),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise DuplicateJobError(job_id) from exc
             conn.commit()
         finally:
             conn.close()
@@ -408,6 +430,13 @@ redis.call('ZADD', KEYS[2], ARGV[2], id)
 return id
 """
 
+_REDIS_ENQUEUE = """
+if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
+redis.call('HSET', KEYS[1], unpack(ARGV, 2))
+redis.call('RPUSH', KEYS[2], ARGV[1])
+return 1
+"""
+
 _REDIS_FINISH = """
 if redis.call('HGET', KEYS[1], 'status') ~= 'running'
    or redis.call('HGET', KEYS[1], 'lease_owner') ~= ARGV[1] then
@@ -430,6 +459,7 @@ class RedisTaskQueue(TaskQueue):
         self._ready = f"{prefix}ready"
         self._leases = f"{prefix}leases"
         self._finished = f"{prefix}finished"
+        self._enqueue = client.register_script(_REDIS_ENQUEUE)
         self._claim = client.register_script(_REDIS_CLAIM)
         self._finish_script = client.register_script(_REDIS_FINISH)
 
@@ -446,24 +476,24 @@ class RedisTaskQueue(TaskQueue):
     def enqueue(self, kind, payload, *, job_id=None, max_attempts=3):
         job_id = job_id or uuid.uuid4().hex
         now = _now_ms()
-        pipe = self._redis.pipeline(transaction=True)
-        pipe.hset(
-            self._job_key(job_id),
-            mapping={
-                "kind": kind,
-                "payload": json.dumps(payload),
-                "status": QUEUED,
-                "attempts": 0,
-                "max_attempts": max_attempts,
-                "result": "",
-                "error": "",
-                "lease_owner": "",
-                "created_at": now,
-                "updated_at": now,
-            },
+        fields = {
+            "kind": kind,
+            "payload": json.dumps(payload),
+            "status": QUEUED,
+            "attempts": 0,
+            "max_attempts": max_attempts,
+            "result": "",
+            "error": "",
+            "lease_owner": "",
+            "created_at": now,
+            "updated_at": now,
+        }
+        created = self._enqueue(
+            keys=[self._job_key(job_id), self._ready],
+            args=[job_id, *(item for pair in fields.items() for item in pair)],
         )
-        pipe.rpush(self._ready, job_id)
-        pipe.execute()
+        if not created:
+            raise DuplicateJobError(job_id)
         return job_id
 
     def claim(self, worker_id, lease_seconds):

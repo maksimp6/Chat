@@ -36,7 +36,7 @@ Voice session IDs are random UUID-derived values. A session is scoped to the own
 
 ## Processing
 
-`POST /api/voice/close` enqueues a `voice.process` background job whose id is the session id, and returns. A task worker runs STT, chat and TTS and writes each event and the synthesized audio to the job, so `/api/voice/events` and `/api/voice/output` keep working after a web restart or on another replica. See [background tasks](runtime/background-tasks.md).
+`POST /api/voice/close` enqueues a `voice.process` background job whose id is the session id, and returns. A task worker runs STT, chat and TTS and writes each event and the synthesized audio to the job, so `/api/voice/events` and `/api/voice/output` keep working after a web restart or on another replica. Each SSE event carries its sequence number as `id`, and a reconnecting `EventSource` resumes after `Last-Event-ID` instead of replaying events. If the queue is unavailable, close returns 503 and keeps the uploaded audio so the client can retry. See [background tasks](runtime/background-tasks.md).
 
 ## Known scope
 

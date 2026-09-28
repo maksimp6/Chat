@@ -1,10 +1,12 @@
 # Background tasks
 
-Long-running work does not run in threads of the web process. A handler
-enqueues a job in a durable queue and returns; a task worker claims the job,
-runs it and records progress events and the result. The web container can then
-be stopped, restarted or scaled to zero on Cloud.ru Container Apps without
-losing accepted work (issue #444, epic #440).
+A request handler enqueues long-running work as a job in a durable queue and
+returns; a task worker claims the job, runs it and records progress events and
+the result. With `ALICE_TASK_WORKER=external` the worker is a separate process,
+so the web container can be stopped, restarted or scaled to zero on Cloud.ru
+Container Apps without losing accepted work (issue #444, epic #440). The default
+`inline` mode runs that worker as a thread of the web process, as a fallback for
+local and Termux installs.
 
 ## Pieces
 
@@ -50,7 +52,8 @@ a shared queue (`ALICE_REDIS_URL` or PostgreSQL) and a separate worker.
 Branch environment runtimes (`environment_manager.py`) still execute as threads
 of the process that started them, because they serve HTTP from loaded code. Their
 ownership is no longer only in memory: each `RUNNING` row stores
-`runtime_instance` and a `runtime_heartbeat_at` refreshed every 15 seconds. On
+`runtime_instance` and a `runtime_heartbeat_at` refreshed every 15 seconds by a
+heartbeat thread of its own, so long operations do not let the lease lapse. On
 startup an instance marks as `STOPPED` only runtimes whose owner is itself, is
 unknown, or has not sent a heartbeat within `ALICE_RUNTIME_LEASE_SECONDS`
 (default 60). Requests for a runtime that lives on another live instance fail

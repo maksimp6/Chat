@@ -139,6 +139,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO)
     load_task_modules()
+    get_task_queue().prepare()
     processed = run_worker(
         drain=args.drain,
         poll_interval=args.poll_interval,

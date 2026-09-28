@@ -396,9 +396,20 @@ def test_runtime_thread_sends_heartbeats_and_survives_failures(tmp_path, monkeyp
     monkeypatch.setattr(environment_manager, "_HEARTBEAT_SECONDS", 0.01)
     monkeypatch.setattr(environment_manager, "_record_heartbeat", record_heartbeat)
     runtime = _runtime(tmp_path, "runtime-heartbeat")
+    release = threading.Event()
+
+    def slow_operation(context, payload):
+        # Heartbeats keep flowing while the job thread is busy.
+        assert two_beats.wait(2)
+        release.set()
+        return "done"
+
+    register_runtime_operation("test.slow", slow_operation)
     runtime.start()
     try:
-        assert two_beats.wait(2)
+        assert dispatch_environment_operation(runtime.runtime_id, "test.slow", {}, timeout=3)
+        assert release.is_set()
     finally:
         runtime.stop()
     assert set(beats) == {"runtime-heartbeat"}
+    assert not runtime._heartbeat_thread.is_alive()

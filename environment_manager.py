@@ -416,6 +416,12 @@ class EnvironmentRuntime:
         )
         self._stream_lock = threading.RLock()
         self._active_streams: dict[threading.Event, queue.Queue] = {}
+        self._heartbeat_stop = threading.Event()
+        self._heartbeat_thread = threading.Thread(
+            target=self._heartbeat_loop,
+            name=f"alice-runtime-heartbeat-{self.runtime_id[:8]}",
+            daemon=True,
+        )
 
     @property
     def thread_id(self) -> Optional[int]:
@@ -468,6 +474,7 @@ class EnvironmentRuntime:
                 root=str(self.data_dir),
             )
             self._thread.start()
+            self._heartbeat_thread.start()
             for _ in range(100):
                 if self._thread.ident is not None:
                     return int(self._thread.ident)
@@ -538,6 +545,9 @@ class EnvironmentRuntime:
                 events.put_nowait(("end",))
             except queue.Full:
                 pass
+        self._heartbeat_stop.set()
+        if self._heartbeat_thread.is_alive():
+            self._heartbeat_thread.join(timeout=5)
         if self._thread.is_alive():
             self._jobs.put(_RUNTIME_STOP)
             self._thread.join(timeout=5)
@@ -568,16 +578,14 @@ class EnvironmentRuntime:
         except Exception:
             logger.exception("Runtime %s heartbeat failed", self.runtime_id)
 
+    def _heartbeat_loop(self) -> None:
+        # Separate from the job thread so a long operation cannot let the lease lapse.
+        while not self._heartbeat_stop.wait(_HEARTBEAT_SECONDS):
+            self._heartbeat()
+
     def _run(self) -> None:
-        last_heartbeat = time.monotonic()
         while True:
-            if time.monotonic() - last_heartbeat >= _HEARTBEAT_SECONDS:
-                self._heartbeat()
-                last_heartbeat = time.monotonic()
-            try:
-                job = self._jobs.get(timeout=_HEARTBEAT_SECONDS)
-            except queue.Empty:
-                continue
+            job = self._jobs.get()
             if job is _RUNTIME_STOP:
                 return
             kind = job[0]
