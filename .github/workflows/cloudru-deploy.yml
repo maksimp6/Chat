@@ -1,23 +1,27 @@
-name: Cloud.ru Container Apps deployment
+name: Cloud.ru Workflow Studio deployment
 
 on:
+  push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
-      ref:
-        description: Branch, tag, or commit to deploy
-        required: true
-        default: master
-        type: string
       action:
-        description: What to do
+        description: Cloud.ru Services operation
         required: true
         default: deploy
         type: choice
         options:
-          - preflight
           - deploy
           - status
-          - estimate
+          - preflight
+      ref:
+        description: Cloud.ru source branch (production is locked to master)
+        required: true
+        default: master
+        type: choice
+        options:
+          - master
 
 concurrency:
   group: alice-cloudru
@@ -28,102 +32,89 @@ permissions:
 
 jobs:
   cloudru:
-    name: Cloud.ru ${{ inputs.action }}
+    name: Cloud.ru Services
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
-      CLOUDRU_REGISTRY_NAME: ${{ vars.CLOUDRU_REGISTRY_NAME || 'alice-pro' }}
-      CLOUDRU_REPOSITORY_NAME: ${{ vars.CLOUDRU_REPOSITORY_NAME || 'alice-pro' }}
-      CLOUDRU_CONTAINER_NAME: ${{ vars.CLOUDRU_CONTAINER_NAME || 'alice-pro' }}
-      CLOUDRU_CONTAINER_CPU: ${{ vars.CLOUDRU_CONTAINER_CPU || '0.5' }}
-      CLOUDRU_MIN_INSTANCES: ${{ vars.CLOUDRU_MIN_INSTANCES || '0' }}
-      CLOUDRU_MAX_INSTANCES: ${{ vars.CLOUDRU_MAX_INSTANCES || '1' }}
+      CLOUDRU_WORKFLOW_API_URL: ${{ vars.CLOUDRU_WORKFLOW_API_URL || 'https://pipeline.cloud.ru/public-api/v1' }}
+      CLOUDRU_WORKFLOW_APP_ID: ${{ vars.CLOUDRU_WORKFLOW_APP_ID }}
+      CLOUDRU_WORKFLOW_API_KEY: ${{ secrets.CLOUDRU_WORKFLOW_API_KEY }}
+      ACTION: ${{ github.event_name == 'push' && 'deploy' || inputs.action }}
+      DEPLOY_REF: ${{ github.event_name == 'push' && github.ref_name || inputs.ref }}
     steps:
-      - name: Check out ref
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ inputs.ref }}
-          fetch-depth: 0
-      - name: Require a commit on master
-        run: |
-          # Only reviewed code that has landed on master may run, before anything is
-          # installed or any secret is in scope.
-          git fetch --no-tags origin master
-          git merge-base --is-ancestor HEAD FETCH_HEAD
       - name: Validate configuration
-        if: inputs.action != 'estimate'
-        env:
-          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
-          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
-          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
-          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
-          ALICE_GITHUB_CLIENT_ID: ${{ secrets.ALICE_GITHUB_CLIENT_ID }}
-          ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.ALICE_GITHUB_CLIENT_SECRET }}
-          ACTION: ${{ inputs.action }}
+        id: configuration
+        shell: bash
         run: |
-          required=(CLOUDRU_IAM_KEY_ID CLOUDRU_IAM_KEY_SECRET CLOUDRU_PROJECT_ID)
-          if [ "$ACTION" = deploy ] || [ "$ACTION" = preflight ]; then
-            required+=(ALICE_SHORT_TOKEN ALICE_DATABASE_URL ALICE_GITHUB_CLIENT_ID ALICE_GITHUB_CLIENT_SECRET)
-          fi
+          set -euo pipefail
+
           missing=()
-          for name in "${required[@]}"; do
+          for name in CLOUDRU_PROJECT_ID CLOUDRU_WORKFLOW_APP_ID; do
             if [ -z "${!name:-}" ]; then missing+=("$name"); fi
           done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            printf '::error::Missing deployment configuration: %s\n' "${missing[*]}"
+          if [ "$ACTION" != preflight ] && [ -z "${CLOUDRU_WORKFLOW_API_KEY:-}" ]; then
+            missing+=(CLOUDRU_WORKFLOW_API_KEY)
+          fi
+
+          if [ "$DEPLOY_REF" != master ]; then
+            echo '::error::Cloud.ru production source is locked to master.'
             exit 1
           fi
-          if [ "$ACTION" = deploy ] || [ "$ACTION" = preflight ]; then
-            case "$ALICE_DATABASE_URL" in
-              postgres://*|postgresql://*) ;;
-              *) echo '::error::ALICE_DATABASE_URL must select durable PostgreSQL'; exit 1 ;;
-            esac
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            if [ "${GITHUB_EVENT_NAME}" = push ]; then
+              printf '::warning::Cloud.ru Workflow Studio is not configured; skipped deployment. Missing: %s\n' "${missing[*]}"
+              echo 'configured=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            printf '::error::Missing Cloud.ru Workflow Studio configuration: %s\n' "${missing[*]}"
+            exit 1
           fi
-          echo 'Configuration validated; no secret values displayed.'
-      - name: Set up Python
-        if: inputs.action != 'preflight'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version-file: .python-version
-      - name: Install dependencies
-        if: inputs.action != 'preflight'
-        run: pip install -r requirements.txt -r requirements-postgres.txt
-      - name: Deploy
-        if: inputs.action == 'deploy'
-        env:
-          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
-          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
-          ALICE_REQUIRE_SHORT_TOKEN: "1"
-          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
-          ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
-          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
-          ALICE_GITHUB_CLIENT_ID: ${{ secrets.ALICE_GITHUB_CLIENT_ID }}
-          ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.ALICE_GITHUB_CLIENT_SECRET }}
-          ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
+
+          echo 'configured=true' >> "$GITHUB_OUTPUT"
+          echo 'Cloud.ru configuration validated; no secret values displayed.'
+
+      - name: Call Cloud.ru Services
+        if: steps.configuration.outputs.configured == 'true' && env.ACTION != 'preflight'
+        shell: bash
         run: |
-          # Pass only the app variables that are configured, by name; values never hit the log.
-          env_args=(--env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN --env ALICE_DATABASE_URL)
-          env_args+=(--env ALICE_GITHUB_CLIENT_ID --env ALICE_GITHUB_CLIENT_SECRET --env ALICE_GITHUB_ALLOWED_IDS)
-          for name in ALICE_PROVIDER_CREDENTIAL_KEY; do
-            if [ -n "${!name}" ]; then env_args+=(--env "$name"); else unset "$name"; fi
-          done
-          set -o pipefail
-          python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" "${env_args[@]}" | tee deploy.json
+          set -euo pipefail
+
+          base_url="${CLOUDRU_WORKFLOW_API_URL%/}/project/${CLOUDRU_PROJECT_ID}/application/${CLOUDRU_WORKFLOW_APP_ID}"
+          curl_args=(
+            --fail-with-body
+            --silent
+            --show-error
+            --request
+          )
+
+          case "$ACTION" in
+            deploy)
+              curl_args+=(POST "$base_url/deployment")
+              curl_args+=(--header 'Content-Type: application/json' --data '{}')
+              ;;
+            status)
+              curl_args+=(GET "$base_url")
+              ;;
+            *)
+              echo "::error::Unsupported Cloud.ru operation: $ACTION"
+              exit 1
+              ;;
+          esac
+
+          curl_args+=(
+            --header "X-API-KEY: ${CLOUDRU_WORKFLOW_API_KEY}"
+            --header 'Accept: application/json'
+          )
+          "${curl_args[@]}" | tee cloudru-services.json
+
           {
-            echo '### Cloud.ru deploy'
+            echo '### Cloud.ru Workflow Studio'
+            echo "Operation: $ACTION"
+            echo "Source: public GitHub repository, branch $DEPLOY_REF"
             echo '```json'
-            cat deploy.json
+            cat cloudru-services.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Status
-        if: inputs.action == 'status'
-        env:
-          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
-          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
-        run: python scripts/cloudru_deploy.py status
-      - name: Estimate
-        if: inputs.action == 'estimate'
-        run: python scripts/cloudru_deploy.py estimate

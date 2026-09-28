@@ -16,6 +16,7 @@
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
+- [Деплой через Cloud.ru Workflow Studio](integrations/cloudru-workflow-studio.md) — Cloud.ru получает исходники из GitHub и собирает Container App
 - [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
