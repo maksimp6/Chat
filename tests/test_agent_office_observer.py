@@ -188,7 +188,13 @@ def test_ready_pr_without_reviews_and_quiet_drafts():
     codex_asked = build_thread(
         pr_item(hours_ago=3), [comment("maksimp6", "@codex review", 2)], pull()
     )
-    assert "no_codex_check" not in kinds(detect_findings(codex_asked, NOW))
+    assert "no_codex_check" in kinds(detect_findings(codex_asked, NOW))
+    codex_reviewed = build_thread(
+        pr_item(hours_ago=3),
+        [comment("maksimp6", "@codex review", 2), review("chatgpt-codex-connector[bot]", 1)],
+        pull(),
+    )
+    assert "no_codex_check" not in kinds(detect_findings(codex_reviewed, NOW))
     draft = build_thread(pr_item(hours_ago=30), [], pull(draft=True))
     assert kinds(detect_findings(draft, NOW)) == ["stale"]
 
@@ -196,7 +202,7 @@ def test_ready_pr_without_reviews_and_quiet_drafts():
 def test_long_pending_checks_and_behind_base():
     thread = build_thread(
         pr_item(),
-        [review("Copilot", 5), comment("maksimp6", "@codex review", 5)],
+        [review("Copilot", 5), comment("chatgpt-codex-connector[bot]", "Looks good", 5)],
         pull(mergeable_state="behind"),
         [run("tests", None, "queued", hours_ago=3)],
     )
@@ -466,3 +472,43 @@ def test_main_reports_api_errors_and_tracking_issue(monkeypatch, capsys):
     )
     assert observer.main(["--repo", "o/r", "--publish"]) == 0
     assert "Tracking issue: https://github.com/o/r/issues/1" in capsys.readouterr().err
+
+
+def test_codex_authored_pr_still_needs_a_codex_test_check():
+    commit = {
+        "event": "committed",
+        "author": {"name": "chatgpt-codex-connector[bot]", "date": ts(4)},
+        "message": "test: add cases",
+    }
+    item = pr_item(hours_ago=4)
+    item["user"] = {"login": "chatgpt-codex-connector[bot]"}
+    thread = build_thread(item, [commit], pull(ref="codex/tests"))
+    assert thread.owner_agent == "codex"
+    assert "no_codex_check" in kinds(detect_findings(thread, NOW))
+
+
+def test_copilot_unassigned_before_answering_cancels_the_dispatch():
+    def assignment(event, hours_ago):
+        return {
+            "event": event,
+            "actor": {"login": "maksimp6"},
+            "assignee": {"login": "Copilot"},
+            "created_at": ts(hours_ago),
+        }
+
+    thread = build_thread(issue(), [assignment("assigned", 5), assignment("unassigned", 4)])
+    assert thread.dispatches == []
+    assert thread.owner_agent == "human"
+    assert detect_findings(thread, NOW) == []
+
+
+def test_digest_escapes_actor_names():
+    commit = {
+        "event": "committed",
+        "author": {"name": "@claude <b>x</b>", "date": ts(1)},
+        "message": "fix",
+    }
+    bot_commit = dict(commit, author={"name": "claude[bot] <i>", "date": ts(1)})
+    digest = render_digest([build_thread(issue(), [commit, bot_commit])], [], NOW, "o/r")
+    assert not re.search(r"@(claude|codex|alice)\b", digest)
+    assert "<b>" not in digest and "<i>" not in digest

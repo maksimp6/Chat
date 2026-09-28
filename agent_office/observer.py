@@ -78,6 +78,7 @@ class Event:
     agent: str
     action: str
     url: str = ""
+    kind: str = ""
 
 
 @dataclass
@@ -204,6 +205,7 @@ def timeline_event(raw: dict[str, Any]) -> Event | None:
                 classify_actor(author, message),
                 f"коммит «{_first_line(message)}»",
                 raw.get("html_url") or "",
+                kind,
             )
             if at
             else None
@@ -257,7 +259,7 @@ def timeline_event(raw: dict[str, Any]) -> Event | None:
         actor = actor or "Copilot"
     else:
         return None
-    return Event(at, actor, classify_actor(actor, body), action, url)
+    return Event(at, actor, classify_actor(actor, body), action, url, kind)
 
 
 def build_thread(
@@ -324,6 +326,9 @@ def build_thread(
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
                 thread.dispatches.append(("copilot", event.at))
+        elif not is_pr and kind == "unassigned":
+            if classify_login(_login(raw.get("assignee"))) == "copilot":
+                thread.dispatches = [d for d in thread.dispatches if d[0] != "copilot"]
         elif not is_pr and kind == "labeled":
             if (raw.get("label") or {}).get("name") == "alice":
                 thread.dispatches.append(("alice", event.at))
@@ -386,8 +391,10 @@ def _has_copilot_review(thread: Thread) -> bool:
 
 
 def _has_codex_check(thread: Thread) -> bool:
+    """Codex's own bot answered with a review or comment; a request or a Codex commit is not one."""
     return any(
-        event.agent == "codex" or "@codex review" in event.action.lower() for event in thread.events
+        event.kind in {"reviewed", "commented"} and classify_login(event.actor) == "codex"
+        for event in thread.events
     )
 
 
@@ -566,9 +573,9 @@ def render_digest(
             lines.append(f"- … ещё {len(thread.events) - len(shown)} шагов раньше")
         for event in shown:
             who = AGENT_LABELS.get(event.agent, event.agent)
-            actor = f" ({event.actor})" if event.actor and event.agent != "human" else ""
+            actor = f" ({_escape(event.actor)})" if event.actor and event.agent != "human" else ""
             if event.agent == "human":
-                who = event.actor or who
+                who = _escape(event.actor) or who
             lines.append(f"- {event.at:%m-%d %H:%M} **{who}**{actor}: {_escape(event.action)}")
         lines += ["", "</details>"]
 
