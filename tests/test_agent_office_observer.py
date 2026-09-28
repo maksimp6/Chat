@@ -512,3 +512,34 @@ def test_digest_escapes_actor_names():
     digest = render_digest([build_thread(issue(), [commit, bot_commit])], [], NOW, "o/r")
     assert not re.search(r"@(claude|codex|alice)\b", digest)
     assert "<b>" not in digest and "<i>" not in digest
+
+
+def test_cross_reference_keeps_the_referencing_actor():
+    signed = {"number": 7, "title": "t", "body": "x" + CLAUDE_FOOTER, "user": {"login": "maksimp6"}}
+    by_person = {
+        "event": "cross-referenced",
+        "actor": {"login": "someone"},
+        "created_at": ts(1),
+        "source": {"issue": signed},
+    }
+    assert observer.timeline_event(by_person).agent == "human"
+    anonymous = dict(by_person, actor=None)
+    event = observer.timeline_event(anonymous)
+    assert (event.actor, event.agent) == ("maksimp6", "claude")
+
+
+def test_only_pending_runs_date_the_checks():
+    thread = build_thread(
+        pr_item(),
+        [review("Copilot", 5), review("chatgpt-codex-connector[bot]", 5)],
+        pull(),
+        [run("old", "success", hours_ago=10), run("new", None, "queued", hours_ago=0.5)],
+    )
+    assert thread.checks_started_at == NOW - timedelta(hours=0.5)
+    assert detect_findings(thread, NOW) == []
+
+
+def test_finding_messages_are_escaped_in_the_digest():
+    thread = build_thread(pr_item(), [], pull(), [run("@claude <b>", "failure")])
+    digest = render_digest([thread], detect_findings(thread, NOW), NOW, "o/r")
+    assert not re.search(r"@claude\b", digest) and "<b>" not in digest

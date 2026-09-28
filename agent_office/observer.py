@@ -242,8 +242,10 @@ def timeline_event(raw: dict[str, Any]) -> Event | None:
         label = "PR" if "pull_request" in source else "issue"
         action = f"упомянут в {label} #{source.get('number')} «{_first_line(source.get('title'))}»"
         url = source.get("html_url") or url
-        actor = actor or _login(source.get("user"))
-        body = source.get("body") or ""
+        if not actor:
+            # Fall back to the referencing item's author, signed footer included.
+            actor = _login(source.get("user"))
+            body = source.get("body") or ""
     elif kind in {"merged", "closed", "reopened", "ready_for_review", "convert_to_draft"}:
         action = {
             "merged": "смержил",
@@ -341,7 +343,12 @@ def build_thread(
         name = run.get("name") or "check"
         thread.checks[name] = run.get("conclusion") or run.get("status") or "queued"
         started = parse_time(run.get("started_at"))
-        if started and (thread.checks_started_at is None or started < thread.checks_started_at):
+        pending = not run.get("conclusion")
+        if (
+            pending
+            and started
+            and (thread.checks_started_at is None or started < thread.checks_started_at)
+        ):
             thread.checks_started_at = started
 
     thread.events.sort(key=lambda event: event.at)
@@ -530,7 +537,7 @@ def render_digest(
             lines.append(
                 f"- {SEVERITY_ICONS[head.severity]} [#{number}]({head.url}) {_escape(head.title)} "
                 f"({AGENT_LABELS.get(head.agent, head.agent)}): "
-                + "; ".join(f.message for f in group)
+                + "; ".join(_escape(f.message) for f in group)
             )
     else:
         lines.append("Всё идёт по плану, зависших задач нет.")

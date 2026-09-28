@@ -12,7 +12,8 @@ Every hour `.github/workflows/agent-observer.yml` runs it. It:
    token);
 3. flags stuck work: red CI, merge conflicts, a ready PR without a Copilot review
    or a Codex test check, a green reviewed PR nobody merged, checks pending too
-   long, an agent silent after it was given a task, and items idle for a day;
+   long, an agent silent after it was given a task, and PRs or agent tasks idle for a
+   day (issues nobody handed to an agent are backlog, not stuck work);
 4. replaces the body of the open issue labelled `agent-observer` with the digest
    (the issue is created on the first run) and uploads the threads as JSON.
 
