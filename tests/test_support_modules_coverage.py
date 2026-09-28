@@ -30,7 +30,6 @@ def test_agent_context_builds_memory_prompt_and_limits_history(monkeypatch):
     assert "Alice Pro" in default_prompt[0]["text"]
 
 
-
 def _create_archive_database(path, rows=()):
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE messages (id INTEGER, content TEXT, created_at TEXT)")
