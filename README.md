@@ -36,7 +36,9 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-The current `master` contains the merged trace, billing and Alice-agent work from PRs [#404](https://github.com/maksimp6/Chat/pull/404), [#407](https://github.com/maksimp6/Chat/pull/407), [#402](https://github.com/maksimp6/Chat/pull/402) and [#405](https://github.com/maksimp6/Chat/pull/405), plus the later restoration of the #407 tree. Master is protected: production changes go through a PR, CI/status checks, review and post-merge verification. The configured protection currently has the status-check gate enabled; named required check contexts must be added when the repository's CI check names are finalized.
+As of 2026-09-28, `master` includes the `invocation/` and `browser/` package moves, canonical CLI and GitHub-agent lifecycle work, removal of unused agent loops and Supabase, GitHub App identity support for Alice, and optional GitHub sign-in ([changelog](docs/changelog.md)). These are repository changes, not evidence that the public deployment or external MCP connection has been verified. Master is protected: production changes go through a PR, CI/status checks, review and post-merge verification. The configured protection currently has the status-check gate enabled; named required check contexts must be added when the repository's CI check names are finalized.
+
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Container Apps deployment, Object Storage, durable background workers and complete PostgreSQL compatibility remain work in progress; an open implementation PR does not establish production readiness.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -52,11 +54,10 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 ### Prerequisites
 
-- Python 3.12
-- Java 17
-- Android SDK with API 37
-- Git
-- Optional PostgreSQL 17
+- Python: backend CI uses 3.14; Ruff targets 3.12.
+- Git.
+- Optional PostgreSQL 17, with `requirements-postgres.txt`.
+- For Android builds only: Android SDK API 37 and Gradle 9.5.0. CI runs Gradle with Java 25 and stages the embedded runtime with Python 3.13; the Android module declares JVM toolchain 17.
 
 ### Backend
 
@@ -65,12 +66,11 @@ python3 -m venv venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
-python app.py
 ```
 
-Open `http://localhost:8080`.
+Copy `.env.example` only for a fresh installation. Replace its placeholders and remove unused integration examples before starting. For local development, set `HOST=127.0.0.1` and configure a persistent `ALICE_PROVIDER_CREDENTIAL_KEY` before saving provider credentials.
 
-At minimum, configure `YANDEX_API_KEY`, `YANDEX_PROJECT_ID`, `YANDEX_BASE_URL`, `SECRET_KEY` and `ALICE_OWNER_ID`. Do not put provider credentials in frontend configuration.
+Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
 SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL` only when selecting PostgreSQL.
 
@@ -78,7 +78,8 @@ SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL
 
 ```bash
 cd android
-./gradlew :app:testDebugUnitTest :app:assembleDebug
+python scripts/stage_python.py
+gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
 The debug APK is for development/testing. Release signing keys must never be committed.
@@ -107,7 +108,9 @@ Keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTIN
 ```bash
 python -m compileall -q .
 pytest -q
-cd android && ./gradlew :app:testDebugUnitTest :app:assembleDebug
+cd android
+python scripts/stage_python.py
+gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
 For frontend/runtime work, preserve the progressive-enhancement path and BrowserShim/VM tests. Do not introduce Playwright as a runtime dependency. Browser Emulator/self-testing work is tracked in [#409](https://github.com/maksimp6/Chat/issues/409).
@@ -117,7 +120,7 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [Documentation index](docs/README.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Integration coordination](docs/architecture/integration-coordination.md)
-- [Current scope](docs/current-scope.md)
+- [Current scope](docs/integration/current-scope.md)
 - [API overview](docs/api/overview.md)
 - [MCP overview](docs/mcp/overview.md)
 - [Agent architecture](docs/agents/overview.md)
@@ -131,7 +134,7 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 
 ## Active issues and expected work
 
-The main coordination issue is [#343](https://github.com/maksimp6/Chat/issues/343). Related scope includes:
+Cloud.ru migration is coordinated in [#440](https://github.com/maksimp6/Chat/issues/440); canonical AI execution and repository layout are tracked in [#433](https://github.com/maksimp6/Chat/issues/433) and [#430](https://github.com/maksimp6/Chat/issues/430). Earlier architecture coordination remains in [#343](https://github.com/maksimp6/Chat/issues/343). Related scope includes:
 
 - [#350](https://github.com/maksimp6/Chat/issues/350) — canonical one-process runtime architecture;
 - [#351](https://github.com/maksimp6/Chat/issues/351) — integration staging and dependency order;
