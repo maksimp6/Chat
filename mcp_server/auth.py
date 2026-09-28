@@ -40,7 +40,7 @@ def _protected_resource_url() -> Optional[str]:
 def _www_authenticate() -> Optional[str]:
     resource = _protected_resource_url()
     if resource:
-        return f'******"{resource}"'
+        return "Bearer " + f'resource_metadata="{resource}"'
     return "Bearer"
 
 
