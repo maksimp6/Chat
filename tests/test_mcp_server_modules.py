@@ -203,7 +203,7 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
     fake_post.payloads = [
         {"active": False},
         {"active": True, "scope": "other", "sub": "user-1"},
-        {"active": True, "scope": protocol.OAUTH_SCOPE, "sub": ""},
+        {"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-3"},
     ]
 
     monkeypatch.setitem(sys.modules, "requests", SimpleNamespace(post=fake_post))
@@ -217,7 +217,7 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
         auth._introspect_token("token-1")
     with pytest.raises(PermissionError, match="required scope"):
         auth._introspect_token("token-2")
-    assert auth._introspect_token("token-3") is None
+    assert auth._introspect_token("token-3") == "user-3"
 
     request_call = calls[0]
     assert request_call[0] == "https://issuer.example/introspect"
