@@ -27,7 +27,7 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
    (push) and Container Apps (admin) roles, and issue an access key.
 2. In GitHub, create the `cloudru` environment with:
    - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `ALICE_SHORT_TOKEN`,
-     and optionally `ALICE_PROVIDER_CREDENTIAL_KEY`, `SUPABASE_URL`,
+     and optionally `ALICE_PROVIDER_CREDENTIAL_KEY`, `ALICE_DATABASE_URL`, `SUPABASE_URL`,
      `SUPABASE_SECRET_KEY`;
    - variable `CLOUDRU_PROJECT_ID`, and optionally `CLOUDRU_REGISTRY_NAME`,
      `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,
@@ -55,9 +55,14 @@ The first request after idle pays a cold start.
 
 ## Known limitations
 
-- **State is ephemeral.** SQLite lives in the container filesystem and is lost on
-  every new revision or restart. Set `ALICE_DATABASE_URL` to Managed PostgreSQL
-  before relying on this for production data.
+- **State is ephemeral without Postgres.** SQLite lives in the container
+  filesystem and is lost whenever the instance sleeps or a new revision starts.
+  Store `ALICE_DATABASE_URL` (Cloud.ru Managed PostgreSQL) as a secret; the
+  deploy passes it through and the existing Postgres backend takes over.
+- **In-process state is lost on sleep.** Branch environment runtimes (git
+  worktrees under `.alice-environments`), voice sessions, and uploaded files
+  live in the container. Keep `CLOUDRU_MAX_INSTANCES=1` until they move to
+  Postgres/Object Storage, or requests may land on an instance without them.
 - **Scale to zero stops background work.** Background threads and SSH runtime
   containers stop when the instance sleeps; they need to move to request-driven
   work or Container Apps jobs.
