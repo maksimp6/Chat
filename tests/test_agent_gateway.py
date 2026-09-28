@@ -2,7 +2,7 @@ import json
 import time
 from urllib.error import HTTPError
 import pytest
-from agent_gateway import (
+from agents.gateway import (
     A2AClient,
     A2AClientConfig,
     A2AProtocolError,
