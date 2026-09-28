@@ -18,8 +18,6 @@ LEGACY_ROOT_PYTHON = {
     "api_contracts.py",
     "archiver.py",
     "billing.py",
-    "browser_adapters.py",
-    "browser_capabilities.py",
     "budget_controller.py",
     "budget_repository.py",
     "chatgpt_mcp.py",
@@ -139,3 +137,14 @@ def test_invocation_modules_live_in_package_not_repository_root():
     assert (package / "context.py").is_file()
     assert (package / "manager.py").is_file()
     assert (package / "trace.py").is_file()
+
+
+def test_browser_modules_live_in_package_not_repository_root():
+    legacy_names = {"browser_adapters.py", "browser_capabilities.py"}
+    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
+    assert not still_in_root, f"Browser modules still in root: {still_in_root}"
+
+    package = ROOT / "browser"
+    assert (package / "__init__.py").is_file()
+    assert (package / "adapters.py").is_file()
+    assert (package / "capabilities.py").is_file()

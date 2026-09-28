@@ -1,7 +1,7 @@
 import pytest
 
-from browser_adapters import BrowserAdapterRegistry, register_browser_tools
-from browser_capabilities import BrowserAction
+from browser.adapters import BrowserAdapterRegistry, register_browser_tools
+from browser.capabilities import BrowserAction
 from universal_tool_platform import UniversalToolExecutor
 
 

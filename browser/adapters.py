@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
-from browser_capabilities import (
+from .capabilities import (
     BROWSER_CAPABILITY_CONTRACTS,
     BrowserAction,
     sanitize_browser_value,

@@ -7,7 +7,7 @@ capabilities for Alice:
 - `browser_local` uses the project Browser Emulator/BrowserShim scope and never
   the user's real browser profile.
 
-The contract layer lives in `browser_capabilities.py`. It does not contain a
+The contract layer lives in `browser/capabilities.py`. It does not contain a
 browser driver. Adapters must expose their tool through `UniversalToolExecutor`
 and preserve `InvocationContext`/`ExecutionTrace` correlation.
 
