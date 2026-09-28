@@ -12,9 +12,11 @@ import hashlib
 import json
 import re
 import secrets
+import sqlite3
 import time
 import uuid
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 from db import get_conn
 
@@ -79,7 +81,7 @@ def init_user_identity_table() -> None:
 
 def register_anonymous_user(
     installation_id: str,
-    metadata: Optional[Mapping[str, Any]] = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     installation_id = str(installation_id or "").strip()
     if not _INSTALLATION_RE.fullmatch(installation_id):
@@ -150,7 +152,7 @@ def register_anonymous_user(
         conn.close()
 
 
-def authenticate_user_token(token: str) -> Optional[str]:
+def authenticate_user_token(token: str) -> str | None:
     token = str(token or "").strip()
     if not token:
         return None
@@ -168,7 +170,7 @@ def authenticate_user_token(token: str) -> Optional[str]:
     return str(row["id"]) if row else None
 
 
-def get_anonymous_user(user_id: str) -> Optional[dict[str, Any]]:
+def get_anonymous_user(user_id: str) -> dict[str, Any] | None:
     init_user_identity_table()
     conn = get_conn()
     try:
@@ -218,25 +220,18 @@ def init_github_accounts_table() -> None:
         conn.close()
 
 
-def sign_in_with_github(
-    github_id: Any,
+def _github_installation_id(github_id: str) -> str:
+    # Random suffix: bootstrap accepts client-chosen ids, so a fixed one could collide.
+    return f"github-{github_id}-{uuid.uuid4().hex}"
+
+
+def _link_github_account(
+    github_id: str,
     login: str,
-    current_user_id: Optional[str] = None,
-) -> dict[str, Any]:
-    """Resolve the Alice user for a verified GitHub account and issue a fresh token.
-
-    A GitHub account already linked to a user always signs in as that user.
-    Otherwise it is linked to ``current_user_id`` (the anonymous user of this
-    browser, so its history is kept) or to a new user.
-    """
-    github_id = str(github_id or "").strip()
-    login = str(login or "").strip()
-    if not github_id.isdigit() or not login:
-        raise ValueError("invalid github account")
-
-    init_github_accounts_table()
+    current_user_id: str | None,
+    auth_token: str,
+) -> tuple[str, bool]:
     now = _now()
-    auth_token = _new_auth_token()
     conn = get_conn()
     try:
         link = conn.execute(
@@ -261,6 +256,12 @@ def sign_in_with_github(
                 ).fetchone()
                 if row is not None:
                     user_id = str(row["id"])
+                    # Retiring the installation id stops anonymous bootstrap from
+                    # minting tokens for the promoted user.
+                    conn.execute(
+                        "UPDATE users SET installation_id = ? WHERE id = ?",
+                        (_github_installation_id(github_id), user_id),
+                    )
             if user_id is None:
                 user_id = str(uuid.uuid4())
                 new_user = True
@@ -268,7 +269,7 @@ def sign_in_with_github(
                     """INSERT INTO users
                        (id, installation_id, status, metadata_json, created_at, updated_at)
                        VALUES (?, ?, 'github', '{}', ?, ?)""",
-                    (user_id, f"github-{github_id}", now, now),
+                    (user_id, _github_installation_id(github_id), now, now),
                 )
             conn.execute(
                 """INSERT INTO github_accounts (github_id, user_id, login, created_at, updated_at)
@@ -276,17 +277,42 @@ def sign_in_with_github(
                 (github_id, user_id, login, now, now),
             )
 
-        # Retiring the installation id stops anonymous bootstrap from minting
-        # tokens for the promoted user; that installation gets a fresh user.
         conn.execute(
-            """UPDATE users
-               SET status = 'github', installation_id = ?, auth_token_hash = ?, updated_at = ?
-               WHERE id = ?""",
-            (f"github-{github_id}", _hash_auth_token(auth_token), now, user_id),
+            "UPDATE users SET status = 'github', auth_token_hash = ?, updated_at = ? WHERE id = ?",
+            (_hash_auth_token(auth_token), now, user_id),
         )
         conn.commit()
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+    return user_id, new_user
+
+
+def sign_in_with_github(
+    github_id: Any,
+    login: str,
+    current_user_id: str | None = None,
+) -> dict[str, Any]:
+    """Resolve the Alice user for a verified GitHub account and issue a fresh token.
+
+    A GitHub account already linked to a user always signs in as that user.
+    Otherwise it is linked to ``current_user_id`` (the anonymous user of this
+    browser, so its history is kept) or to a new user.
+    """
+    github_id = str(github_id or "").strip()
+    login = str(login or "").strip()
+    if not github_id.isdigit() or not login:
+        raise ValueError("invalid github account")
+
+    init_github_accounts_table()
+    auth_token = _new_auth_token()
+    try:
+        user_id, new_user = _link_github_account(github_id, login, current_user_id, auth_token)
+    except sqlite3.IntegrityError:
+        # A concurrent sign-in created the link first; the retry signs in as it.
+        user_id, new_user = _link_github_account(github_id, login, current_user_id, auth_token)
 
     return {
         "user_id": user_id,
@@ -296,7 +322,7 @@ def sign_in_with_github(
     }
 
 
-def get_github_login(user_id: str) -> Optional[str]:
+def get_github_login(user_id: str) -> str | None:
     init_github_accounts_table()
     conn = get_conn()
     try:

@@ -16,8 +16,8 @@ log() { printf '[production] %s\n' "$*"; }
 die() { printf '[production] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # Secrets arrive on stdin, one per line, so they never appear in process
-# arguments: the short token, then the optional GitHub OAuth App client id and
-# client secret. Values already in the environment win.
+# arguments: the short token, then the optional GitHub OAuth App client id,
+# client secret and allowed logins. Values already in the environment win.
 require_runtime_secret() {
   local line
   IFS= read -r line || true
@@ -26,6 +26,8 @@ require_runtime_secret() {
   ALICE_GITHUB_CLIENT_ID="${ALICE_GITHUB_CLIENT_ID:-$line}"
   IFS= read -r line || true
   ALICE_GITHUB_CLIENT_SECRET="${ALICE_GITHUB_CLIENT_SECRET:-$line}"
+  IFS= read -r line || true
+  ALICE_GITHUB_ALLOWED_LOGINS="${ALICE_GITHUB_ALLOWED_LOGINS:-$line}"
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
 

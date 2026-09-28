@@ -1,6 +1,5 @@
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy" / "production" / "server.sh"
@@ -99,7 +98,7 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         "ALICE_SHORT_TOKEN": "short-token-value",
         "ALICE_GITHUB_CLIENT_ID": "client-id-value",
         "ALICE_GITHUB_CLIENT_SECRET": "client-secret-value",
-        "ALICE_GITHUB_ALLOWED_LOGINS": "maksimp6",
+        "ALICE_GITHUB_ALLOWED_LOGINS": "maksimp6,o'brien;x",
     }
     result = subprocess.run(
         ["bash", "-c", deploy_line], env=env, capture_output=True, text=True, check=False
@@ -109,9 +108,10 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         "short-token-value",
         "client-id-value",
         "client-secret-value",
-        "maksimp6",
+        "maksimp6,o'brien;x",
     ]
     assert "short-token-value" not in deploy_line
+    assert "ALLOWED_LOGINS'" not in deploy_line
     assert "$token" not in deploy_line
 
     # Without GitHub secrets the token still arrives and OAuth stays empty.
@@ -125,5 +125,5 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         "short-token-value",
         "",
         "",
-        "maksimp6",
+        "maksimp6,o'brien;x",
     ]
