@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-import alice_agent_runner
+import agents.github_runner as alice_agent_runner
 
 
 @pytest.fixture
