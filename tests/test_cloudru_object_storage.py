@@ -253,6 +253,20 @@ def test_invalid_list_xml_is_a_safe_error():
     assert "/ru-central-1/s3/aws4_request" in kwargs["headers"]["Authorization"]
 
 
+def test_malformed_list_size_is_a_safe_error():
+    body = (
+        b"<ListBucketResult><IsTruncated>false</IsTruncated>"
+        b"<Contents><Key>a.txt</Key><Size>not-a-number</Size></Contents></ListBucketResult>"
+    )
+    storage = CloudRuObjectStorage("bucket", session=FakeSession(FakeResponse(200, body)))
+
+    with pytest.raises(StorageError) as excinfo:
+        storage.list("", credentials=CREDS)
+
+    assert excinfo.value.__cause__ is None
+    assert "not-a-number" not in str(excinfo.value)
+
+
 def test_default_clock_and_session_are_used():
     storage = CloudRuObjectStorage("bucket")
     assert isinstance(storage._session, requests.Session)
@@ -300,6 +314,16 @@ def test_credential_resolver_prefers_stored_key_then_env():
     assert env_only(None, "cloudru") == S3Credentials("tenant:env-key", "env-secret")
     assert env_only(None, "local") is None
     assert cloudru_storage_credential_resolver(env={})(None, "cloudru") is None
+
+    dedicated_env = {
+        **env,
+        "CLOUDRU_STORAGE_KEY_ID": "s3-key",
+        "CLOUDRU_STORAGE_KEY_SECRET": "s3-secret",
+    }
+    dedicated = cloudru_storage_credential_resolver(
+        lambda: {"key_id": "db-key", "key_secret": "db-secret"}, dedicated_env
+    )
+    assert dedicated(None, "cloudru") == S3Credentials("tenant:s3-key", "s3-secret")
 
 
 def test_credential_resolver_reads_process_env(monkeypatch):

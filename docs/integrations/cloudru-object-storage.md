@@ -17,6 +17,8 @@ with AWS Signature V4 over `requests`, so no SDK dependency is added.
 | `CLOUDRU_STORAGE_ENDPOINT` | `https://s3.cloud.ru` | S3 endpoint |
 | `CLOUDRU_STORAGE_REGION` | `ru-central-1` | SigV4 region |
 | `CLOUDRU_STORAGE_PREFIX` | empty | Key prefix inside the bucket, e.g. `prod` |
+| `CLOUDRU_STORAGE_TENANT_ID` | empty | Tenant ID prepended to the access key ID |
+| `CLOUDRU_STORAGE_KEY_ID` / `CLOUDRU_STORAGE_KEY_SECRET` | empty | Optional dedicated Object Storage access key |
 
 Buckets are not created by the application; create one in the Cloud.ru console
 first.
@@ -27,9 +29,14 @@ Register `cloudru_storage_credential_resolver(...)` with
 `RuntimeDispatcher.set_storage_credential_resolver`. It resolves the Cloud.ru
 service account access key, in order:
 
-1. the stored IAM key from `provider_credentials.get_cloudru_iam_credentials`,
+1. a dedicated key from `CLOUDRU_STORAGE_KEY_ID` / `CLOUDRU_STORAGE_KEY_SECRET`;
+2. the stored IAM key from `provider_credentials.get_cloudru_iam_credentials`,
    when a loader is passed;
-2. `CLOUDRU_IAM_KEY_ID` / `CLOUDRU_IAM_KEY_SECRET`.
+3. `CLOUDRU_IAM_KEY_ID` / `CLOUDRU_IAM_KEY_SECRET`.
+
+Only service account access keys work for S3 signing. The rotated Foundation
+Models API key in `provider_credentials` is a different kind of key and is never
+used for storage.
 
 Cloud.ru expects the S3 access key ID as `<tenant_id>:<key_id>`; set
 `CLOUDRU_STORAGE_TENANT_ID` so the resolver adds the prefix. The service account

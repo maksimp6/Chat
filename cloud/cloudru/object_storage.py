@@ -288,7 +288,10 @@ class CloudRuObjectStorage:
                     continue
                 if not object_id or object_id.endswith("/"):
                     continue
-                size = int(_child_text(item, "Size") or 0)
+                try:
+                    size = int(_child_text(item, "Size") or 0)
+                except ValueError:
+                    raise StorageError("Storage provider operation failed") from None
                 objects.append(self._object(PurePosixPath(object_id), key, size))
             token = _child_text(tree, "NextContinuationToken")
             if _child_text(tree, "IsTruncated").lower() != "true" or not token:
@@ -302,9 +305,12 @@ def cloudru_storage_credential_resolver(
 ) -> Callable[[object, str], S3Credentials | None]:
     """Dispatcher resolver for Cloud.ru storage credentials.
 
-    Uses the stored Cloud.ru IAM access key (``provider_credentials``) when a loader is
-    given, then falls back to ``CLOUDRU_IAM_KEY_ID``/``CLOUDRU_IAM_KEY_SECRET``. The
-    tenant prefix comes from ``CLOUDRU_STORAGE_TENANT_ID``.
+    Order: a dedicated Object Storage access key (``CLOUDRU_STORAGE_KEY_ID``/
+    ``CLOUDRU_STORAGE_KEY_SECRET``), then the stored Cloud.ru service account access key
+    (``provider_credentials.get_cloudru_iam_credentials``) when a loader is given, then
+    ``CLOUDRU_IAM_KEY_ID``/``CLOUDRU_IAM_KEY_SECRET``. Foundation Models API keys are not
+    S3 access keys and are never used. The tenant prefix comes from
+    ``CLOUDRU_STORAGE_TENANT_ID``.
     """
 
     def resolve(_context: object, provider: str) -> S3Credentials | None:
@@ -312,6 +318,13 @@ def cloudru_storage_credential_resolver(
             return None
         values = os.environ if env is None else env
         tenant_id = values.get("CLOUDRU_STORAGE_TENANT_ID", "")
+        dedicated = cloudru_s3_credentials(
+            values.get("CLOUDRU_STORAGE_KEY_ID", ""),
+            values.get("CLOUDRU_STORAGE_KEY_SECRET", ""),
+            tenant_id,
+        )
+        if dedicated is not None:
+            return dedicated
         stored = load_iam_credentials() if load_iam_credentials else None
         if stored:
             resolved = cloudru_s3_credentials(
