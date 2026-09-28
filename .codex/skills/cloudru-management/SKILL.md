@@ -1,6 +1,6 @@
 ---
 name: cloudru-management
-description: Work on Alice Pro deployment to Cloud.ru Evolution using EDS (Evolution DevServices CLI), Workflow Studio, Container Apps, external PostgreSQL, IAM, secrets and storage. Use for eds setup, cloud inventory, deployment configuration, readiness checks and rollout troubleshooting.
+description: "Prepare and operate Alice Pro on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, Foundation Models and AI Agents. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
 ---
 
 # Cloud.ru / Alice Pro
@@ -15,7 +15,11 @@ the repository's production/data/secret approval rules to actual live changes.
 1. Identify the interface in the table below. Do not interchange keys.
 2. Read [EDS reference](references/eds.md) for CLI work, or the
    [deployment runbook](../../../deploy/cloudru/README.md) for Alice rollout.
-3. Reuse existing authorized credentials without printing their values. Report
+3. Read [Evolution service and identity reference](references/evolution-services.md)
+   for DNS, Gateway, workflow, logs, users/keys, secrets/certificates and AI.
+   For JSON stdout and cloud log-stream configuration, also read
+   [`deploy/cloudru/logging/README.md`](../../../deploy/cloudru/logging/README.md).
+   Reuse existing authorized credentials without printing their values. Report
    missing variable **names**. Do not dump environment, config, DSNs or raw API
    responses. `eds config` exposes key prefixes/suffixes; skip it in agent logs.
 4. Run read-only inventory with complete pagination. Confirm the project,
@@ -76,11 +80,13 @@ Use `cloudru_iam.py`, `cloudru_iam_routes.py` and `provider_key_rotation.py` for
 existing key flows. Consult `docs/integrations/cloudru-iam-wizard.md` and
 `docs/provider-key-rotation.md` before changing them.
 
-For DNS, discover zones/records first at the documented Evolution DNS API
-`https://dns.api.cloud.ru`. Its client-credentials endpoint is
-`https://id.cloud.ru/auth/system/openid/token`; do not assume another service's
-token works. Confirm zone ownership, delegation/VPC and target records before
-an authorized write, then verify authoritative DNS and TTL effects.
+For Cloud DNS, use the documented endpoint
+`https://console.cloud.ru/api/clouddns` with an Evolution IAM Bearer token.
+Discover zones and records first; the DNS service `parentId` is its Service
+Instance ID, not the project UUID. Follow
+[`deploy/cloudru/dns/README.md`](../../../deploy/cloudru/dns/README.md) and
+preserve the zone/record snapshot before any authorized write. Do not reuse EDS
+or Cloud Advanced credentials as Evolution IAM credentials.
 
 For the requested service rollout and current pricing caveats, read the
 [service matrix](../../../deploy/cloudru/services.md). Recheck official

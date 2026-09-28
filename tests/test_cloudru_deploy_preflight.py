@@ -71,8 +71,33 @@ def test_rejects_tls_downgrade_and_libpq_query_overrides(inputs, change):
     assert "secret-value" not in json.dumps(errors)
 
 
+@pytest.mark.parametrize("mutation", ["uppercase-scheme", "malformed-percent"])
+def test_rejects_malformed_or_noncanonical_dsn(inputs, mutation):
+    config, env = inputs
+    dsn = env["ALICE_DATABASE_URL"]
+    if mutation == "uppercase-scheme":
+        dsn = dsn.replace("postgresql://", "POSTGRESQL://", 1)
+    else:
+        dsn = dsn.replace("p%40ssword", "p%zzssword", 1)
+    env["ALICE_DATABASE_URL"] = dsn
+    errors = preflight.validate(config, env)
+    assert any("ALICE_DATABASE_URL" in error for error in errors)
+    assert "p%zzssword" not in json.dumps(errors)
+
+
 @pytest.mark.parametrize(
-    "cidrs", [[], ["0.0.0.0/0"], ["::/0"], ["8.0.0.0/8"], ["127.0.0.1/32"], ["10.0.0.0/24"], [123]]
+    "cidrs",
+    [
+        [],
+        ["0.0.0.0/0"],
+        ["::/0"],
+        ["8.0.0.0/8"],
+        ["127.0.0.1/32"],
+        ["10.0.0.0/24"],
+        ["224.0.0.1/32"],
+        ["ff0e::1/128"],
+        [123],
+    ],
 )
 def test_rejects_absent_or_unsafe_public_egress(inputs, cidrs):
     config, env = inputs
@@ -158,8 +183,13 @@ def test_driver_failure_does_not_leak_dsn(inputs, monkeypatch):
     assert error and "postgresql://" not in error and "test-only" not in error
 
 
-@pytest.mark.parametrize("tls,superuser", [(False, False), (True, True), (True, False)])
-def test_probe_is_read_only_and_checks_tls_and_role(inputs, monkeypatch, tls, superuser):
+@pytest.mark.parametrize(
+    "tls,superuser,inherited_privileged_role",
+    [(False, False, False), (True, True, False), (True, False, False), (True, False, True)],
+)
+def test_probe_is_read_only_and_checks_tls_and_role(
+    inputs, monkeypatch, tls, superuser, inherited_privileged_role
+):
     config, env = inputs
     captured = {}
     monkeypatch.setattr(preflight.ssl, "create_default_context", lambda **kwargs: None)
@@ -184,6 +214,7 @@ def test_probe_is_read_only_and_checks_tls_and_role(inputs, monkeypatch, tls, su
                     False,
                     False,
                     False,
+                    inherited_privileged_role,
                 )
             )
 
@@ -193,8 +224,10 @@ def test_probe_is_read_only_and_checks_tls_and_role(inputs, monkeypatch, tls, su
 
     monkeypatch.setitem(sys.modules, "psycopg", SimpleNamespace(connect=connect))
     error = preflight.probe_database(env["ALICE_DATABASE_URL"], config["database"])
-    assert (error is None) == (tls and not superuser)
+    assert (error is None) == (tls and not superuser and not inherited_privileged_role)
     assert "default_transaction_read_only=on" in captured["options"]
     assert "statement_timeout=5000" in captured["options"]
     assert captured["sql"].startswith("SELECT ")
+    assert "pg_has_role" in captured["sql"]
+    assert "pg_execute_server_program" in captured["sql"]
     assert captured["connect_timeout"] == 5

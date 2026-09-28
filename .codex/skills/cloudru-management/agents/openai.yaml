@@ -1,4 +1,4 @@
 interface:
   display_name: "Cloud.ru EDS / Alice Pro"
-  short_description: "Configure EDS and deploy Alice Pro on Cloud.ru"
-  default_prompt: "Use $cloudru-management to inspect EDS and prepare or verify Alice Pro deployment configuration without exposing secrets."
+  short_description: "Deploy Alice across Cloud.ru Evolution"
+  default_prompt: "Use $cloudru-management to configure or verify Alice's EDS, networking, security, logs, AI, and deployment setup without exposing secrets."

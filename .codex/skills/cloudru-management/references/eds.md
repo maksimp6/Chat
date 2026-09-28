@@ -5,6 +5,10 @@
 commit `b75066263c156695b30ec3d6ed627a8fc6c5548c`.
 EDS означает Evolution DevServices CLI. Поддерживает Repo и Workflow Studio.
 
+Contents: [install](#установка) · [config and credentials](#конфигурация-и-ключи) ·
+[read-only inventory](#чтение) · [mutating operations](#изменения-после-заполнения-deployment-runbook) ·
+[current discovery state](#состояние-обнаружения).
+
 ## Установка
 
 Из корня Alice Pro:

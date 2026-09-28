@@ -7,8 +7,9 @@
 
 ## С чего начать Codex
 
-Прочитать `.codex/skills/cloudru-management/SKILL.md`, затем EDS reference.
-Навык лежит в репозитории: он не устанавливает EDS и не создаёт ресурсы сам.
+Прочитать `.codex/skills/cloudru-management/SKILL.md`, затем EDS reference и
+справочник сервисов Evolution. Навык лежит в репозитории: он не устанавливает
+EDS и не создаёт ресурсы сам.
 
 ```bash
 python scripts/install_eds.py
@@ -26,6 +27,10 @@ python scripts/cloudru_deploy_preflight.py --help
 | `container-app.create.example.json` | Evolution Container Apps API adapter | Реальный project/image и секреты только в памяти запроса |
 | `postgres/*` | Администратор PostgreSQL/backup runner | Bind IP, DNS/TLS, client CIDRs, роли, backup profile |
 | `services.md` | Следующие интеграции | Приоритеты, подтверждённые возможности и текущие задачи |
+| `dns/*`, `api-gateway/*` | DNS/Gateway operator | Шаблон зоны/CNAME и OpenAPI starter; заполнить IDs и все routes |
+| `logging/*` | App/platform log operator | JSON stdout event, service-specific logs and redaction checks |
+| `identities-and-secrets.md` | Cloud/IAM operator | Пользователи, типы ключей, secret references и сертификаты |
+| `.codex/skills/cloudru-management/references/evolution-services.md` | Codex | API boundaries, Workflow, logs, roles, security and AI services |
 
 `deployment.example.json` — **внутренний формат комплекта**, не Terraform,
 не OpenAPI и не формат EDS/Workflow Studio. `container-app.create.example.json`
@@ -126,36 +131,39 @@ JSON-пример env содержит заглушки. Adapter должен з
 и отправить TLS-запрос с редактированием до trace/log. Сохранение secret-bearing
 request/response в `deploy.json`, `tee` или GitHub summary недопустимо.
 
-## Gateway и журналы
+## DNS, API Gateway и журналы
 
-Пока нет подтверждённой management API schema Gateway для этого проекта,
-не выдавать придуманный Terraform/provider YAML за применяемую конфигурацию.
-Настройки для последующего перевода в документированный API/консоль:
+Для пользовательского домена использовать Cloud DNS → API Gateway → Container
+Apps: сам Container Apps сейчас выдаёт provider URL без пользовательского host.
+`dns/README.md` описывает inventory и CNAME, `dns/*.example.json` — тела
+документированных DNS операций, а `api-gateway/alice-openapi.example.json` —
+частичный OpenAPI 3.0 starter с Container Apps backend, rate-limit примером и
+log-group reference. Это не полный route map и не выполненный gateway deploy:
+до импорта заполнить реальные UUID и описать все используемые маршруты. Подключить
+custom domain к сертификату Certificate Manager; сверить TLS, OAuth callback,
+MCP metadata и поведение прямого Container Apps URL. Не менять production DNS
+до end-to-end проверки и плана отката.
 
-| Маршруты | Политика |
-|---|---|
-| `/healthz` | Только минимальный статус; rate limit, без данных пользователя |
-| Login/callback, OAuth discovery/authorization/token | Сохранить соответствующие публичные протокольные шаги, state/PKCE и app auth |
-| MCP | Сохранить MCP OAuth и проверку пользователя; blanket cloud API key может сломать клиент |
-| Chat/API, персональные ответы | App authorization; tenant/user isolation; кэш выключен |
-| SSE/streaming | Кэш и buffering выключены; согласованные timeout и disconnect handling |
+Gateway default address не аутентифицирует пользователя. Политики API-key, IAM
+или поддерживаемая OIDC policy защищают gateway/client boundary, а Alice сохраняет
+GitHub owner login, short token, MCP OAuth, user ownership и authorization. Не
+включать общий cache для персональных/API/MCP/streaming routes. Gateway rate
+limit — агрегат route/window в примере, не per-user quota; проверять backend
+direct-access и streaming timeout до production.
 
-API key Gateway идентифицирует клиента, но не заменяет таблицы пользователей,
-GitHub owner login, MCP OAuth и историю диалогов. Ограничить размер запроса,
-частоту и параллельность по реальному клиенту. Проверить прямой backend URL:
-app auth остаётся обязательной, а защита от обхода Gateway quotas требует
-поддерживаемого provider-механизма/отдельной интеграции. Не объявлять backend
-закрытым только из-за появления Gateway. Начальная API template использует
-public ingress и **не реализует** этот дополнительный запрет обхода.
+Конкретные потоки и JSON event описаны в `logging/README.md` и
+`.codex/skills/cloudru-management/references/evolution-services.md`: JSON
+stdout/stderr, Container Apps system/request logs, Gateway log group, Cloud audit
+и AI service telemetry — разные потоки. Request logging для chat/MCP включать
+только после проверки фактически записываемых headers, query, body и redaction;
+не писать токены, prompts, DSN, cookies или private keys. Конфигурацию приложения
+для JSON logger ведёт задача #478; этот комплект не выдумывает неизвестные поля
+Container Apps API.
 
-Приложение должно выдавать один JSON object на строку stdout/stderr: timestamp
-UTC, level, service, message, request_id, trace_id, duration_ms. User ID — только
-если нужен и без прямой PII. Уровни не превращать все в CRITICAL. Не логировать
-DSN, токены, query secrets, содержимое prompt/ответов по умолчанию. Это задача
-#478; этот комплект не меняет текущий logger и не включает несуществующий флаг.
-HTTP request logging включается отдельной настройкой Container Apps; audit logs
-фиксируют действия control plane. Все три потока проверять отдельно. Поле
-loggingService не добавлено без подтверждённой вложенной API-схемы.
+`identities-and-secrets.md` перечисляет IAM users/service accounts, EDS key,
+Workflow Studio API, Gateway users/keys, FM/S3 keys, DB roles и certificate
+material. Runtime secret injection остаётся gated adapter/pipeline work (#477);
+placeholder `REPLACE_FROM_SECRET_STORE` пока не native secret reference.
 
 ## Проверка результата и rollback
 

@@ -56,19 +56,24 @@ def database_parameters(dsn: str, database: dict) -> tuple[dict, list[str]]:
     """Support one explicit libpq URI; reject query overrides and duplicates."""
     errors: list[str] = []
     try:
-        uri = urlsplit(dsn)
-        pairs = parse_qsl(uri.query, keep_blank_values=True, strict_parsing=True)
-        params = dict(pairs)
         if (
             not filled(dsn)
-            or uri.scheme not in {"postgres", "postgresql"}
+            or not dsn.startswith(("postgres://", "postgresql://"))
+            or re.search(r"%(?![0-9A-Fa-f]{2})", dsn)
+        ):
+            return {}, ["ALICE_DATABASE_URL: invalid URI"]
+        uri = urlsplit(dsn)
+        pairs = parse_qsl(uri.query, keep_blank_values=True, strict_parsing=True, errors="strict")
+        params = dict(pairs)
+        if (
+            uri.scheme not in {"postgres", "postgresql"}
             or uri.fragment
             or not uri.password
-            or not filled(unquote(uri.password))
+            or not filled(unquote(uri.password, errors="strict"))
             or uri.hostname != database.get("host")
             or (uri.port or 5432) != database.get("port")
-            or unquote(uri.path) != "/" + str(database.get("name"))
-            or unquote(uri.username or "") != database.get("user")
+            or unquote(uri.path, errors="strict") != "/" + str(database.get("name"))
+            or unquote(uri.username or "", errors="strict") != database.get("user")
         ):
             errors.append("ALICE_DATABASE_URL: explicit endpoint/database/role/password required")
         allowed = {
@@ -96,7 +101,7 @@ def database_parameters(dsn: str, database: dict) -> tuple[dict, list[str]]:
         if params.get("connect_timeout") not in {str(n) for n in range(2, 11)}:
             errors.append("ALICE_DATABASE_URL: connect_timeout must be 2..10 seconds")
         return params, errors
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, UnicodeError):
         return {}, ["ALICE_DATABASE_URL: invalid URI"]
 
 
@@ -174,6 +179,7 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
                 n.prefixlen < (24 if n.version == 4 else 120)
                 or not n.network_address.is_global
                 or not n.broadcast_address.is_global
+                or n.is_multicast
                 for n in parsed
             ):
                 raise ValueError
@@ -239,13 +245,23 @@ def probe_database(dsn: str, database: dict) -> str | None:
         ) as conn:
             row = conn.execute(
                 "SELECT current_database(), current_user, s.ssl, s.version, "
-                "r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication, r.rolbypassrls "
+                "r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication, r.rolbypassrls, "
+                "EXISTS (SELECT 1 FROM pg_roles p WHERE p.rolname IN ("
+                "'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', "
+                "'pg_read_all_data', 'pg_write_all_data', 'pg_monitor', 'pg_signal_backend', "
+                "'pg_checkpoint', 'pg_create_subscription', 'pg_use_reserved_connections', "
+                "'pg_maintain') AND pg_has_role(current_user, p.oid, 'MEMBER')) "
                 "FROM pg_stat_ssl s JOIN pg_roles r ON r.rolname = current_user "
                 "WHERE s.pid = pg_backend_pid()"
             ).fetchone()
             if not row or row[:2] != (database["name"], database["user"]):
                 return "database probe: unexpected database or role"
-            if row[2] is not True or row[3] not in {"TLSv1.2", "TLSv1.3"} or any(row[4:]):
+            if (
+                row[2] is not True
+                or row[3] not in {"TLSv1.2", "TLSv1.3"}
+                or any(row[4:9])
+                or row[9] is not False
+            ):
                 return "database probe: TLS or role policy failed"
     except Exception:  # noqa: BLE001 - secret-safe CLI error boundary
         return "database probe failed; verify CA, network, credentials and server policy in a protected session"

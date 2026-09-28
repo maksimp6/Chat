@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-09-28T12:00:00.000Z",
+  "level": "INFO",
+  "service": "alice",
+  "event": "http.request.completed",
+  "message": "request completed",
+  "request_id": "REPLACE_REQUEST_ID",
+  "trace_id": "REPLACE_TRACE_ID",
+  "method": "POST",
+  "route": "/api/chat",
+  "status_code": 200,
+  "duration_ms": 350
+}
