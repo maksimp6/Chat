@@ -23,3 +23,7 @@ alice_pro_files.tar.gz
 # Local tooling
 node_modules/
 app_logs.jsonl
+
+# pytest-cov data
+.coverage
+coverage.xml
