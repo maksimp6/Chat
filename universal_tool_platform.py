@@ -416,7 +416,7 @@ class UniversalToolExecutor:
         call: UniversalToolCall,
         target: Mapping[str, Any],
     ) -> Any:
-        from local_agent_gateway import enqueue_local_tool_job, wait_for_local_tool_job
+        from agents.local_gateway import enqueue_local_tool_job, wait_for_local_tool_job
 
         agent_id = str(target.get("agent_id") or target.get("target_agent") or "").strip()
         if not agent_id:
