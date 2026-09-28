@@ -63,6 +63,7 @@ async function flush() {
     "provider-credentials-btn",
     "memory-btn",
     "donate-btn",
+    "github-login-btn",
     "theme-toggle",
   ];
   assert.deepEqual(

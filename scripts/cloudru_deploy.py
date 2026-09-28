@@ -77,6 +77,22 @@ def _export_commit(tag: str, repo: str, dest: str, runner=subprocess.run) -> Non
         raise CloudProviderError(
             "--tag must be a full 40-character commit SHA", code="validation_error"
         )
+    # Refresh the canonical branch for direct CLI invocations too. Never trust
+    # an arbitrary local branch or a stale origin/master as deployment approval.
+    fetched = runner(
+        ["git", "-C", repo, "fetch", "--no-tags", "origin", "master"],
+        capture_output=True,
+        check=False,
+    )
+    if fetched.returncode != 0:
+        raise CloudProviderError("cannot fetch canonical master", code="validation_error")
+    trusted = runner(
+        ["git", "-C", repo, "merge-base", "--is-ancestor", tag, "FETCH_HEAD"],
+        capture_output=True,
+        check=False,
+    )
+    if trusted.returncode != 0:
+        raise CloudProviderError("commit is not on canonical master", code="validation_error")
     done = runner(
         ["git", "-C", repo, "archive", "--format=tar", tag], capture_output=True, check=False
     )
@@ -94,10 +110,26 @@ def _emit(payload: dict) -> None:
 
 
 REQUIRED_APP_ENV = ("ALICE_REQUIRE_SHORT_TOKEN", "ALICE_SHORT_TOKEN")
+CONTROL_PLANE_ENV = frozenset(
+    {
+        "CLOUDRU_IAM_KEY_ID",
+        "CLOUDRU_IAM_KEY_SECRET",
+        "CLOUDRU_API_KEY",
+        "CLOUDRU_KEY_ID",
+        "CLOUDRU_KEY_SECRET",
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+    }
+)
 
 
 def cmd_deploy(args: argparse.Namespace) -> dict:
     cfg = _settings()
+    if CONTROL_PLANE_ENV.intersection(args.env):
+        raise CloudProviderError(
+            "control-plane credentials cannot be passed to the application",
+            code="validation_error",
+        )
     missing = [name for name in args.env if name not in os.environ]
     if missing:
         raise CloudProviderError(
@@ -111,6 +143,14 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
     ):
         raise CloudProviderError(
             "deploy needs --env ALICE_REQUIRE_SHORT_TOKEN (set to 1) and --env ALICE_SHORT_TOKEN",
+            code="validation_error",
+        )
+    database_url = os.environ.get("ALICE_DATABASE_URL", "")
+    if "ALICE_DATABASE_URL" not in args.env or not database_url.startswith(
+        ("postgres://", "postgresql://")
+    ):
+        raise CloudProviderError(
+            "deploy needs --env ALICE_DATABASE_URL set to durable PostgreSQL",
             code="validation_error",
         )
     registry = CloudRuRegistryClient()

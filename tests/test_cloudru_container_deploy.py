@@ -77,10 +77,43 @@ def test_ensure_registry_creates_private_docker_registry_when_missing():
 
 
 def test_ensure_registry_reuses_existing():
-    client = RecordingClient([{"registries": [{"name": "alice-pro", "id": "r1"}]}])
+    client = RecordingClient(
+        [
+            {
+                "registries": [
+                    {"name": "alice-pro", "id": "r1", "isPublic": False, "registryType": "DOCKER"}
+                ]
+            }
+        ]
+    )
     reg = CloudRuRegistryClient(project_id="p1", client=client, iam_client=_iam())
     assert reg.ensure_registry("alice-pro")["id"] == "r1"
     assert len(client.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {},
+        {"isPublic": True, "registryType": "DOCKER"},
+        {"isPublic": "false", "registryType": "DOCKER"},
+        {"isPublic": False, "registryType": "MAVEN"},
+    ],
+)
+def test_deploy_rejects_unsafe_or_unknown_registry_before_publishing(metadata):
+    client = RecordingClient([{"registries": [{"name": "alice-pro", **metadata}]}])
+    reg = CloudRuRegistryClient(project_id="p1", client=client, iam_client=_iam())
+    with pytest.raises(CloudProviderError, match="private and type DOCKER"):
+        reg.ensure_registry("alice-pro")
+    assert [call[1] for call in client.calls] == ["GET"]
+
+
+def test_deploy_cannot_request_a_public_registry():
+    client = RecordingClient()
+    reg = CloudRuRegistryClient(project_id="p1", client=client, iam_client=_iam())
+    with pytest.raises(CloudProviderError, match="private registry"):
+        reg.ensure_registry("alice-pro", is_public=True)
+    assert client.calls == []
 
 
 def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
@@ -422,7 +455,8 @@ def _git(repo, *args):
 def test_export_commit_builds_only_committed_files(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
-    _git(repo, "init", "-q")
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "remote", "add", "origin", str(repo))
     (repo / "app.py").write_text("committed\n")
     _git(repo, "add", "app.py")
     _git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c")
@@ -442,11 +476,40 @@ def test_export_commit_builds_only_committed_files(tmp_path):
 
 @pytest.mark.parametrize(
     ("tag", "message"),
-    [("latest", "full 40-character"), (SHA, "cannot export commit")],
+    [("latest", "full 40-character"), (SHA, "cannot fetch canonical master")],
 )
 def test_export_commit_rejects_bad_tags(tmp_path, tag, message):
     with pytest.raises(CloudProviderError, match=message):
         _deploy_script()._export_commit(tag, str(tmp_path), str(tmp_path))
+
+
+def test_export_rejects_side_branch_even_with_stale_local_master(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "remote", "add", "origin", str(repo))
+    (repo / "app.py").write_text("trusted\n")
+    _git(repo, "add", ".")
+    _git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "trusted")
+    _git(repo, "checkout", "-qb", "unreviewed")
+    (repo / "app.py").write_text("unreviewed\n")
+    _git(repo, "add", ".")
+    _git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "side")
+    sha = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+    _git(repo, "update-ref", "refs/remotes/origin/master", sha)
+    out = tmp_path / "out"
+    out.mkdir()
+    with pytest.raises(CloudProviderError, match="not on canonical master"):
+        _deploy_script()._export_commit(sha, str(repo), str(out))
+    assert list(out.iterdir()) == []
+
+
+def test_export_reports_archive_failure_after_master_check(tmp_path):
+    def runner(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 1 if "archive" in argv else 0, b"", b"failed")
+
+    with pytest.raises(CloudProviderError, match="cannot export commit"):
+        _deploy_script()._export_commit(SHA, str(tmp_path), str(tmp_path), runner=runner)
 
 
 def _run_deploy(monkeypatch, capsys, argv, **env):
@@ -484,6 +547,107 @@ def test_invalid_repository_name_fails_before_provider_calls(monkeypatch, capsys
     code, out = _run_deploy(monkeypatch, capsys, ["estimate"])
     assert code == 1
     assert "CLOUDRU_REPOSITORY_NAME" in out
+
+
+@pytest.mark.parametrize("name", sorted(_deploy_script().CONTROL_PLANE_ENV))
+def test_control_plane_secrets_rejected_before_any_provider_calls(monkeypatch, capsys, name):
+    script = _deploy_script()
+    registry = Mock(side_effect=AssertionError("must not construct a provider"))
+    monkeypatch.setattr(script, "CloudRuRegistryClient", registry)
+    monkeypatch.setenv(name, "private-test-value")
+    assert script.main(["deploy", "--tag", SHA, "--env", name]) == 1
+    output = capsys.readouterr().out
+    assert "control-plane credentials" in output
+    assert "private-test-value" not in output
+    registry.assert_not_called()
+
+
+@pytest.mark.parametrize("database_url", [None, "", "sqlite:///alice.db"])
+def test_deploy_requires_postgres_before_provider_calls(monkeypatch, capsys, database_url):
+    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+    env = {"ALICE_REQUIRE_SHORT_TOKEN": "1", "ALICE_SHORT_TOKEN": "private-test-value"}
+    argv = [
+        "deploy",
+        "--tag",
+        SHA,
+        "--env",
+        "ALICE_REQUIRE_SHORT_TOKEN",
+        "--env",
+        "ALICE_SHORT_TOKEN",
+    ]
+    if database_url is not None:
+        env["ALICE_DATABASE_URL"] = database_url
+        argv += ["--env", "ALICE_DATABASE_URL"]
+    code, output = _run_deploy(monkeypatch, capsys, argv, **env)
+    assert code == 1
+    assert "durable PostgreSQL" in output
+    assert "private-test-value" not in output
+
+
+def test_successful_deploy_passes_app_configuration_only(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    app_env = {
+        "ALICE_REQUIRE_SHORT_TOKEN": "1",
+        "ALICE_SHORT_TOKEN": "test-token",
+        "ALICE_DATABASE_URL": "postgresql://test/db",
+    }
+    for name, value in app_env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("CLOUDRU_IAM_KEY_SECRET", "control-secret")
+    registry, apps = Mock(), Mock()
+    registry.build_and_push.return_value = ImageRef("registry", "alice", SHA, DIGEST)
+    apps.deploy_verified.return_value = {"action": "create"}
+    monkeypatch.setattr(script, "CloudRuRegistryClient", lambda: registry)
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    monkeypatch.setattr(script, "_export_commit", Mock())
+    result = script.cmd_deploy(
+        argparse.Namespace(env=list(app_env), tag=SHA, context=".", timeout=30)
+    )
+    assert apps.deploy_verified.call_args.args[0].env == app_env
+    assert result["image"].endswith(DIGEST)
+    assert "control-secret" not in str(result)
+
+
+@pytest.mark.parametrize(
+    "action,missing,bad_database,success",
+    [
+        ("preflight", None, False, True),
+        ("deploy", "CLOUDRU_IAM_KEY_SECRET", False, False),
+        ("preflight", "ALICE_DATABASE_URL", False, False),
+        ("deploy", "ALICE_GITHUB_CLIENT_SECRET", False, False),
+        ("preflight", None, True, False),
+        ("status", "ALICE_DATABASE_URL", False, True),
+    ],
+)
+def test_workflow_preflight_reports_configuration_without_secret_values(
+    action, missing, bad_database, success
+):
+    from pathlib import Path
+    import yaml
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-deploy.yml").read_text()
+    )
+    step = next(
+        s for s in workflow["jobs"]["cloudru"]["steps"] if s["name"] == "Validate configuration"
+    )
+    env = {name: "private-test-value" for name in step["env"]}
+    env.update(
+        ACTION=action, CLOUDRU_PROJECT_ID="project", ALICE_DATABASE_URL="postgresql://test/db"
+    )
+    if missing:
+        env.pop(missing)
+    if bad_database:
+        env["ALICE_DATABASE_URL"] = "sqlite:///test"
+    result = subprocess.run(
+        ["bash", "-e", "-c", step["run"]], env=env, text=True, capture_output=True
+    )
+    assert (result.returncode == 0) is success
+    assert "private-test-value" not in result.stdout + result.stderr
+    if missing and not success:
+        assert missing in result.stdout
 
 
 def test_deploy_verified_restores_config_even_with_same_image():

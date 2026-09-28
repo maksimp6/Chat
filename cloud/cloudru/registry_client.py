@@ -103,8 +103,17 @@ class CloudRuRegistryClient:
 
     def ensure_registry(self, registry_name: str, *, is_public: bool = False) -> dict[str, Any]:
         """Return the registry, creating a private Docker registry if it is missing."""
+        if is_public:
+            raise CloudProviderError(
+                "deployment requires a private registry", code="validation_error"
+            )
         existing = self.get_registry(registry_name)
         if existing is not None:
+            if existing.get("isPublic") is not False or existing.get("registryType") != "DOCKER":
+                raise CloudProviderError(
+                    "existing registry must explicitly be private and type DOCKER",
+                    code="validation_error",
+                )
             return existing
         return self.client.request(
             SERVICE,
