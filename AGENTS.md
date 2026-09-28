@@ -26,7 +26,8 @@ agent in a comment:
   `scripts/codex_setup.sh`.
 - `@copilot` — assign the issue to Copilot; it also reviews pull requests
   (`.github/copilot-instructions.md`).
-- `@alice` — Alice Pro working on her own code through her filesystem tools
+- `@alice` — self-improver: Alice Pro making small changes to her own code
+  (UI, translations, prompts, her tools, docs) through her filesystem tools
   (`.github/workflows/alice.yml`, `docs/agents/alice-github-agent.md`).
 
 Every agent opens one focused pull request per issue. Only the maintainer
@@ -43,6 +44,8 @@ owner (@maksimp6) does not merge by hand.
   `@alice`) and merges them when CI is green and the review finds no blocking
   issue; otherwise it comments with what must change.
 - Draft pull requests are not merged; the author marks them ready first.
+  Alice always opens drafts, so the maintainer marks an Alice draft ready once
+  its CI is green, then reviews it like any other pull request.
 - Every ready pull request gets a GitHub Copilot code review. Claude requests it
   when it was not requested automatically, waits for it, and fixes or answers
   each Copilot comment before merging.
