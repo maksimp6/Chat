@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-from invocation_context import InvocationContext
-from invocation_trace import create_invocation_trace
+from invocation.context import InvocationContext
+from invocation.trace import create_invocation_trace
 from universal_tool_platform import UniversalToolDefinition
 from yandex_client_modules.mcp_mixin import YandexMcpMixin
 
