@@ -41,22 +41,26 @@ digest with a public URL, and requires `GET /healthz` to return 200.
 
 ## Cost
 
-Defaults: 0.5 vCPU / 1 GiB, one always-on instance. Using the Container Services
-pay-as-you-go example prices (1.8905 RUB per vCPU·h, 1.257 RUB per GB·h) and the
-monthly free tier (25 vCPU·h, 50 GB·h), the floor is about **1,500 RUB/month**.
-Traffic that scales past `CLOUDRU_MIN_INSTANCES` adds to it. Check the live
-tariff before provisioning:
+Defaults: 0.5 vCPU / 1 GiB, scale to zero (`CLOUDRU_MIN_INSTANCES=0`), at most
+one instance. With no warm instance there is no fixed floor: you pay only for
+the time an instance is awake, at the Container Services pay-as-you-go example
+prices (1.8905 RUB per vCPU·h, 1.257 RUB per GB·h) after the monthly free tier
+(25 vCPU·h, 50 GB·h). That free tier covers roughly 50 awake hours a month at
+this size. Keeping one instance warm (`CLOUDRU_MIN_INSTANCES=1`) costs about
+**1,500 RUB/month**. `scripts/cloudru_deploy.py estimate` prints the floor for
+the configured size. Check the live tariff before provisioning:
 https://cloud.ru/docs/container-apps-evolution/ug/topics/pricing__container-services
 
-`CLOUDRU_MIN_INSTANCES=0` scales to zero but is not safe yet (see below).
+The first request after idle pays a cold start.
 
 ## Known limitations
 
 - **State is ephemeral.** SQLite lives in the container filesystem and is lost on
   every new revision or restart. Set `ALICE_DATABASE_URL` to Managed PostgreSQL
   before relying on this for production data.
-- **Scale to zero breaks background work.** The app runs background threads and
-  SSH runtime containers, which stop when the instance sleeps.
+- **Scale to zero stops background work.** Background threads and SSH runtime
+  containers stop when the instance sleeps; they need to move to request-driven
+  work or Container Apps jobs.
 - **App secrets are plain container env vars**, visible to anyone with Container
   Apps read access in the project. Move them to a secret store as a follow-up.
 - **API field names are unconfirmed.** The rendered API reference is not

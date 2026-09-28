@@ -116,7 +116,7 @@ def test_build_failure_raises_without_pushing():
         reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc")
 
 
-def test_deploy_creates_always_on_service_when_missing():
+def test_deploy_creates_scale_to_zero_service_when_missing():
     client = RecordingClient([CloudProviderError("nf", http_status=404), {"done": False}])
     apps = CloudRuContainerAppsClient(project_id="p1", client=client)
     spec = ContainerSpec(name="alice-pro", image="img@sha", env={"B": "2", "A": "1"})
@@ -124,7 +124,7 @@ def test_deploy_creates_always_on_service_when_missing():
     assert apps.deploy(spec)["action"] == "create"
     service, method, path, _, body = client.calls[1]
     assert (service, method, path) == ("container_apps", "POST", "/v2/containers")
-    assert body["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
+    assert body["template"]["scaling"] == {"minInstanceCount": 0, "maxInstanceCount": 1}
     container = body["template"]["containers"][0]
     assert container["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
     assert container["containerPort"] == 8080
@@ -142,7 +142,7 @@ def test_deploy_patches_existing_service_with_new_image():
     _, method, path, params, body = client.calls[2]
     assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", {"projectId": "p1"})
     assert body["template"]["containers"][0]["image"] == "new@sha"
-    assert body["template"]["scaling"]["minInstanceCount"] == 1
+    assert body["template"]["scaling"]["minInstanceCount"] == 0
     assert "status" not in body and "id" not in body
 
 

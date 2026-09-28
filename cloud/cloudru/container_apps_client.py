@@ -48,7 +48,7 @@ class ContainerSpec:
     image: str
     port: int = 8080
     cpu: str = "0.5"
-    min_instances: int = 1
+    min_instances: int = 0
     max_instances: int = 1
     public: bool = True
     env: dict[str, str] = field(default_factory=dict)

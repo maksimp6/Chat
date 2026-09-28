@@ -38,7 +38,7 @@ def _settings() -> dict:
         "repository": os.getenv("CLOUDRU_REPOSITORY_NAME", "alice-pro"),
         "name": os.getenv("CLOUDRU_CONTAINER_NAME", "alice-pro"),
         "cpu": os.getenv("CLOUDRU_CONTAINER_CPU", "0.5"),
-        "min_instances": int(os.getenv("CLOUDRU_MIN_INSTANCES", "1")),
+        "min_instances": int(os.getenv("CLOUDRU_MIN_INSTANCES", "0")),
         "max_instances": int(os.getenv("CLOUDRU_MAX_INSTANCES", "1")),
     }
 
