@@ -54,10 +54,7 @@ class BrowserShimScenarioRunner {
 
   _runStep(browser, step) {
     if (!step || typeof step !== "object") {
-      throw new BrowserShimScenarioError(
-        "validation_failed",
-        "Scenario step must be an object",
-      );
+      throw new BrowserShimScenarioError("validation_failed", "Scenario step must be an object");
     }
 
     const action = String(step.action || "");
@@ -101,10 +98,7 @@ class BrowserShimScenarioRunner {
 
     const element = browser.document.querySelector(target);
     if (!element) {
-      throw new BrowserShimScenarioError(
-        "target_not_found",
-        "No element matches: " + target,
-      );
+      throw new BrowserShimScenarioError("target_not_found", "No element matches: " + target);
     }
 
     if (action === "inspect") {
@@ -118,10 +112,7 @@ class BrowserShimScenarioRunner {
 
     if (action === "fill") {
       if (typeof step.value !== "string") {
-        throw new BrowserShimScenarioError(
-          "validation_failed",
-          "Fill value must be a string",
-        );
+        throw new BrowserShimScenarioError("validation_failed", "Fill value must be a string");
       }
       element.value = step.value;
       element.dispatchEvent({ type: "input", bubbles: true });
@@ -177,10 +168,7 @@ function parseExpectedState(value) {
 function assertExpectedState(actual, expected) {
   for (const [key, value] of Object.entries(expected)) {
     if (!Object.hasOwn(actual, key)) {
-      throw new BrowserShimScenarioError(
-        "validation_failed",
-        "Unsupported state field: " + key,
-      );
+      throw new BrowserShimScenarioError("validation_failed", "Unsupported state field: " + key);
     }
     if (actual[key] !== value) {
       throw new BrowserShimScenarioError(
