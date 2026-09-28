@@ -1,8 +1,8 @@
 import json
-import sys
 from types import SimpleNamespace
 
 import pytest
+import requests
 from flask import Flask
 
 from mcp_server import auth, protocol, runtime_bridge, tools, transport
@@ -206,7 +206,7 @@ def test_introspect_token_covers_configuration_scopes_and_subject(monkeypatch):
         {"active": True, "scope": protocol.OAUTH_SCOPE, "sub": "user-3"},
     ]
 
-    monkeypatch.setitem(sys.modules, "requests", SimpleNamespace(post=fake_post))
+    monkeypatch.setattr(requests, "post", fake_post)
     monkeypatch.setenv("ALICE_MCP_INTROSPECTION_URL", "https://issuer.example/introspect")
     monkeypatch.setenv("ALICE_MCP_INTROSPECTION_CLIENT_ID", "client")
     monkeypatch.setenv("ALICE_MCP_INTROSPECTION_CLIENT_SECRET", "secret")
