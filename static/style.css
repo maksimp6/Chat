@@ -266,7 +266,8 @@ body {
   text-decoration: none;
 }
 
-.alice-pro-app .donate-btn img {
+.alice-pro-app .donate-btn img,
+.alice-pro-app .github-login-btn svg {
   display: block;
   pointer-events: none;
 }
