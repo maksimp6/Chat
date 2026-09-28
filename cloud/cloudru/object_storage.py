@@ -186,7 +186,7 @@ class CloudRuObjectStorage:
         env = os.environ if env is None else env
         return cls(
             env.get("CLOUDRU_STORAGE_BUCKET", ""),
-            endpoint=env.get("CLOUDRU_STORAGE_ENDPOINT", ""),
+            endpoint=env.get("CLOUDRU_STORAGE_S3_ENDPOINT", ""),
             region=env.get("CLOUDRU_STORAGE_REGION", ""),
             prefix=env.get("CLOUDRU_STORAGE_PREFIX", ""),
             **kwargs,
@@ -299,9 +299,12 @@ class CloudRuObjectStorage:
                 except ValueError:
                     raise StorageError("Storage provider operation failed") from None
                 objects.append(self._object(relative, key, size))
-            token = _child_text(tree, "NextContinuationToken")
-            if _child_text(tree, "IsTruncated").lower() != "true" or not token:
+            if _child_text(tree, "IsTruncated").lower() != "true":
                 break
+            token = _child_text(tree, "NextContinuationToken")
+            if not token:
+                # A truncated page without a token would silently drop objects.
+                raise StorageError("Storage provider operation failed")
         return sorted(objects, key=lambda item: item.object_id)
 
 

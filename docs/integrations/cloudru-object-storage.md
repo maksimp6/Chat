@@ -14,7 +14,7 @@ with AWS Signature V4 over `requests`, so no SDK dependency is added.
 | `ALICE_STORAGE_PROVIDER` | `local` | `local` or `cloudru` |
 | `ALICE_STORAGE_LOCAL_ROOT` | `data/storage` | Root of the local adapter |
 | `CLOUDRU_STORAGE_BUCKET` | (required for `cloudru`) | Bucket name |
-| `CLOUDRU_STORAGE_ENDPOINT` | `https://s3.cloud.ru` | S3 endpoint |
+| `CLOUDRU_STORAGE_S3_ENDPOINT` | `https://s3.cloud.ru` | S3 endpoint (separate from the inventory `CLOUDRU_STORAGE_ENDPOINT`) |
 | `CLOUDRU_STORAGE_REGION` | `ru-central-1` | SigV4 region |
 | `CLOUDRU_STORAGE_PREFIX` | empty | Key prefix inside the bucket, e.g. `prod` |
 | `CLOUDRU_STORAGE_TENANT_ID` | empty | Tenant ID prepended to the access key ID |

@@ -278,6 +278,17 @@ def test_list_skips_keys_outside_the_safe_path_contract():
     assert [item.object_id for item in storage.list("", credentials=CREDS)] == ["ok.txt"]
 
 
+def test_truncated_list_without_token_is_a_safe_error():
+    body = (
+        b"<ListBucketResult><IsTruncated>true</IsTruncated>"
+        b"<Contents><Key>a.txt</Key><Size>1</Size></Contents></ListBucketResult>"
+    )
+    storage = CloudRuObjectStorage("bucket", session=FakeSession(FakeResponse(200, body)))
+
+    with pytest.raises(StorageError):
+        storage.list("", credentials=CREDS)
+
+
 def test_default_clock_and_session_are_used():
     storage = CloudRuObjectStorage("bucket")
     assert isinstance(storage._session, requests.Session)
@@ -382,7 +393,7 @@ def test_storage_provider_from_env(tmp_path, monkeypatch):
         {
             "ALICE_STORAGE_PROVIDER": " CloudRU ",
             "CLOUDRU_STORAGE_BUCKET": "alice",
-            "CLOUDRU_STORAGE_ENDPOINT": "https://s3.example.test/",
+            "CLOUDRU_STORAGE_S3_ENDPOINT": "https://s3.example.test/",
             "CLOUDRU_STORAGE_REGION": "ru-test-1",
             "CLOUDRU_STORAGE_PREFIX": "prod",
         }
