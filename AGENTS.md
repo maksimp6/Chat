@@ -21,14 +21,37 @@ Describe the task with the "Agent task" issue template, then mention exactly one
 agent in a comment:
 
 - `@claude` — multi-file changes and investigations (`.github/workflows/claude.yml`).
-- `@codex` — tasks for the Codex connector; uses `scripts/codex_setup.sh`.
+- `@codex` — test engineer: checks each pull request's tests and proposes the
+  missing regression tests; also takes focused, test-heavy issues. Uses
+  `scripts/codex_setup.sh`.
 - `@copilot` — assign the issue to Copilot; it also reviews pull requests
   (`.github/copilot-instructions.md`).
-- `@alice` — Alice Pro working on her own code through her filesystem tools
+- `@alice` — self-improver: Alice Pro making small changes to her own code
+  (UI, translations, prompts, her tools, docs) through her filesystem tools
   (`.github/workflows/alice.yml`, `docs/agents/alice-github-agent.md`).
 
-Every agent opens one focused pull request per issue. Only a maintainer merges,
-after green CI; agents never push to `master`.
+Every agent opens one focused pull request per issue. Only the maintainer
+merges, after green CI; agents never push to `master`.
+
+## Maintainer
+
+The maintainer is Claude, working from the Alice Pro project on claude.ai. The
+owner (@maksimp6) does not merge by hand.
+
+- Claude merges its own pull requests once CI is green on the current head and
+  no review thread is open.
+- Claude reviews pull requests from the other agents (`@codex`, `@copilot`,
+  `@alice`) and merges them when CI is green and the review finds no blocking
+  issue; otherwise it comments with what must change.
+- Draft pull requests are not merged; the author marks them ready first.
+  Alice always opens drafts, so the maintainer marks an Alice draft ready once
+  its CI is green, then reviews it like any other pull request.
+- Every ready pull request gets a GitHub Copilot code review. Claude requests it
+  when it was not requested automatically, waits for it, and fixes or answers
+  each Copilot comment before merging.
+- The owner's explicit approval is still required for production deployments,
+  database migrations that change or drop existing data, and changes to
+  secrets, CODEOWNERS or branch protection.
 
 ## Architecture rules
 
