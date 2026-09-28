@@ -106,7 +106,7 @@ Secrets must never be included in MCP tool metadata, results, ordinary logs, or 
 
 The production service must be reachable over HTTPS. In ChatGPT developer mode, create an app/connector using the public URL ending in `/mcp`.
 
-For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish the Yandex API key or Supabase service-role credential.
+For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish provider API keys or backend-only credentials.
 
 ## Validation
 

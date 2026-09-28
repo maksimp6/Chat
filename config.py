@@ -25,11 +25,6 @@ CLOUDRU_BASE_URL = os.getenv(
 YANDEX_PROVIDER_KEY_ID = os.getenv("YANDEX_PROVIDER_KEY_ID")
 CLOUDRU_API_KEY_ID = os.getenv("CLOUDRU_API_KEY_ID")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
-SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
-SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
-
 
 def get_donation_url():
     """Return the optional public donation page URL, or None when disabled.
@@ -194,10 +189,6 @@ class Config:
     CLOUDRU_BASE_URL = CLOUDRU_BASE_URL
     YANDEX_PROVIDER_KEY_ID = YANDEX_PROVIDER_KEY_ID
     CLOUDRU_API_KEY_ID = CLOUDRU_API_KEY_ID
-    SUPABASE_URL = SUPABASE_URL
-    SUPABASE_ANON_KEY = SUPABASE_ANON_KEY
-    SUPABASE_SECRET_KEY = SUPABASE_SECRET_KEY
-    SUPABASE_DB_URL = SUPABASE_DB_URL
     HOST = HOST
     PORT = PORT
 
@@ -241,10 +232,3 @@ def calculate_full_cost(model_key, usage):
 
 config = Config()
 REPO_DIR = "/sdcard/repo"
-
-try:
-    import trace_mirror_integration  # noqa: F401,E402
-except ImportError:
-    logger.debug("Trace mirror integration is unavailable", exc_info=True)
-except Exception:
-    logger.warning("Failed to install trace mirror integration", exc_info=True)
