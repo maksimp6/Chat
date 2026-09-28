@@ -190,6 +190,77 @@ def test_cli_main_handles_backend_failure_and_module_entrypoint(monkeypatch, cap
     assert "Conversation: conv-existing" in capsys.readouterr().out
 
 
+
+def test_cli_client_handles_transport_invalid_json_and_invalid_payload():
+    class FailingSession:
+        def request(self, *args, **kwargs):
+            raise cli_agent.requests.ConnectionError("offline secret-url")
+
+    client = cli_agent.AliceCliClient(session=FailingSession())
+    with pytest.raises(cli_agent.AliceCliError, match="backend is unavailable"):
+        client.create_conversation()
+
+    class InvalidJsonResponse:
+        status_code = 200
+
+        def json(self):
+            raise ValueError("bad json")
+
+    client = cli_agent.AliceCliClient(session=FakeSession([InvalidJsonResponse()]))
+    with pytest.raises(cli_agent.AliceCliError, match="invalid JSON"):
+        client.create_conversation()
+
+    client = cli_agent.AliceCliClient(session=FakeSession([FakeResponse(["not", "object"])]))
+    with pytest.raises(cli_agent.AliceCliError, match="invalid response"):
+        client.create_conversation()
+
+    client = cli_agent.AliceCliClient(session=FakeSession([FakeResponse({})]))
+    with pytest.raises(cli_agent.AliceCliError, match="conversation id"):
+        client.create_conversation()
+
+
+def test_cli_prints_backend_error_payload(capsys):
+    cli_agent._print_reply({"error": "provider_unavailable"})
+    assert "AI error > provider_unavailable" in capsys.readouterr().out
+
+
+def test_cli_approval_can_be_declined_or_cancelled(monkeypatch, capsys):
+    class NeverApprove:
+        def execute_approved(self, *args, **kwargs):
+            raise AssertionError("approval must not execute")
+
+    payload = {
+        "tool_call": {
+            "name": "dangerous_tool",
+            "description": "Dangerous tool",
+            "arguments": {},
+        }
+    }
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+    cli_agent._handle_approval(NeverApprove(), "conv-1", payload)
+    assert "Действие не выполнено" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: (_ for _ in ()).throw(EOFError()),
+    )
+    cli_agent._handle_approval(NeverApprove(), "conv-1", payload)
+    assert "Действие не выполнено" in capsys.readouterr().out
+
+
+def test_cli_startup_failure_is_reported(monkeypatch, capsys):
+    class BrokenClient:
+        def create_conversation(self, title="Alice Pro CLI"):
+            raise cli_agent.AliceCliError("cannot create conversation")
+
+    monkeypatch.delenv("ALICE_CONVERSATION_ID", raising=False)
+    monkeypatch.setattr(cli_agent, "AliceCliClient", lambda: BrokenClient())
+
+    cli_agent.main()
+
+    assert "CLI startup failed: cannot create conversation" in capsys.readouterr().out
+
 def test_force_critical_filter_and_yc_handler(monkeypatch):
     record = logging.LogRecord("source", logging.INFO, __file__, 1, "hello", (), None)
     critical_filter = alice_logging.ForceCriticalFilter()
