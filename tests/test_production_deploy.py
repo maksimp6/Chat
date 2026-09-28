@@ -39,7 +39,6 @@ def test_production_deployment_uses_runtime_secret_not_traefik_labels():
     assert "ALICE_SHORT_TOKEN" not in docker_block
 
 
-
 def test_production_workflow_uses_a_separate_runtime_supabase_key():
     workflow = (ROOT / ".github" / "workflows" / "production-deploy.yml").read_text(
         encoding="utf-8"
