@@ -232,3 +232,96 @@ def test_runtime_prepare_rejects_dirty_snapshot(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="not an immutable clean snapshot"):
         runtime._prepare()
+
+
+def _set_runtime_owner(environment_id, instance, heartbeat_at):
+    conn = db.get_conn()
+    conn.execute(
+        """
+        UPDATE environments
+           SET status = ?, runtime_instance = ?, runtime_heartbeat_at = ?
+         WHERE environment_id = ?
+        """,
+        ("RUNNING", instance, heartbeat_at, environment_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _status(environment_id):
+    return next(
+        environment
+        for environment in list_environments()
+        if environment["environment_id"] == environment_id
+    )
+
+
+def test_environment_init_keeps_runtime_owned_by_live_instance(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    item = create_environment("feature/one")
+    environment_id = item["environment_id"]
+    _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now())
+
+    init_environment_tables()
+    assert _status(environment_id)["status"] == "RUNNING"
+    with pytest.raises(RuntimeError, match="running on another instance: other-host:1:abc"):
+        dispatch_environment_revision(environment_id, "invoke", {"value": "x"})
+
+    _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now() - 3600)
+    init_environment_tables()
+    recovered = _status(environment_id)
+    assert recovered["status"] == "STOPPED"
+    assert recovered["runtime_instance"] is None
+    assert recovered["runtime_heartbeat_at"] is None
+    delete_environment(environment_id)
+
+
+def test_started_environment_records_owner_instance_and_heartbeat(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    item = create_environment("feature/one")
+    environment_id = item["environment_id"]
+    started = start_environment(environment_id)
+    try:
+        assert started["runtime_instance"] == environment_manager.INSTANCE_ID
+        stored = _status(environment_id)
+        assert stored["runtime_instance"] == environment_manager.INSTANCE_ID
+
+        conn = db.get_conn()
+        conn.execute(
+            "UPDATE environments SET runtime_heartbeat_at = 0 WHERE environment_id = ?",
+            (environment_id,),
+        )
+        conn.commit()
+        conn.close()
+        environment_manager._record_heartbeat(environment_id)
+        assert _status(environment_id)["runtime_heartbeat_at"] > 0
+    finally:
+        stopped = stop_environment(environment_id)
+    assert stopped["runtime_instance"] is None
+    assert _status(environment_id)["runtime_instance"] is None
+    delete_environment(environment_id)
+
+
+def test_environment_tables_add_runtime_owner_columns_to_old_schema(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "old.db"))
+    conn = db.get_conn()
+    conn.execute(
+        """
+        CREATE TABLE environments (
+            environment_id TEXT PRIMARY KEY, branch_name TEXT NOT NULL,
+            commit_sha TEXT NOT NULL, status TEXT NOT NULL, url TEXT,
+            runtime_pid INTEGER, runtime_port INTEGER, data_namespace TEXT NOT NULL,
+            owner_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            started_at INTEGER, stopped_at INTEGER, deleted_at INTEGER, error TEXT
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    init_environment_tables()
+
+    conn = db.get_conn()
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(environments)")}
+    conn.close()
+    assert {"runtime_instance", "runtime_heartbeat_at"} <= columns

@@ -6,3 +6,7 @@ pytest-cov==7.1.0
 coverage==7.16.1
 ruff==0.16.9
 diff-cover==10.6.0
+
+# Redis task queue backend (tasks.queue.RedisTaskQueue) tests.
+redis>=5.0
+fakeredis[lua]>=2.26

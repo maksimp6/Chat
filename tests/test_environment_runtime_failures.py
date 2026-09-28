@@ -381,3 +381,24 @@ def test_runtime_worker_encodes_text_and_stops_when_chunk_delivery_is_cancelled(
     finally:
         _restore_http_handler()
         runtime.stop()
+
+
+def test_runtime_thread_sends_heartbeats_and_survives_failures(tmp_path, monkeypatch):
+    beats = []
+    two_beats = threading.Event()
+
+    def record_heartbeat(environment_id):
+        beats.append(environment_id)
+        if len(beats) == 1:
+            raise RuntimeError("database unavailable")
+        two_beats.set()
+
+    monkeypatch.setattr(environment_manager, "_HEARTBEAT_SECONDS", 0.01)
+    monkeypatch.setattr(environment_manager, "_record_heartbeat", record_heartbeat)
+    runtime = _runtime(tmp_path, "runtime-heartbeat")
+    runtime.start()
+    try:
+        assert two_beats.wait(2)
+    finally:
+        runtime.stop()
+    assert set(beats) == {"runtime-heartbeat"}

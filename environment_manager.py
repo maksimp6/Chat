@@ -9,8 +9,10 @@ contract through its deployment workflow.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
+import socket
 import subprocess
 import threading
 import time
@@ -27,6 +29,16 @@ from runtime.request_context import bind_runtime_request
 
 
 ENV_STATUSES = ("CREATING", "RUNNING", "STOPPED", "FAILED", "DELETING")
+
+logger = logging.getLogger(__name__)
+
+# Runtime threads live in one process, but their ownership is recorded in the
+# database: each RUNNING row names the instance hosting it and a heartbeat. A
+# restarted or additional instance only reclaims rows whose owner is gone.
+INSTANCE_ID = os.environ.get("ALICE_INSTANCE_ID") or (
+    f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
+)
+_HEARTBEAT_SECONDS = 15.0
 
 _RUNTIME_DISPATCHER = RuntimeDispatcher()
 _RUNTIME_WORKERS: dict[str, "EnvironmentRuntime"] = {}
@@ -128,10 +140,18 @@ def init_environment_tables() -> None:
                 started_at INTEGER,
                 stopped_at INTEGER,
                 deleted_at INTEGER,
-                error TEXT
+                error TEXT,
+                runtime_instance TEXT,
+                runtime_heartbeat_at INTEGER
             )
             """
         )
+        existing_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(environments)").fetchall()
+        }
+        for column in ("runtime_instance TEXT", "runtime_heartbeat_at INTEGER"):
+            if column.split()[0] not in existing_columns:
+                conn.execute(f"ALTER TABLE environments ADD COLUMN {column}")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS environment_events (
@@ -151,23 +171,56 @@ def init_environment_tables() -> None:
             "CREATE INDEX IF NOT EXISTS idx_environment_events_env ON environment_events(environment_id)"
         )
         running_rows = conn.execute(
-            "SELECT environment_id FROM environments WHERE status = ?",
+            """
+            SELECT environment_id, runtime_instance, runtime_heartbeat_at
+              FROM environments WHERE status = ?
+            """,
             ("RUNNING",),
         ).fetchall()
         with _RUNTIME_WORKERS_LOCK:
             active_runtime_ids = set(_RUNTIME_WORKERS)
         for row in running_rows:
-            runtime_id = row["environment_id"] if hasattr(row, "keys") else row[0]
-            if runtime_id not in active_runtime_ids:
-                conn.execute(
-                    """
-                    UPDATE environments
-                       SET status = ?, runtime_pid = NULL, runtime_port = NULL,
-                           updated_at = ?, stopped_at = COALESCE(stopped_at, ?)
-                     WHERE environment_id = ?
-                    """,
-                    ("STOPPED", _now(), _now(), runtime_id),
-                )
+            runtime_id = row["environment_id"]
+            if runtime_id in active_runtime_ids or _owned_by_live_instance(row):
+                continue
+            conn.execute(
+                """
+                UPDATE environments
+                   SET status = ?, runtime_pid = NULL, runtime_port = NULL,
+                       runtime_instance = NULL, runtime_heartbeat_at = NULL,
+                       updated_at = ?, stopped_at = COALESCE(stopped_at, ?)
+                 WHERE environment_id = ?
+                """,
+                ("STOPPED", _now(), _now(), runtime_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _runtime_lease_seconds() -> float:
+    return float(os.environ.get("ALICE_RUNTIME_LEASE_SECONDS", "").strip() or 60)
+
+
+def _owned_by_live_instance(row) -> bool:
+    """True when another instance hosts the runtime and its heartbeat is fresh."""
+    instance = row["runtime_instance"]
+    heartbeat = row["runtime_heartbeat_at"]
+    if not instance or instance == INSTANCE_ID or heartbeat is None:
+        return False
+    return _now() - int(heartbeat) < _runtime_lease_seconds()
+
+
+def _record_heartbeat(environment_id: str) -> None:
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            UPDATE environments SET runtime_heartbeat_at = ?
+             WHERE environment_id = ? AND runtime_instance = ?
+            """,
+            (_now(), environment_id, INSTANCE_ID),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -509,9 +562,22 @@ class EnvironmentRuntime:
 
         shutil.rmtree(self.worktree.parent, ignore_errors=True)
 
+    def _heartbeat(self) -> None:
+        try:
+            _record_heartbeat(self.runtime_id)
+        except Exception:
+            logger.exception("Runtime %s heartbeat failed", self.runtime_id)
+
     def _run(self) -> None:
+        last_heartbeat = time.monotonic()
         while True:
-            job = self._jobs.get()
+            if time.monotonic() - last_heartbeat >= _HEARTBEAT_SECONDS:
+                self._heartbeat()
+                last_heartbeat = time.monotonic()
+            try:
+                job = self._jobs.get(timeout=_HEARTBEAT_SECONDS)
+            except queue.Empty:
+                continue
             if job is _RUNTIME_STOP:
                 return
             kind = job[0]
@@ -587,6 +653,19 @@ def authorize_environment_runtime(
             raise RuntimeOwnerViolation(environment_id) from None
 
 
+def _local_runtime(environment_id: str) -> "EnvironmentRuntime":
+    with _RUNTIME_WORKERS_LOCK:
+        runtime = _RUNTIME_WORKERS.get(environment_id)
+    if runtime is not None:
+        return runtime
+    item = _get(environment_id)
+    if item and item["status"] == "RUNNING" and _owned_by_live_instance(item):
+        raise RuntimeError(
+            f"environment runtime is running on another instance: {item['runtime_instance']}"
+        )
+    raise RuntimeError("environment runtime is not running")
+
+
 def dispatch_environment_operation(
     environment_id: str,
     operation: str,
@@ -594,10 +673,7 @@ def dispatch_environment_operation(
     *,
     timeout: float = 30.0,
 ) -> Any:
-    with _RUNTIME_WORKERS_LOCK:
-        runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is None:
-        raise RuntimeError("environment runtime is not running")
+    runtime = _local_runtime(environment_id)
     _RUNTIME_DISPATCHER.context(environment_id)
     return runtime.submit(operation, payload, timeout=timeout)
 
@@ -624,10 +700,7 @@ def dispatch_environment_http(
     *,
     timeout: float = 30.0,
 ) -> RuntimeHTTPStream:
-    with _RUNTIME_WORKERS_LOCK:
-        runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is None:
-        raise RuntimeError("environment runtime is not running")
+    runtime = _local_runtime(environment_id)
     _RUNTIME_DISPATCHER.context(environment_id)
     return runtime.submit_http(payload, timeout=timeout)
 
@@ -719,10 +792,11 @@ def start_environment(
                 """
                 UPDATE environments
                    SET status = ?, runtime_pid = NULL, runtime_port = NULL,
+                       runtime_instance = ?, runtime_heartbeat_at = ?,
                        started_at = ?, updated_at = ?, error = NULL
                  WHERE environment_id = ?
                 """,
-                ("RUNNING", _now(), _now(), environment_id),
+                ("RUNNING", INSTANCE_ID, _now(), _now(), _now(), environment_id),
             )
             conn.commit()
         finally:
@@ -733,6 +807,8 @@ def start_environment(
                 "runtime_pid": None,
                 "runtime_port": None,
                 "runtime_thread_id": thread_id,
+                "runtime_instance": INSTANCE_ID,
+                "runtime_heartbeat_at": _now(),
                 "started_at": _now(),
                 "error": None,
             }
@@ -772,7 +848,12 @@ def stop_environment(
     conn = get_conn()
     try:
         conn.execute(
-            "UPDATE environments SET status = ?, runtime_pid = NULL, updated_at = ?, stopped_at = ? WHERE environment_id = ?",
+            """
+            UPDATE environments
+               SET status = ?, runtime_pid = NULL, runtime_instance = NULL,
+                   runtime_heartbeat_at = NULL, updated_at = ?, stopped_at = ?
+             WHERE environment_id = ?
+            """,
             ("STOPPED", _now(), _now(), environment_id),
         )
         conn.commit()
@@ -784,6 +865,8 @@ def stop_environment(
             "runtime_pid": None,
             "runtime_port": None,
             "runtime_thread_id": None,
+            "runtime_instance": None,
+            "runtime_heartbeat_at": None,
             "stopped_at": _now(),
         }
     )

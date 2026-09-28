@@ -6,8 +6,10 @@ from typing import ClassVar
 
 import pytest
 
+import db
 import voice_routes
 from app import app
+from tasks import reset_task_queue, run_worker
 
 
 def _wav():
@@ -25,14 +27,30 @@ def _wav():
 
 
 @pytest.fixture()
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     monkeypatch.setenv("YANDEX_API_KEY", "test-key")
     monkeypatch.setenv("YANDEX_PROJECT_ID", "test-project")
+    # Jobs go to a durable SQLite queue and run only when a worker drains it.
+    monkeypatch.setenv("ALICE_TASK_WORKER", "external")
+    monkeypatch.delenv("ALICE_TASK_QUEUE", raising=False)
+    monkeypatch.delenv("ALICE_REDIS_URL", raising=False)
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "voice.db"))
+    monkeypatch.setattr(voice_routes, "_SSE_POLL_SECONDS", 0.01)
+    reset_task_queue()
     app.config.update(TESTING=True)
     with app.test_client() as c:
         yield c
     with voice_routes._sessions_lock:
         voice_routes._sessions.clear()
+    reset_task_queue()
+
+
+def _sse_events(response):
+    return [
+        json.loads(line[len("data: ") :])
+        for line in response.get_data(as_text=True).splitlines()
+        if line.startswith("data: ")
+    ]
 
 
 def test_voice_session_lifecycle_and_pipeline(client, monkeypatch):
@@ -75,15 +93,13 @@ def test_voice_session_lifecycle_and_pipeline(client, monkeypatch):
 
     closed = client.post("/api/voice/close", json={"session_id": session_id})
     assert closed.status_code == 200
+    assert client.get(f"/api/voice/output?session_id={session_id}").status_code == 404
 
-    deadline = time.time() + 2
-    events = []
-    while time.time() < deadline:
-        event = voice_routes._require_session(session_id).events.get(timeout=0.2)
-        events.append(event)
-        if event["type"] == "response.done":
-            break
+    # The web process only enqueued the job; a separate worker runs it.
+    assert calls == []
+    assert run_worker(drain=True) == 1
 
+    events = _sse_events(client.get(f"/api/voice/events?session_id={session_id}"))
     assert [event["type"] for event in events] == [
         "input_audio_buffer.speech_stopped",
         "conversation.item.input_audio_transcription.completed",
@@ -91,7 +107,9 @@ def test_voice_session_lifecycle_and_pipeline(client, monkeypatch):
         "response.output_audio.ready",
         "response.done",
     ]
-    assert voice_routes._require_session(session_id).output_audio == b"OggOpus"
+    output = client.get(f"/api/voice/output?session_id={session_id}")
+    assert output.status_code == 200
+    assert output.data == b"OggOpus"
     assert calls[1][0] == "chat"
     assert calls[1][1] == "Привет"
 
@@ -118,6 +136,7 @@ def test_voice_events_is_sse(client, monkeypatch):
     ]
     client.post(f"/api/voice/audio?session_id={session_id}", data=b"audio")
     client.post("/api/voice/close", json={"session_id": session_id})
+    run_worker(drain=True)
 
     response = client.get(f"/api/voice/events?session_id={session_id}")
     body = response.get_data(as_text=True)
@@ -188,3 +207,85 @@ def test_voice_chat_requires_conversation_and_text_reply(monkeypatch):
     monkeypatch.setattr(_FakeAliceClient, "reply", "")
     with pytest.raises(RuntimeError, match="no text response"):
         voice_routes._chat("вопрос", "conv-1", "aliceai-llm")
+
+
+def _closed_session(client, audio=b"audio"):
+    session_id = client.post("/api/voice/session", json={"response_mode": "text"}).get_json()[
+        "session_id"
+    ]
+    if audio:
+        client.post(f"/api/voice/audio?session_id={session_id}", data=audio)
+    assert client.post("/api/voice/close", json={"session_id": session_id}).status_code == 200
+    return session_id
+
+
+def test_voice_job_survives_web_restart(client, monkeypatch):
+    monkeypatch.setattr(
+        voice_routes, "_stt", lambda audio, content_type="application/octet-stream": "тест"
+    )
+    monkeypatch.setattr(voice_routes, "_chat", lambda text, conversation_id, model: "ответ")
+    session_id = _closed_session(client)
+
+    # Simulate a web container restart: in-process state and queue objects are gone.
+    with voice_routes._sessions_lock:
+        voice_routes._sessions.clear()
+    reset_task_queue()
+
+    assert run_worker(drain=True) == 1
+    events = _sse_events(client.get(f"/api/voice/events?session_id={session_id}"))
+    assert events[-2] == {"type": "response.output_text.done", "text": "ответ"}
+    assert events[-1] == {"type": "response.done"}
+
+
+def test_voice_empty_audio_reports_error(client):
+    session_id = _closed_session(client, audio=b"")
+    run_worker(drain=True)
+    events = _sse_events(client.get(f"/api/voice/events?session_id={session_id}"))
+    assert events == [
+        {"type": "error", "error": {"message": "audio is empty"}},
+        {"type": "response.done"},
+    ]
+
+
+def test_voice_closed_session_rejects_audio_and_second_close(client):
+    session_id = _closed_session(client)
+    response = client.post(f"/api/voice/audio?session_id={session_id}", data=b"more")
+    assert response.status_code == 409
+    response = client.post("/api/voice/close", json={"session_id": session_id})
+    assert response.status_code == 409
+
+
+def test_voice_unknown_session_is_not_found(client):
+    assert client.post("/api/voice/close", json={}).status_code == 404
+    assert client.get("/api/voice/events?session_id=missing").status_code == 404
+
+
+def test_voice_non_voice_job_is_not_a_session(client):
+    job_id = voice_routes.get_task_queue().enqueue("other.task", {})
+    assert client.get(f"/api/voice/output?session_id={job_id}").status_code == 404
+
+
+def test_voice_events_report_failed_job_and_keep_alive(client, monkeypatch):
+    monkeypatch.setattr(voice_routes, "_SSE_KEEPALIVE_SECONDS", 0.0)
+    session_id = _closed_session(client)
+    queue = voice_routes.get_task_queue()
+    original_get = queue.get
+    polls = []
+
+    def get_after_worker_died(job_id):
+        # Session lookup and the first stream poll see a queued job, a worker
+        # reports progress, and then that worker dies for good.
+        polls.append(job_id)
+        if len(polls) == 2:
+            queue.append_event(job_id, {"type": "input_audio_buffer.speech_stopped"})
+        if len(polls) == 3:
+            job = queue.claim("dead-worker", lease_seconds=60)
+            queue.fail(job, "worker lease expired too many times")
+        return original_get(job_id)
+
+    monkeypatch.setattr(queue, "get", get_after_worker_died)
+    body = client.get(f"/api/voice/events?session_id={session_id}").get_data(as_text=True)
+    assert body.startswith(": keep-alive")
+    assert "input_audio_buffer.speech_stopped" in body
+    assert '"message": "worker lease expired too many times"' in body
+    assert body.rstrip().endswith('data: {"type": "response.done"}')

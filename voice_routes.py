@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import queue
 import threading
 import time
 import uuid
@@ -18,6 +17,8 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 from config import Config, TEXT_MODELS
 from mcp_routes import AliceClient
 from conversation_ownership import check_access
+from tasks import TaskContext, enqueue, get_task_queue, register_task
+from tasks.queue import FAILED
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 
@@ -27,6 +28,9 @@ _MAX_AUDIO_BYTES = 1024 * 1024
 _SESSION_TTL_SECONDS = 10 * 60
 _STT_URL = "https://stt.api.cloud.yandex.net/speech/v1/stt:recognize"
 _TTS_URL = "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize"
+_SSE_POLL_SECONDS = 0.2
+_SSE_KEEPALIVE_SECONDS = 15.0
+VOICE_TASK = "voice.process"
 
 
 @dataclass
@@ -40,8 +44,7 @@ class VoiceSession:
     created_at: float = field(default_factory=time.time)
     audio: bytearray = field(default_factory=bytearray)
     audio_content_type: str = "application/octet-stream"
-    output_audio: bytes | None = None
-    events: queue.Queue = field(default_factory=queue.Queue)
+    closed: bool = False
 
 
 _sessions: dict[str, VoiceSession] = {}
@@ -73,17 +76,27 @@ def _cleanup_sessions() -> None:
                 _sessions.pop(session_id, None)
 
 
-def _emit(session: VoiceSession, event_type: str, **payload: Any) -> None:
-    session.events.put({"type": event_type, **payload})
-
-
 def _require_session(session_id: str) -> VoiceSession:
+    """Return an open session, or a closed one rebuilt from its durable job."""
     _cleanup_sessions()
     with _sessions_lock:
         session = _sessions.get(session_id)
-    if session is None:
+    if session is not None:
+        return session
+    job = get_task_queue().get(session_id) if session_id else None
+    if job is None or job.kind != VOICE_TASK:
         raise KeyError("voice session not found")
-    return session
+    payload = job.payload
+    return VoiceSession(
+        session_id=session_id,
+        owner_id=payload.get("owner_id"),
+        conversation_id=payload.get("conversation_id"),
+        model=payload["model"],
+        voice=payload["voice"],
+        response_mode=payload["response_mode"],
+        audio_content_type=payload["audio_content_type"],
+        closed=True,
+    )
 
 
 def _check_owner(session: VoiceSession) -> None:
@@ -177,32 +190,47 @@ def _tts(text: str, voice: str) -> bytes:
     return response.content
 
 
-def _process(session: VoiceSession) -> None:
+@register_task(VOICE_TASK)
+def _process(context: TaskContext) -> dict[str, Any]:
+    """Worker handler: STT -> chat -> TTS, publishing events to the job log."""
+    payload = context.payload
+
+    def emit(event_type: str, **data: Any) -> None:
+        context.emit({"type": event_type, **data})
+
+    output_audio = None
     try:
-        _emit(session, "input_audio_buffer.speech_stopped")
-        transcript = _stt(bytes(session.audio), session.audio_content_type)
+        audio = base64.b64decode(payload["audio_b64"])
+        if not audio:
+            raise ValueError("audio is empty")
+        emit("input_audio_buffer.speech_stopped")
+        transcript = _stt(audio, payload["audio_content_type"])
         if not transcript:
             raise ValueError("speech was not recognized")
-        _emit(
-            session, "conversation.item.input_audio_transcription.completed", transcript=transcript
-        )
+        emit("conversation.item.input_audio_transcription.completed", transcript=transcript)
 
-        reply = _chat(transcript, session.conversation_id, session.model)
-        if session.response_mode in {"text", "both", "audio"}:
-            _emit(session, "response.output_text.done", text=reply)
+        reply = _chat(transcript, payload.get("conversation_id"), payload["model"])
+        if payload["response_mode"] in {"text", "both", "audio"}:
+            emit("response.output_text.done", text=reply)
 
-        if session.response_mode in {"audio", "both"}:
-            session.output_audio = _tts(reply, session.voice)
-            _emit(
-                session,
+        if payload["response_mode"] in {"audio", "both"}:
+            output_audio = _tts(reply, payload["voice"])
+            emit(
                 "response.output_audio.ready",
-                audio_url=f"/api/voice/output?session_id={session.session_id}",
+                audio_url=f"/api/voice/output?session_id={context.job_id}",
             )
 
-        _emit(session, "response.done")
+        emit("response.done")
     except Exception as exc:
-        _emit(session, "error", error={"message": str(exc)[:500]})
-        _emit(session, "response.done")
+        emit("error", error={"message": str(exc)[:500]})
+        emit("response.done")
+    return {
+        "output_audio_b64": base64.b64encode(output_audio).decode("ascii") if output_audio else None
+    }
+
+
+def _closed_error():
+    return jsonify({"error": "voice session is already closed"}), 409
 
 
 @voice_bp.post("/api/voice/session")
@@ -239,6 +267,8 @@ def append_voice_audio():
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
+    if session.closed:
+        return _closed_error()
 
     chunk = request.get_data(cache=False)
     if not chunk:
@@ -262,17 +292,33 @@ def voice_events():
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
 
+    queue = get_task_queue()
+
     @stream_with_context
     def stream():
+        seq = 0
+        last_write = time.monotonic()
         while True:
-            try:
-                event = session.events.get(timeout=15)
-            except queue.Empty:
-                yield ": keep-alive\n\n"
+            batch = queue.events(session.session_id, after=seq)
+            for seq, event in batch:
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") == "response.done":
+                    return
+            if batch:
+                last_write = time.monotonic()
                 continue
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-            if event.get("type") == "response.done":
-                break
+            job = queue.get(session.session_id)
+            if job is not None and job.status == FAILED:
+                for event in (
+                    {"type": "error", "error": {"message": job.error or "voice task failed"}},
+                    {"type": "response.done"},
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                return
+            if time.monotonic() - last_write >= _SSE_KEEPALIVE_SECONDS:
+                yield ": keep-alive\n\n"
+                last_write = time.monotonic()
+            time.sleep(_SSE_POLL_SECONDS)
 
     return Response(
         stream(),
@@ -290,25 +336,40 @@ def voice_output():
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
-    if not session.output_audio:
+    job = get_task_queue().get(session.session_id)
+    output_audio = ((job.result or {}) if job else {}).get("output_audio_b64")
+    if not output_audio:
         return jsonify({"error": "voice output is not ready"}), 404
-    return Response(session.output_audio, mimetype="audio/ogg")
+    return Response(base64.b64decode(output_audio), mimetype="audio/ogg")
 
 
 @voice_bp.post("/api/voice/close")
 def close_voice_session():
     try:
-        session = _require_session(request.get_json(silent=True).get("session_id", ""))
+        data = request.get_json(silent=True) or {}
+        session = _require_session(str(data.get("session_id") or ""))
         _check_owner(session)
     except KeyError as exc:
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
+    if session.closed:
+        return _closed_error()
 
-    if not session.audio:
-        _emit(session, "error", error={"message": "audio is empty"})
-        _emit(session, "response.done")
-        return jsonify({"status": "closed"})
-
-    threading.Thread(target=_process, args=(session,), daemon=True).start()
+    with _sessions_lock:
+        _sessions.pop(session.session_id, None)
+    # The job id is the session id, so events and output survive a web restart.
+    enqueue(
+        VOICE_TASK,
+        {
+            "owner_id": session.owner_id,
+            "conversation_id": session.conversation_id,
+            "model": session.model,
+            "voice": session.voice,
+            "response_mode": session.response_mode,
+            "audio_content_type": session.audio_content_type,
+            "audio_b64": base64.b64encode(bytes(session.audio)).decode("ascii"),
+        },
+        job_id=session.session_id,
+    )
     return jsonify({"status": "processing"})

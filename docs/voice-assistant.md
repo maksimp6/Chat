@@ -32,7 +32,11 @@ Voice model identifiers from `VOICE_MODELS` are not passed to the text chat prov
 
 ## Security boundaries
 
-Voice session IDs are random UUID-derived values. A session is scoped to the owner and, when supplied, to the conversation owner. Audio is kept in memory and automatically expires after the session TTL. Provider credentials remain server-side.
+Voice session IDs are random UUID-derived values. A session is scoped to the owner and, when supplied, to the conversation owner. Audio is buffered in memory while it is uploaded; unclosed sessions expire after the session TTL. Provider credentials remain server-side.
+
+## Processing
+
+`POST /api/voice/close` enqueues a `voice.process` background job whose id is the session id, and returns. A task worker runs STT, chat and TTS and writes each event and the synthesized audio to the job, so `/api/voice/events` and `/api/voice/output` keep working after a web restart or on another replica. See [background tasks](runtime/background-tasks.md).
 
 ## Known scope
 
