@@ -47,7 +47,7 @@ response
 - browser;
 - Android / local tool agent;
 - GitHub issue agent;
-- будущий CLI/Termux entrypoint;
+- CLI/Termux entrypoint (`cli_agent.py`);
 - A2A / agent gateway.
 
 ## Удалённый legacy
@@ -56,16 +56,18 @@ response
 
 - `run_agent.py`;
 - `run_agent_loop.py`;
-- `yandex_agent_loop.py`.
+- `yandex_agent_loop.py`;
+- `agent_runner.py`.
 
 Они напрямую вызывали старые completion/OpenAI-compatible endpoints и имели собственные
 tool protocols, поэтому обходили единые invocation, approval, trace и billing contracts.
 
+## Уже переведено на canonical runtime
+
+- `cli_agent.py` — тонкий CLI/Termux-адаптер к `/api/conversations`, `/api/chat` и стандартному approval endpoint; прямых Yandex API calls и локального shell execution больше нет.
+
 ## На апгрейд
 
-- `cli_agent.py` — сохранить пользовательский CLI use case, но перевести на canonical runtime;
-- `agent_runner.py` — проверить роль в GitHub-agent path и либо адаптировать к UniversalToolExecutor,
-  либо удалить после миграции;
 - `alice_agent_runner.py` — живой GitHub workflow adapter, должен использовать общий runtime;
 - `local_tool_agent.py` — живой Android/local transport adapter;
 - `agent_gateway.py` — provider-neutral/A2A routing;
