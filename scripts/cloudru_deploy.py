@@ -37,6 +37,54 @@ from cloud.cloudru.container_apps_client import (  # noqa: E402
 from cloud.cloudru.registry_client import CloudRuRegistryClient, validate_name  # noqa: E402
 
 
+CODEX_CLOUDRU_STATE_FILE = Path.home() / ".local" / "state" / "alice-pro" / "cloudru-codex.json"
+
+
+def _load_cloudru_credentials() -> None:
+    """Load the protected Codex hand-off without printing credential values.
+
+    Codex removes environment secrets before the agent phase. The setup script
+    writes only this exact Cloud.ru pair (and the non-secret project ID) to a
+    mode-600 file outside the checkout. Explicit process environment values
+    take precedence, while the historical ``CLOUDRU_KEY_*`` names remain
+    accepted for direct invocations.
+    """
+    state_file = CODEX_CLOUDRU_STATE_FILE
+    if state_file.exists():
+        try:
+            mode = state_file.stat().st_mode & 0o777
+            if mode & 0o077:
+                raise CloudProviderError(
+                    "Cloud.ru credential cache has unsafe permissions",
+                    code="validation_error",
+                )
+            payload = json.loads(state_file.read_text(encoding="utf-8"))
+        except CloudProviderError:
+            raise
+        except (OSError, json.JSONDecodeError, TypeError) as exc:
+            raise CloudProviderError(
+                "Cloud.ru credential cache is unreadable",
+                code="validation_error",
+            ) from exc
+        if not isinstance(payload, dict):
+            raise CloudProviderError(
+                "Cloud.ru credential cache is invalid", code="validation_error"
+            )
+        for name in ("CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET", "CLOUDRU_PROJECT_ID"):
+            value = payload.get(name)
+            if not os.environ.get(name) and isinstance(value, str) and value:
+                os.environ[name] = value
+
+    if not os.environ.get("CLOUDRU_IAM_KEY_ID"):
+        legacy_key_id = os.environ.get("CLOUDRU_KEY_ID", "").strip()
+        if legacy_key_id:
+            os.environ["CLOUDRU_IAM_KEY_ID"] = legacy_key_id
+    if not os.environ.get("CLOUDRU_IAM_KEY_SECRET"):
+        legacy_key_secret = os.environ.get("CLOUDRU_KEY_SECRET", "").strip()
+        if legacy_key_secret:
+            os.environ["CLOUDRU_IAM_KEY_SECRET"] = legacy_key_secret
+
+
 def _settings() -> dict:
     try:
         min_instances = int(os.getenv("CLOUDRU_MIN_INSTANCES", "0"))
@@ -235,6 +283,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
+        _load_cloudru_credentials()
         _emit(args.func(args))
     except CloudProviderError as exc:
         _emit({"error": exc.code, "message": exc.message, "http_status": exc.http_status})
