@@ -41,6 +41,9 @@ owner (@maksimp6) does not merge by hand.
   `@alice`) and merges them when CI is green and the review finds no blocking
   issue; otherwise it comments with what must change.
 - Draft pull requests are not merged; the author marks them ready first.
+- Every ready pull request gets a GitHub Copilot code review. Claude requests it
+  when it was not requested automatically, waits for it, and fixes or answers
+  each Copilot comment before merging.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
