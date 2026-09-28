@@ -190,7 +190,6 @@ def test_cli_main_handles_backend_failure_and_module_entrypoint(monkeypatch, cap
     assert "Conversation: conv-existing" in capsys.readouterr().out
 
 
-
 def test_cli_client_handles_transport_invalid_json_and_invalid_payload():
     class FailingSession:
         def request(self, *args, **kwargs):
@@ -260,6 +259,7 @@ def test_cli_startup_failure_is_reported(monkeypatch, capsys):
     cli_agent.main()
 
     assert "CLI startup failed: cannot create conversation" in capsys.readouterr().out
+
 
 def test_force_critical_filter_and_yc_handler(monkeypatch):
     record = logging.LogRecord("source", logging.INFO, __file__, 1, "hello", (), None)
