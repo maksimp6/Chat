@@ -32,7 +32,6 @@ def test_reachable_endpoint_is_ready(monkeypatch):
     assert checker.check_supabase_trace_mirror() == "ready"
 
 
-
 def test_secret_api_key_uses_apikey_without_bearer(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
