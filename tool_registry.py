@@ -180,6 +180,14 @@ class ToolRegistry:
         except Exception as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Partner Relations: {e}")
 
+        try:
+            from cloud.tools import CLOUD_TOOLS
+
+            for name, cfg in CLOUD_TOOLS.items():
+                self._register("cloud", name, cfg)
+        except Exception as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки Cloud tools: {e}")
+
     @staticmethod
     def _strict_schema(schema: dict) -> dict:
         """Normalize a JSON Schema for strict function calling."""
