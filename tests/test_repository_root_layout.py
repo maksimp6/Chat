@@ -67,8 +67,6 @@ LEGACY_ROOT_PYTHON = {
     "provider_quotas.py",
     "reasoning_plan.py",
     "responses_tool_loop.py",
-    "run_agent.py",
-    "run_agent_loop.py",
     "runtime_api.py",
     "runtime_migrations.py",
     "runtime_tools.py",
@@ -97,7 +95,6 @@ LEGACY_ROOT_PYTHON = {
     "user_identity.py",
     "voice_routes.py",
     "wikipedia_mcp_tools.py",
-    "yandex_agent_loop.py",
     "yandex_api_key_provider.py",
     "yandex_api_logger.py",
     "yandex_client.py",
@@ -148,3 +145,9 @@ def test_browser_modules_live_in_package_not_repository_root():
     assert (package / "__init__.py").is_file()
     assert (package / "adapters.py").is_file()
     assert (package / "capabilities.py").is_file()
+
+
+def test_pruned_legacy_agent_loops_stay_deleted():
+    pruned = {"run_agent.py", "run_agent_loop.py", "yandex_agent_loop.py"}
+    resurrected = sorted(name for name in pruned if (ROOT / name).exists())
+    assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
