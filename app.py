@@ -31,7 +31,6 @@ from partner_relations import (
     init_partner_relations_tables,
     ensure_partner_department,
 )
-from supabase_startup_check import check_supabase_trace_mirror
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from user_identity import init_user_identity_table, register_anonymous_user
@@ -132,7 +131,6 @@ def _set_web_cache_headers(response):
 init_db()
 init_runtime_tables()
 init_local_agent_tables()
-check_supabase_trace_mirror()
 init_treasury_tables()
 init_user_identity_table()
 init_conversation_ownership_table()
