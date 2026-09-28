@@ -9,7 +9,6 @@ import send_logs
 import yc_logging
 
 
-
 def _create_archive_database(path, rows=()):
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE messages (id INTEGER, content TEXT, created_at TEXT)")
