@@ -1,6 +1,6 @@
 import json
 import time
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 import pytest
 from agent_gateway import (
     A2AClient,
@@ -168,6 +168,77 @@ def test_a2a_bad_id(monkeypatch):
         )
 
 
+def test_a2a_requires_endpoint_or_agent_card():
+    with pytest.raises(ValueError, match="must be configured"):
+        A2AClient(A2AClientConfig())
+
+
+def test_a2a_load_agent_card_requires_configured_url():
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    with pytest.raises(A2AProtocolError, match="not configured"):
+        client._load_agent_card()
+
+
+def test_a2a_load_agent_card_wraps_http_errors(monkeypatch):
+    client = A2AClient(
+        A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json")
+    )
+    error = HTTPError(client._config.agent_card_url, 503, "unavailable", hdrs=None, fp=None)
+    monkeypatch.setattr("agent_gateway.urlopen", lambda req, timeout: (_ for _ in ()).throw(error))
+    with pytest.raises(A2AProtocolError, match="HTTP error 503: unavailable"):
+        client._load_agent_card()
+
+
+def test_a2a_load_agent_card_wraps_transport_errors(monkeypatch):
+    client = A2AClient(
+        A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json")
+    )
+    monkeypatch.setattr(
+        "agent_gateway.urlopen",
+        lambda req, timeout: (_ for _ in ()).throw(URLError("offline")),
+    )
+    with pytest.raises(A2AProtocolError, match="transport error"):
+        client._load_agent_card()
+
+
+def test_a2a_load_agent_card_rejects_invalid_json(monkeypatch):
+    class R:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b"{"
+
+    monkeypatch.setattr("agent_gateway.urlopen", lambda req, timeout: R())
+    client = A2AClient(
+        A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json")
+    )
+    with pytest.raises(A2AProtocolError, match="not valid JSON"):
+        client._load_agent_card()
+
+
+def test_a2a_load_agent_card_requires_json_object(monkeypatch):
+    class R:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'["not","an","object"]'
+
+    monkeypatch.setattr("agent_gateway.urlopen", lambda req, timeout: R())
+    client = A2AClient(
+        A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json")
+    )
+    with pytest.raises(A2AProtocolError, match="must be a JSON object"):
+        client._load_agent_card()
+
+
 def test_a2a_reads_endpoint_from_agent_card(monkeypatch):
     captured = {}
 
@@ -201,6 +272,51 @@ def test_a2a_reads_endpoint_from_agent_card(monkeypatch):
     assert result == {"ok": True}
     assert captured["method"] == "message/send"
     assert captured["params"]["message"]["role"] == "user"
+
+
+def test_a2a_reads_endpoint_from_agent_card_transports():
+    endpoint = A2AClient._extract_card_endpoint(
+        {
+            "transports": [
+                {"protocol": "other", "endpoint": "https://agent.example/ignored"},
+                {"name": "a2a", "url": "/a2a"},
+            ]
+        },
+        "https://agent.example/.well-known/agent.json",
+    )
+    assert endpoint == "https://agent.example/a2a"
+
+
+def test_a2a_reads_endpoint_from_agent_card_capabilities():
+    endpoint = A2AClient._extract_card_endpoint(
+        {"capabilities": {"a2a": {"endpoint": "/rpc"}}},
+        "https://agent.example/.well-known/agent.json",
+    )
+    assert endpoint == "https://agent.example/rpc"
+
+
+def test_a2a_requires_endpoint_in_agent_card():
+    with pytest.raises(A2AProtocolError, match="does not define an endpoint"):
+        A2AClient._extract_card_endpoint(
+            {"transports": ["bad"], "capabilities": {"a2a": []}},
+            "https://agent.example/.well-known/agent.json",
+        )
+
+
+def test_a2a_resolve_endpoint_returns_cached_value_inside_lock():
+    client = A2AClient(A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json"))
+
+    class LockThatSetsEndpoint:
+        def __enter__(self):
+            client._endpoint = "https://agent.example/from-lock"
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    client._endpoint_lock = LockThatSetsEndpoint()
+    client._load_agent_card = lambda: (_ for _ in ()).throw(AssertionError("should not load"))
+    assert client._resolve_endpoint() == "https://agent.example/from-lock"
 
 
 def test_a2a_sse_stream(monkeypatch):
@@ -254,6 +370,94 @@ def test_a2a_sse_stream_with_crlf(monkeypatch):
     assert events == [{"delta": "one"}, {"delta": "two"}]
 
 
+def test_a2a_parse_sse_skips_comments_and_yields_raw_trailing_event():
+    events = list(
+        A2AClient._parse_sse(
+            ':keepalive\n'
+            'data: {"result":{"delta":"one"}}\n'
+            "\n"
+            "data: not-json"
+        )
+    )
+    assert events == [{"result": {"delta": "one"}}, "not-json"]
+
+
+def test_a2a_parse_sse_yields_raw_invalid_json_event():
+    assert list(A2AClient._parse_sse("data: not-json\n\n")) == ["not-json"]
+
+
+def test_a2a_parse_sse_stops_on_trailing_done():
+    assert list(A2AClient._parse_sse("data: [DONE]")) == []
+
+
+def test_a2a_send_message_raises_on_error_response(monkeypatch):
+    monkeypatch.setattr(
+        A2AClient,
+        "_send_rpc",
+        lambda self, payload, accept: (
+            "req-id",
+            {"jsonrpc": "2.0", "id": "req-id", "error": {"message": "boom"}},
+        ),
+    )
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    with pytest.raises(AgentInvocationError, match="boom"):
+        client.send_message({"message": {"role": "user", "parts": []}})
+
+
+def test_a2a_stream_message_requires_text_stream(monkeypatch):
+    monkeypatch.setattr(
+        A2AClient,
+        "_send_rpc",
+        lambda self, payload, accept: ("req-id", b"not-text"),
+    )
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    with pytest.raises(A2AProtocolError, match="text stream"):
+        list(client.stream_message({"message": {"role": "user", "parts": []}}))
+
+
+def test_a2a_stream_message_yields_non_mapping_events(monkeypatch):
+    monkeypatch.setattr(
+        A2AClient,
+        "_send_rpc",
+        lambda self, payload, accept: ("req-id", "ignored"),
+    )
+    monkeypatch.setattr(A2AClient, "_parse_sse", staticmethod(lambda raw: iter(["chunk"])))
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    assert list(client.stream_message({"message": {"role": "user", "parts": []}})) == ["chunk"]
+
+
+def test_a2a_stream_message_rejects_mismatched_event_id(monkeypatch):
+    monkeypatch.setattr(
+        A2AClient,
+        "_send_rpc",
+        lambda self, payload, accept: ("req-id", "ignored"),
+    )
+    monkeypatch.setattr(
+        A2AClient,
+        "_parse_sse",
+        staticmethod(lambda raw: iter([{"id": "wrong", "result": {}}])),
+    )
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    with pytest.raises(A2AProtocolError, match="does not match"):
+        list(client.stream_message({"message": {"role": "user", "parts": []}}))
+
+
+def test_a2a_stream_message_raises_on_event_error(monkeypatch):
+    monkeypatch.setattr(
+        A2AClient,
+        "_send_rpc",
+        lambda self, payload, accept: ("req-id", "ignored"),
+    )
+    monkeypatch.setattr(
+        A2AClient,
+        "_parse_sse",
+        staticmethod(lambda raw: iter([{"id": "req-id", "error": {"message": "boom"}}])),
+    )
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    with pytest.raises(AgentInvocationError, match="boom"):
+        list(client.stream_message({"message": {"role": "user", "parts": []}}))
+
+
 def test_cloudru_iam_token_provider_uses_stored_credentials(monkeypatch):
     import sqlite3
 
@@ -305,6 +509,19 @@ def test_cloudru_iam_token_provider_translates_iam_error(monkeypatch):
     provider = cloudru_iam_token_provider(conn, lambda value: value.replace("enc:", "", 1))
     with pytest.raises(A2AProtocolError, match="token exchange failed"):
         provider()
+    conn.close()
+
+
+def test_cloudru_iam_token_provider_requires_stored_credentials():
+    import sqlite3
+
+    from provider_credentials import create_schema
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    with pytest.raises(AgentInvocationError, match="not configured"):
+        cloudru_iam_token_provider(conn, lambda value: value)
     conn.close()
 
 

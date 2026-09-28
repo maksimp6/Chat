@@ -18,6 +18,13 @@ def test_cloudru_token_exchange_uses_service_account_key_pair():
     assert post.call_args.kwargs["json"] == {"keyId": "id", "secret": "secret"}
 
 
+def test_cloudru_access_token_uses_public_accessor():
+    client = CloudRuIamClient(key_id="id", key_secret="secret")
+    with patch.object(client, "_token", return_value="iam-token") as token:
+        assert client.access_token() == "iam-token"
+    token.assert_called_once_with()
+
+
 def test_cloudru_list_api_keys_uses_documented_filter():
     client = CloudRuIamClient(key_id="id", key_secret="secret")
     with patch.object(client, "_request", return_value={"keys": [{"id": "1"}]}) as req:
