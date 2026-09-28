@@ -16,7 +16,61 @@ Alice Pro now exposes a provider-neutral cloud tool surface backed by a Cloud.ru
   - `cloud.compute.start|stop|reboot`
   - `cloud.backup.create`
   - `cloud.ssh.exec`
+  - `cloud.environment.create|start|stop|delete|exec`
 - Read-only operations are marked `read_only=true` and do not require approval.
+
+## Sandbox environments (issue #445, phase 3 of #440)
+
+`environment_manager.py` selects one `EnvironmentAdapter` (`cloud/environment.py`)
+per environment record:
+
+- `local` (default) — today's git worktree + in-process thread runtime. Unchanged
+  behavior; Termux/local deployments do not need any new configuration.
+- `cloudru` — an isolated Cloud.ru Container Apps Job or Compute VM, provisioned
+  through `cloud/cloudru/provider.py` (`environment_create/start/exec/stop/delete`)
+  and `cloud/cloudru/environment_adapter.py`. Use this instead of `local_runtime_exec`
+  (local subprocess) or `cloud.ssh.exec` into a shared VM when Alice needs a fully
+  isolated, disposable sandbox.
+
+Every environment carries a TTL (`ttl_seconds`/`expires_at`). Local environments keep
+no TTL by default (set `ALICE_ENV_DEFAULT_TTL_SECONDS` to opt in); Cloud.ru sandboxes
+default to 3600s (override with `ALICE_CLOUDRU_ENV_DEFAULT_TTL_SECONDS`, or pass
+`ttl_seconds` explicitly on create). `environment_manager.cleanup_expired_environments()`
+deletes expired environments; it runs opportunistically from `list_environments()`, and
+can also be wired into an external cron/scheduler that calls it directly.
+
+### Configuration
+
+- `CLOUDRU_ENVIRONMENT_ENDPOINT`, `CLOUDRU_ENVIRONMENT_PATH` — base Cloud.ru API for
+  sandbox lifecycle calls (Container Apps Jobs or Compute VM), reusing the same
+  `CLOUDRU_API_KEY` / `CLOUDRU_IAM_KEY_ID`+`CLOUDRU_IAM_KEY_SECRET` authentication as
+  the rest of this provider.
+- `ALICE_ENV_ADAPTER` — default adapter for `create_environment()` calls that don't pass
+  `adapter=` explicitly (default `local`).
+
+### e2e scenario: create → execute → delete
+
+This cannot run against the real Cloud.ru API in CI (no paid resources are created in
+CI); it is covered by mocked unit tests (`tests/test_cloudru_environment_adapter.py`,
+`tests/test_environment_adapters.py`, `tests/test_cloud_tools.py`) and documented here
+for manual verification against a real Cloud.ru project:
+
+1. Set `CLOUDRU_ENVIRONMENT_ENDPOINT`/`CLOUDRU_ENVIRONMENT_PATH` and Cloud.ru
+   credentials.
+2. Create a sandbox from a commit: `cloud.environment.create` with
+   `{"branch": "master", "ttl_seconds": 3600}` (requires approval). This calls
+   `CloudRuProvider.environment_create`, which returns a remote resource id persisted
+   as `cloud_resource_id` on the environment row.
+3. Start it: `cloud.environment.start` with `{"environment_id": "<id>"}` (requires
+   approval).
+4. Run a command: `cloud.environment.exec` with
+   `{"environment_id": "<id>", "command": "echo hello"}` (requires approval); stdout/
+   stderr are redacted from traces via `trace_redact_result_fields`.
+5. Delete it: `cloud.environment.delete` with `{"environment_id": "<id>"}` (requires
+   approval). This calls `CloudRuProvider.environment_delete` and removes the DB row.
+
+Expired sandboxes that were never explicitly deleted are removed automatically by
+`cleanup_expired_environments()` once their TTL passes.
 
 ## Trace and secret handling
 

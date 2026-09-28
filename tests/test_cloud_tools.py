@@ -4,7 +4,17 @@ import pytest
 
 from cloud.policy import CONFIRMATION_REQUIRED_TOOLS
 from cloud.base import CloudProviderError
-from cloud.tools import CLOUD_TOOLS, cloud_backup, cloud_compute, cloud_ssh_exec
+from cloud.tools import (
+    CLOUD_TOOLS,
+    cloud_backup,
+    cloud_compute,
+    cloud_environment_create,
+    cloud_environment_delete,
+    cloud_environment_exec,
+    cloud_environment_start,
+    cloud_environment_stop,
+    cloud_ssh_exec,
+)
 
 
 class FakeProvider:
@@ -106,6 +116,85 @@ def test_cloud_dangerous_tools_require_approval():
     assert CLOUD_TOOLS["cloud.backup.create"]["requires_approval"] is True
     assert CLOUD_TOOLS["cloud.ssh.exec"]["requires_approval"] is True
     assert CLOUD_TOOLS["cloud.resources.list"]["requires_approval"] is False
+    assert CLOUD_TOOLS["cloud.environment.create"]["requires_approval"] is True
+    assert CLOUD_TOOLS["cloud.environment.start"]["requires_approval"] is True
+    assert CLOUD_TOOLS["cloud.environment.stop"]["requires_approval"] is True
+    assert CLOUD_TOOLS["cloud.environment.delete"]["requires_approval"] is True
+    assert CLOUD_TOOLS["cloud.environment.exec"]["requires_approval"] is True
+    for name in (
+        "cloud.environment.create",
+        "cloud.environment.start",
+        "cloud.environment.stop",
+        "cloud.environment.delete",
+        "cloud.environment.exec",
+    ):
+        assert name in CONFIRMATION_REQUIRED_TOOLS
+
+
+def test_cloud_environment_tools_delegate_to_environment_manager():
+    with patch("cloud.tools.environment_manager") as manager:
+        manager.create_environment.return_value = {"environment_id": "env-1", "status": "STOPPED"}
+        result = cloud_environment_create(
+            {"branch": "master", "commit_sha": None, "ttl_seconds": 900}, {}
+        )
+        manager.create_environment.assert_called_once_with(
+            "master", None, None, adapter="cloudru", ttl_seconds=900
+        )
+        assert result["environment_id"] == "env-1"
+
+        manager.start_environment.return_value = {"status": "RUNNING"}
+        assert cloud_environment_start({"environment_id": "env-1"}, {})["status"] == "RUNNING"
+        manager.start_environment.assert_called_once_with("env-1", None)
+
+        manager.stop_environment.return_value = {"status": "STOPPED"}
+        assert cloud_environment_stop({"environment_id": "env-1"}, {})["status"] == "STOPPED"
+
+        manager.delete_environment.return_value = {"status": "DELETING"}
+        assert cloud_environment_delete({"environment_id": "env-1"}, {})["status"] == "DELETING"
+
+        manager.execute_environment.return_value = {"success": True, "stdout": "ok"}
+        exec_result = cloud_environment_exec(
+            {"environment_id": "env-1", "command": "echo ok", "timeout_seconds": 10}, {}
+        )
+        assert exec_result["success"] is True
+        manager.execute_environment.assert_called_once_with(
+            "env-1", "echo ok", None, timeout_seconds=10.0
+        )
+
+
+def test_cloud_environment_tools_normalize_errors():
+    with patch("cloud.tools.environment_manager") as manager:
+        manager.start_environment.side_effect = KeyError("environment_not_found")
+        result = cloud_environment_start({"environment_id": "missing"}, {})
+        assert result["success"] is False
+
+        manager.create_environment.side_effect = CloudProviderError(
+            "denied", code="authorization_failed", http_status=403
+        )
+        result = cloud_environment_create({"branch": "master"}, {})
+        assert result["success"] is False
+
+        manager.stop_environment.side_effect = ValueError("invalid environment transition")
+        assert cloud_environment_stop({"environment_id": "env-1"}, {})["success"] is False
+
+        manager.delete_environment.side_effect = KeyError("environment_not_found")
+        assert cloud_environment_delete({"environment_id": "env-1"}, {})["success"] is False
+
+        manager.execute_environment.side_effect = ValueError("environment is not running")
+        assert cloud_environment_exec({"environment_id": "env-1", "command": "x"}, {})[
+            "success"
+        ] is False
+
+
+def test_cloud_environment_owner_id_resolved_from_trusted_identity():
+    call = type("Call", (), {"user_id": " alice "})()
+    cfg = {"_universal_context": {"call": call}}
+    with patch("cloud.tools.environment_manager") as manager:
+        manager.create_environment.return_value = {"environment_id": "env-1"}
+        cloud_environment_create({"branch": "master"}, cfg)
+        manager.create_environment.assert_called_once_with(
+            "master", None, "alice", adapter="cloudru", ttl_seconds=None
+        )
 
 
 def test_cloud_compute_schema_rejects_missing_instance_id():

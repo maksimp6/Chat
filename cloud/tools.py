@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import environment_manager
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
 from runtime_tools import ssh_runtime_exec
@@ -126,6 +127,70 @@ def cloud_ssh_exec(args: dict[str, Any], cfg: dict | None = None) -> dict[str, A
         "timeout_seconds": args.get("timeout_seconds"),
     }
     return ssh_runtime_exec(runtime_args, cfg)
+
+
+def _environment_owner_id(cfg: dict | None) -> str | None:
+    context = cfg.get("_universal_context") if isinstance(cfg, dict) else None
+    call = context.get("call") if isinstance(context, dict) else None
+    identity = getattr(call, "user_id", None) if call is not None else None
+    return str(identity).strip() if identity is not None and str(identity).strip() else None
+
+
+def _environment_error(exc: Exception) -> dict[str, Any]:
+    return {"success": False, "error": str(exc)}
+
+
+def cloud_environment_create(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    """Provision an isolated Alice sandbox on Cloud.ru (replaces local subprocess/SSH)."""
+    try:
+        return environment_manager.create_environment(
+            str(args.get("branch") or ""),
+            args.get("commit_sha"),
+            _environment_owner_id(cfg),
+            adapter="cloudru",
+            ttl_seconds=args.get("ttl_seconds"),
+        )
+    except (ValueError, CloudProviderError) as exc:
+        return _environment_error(exc)
+
+
+def cloud_environment_start(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    try:
+        return environment_manager.start_environment(
+            str(args.get("environment_id") or ""), _environment_owner_id(cfg)
+        )
+    except (KeyError, ValueError, CloudProviderError) as exc:
+        return _environment_error(exc)
+
+
+def cloud_environment_stop(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    try:
+        return environment_manager.stop_environment(
+            str(args.get("environment_id") or ""), _environment_owner_id(cfg)
+        )
+    except (KeyError, ValueError, CloudProviderError) as exc:
+        return _environment_error(exc)
+
+
+def cloud_environment_delete(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    try:
+        return environment_manager.delete_environment(
+            str(args.get("environment_id") or ""), _environment_owner_id(cfg)
+        )
+    except (KeyError, ValueError, CloudProviderError) as exc:
+        return _environment_error(exc)
+
+
+def cloud_environment_exec(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    try:
+        return environment_manager.execute_environment(
+            str(args.get("environment_id") or ""),
+            str(args.get("command") or ""),
+            _environment_owner_id(cfg),
+            timeout_seconds=float(args.get("timeout_seconds") or 30.0),
+        )
+    except (KeyError, ValueError, CloudProviderError) as exc:
+        return _environment_error(exc)
 
 
 def _tool(
@@ -366,6 +431,86 @@ CLOUD_TOOLS = {
         ),
         title="Cloud SSH Execute",
         description="Execute a command inside a VM over SSH (separate from cloud infrastructure APIs).",
+        metadata={"trace_redact_result_fields": ["stdout", "stderr"]},
+    ),
+    "cloud.environment.create": _tool(
+        cloud_environment_create,
+        read_only=False,
+        requires_approval=True,
+        schema=_schema(
+            {
+                "branch": {"type": "string", "minLength": 1, "maxLength": 256},
+                "commit_sha": {
+                    "anyOf": [{"type": "string", "minLength": 7, "maxLength": 64}, {"type": "null"}]
+                },
+                "ttl_seconds": {
+                    "anyOf": [
+                        {"type": "integer", "minimum": 60, "maximum": 604800},
+                        {"type": "null"},
+                    ]
+                },
+            },
+            ["branch"],
+        ),
+        title="Cloud Environment Create",
+        description=(
+            "Provision an isolated Alice sandbox environment on Cloud.ru (Container Apps "
+            "Jobs or Compute VM) from a git commit snapshot, instead of local subprocess "
+            "or SSH into a shared VM (confirmation required)."
+        ),
+    ),
+    "cloud.environment.start": _tool(
+        cloud_environment_start,
+        read_only=False,
+        requires_approval=True,
+        schema=_schema(
+            {"environment_id": {"type": "string", "minLength": 1, "maxLength": 64}},
+            ["environment_id"],
+        ),
+        title="Cloud Environment Start",
+        description="Start a Cloud.ru sandbox environment so it can run commands (confirmation required).",
+    ),
+    "cloud.environment.stop": _tool(
+        cloud_environment_stop,
+        read_only=False,
+        requires_approval=True,
+        schema=_schema(
+            {"environment_id": {"type": "string", "minLength": 1, "maxLength": 64}},
+            ["environment_id"],
+        ),
+        title="Cloud Environment Stop",
+        description="Stop a Cloud.ru sandbox environment while keeping its resource allocated (confirmation required).",
+    ),
+    "cloud.environment.delete": _tool(
+        cloud_environment_delete,
+        read_only=False,
+        requires_approval=True,
+        schema=_schema(
+            {"environment_id": {"type": "string", "minLength": 1, "maxLength": 64}},
+            ["environment_id"],
+        ),
+        title="Cloud Environment Delete",
+        description="Delete a Cloud.ru sandbox environment and its remote resource (confirmation required).",
+    ),
+    "cloud.environment.exec": _tool(
+        cloud_environment_exec,
+        read_only=False,
+        requires_approval=True,
+        schema=_schema(
+            {
+                "environment_id": {"type": "string", "minLength": 1, "maxLength": 64},
+                "command": {"type": "string", "minLength": 1, "maxLength": 20000},
+                "timeout_seconds": {
+                    "anyOf": [
+                        {"type": "number", "minimum": 1, "maximum": 300},
+                        {"type": "null"},
+                    ]
+                },
+            },
+            ["environment_id", "command"],
+        ),
+        title="Cloud Environment Execute",
+        description="Execute a command inside a running Cloud.ru sandbox environment (confirmation required).",
         metadata={"trace_redact_result_fields": ["stdout", "stderr"]},
     ),
 }

@@ -24,6 +24,11 @@ CONFIRMATION_REQUIRED_TOOLS = {
     "cloud.compute.reboot",
     "cloud.backup.create",
     "cloud.ssh.exec",
+    "cloud.environment.create",
+    "cloud.environment.start",
+    "cloud.environment.stop",
+    "cloud.environment.delete",
+    "cloud.environment.exec",
 }
 
 

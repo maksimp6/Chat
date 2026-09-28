@@ -123,6 +123,10 @@ def init_environment_tables() -> None:
                 runtime_port INTEGER,
                 data_namespace TEXT NOT NULL,
                 owner_id TEXT,
+                adapter TEXT NOT NULL DEFAULT 'local',
+                ttl_seconds INTEGER,
+                expires_at INTEGER,
+                cloud_resource_id TEXT,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 started_at INTEGER,
@@ -145,14 +149,27 @@ def init_environment_tables() -> None:
             )
             """
         )
+        existing_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(environments)").fetchall()
+        }
+        for column, statement in (
+            ("adapter", "ALTER TABLE environments ADD COLUMN adapter TEXT NOT NULL DEFAULT 'local'"),
+            ("ttl_seconds", "ALTER TABLE environments ADD COLUMN ttl_seconds INTEGER"),
+            ("expires_at", "ALTER TABLE environments ADD COLUMN expires_at INTEGER"),
+            ("cloud_resource_id", "ALTER TABLE environments ADD COLUMN cloud_resource_id TEXT"),
+        ):
+            if column not in existing_columns:
+                conn.execute(statement)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_environments_owner ON environments(owner_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_environments_status ON environments(status)")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_environment_events_env ON environment_events(environment_id)"
         )
+        # Only local environments die with this process; a RUNNING Cloud.ru
+        # sandbox survives a backend restart, so it must not be reconciled here.
         running_rows = conn.execute(
-            "SELECT environment_id FROM environments WHERE status = ?",
-            ("RUNNING",),
+            "SELECT environment_id FROM environments WHERE status = ? AND adapter = ?",
+            ("RUNNING", "local"),
         ).fetchall()
         with _RUNTIME_WORKERS_LOCK:
             active_runtime_ids = set(_RUNTIME_WORKERS)
@@ -563,6 +580,102 @@ class EnvironmentRuntime:
                     self._active_streams.pop(cancel, None)
 
 
+class LocalEnvironmentAdapter:
+    """Default `EnvironmentAdapter`: today's git-worktree + in-process thread runtime."""
+
+    name = "local"
+
+    def __init__(self, environment: Dict[str, Any]):
+        self.environment = environment
+
+    def provision(self) -> Dict[str, Any]:
+        return {}
+
+    def start(self) -> Dict[str, Any]:
+        runtime = EnvironmentRuntime(self.environment)
+        thread_id = runtime.start()
+        return {"runtime_thread_id": thread_id}
+
+    def execute(self, command: str, *, timeout_seconds: float = 30.0) -> Dict[str, Any]:
+        with _RUNTIME_WORKERS_LOCK:
+            runtime = _RUNTIME_WORKERS.get(self.environment["environment_id"])
+        if runtime is None:
+            raise RuntimeError("environment runtime is not running")
+        completed = subprocess.run(
+            ["/bin/bash", "-lc", command],
+            shell=False,
+            check=False,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            cwd=str(runtime.worktree),
+            timeout=timeout_seconds,
+        )
+        return {
+            "success": completed.returncode == 0,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+            "exit_code": completed.returncode,
+        }
+
+    def stop(self) -> None:
+        with _RUNTIME_WORKERS_LOCK:
+            runtime = _RUNTIME_WORKERS.get(self.environment["environment_id"])
+        if runtime is not None:
+            runtime.stop()
+
+    def remove(self) -> None:
+        EnvironmentRuntime(self.environment).remove()
+
+
+_ENV_ADAPTER_NAMES = ("local", "cloudru")
+
+
+def _validate_adapter_name(name: Optional[str]) -> str:
+    value = str(name or "local").strip().lower()
+    if value not in _ENV_ADAPTER_NAMES:
+        raise ValueError(f"Unknown environment adapter: {value}")
+    return value
+
+
+def _adapter_for(environment: Dict[str, Any]):
+    """Select the `EnvironmentAdapter` implementation for one environment record."""
+    name = _validate_adapter_name(environment.get("adapter"))
+    if name == "local":
+        return LocalEnvironmentAdapter(environment)
+    from cloud.cloudru.environment_adapter import CloudRuEnvironmentAdapter
+
+    return CloudRuEnvironmentAdapter(environment)
+
+
+def _default_ttl_seconds(adapter_name: str) -> Optional[int]:
+    """Local environments keep today's behavior (no TTL) unless configured.
+
+    Cloud.ru sandboxes default to a 1 hour TTL so an unattended Alice run
+    cannot leave a paid resource allocated forever.
+    """
+    env_name = (
+        "ALICE_ENV_DEFAULT_TTL_SECONDS"
+        if adapter_name == "local"
+        else "ALICE_CLOUDRU_ENV_DEFAULT_TTL_SECONDS"
+    )
+    fallback = "" if adapter_name == "local" else "3600"
+    raw = os.environ.get(env_name, fallback).strip()
+    if not raw:
+        return None
+    value = int(raw)
+    return value if value > 0 else None
+
+
+def _resolve_ttl_seconds(adapter_name: str, ttl_seconds: Optional[int]) -> Optional[int]:
+    if ttl_seconds is not None:
+        value = int(ttl_seconds)
+        if value <= 0:
+            raise ValueError("ttl_seconds must be > 0")
+        return value
+    return _default_ttl_seconds(adapter_name)
+
+
 def register_runtime_operation(name: str, handler) -> None:
     """Register a dispatcher operation available to managed runtime threads."""
     _RUNTIME_DISPATCHER.register_operation(name, handler)
@@ -638,9 +751,13 @@ def create_environment(
     owner_id: Optional[str] = None,
     *,
     context: Optional[InvocationContext] = None,
+    adapter: Optional[str] = None,
+    ttl_seconds: Optional[int] = None,
 ) -> Dict[str, Any]:
     init_environment_tables()
     resolved = resolve_commit(branch, commit_sha)
+    adapter_name = _validate_adapter_name(adapter or os.environ.get("ALICE_ENV_ADAPTER", "local"))
+    ttl = _resolve_ttl_seconds(adapter_name, ttl_seconds)
     environment_id = str(uuid.uuid4())
     item = {
         "environment_id": environment_id,
@@ -652,6 +769,10 @@ def create_environment(
         "runtime_port": None,
         "data_namespace": _namespace(environment_id),
         "owner_id": owner_id,
+        "adapter": adapter_name,
+        "ttl_seconds": ttl,
+        "expires_at": (_now() + ttl) if ttl else None,
+        "cloud_resource_id": None,
         "created_at": _now(),
         "updated_at": _now(),
         "started_at": None,
@@ -665,21 +786,41 @@ def create_environment(
             """
             INSERT INTO environments
             (environment_id, branch_name, commit_sha, status, url, runtime_pid,
-             runtime_port, data_namespace, owner_id, created_at, updated_at,
-             started_at, stopped_at, deleted_at, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             runtime_port, data_namespace, owner_id, adapter, ttl_seconds, expires_at,
+             cloud_resource_id, created_at, updated_at, started_at, stopped_at,
+             deleted_at, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             tuple(item.values()),
         )
         conn.commit()
     finally:
         conn.close()
+
+    try:
+        provisioned = _adapter_for(item).provision()
+    except Exception as exc:
+        _transition("CREATING", "FAILED")
+        conn = get_conn()
+        try:
+            conn.execute(
+                "UPDATE environments SET status = ?, error = ?, updated_at = ? WHERE environment_id = ?",
+                ("FAILED", str(exc), _now(), environment_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        item.update({"status": "FAILED", "error": str(exc)})
+        _record_trace(item, "CREATE_ENVIRONMENT", "FAILED", context=context, error=str(exc))
+        raise
+    item.update(provisioned)
+
     _transition("CREATING", "STOPPED")
     conn = get_conn()
     try:
         conn.execute(
-            "UPDATE environments SET status = ?, updated_at = ? WHERE environment_id = ?",
-            ("STOPPED", _now(), environment_id),
+            "UPDATE environments SET status = ?, cloud_resource_id = ?, updated_at = ? WHERE environment_id = ?",
+            ("STOPPED", item.get("cloud_resource_id"), _now(), environment_id),
         )
         conn.commit()
     finally:
@@ -689,8 +830,48 @@ def create_environment(
     return item
 
 
+def cleanup_expired_environments(
+    owner_id: Optional[str] = None, *, context: Optional[InvocationContext] = None
+) -> list[str]:
+    """Delete environments past their TTL. Safe to call opportunistically."""
+    init_environment_tables()
+    now = _now()
+    conn = get_conn()
+    try:
+        if owner_id:
+            rows = conn.execute(
+                """
+                SELECT environment_id FROM environments
+                 WHERE expires_at IS NOT NULL AND expires_at <= ? AND status != 'DELETING'
+                   AND (owner_id = ? OR owner_id IS NULL)
+                """,
+                (now, owner_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT environment_id FROM environments
+                 WHERE expires_at IS NOT NULL AND expires_at <= ? AND status != 'DELETING'
+                """,
+                (now,),
+            ).fetchall()
+    finally:
+        conn.close()
+
+    removed = []
+    for row in rows:
+        environment_id = row["environment_id"] if hasattr(row, "keys") else row[0]
+        try:
+            delete_environment(environment_id, owner_id, context=context)
+            removed.append(environment_id)
+        except (KeyError, ValueError):
+            continue
+    return removed
+
+
 def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
     init_environment_tables()
+    cleanup_expired_environments(owner_id)
     conn = get_conn()
     try:
         if owner_id:
@@ -710,9 +891,8 @@ def start_environment(
 ) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "RUNNING")
-    runtime = EnvironmentRuntime(item)
     try:
-        thread_id = runtime.start()
+        thread_id = _adapter_for(item).start().get("runtime_thread_id")
         conn = get_conn()
         try:
             conn.execute(
@@ -765,10 +945,7 @@ def stop_environment(
 ) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "STOPPED")
-    with _RUNTIME_WORKERS_LOCK:
-        runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is not None:
-        runtime.stop()
+    _adapter_for(item).stop()
     conn = get_conn()
     try:
         conn.execute(
@@ -808,7 +985,7 @@ def delete_environment(
         stop_environment(environment_id, owner_id, context=context)
         item = _require(environment_id, owner_id)
     _transition(item["status"], "DELETING")
-    EnvironmentRuntime(item).remove()
+    _adapter_for(item).remove()
     item.update({"status": "DELETING", "deleted_at": _now()})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
     conn = get_conn()
@@ -818,3 +995,30 @@ def delete_environment(
     finally:
         conn.close()
     return item
+
+
+def execute_environment(
+    environment_id: str,
+    command: str,
+    owner_id: Optional[str] = None,
+    *,
+    timeout_seconds: float = 30.0,
+    context: Optional[InvocationContext] = None,
+) -> Dict[str, Any]:
+    """Run one command inside a RUNNING environment, local or Cloud.ru."""
+    item = _require(environment_id, owner_id)
+    if item["status"] != "RUNNING":
+        raise ValueError(f"environment is not running: {item['status']}")
+    try:
+        result = _adapter_for(item).execute(command, timeout_seconds=timeout_seconds)
+    except Exception as exc:
+        _record_trace(item, "EXECUTE_ENVIRONMENT", "FAILED", context=context, error=str(exc))
+        raise
+    _record_trace(
+        item,
+        "EXECUTE_ENVIRONMENT",
+        "SUCCESS" if result.get("success") else "FAILED",
+        context=context,
+        extra={"exit_code": result.get("exit_code")},
+    )
+    return result
