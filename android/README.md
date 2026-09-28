@@ -4,7 +4,7 @@ This module packages the existing Flask application in an Android shell using Ch
 
 ## Build
 
-CI stages the backend with `scripts/stage_python.py` and then builds the debug APK with Android Gradle Plugin 8.7.3 and Gradle 8.9.
+CI stages the backend with `scripts/stage_python.py` using Python 3.13 and then builds the debug APK with Gradle 9.5.0 on Java 25. `android/build.gradle.kts` declares Android Gradle Plugin 9.2.1 and Chaquopy 17.0.0; the app uses SDK 37 and JVM toolchain 17. There is no checked-in Gradle wrapper, so these commands require an installed `gradle`. See [the CI workflow](../.github/workflows/ci.yml) for the build sequence.
 
 ```bash
 cd android
