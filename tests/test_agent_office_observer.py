@@ -288,6 +288,8 @@ class FakeGitHub:
         for prefix, response in self.routes.items():
             method, _, route = prefix.partition(" ")
             if request.get_method() == method and path.startswith(route):
+                if isinstance(response, Exception):
+                    raise response
                 payload, headers = response if isinstance(response, tuple) else (response, {})
                 return FakeResponse(payload, headers)
         raise AssertionError(f"unexpected request {request.get_method()} {path}")
@@ -331,18 +333,49 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
     assert json.loads(patch[2])["body"] == result["digest"]
 
 
-def test_publish_creates_tracking_issue_on_first_run():
+def http_error(code):
+    return observer.urllib.error.HTTPError("https://api.github.com/x", code, "err", {}, None)
+
+
+def test_publish_creates_label_and_tracking_issue_on_first_run():
     fake = FakeGitHub(
         {
             "GET /repos/o/r/issues?state=open&labels=": [],
+            "POST /repos/o/r/labels": {"name": observer.TRACKING_LABEL},
             "POST /repos/o/r/issues": {"html_url": "https://github.com/o/r/issues/100"},
         }
     )
     url = observer.publish_digest(GitHub("t", "o/r", opener=fake), "digest")
     assert url.endswith("/100")
+    assert json.loads(fake.calls[1][2])["name"] == observer.TRACKING_LABEL
     payload = json.loads(fake.calls[-1][2])
     assert payload["labels"] == [observer.TRACKING_LABEL]
     assert payload["title"] == observer.TRACKING_TITLE
+
+
+def test_existing_label_is_fine_but_other_label_errors_surface():
+    routes = {
+        "GET /repos/o/r/issues?state=open&labels=": [],
+        "POST /repos/o/r/labels": http_error(422),
+        "POST /repos/o/r/issues": {"html_url": "https://github.com/o/r/issues/101"},
+    }
+    assert observer.publish_digest(GitHub("t", "o/r", opener=FakeGitHub(routes)), "d")
+    routes["POST /repos/o/r/labels"] = http_error(403)
+    try:
+        observer.publish_digest(GitHub("t", "o/r", opener=FakeGitHub(routes)), "d")
+    except observer.urllib.error.HTTPError as error:
+        assert error.code == 403
+    else:
+        raise AssertionError("expected the 403 to surface")
+
+
+def test_copilot_mention_is_a_dispatch_and_queued_runs_date_from_creation():
+    thread = build_thread(issue(), [comment("maksimp6", "@copilot please take this", 3)])
+    assert thread.owner_agent == "copilot"
+    assert kinds(detect_findings(thread, NOW)) == ["agent_silent"]
+    queued = {"name": "t", "conclusion": None, "status": "queued", "created_at": ts(3)}
+    pr = build_thread(pr_item(), [], pull(), [queued])
+    assert pr.checks_started_at == NOW - timedelta(hours=3)
 
 
 def test_main_writes_summary_and_json(monkeypatch, tmp_path):

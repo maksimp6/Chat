@@ -164,7 +164,7 @@ def classify_branch(ref: str | None) -> str | None:
     return prefix if prefix in AGENTS else None
 
 
-_MENTION = re.compile(r"(?<![\w/])@(claude|codex|alice)\b", re.I)
+_MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
 
 
 def mentioned_agents(text: str | None) -> list[str]:
@@ -342,7 +342,7 @@ def build_thread(
     for run in check_runs or []:
         name = run.get("name") or "check"
         thread.checks[name] = run.get("conclusion") or run.get("status") or "queued"
-        started = parse_time(run.get("started_at"))
+        started = parse_time(run.get("started_at") or run.get("created_at"))
         pending = not run.get("conclusion")
         if (
             pending
@@ -691,6 +691,23 @@ def collect_threads(
         return list(pool.map(load, items))
 
 
+def ensure_tracking_label(gh: GitHub) -> None:
+    """Create the tracking label so the next run can find the issue by it."""
+    try:
+        gh.request(
+            "POST",
+            gh.repo_path("/labels"),
+            {
+                "name": TRACKING_LABEL,
+                "color": "5319e7",
+                "description": "Digest of the agent observer",
+            },
+        )
+    except urllib.error.HTTPError as error:
+        if error.code != 422:  # 422: the label already exists
+            raise
+
+
 def publish_digest(gh: GitHub, digest: str) -> str:
     """Rewrite the tracking issue with the digest, creating it on first run."""
     existing = gh.get(gh.repo_path(f"/issues?state=open&labels={TRACKING_LABEL}&per_page=10")) or []
@@ -699,6 +716,7 @@ def publish_digest(gh: GitHub, digest: str) -> str:
         number = existing[0]["number"]
         issue = gh.request("PATCH", gh.repo_path(f"/issues/{number}"), {"body": digest})[0]
     else:
+        ensure_tracking_label(gh)
         issue = gh.request(
             "POST",
             gh.repo_path("/issues"),
