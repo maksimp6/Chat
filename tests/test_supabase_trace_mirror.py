@@ -35,7 +35,8 @@ class SupabaseTraceMirrorTests(unittest.TestCase):
 
         self.assertTrue(supabase_trace_mirror.mirror_trace(trace))
         request = urlopen.call_args.args[0]
-        self.assertIn("Bearer server-secret", request.headers.get("Authorization"))
+        self.assertEqual(request.headers.get("Apikey"), "server-secret")
+        self.assertIsNone(request.headers.get("Authorization"))
         body = json.loads(request.data.decode("utf-8"))
         self.assertEqual(body["trace_id"], "t1")
         self.assertEqual(body["payload"]["nested"]["self"], "<cycle omitted>")
