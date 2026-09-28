@@ -152,7 +152,7 @@ class _MarkdownParser(HTMLParser):
         elif tag in _BLOCK_TAGS and not self._pre:
             self._emit("\n\n")
         elif tag == "br":
-            self._emit("  \n")
+            self._emit("\n")
         elif tag == "hr":
             self._emit("\n\n---\n\n")
         elif tag in {"ul", "ol"}:

@@ -184,3 +184,78 @@ def test_crawler_path_has_no_llm_dependency():
         "cloudru_api_key_provider",
     }
     assert not imported & forbidden
+
+
+def test_inline_markup_images_and_rules():
+    html = (
+        "<main><p>a<br>b <em>soft</em> <i>it</i></p><hr>"
+        '<img src="/img/x.png" alt=" Diagram "><img alt="no src"></main>'
+    )
+    _, md, _ = html_to_markdown(html, f"{BASE}/a")
+    assert "a\nb *soft* *it*" in md
+    assert "---" in md
+    assert "![Diagram](https://cloud.ru/img/x.png)" in md
+    assert "no src" not in md
+
+
+def test_render_page_adds_title_only_when_missing():
+    assert "\n# T\n" in docs_mirror_render("T", "body\n")
+    assert docs_mirror_render("T", "# Own\n").count("# ") == 1
+
+
+def docs_mirror_render(title, markdown):
+    return crawler.render_page(f"{BASE}/a", title, markdown)
+
+
+def test_scope_rejects_other_hosts():
+    assert not crawler.in_scope("https://example.com/docs/svc/a", "cloud.ru", ["/docs/svc"])
+    assert crawler.in_scope("https://cloud.ru/docs/svc", "cloud.ru", ["/docs/svc"])
+
+
+def test_unsafe_target_path_is_rejected(tmp_path):
+    with pytest.raises(ValueError):
+        make_mirror(tmp_path, FakeSite({}))._target("../outside.md")
+
+
+def test_crawl_sleeps_between_requests(tmp_path):
+    sleeps = []
+    site = FakeSite(
+        {f"{BASE}/index": page("Index", "x", [f"{BASE}/a"]), f"{BASE}/a": page("A", "y")}
+    )
+    mirror = Mirror(
+        tmp_path,
+        host="cloud.ru",
+        prefixes=["/docs/svc"],
+        fetcher=site,
+        delay_s=0.25,
+        sleep=sleeps.append,
+    )
+    mirror.crawl([f"{BASE}/index"])
+    assert sleeps == [0.25]
+
+
+def test_requests_fetcher_maps_response(monkeypatch):
+    import requests
+
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+        ok = True
+        encoding = None
+        text = "<p>hi</p>"
+        headers = {"Content-Type": "text/html", "Last-Modified": "Mon"}
+        url = f"{BASE}/a"
+
+    class FakeSession:
+        def __init__(self):
+            self.headers = {}
+
+        def get(self, url, timeout):
+            calls.append((url, timeout, dict(self.headers)))
+            return FakeResponse()
+
+    monkeypatch.setattr(requests, "Session", FakeSession)
+    result = crawler.requests_fetcher(timeout=3)(f"{BASE}/a")
+    assert result == FetchResult(200, "<p>hi</p>", "text/html", "Mon", f"{BASE}/a")
+    assert calls[0][1] == 3 and "AliceProDocsMirror" in calls[0][2]["User-Agent"]
