@@ -304,7 +304,9 @@ def test_a2a_requires_endpoint_in_agent_card():
 
 
 def test_a2a_resolve_endpoint_returns_cached_value_inside_lock():
-    client = A2AClient(A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json"))
+    client = A2AClient(
+        A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json")
+    )
 
     class LockThatSetsEndpoint:
         def __enter__(self):
@@ -372,12 +374,7 @@ def test_a2a_sse_stream_with_crlf(monkeypatch):
 
 def test_a2a_parse_sse_skips_comments_and_yields_raw_trailing_event():
     events = list(
-        A2AClient._parse_sse(
-            ':keepalive\n'
-            'data: {"result":{"delta":"one"}}\n'
-            "\n"
-            "data: not-json"
-        )
+        A2AClient._parse_sse(':keepalive\ndata: {"result":{"delta":"one"}}\n\ndata: not-json')
     )
     assert events == [{"result": {"delta": "one"}}, "not-json"]
 
