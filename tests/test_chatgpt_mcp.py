@@ -4,8 +4,8 @@ import pytest
 from flask import Flask
 
 import chatgpt_mcp
-from invocation_context import InvocationContext
-from invocation_trace import create_invocation_trace
+from invocation.context import InvocationContext
+from invocation.trace import create_invocation_trace
 
 
 @pytest.fixture()
