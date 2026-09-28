@@ -48,7 +48,14 @@ owner (@maksimp6) does not merge by hand.
   its CI is green, then reviews it like any other pull request.
 - Every ready pull request gets a GitHub Copilot code review. Claude requests it
   when it was not requested automatically, waits for it, and fixes or answers
-  each Copilot comment before merging.
+  each Copilot comment before merging. If the code changed materially after
+  that review, Claude requests one more Copilot review on the final head;
+  typo and formatting fixes do not need one.
+- Every ready pull request also gets a test check from `@codex`. Claude
+  comments `@codex review` (one agent per comment) when Codex has not reviewed
+  the pull request yet, and adds or answers each test Codex proposes. If Codex
+  has not responded by the next hourly maintainer pass, Claude merges without
+  it.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
