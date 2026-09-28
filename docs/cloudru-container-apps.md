@@ -47,18 +47,28 @@ procedure has been reviewed.
 
 ## Verified readiness (2026-09-28)
 
-The [read-only runner report in #427](https://github.com/maksimp6/Chat/issues/427#issuecomment-5879256021)
+The [read-only runner report in #427](https://github.com/maksimp6/Chat/issues/427#issuecomment-5879401586)
 verified the exact merged baseline `a0f1f5277f7d612fd3f44622b48342a21aadfb2d`:
 
 - The existing protected Codex hand-off loads the IAM key pair and project ID;
   IAM token exchange succeeds.
 - Artifact Registry inventory succeeds and returns resources. This does not yet
   establish that a suitable private Docker registry has been selected.
-- IAM service-account listing returns HTTP 415; Container Apps status raises a
-  provider error whose precise response is being investigated. Neither result
-  establishes that credentials are absent or that the project has no containers.
-- PostgreSQL and Object Storage inventory, database connectivity, image rollout,
-  HTTPS/auth smoke checks, and persistence after restart remain unverified.
+- The client's `GET /v1/containers/alice-pro` returns HTTP 499. The current
+  [official OpenAPI](https://cloud.ru/docs/api/specs/container-apps-evolution/ug/_specs/openapi.yaml)
+  specifies `GET /v2/containers` for inventory; that request succeeds with HTTP
+  200 and an empty `data` list. There are no Container Apps in the selected project.
+- Managed PostgreSQL `GET /v1/clusters` succeeds with HTTP 200 and an empty
+  `clusters` list. No existing cluster or authorized `ALICE_DATABASE_URL` source
+  was found in the runner.
+- IAM service-account listing returns HTTP 415 with `application/grpc`, both with
+  and without a request `Content-Type`. Removing that header does not fix the
+  response; it is not evidence of invalid credentials.
+- Object Storage inventory remains unverified because the runner lacks the S3
+  access-key pair and tenant configuration. IAM bearer authentication is not a
+  substitute for S3 SigV4 authentication.
+- Database connectivity, image rollout, HTTPS/auth smoke checks, and persistence
+  after restart remain unverified.
 
 No cloud deployment has been verified. The successful GitHub `estimate` run is
 an offline calculation. GitHub `preflight` currently reports missing
@@ -161,9 +171,10 @@ The first request after idle pays a cold start.
   work or Container Apps jobs.
 - **App secrets are plain container env vars**, visible to anyone with Container
   Apps read access in the project. Move them to a secret store as a follow-up.
-- **API field names are unconfirmed.** The rendered API reference is not
-  machine-readable; paths and bodies were cross-checked against a working
-  community client. Confirm them on the first live deploy.
+- **The baseline read path is obsolete.** The client still uses `/v1/containers`
+  and must be aligned with the current official OpenAPI linked above before
+  deployment. Live inventory has verified v2 listing; create/update bodies and
+  response/revision handling still need contract verification.
 - **Readiness does not track revisions yet.** The deploy waits for the new image
   digest and a running status. A rollout that keeps the same digest (config
   only) can pass that check while the old revision still serves, so the health
