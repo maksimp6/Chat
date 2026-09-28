@@ -10,8 +10,6 @@ PROJECT_ROOT_PYTHON = {
 # Existing debt only. New root Python modules must not be added here.
 # Delete entries as modules move into packages.
 LEGACY_ROOT_PYTHON = {
-    "agent_gateway.py",
-    "alice_agent_runner.py",
     "api_contracts.py",
     "archiver.py",
     "billing.py",
@@ -38,8 +36,6 @@ LEGACY_ROOT_PYTHON = {
     "government.py",
     "key_manager.py",
     "knowledge_economics.py",
-    "local_agent_gateway.py",
-    "local_tool_agent.py",
     "logger.py",
     "mcp_routes.py",
     "mcp_storage.py",
@@ -148,3 +144,21 @@ def test_pruned_legacy_agent_modules_stay_deleted():
     pruned = {"agent_context.py", "agent_runner.py", "agent_tools.py", "run_agent.py", "run_agent_loop.py", "yandex_agent_loop.py"}
     resurrected = sorted(name for name in pruned if (ROOT / name).exists())
     assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
+
+
+def test_live_agent_modules_live_in_agents_package():
+    legacy_names = {
+        "agent_gateway.py",
+        "alice_agent_runner.py",
+        "local_agent_gateway.py",
+        "local_tool_agent.py",
+    }
+    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
+    assert not still_in_root, f"Live agent modules still in root: {still_in_root}"
+
+    package = ROOT / "agents"
+    assert (package / "__init__.py").is_file()
+    assert (package / "gateway.py").is_file()
+    assert (package / "local_gateway.py").is_file()
+    assert (package / "local_worker.py").is_file()
+    assert (package / "github_runner.py").is_file()
