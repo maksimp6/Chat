@@ -3,8 +3,8 @@
 from flask import Blueprint, jsonify, request
 
 from api_contracts import ContractViolation, validate_api_contract
-from invocation_api import get_invocation_status, get_invocation_trace
-from invocation_manager import create_invocation
+from invocation.api import get_invocation_status, get_invocation_trace
+from invocation.manager import create_invocation
 from session_manager import create_session, get_session
 from session_profiles import clone_profile, get_profile, list_profiles, session_profile
 
