@@ -9,11 +9,18 @@ mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
 # A resumed cached container must remain maintainable even with no GitHub
 # connectivity. Refresh the installed copies from the checkout when present.
-for name in codex_setup.sh codex_maintenance.sh; do
+for name in codex_setup.sh codex_maintenance.sh codex_cloudru_env.sh; do
   if test -f "scripts/$name"; then
     install -m 700 "scripts/$name" "$INSTALL_DIR/$name"
   fi
 done
+
+# Refresh the protected Cloud.ru hand-off when the cached environment is
+# resumed and setup secrets are available again.
+# shellcheck disable=SC1091
+if test -f scripts/codex_cloudru_env.sh; then
+  source scripts/codex_cloudru_env.sh
+fi
 
 python --version | grep -q '3.14'
 node --version | grep -q '^v22\.'
