@@ -27,3 +27,5 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 Ключи разделяются по provider, purpose, environment и owner. Секретные значения нельзя записывать в ExecutionTrace, обычные логи, ответы API или frontend storage.
 
 Release signing keystore, Cloud.ru API keys, OAuth credentials и другие секреты должны использовать этот слой или внешний secret manager. Сам encryption key менеджера также является секретом и должен храниться только вне репозитория.
+
+Для секретов, которыми управляет Cloud.ru Secret Management (внешнее хранилище с неизменяемыми версиями), см. [docs/security/cloudru-secret-management.md](cloudru-secret-management.md) — там описана отдельная граница: локально хранится только ссылка на закреплённую версию, а не сам секрет.
