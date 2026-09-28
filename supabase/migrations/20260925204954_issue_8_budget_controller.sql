@@ -52,8 +52,8 @@ create or replace function apply_budget_operation(
   p_cooldown_seconds integer default 0
 ) returns jsonb
 language plpgsql
-security definer
-set search_path = public
+security invoker
+set search_path = public, pg_temp
 as $
 declare
   a budget_accounts%rowtype;
@@ -165,4 +165,5 @@ begin
 end;
 $$;
 
-revoke all on function apply_budget_operation(text,text,text,numeric,text,text,integer) from public;
+revoke all on function public.apply_budget_operation(text,text,text,numeric,text,text,integer) from public, anon, authenticated;
+grant execute on function public.apply_budget_operation(text,text,text,numeric,text,text,integer) to service_role;
