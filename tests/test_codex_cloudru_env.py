@@ -28,6 +28,16 @@ def _clear_cloudru_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_setup_helper_maps_legacy_names_without_tracing_secret(tmp_path: Path) -> None:
     env = os.environ.copy()
+    # Keep this subprocess focused on the legacy-name compatibility path even
+    # when the runner itself happens to expose canonical Cloud.ru variables.
+    for name in (
+        "CLOUDRU_IAM_KEY_ID",
+        "CLOUDRU_IAM_KEY_SECRET",
+        "CLOUDRU_KEY_ID",
+        "CLOUDRU_KEY_SECRET",
+        "CLOUDRU_PROJECT_ID",
+    ):
+        env.pop(name, None)
     env.update(
         {
             "HOME": str(tmp_path),
