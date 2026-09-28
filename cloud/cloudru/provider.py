@@ -6,6 +6,7 @@ import os
 from typing import Any
 
 from cloud.base import CloudProviderError
+from cloud.cloudru.billing import parse_consumption_total
 from cloud.cloudru.client import CloudRuClient
 from cloud.models import normalize_resource, normalize_resources
 from cloudru_iam import CloudRuIamClient
@@ -52,12 +53,29 @@ class CloudRuProvider:
             return False
         return CloudRuProvider._service_enabled(endpoint_env, path_env)
 
+    @staticmethod
+    def _deploy_configured() -> bool:
+        return all(
+            os.getenv(name, "").strip()
+            for name in ("CLOUDRU_PROJECT_ID", "CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET")
+        )
+
     def capabilities(self) -> dict[str, Any]:
         services = {
             "iam": {
                 "enabled": True,
                 "operations": ["list_service_accounts", "list_api_keys"],
                 "notes": "Uses documented Cloud.ru IAM API endpoints.",
+            },
+            "artifact_registry": {
+                "enabled": self._deploy_configured(),
+                "operations": ["list_registries", "ensure_registry", "build_and_push"],
+                "notes": "Runs through scripts/cloudru_deploy.py and the Cloud.ru deploy workflow.",
+            },
+            "container_apps": {
+                "enabled": self._deploy_configured(),
+                "operations": ["status", "deploy", "delete", "start", "stop"],
+                "notes": "Runs through scripts/cloudru_deploy.py and the Cloud.ru deploy workflow.",
             },
             "compute": {
                 "enabled": self._service_enabled(
@@ -476,6 +494,8 @@ class CloudRuProvider:
             path,
             params={k: v for k, v in {"period": period, "group_by": group_by}.items() if v},
         )
+        totals = parse_consumption_total(payload)
+        total_cost = totals["total_cost"]
         return {
             "provider": self.name,
             "period": period,
@@ -483,4 +503,7 @@ class CloudRuProvider:
             "summary": payload.get("summary")
             if isinstance(payload.get("summary"), dict)
             else payload,
+            "total_cost": str(total_cost) if total_cost is not None else None,
+            "currency": totals["currency"]
+            or os.getenv("CLOUDRU_BILLING_CURRENCY", "RUB").strip().upper(),
         }

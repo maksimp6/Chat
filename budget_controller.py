@@ -16,6 +16,8 @@ import threading
 import uuid
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
+from cloud.base import CloudProviderError
+
 if TYPE_CHECKING:
     from budget_repository import BudgetRepository
 
@@ -527,3 +529,160 @@ class BudgetController:
         }
         if self._trace_sink is not None:
             self._trace_sink(event)
+
+
+# Provider and transport failures that mean "billing unavailable", not a bug.
+_BILLING_OUTAGE_ERRORS: tuple[type[BaseException], ...] = (CloudProviderError, OSError)
+
+
+class CloudSpendStatus(str, Enum):
+    OK = "ok"
+    WARN = "warn"
+    BLOCK = "block"
+    UNCONFIGURED = "unconfigured"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class CloudBudgetLimits:
+    """Monthly cloud spend limit checked against provider billing data."""
+
+    monthly_limit: Optional[Decimal]
+    warn_ratio: Decimal = Decimal("0.80")
+    currency: str = "RUB"
+
+    def __post_init__(self) -> None:
+        if self.monthly_limit is not None:
+            object.__setattr__(self, "monthly_limit", _money(self.monthly_limit))
+        ratio = Decimal(str(self.warn_ratio))
+        if not Decimal("0") < ratio <= Decimal("1"):
+            raise InvalidOperation("warn_ratio must be in (0, 1]")
+        object.__setattr__(self, "warn_ratio", ratio)
+        object.__setattr__(self, "currency", self.currency.strip().upper())
+
+    @classmethod
+    def from_env(cls, env: Optional[Dict[str, str]] = None) -> "CloudBudgetLimits":
+        import os
+
+        source = os.environ if env is None else env
+        raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()
+        raw_ratio = str(source.get("CLOUDRU_BUDGET_WARN_RATIO", "")).strip() or "0.80"
+        currency = str(source.get("CLOUDRU_BILLING_CURRENCY", "")).strip() or "RUB"
+        return cls(_money(raw_limit) if raw_limit else None, Decimal(raw_ratio), currency)
+
+
+def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> Dict[str, Any]:
+    """Classify current-period cloud spend against a monthly limit."""
+    if limits.monthly_limit is None:
+        return {"status": CloudSpendStatus.UNCONFIGURED.value, "currency": limits.currency}
+    if spent is None:
+        return {
+            "status": CloudSpendStatus.UNKNOWN.value,
+            "limit": str(limits.monthly_limit),
+            "currency": limits.currency,
+        }
+    amount = _money(spent)
+    limit = limits.monthly_limit
+    if amount >= limit:
+        status = CloudSpendStatus.BLOCK
+    elif amount >= (limit * limits.warn_ratio).quantize(Decimal("0.01")):
+        status = CloudSpendStatus.WARN
+    else:
+        status = CloudSpendStatus.OK
+    return {
+        "status": status.value,
+        "spent": str(amount),
+        "limit": str(limit),
+        "remaining": str(max(Decimal("0.00"), limit - amount)),
+        "ratio": str((amount / limit).quantize(Decimal("0.0001"))) if limit > 0 else None,
+        "currency": limits.currency,
+    }
+
+
+class CloudBudgetGuard:
+    """Warn or block cost-creating cloud operations from real billing data.
+
+    Billing outages never block operations: the status becomes ``unknown`` and
+    the caller decides. Only a confirmed spend at or above the limit blocks.
+    """
+
+    def __init__(
+        self,
+        provider: Any,
+        limits: Optional[CloudBudgetLimits] = None,
+        *,
+        period: Optional[str] = None,
+        cache_seconds: int = 300,
+        clock: Optional[Clock] = None,
+        trace_sink: Optional[TraceSink] = None,
+    ) -> None:
+        self._provider = provider
+        self.limits = limits or CloudBudgetLimits.from_env()
+        self._period = period
+        self._cache_seconds = max(0, int(cache_seconds))
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._trace_sink = trace_sink
+        self._cached: Optional[Dict[str, Any]] = None
+        self._cached_at: Optional[datetime] = None
+        self._lock = threading.Lock()
+
+    def status(self, *, refresh: bool = False) -> Dict[str, Any]:
+        with self._lock:
+            now = self._clock()
+            period = self._period or now.strftime("%Y-%m")
+            if (
+                not refresh
+                and self._cached is not None
+                and self._cached_at is not None
+                and self._cached.get("period") == period
+                and now - self._cached_at < timedelta(seconds=self._cache_seconds)
+            ):
+                result = dict(self._cached)
+                self._emit_if_not_ok(result)
+                return result
+            result = self._fetch(period)
+            result["period"] = period
+            result["checked_at"] = now.isoformat()
+            self._cached, self._cached_at = result, now
+            self._emit_if_not_ok(result)
+            return dict(result)
+
+    def _fetch(self, period: str) -> Dict[str, Any]:
+        if self.limits.monthly_limit is None:
+            return evaluate_cloud_spend(None, self.limits)
+        try:
+            summary = self._provider.costs_summary(period=period, group_by=None)
+        except _BILLING_OUTAGE_ERRORS as exc:
+            # Billing outages must not break cloud operations; anything else surfaces.
+            result = evaluate_cloud_spend(None, self.limits)
+            result["error"] = type(exc).__name__
+            return result
+        try:
+            result = evaluate_cloud_spend(summary.get("total_cost"), self.limits)
+        except BudgetError:
+            result = evaluate_cloud_spend(None, self.limits)
+            result["error"] = "invalid_total"
+        currency = str(summary.get("currency") or "").upper()
+        if currency and currency != self.limits.currency:
+            result = evaluate_cloud_spend(None, self.limits)
+            result["error"] = "currency_mismatch"
+            result["billing_currency"] = currency
+        result["provider"] = summary.get("provider")
+        return result
+
+    def _emit_if_not_ok(self, result: Dict[str, Any]) -> None:
+        if result["status"] not in {CloudSpendStatus.OK.value, CloudSpendStatus.UNCONFIGURED.value}:
+            self._emit("cloud_budget_" + result["status"], result)
+
+    def enforce(self, operation: str) -> Dict[str, Any]:
+        result = self.status()
+        if result["status"] == CloudSpendStatus.BLOCK.value:
+            raise BudgetLimitExceeded(
+                f"cloud monthly budget exhausted: {result['spent']} of "
+                f"{result['limit']} {result['currency']}; '{operation}' blocked"
+            )
+        return result
+
+    def _emit(self, event_type: str, data: Dict[str, Any]) -> None:
+        if self._trace_sink is not None:
+            self._trace_sink({"event": event_type, **data})
