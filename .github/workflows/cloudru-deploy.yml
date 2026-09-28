@@ -50,13 +50,19 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
-          fetch-depth: 1
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version-file: .python-version
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Require a commit on master
+        if: inputs.action == 'deploy'
+        run: |
+          # Only reviewed code that has landed on master may be deployed.
+          git fetch --no-tags origin master
+          git merge-base --is-ancestor HEAD FETCH_HEAD
       - name: Validate configuration
         if: inputs.action != 'estimate'
         run: |
@@ -72,6 +78,7 @@ jobs:
           for name in ALICE_PROVIDER_CREDENTIAL_KEY ALICE_DATABASE_URL; do
             if [ -n "${!name}" ]; then env_args+=(--env "$name"); else unset "$name"; fi
           done
+          set -o pipefail
           python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" "${env_args[@]}" | tee deploy.json
           {
             echo '### Cloud.ru deploy'

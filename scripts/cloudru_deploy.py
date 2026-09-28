@@ -33,14 +33,31 @@ from cloud.cloudru.registry_client import CloudRuRegistryClient  # noqa: E402
 
 
 def _settings() -> dict:
-    return {
+    try:
+        min_instances = int(os.getenv("CLOUDRU_MIN_INSTANCES", "0"))
+        max_instances = int(os.getenv("CLOUDRU_MAX_INSTANCES", "1"))
+    except ValueError as exc:
+        raise CloudProviderError(
+            "CLOUDRU_MIN_INSTANCES and CLOUDRU_MAX_INSTANCES must be integers",
+            code="validation_error",
+        ) from exc
+    cfg = {
         "registry": os.getenv("CLOUDRU_REGISTRY_NAME", "alice-pro"),
         "repository": os.getenv("CLOUDRU_REPOSITORY_NAME", "alice-pro"),
         "name": os.getenv("CLOUDRU_CONTAINER_NAME", "alice-pro"),
         "cpu": os.getenv("CLOUDRU_CONTAINER_CPU", "0.5"),
-        "min_instances": int(os.getenv("CLOUDRU_MIN_INSTANCES", "0")),
-        "max_instances": int(os.getenv("CLOUDRU_MAX_INSTANCES", "1")),
+        "min_instances": min_instances,
+        "max_instances": max_instances,
     }
+    # Validate everything up front, before any command touches the provider.
+    ContainerSpec(
+        name=cfg["name"],
+        image="validation-only",
+        cpu=cfg["cpu"],
+        min_instances=min_instances,
+        max_instances=max_instances,
+    ).validate()
+    return cfg
 
 
 def _emit(payload: dict) -> None:
@@ -49,6 +66,11 @@ def _emit(payload: dict) -> None:
 
 def cmd_deploy(args: argparse.Namespace) -> dict:
     cfg = _settings()
+    missing = [name for name in args.env if name not in os.environ]
+    if missing:
+        raise CloudProviderError(
+            f"environment variables not set: {', '.join(missing)}", code="validation_error"
+        )
     registry = CloudRuRegistryClient()
     apps = CloudRuContainerAppsClient()
 
@@ -59,11 +81,6 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
         tag=args.tag,
         context_dir=args.context,
     )
-    missing = [name for name in args.env if name not in os.environ]
-    if missing:
-        raise CloudProviderError(
-            f"environment variables not set: {', '.join(missing)}", code="validation_error"
-        )
     spec = ContainerSpec(
         name=cfg["name"],
         image=image.pinned,
@@ -72,14 +89,10 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
         max_instances=cfg["max_instances"],
         env={name: os.environ[name] for name in args.env},
     )
-    result = apps.deploy(spec)
-    ready = apps.wait_until_ready(spec.name, image=spec.image, timeout_s=args.timeout)
-    health = apps.health_check(ready["public_uri"])
+    result = apps.deploy_verified(spec, timeout_s=args.timeout)
     return {
-        "action": result["action"],
+        **result,
         "image": image.pinned,
-        "status": ready,
-        "health": health,
         "env_names": sorted(spec.env),
         "cost_floor": estimate_monthly_cost(spec.cpu, spec.min_instances),
     }

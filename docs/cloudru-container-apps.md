@@ -37,6 +37,10 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
 `deploy` creates the registry if missing, pushes `<registry>.cr.cloud.ru/alice-pro:<sha>`,
 creates the service (or rolls out a new revision), waits until it runs the new
 digest with a public URL, and requires `GET /healthz` to return 200.
+If the new revision fails readiness or the health check, it redeploys the
+previous image and fails the run. The workflow only deploys commits that are
+already on `master`, and it fails closed if the registry reports no image
+digest.
 
 ## Cost
 

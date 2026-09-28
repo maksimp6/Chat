@@ -184,6 +184,11 @@ class CloudRuRegistryClient:
                 )
             if argv[1] == "push":
                 match = _DIGEST_RE.search(result.stdout or "")
-                if match:
-                    ref = ImageRef(host, repository, tag, match.group(0))
+                if not match:
+                    # Deploys must pin a digest; never fall back to the mutable tag.
+                    raise CloudProviderError(
+                        f"docker push of {ref.tagged} reported no sha256 digest",
+                        code="docker_error",
+                    )
+                ref = ImageRef(host, repository, tag, match.group(0))
         return ref

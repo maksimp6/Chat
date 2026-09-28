@@ -52,12 +52,29 @@ class CloudRuProvider:
             return False
         return CloudRuProvider._service_enabled(endpoint_env, path_env)
 
+    @staticmethod
+    def _deploy_configured() -> bool:
+        return all(
+            os.getenv(name, "").strip()
+            for name in ("CLOUDRU_PROJECT_ID", "CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET")
+        )
+
     def capabilities(self) -> dict[str, Any]:
         services = {
             "iam": {
                 "enabled": True,
                 "operations": ["list_service_accounts", "list_api_keys"],
                 "notes": "Uses documented Cloud.ru IAM API endpoints.",
+            },
+            "artifact_registry": {
+                "enabled": self._deploy_configured(),
+                "operations": ["list_registries", "ensure_registry", "build_and_push"],
+                "notes": "Runs through scripts/cloudru_deploy.py and the Cloud.ru deploy workflow.",
+            },
+            "container_apps": {
+                "enabled": self._deploy_configured(),
+                "operations": ["status", "deploy", "delete", "start", "stop"],
+                "notes": "Runs through scripts/cloudru_deploy.py and the Cloud.ru deploy workflow.",
             },
             "compute": {
                 "enabled": self._service_enabled(

@@ -325,3 +325,83 @@ def test_docker_login_needs_key_pair_and_reports_failure():
     )
     with pytest.raises(CloudProviderError, match="unauthorized"):
         reg.docker_login("alice-pro")
+
+
+def test_push_without_digest_fails_closed():
+    def runner(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 0, stdout="pushed", stderr="")
+
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=runner
+    )
+    with pytest.raises(CloudProviderError, match="no sha256 digest"):
+        reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc")
+
+
+def _verified_client(responses, http_status=200):
+    return CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient(responses),
+        sleep=lambda _: None,
+        http_get=lambda url, timeout: Mock(status_code=http_status),
+    )
+
+
+def test_deploy_verified_success_reports_previous_image():
+    apps = _verified_client(
+        [_app(image="old"), _app(image="old"), _app(image="old"), {}, _app(image="new")]
+    )
+    result = apps.deploy_verified(ContainerSpec(name="alice-pro", image="new"))
+    assert result["action"] == "update"
+    assert result["previous_image"] == "old"
+    assert result["health"]["http_status"] == 200
+
+
+def test_deploy_verified_rolls_back_on_failed_health_check():
+    apps = _verified_client(
+        [
+            _app(image="old"),  # status before deploy
+            _app(image="old"),  # deploy -> get
+            _app(image="old"),  # update -> get
+            {},  # patch
+            _app(image="new"),  # ready on new image
+            _app(image="new"),  # rollback update -> get
+            {},  # rollback patch
+            _app(image="old"),  # ready on old image
+        ],
+        http_status=503,
+    )
+    with pytest.raises(CloudProviderError, match="rolled back to old"):
+        apps.deploy_verified(ContainerSpec(name="alice-pro", image="new"))
+    patches = [c for c in apps.client.calls if c[1] == "PATCH"]
+    assert [p[4]["template"]["containers"][0]["image"] for p in patches] == ["new", "old"]
+
+
+def test_deploy_verified_without_previous_image_just_raises():
+    apps = _verified_client(
+        [
+            CloudProviderError("nf", http_status=404),
+            CloudProviderError("nf", http_status=404),
+            {},
+            _app("FAILED", "new"),
+        ]
+    )
+    with pytest.raises(CloudProviderError, match="FAILED"):
+        apps.deploy_verified(ContainerSpec(name="alice-pro", image="new"))
+
+
+def test_provider_advertises_deploy_services(monkeypatch):
+    from cloud.cloudru.provider import CloudRuProvider
+
+    for name in ("CLOUDRU_PROJECT_ID", "CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET"):
+        monkeypatch.setenv(name, "x")
+    services = CloudRuProvider(client=RecordingClient()).capabilities()["services"]
+    assert services["container_apps"]["enabled"] is True
+    assert "deploy" in services["container_apps"]["operations"]
+    monkeypatch.delenv("CLOUDRU_PROJECT_ID")
+    assert (
+        CloudRuProvider(client=RecordingClient()).capabilities()["services"]["artifact_registry"][
+            "enabled"
+        ]
+        is False
+    )

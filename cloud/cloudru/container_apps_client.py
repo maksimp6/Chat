@@ -12,6 +12,7 @@ working community client; confirm them on the first real deploy.
 from __future__ import annotations
 
 import copy
+import dataclasses
 from dataclasses import dataclass, field
 import os
 import re
@@ -227,6 +228,32 @@ class CloudRuContainerAppsClient:
         if self.get(spec.name) is None:
             return {"action": "create", "operation": self.create(spec)}
         return {"action": "update", "operation": self.update(spec)}
+
+    def deploy_verified(self, spec: ContainerSpec, *, timeout_s: float = 600) -> dict[str, Any]:
+        """Deploy, wait for the new image, health-check, and roll back to the previous image on failure."""
+        spec.validate()
+        previous = self.status(spec.name)
+        previous_image = previous.get("image") if previous["exists"] else None
+        result = self.deploy(spec)
+        try:
+            ready = self.wait_until_ready(spec.name, image=spec.image, timeout_s=timeout_s)
+            health = self.health_check(ready["public_uri"])
+        except CloudProviderError as exc:
+            if not previous_image or previous_image == spec.image:
+                raise
+            self.update(dataclasses.replace(spec, image=previous_image))
+            self.wait_until_ready(spec.name, image=previous_image, timeout_s=timeout_s)
+            raise CloudProviderError(
+                f"{exc.message}; rolled back to {previous_image}",
+                code=exc.code,
+                http_status=exc.http_status,
+            ) from exc
+        return {
+            "action": result["action"],
+            "previous_image": previous_image,
+            "status": ready,
+            "health": health,
+        }
 
     def delete(self, name: str) -> dict[str, Any]:
         return self.client.request(
