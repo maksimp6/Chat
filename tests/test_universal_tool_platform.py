@@ -137,7 +137,7 @@ def test_executor_accepts_approval_hook():
 def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
     calls = []
 
-    fake_gateway = types.ModuleType("local_agent_gateway")
+    fake_gateway = types.ModuleType("agents.local_gateway")
 
     def enqueue(agent_id, tool_name, arguments, **kwargs):
         calls.append(("enqueue", agent_id, tool_name, arguments, kwargs))
@@ -154,7 +154,7 @@ def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
 
     fake_gateway.enqueue_local_tool_job = enqueue
     fake_gateway.wait_for_local_tool_job = wait
-    monkeypatch.setitem(sys.modules, "local_agent_gateway", fake_gateway)
+    monkeypatch.setitem(sys.modules, "agents.local_gateway", fake_gateway)
 
     cfg = definition(
         supported_transports=["responses_api"],
