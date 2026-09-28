@@ -49,13 +49,14 @@ under GitHub → Settings → Developer settings → GitHub Apps → New GitHub 
   delete the downloaded file.
 - Install the App on `maksimp6/Chat` only.
 
-Commits, pull requests and comments then appear as `alice-pro[bot]`, and,
-unlike `GITHUB_TOKEN`, they trigger CI.
+Commits, pull requests and comments then appear as `alice-pro[bot]`: the
+workflow sets the commit author to the App's bot name and its ID-based
+noreply email. Unlike `GITHUB_TOKEN`, these pushes trigger CI.
 
 Until the App exists, the workflow falls back to `ALICE_GITHUB_TOKEN`, a
 fine-grained personal token of the maintainer (only `maksimp6/Chat`; Contents,
 Pull requests and Issues read and write). Its posts appear under the
-maintainer's name. Delete that secret once the App works.
+maintainer's name, and commits are authored as `Alice Pro`. Delete that secret once the App works.
 
 Optional repository variable `ALICE_AGENT_MODEL` selects the model key from
 `config.py` (default `aliceai-llm`).

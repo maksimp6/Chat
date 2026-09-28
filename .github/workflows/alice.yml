@@ -132,6 +132,7 @@ jobs:
       - name: Open pull request and report
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.ALICE_GITHUB_TOKEN }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -156,8 +157,16 @@ jobs:
           if [ -s "$RUNNER_TEMP/files.txt" ]; then
             branch="alice/issue-$ISSUE_NUMBER-$GITHUB_RUN_ID"
             gh auth setup-git
-            git config user.name "Alice Pro"
-            git config user.email "alice-pro@users.noreply.github.com"
+            if [ -n "$APP_SLUG" ]; then
+              # Commits link to the App's bot account only with its exact name and ID email.
+              bot="$APP_SLUG[bot]"
+              bot_id="$(gh api "users/$bot" --jq .id)"
+              git config user.name "$bot"
+              git config user.email "$bot_id+$bot@users.noreply.github.com"
+            else
+              git config user.name "Alice Pro"
+              git config user.email "alice-pro@users.noreply.github.com"
+            fi
             git checkout -b "$branch"
             git add -A
             git commit -m "Alice: work on issue #$ISSUE_NUMBER" -m "Closes #$ISSUE_NUMBER"
