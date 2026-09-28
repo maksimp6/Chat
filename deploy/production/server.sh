@@ -17,7 +17,7 @@ die() { printf '[production] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # Secrets arrive on stdin, one per line, so they never appear in process
 # arguments: the short token, then the optional GitHub OAuth App client id,
-# client secret and allowed logins. Values already in the environment win.
+# client secret and allowed account ids. Values already in the environment win.
 require_runtime_secret() {
   local line
   IFS= read -r line || true
@@ -27,7 +27,7 @@ require_runtime_secret() {
   IFS= read -r line || true
   ALICE_GITHUB_CLIENT_SECRET="${ALICE_GITHUB_CLIENT_SECRET:-$line}"
   IFS= read -r line || true
-  ALICE_GITHUB_ALLOWED_LOGINS="${ALICE_GITHUB_ALLOWED_LOGINS:-$line}"
+  ALICE_GITHUB_ALLOWED_IDS="${ALICE_GITHUB_ALLOWED_IDS:-$line}"
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
 }
 
@@ -85,7 +85,7 @@ deploy() {
       printf 'ALICE_GITHUB_CLIENT_ID=%s\n' "$ALICE_GITHUB_CLIENT_ID"
       printf 'ALICE_GITHUB_CLIENT_SECRET=%s\n' "$ALICE_GITHUB_CLIENT_SECRET"
       printf 'ALICE_GITHUB_REDIRECT_URI=%s\n' "${ALICE_GITHUB_REDIRECT_URI:-https://maxxxpavlov.ru/auth/github/callback}"
-      printf 'ALICE_GITHUB_ALLOWED_LOGINS=%s\n' "${ALICE_GITHUB_ALLOWED_LOGINS:-}"
+      printf 'ALICE_GITHUB_ALLOWED_IDS=%s\n' "${ALICE_GITHUB_ALLOWED_IDS:-}"
     fi
   ) > "$runtime_env"
 

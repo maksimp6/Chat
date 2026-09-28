@@ -7,10 +7,10 @@ Configuration (all runtime environment variables):
 - ALICE_GITHUB_REDIRECT_URI: the callback URL registered in the OAuth App, e.g.
   https://maxxxpavlov.ru/auth/github/callback. Defaults to this host's
   /auth/github/callback.
-- ALICE_GITHUB_ALLOWED_LOGINS: comma-separated GitHub logins. When the
-  short-token gate is on (ALICE_REQUIRE_SHORT_TOKEN), only these logins may
-  sign in, and signing in also opens the gate. When the gate is off, any
-  GitHub account may sign in.
+- ALICE_GITHUB_ALLOWED_IDS: comma-separated numeric GitHub account ids (not
+  logins, which can be renamed and reassigned). When the short-token gate is on
+  (ALICE_REQUIRE_SHORT_TOKEN), only these accounts may sign in, and signing in
+  also opens the gate. When the gate is off, any GitHub account may sign in.
 
 The GitHub access token is used once to read the account id and login and is
 never stored or logged.
@@ -64,15 +64,15 @@ def login_path() -> str:
     return LOGIN_PATH
 
 
-def _allowed_logins() -> set[str]:
-    raw = os.environ.get("ALICE_GITHUB_ALLOWED_LOGINS", "")
-    return {item.strip().lower() for item in raw.split(",") if item.strip()}
+def _allowed_ids() -> set[str]:
+    raw = os.environ.get("ALICE_GITHUB_ALLOWED_IDS", "")
+    return {item.strip() for item in raw.split(",") if item.strip()}
 
 
-def _login_allowed(login: str) -> bool:
+def _account_allowed(github_id) -> bool:
     if not short_token_required():
         return True
-    return login.lower() in _allowed_logins()
+    return str(github_id) in _allowed_ids()
 
 
 def _redirect_uri() -> str:
@@ -199,8 +199,8 @@ def github_callback():
     if account is None:
         return _page("Не удалось получить аккаунт GitHub. Попробуйте ещё раз.", 502)
 
-    if not _login_allowed(account["login"]):
-        logger.info("[GITHUB_AUTH] rejected login not in allowlist")
+    if not _account_allowed(account["id"]):
+        logger.info("[GITHUB_AUTH] rejected account not in allowlist")
         response = make_response(_page("Этому аккаунту GitHub вход в Alice Pro не разрешён.", 403))
         response.delete_cookie(STATE_COOKIE, path="/auth/github/")
         return response

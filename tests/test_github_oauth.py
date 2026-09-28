@@ -44,7 +44,7 @@ def github_env(monkeypatch):
     monkeypatch.setenv("ALICE_GITHUB_CLIENT_ID", "client-id")
     monkeypatch.setenv("ALICE_GITHUB_CLIENT_SECRET", "client-secret-value")
     monkeypatch.setenv("ALICE_GITHUB_REDIRECT_URI", "https://alice.test/auth/github/callback")
-    monkeypatch.delenv("ALICE_GITHUB_ALLOWED_LOGINS", raising=False)
+    monkeypatch.delenv("ALICE_GITHUB_ALLOWED_IDS", raising=False)
     monkeypatch.delenv("ALICE_REQUIRE_SHORT_TOKEN", raising=False)
     monkeypatch.delenv("ALICE_SHORT_TOKEN", raising=False)
 
@@ -179,8 +179,9 @@ def test_gate_login_page_offers_github_sign_in(github_env, monkeypatch):
 def test_gate_rejects_login_not_in_allowlist(github_env, temp_db, monkeypatch):
     monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
     monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
-    monkeypatch.setenv("ALICE_GITHUB_ALLOWED_LOGINS", "maksimp6")
-    _fake_github(monkeypatch, {"id": 99, "login": "stranger"})
+    monkeypatch.setenv("ALICE_GITHUB_ALLOWED_IDS", "293531601")
+    # The allowlisted login, reassigned to a different account, is not enough.
+    _fake_github(monkeypatch, {"id": 99, "login": "maksimp6"})
     client = _app()
     state = _start_login(client)
 
@@ -198,8 +199,9 @@ def test_gate_rejects_login_not_in_allowlist(github_env, temp_db, monkeypatch):
 def test_gate_opens_for_allowlisted_login(github_env, temp_db, monkeypatch):
     monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
     monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
-    monkeypatch.setenv("ALICE_GITHUB_ALLOWED_LOGINS", "someone, MaksimP6")
-    _fake_github(monkeypatch, {"id": 293531601, "login": "maksimp6"})
+    monkeypatch.setenv("ALICE_GITHUB_ALLOWED_IDS", "12, 293531601")
+    # A renamed account keeps its id and keeps access.
+    _fake_github(monkeypatch, {"id": 293531601, "login": "maksimp6-renamed"})
     client = _app()
     state = _start_login(client)
 

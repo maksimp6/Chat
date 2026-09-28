@@ -84,7 +84,7 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         + _function_source(source, "require_runtime_secret")
         + "require_runtime_secret\n"
         f'printf \'%s\\n\' "$ALICE_SHORT_TOKEN" "$ALICE_GITHUB_CLIENT_ID" '
-        f'"$ALICE_GITHUB_CLIENT_SECRET" "$ALICE_GITHUB_ALLOWED_LOGINS" > \'{out}\'\n',
+        f'"$ALICE_GITHUB_CLIENT_SECRET" "$ALICE_GITHUB_ALLOWED_IDS" > \'{out}\'\n',
         encoding="utf-8",
     )
 
@@ -98,7 +98,7 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         "ALICE_SHORT_TOKEN": "short-token-value",
         "ALICE_GITHUB_CLIENT_ID": "client-id-value",
         "ALICE_GITHUB_CLIENT_SECRET": "client-secret-value",
-        "ALICE_GITHUB_ALLOWED_LOGINS": "maksimp6,o'brien;x",
+        "ALICE_GITHUB_ALLOWED_IDS": "maksimp6,o'brien;x",
     }
     result = subprocess.run(
         ["bash", "-c", deploy_line], env=env, capture_output=True, text=True, check=False
@@ -111,7 +111,7 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         "maksimp6,o'brien;x",
     ]
     assert "short-token-value" not in deploy_line
-    assert "ALLOWED_LOGINS'" not in deploy_line
+    assert "ALLOWED_IDS'" not in deploy_line
     assert "$token" not in deploy_line
 
     # Without GitHub secrets the token still arrives and OAuth stays empty.
