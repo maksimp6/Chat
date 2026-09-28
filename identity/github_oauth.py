@@ -30,8 +30,7 @@ from flask import Blueprint, jsonify, make_response, redirect, request
 from short_token_auth import COOKIE_NAME as SHORT_TOKEN_COOKIE
 from short_token_auth import _enabled as short_token_required
 from short_token_auth import grant_short_token_session
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
-from user_identity import get_github_login, sign_in_with_github
+from user_identity import get_github_login, lookup_user_token, sign_in_with_github
 
 logger = logging.getLogger("alice_github_auth")
 
@@ -96,10 +95,15 @@ def _page(message: str, status: int):
 
 
 def _current_user_id() -> str | None:
-    try:
-        return get_current_owner_id(required=False)
-    except TreasuryIdentityError:
-        return None
+    # Only this request's own token counts. The single-user ALICE_OWNER_ID
+    # fallback must never decide whose account a browser signs in to.
+    token = request.headers.get("X-Alice-User-Token") or request.cookies.get(USER_TOKEN_COOKIE)
+    return lookup_user_token(token) if token else None
+
+
+def current_github_login() -> str | None:
+    user_id = _current_user_id()
+    return get_github_login(user_id) if user_id else None
 
 
 @github_auth_bp.route(LOGIN_PATH, methods=["GET"])
@@ -225,8 +229,7 @@ def github_callback():
 
 @github_auth_bp.route("/api/auth/me", methods=["GET"])
 def auth_me():
-    user_id = _current_user_id()
-    github_login = get_github_login(user_id) if user_id else None
+    github_login = current_github_login()
     return jsonify(
         {
             "authenticated": bool(github_login),

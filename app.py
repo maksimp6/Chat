@@ -39,8 +39,13 @@ from government import government_bp, init_government_tables, ensure_government_
 from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
-from identity.github_oauth import github_auth_bp, github_login_enabled, login_path
-from user_identity import get_github_login, init_github_accounts_table
+from identity.github_oauth import (
+    current_github_login,
+    github_auth_bp,
+    github_login_enabled,
+    login_path,
+)
+from user_identity import init_github_accounts_table
 from conversation_ownership import (
     init_conversation_ownership_table,
     check_access,
@@ -177,16 +182,8 @@ def index():
         donation_url=get_donation_url(),
         github_login_enabled=github_login_enabled(),
         github_login_url=login_path(),
-        github_login=_current_github_login(),
+        github_login=current_github_login(),
     )
-
-
-def _current_github_login():
-    try:
-        owner_id = get_current_owner_id(required=False)
-    except TreasuryIdentityError:
-        return None
-    return get_github_login(owner_id) if owner_id else None
 
 
 @app.route("/healthz", methods=["GET"])

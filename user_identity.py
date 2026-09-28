@@ -157,11 +157,16 @@ def register_anonymous_user(
 
 
 def authenticate_user_token(token: str) -> Optional[str]:
+    init_user_identity_table()
+    return lookup_user_token(token)
+
+
+def lookup_user_token(token: str) -> Optional[str]:
+    """Resolve a bootstrap/GitHub token without schema work (the table must exist)."""
     token = str(token or "").strip()
     if not token:
         return None
 
-    init_user_identity_table()
     token_hash = _hash_auth_token(token)
     conn = get_conn()
     try:

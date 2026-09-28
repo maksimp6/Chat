@@ -414,3 +414,20 @@ def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypat
 
     assert promoted["user_id"] == anon["user_id"]
     assert authenticate_user_token(promoted["auth_token"]) == anon["user_id"]
+
+
+def test_single_user_owner_fallback_is_not_used_for_sign_in(github_env, temp_db, monkeypatch):
+    owner = register_anonymous_user("web-installation-owner", {})
+    monkeypatch.setenv("ALICE_OWNER_ID", owner["user_id"])
+    _fake_github(monkeypatch, {"id": 5, "login": "visitor"})
+    client = _app()
+    state = _start_login(client)
+
+    response = _callback(client, f"code=abc&state={state}")
+
+    assert response.status_code == 302
+    assert get_github_login(owner["user_id"]) is None
+    me = client.get("/api/auth/me", base_url="https://alice.test").get_json()
+    assert me["github_login"] == "visitor"
+    stranger = _app()
+    assert stranger.get("/api/auth/me").get_json()["authenticated"] is False
