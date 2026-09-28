@@ -189,9 +189,21 @@ def init_environment_tables() -> None:
                    SET status = ?, runtime_pid = NULL, runtime_port = NULL,
                        runtime_instance = NULL, runtime_heartbeat_at = NULL,
                        updated_at = ?, stopped_at = COALESCE(stopped_at, ?)
-                 WHERE environment_id = ?
+                 WHERE environment_id = ? AND status = ?
+                   AND COALESCE(runtime_instance, '') = ?
+                   AND COALESCE(runtime_heartbeat_at, -1) = ?
                 """,
-                ("STOPPED", _now(), _now(), runtime_id),
+                # Only reclaim the ownership observed above: a heartbeat that
+                # lands in between makes this a no-op.
+                (
+                    "STOPPED",
+                    _now(),
+                    _now(),
+                    runtime_id,
+                    "RUNNING",
+                    row["runtime_instance"] or "",
+                    -1 if row["runtime_heartbeat_at"] is None else row["runtime_heartbeat_at"],
+                ),
             )
         conn.commit()
     finally:
@@ -416,6 +428,7 @@ class EnvironmentRuntime:
         )
         self._stream_lock = threading.RLock()
         self._active_streams: dict[threading.Event, queue.Queue] = {}
+        self.owned_in_db = False
         self._heartbeat_stop = threading.Event()
         self._heartbeat_thread = threading.Thread(
             target=self._heartbeat_loop,
@@ -454,7 +467,22 @@ class EnvironmentRuntime:
             raise RuntimeError("runtime worktree is not an immutable clean snapshot")
         self.loader.load()
 
+    def _stop_heartbeat(self) -> None:
+        self._heartbeat_stop.set()
+        if self._heartbeat_thread.is_alive():
+            self._heartbeat_thread.join(timeout=5)
+
     def start(self) -> int:
+        # Heartbeats start before the (possibly slow) worktree preparation so
+        # the ownership lease reserved by start_environment cannot lapse.
+        self._heartbeat_thread.start()
+        try:
+            return self._start()
+        except Exception:
+            self._stop_heartbeat()
+            raise
+
+    def _start(self) -> int:
         self._prepare()
         with bind_runtime_request(
             self.runtime_id,
@@ -474,7 +502,6 @@ class EnvironmentRuntime:
                 root=str(self.data_dir),
             )
             self._thread.start()
-            self._heartbeat_thread.start()
             for _ in range(100):
                 if self._thread.ident is not None:
                     return int(self._thread.ident)
@@ -545,14 +572,13 @@ class EnvironmentRuntime:
                 events.put_nowait(("end",))
             except queue.Full:
                 pass
-        self._heartbeat_stop.set()
-        if self._heartbeat_thread.is_alive():
-            self._heartbeat_thread.join(timeout=5)
         if self._thread.is_alive():
             self._jobs.put(_RUNTIME_STOP)
             self._thread.join(timeout=5)
         if self._thread.is_alive():
+            # Keep the heartbeat so no other instance reclaims a live runtime.
             raise RuntimeError("environment runtime thread did not stop")
+        self._stop_heartbeat()
         with _RUNTIME_WORKERS_LOCK:
             if _RUNTIME_WORKERS.get(self.runtime_id) is self:
                 _RUNTIME_WORKERS.pop(self.runtime_id, None)
@@ -666,8 +692,10 @@ def _local_runtime(environment_id: str) -> "EnvironmentRuntime":
         runtime = _RUNTIME_WORKERS.get(environment_id)
     item = _get(environment_id)
     if runtime is not None:
-        lost = item is not None and (
-            item["status"] != "RUNNING" or item["runtime_instance"] != INSTANCE_ID
+        # Runtimes started by start_environment are owned through their row; a
+        # missing, stopped or re-owned row means this instance lost ownership.
+        lost = runtime.owned_in_db and (
+            item is None or item["status"] != "RUNNING" or item["runtime_instance"] != INSTANCE_ID
         )
         if not lost:
             return runtime
@@ -818,6 +846,7 @@ def start_environment(
     if reserved != 1:
         raise ValueError("environment is already being started by another instance")
     runtime = EnvironmentRuntime(item)
+    runtime.owned_in_db = True
     try:
         thread_id = runtime.start()
         item.update(
@@ -875,18 +904,22 @@ def stop_environment(
         runtime.stop()
     conn = get_conn()
     try:
-        conn.execute(
+        # Conditional on the ownership read above, so a runtime another
+        # instance took over in the meantime is never marked stopped.
+        stopped = conn.execute(
             """
             UPDATE environments
                SET status = ?, runtime_pid = NULL, runtime_instance = NULL,
                    runtime_heartbeat_at = NULL, updated_at = ?, stopped_at = ?
-             WHERE environment_id = ?
+             WHERE environment_id = ? AND COALESCE(runtime_instance, '') = ?
             """,
-            ("STOPPED", _now(), _now(), environment_id),
-        )
+            ("STOPPED", _now(), _now(), environment_id, item.get("runtime_instance") or ""),
+        ).rowcount
         conn.commit()
     finally:
         conn.close()
+    if stopped != 1:
+        raise ValueError("environment ownership changed while stopping; retry")
     item.update(
         {
             "status": "STOPPED",

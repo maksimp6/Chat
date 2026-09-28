@@ -413,3 +413,38 @@ def test_runtime_thread_sends_heartbeats_and_survives_failures(tmp_path, monkeyp
         runtime.stop()
     assert set(beats) == {"runtime-heartbeat"}
     assert not runtime._heartbeat_thread.is_alive()
+
+
+def test_runtime_heartbeats_during_startup_and_stops_on_failure(tmp_path, monkeypatch):
+    beat = threading.Event()
+    monkeypatch.setattr(environment_manager, "_HEARTBEAT_SECONDS", 0.01)
+    monkeypatch.setattr(environment_manager, "_record_heartbeat", lambda _id: beat.set())
+    runtime = _runtime(tmp_path, "runtime-slow-start")
+
+    def slow_failing_prepare():
+        # Startup is slow: the lease must be renewed while it runs.
+        assert beat.wait(2)
+        raise RuntimeError("worktree failed")
+
+    runtime._prepare = slow_failing_prepare
+    with pytest.raises(RuntimeError, match="worktree failed"):
+        runtime.start()
+    assert not runtime._heartbeat_thread.is_alive()
+
+
+def test_runtime_stop_keeps_heartbeat_when_thread_does_not_stop(tmp_path, monkeypatch):
+    runtime = _runtime(tmp_path, "runtime-stuck")
+
+    class StuckThread:
+        ident = 1
+
+        def is_alive(self):
+            return True
+
+        def join(self, timeout=None):
+            pass
+
+    runtime._thread = StuckThread()
+    with pytest.raises(RuntimeError, match="did not stop"):
+        runtime.stop()
+    assert not runtime._heartbeat_stop.is_set()

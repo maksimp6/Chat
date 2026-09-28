@@ -373,3 +373,55 @@ def test_environment_start_failure_releases_ownership(tmp_path, monkeypatch):
     failed = _status(environment_id)
     assert (failed["status"], failed["error"]) == ("FAILED", "worktree unavailable")
     assert failed["runtime_instance"] is None
+
+
+def test_environment_init_reclaim_yields_to_a_fresh_heartbeat(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    environment_id = create_environment("feature/one")["environment_id"]
+    _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now() - 3600)
+    real_owned = environment_manager._owned_by_live_instance
+
+    def heartbeat_lands_after_read(row):
+        # The owner heartbeats between the SELECT and the reclaim UPDATE.
+        _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now())
+        return real_owned(row)
+
+    monkeypatch.setattr(environment_manager, "_owned_by_live_instance", heartbeat_lands_after_read)
+    init_environment_tables()
+    assert _status(environment_id)["status"] == "RUNNING"
+    assert _status(environment_id)["runtime_instance"] == "other-host:1:abc"
+
+
+def test_environment_stop_yields_when_ownership_changed(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    environment_id = create_environment("feature/one")["environment_id"]
+    _set_runtime_owner(environment_id, "new-host:1:abc", environment_manager._now())
+    # What this instance read before a new owner reclaimed the dead one.
+    stale = dict(_status(environment_id))
+    stale.update(
+        runtime_instance="dead-host:1:abc",
+        runtime_heartbeat_at=environment_manager._now() - 3600,
+    )
+    monkeypatch.setattr(environment_manager, "_require", lambda *args, **kwargs: dict(stale))
+    with pytest.raises(ValueError, match="ownership changed while stopping"):
+        stop_environment(environment_id)
+    assert _status(environment_id)["runtime_instance"] == "new-host:1:abc"
+
+
+def test_local_runtime_whose_row_was_deleted_stops_serving(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    environment_id = create_environment("feature/one")["environment_id"]
+    start_environment(environment_id)
+    conn = db.get_conn()
+    conn.execute("DELETE FROM environments WHERE environment_id = ?", (environment_id,))
+    conn.commit()
+    conn.close()
+    with pytest.raises(RuntimeError, match="no longer owned by this instance"):
+        dispatch_environment_revision(environment_id, "invoke", {"value": "x"})
+
+
+def test_list_environments_filters_by_owner(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    mine = create_environment("feature/one", owner_id="alice")["environment_id"]
+    create_environment("feature/one", owner_id="bob")
+    assert [item["environment_id"] for item in list_environments("alice")] == [mine]
