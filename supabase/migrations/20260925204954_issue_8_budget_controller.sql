@@ -54,7 +54,7 @@ create or replace function apply_budget_operation(
 language plpgsql
 security invoker
 set search_path = public, pg_temp
-as $
+as $$
 declare
   a budget_accounts%rowtype;
   result jsonb;
