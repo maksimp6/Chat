@@ -55,12 +55,6 @@ creates and validates a Foundation Models key, then stores the management and
 runtime credentials. Its lifetime follows `CLOUDRU_KEY_TTL_DAYS` (default: one
 day). The manual API-key modal does not invoke this bootstrap route.
 
-Known issue: on `master` as of 2026-09-28, `provider_credentials.py` defines
-`save_cloudru_iam_credentials` twice, and the second definition does not accept
-`expires_at`. The bootstrap route therefore fails with a generic 502 before it
-stores anything. The fix is in pull request #456; until it is merged, bootstrap
-does not work.
-
 The service account must already exist and have an appropriate project role.
 The bootstrap route does not create a service account. A separate
 `POST /api/provider-credentials/cloudru/service-accounts` route lists accounts.
