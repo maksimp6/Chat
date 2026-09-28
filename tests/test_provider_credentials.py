@@ -284,6 +284,35 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
     assert "provider API-key validation" in body["detail"]
 
 
+def test_cloudru_iam_credentials_preserve_expiry():
+    import sqlite3
+
+    from provider_credentials import (
+        create_schema,
+        get_cloudru_iam_credentials,
+        save_cloudru_iam_credentials,
+    )
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    save_cloudru_iam_credentials(
+        conn,
+        key_id="master-id",
+        key_secret="master-secret",
+        project_id="project-1",
+        service_account_id="550e8400-e29b-41d4-a716-446655440000",
+        expires_at=datetime(2027, 1, 2, tzinfo=timezone.utc),
+        encrypt=lambda value: "enc:" + value,
+    )
+    creds = get_cloudru_iam_credentials(conn, lambda value: value.replace("enc:", "", 1))
+    conn.close()
+
+    assert creds is not None
+    assert creds["key_id"] == "master-id"
+    assert creds["expires_at"].startswith("2027-01-02T00:00:00")
+
+
 def test_provider_credentials_update_accepts_yandex_static_key_without_remote_probe(monkeypatch):
     from flask import Flask
     import provider_credentials_routes as routes

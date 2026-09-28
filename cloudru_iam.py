@@ -44,6 +44,10 @@ class CloudRuIamClient:
         self._access_token: Optional[str] = None
         self._access_token_expires_at: Optional[datetime] = None
 
+    def access_token(self) -> str:
+        """Return a cached IAM token for authenticated API calls."""
+        return self._token()
+
     def _token(self) -> str:
         now = datetime.now(timezone.utc)
         if (

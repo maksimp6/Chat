@@ -16,6 +16,7 @@ from agent_gateway import (
     AgentNotFound,
     AgentPermissionError,
     AgentRateLimitError,
+    cloudru_iam_token_provider,
 )
 
 
@@ -164,6 +165,95 @@ def test_a2a_bad_id(monkeypatch):
         A2AClient(A2AClientConfig("https://agent.example/a2a")).send_message(
             {"message": {"role": "user", "parts": []}}
         )
+
+
+def test_a2a_reads_endpoint_from_agent_card(monkeypatch):
+    captured = {}
+
+    class R:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self._payload
+
+    def fake(req, timeout):
+        if req.get_method() == "GET":
+            return R(b'{"name":"demo","endpoint":"https://agent.example/a2a"}')
+        body = json.loads(req.data.decode())
+        captured["method"] = body["method"]
+        captured["params"] = body["params"]
+        captured["id"] = body["id"]
+        return R(json.dumps({"jsonrpc": "2.0", "id": body["id"], "result": {"ok": True}}).encode())
+
+    monkeypatch.setattr("agent_gateway.urlopen", fake)
+    client = A2AClient(A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json"))
+    result = client.send_message({"message": {"role": "user", "parts": [{"text": "hi"}]}})
+    assert result == {"ok": True}
+    assert captured["method"] == "message/send"
+    assert captured["params"]["message"]["role"] == "user"
+
+
+def test_a2a_sse_stream(monkeypatch):
+    captured = {}
+
+    class R:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return (
+                b'data: {"jsonrpc":"2.0","id":"req-id","result":{"delta":"hello"}}\n\n'
+                b'data: {"jsonrpc":"2.0","id":"req-id","result":{"done":true}}\n\n'
+                b"data: [DONE]\n\n"
+            )
+
+    def fake(req, timeout):
+        captured["accept"] = dict((k.lower(), v) for k, v in req.header_items())["accept"]
+        return R()
+
+    monkeypatch.setattr("agent_gateway.urlopen", fake)
+    monkeypatch.setattr("agent_gateway.uuid4", lambda: "req-id")
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    events = client.stream_message({"message": {"role": "user", "parts": []}})
+    assert events == [{"delta": "hello"}, {"done": True}]
+    assert captured["accept"] == "text/event-stream"
+
+
+def test_cloudru_iam_token_provider_uses_stored_credentials(monkeypatch):
+    import sqlite3
+
+    from provider_credentials import create_schema, save_cloudru_iam_credentials
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    save_cloudru_iam_credentials(
+        conn,
+        key_id="master-id",
+        key_secret="master-secret",
+        project_id="project-1",
+        service_account_id="sa-1",
+        expires_at=None,
+        encrypt=lambda value: f"enc:{value}",
+    )
+    monkeypatch.setattr(
+        "cloudru_iam.CloudRuIamClient.access_token",
+        lambda self: "iam-token",
+    )
+
+    provider = cloudru_iam_token_provider(conn, lambda value: value.replace("enc:", "", 1))
+    assert provider() == "iam-token"
+    conn.close()
 
 
 def test_rest(monkeypatch):

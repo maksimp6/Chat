@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from threading import RLock
 from typing import Any, Callable, Mapping, MutableMapping, Optional
 from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 from uuid import uuid4
 import json
@@ -82,7 +83,8 @@ class InvocationResult:
 
 @dataclass(frozen=True)
 class A2AClientConfig:
-    endpoint: str
+    endpoint: str = ""
+    agent_card_url: str = ""
     timeout_seconds: float = 30.0
 
 
@@ -90,14 +92,112 @@ class A2AClient:
     def __init__(
         self, config: A2AClientConfig, token_provider: Optional[TokenProvider] = None
     ) -> None:
-        if not config.endpoint.strip():
-            raise ValueError("A2A endpoint must not be empty")
+        if not config.endpoint.strip() and not config.agent_card_url.strip():
+            raise ValueError("A2A endpoint or agent_card_url must be configured")
         if config.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
         self._config = config
         self._token_provider = token_provider
+        self._endpoint = config.endpoint.strip()
 
-    def send_message(self, payload: Mapping[str, Any]) -> Any:
+    def _headers(self, *, accept: str) -> dict[str, str]:
+        headers = {"Content-Type": "application/json", "Accept": accept}
+        if self._token_provider is not None:
+            token = self._token_provider()
+            if token:
+                headers["Authorization"] = "Bearer " + token
+        return headers
+
+    def _load_agent_card(self) -> Mapping[str, Any]:
+        card_url = self._config.agent_card_url.strip()
+        if not card_url:
+            raise A2AProtocolError("A2A agent card URL is not configured")
+        req = Request(
+            card_url,
+            headers=self._headers(accept="application/json"),
+            method="GET",
+        )
+        try:
+            with urlopen(req, timeout=self._config.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+        except HTTPError as exc:
+            raise A2AProtocolError(f"A2A Agent Card HTTP error {exc.code}: {exc.reason}") from exc
+        except (URLError, TimeoutError) as exc:
+            raise A2AProtocolError(f"A2A Agent Card transport error: {exc}") from exc
+        try:
+            card = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise A2AProtocolError("A2A Agent Card is not valid JSON") from exc
+        if not isinstance(card, Mapping):
+            raise A2AProtocolError("A2A Agent Card must be a JSON object")
+        return card
+
+    @staticmethod
+    def _extract_card_endpoint(card: Mapping[str, Any], card_url: str) -> str:
+        for key in ("endpoint", "agent_endpoint", "agentEndpoint", "url"):
+            value = card.get(key)
+            if isinstance(value, str) and value.strip():
+                return urljoin(card_url, value.strip())
+        transports = card.get("transports")
+        if isinstance(transports, list):
+            for item in transports:
+                if not isinstance(item, Mapping):
+                    continue
+                kind = str(item.get("protocol") or item.get("name") or "").lower()
+                if kind == "a2a":
+                    value = item.get("endpoint") or item.get("url")
+                    if isinstance(value, str) and value.strip():
+                        return urljoin(card_url, value.strip())
+        capabilities = card.get("capabilities")
+        if isinstance(capabilities, Mapping):
+            a2a = capabilities.get("a2a")
+            if isinstance(a2a, Mapping):
+                value = a2a.get("endpoint") or a2a.get("url")
+                if isinstance(value, str) and value.strip():
+                    return urljoin(card_url, value.strip())
+        raise A2AProtocolError("A2A Agent Card does not define an endpoint")
+
+    def _resolve_endpoint(self) -> str:
+        if self._endpoint:
+            return self._endpoint
+        card_url = self._config.agent_card_url.strip()
+        card = self._load_agent_card()
+        self._endpoint = self._extract_card_endpoint(card, card_url)
+        return self._endpoint
+
+    @staticmethod
+    def _parse_sse(raw: str) -> list[Any]:
+        events: list[Any] = []
+        data_lines: list[str] = []
+        for line in raw.splitlines():
+            if not line:
+                if data_lines:
+                    events.append("\n".join(data_lines))
+                    data_lines = []
+                continue
+            if line.startswith(":"):
+                continue
+            if line.startswith("data:"):
+                data_lines.append(line[5:].lstrip())
+        if data_lines:
+            events.append("\n".join(data_lines))
+
+        parsed: list[Any] = []
+        for event in events:
+            if event == "[DONE]":
+                break
+            try:
+                parsed.append(json.loads(event))
+            except json.JSONDecodeError:
+                parsed.append(event)
+        return parsed
+
+    def _send_rpc(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        accept: str,
+    ) -> tuple[str, Any]:
         message = payload.get("message")
         if not isinstance(message, Mapping):
             raise A2AProtocolError("payload.message must be an object")
@@ -110,12 +210,12 @@ class A2AClient:
             {"jsonrpc": "2.0", "id": request_id, "method": "message/send", "params": params},
             separators=(",", ":"),
         ).encode()
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        if self._token_provider is not None:
-            token = self._token_provider()
-            if token:
-                headers["Authorization"] = "Bearer " + token
-        req = Request(self._config.endpoint, data=body, headers=headers, method="POST")
+        req = Request(
+            self._resolve_endpoint(),
+            data=body,
+            headers=self._headers(accept=accept),
+            method="POST",
+        )
         try:
             with urlopen(req, timeout=self._config.timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
@@ -123,10 +223,16 @@ class A2AClient:
             raise A2AProtocolError(f"A2A HTTP error {exc.code}: {exc.reason}") from exc
         except (URLError, TimeoutError) as exc:
             raise A2AProtocolError(f"A2A transport error: {exc}") from exc
+        if accept == "text/event-stream":
+            return request_id, self._parse_sse(raw)
         try:
             obj = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise A2AProtocolError("A2A response is not valid JSON") from exc
+        return request_id, obj
+
+    def send_message(self, payload: Mapping[str, Any]) -> Any:
+        request_id, obj = self._send_rpc(payload, accept="application/json")
         if not isinstance(obj, Mapping):
             raise A2AProtocolError("A2A response must be a JSON object")
         if obj.get("id") != request_id:
@@ -137,8 +243,54 @@ class A2AClient:
             raise A2AProtocolError("A2A response has neither result nor error")
         return obj["result"]
 
+    def stream_message(self, payload: Mapping[str, Any]) -> list[Any]:
+        request_id, events = self._send_rpc(payload, accept="text/event-stream")
+        if not isinstance(events, list):
+            raise A2AProtocolError("A2A SSE response must be an event list")
+        normalized: list[Any] = []
+        for event in events:
+            if not isinstance(event, Mapping):
+                normalized.append(event)
+                continue
+            if event.get("id") not in (None, request_id):
+                raise A2AProtocolError("A2A SSE event id does not match request id")
+            if "error" in event:
+                raise AgentInvocationError(_format_a2a_error(event["error"]))
+            normalized.append(event.get("result", event))
+        return normalized
+
     def handler(self) -> AgentHandler:
         return self.send_message
+
+
+def cloudru_iam_token_provider(
+    db: Any,
+    decrypt: Callable[[str], str],
+    *,
+    iam_endpoint: Optional[str] = None,
+    timeout_seconds: float = 20.0,
+) -> TokenProvider:
+    """Resolve Cloud.ru IAM credentials from the backend store and mint tokens."""
+    from cloudru_iam import CloudRuIamClient, CloudRuIamError
+    from provider_credentials import get_cloudru_iam_credentials
+
+    credentials = get_cloudru_iam_credentials(db, decrypt)
+    if not credentials:
+        raise AgentInvocationError("Cloud.ru IAM credentials are not configured")
+    client = CloudRuIamClient(
+        key_id=credentials["key_id"],
+        key_secret=credentials["key_secret"],
+        endpoint=iam_endpoint,
+        timeout=timeout_seconds,
+    )
+
+    def _provider() -> Optional[str]:
+        try:
+            return client.access_token()
+        except CloudRuIamError as exc:
+            raise A2AProtocolError("Cloud.ru IAM token exchange failed") from exc
+
+    return _provider
 
 
 class RESTAgentClient:
@@ -471,6 +623,7 @@ __all__ = [
     "A2AClientConfig",
     "A2AProtocolError",
     "RESTAgentClient",
+    "cloudru_iam_token_provider",
     "AgentAlreadyRegistered",
     "AgentApprovalRequired",
     "AgentCircuitOpenError",
