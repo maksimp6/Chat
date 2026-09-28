@@ -27,10 +27,14 @@ through metadata, traces, logs, or frontend responses.
 - Alice Pro therefore uses in-place reissue for Cloud.ru. The new secret is
   validated against Foundation Models before the local credential is promoted.
   The same Cloud.ru provider resource is not revoked after reissue.
-- Automated Cloud.ru rotation additionally requires a provider key ID and
-  server-side IAM management credentials (`CLOUDRU_IAM_KEY_ID` /
-  `CLOUDRU_IAM_KEY_SECRET`). Without them, the UI reports rotation as
-  unsupported rather than claiming that rotation works.
+- Automated Cloud.ru rotation additionally requires a provider key ID and IAM
+  management credentials stored in the database by the bootstrap route below.
+  The rotation worker (`scripts/rotate_cloudru_provider_key.py`) reads those
+  stored credentials; setting `CLOUDRU_IAM_KEY_ID` / `CLOUDRU_IAM_KEY_SECRET`
+  in the environment alone does not enable it.
+- Known limitation: the status endpoint builds the Cloud.ru provider without an
+  IAM client, so the UI currently shows `rotation.supported: false` even when
+  bootstrap credentials are stored and the worker can rotate the key.
 
 ## Credential configuration UI
 
@@ -50,6 +54,12 @@ management credentials and an existing service-account UUID as form data. It
 creates and validates a Foundation Models key, then stores the management and
 runtime credentials. Its lifetime follows `CLOUDRU_KEY_TTL_DAYS` (default: one
 day). The manual API-key modal does not invoke this bootstrap route.
+
+Known issue: on `master` as of 2026-09-28, `provider_credentials.py` defines
+`save_cloudru_iam_credentials` twice, and the second definition does not accept
+`expires_at`. The bootstrap route therefore fails with a generic 502 before it
+stores anything. The fix is in pull request #456; until it is merged, bootstrap
+does not work.
 
 The service account must already exist and have an appropriate project role.
 The bootstrap route does not create a service account. A separate
