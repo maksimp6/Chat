@@ -57,6 +57,8 @@ def test_secret_api_key_uses_apikey_without_bearer(monkeypatch):
     request = captured["request"]
     assert request.headers.get("Apikey") == "secret"
     assert request.headers.get("Authorization") is None
+
+
 def test_missing_table_is_error(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
