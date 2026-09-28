@@ -373,3 +373,96 @@ def test_observer_workflow_is_hourly_pinned_and_least_privilege():
     assert "pull_request_target" not in workflow
     assert "python -m agent_office.observer" in workflow
     assert "--publish" in workflow
+
+
+def test_every_timeline_event_kind_is_described():
+    actor = {"login": "maksimp6"}
+    raw = [
+        {
+            "event": "assigned",
+            "actor": actor,
+            "assignee": {"login": "Copilot"},
+            "created_at": ts(9),
+        },
+        {
+            "event": "unassigned",
+            "actor": actor,
+            "assignee": {"login": "Copilot"},
+            "created_at": ts(8),
+        },
+        {
+            "event": "review_requested",
+            "actor": actor,
+            "requested_reviewer": {"login": "Copilot"},
+            "created_at": ts(7),
+        },
+        {
+            "event": "review_requested",
+            "actor": actor,
+            "requested_team": {"name": "core"},
+            "created_at": ts(7),
+        },
+        {"event": "merged", "actor": actor, "created_at": ts(6)},
+        {"event": "head_ref_force_pushed", "actor": actor, "created_at": ts(5)},
+        {"event": "copilot_work_started", "created_at": ts(4)},
+        {"event": "copilot_work_finished", "actor": {"login": "Copilot"}, "created_at": ts(3)},
+        {"event": "committed", "author": {"name": "Claude"}, "message": "no date"},
+        {"event": "commented", "user": actor, "body": "", "created_at": None},
+        {"event": "commented", "user": actor, "body": "", "created_at": ts(2)},
+    ]
+    events = [observer.timeline_event(item) for item in raw]
+    actions = [event.action if event else None for event in events]
+    assert actions == [
+        "назначил Copilot",
+        "снял Copilot",
+        "запросил ревью у Copilot",
+        "запросил ревью у core",
+        "смержил",
+        "head ref force pushed",
+        "Copilot начал работу",
+        "Copilot закончил работу",
+        None,
+        None,
+        "комментарий",
+    ]
+    assert events[6].actor == "Copilot" and events[6].agent == "copilot"
+    assert classify_actor("") == "human"
+    assert observer.parse_time(None) is None
+
+
+def test_copilot_assigned_later_becomes_owner_and_long_threads_are_trimmed():
+    assign = {
+        "event": "assigned",
+        "actor": {"login": "maksimp6"},
+        "assignee": {"login": "Copilot"},
+        "created_at": ts(3),
+    }
+    other = dict(assign, assignee={"login": "maksimp6"})
+    thread = build_thread(issue(), [other, assign])
+    assert thread.dispatches == [("copilot", NOW - timedelta(hours=3))]
+    many = [comment("maksimp6", f"note {n}", n / 10) for n in range(1, 20)]
+    digest = render_digest([build_thread(issue(), many)], [], NOW, "o/r", events_per_thread=5)
+    assert "ещё 15 шагов раньше" in digest
+
+
+def test_main_reports_api_errors_and_tracking_issue(monkeypatch, capsys):
+    def fail(gh, publish):
+        raise observer.urllib.error.HTTPError("https://api.github.com/x", 403, "no", {}, None)
+
+    monkeypatch.setattr(observer, "run", fail)
+    assert observer.main(["--repo", "o/r"]) == 2
+    assert "GitHub API error 403" in capsys.readouterr().err
+
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.setattr(
+        observer,
+        "run",
+        lambda gh, publish: {
+            "digest": "d",
+            "findings": [],
+            "threads": [],
+            "tracking_issue": "https://github.com/o/r/issues/1",
+        },
+    )
+    assert observer.main(["--repo", "o/r", "--publish"]) == 0
+    assert "Tracking issue: https://github.com/o/r/issues/1" in capsys.readouterr().err

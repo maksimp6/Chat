@@ -769,5 +769,5 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if args.fail_on_high and high else 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
