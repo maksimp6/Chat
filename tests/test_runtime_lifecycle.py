@@ -96,3 +96,19 @@ def test_runtime_invocation_can_require_an_existing_session(runtime_db):
             "conversation-a",
             create_missing_session=False,
         )
+
+
+def test_first_use_session_race_reuses_the_winner(runtime_db, monkeypatch):
+    import invocation.manager as invocation_manager
+    from db_backend import IntegrityError
+    from session_manager import create_session
+
+    def lose_race(session_id, metadata=None):
+        # Another request created the session between our lookup and insert.
+        create_session(session_id, metadata=metadata)
+        raise IntegrityError("duplicate session")
+
+    monkeypatch.setattr(invocation_manager, "create_session", lose_race)
+    context = invocation_manager.create_invocation("race-session", "race-conversation")
+
+    assert context.session_id == "race-session"

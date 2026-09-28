@@ -129,3 +129,61 @@ def test_postgres_observability_migration_is_idempotent():
     finally:
         conn.close()
     assert len(rows) == 1
+
+
+def test_postgres_runtime_tables_drop_legacy_conversation_foreign_key():
+    _require_postgres()
+    db.init_db()
+    init_runtime_tables()
+
+    conn = db.get_conn()
+    try:
+        # Recreate invocations as earlier releases did, with the conversation key.
+        conn.execute("DROP TABLE invocations")
+        conn.execute(
+            """
+            CREATE TABLE invocations (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                conversation_id TEXT NOT NULL,
+                trace_id TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL DEFAULT 'created',
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                result_json TEXT,
+                error_json TEXT,
+                trace_json TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER NOT NULL,
+                started_at INTEGER,
+                completed_at INTEGER,
+                FOREIGN KEY (session_id) REFERENCES sessions(id),
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    init_runtime_tables()
+
+    conn = db.get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO sessions (id, created_at, updated_at) VALUES (?, ?, ?)",
+            ("legacy-session", 1, 1),
+        )
+        conn.execute(
+            """
+            INSERT INTO invocations (id, session_id, conversation_id, trace_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("legacy-invocation", "legacy-session", "github-issue-7", "legacy-trace", 1),
+        )
+        conn.commit()
+        count = conn.execute(
+            "SELECT COUNT(*) AS count FROM invocations WHERE conversation_id = ?",
+            ("github-issue-7",),
+        ).fetchone()["count"]
+    finally:
+        conn.close()
+    assert count == 1

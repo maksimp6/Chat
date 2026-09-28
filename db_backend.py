@@ -265,5 +265,12 @@ def add_column_if_missing(conn, table: str, column: str, definition: str) -> boo
     existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     if column in existing:
         return False
-    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    except OperationalError as exc:
+        # Another process or thread added the column after our check. PostgreSQL
+        # never gets here: its ALTER is translated to ADD COLUMN IF NOT EXISTS.
+        if "duplicate column name" not in str(exc).lower():
+            raise
+        return False
     return True

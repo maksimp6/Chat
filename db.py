@@ -157,7 +157,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS conv_settings (
             conversation_id TEXT PRIMARY KEY,
             settings_json TEXT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            -- Unix seconds, like every other *_at column written by this module.
+            updated_at INTEGER
         )
     """)
 

@@ -122,6 +122,61 @@ def test_add_column_if_missing_is_idempotent_and_rejects_bad_identifiers(tmp_pat
     conn.close()
 
 
+def test_add_column_if_missing_tolerates_a_concurrent_migration(tmp_path):
+    import threading
+
+    from db_backend import add_column_if_missing
+
+    path = tmp_path / "race.db"
+    setup = sqlite3.connect(path)
+    setup.execute("CREATE TABLE probe (id INTEGER)")
+    setup.commit()
+    setup.close()
+
+    # Both workers read the old schema before either one alters it.
+    barrier = threading.Barrier(2)
+
+    class RacingConnection:
+        def __init__(self):
+            self._conn = sqlite3.connect(path, timeout=15, check_same_thread=False)
+
+        def execute(self, sql, params=()):
+            cursor = self._conn.execute(sql, params)
+            if sql.startswith("PRAGMA"):
+                rows = cursor.fetchall()
+                barrier.wait()
+                return type("Rows", (), {"fetchall": lambda self: rows})()
+            return cursor
+
+    results = []
+
+    def migrate():
+        conn = RacingConnection()
+        results.append(add_column_if_missing(conn, "probe", "note", "TEXT"))
+        conn._conn.commit()
+        conn._conn.close()
+
+    workers = [threading.Thread(target=migrate) for _ in range(2)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+    assert sorted(results) == [False, True]
+
+
+def test_add_column_if_missing_reraises_other_errors(tmp_path):
+    import pytest
+
+    from db_backend import OperationalError, add_column_if_missing
+
+    conn = sqlite3.connect(tmp_path / "broken.db")
+    conn.execute("CREATE TABLE probe (id INTEGER)")
+    with pytest.raises(OperationalError):
+        add_column_if_missing(conn, "probe", "note", "NOT A TYPE (((")
+    conn.close()
+
+
 def test_postgres_integrity_errors_use_backend_neutral_type():
     import pytest
 
@@ -174,7 +229,7 @@ def test_postgres_executemany_unique_violation_uses_backend_neutral_type(monkeyp
 
 
 def test_delete_conversation_removes_messages_and_settings(monkeypatch, tmp_path):
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+    # Runs on the selected backend: PostgreSQL enforces messages -> conversations.
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice_pro.db"))
 
     db.init_db()
