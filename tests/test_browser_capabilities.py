@@ -27,9 +27,10 @@ def test_contracts_expose_universal_tool_definitions():
 
 
 def test_browser_action_validation_rejects_unknown_or_empty_targets():
-    assert validate_browser_action(
-        BrowserAction("browser_local", "navigate", "https://example.test")
-    ) == []
+    assert (
+        validate_browser_action(BrowserAction("browser_local", "navigate", "https://example.test"))
+        == []
+    )
     assert validate_browser_action(BrowserAction("browser_local", "submit", "form"))
     assert validate_browser_action(BrowserAction("browser_local", "click", "   "))
 
