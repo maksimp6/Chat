@@ -1,75 +1,88 @@
 ---
 name: cloudru-management
-description: Manage Cloud.ru Evolution infrastructure or IAM credentials through its APIs. Use for inventory, VM lifecycle, project access, and service-account key work; not for unrelated cloud providers.
+description: Work on Alice Pro deployment to Cloud.ru Evolution using EDS (Evolution DevServices CLI), Workflow Studio, Container Apps, external PostgreSQL, IAM, secrets and storage. Use for eds setup, cloud inventory, deployment configuration, readiness checks and rollout troubleshooting.
 ---
 
-# Cloud.ru Management
+# Cloud.ru / Alice Pro
 
-Use the Cloud.ru Public API with a service-account Key ID/Key Secret. Keep both
-secrets server-side; never put them in source, browser storage, logs, traces,
-issues, or chat output.
+Read repository `AGENTS.md` and the current issue first. Work from fresh `master`
+in a focused branch; publish a PR. Keep existing authorization in scope: do not
+ask again for authorized read-only discovery, code or configuration work. Apply
+the repository's production/data/secret approval rules to actual live changes.
+
+## Start here
+
+1. Identify the interface in the table below. Do not interchange keys.
+2. Read [EDS reference](references/eds.md) for CLI work, or the
+   [deployment runbook](../../../deploy/cloudru/README.md) for Alice rollout.
+3. Reuse existing authorized credentials without printing their values. Report
+   missing variable **names**. Do not dump environment, config, DSNs or raw API
+   responses. `eds config` exposes key prefixes/suffixes; skip it in agent logs.
+4. Run read-only inventory with complete pagination. Confirm the project,
+   resource IDs and current state; a similar name is insufficient evidence.
+5. Complete templates and run `scripts/cloudru_deploy_preflight.py`. Its success
+   validates configuration, not infrastructure, costs or deployment readiness.
+6. For rollout, record approved source SHA → image digest → deployment/revision
+   ID; verify authentication, database TLS and application behavior. Report
+   blockers precisely; never call prepared templates a completed deployment.
 
 ## Choose the interface
 
-- For Cloud.ru Evolution resources, use the documented REST API. Obtain a
-  short-lived bearer token from `https://iam.api.cloud.ru/api/v1/auth/token`,
-  then call the service-specific endpoint. For example, Evolution Compute uses
-  `https://compute.api.cloud.ru/api/v1/vms` with `project_id`.
-- For static API-key and service-account operations in Alice Pro, use the
-  existing backend modules `cloudru_iam.py`, `cloudru_iam_routes.py`, and
-  `provider_key_rotation.py`. Preserve their backend-only secret handling and
-  explicit confirmation requirements.
-- Use the Cloud CLI only for the Cloud.ru Advanced platform and compatible
-  IAM AK/SK credentials. Do not feed Evolution Public API Key ID/Key Secret
-  pairs to `cloud configure init`.
+| Interface | Purpose | Authentication |
+|---|---|---|
+| `eds repo`, `eds wf` v0.4.0 | Repo and Workflow Studio | `EDS_API_KEY` as `X-API-KEY`, `EDS_PROJECT_ID` |
+| Evolution service APIs | Container Apps, IAM and other documented services | Service-specific auth; IAM Key ID/Key Secret where supported |
+| Existing Alice backend | IAM wizard, provider keys, S3, Container Apps | Existing provider adapters and redaction boundaries |
+| Cloud CLI Advanced | Advanced platform only | Its own AK/SK; not an Evolution IAM pair |
 
-## Discovery first
+EDS is **not** a universal infrastructure provisioner. It has no PostgreSQL,
+KMS, Secret Management, bucket or Container Apps resource-configuration commands.
+`eds wf app create` **immediately deploys**. `eds wf app deploy` selects a branch,
+not an immutable commit; enforce SHA/digest checks in the pipeline.
 
-1. Verify credentials by requesting a token without displaying it.
-2. Confirm the target project and run read-only discovery before planning a
-   change. A direct project GET is useful when project-list pagination or role
-   visibility is incomplete.
-3. Report the resource names, IDs, current state, and expected impact. Do not
-   infer a project, region, or resource identifier from a similarly named one.
+## Deployment constraints
 
-## Changes and credentials
+- Alice runs in Container Apps. Do not introduce a replacement VM/Kubernetes
+  runtime, Remote Desktop Commander or Supabase into this task.
+- Target durable data: external PostgreSQL with a public endpoint, certificate
+  verification and verified narrow client CIDRs. Evolution Managed PostgreSQL
+  currently has private connectivity; Container Apps cannot connect directly.
+- A stable Container Apps outbound address is **not established**. Do not treat
+  one observed IP as a guarantee or open PostgreSQL to the internet to bypass
+  this dependency. See [PostgreSQL runbook](../../../deploy/cloudru/postgres/README.md).
+- Keep scale at 0–1 initially. This does not prove absence of revision overlap
+  or solve distributed background-job/migration coordination.
+- Object Storage holds objects/backups, not the live PostgreSQL data directory.
+  Preserve local/Termux SQLite compatibility.
+- Keep owner login, MCP OAuth, `InvocationContext` and `ExecutionTrace` intact.
+  Gateway API keys do not replace application user identity or authorization.
 
-- Get explicit confirmation immediately before creating, resizing, starting,
-  stopping, deleting, rotating, or changing access to a cloud resource.
-- For a requested VM lifecycle action, show the selected VM and current state
-  first. Treat deletion and public-network exposure as important actions.
-- Prefer a dedicated service account with project-scoped roles. Grant the
-  narrowest service roles that satisfy the request; project administrator is
-  appropriate only when the user asks for broad project management.
-- An API key or Key Secret disclosed in chat is compromised for operational
-  purposes: recommend reissuing or rotating it, but never rotate or revoke it
-  without explicit user direction.
+## Secret and output boundaries
 
-## Evolution DNS
+- Use env injection or an authorized secret store; examples contain placeholders
+  only. Never pass keys in CLI arguments or embed them into Git URLs.
+- In EDS v0.4.0 HTTPS `repo clone`/`remote-add` embed the key into the remote URL.
+  Use an already authorized SSH setup or an approved credential helper instead.
+- Capture EDS output privately and publish only validated resource IDs/status.
+  JSON formatting is not redaction. Job logs and HTTP errors may contain secrets.
+- Separate deployment IAM/EDS credentials from runtime DB, S3 and model keys.
+  Preserve `ALICE_PROVIDER_CREDENTIAL_KEY` across redeploys and restore.
+- New secret/KMS integrations must use provider boundaries and redact before
+  tracing. Do not assume an adapter or env variable exists until checked in code.
 
-- Use the Evolution DNS API endpoint `https://dns.api.cloud.ru`. Its documented
-  client-credentials exchange is `https://id.cloud.ru/auth/system/openid/token`;
-  do not assume a bearer token issued for another Cloud.ru service is accepted.
-- Start by listing direct, reverse, public, or private zones and their records.
-  Report the zone type, record name, type, value, TTL, and current delegation or
-  validation state before proposing a change.
-- Treat creation, update, deletion, activation, deactivation, VPC attachment,
-  and changes to A, AAAA, CNAME, MX, NS, TXT, SPF, or PTR records as mutating
-  operations that require explicit confirmation immediately before the request.
-- For a public zone, verify domain ownership and delegation status before
-  publishing records. For a private zone, verify the target VPC and avoid
-  altering a VPC attachment without the user's explicit scope.
-- Validate the intended result after an approved change with an authoritative
-  DNS lookup or the API's returned state. Explain that DNS propagation and TTL
-  can delay observed results.
+## Other Evolution tasks
 
-## Alice Pro integration
+Use `cloudru_iam.py`, `cloudru_iam_routes.py` and `provider_key_rotation.py` for
+existing key flows. Consult `docs/integrations/cloudru-iam-wizard.md` and
+`docs/provider-key-rotation.md` before changing them.
 
-- Put configuration in server-side environment variables or the encrypted
-  credential store, never in `.env.example`, frontend JavaScript, or test
-  fixtures.
-- Preserve `ExecutionTrace` correlation while excluding token and secret
-  values from trace payloads and error messages.
-- Follow `docs/integrations/cloudru-iam-wizard.md` for Alice Pro IAM key
-  issuance and `docs/provider-key-rotation.md` for Foundation Models key
-  rotation.
+For DNS, discover zones/records first at the documented Evolution DNS API
+`https://dns.api.cloud.ru`. Its client-credentials endpoint is
+`https://id.cloud.ru/auth/system/openid/token`; do not assume another service's
+token works. Confirm zone ownership, delegation/VPC and target records before
+an authorized write, then verify authoritative DNS and TTL effects.
+
+For the requested service rollout and current pricing caveats, read the
+[service matrix](../../../deploy/cloudru/services.md). Recheck official
+documentation before live provisioning; Preview does not make dependent
+compute, storage or traffic universally free.
