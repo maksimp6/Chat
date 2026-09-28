@@ -10,9 +10,7 @@ PROJECT_ROOT_PYTHON = {
 # Existing debt only. New root Python modules must not be added here.
 # Delete entries as modules move into packages.
 LEGACY_ROOT_PYTHON = {
-    "agent_context.py",
     "agent_gateway.py",
-    "agent_tools.py",
     "alice_agent_runner.py",
     "api_contracts.py",
     "archiver.py",
@@ -146,7 +144,7 @@ def test_browser_modules_live_in_package_not_repository_root():
     assert (package / "capabilities.py").is_file()
 
 
-def test_pruned_legacy_agent_loops_stay_deleted():
-    pruned = {"agent_runner.py", "run_agent.py", "run_agent_loop.py", "yandex_agent_loop.py"}
+def test_pruned_legacy_agent_modules_stay_deleted():
+    pruned = {"agent_context.py", "agent_runner.py", "agent_tools.py", "run_agent.py", "run_agent_loop.py", "yandex_agent_loop.py"}
     resurrected = sorted(name for name in pruned if (ROOT / name).exists())
     assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
