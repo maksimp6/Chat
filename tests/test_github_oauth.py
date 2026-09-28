@@ -59,16 +59,18 @@ def _app():
     return app.test_client()
 
 
-def _fake_github(monkeypatch, account=None, token_status=200):
+def _fake_github(monkeypatch, account=None, token_status=200, user_status=200, raise_error=None):
     calls = []
 
     def fake_post(url, data=None, headers=None, timeout=None):
         calls.append(("post", url, data))
+        if raise_error is not None:
+            raise raise_error
         return _FakeResponse(token_status, {"access_token": "gho_secret_access"})
 
     def fake_get(url, headers=None, timeout=None):
         calls.append(("get", url, headers))
-        return _FakeResponse(200, account or {"id": 42, "login": "octocat"})
+        return _FakeResponse(user_status, account or {"id": 42, "login": "octocat"})
 
     monkeypatch.setattr(github_auth.requests, "post", fake_post)
     monkeypatch.setattr(github_auth.requests, "get", fake_get)
@@ -235,3 +237,59 @@ def test_index_shows_github_button_only_when_configured(github_env, monkeypatch)
     monkeypatch.delenv("ALICE_GITHUB_CLIENT_SECRET")
     html = app_module.app.test_client().get("/").get_data(as_text=True)
     assert 'id="github-login-btn"' not in html
+
+
+def _callback(client, query):
+    return client.get(f"/auth/github/callback?{query}", base_url="https://alice.test")
+
+
+@pytest.mark.parametrize(
+    "fake",
+    [
+        {"user_status": 500},
+        {"raise_error": github_auth.requests.ConnectionError("down")},
+        {"account": {"id": 5, "login": ""}},
+    ],
+)
+def test_github_lookup_failures_do_not_sign_in(github_env, temp_db, monkeypatch, fake):
+    _fake_github(monkeypatch, **fake)
+    client = _app()
+    state = _start_login(client)
+    response = _callback(client, f"code=abc&state={state}")
+    assert response.status_code == 502
+    assert "alice_user_token=" not in " ".join(response.headers.getlist("Set-Cookie"))
+
+
+def test_callback_handles_denied_and_missing_code(github_env, temp_db, monkeypatch):
+    calls = _fake_github(monkeypatch)
+    client = _app()
+    state = _start_login(client)
+    assert _callback(client, f"error=access_denied&state={state}").status_code == 400
+    assert _callback(client, f"state={state}").status_code == 400
+    assert calls == []
+
+
+def test_callback_disabled_without_oauth_app(monkeypatch):
+    monkeypatch.delenv("ALICE_GITHUB_CLIENT_ID", raising=False)
+    monkeypatch.delenv("ALICE_GITHUB_CLIENT_SECRET", raising=False)
+    assert _app().get("/auth/github/callback?code=a&state=b").status_code == 404
+
+
+def test_default_redirect_uri_uses_request_host(github_env, monkeypatch):
+    monkeypatch.delenv("ALICE_GITHUB_REDIRECT_URI")
+    response = _app().get("/auth/github/login", base_url="https://host.test")
+    query = parse_qs(urlsplit(response.headers["Location"]).query)
+    assert query["redirect_uri"] == ["https://host.test/auth/github/callback"]
+
+
+def test_invalid_user_token_is_treated_as_signed_out(github_env, temp_db):
+    import app as app_module
+
+    me = _app()
+    me.set_cookie("alice_user_token", "not-a-valid-token")
+    assert me.get("/api/auth/me").get_json()["authenticated"] is False
+
+    index = app_module.app.test_client()
+    index.set_cookie("alice_user_token", "not-a-valid-token")
+    html = index.get("/").get_data(as_text=True)
+    assert "Войти через GitHub" in html
