@@ -9,11 +9,19 @@ WORKDIR /app
 
 COPY requirements.txt requirements-postgres.txt ./
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssh-client coreutils \
+    && apt-get install -y --no-install-recommends adduser openssh-client coreutils \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir -r requirements.txt -r requirements-postgres.txt
 
-COPY . .
+RUN addgroup --system --gid 10001 alice \
+    && adduser --system --uid 10001 --gid 10001 --home /home/alice --no-create-home alice \
+    && mkdir -p /home/alice /app/data /app/logs \
+    && chown -R alice:alice /home/alice /app
+
+COPY --chown=alice:alice . .
+
+ENV HOME=/home/alice
+USER alice
 
 EXPOSE 8080
 

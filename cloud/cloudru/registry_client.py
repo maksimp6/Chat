@@ -25,6 +25,7 @@ from cloudru_iam import CloudRuIamClient
 
 SERVICE = "artifact_registry"
 DEFAULT_REGISTRY_DOMAIN = "cr.cloud.ru"
+ALLOWED_REGISTRY_DOMAINS = frozenset({DEFAULT_REGISTRY_DOMAIN})
 _NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _TAG_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
 _DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
@@ -60,6 +61,18 @@ def validate_name(value: str, field: str) -> str:
     return value
 
 
+def validate_registry_domain(value: str) -> str:
+    """Allow only the official Cloud.ru registry domain before using IAM auth."""
+    domain = str(value or "").strip().lower()
+    if domain not in ALLOWED_REGISTRY_DOMAINS:
+        allowed = ", ".join(sorted(ALLOWED_REGISTRY_DOMAINS))
+        raise CloudProviderError(
+            f"CLOUDRU_REGISTRY_DOMAIN must be one of: {allowed}",
+            code="validation_error",
+        )
+    return domain
+
+
 class CloudRuRegistryClient:
     def __init__(
         self,
@@ -73,9 +86,10 @@ class CloudRuRegistryClient:
         self.iam_client = iam_client or CloudRuIamClient()
         self.client = client or CloudRuClient(iam_client=self.iam_client, api_key_auth=False)
         self.project_id = (project_id or os.getenv("CLOUDRU_PROJECT_ID", "")).strip()
-        self.registry_domain = (
+        configured_domain = (
             registry_domain or os.getenv("CLOUDRU_REGISTRY_DOMAIN") or DEFAULT_REGISTRY_DOMAIN
-        ).strip()
+        )
+        self.registry_domain = validate_registry_domain(configured_domain)
         self._run = runner
 
     def _require_project(self) -> str:
@@ -84,7 +98,8 @@ class CloudRuRegistryClient:
         return self.project_id
 
     def registry_host(self, registry_name: str) -> str:
-        return f"{validate_name(registry_name, 'registry_name')}.{self.registry_domain}"
+        domain = validate_registry_domain(self.registry_domain)
+        return f"{validate_name(registry_name, 'registry_name')}.{domain}"
 
     # Control plane -----------------------------------------------------------
 

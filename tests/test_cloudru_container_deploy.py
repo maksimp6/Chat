@@ -116,6 +116,33 @@ def test_deploy_cannot_request_a_public_registry():
     assert client.calls == []
 
 
+@pytest.mark.parametrize(
+    "domain",
+    [
+        "evil.example",
+        "cr.cloud.ru.evil.example",
+        "https://cr.cloud.ru",
+        "cr.cloud.ru:443",
+    ],
+)
+def test_registry_domain_allowlist_rejects_untrusted_hosts_before_login(domain):
+    runner = Mock(side_effect=AssertionError("docker login must not run"))
+    with pytest.raises(CloudProviderError, match="CLOUDRU_REGISTRY_DOMAIN"):
+        CloudRuRegistryClient(
+            project_id="p1",
+            client=RecordingClient(),
+            iam_client=_iam(),
+            registry_domain=domain,
+            runner=runner,
+        ).docker_login("alice-pro")
+    runner.assert_not_called()
+
+
+def test_registry_domain_defaults_to_official_cloudru_host():
+    reg = CloudRuRegistryClient(project_id="p1", client=RecordingClient(), iam_client=_iam())
+    assert reg.registry_host("alice-pro") == "alice-pro.cr.cloud.ru"
+
+
 def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
     runs = []
 

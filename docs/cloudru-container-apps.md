@@ -66,6 +66,11 @@ Direct CLI deployment also fetches canonical `master` from `origin` and rejects
 any commit outside that history before exporting it. A same-named registry is
 reused only when its metadata explicitly says private and `DOCKER`. Control-plane
 credential names are rejected by `--env` before provider calls or image builds.
+The registry host is fixed to the official `cr.cloud.ru` domain; any
+`CLOUDRU_REGISTRY_DOMAIN` override outside that exact allowlist fails before
+`docker login`, so the IAM secret cannot be sent to an arbitrary host. The
+Container Apps image runs as the unprivileged `alice` user (UID/GID 10001) and
+only pre-creates its application data and log directories as writable paths.
 
 ## Cost
 
