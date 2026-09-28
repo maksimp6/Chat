@@ -18,6 +18,7 @@ from agent_gateway import (
     AgentRateLimitError,
     cloudru_iam_token_provider,
 )
+from cloudru_iam import CloudRuIamError
 
 
 def test_register_and_invoke():
@@ -226,9 +227,31 @@ def test_a2a_sse_stream(monkeypatch):
     monkeypatch.setattr("agent_gateway.urlopen", fake)
     monkeypatch.setattr("agent_gateway.uuid4", lambda: "req-id")
     client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
-    events = client.stream_message({"message": {"role": "user", "parts": []}})
+    events = list(client.stream_message({"message": {"role": "user", "parts": []}}))
     assert events == [{"delta": "hello"}, {"done": True}]
     assert captured["accept"] == "text/event-stream"
+
+
+def test_a2a_sse_stream_with_crlf(monkeypatch):
+    class R:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return (
+                b'data: {"jsonrpc":"2.0","id":"req-id","result":{"delta":"one"}}\r\n\r\n'
+                b'data: {"jsonrpc":"2.0","id":"req-id","result":{"delta":"two"}}\r\n\r\n'
+                b"data: [DONE]\r\n\r\n"
+            )
+
+    monkeypatch.setattr("agent_gateway.urlopen", lambda req, timeout: R())
+    monkeypatch.setattr("agent_gateway.uuid4", lambda: "req-id")
+    client = A2AClient(A2AClientConfig("https://agent.example/a2a"))
+    events = list(client.stream_message({"message": {"role": "user", "parts": []}}))
+    assert events == [{"delta": "one"}, {"delta": "two"}]
 
 
 def test_cloudru_iam_token_provider_uses_stored_credentials(monkeypatch):
@@ -255,6 +278,33 @@ def test_cloudru_iam_token_provider_uses_stored_credentials(monkeypatch):
 
     provider = cloudru_iam_token_provider(conn, lambda value: value.replace("enc:", "", 1))
     assert provider() == "iam-token"
+    conn.close()
+
+
+def test_cloudru_iam_token_provider_translates_iam_error(monkeypatch):
+    import sqlite3
+
+    from provider_credentials import create_schema, save_cloudru_iam_credentials
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    create_schema(conn)
+    save_cloudru_iam_credentials(
+        conn,
+        key_id="master-id",
+        key_secret="master-secret",
+        project_id="project-1",
+        service_account_id="sa-1",
+        encrypt=lambda value: f"enc:{value}",
+    )
+    monkeypatch.setattr(
+        "cloudru_iam.CloudRuIamClient.access_token",
+        lambda self: (_ for _ in ()).throw(CloudRuIamError("failed")),
+    )
+
+    provider = cloudru_iam_token_provider(conn, lambda value: value.replace("enc:", "", 1))
+    with pytest.raises(A2AProtocolError, match="token exchange failed"):
+        provider()
     conn.close()
 
 

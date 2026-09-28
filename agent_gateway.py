@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Any, Callable, Mapping, MutableMapping, Optional
+from typing import Any, Callable, Iterator, Mapping, MutableMapping, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
@@ -99,6 +99,7 @@ class A2AClient:
         self._config = config
         self._token_provider = token_provider
         self._endpoint = config.endpoint.strip()
+        self._endpoint_lock = RLock()
 
     def _headers(self, *, accept: str) -> dict[str, str]:
         headers = {"Content-Type": "application/json", "Accept": accept}
@@ -134,7 +135,7 @@ class A2AClient:
 
     @staticmethod
     def _extract_card_endpoint(card: Mapping[str, Any], card_url: str) -> str:
-        for key in ("endpoint", "agent_endpoint", "agentEndpoint", "url"):
+        for key in ("endpoint", "agent_endpoint", "agentEndpoint"):
             value = card.get(key)
             if isinstance(value, str) and value.strip():
                 return urljoin(card_url, value.strip())
@@ -160,37 +161,42 @@ class A2AClient:
     def _resolve_endpoint(self) -> str:
         if self._endpoint:
             return self._endpoint
-        card_url = self._config.agent_card_url.strip()
-        card = self._load_agent_card()
-        self._endpoint = self._extract_card_endpoint(card, card_url)
-        return self._endpoint
+        with self._endpoint_lock:
+            if self._endpoint:
+                return self._endpoint
+            card_url = self._config.agent_card_url.strip()
+            card = self._load_agent_card()
+            self._endpoint = self._extract_card_endpoint(card, card_url)
+            return self._endpoint
 
     @staticmethod
-    def _parse_sse(raw: str) -> list[Any]:
-        events: list[Any] = []
+    def _parse_sse(raw: str) -> Iterator[Any]:
         data_lines: list[str] = []
-        for line in raw.splitlines():
+        normalized_raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+        for line in normalized_raw.split("\n"):
             if not line:
                 if data_lines:
-                    events.append("\n".join(data_lines))
+                    event = "\n".join(data_lines)
                     data_lines = []
+                    if event == "[DONE]":
+                        return
+                    try:
+                        yield json.loads(event)
+                    except json.JSONDecodeError:
+                        yield event
                 continue
             if line.startswith(":"):
                 continue
             if line.startswith("data:"):
                 data_lines.append(line[5:].lstrip())
         if data_lines:
-            events.append("\n".join(data_lines))
-
-        parsed: list[Any] = []
-        for event in events:
+            event = "\n".join(data_lines)
             if event == "[DONE]":
-                break
+                return
             try:
-                parsed.append(json.loads(event))
+                yield json.loads(event)
             except json.JSONDecodeError:
-                parsed.append(event)
-        return parsed
+                yield event
 
     def _send_rpc(
         self,
@@ -224,7 +230,7 @@ class A2AClient:
         except (URLError, TimeoutError) as exc:
             raise A2AProtocolError(f"A2A transport error: {exc}") from exc
         if accept == "text/event-stream":
-            return request_id, self._parse_sse(raw)
+            return request_id, raw
         try:
             obj = json.loads(raw)
         except json.JSONDecodeError as exc:
@@ -243,21 +249,19 @@ class A2AClient:
             raise A2AProtocolError("A2A response has neither result nor error")
         return obj["result"]
 
-    def stream_message(self, payload: Mapping[str, Any]) -> list[Any]:
-        request_id, events = self._send_rpc(payload, accept="text/event-stream")
-        if not isinstance(events, list):
-            raise A2AProtocolError("A2A SSE response must be an event list")
-        normalized: list[Any] = []
-        for event in events:
+    def stream_message(self, payload: Mapping[str, Any]) -> Iterator[Any]:
+        request_id, raw = self._send_rpc(payload, accept="text/event-stream")
+        if not isinstance(raw, str):
+            raise A2AProtocolError("A2A SSE response must be a text stream")
+        for event in self._parse_sse(raw):
             if not isinstance(event, Mapping):
-                normalized.append(event)
+                yield event
                 continue
             if event.get("id") not in (None, request_id):
                 raise A2AProtocolError("A2A SSE event id does not match request id")
             if "error" in event:
                 raise AgentInvocationError(_format_a2a_error(event["error"]))
-            normalized.append(event.get("result", event))
-        return normalized
+            yield event.get("result", event)
 
     def handler(self) -> AgentHandler:
         return self.send_message

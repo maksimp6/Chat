@@ -211,8 +211,8 @@ def save_cloudru_iam_credentials(
     key_secret: str,
     project_id: str,
     service_account_id: Optional[str],
-    expires_at: Optional[datetime] = None,
     encrypt: Callable[[str], str],
+    expires_at: Optional[datetime] = None,
 ) -> None:
     if not key_id.strip() or not key_secret:
         raise ValueError("Cloud.ru IAM key_id and key_secret are required")
