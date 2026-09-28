@@ -60,6 +60,7 @@ jobs:
           NODE_V8_COVERAGE=coverage-js node tests/test_project_tree.js
           NODE_V8_COVERAGE=coverage-js node tests/test_header_dom.js
           NODE_V8_COVERAGE=coverage-js node tests/test_frontend_smoke.js
+          NODE_V8_COVERAGE=coverage-js node tests/test_browser_self_test_runner.js
           node tests/test_frontend_runtime_safety.js
           pytest -q tests/test_frontend_policy.py
           pytest -q tests/test_unified_buttons_contract.py
@@ -77,7 +78,7 @@ jobs:
         if: always()
         run: |
           : > frontend-test.log
-          for test in tests/test_file_manager.js tests/test_dozzle_header.js tests/test_frontend_boot.js tests/test_project_tree.js tests/test_header_dom.js tests/test_frontend_smoke.js; do
+          for test in tests/test_file_manager.js tests/test_dozzle_header.js tests/test_frontend_boot.js tests/test_project_tree.js tests/test_header_dom.js tests/test_frontend_smoke.js tests/test_browser_self_test_runner.js; do
             node "$test" >> frontend-test.log 2>&1 || true
           done
       - name: Start Flask for live resource validation
