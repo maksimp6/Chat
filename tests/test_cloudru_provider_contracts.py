@@ -1,9 +1,6 @@
-import json
 from unittest.mock import Mock, patch
 
 import pytest
-import requests
-
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
 from cloud.cloudru.provider import CloudRuProvider
@@ -115,7 +112,7 @@ def test_provider_validation_and_bad_payloads(monkeypatch):
         provider.compute(operation="unknown")
     with pytest.raises(CloudProviderError, match="Unsupported backup operation"):
         provider.backup(operation="unknown")
-    with pytest.raises(CloudProviderError, match="Unknown"):
+    with pytest.raises(CloudProviderError, match="not configured"):
         provider.list_resources(service="unknown")
 
     class BadClient:
