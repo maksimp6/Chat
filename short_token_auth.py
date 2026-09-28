@@ -18,6 +18,8 @@ COOKIE_NAME = "alice_short_token_session"
 COOKIE_SALT = "alice-pro-short-token-v1"
 DEFAULT_MAX_AGE = 12 * 60 * 60
 _PUBLIC_PATHS = frozenset({"/healthz"})
+# GitHub sign-in must be reachable before the visitor has the short token.
+_PUBLIC_PREFIXES = ("/auth/github/",)
 _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
 _PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
 
@@ -76,6 +78,41 @@ def _token_path_remainder(token: str, path: Optional[str] = None) -> Optional[st
     return remainder or "/"
 
 
+def grant_short_token_session(response) -> None:
+    """Give a visitor authenticated by another trusted method the short-token session."""
+    token = _token()
+    if not (_enabled() and token):
+        return
+    response.set_cookie(
+        COOKIE_NAME,
+        _serializer(token).dumps({"authenticated": True}),
+        max_age=_max_age(),
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+        path="/",
+    )
+
+
+def _login_page_response():
+    """Offer GitHub sign-in to browsers when it is configured."""
+    from identity.github_oauth import github_login_enabled, login_path
+
+    if request.method != "GET" or not github_login_enabled():
+        return None
+    if request.path.startswith("/api/") or not request.accept_mimetypes.accept_html:
+        return None
+    html = (
+        '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>Alice Pro</title></head><body style="font-family:sans-serif;'
+        'display:flex;min-height:90vh;align-items:center;justify-content:center">'
+        f'<a href="{login_path()}" style="font-size:1.2em">Войти через GitHub</a>'
+        "</body></html>"
+    )
+    return html, 401, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
+
+
 class _TokenPathMiddleware:
     """Rewrite token-prefixed URLs before Flask performs route matching."""
 
@@ -123,7 +160,7 @@ def install_short_token_auth(app: Flask) -> None:
         if not _enabled():
             return None
 
-        if request.path in _PUBLIC_PATHS:
+        if request.path in _PUBLIC_PATHS or request.path.startswith(_PUBLIC_PREFIXES):
             return None
 
         token = _token()
@@ -144,4 +181,4 @@ def install_short_token_auth(app: Flask) -> None:
         if _has_valid_session(token, request.cookies.get(COOKIE_NAME)):
             return None
 
-        return jsonify({"error": "authentication required"}), 401
+        return _login_page_response() or (jsonify({"error": "authentication required"}), 401)

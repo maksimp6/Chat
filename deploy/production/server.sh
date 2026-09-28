@@ -20,6 +20,13 @@ require_runtime_secret() {
     IFS= read -r ALICE_SHORT_TOKEN || true
   fi
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
+  # Optional GitHub OAuth App credentials follow the token on stdin, one per line.
+  if [[ -z "${ALICE_GITHUB_CLIENT_ID:-}" ]]; then
+    IFS= read -r ALICE_GITHUB_CLIENT_ID || true
+  fi
+  if [[ -z "${ALICE_GITHUB_CLIENT_SECRET:-}" ]]; then
+    IFS= read -r ALICE_GITHUB_CLIENT_SECRET || true
+  fi
 }
 
 ensure_provider_credential_key() {
@@ -71,6 +78,13 @@ deploy() {
     printf 'ALICE_REQUIRE_SHORT_TOKEN=1\n'
     printf 'ALICE_SHORT_TOKEN=%s\n' "$ALICE_SHORT_TOKEN"
     printf 'ALICE_PROVIDER_CREDENTIAL_KEY=%s\n' "$ALICE_PROVIDER_CREDENTIAL_KEY"
+    # Optional GitHub sign-in (identity/github_oauth.py); disabled unless both OAuth values are set.
+    if [[ -n "${ALICE_GITHUB_CLIENT_ID:-}" && -n "${ALICE_GITHUB_CLIENT_SECRET:-}" ]]; then
+      printf 'ALICE_GITHUB_CLIENT_ID=%s\n' "$ALICE_GITHUB_CLIENT_ID"
+      printf 'ALICE_GITHUB_CLIENT_SECRET=%s\n' "$ALICE_GITHUB_CLIENT_SECRET"
+      printf 'ALICE_GITHUB_REDIRECT_URI=%s\n' "${ALICE_GITHUB_REDIRECT_URI:-https://maxxxpavlov.ru/auth/github/callback}"
+      printf 'ALICE_GITHUB_ALLOWED_LOGINS=%s\n' "${ALICE_GITHUB_ALLOWED_LOGINS:-}"
+    fi
   ) > "$runtime_env"
 
   log "building $IMAGE_NAME"

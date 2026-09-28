@@ -192,3 +192,108 @@ def get_anonymous_user(user_id: str) -> Optional[dict[str, Any]]:
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
+
+
+def init_github_accounts_table() -> None:
+    init_user_identity_table()
+    conn = get_conn()
+    try:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS github_accounts (
+                github_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                login TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_github_accounts_user_id ON github_accounts(user_id)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def sign_in_with_github(
+    github_id: Any,
+    login: str,
+    current_user_id: Optional[str] = None,
+) -> dict[str, Any]:
+    """Resolve the Alice user for a verified GitHub account and issue a fresh token.
+
+    A GitHub account already linked to a user always signs in as that user.
+    Otherwise it is linked to ``current_user_id`` (the anonymous user of this
+    browser, so its history is kept) or to a new user.
+    """
+    github_id = str(github_id or "").strip()
+    login = str(login or "").strip()
+    if not github_id.isdigit() or not login:
+        raise ValueError("invalid github account")
+
+    init_github_accounts_table()
+    now = _now()
+    auth_token = _new_auth_token()
+    conn = get_conn()
+    try:
+        link = conn.execute(
+            "SELECT user_id FROM github_accounts WHERE github_id = ?",
+            (github_id,),
+        ).fetchone()
+        new_user = False
+        if link is not None:
+            user_id = str(link["user_id"])
+            conn.execute(
+                "UPDATE github_accounts SET login = ?, updated_at = ? WHERE github_id = ?",
+                (login, now, github_id),
+            )
+        else:
+            user_id = None
+            if current_user_id:
+                row = conn.execute(
+                    "SELECT id FROM users WHERE id = ?", (str(current_user_id),)
+                ).fetchone()
+                if row is not None:
+                    user_id = str(row["id"])
+            if user_id is None:
+                user_id = str(uuid.uuid4())
+                new_user = True
+                conn.execute(
+                    """INSERT INTO users
+                       (id, installation_id, status, metadata_json, created_at, updated_at)
+                       VALUES (?, ?, 'github', '{}', ?, ?)""",
+                    (user_id, f"github-{github_id}", now, now),
+                )
+            conn.execute(
+                """INSERT INTO github_accounts (github_id, user_id, login, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (github_id, user_id, login, now, now),
+            )
+
+        conn.execute(
+            "UPDATE users SET status = 'github', auth_token_hash = ?, updated_at = ? WHERE id = ?",
+            (_hash_auth_token(auth_token), now, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "user_id": user_id,
+        "github_login": login,
+        "new_user": new_user,
+        "auth_token": auth_token,
+    }
+
+
+def get_github_login(user_id: str) -> Optional[str]:
+    init_github_accounts_table()
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT login FROM github_accounts WHERE user_id = ? ORDER BY updated_at DESC",
+            (str(user_id),),
+        ).fetchone()
+    finally:
+        conn.close()
+    return str(row["login"]) if row else None
