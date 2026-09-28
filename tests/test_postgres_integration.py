@@ -5,7 +5,7 @@ import pytest
 import db
 import mcp_storage
 from departments import init_department_tables
-from local_agent_gateway import init_local_agent_tables
+from agents.local_gateway import init_local_agent_tables
 from runtime_migrations import init_runtime_tables
 from treasury import init_treasury_tables
 from user_identity import init_user_identity_table
