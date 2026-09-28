@@ -60,7 +60,18 @@ def test_url_to_path_is_safe():
     assert url_to_path(f"{BASE}/topics/a") == "svc/ug/topics/a.md"
     assert url_to_path("https://cloud.ru/docs") == "index.md"
     assert ".." not in url_to_path("https://cloud.ru/docs/%2e%2e/x")
-    assert url_to_path("https://cloud.ru/docs/a b/c?") == "a_b/c.md"
+    spaced = url_to_path("https://cloud.ru/docs/a b/c?")
+    assert spaced.startswith("a_b-") and spaced.endswith("/c.md")
+
+
+def test_url_to_path_has_no_collisions():
+    paths = {
+        url_to_path("https://cloud.ru/docs/svc/a%20b"),
+        url_to_path("https://cloud.ru/docs/svc/a_b"),
+        url_to_path("https://cloud.ru/docs/svc/a b"),
+    }
+    assert len(paths) == 3
+    assert "svc/a_b.md" in paths
 
 
 def test_html_to_markdown_keeps_content_and_drops_chrome():
@@ -308,3 +319,15 @@ def test_failed_refresh_marks_error_and_skips_missing_sweep(tmp_path):
     assert stats.errors == 1 and stats.missing == 0
     assert manifest["svc/ug/a.md"]["status"] == "error"
     assert manifest["svc/ug/b.md"]["status"] == "ok"
+
+
+def test_unsafe_image_schemes_are_dropped():
+    _, md, _ = html_to_markdown(
+        '<main><img src="javascript:alert(1)" alt="js">'
+        '<img src="data:image/png;base64,AAAA" alt="data">'
+        '<img src="https://cloud.ru/ok.png" alt="ok"></main>',
+        page_url=f"{BASE}/topics/a",
+    )
+    assert "javascript:" not in md
+    assert "data:" not in md
+    assert "![ok](https://cloud.ru/ok.png)" in md

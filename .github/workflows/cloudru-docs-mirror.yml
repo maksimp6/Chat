@@ -42,9 +42,14 @@ jobs:
         run: |
           auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           # Start from the last published mirror so unchanged pages are detected.
-          if git -c http.https://github.com/.extraheader="$auth" fetch --depth 1 origin "$MIRROR_BRANCH"; then
-            git checkout FETCH_HEAD -- docs/mirrors/cloudru || true
+          # Only a branch that does not exist yet is skipped; any other failure stops the run
+          # so a partial crawl never replaces the published mirror.
+          if [ -z "$(git -c http.https://github.com/.extraheader="$auth" ls-remote --heads origin "$MIRROR_BRANCH")" ]; then
+            echo "No published mirror yet; starting fresh."
+            exit 0
           fi
+          git -c http.https://github.com/.extraheader="$auth" fetch --depth 1 origin "$MIRROR_BRANCH"
+          git checkout FETCH_HEAD -- docs/mirrors/cloudru
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -55,6 +60,7 @@ jobs:
         env:
           WAVE: ${{ inputs.wave || 'first' }}
         run: |
+          set -euo pipefail
           python scripts/cloudru_docs_mirror.py --wave "$WAVE" | tee mirror-summary.json
           {
             echo '### Cloud.ru mirror'

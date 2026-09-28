@@ -71,6 +71,15 @@ def in_scope(url: str, host: str, prefixes: Iterable[str]) -> bool:
     )
 
 
+def _safe_segment(segment: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", segment)
+    if safe == segment and segment not in {".", ".."}:
+        return segment
+    # A changed segment gets a hash of the original, so distinct URLs never share a file.
+    digest = hashlib.sha256(segment.encode()).hexdigest()[:8]
+    return f"{safe.strip('.') or '_'}-{digest}"
+
+
 def url_to_path(url: str, strip_prefix: str = "/docs") -> str:
     """Safe relative Markdown path for a canonical URL (never escapes the mirror root)."""
     path = urlsplit(url).path
@@ -78,8 +87,7 @@ def url_to_path(url: str, strip_prefix: str = "/docs") -> str:
         path = path[len(strip_prefix) + 1 :]
     elif path == strip_prefix:
         path = ""
-    segments = [re.sub(r"[^A-Za-z0-9._-]", "_", s) for s in path.split("/") if s]
-    segments = [s for s in segments if s not in {".", ".."}]
+    segments = [_safe_segment(s) for s in path.split("/") if s]
     if not segments:
         segments = ["index"]
     return str(PurePosixPath(*segments)) + ".md"
@@ -184,8 +192,10 @@ class _MarkdownParser(HTMLParser):
         elif tag == "img":
             alt = (attrs.get("alt") or "").strip()
             src = attrs.get("src")
-            if src:
-                self._emit(f"![{alt}]({urljoin(self.page_url, src)})")
+            target = urljoin(self.page_url, src) if src else ""
+            # Only http(s) images are kept; data:, javascript: and the like are dropped.
+            if urlsplit(target).scheme in {"http", "https"}:
+                self._emit(f"![{alt}]({target})")
         elif tag == "table":
             self._table = []
         elif tag == "tr" and self._table is not None:
