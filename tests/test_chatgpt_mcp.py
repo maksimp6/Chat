@@ -4,6 +4,7 @@ import pytest
 from flask import Flask
 
 import chatgpt_mcp
+import mcp_server
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
 
@@ -56,6 +57,13 @@ def test_tools_list_is_deterministic_and_read_only(client):
     assert body["result"]["ttlMs"] > 0
     assert all("inputSchema" in tool for tool in tools)
     assert all("securitySchemes" in tool for tool in tools)
+
+
+def test_chatgpt_mcp_compatibility_shim_reexports_package_api():
+    assert chatgpt_mcp.chatgpt_mcp_bp is mcp_server.chatgpt_mcp_bp
+    assert chatgpt_mcp.mcp_runtime_dispatcher is mcp_server.mcp_runtime_dispatcher
+    assert chatgpt_mcp.registry is mcp_server.registry
+    assert chatgpt_mcp.DEFAULT_PROTOCOL_VERSION == mcp_server.DEFAULT_PROTOCOL_VERSION
 
 
 def test_every_registered_tool_is_exposed_through_mcp(client):
