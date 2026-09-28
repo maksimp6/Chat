@@ -84,9 +84,12 @@ Apps backend must be configured and tested separately.
 For the pilot, keep response caching disabled for chat, authenticated data,
 OAuth and MCP/streaming routes. Check rate-limit responses (use 429), cold-start
 and streaming timeouts, cookies/redirects, MCP discovery and token exchange.
-Prove that the backend cannot bypass the intended access policy. API Gateway
-has a management API; Preview alone is not a reason to require manual console
-configuration.
+Prove that the backend cannot bypass the intended access policy. API Gateway's
+benefits page advertises API management, but the documented control-plane base
+URL and inventory endpoint were not established in this investigation. The old
+`api-ref__authentication` link now redirects to the service overview. Do not
+confuse importable gateway OpenAPI specifications with a management API contract
+or promise automated provisioning before that contract is available.
 
 ### Persistence acceptance criteria
 
@@ -160,6 +163,17 @@ an offline calculation. GitHub `preflight` currently reports missing
 available in Codex are not automatically available to GitHub Actions. Diagnose
 through the runner that already has authorized access rather than copying keys
 between secret stores as part of an inventory check.
+
+The [subsequent volume/Gateway investigation](https://github.com/maksimp6/Chat/issues/427#issuecomment-5879945939)
+retrieved the public Container Apps `Volume` and `VolumeMount` schemas. The S3
+volume description says `bucketName` is sufficient and other attributes are
+filled automatically; separate S3 credentials for application SDK/inventory
+calls are not necessarily required by the platform's volume mount. However,
+`volumeAttributes` is inconsistently typed as a string while its example is a
+map, so the proposed payload still needs validation. Mount locking, WAL, durable
+flush, UID 10001 ownership and revision handoff guarantees were not found.
+No documented Gateway inventory endpoint or IAM-bearer bucket inventory was
+established, so neither resource inventory was performed.
 
 ## One-time setup
 
