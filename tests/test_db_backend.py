@@ -269,6 +269,7 @@ def test_conv_settings_timestamp_column_is_converted_on_postgres():
 
     pg = _fake_pg_connection(rows=rows)
     db._migrate_conv_settings_updated_at(pg)
+    assert "pg_advisory_xact_lock" in pg._raw.log[0]
     assert any("ALTER COLUMN updated_at TYPE INTEGER" in sql for sql in pg._raw.log)
 
     converted = _fake_pg_connection(rows=lambda sql: [("integer",)])

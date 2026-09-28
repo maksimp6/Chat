@@ -156,6 +156,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ALICE_DATABASE_URL: postgresql://alice:ci-postgres-password@localhost:5432/alice_pro
+      # The service container is disposable; tests may empty its tables.
+      ALICE_TEST_DATABASE_RESET: "1"
       YANDEX_API_KEY: ci-test-placeholder
     services:
       postgres:

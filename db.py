@@ -129,6 +129,9 @@ def _migrate_conv_settings_updated_at(conn):
     """
     if not isinstance(conn, PGConnection):
         return
+    # Serialize concurrent workers: the lock is held until init_db commits, so
+    # a second worker re-reads the column only after the first converted it.
+    conn.execute("SELECT pg_advisory_xact_lock(hashtext('alice:conv_settings.updated_at'))")
     row = conn.execute(
         """
         SELECT data_type FROM information_schema.columns
