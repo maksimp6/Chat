@@ -73,3 +73,12 @@ from invocation.trace import create_invocation_trace
 
 `browser_adapters.py` и `browser_capabilities.py` перенесены в пакет `browser/`.
 Тесты и архитектурная документация используют новые package imports.
+
+## Пятая волна
+
+Живые агентные компоненты собраны в пакет `agents/`:
+
+- `agents/gateway.py` — provider-neutral/A2A routing;
+- `agents/local_gateway.py` — HTTP gateway и очередь remote local-agent jobs;
+- `agents/local_worker.py` — Android/local worker поверх UniversalToolExecutor;
+- `agents/github_runner.py` — GitHub issue adapter с persisted invocation lifecycle.
