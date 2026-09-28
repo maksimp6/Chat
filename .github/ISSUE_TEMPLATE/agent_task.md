@@ -31,4 +31,4 @@ What the agent must not change.
 ## Dispatch
 
 Mention exactly one agent in a comment, e.g. `@alice please take this`.
-The agent opens a pull request; a maintainer merges it after green CI.
+The agent opens a pull request; the maintainer (Claude, see AGENTS.md) merges it after green CI.

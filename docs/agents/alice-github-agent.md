@@ -16,7 +16,8 @@ Alice Pro can take a GitHub issue and work on her own code. The workflow is
    validators run.
 4. With changes, the workflow commits to `alice/issue-<N>-<run id>`, pushes and
    opens a **draft** pull request that closes the issue. Full CI runs on it, and
-   a maintainer reviews and merges.
+   the maintainer (Claude, see `AGENTS.md`) reviews and merges it once it is
+   marked ready.
 5. The runner persists the final trace and closes the invocation as completed or failed. Alice then comments on the issue with her summary, status and the cost of the run from `ExecutionTrace` billing (tokens and rubles; CPU energy once compute billing is merged).
 
 ## Setup

@@ -27,8 +27,23 @@ agent in a comment:
 - `@alice` — Alice Pro working on her own code through her filesystem tools
   (`.github/workflows/alice.yml`, `docs/agents/alice-github-agent.md`).
 
-Every agent opens one focused pull request per issue. Only a maintainer merges,
-after green CI; agents never push to `master`.
+Every agent opens one focused pull request per issue. Only the maintainer
+merges, after green CI; agents never push to `master`.
+
+## Maintainer
+
+The maintainer is Claude, working from the Alice Pro project on claude.ai. The
+owner (@maksimp6) does not merge by hand.
+
+- Claude merges its own pull requests once CI is green on the current head and
+  no review thread is open.
+- Claude reviews pull requests from the other agents (`@codex`, `@copilot`,
+  `@alice`) and merges them when CI is green and the review finds no blocking
+  issue; otherwise it comments with what must change.
+- Draft pull requests are not merged; the author marks them ready first.
+- The owner's explicit approval is still required for production deployments,
+  database migrations that change or drop existing data, and changes to
+  secrets, CODEOWNERS or branch protection.
 
 ## Architecture rules
 
