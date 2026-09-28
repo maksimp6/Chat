@@ -77,8 +77,8 @@ def mirror_trace(trace: Mapping[str, Any], *, timeout: float = 2.0) -> bool:
         f"{url}/rest/v1/execution_traces",
         data=json.dumps(row, ensure_ascii=False, allow_nan=False).encode("utf-8"),
         headers={
+            # Supabase secret API keys are opaque, not JWTs. Send via apikey only.
             "apikey": key,
-            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "Prefer": "resolution=merge-duplicates,return=minimal",
         },
