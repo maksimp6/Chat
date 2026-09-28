@@ -303,7 +303,7 @@ def sign_in_with_github(
     if not github_id.isdigit() or not login:
         raise ValueError("invalid github account")
 
-    init_github_accounts_table()
+    # No DDL on the request path; app.py creates the table at startup.
     auth_token = _new_auth_token()
     try:
         user_id, new_user = _link_github_account(github_id, login, current_user_id, auth_token)

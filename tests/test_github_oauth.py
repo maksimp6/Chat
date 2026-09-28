@@ -12,6 +12,7 @@ from identity import github_oauth as github_auth
 from user_identity import (
     authenticate_user_token,
     get_github_login,
+    init_github_accounts_table,
     register_anonymous_user,
     sign_in_with_github,
 )
@@ -32,6 +33,7 @@ def temp_db():
         old = db.DB_PATH
         db.DB_PATH = os.path.join(tmp, "users.db")
         try:
+            init_github_accounts_table()  # app.py does this at startup
             yield
         finally:
             db.DB_PATH = old
@@ -364,7 +366,6 @@ def test_link_rolls_back_on_unique_violation(temp_db, monkeypatch):
 
     import user_identity
 
-    user_identity.init_github_accounts_table()
     existing = register_anonymous_user("web-installation-0005", {})
     fixed = uuid_module.UUID(existing["user_id"])
     monkeypatch.setattr(user_identity.uuid, "uuid4", lambda: fixed)

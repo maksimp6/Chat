@@ -131,7 +131,7 @@ def test_postgres_observability_migration_is_idempotent():
     assert len(rows) == 1
 
 
-def test_postgres_github_sign_in_promotes_anonymous_user_once(monkeypatch):
+def test_postgres_github_sign_in_promotes_anonymous_user_once():
     _require_postgres()
     import threading
     import time
@@ -145,13 +145,8 @@ def test_postgres_github_sign_in_promotes_anonymous_user_once(monkeypatch):
         sign_in_with_github,
     )
 
-    import user_identity
-
     init_github_accounts_table()  # app.py creates the table at startup
     anon = register_anonymous_user(f"pg-installation-{uuid.uuid4().hex}", {})
-    # The idempotent DDL takes a table lock that would queue the second sign-in
-    # before it reads the row; skip it so the second one reaches the promotion.
-    monkeypatch.setattr(user_identity, "init_github_accounts_table", lambda: None)
     github_id = int(uuid.uuid4().int % 10**12)
 
     # A first callback has claimed the anonymous row but not committed yet.
