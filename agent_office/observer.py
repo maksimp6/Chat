@@ -28,11 +28,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from collections.abc import Callable
 
 API_ROOT = "https://api.github.com"
 TRACKING_LABEL = "agent-observer"
@@ -66,6 +66,7 @@ class Thresholds:
     checks_pending: timedelta = timedelta(hours=2)
     stale: timedelta = timedelta(hours=24)
     recent_window: timedelta = timedelta(hours=24)
+    kpi_window: timedelta = timedelta(days=7)
 
 
 DEFAULT_LIMITS = Thresholds()
@@ -97,6 +98,8 @@ class Thread:
     checks_started_at: datetime | None = None
     linked_prs: list[int] = field(default_factory=list)
     dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    closed_at: datetime | None = None
+    labels: list[str] = field(default_factory=list)
 
     @property
     def last_activity(self) -> datetime:
@@ -297,6 +300,8 @@ def build_thread(
         created_at=created_at,
         draft=bool((pull or {}).get("draft") or item.get("draft")),
         mergeable_state=(pull or {}).get("mergeable_state") or "",
+        closed_at=parse_time(item.get("closed_at")),
+        labels=[label.get("name", "") for label in item.get("labels") or []],
     )
     thread.events.append(
         Event(
@@ -496,6 +501,7 @@ def render_digest(
     limits: Thresholds = DEFAULT_LIMITS,
     events_per_thread: int = 12,
     max_threads: int = 40,
+    kpi_lines: list[str] | None = None,
 ) -> str:
     """Markdown digest for the tracking issue and the workflow summary."""
     open_threads = [thread for thread in threads if thread.state == "open"]
@@ -525,6 +531,9 @@ def render_digest(
         issues = sum(t.kind == "issue" and t.owner_agent == agent for t in open_threads)
         lines.append(f"| {AGENT_LABELS[agent]} | {prs} | {issues} | {steps[agent]} |")
 
+    if kpi_lines:
+        lines += ["", *kpi_lines]
+
     lines += ["", "## Требует внимания", ""]
     by_item: dict[int, list[Finding]] = {}
     for item in findings:
@@ -546,7 +555,9 @@ def render_digest(
     shown_threads = [
         t
         for t in threads
-        if t.number in flagged or t.last_activity >= recent or t.owner_agent in AGENTS
+        if t.number in flagged
+        or (t.state == "open" and (t.last_activity >= recent or t.owner_agent in AGENTS))
+        or (t.state != "open" and (t.closed_at or t.last_activity) >= recent)
     ]
     ordered = sorted(
         shown_threads,
@@ -556,7 +567,7 @@ def render_digest(
     lines += ["", "## Треды", ""]
     if hidden:
         lines += [
-            f"Не показаны ещё {hidden}: тихие задачи без агента или сверх {max_threads} тредов.",
+            f"Не показаны ещё {hidden}: тихие без агента или сверх {max_threads}.",
             "",
         ]
     for thread in ordered:
@@ -637,6 +648,10 @@ class GitHub:
             page, headers = self.request("GET", url)
             items.extend(page[key] if key else page)
             url = _next_link(headers.get("link", ""))
+            if url:
+                # GitHub pages by numeric repository id; keep the owner/name path instead,
+                # which every proxy and fine-grained token scope understands.
+                url = re.sub(r"/repositories/\d+/", f"/repos/{self.repo}/", url)
         return items[:limit]
 
     def repo_path(self, suffix: str) -> str:
@@ -654,12 +669,12 @@ def _next_link(header: str) -> str | None:
 def collect_threads(
     gh: GitHub, now: datetime, limits: Thresholds = DEFAULT_LIMITS, workers: int = 8
 ) -> list[Thread]:
-    """Read open items and those closed recently, then build their threads in parallel."""
-    since = (now - limits.recent_window).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """Read open items and those closed in the KPI window, then build threads in parallel."""
+    since = (now - limits.kpi_window).strftime("%Y-%m-%dT%H:%M:%SZ")
     open_items = gh.paginate(gh.repo_path("/issues?state=open&per_page=100"), limit=300)
     closed_items = gh.paginate(
         gh.repo_path(f"/issues?state=closed&per_page=100&since={urllib.parse.quote(since)}"),
-        limit=200,
+        limit=500,
     )
     items = [
         item
@@ -667,7 +682,7 @@ def collect_threads(
         if not any(label.get("name") == TRACKING_LABEL for label in item.get("labels") or [])
         and (
             item.get("state") == "open"
-            or (parse_time(item.get("closed_at")) or now) >= now - limits.recent_window
+            or (parse_time(item.get("closed_at")) or now) >= now - limits.kpi_window
         )
     ]
 
@@ -691,21 +706,22 @@ def collect_threads(
         return list(pool.map(load, items))
 
 
-def ensure_tracking_label(gh: GitHub) -> None:
-    """Create the tracking label so the next run can find the issue by it."""
+def ensure_label(gh: GitHub, name: str, color: str, description: str) -> None:
+    """Create a label; an existing one (422) is fine."""
     try:
         gh.request(
             "POST",
             gh.repo_path("/labels"),
-            {
-                "name": TRACKING_LABEL,
-                "color": "5319e7",
-                "description": "Digest of the agent observer",
-            },
+            {"name": name, "color": color, "description": description},
         )
     except urllib.error.HTTPError as error:
         if error.code != 422:  # 422: the label already exists
             raise
+
+
+def ensure_tracking_label(gh: GitHub) -> None:
+    """Create the tracking label so the next run can find the issue by it."""
+    ensure_label(gh, TRACKING_LABEL, "5319e7", "Digest of the agent observer")
 
 
 def publish_digest(gh: GitHub, digest: str) -> str:
@@ -729,16 +745,34 @@ def publish_digest(gh: GitHub, digest: str) -> str:
 # Entry point
 
 
+def is_weekly_slot(now: datetime) -> bool:
+    """The hourly run on Monday 06:00-06:59 UTC also saves the weekly KPI snapshot."""
+    return now.weekday() == 0 and now.hour == 6
+
+
+def post_weekly_snapshot(gh: GitHub, issue_url: str, kpi_lines: list[str], now: datetime) -> None:
+    number = issue_url.rstrip("/").rsplit("/", 1)[-1]
+    body = "\n".join([f"Снимок KPI на {now:%Y-%m-%d}", "", *kpi_lines[2:]]) + "\n"
+    gh.request("POST", gh.repo_path(f"/issues/{number}/comments"), {"body": body})
+
+
 def run(
     gh: GitHub,
     now: datetime | None = None,
     publish: bool = False,
     limits: Thresholds = DEFAULT_LIMITS,
+    apply_labels: bool = False,
+    weekly: bool | None = None,
 ) -> dict[str, Any]:
+    from agent_office.kpi import compute_kpis, render_kpi_table
+    from agent_office.labels import apply_agent_labels
+
     now = now or datetime.now(UTC)
     threads = collect_threads(gh, now, limits)
     findings = [finding for thread in threads for finding in detect_findings(thread, now, limits)]
-    digest = render_digest(threads, findings, now, gh.repo, limits)
+    kpis = compute_kpis(threads, findings, now, limits.kpi_window)
+    kpi_lines = render_kpi_table(kpis, limits.kpi_window)
+    digest = render_digest(threads, findings, now, gh.repo, limits, kpi_lines=kpi_lines)
     result: dict[str, Any] = {
         "generated_at": now.isoformat(),
         "repo": gh.repo,
@@ -754,10 +788,16 @@ def run(
             }
             for t in threads
         ],
+        "kpis": {agent: asdict(kpi) for agent, kpi in kpis.items()},
         "digest": digest,
     }
+    if apply_labels:
+        result["label_changes"] = apply_agent_labels(gh, threads)
     if publish:
         result["tracking_issue"] = publish_digest(gh, digest)
+        if is_weekly_slot(now) if weekly is None else weekly:
+            post_weekly_snapshot(gh, result["tracking_issue"], kpi_lines, now)
+            result["weekly_snapshot"] = True
     return result
 
 
@@ -766,6 +806,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "maksimp6/Chat"))
     parser.add_argument("--publish", action="store_true", help="update the tracking issue")
     parser.add_argument("--json-out", help="write threads and findings as JSON to this file")
+    parser.add_argument(
+        "--apply-labels",
+        action="store_true",
+        help="keep one agent:<name> label on each open agent-owned issue and PR",
+    )
+    parser.add_argument(
+        "--weekly-snapshot",
+        action="store_true",
+        help="with --publish, also save the KPI table as a comment now",
+    )
     parser.add_argument(
         "--fail-on-high",
         action="store_true",
@@ -776,7 +826,12 @@ def main(argv: list[str] | None = None) -> int:
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     gh = GitHub(token, args.repo)
     try:
-        result = run(gh, publish=args.publish)
+        result = run(
+            gh,
+            publish=args.publish,
+            apply_labels=args.apply_labels,
+            weekly=True if args.weekly_snapshot else None,
+        )
     except urllib.error.HTTPError as error:
         print(f"GitHub API error {error.code} for {error.url}", file=sys.stderr)
         return 2

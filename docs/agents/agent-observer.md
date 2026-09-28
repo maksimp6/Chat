@@ -14,15 +14,26 @@ Every hour `.github/workflows/agent-observer.yml` runs it. It:
    or a Codex test check, a green reviewed PR nobody merged, checks pending too
    long, an agent silent after it was given a task, and PRs or agent tasks idle for a
    day (issues nobody handed to an agent are backlog, not stuck work);
-4. replaces the body of the open issue labelled `agent-observer` with the digest
-   (the issue is created on the first run) and uploads the threads as JSON.
+4. computes KPIs per agent over the last 7 days (`agent_office/kpi.py`): merged
+   PRs, PRs closed without a merge, median time from opening a PR to its merge,
+   reviews per merged PR, open PRs and how many are red, issues handed to the
+   agent, and items flagged as stuck;
+5. keeps exactly one `agent:claude`, `agent:codex`, `agent:copilot` or
+   `agent:alice` label on each open issue and PR an agent owns
+   (`agent_office/labels.py`), so `is:open label:agent:codex` shows one agent's
+   desk;
+6. replaces the body of the open issue labelled `agent-observer` with the digest
+   (the issue is created on the first run) and uploads the threads as JSON. The
+   run on Monday 06:17 UTC also saves the KPI table there as a comment, which
+   keeps a weekly history.
 
-The observer only reads GitHub and edits that one issue. It never comments,
-mentions agents, pushes or merges; mentions quoted in the digest are
+Apart from that issue and the agent labels, the observer only reads GitHub. It
+never mentions agents, pushes or merges; mentions quoted in the digest are
 neutralised so editing the issue cannot wake an agent. The maintainer acts on
 the findings as described in `AGENTS.md`.
 
-Run it locally (read-only unless `--publish` is given):
+Run it locally (read-only unless `--publish` or `--apply-labels` is given;
+`--weekly-snapshot` saves the KPI comment right away):
 
 ```sh
 GITHUB_TOKEN=... python -m agent_office.observer --repo maksimp6/Chat --json-out threads.json

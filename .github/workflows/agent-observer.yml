@@ -1,10 +1,12 @@
 name: Agent observer
 
 # Watches the agent office (Claude, Codex, Copilot, Alice) every hour: builds a
-# thread per issue and pull request and flags stuck work. The digest replaces
-# the body of the open issue labelled "agent-observer" (created on first run)
-# and is shown in the run summary. It reads GitHub and edits only that issue;
-# it never comments, mentions agents, pushes, or merges.
+# thread per issue and pull request, flags stuck work and computes weekly KPIs
+# per agent. The digest replaces the body of the open issue labelled
+# "agent-observer" (created on first run) and is shown in the run summary; on
+# Mondays at 06:17 UTC the KPI table is also saved there as a comment. It keeps
+# one agent:<name> label on each open agent-owned issue and PR. It never
+# mentions agents, pushes, or merges.
 
 on:
   schedule:
@@ -25,7 +27,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
       checks: read
     steps:
       - name: Checkout
@@ -39,7 +41,7 @@ jobs:
       - name: Observe the agent office
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python -m agent_office.observer --repo "$GITHUB_REPOSITORY" --publish --json-out agent-observer.json > /dev/null
+        run: python -m agent_office.observer --repo "$GITHUB_REPOSITORY" --publish --apply-labels --json-out agent-observer.json > /dev/null
       - name: Save threads as JSON
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

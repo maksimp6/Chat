@@ -296,7 +296,7 @@ class FakeGitHub:
 
 
 def test_paginate_follows_link_headers_and_sends_token():
-    next_url = "https://api.github.com/repos/o/r/issues?page=2"
+    next_url = "https://api.github.com/repositories/42/issues?page=2"
     fake = FakeGitHub(
         {
             "GET /repos/o/r/issues?page=2": [{"n": 2}],
@@ -385,7 +385,7 @@ def test_main_writes_summary_and_json(monkeypatch, tmp_path):
     monkeypatch.setattr(
         observer,
         "run",
-        lambda gh, publish: {
+        lambda gh, **options: {
             "digest": "# digest\n",
             "findings": [{"severity": "high"}],
             "threads": [],
@@ -412,6 +412,7 @@ def test_observer_workflow_is_hourly_pinned_and_least_privilege():
     assert "pull_request_target" not in workflow
     assert "python -m agent_office.observer" in workflow
     assert "--publish" in workflow
+    assert "--apply-labels" in workflow
 
 
 def test_every_timeline_event_kind_is_described():
@@ -485,7 +486,7 @@ def test_copilot_assigned_later_becomes_owner_and_long_threads_are_trimmed():
 
 
 def test_main_reports_api_errors_and_tracking_issue(monkeypatch, capsys):
-    def fail(gh, publish):
+    def fail(gh, **options):
         raise observer.urllib.error.HTTPError("https://api.github.com/x", 403, "no", {}, None)
 
     monkeypatch.setattr(observer, "run", fail)
@@ -496,7 +497,7 @@ def test_main_reports_api_errors_and_tracking_issue(monkeypatch, capsys):
     monkeypatch.setattr(
         observer,
         "run",
-        lambda gh, publish: {
+        lambda gh, **options: {
             "digest": "d",
             "findings": [],
             "threads": [],
