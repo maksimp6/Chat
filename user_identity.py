@@ -127,10 +127,12 @@ def register_anonymous_user(
         if row["status"] != "anonymous":
             raise ValueError("installation is linked to a signed-in account")
 
-        conn.execute(
+        # Conditional on the status too: a GitHub sign-in may promote the row
+        # between the read above and this write.
+        updated = conn.execute(
             """UPDATE users
                SET metadata_json = ?, auth_token_hash = ?, updated_at = ?
-               WHERE installation_id = ?""",
+               WHERE installation_id = ? AND status = 'anonymous'""",
             (
                 json.dumps(sanitized, ensure_ascii=False),
                 auth_token_hash,
@@ -138,6 +140,9 @@ def register_anonymous_user(
                 installation_id,
             ),
         )
+        if updated.rowcount != 1:
+            conn.rollback()
+            raise ValueError("installation is linked to a signed-in account")
         conn.commit()
         return {
             "user_id": row["id"],

@@ -383,3 +383,34 @@ def test_logout_works_after_gate_session_expired(github_env, monkeypatch):
     response = _app().post("/auth/logout")
     assert response.status_code == 200
     assert "alice_user_token=;" in " ".join(response.headers.getlist("Set-Cookie"))
+
+
+def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypatch):
+    import user_identity
+
+    anon = register_anonymous_user("web-installation-0006", {})
+    real_get_conn = user_identity.get_conn
+    promoted = {}
+
+    class _PromoteAfterRead:
+        """Runs a GitHub sign-in between bootstrap's read and its write."""
+
+        def __init__(self, conn):
+            self._conn = conn
+
+        def execute(self, sql, params=()):
+            if sql.lstrip().startswith("UPDATE users") and not promoted:
+                promoted["started"] = True
+                promoted.update(sign_in_with_github(4, "octocat", anon["user_id"]))
+            return self._conn.execute(sql, params)
+
+        def __getattr__(self, name):
+            return getattr(self._conn, name)
+
+    monkeypatch.setattr(user_identity, "get_conn", lambda: _PromoteAfterRead(real_get_conn()))
+    with pytest.raises(ValueError):
+        register_anonymous_user("web-installation-0006", {})
+    monkeypatch.setattr(user_identity, "get_conn", real_get_conn)
+
+    assert promoted["user_id"] == anon["user_id"]
+    assert authenticate_user_token(promoted["auth_token"]) == anon["user_id"]
