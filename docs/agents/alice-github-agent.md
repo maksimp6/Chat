@@ -1,7 +1,7 @@
 # Alice as a GitHub agent
 
 Alice Pro can take a GitHub issue and work on her own code. The workflow is
-`.github/workflows/alice.yml`; the headless runner is `alice_agent_runner.py`.
+`.github/workflows/alice.yml`; the headless runner is `agents/github_runner.py`.
 
 ## How it works
 
