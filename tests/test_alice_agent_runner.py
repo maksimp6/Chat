@@ -64,6 +64,13 @@ def test_edits_are_reported_with_summary_and_billing(repo):
     assert result["trace_id"]
     assert "cost_status" in result["billing"]
 
+    from invocation.manager import get_invocation
+
+    invocation = get_invocation(result["invocation_id"])
+    assert invocation["status"] == "completed"
+    assert invocation["trace"]["trace_id"] == result["trace_id"]
+    assert invocation["result"]["status"] == "changed"
+
 
 def test_only_filesystem_tools_are_offered_and_issue_is_task_data(repo):
     client = FakeClient(_message("Nothing to do."))
@@ -102,6 +109,14 @@ def test_client_failure_is_reported_without_details(repo):
     assert result["status"] == "failed"
     assert result["error"] == "RuntimeError"
     assert "secret-bearing" not in json.dumps(result)
+
+    from invocation.manager import get_invocation
+
+    invocation = get_invocation(result["invocation_id"])
+    assert invocation["status"] == "failed"
+    assert invocation["error"] == {"type": "RuntimeError"}
+    assert invocation["trace"]["trace_id"] == result["trace_id"]
+    assert "secret-bearing" not in json.dumps(invocation["trace"])
 
 
 def test_seed_requires_yandex_secrets(monkeypatch):
