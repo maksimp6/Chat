@@ -148,3 +148,11 @@ def test_app_commits_use_the_bot_identity():
     assert 'bot="$APP_SLUG[bot]"' in script
     assert 'gh api "users/$bot" --jq .id' in script
     assert 'git config user.email "$bot_id+$bot@users.noreply.github.com"' in script
+
+
+def test_personal_token_commits_use_fallback_identity():
+    script = _step_run("Open pull request and report")
+    app_branch = script.split('if [ -n "$APP_SLUG" ]; then', 1)[1]
+    fallback = app_branch.split("\n  else\n", 1)[1].split("\n  fi\n", 1)[0]
+    assert 'git config user.name "Alice Pro"' in fallback
+    assert 'git config user.email "alice-pro@users.noreply.github.com"' in fallback
