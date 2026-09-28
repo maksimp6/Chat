@@ -283,16 +283,22 @@ class CloudRuObjectStorage:
                 if _local_name(item.tag) != "Contents":
                     continue
                 key = _child_text(item, "Key")
+                if not key.startswith(root) or key.endswith("/"):
+                    continue
                 object_id = key[len(root) :]
                 if wanted and object_id != wanted and not object_id.startswith(wanted + "/"):
                     continue
-                if not object_id or object_id.endswith("/"):
+                try:
+                    relative = _safe_relative_path(object_id)
+                except StorageError:
+                    continue  # keys like ``../x`` are not addressable through this contract
+                if relative.as_posix() != object_id:
                     continue
                 try:
                     size = int(_child_text(item, "Size") or 0)
                 except ValueError:
                     raise StorageError("Storage provider operation failed") from None
-                objects.append(self._object(PurePosixPath(object_id), key, size))
+                objects.append(self._object(relative, key, size))
             token = _child_text(tree, "NextContinuationToken")
             if _child_text(tree, "IsTruncated").lower() != "true" or not token:
                 break

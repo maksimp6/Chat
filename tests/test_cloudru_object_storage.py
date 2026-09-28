@@ -267,6 +267,17 @@ def test_malformed_list_size_is_a_safe_error():
     assert "not-a-number" not in str(excinfo.value)
 
 
+def test_list_skips_keys_outside_the_safe_path_contract():
+    keys = ["other/x.txt", "p/", "p/../secret", "p//double.txt", "p/a//b.txt", "p/ok.txt"]
+    contents = "".join(f"<Contents><Key>{key}</Key><Size>1</Size></Contents>" for key in keys)
+    body = f"<ListBucketResult>{contents}</ListBucketResult>".encode()
+    storage = CloudRuObjectStorage(
+        "bucket", prefix="p", session=FakeSession(FakeResponse(200, body))
+    )
+
+    assert [item.object_id for item in storage.list("", credentials=CREDS)] == ["ok.txt"]
+
+
 def test_default_clock_and_session_are_used():
     storage = CloudRuObjectStorage("bucket")
     assert isinstance(storage._session, requests.Session)
