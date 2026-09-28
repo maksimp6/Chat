@@ -39,10 +39,13 @@ def test_production_deployment_uses_runtime_secret_not_traefik_labels():
     assert "ALICE_SHORT_TOKEN" not in docker_block
 
 
-def test_production_workflow_uses_a_separate_runtime_supabase_key():
+def test_production_deployment_has_no_supabase_dependency():
     workflow = (ROOT / ".github" / "workflows" / "production-deploy.yml").read_text(
         encoding="utf-8"
     )
-    assert "SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}" in workflow
-    assert 'test -n "$SUPABASE_SECRET_KEY"' in workflow
-    assert "SUPABASE_ACCESS_TOKEN" not in workflow
+    preview = (ROOT / "deploy" / "preview" / "server.sh").read_text(encoding="utf-8")
+    production = SCRIPT.read_text(encoding="utf-8")
+
+    for source in (workflow, preview, production):
+        assert "SUPABASE_" not in source
+        assert "supabase" not in source.lower()
