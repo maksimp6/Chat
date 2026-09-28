@@ -44,8 +44,6 @@ jobs:
       ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
       ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
       ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
       - name: Check out ref
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,7 +69,7 @@ jobs:
         run: |
           # Pass only the app variables that are configured, by name; values never hit the log.
           env_args=(--env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN)
-          for name in ALICE_PROVIDER_CREDENTIAL_KEY ALICE_DATABASE_URL SUPABASE_URL SUPABASE_SECRET_KEY; do
+          for name in ALICE_PROVIDER_CREDENTIAL_KEY ALICE_DATABASE_URL; do
             if [ -n "${!name}" ]; then env_args+=(--env "$name"); else unset "$name"; fi
           done
           python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" "${env_args[@]}" | tee deploy.json

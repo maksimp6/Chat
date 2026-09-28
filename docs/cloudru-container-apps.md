@@ -27,8 +27,7 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
    (push) and Container Apps (admin) roles, and issue an access key.
 2. In GitHub, create the `cloudru` environment with:
    - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `ALICE_SHORT_TOKEN`,
-     and optionally `ALICE_PROVIDER_CREDENTIAL_KEY`, `ALICE_DATABASE_URL`, `SUPABASE_URL`,
-     `SUPABASE_SECRET_KEY`;
+     and optionally `ALICE_PROVIDER_CREDENTIAL_KEY` and `ALICE_DATABASE_URL`;
    - variable `CLOUDRU_PROJECT_ID`, and optionally `CLOUDRU_REGISTRY_NAME`,
      `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,
      `CLOUDRU_MIN_INSTANCES`, `CLOUDRU_MAX_INSTANCES`.
