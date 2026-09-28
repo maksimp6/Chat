@@ -28,6 +28,13 @@ from cloud.tools import CLOUD_TOOLS, cloud_budget_status, cloud_compute
         ({"total": {"value": "10,5"}}, Decimal("10.5"), None, 0),
         ({"total": {"value": 10, "currency": "usd"}, "currency": "RUB"}, Decimal("10"), "USD", 0),
         ({"items": [{"cost": {"amount": "3", "currency": "eur"}}]}, Decimal("3"), "EUR", 1),
+        (
+            {"items": [{"cost": "3", "currency": "USD"}, {"cost": "4", "currency": "EUR"}]},
+            None,
+            None,
+            2,
+        ),
+        ({"currency": "RUB", "items": [{"cost": "3", "currency": "USD"}]}, None, None, 1),
         ({"summary": {"total": 12}, "currency": "RUB"}, Decimal("12"), "RUB", 0),
         (
             {

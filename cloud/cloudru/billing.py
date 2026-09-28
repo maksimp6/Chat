@@ -66,6 +66,7 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
             continue
         total = Decimal("0")
         counted = 0
+        row_currencies: set[str] = set()
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -76,9 +77,17 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
                     total += amount
                     counted += 1
                     nested = _currency(value) if isinstance(value, dict) else None
-                    currency = currency or nested or _currency(row)
+                    row_currency = nested or _currency(row)
+                    if row_currency:
+                        row_currencies.add(row_currency)
                     break
         if counted:
+            if currency:
+                row_currencies.add(currency)
+            if len(row_currencies) > 1:
+                # A sum across currencies is meaningless; report it as unparseable.
+                return {"total_cost": None, "currency": None, "rows": counted}
+            currency = next(iter(row_currencies), None)
             return {"total_cost": total, "currency": currency, "rows": counted}
 
     return {"total_cost": None, "currency": currency, "rows": 0}
