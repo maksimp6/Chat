@@ -7,7 +7,7 @@ import pytest
 def runtime_db(tmp_path, monkeypatch):
     import db
     import session_manager
-    import invocation_manager
+    import invocation.manager as invocation_manager
     import runtime_migrations
 
     path = tmp_path / "concurrency.db"
@@ -23,7 +23,7 @@ def runtime_db(tmp_path, monkeypatch):
 
 def test_parallel_invocations_keep_context_and_trace_isolated(runtime_db):
     from session_manager import create_session
-    from invocation_manager import create_invocation, finish_invocation, get_invocation
+    from invocation.manager import create_invocation, finish_invocation, get_invocation
 
     session = create_session(metadata={"suite": "concurrency"})
 
@@ -52,7 +52,7 @@ def test_parallel_invocations_keep_context_and_trace_isolated(runtime_db):
 
 
 def test_parallel_first_use_reuses_one_session_without_losing_invocations(runtime_db):
-    from invocation_manager import create_invocation, finish_invocation, get_invocation
+    from invocation.manager import create_invocation, finish_invocation, get_invocation
 
     session_id = "first-use-session"
 
