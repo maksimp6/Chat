@@ -5,6 +5,7 @@
 ## Разделы документации
 
 - [Архитектура](architecture/overview.md) — общая структура и компоненты системы
+- [Канонический AI pipeline](architecture/ai-execution-pipeline.md) — единый путь model/tool execution и правила адаптеров
 - [Координация архитектурной интеграции](architecture/integration-coordination.md) — порядок и границы активных потоков работ
 - [Текущий интеграционный реестр](integration/current-scope.md) — статус и правила допуска сфокусированных PR
 - [Настройка](setup/installation.md) — установка и конфигурация
