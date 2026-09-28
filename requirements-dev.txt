@@ -6,3 +6,4 @@ pytest-cov==7.1.0
 coverage==7.16.1
 ruff==0.16.9
 diff-cover==10.6.0
+PyYAML==6.0.3
