@@ -86,7 +86,7 @@ jobs:
           export ALICE_PROVIDER_CREDENTIAL_KEY
           export ALICE_DB_PATH="$RUNNER_TEMP/alice.db"
           # A failed run is still reported on the issue by the last step.
-          python alice_agent_runner.py \
+          python agents/github_runner.py \
             --issue "$ISSUE_NUMBER" \
             --title-file "$RUNNER_TEMP/title.txt" \
             --body-file "$RUNNER_TEMP/body.txt" \
