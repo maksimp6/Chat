@@ -1,7 +1,7 @@
 import json
 
-from invocation_context import InvocationContext
-from invocation_trace import create_invocation_trace
+from invocation.context import InvocationContext
+from invocation.trace import create_invocation_trace
 from mcp_trace import record_yandex_mcp_activity
 
 
