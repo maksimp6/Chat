@@ -1,3 +1,4 @@
+import os
 import subprocess
 from unittest.mock import Mock
 
@@ -96,6 +97,9 @@ def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
     ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc123")
 
     login_argv, login_kwargs = runs[0]
+    configs = {kwargs["env"]["DOCKER_CONFIG"] for _, kwargs in runs}
+    assert len(configs) == 1
+    assert not os.path.exists(configs.pop())  # removed after the push
     assert login_argv[:3] == ["docker", "login", "alice-pro.cr.cloud.ru"]
     assert "key-secret" not in login_argv
     assert login_kwargs["input"] == "key-secret"
@@ -411,32 +415,88 @@ def _deploy_script():
 SHA = "a" * 40
 
 
-def _git_runner(head=SHA, dirty="", fail=False):
-    def run(cmd, **_):
-        if fail:
-            return Mock(returncode=128, stdout="", stderr="not a git repository")
-        return Mock(returncode=0, stdout=head if "rev-parse" in cmd else dirty, stderr="")
+def _git(repo, *args):
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
 
-    return run
+
+def test_export_commit_builds_only_committed_files(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "app.py").write_text("committed\n")
+    _git(repo, "add", "app.py")
+    _git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c")
+    sha = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "app.py").write_text("edited\n")
+    (repo / ".env").write_text("SECRET=1\n")
+    (repo / "Dockerfile").write_text("FROM scratch\n")
+
+    out = tmp_path / "out"
+    out.mkdir()
+    _deploy_script()._export_commit(sha, str(repo), str(out))
+    assert sorted(p.name for p in out.iterdir()) == ["app.py"]
+    assert (out / "app.py").read_text() == "committed\n"
 
 
 @pytest.mark.parametrize(
-    ("tag", "runner", "message"),
+    ("tag", "message"),
+    [("latest", "full 40-character"), (SHA, "cannot export commit")],
+)
+def test_export_commit_rejects_bad_tags(tmp_path, tag, message):
+    with pytest.raises(CloudProviderError, match=message):
+        _deploy_script()._export_commit(tag, str(tmp_path), str(tmp_path))
+
+
+def _run_deploy(monkeypatch, capsys, argv, **env):
+    for name in ("ALICE_REQUIRE_SHORT_TOKEN", "ALICE_SHORT_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    code = _deploy_script().main(argv)
+    return code, capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("env_args", "env"),
     [
-        ("latest", _git_runner(), "full 40-character"),
-        (SHA, _git_runner(fail=True), "not a git checkout"),
-        (SHA, _git_runner(head="b" * 40), "does not match"),
-        (SHA, _git_runner(dirty=" M app.py"), "uncommitted changes"),
+        ([], {}),
+        (["--env", "ALICE_SHORT_TOKEN"], {"ALICE_SHORT_TOKEN": "t"}),
+        (
+            ["--env", "ALICE_REQUIRE_SHORT_TOKEN", "--env", "ALICE_SHORT_TOKEN"],
+            {"ALICE_REQUIRE_SHORT_TOKEN": "0", "ALICE_SHORT_TOKEN": "t"},
+        ),
+        (
+            ["--env", "ALICE_REQUIRE_SHORT_TOKEN", "--env", "ALICE_SHORT_TOKEN"],
+            {"ALICE_REQUIRE_SHORT_TOKEN": "1", "ALICE_SHORT_TOKEN": ""},
+        ),
     ],
 )
-def test_deploy_requires_clean_checkout_of_tag(tag, runner, message):
-    script = _deploy_script()
-    with pytest.raises(CloudProviderError, match=message):
-        script._verify_commit(tag, ".", runner=runner)
+def test_deploy_requires_short_token_gate(monkeypatch, capsys, env_args, env):
+    code, out = _run_deploy(monkeypatch, capsys, ["deploy", "--tag", SHA, *env_args], **env)
+    assert code == 1
+    assert "ALICE_REQUIRE_SHORT_TOKEN" in out
 
 
-def test_deploy_accepts_matching_clean_checkout():
-    _deploy_script()._verify_commit(SHA, ".", runner=_git_runner())
+def test_invalid_repository_name_fails_before_provider_calls(monkeypatch, capsys):
+    monkeypatch.setenv("CLOUDRU_REPOSITORY_NAME", "Bad_Name")
+    code, out = _run_deploy(monkeypatch, capsys, ["estimate"])
+    assert code == 1
+    assert "CLOUDRU_REPOSITORY_NAME" in out
+
+
+def test_deploy_verified_restores_config_even_with_same_image():
+    previous = _app(image="same")
+    apps = _verified_client(
+        [previous, previous, previous, {}, _app(image="same"), {}, _app(image="same")],
+        http_status=503,
+    )
+    with pytest.raises(CloudProviderError, match="rolled back"):
+        apps.deploy_verified(ContainerSpec(name="alice-pro", image="same", cpu="1"))
+    patches = [c for c in apps.client.calls if c[1] == "PATCH"]
+    assert len(patches) == 2
+    assert patches[1][4] == {k: v for k, v in previous.items() if k not in {"status", "id"}}
 
 
 def test_deploy_verified_without_previous_image_just_raises():

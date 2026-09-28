@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import os
 import re
 import subprocess
+import tempfile
 from typing import Any, Callable
 
 from cloud.base import CloudProviderError
@@ -50,7 +51,7 @@ class ImageRef:
         return f"{self.registry_host}/{self.repository}@{self.digest}"
 
 
-def _validate_name(value: str, field: str) -> str:
+def validate_name(value: str, field: str) -> str:
     value = str(value or "").strip()
     if not _NAME_RE.match(value):
         raise CloudProviderError(
@@ -83,7 +84,7 @@ class CloudRuRegistryClient:
         return self.project_id
 
     def registry_host(self, registry_name: str) -> str:
-        return f"{_validate_name(registry_name, 'registry_name')}.{self.registry_domain}"
+        return f"{validate_name(registry_name, 'registry_name')}.{self.registry_domain}"
 
     # Control plane -----------------------------------------------------------
 
@@ -97,7 +98,7 @@ class CloudRuRegistryClient:
         return [item for item in items if isinstance(item, dict)]
 
     def get_registry(self, registry_name: str) -> dict[str, Any] | None:
-        name = _validate_name(registry_name, "registry_name")
+        name = validate_name(registry_name, "registry_name")
         return next((r for r in self.list_registries() if r.get("name") == name), None)
 
     def ensure_registry(self, registry_name: str, *, is_public: bool = False) -> dict[str, Any]:
@@ -111,7 +112,7 @@ class CloudRuRegistryClient:
             "/v1/registries",
             json_body={
                 "projectId": self._require_project(),
-                "name": _validate_name(registry_name, "registry_name"),
+                "name": validate_name(registry_name, "registry_name"),
                 "isPublic": bool(is_public),
                 "registryType": "DOCKER",
             },
@@ -125,7 +126,7 @@ class CloudRuRegistryClient:
 
     # Data plane (Docker CLI) -------------------------------------------------
 
-    def docker_login(self, registry_name: str) -> str:
+    def docker_login(self, registry_name: str, *, env: dict[str, str] | None = None) -> str:
         host = self.registry_host(registry_name)
         if not self.iam_client.key_id or not self.iam_client.key_secret:
             raise CloudProviderError(
@@ -138,6 +139,7 @@ class CloudRuRegistryClient:
             text=True,
             capture_output=True,
             check=False,
+            env=env,
         )
         if result.returncode != 0:
             # Docker's stderr never contains the password, but keep it short anyway.
@@ -157,10 +159,27 @@ class CloudRuRegistryClient:
         dockerfile: str = "Dockerfile",
         platform: str = "linux/amd64",
     ) -> ImageRef:
-        repository = _validate_name(repository, "repository")
+        repository = validate_name(repository, "repository")
         if not _TAG_RE.match(tag or ""):
             raise CloudProviderError("tag is invalid", code="validation_error")
-        host = self.docker_login(registry_name)
+        # A throwaway Docker config keeps the registry credential off disk after the push.
+        with tempfile.TemporaryDirectory(prefix="alice-docker-") as docker_config:
+            env = {**os.environ, "DOCKER_CONFIG": docker_config}
+            return self._build_and_push(
+                registry_name, repository, tag, context_dir, dockerfile, platform, env
+            )
+
+    def _build_and_push(
+        self,
+        registry_name: str,
+        repository: str,
+        tag: str,
+        context_dir: str,
+        dockerfile: str,
+        platform: str,
+        env: dict[str, str],
+    ) -> ImageRef:
+        host = self.docker_login(registry_name, env=env)
         ref = ImageRef(host, repository, tag)
         for argv in (
             [
@@ -176,7 +195,7 @@ class CloudRuRegistryClient:
             ],
             ["docker", "push", ref.tagged],
         ):
-            result = self._run(argv, text=True, capture_output=True, check=False)
+            result = self._run(argv, text=True, capture_output=True, check=False, env=env)
             if result.returncode != 0:
                 raise CloudProviderError(
                     f"{argv[1]} failed: {(result.stderr or '').strip()[-500:]}",

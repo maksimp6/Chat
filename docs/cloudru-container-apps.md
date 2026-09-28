@@ -41,9 +41,11 @@ If the new revision fails readiness or the health check, it restores the
 previous revision's full configuration (image, env, scaling, resources) and
 fails the run. Every action runs only on commits that are already on `master`,
 checked before dependencies are installed, and secrets are scoped to the steps
-that call Cloud.ru (`estimate` gets none). The deploy script refuses a `--tag`
-that is not the full, clean `HEAD` commit of the build context, and it fails
-closed if the registry reports no image digest.
+that call Cloud.ru (`estimate` gets none). The deploy script builds from a
+`git archive` export of the `--tag` commit, so untracked and ignored files never
+reach the image. It refuses to deploy without the short-token gate, keeps the
+registry credential in a throwaway Docker config, and fails closed if the
+registry reports no image digest.
 
 ## Cost
 
@@ -77,3 +79,8 @@ The first request after idle pays a cold start.
 - **API field names are unconfirmed.** The rendered API reference is not
   machine-readable; paths and bodies were cross-checked against a working
   community client. Confirm them on the first live deploy.
+- **Readiness does not track revisions yet.** The deploy waits for the new image
+  digest and a running status. A rollout that keeps the same digest (config
+  only) can pass that check while the old revision still serves, so the health
+  check may hit it. Pin the check to the rollout's revision once the first live
+  deploy confirms which field carries it.

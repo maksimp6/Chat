@@ -265,7 +265,7 @@ class CloudRuContainerAppsClient:
             ready = self.wait_until_ready(spec.name, image=spec.image, timeout_s=timeout_s)
             health = self.health_check(ready["public_uri"])
         except CloudProviderError as exc:
-            if not previous_image or previous_image == spec.image:
+            if previous is None:
                 raise
             self.restore(spec.name, previous)
             self.wait_until_ready(spec.name, image=previous_image, timeout_s=timeout_s)

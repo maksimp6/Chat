@@ -16,12 +16,15 @@ CLOUDRU_MAX_INSTANCES. Output is JSON without secret values.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tarfile
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -31,7 +34,7 @@ from cloud.cloudru.container_apps_client import (  # noqa: E402
     ContainerSpec,
     estimate_monthly_cost,
 )
-from cloud.cloudru.registry_client import CloudRuRegistryClient  # noqa: E402
+from cloud.cloudru.registry_client import CloudRuRegistryClient, validate_name  # noqa: E402
 
 
 def _settings() -> dict:
@@ -52,6 +55,8 @@ def _settings() -> dict:
         "max_instances": max_instances,
     }
     # Validate everything up front, before any command touches the provider.
+    validate_name(cfg["registry"], "CLOUDRU_REGISTRY_NAME")
+    validate_name(cfg["repository"], "CLOUDRU_REPOSITORY_NAME")
     ContainerSpec(
         name=cfg["name"],
         image="validation-only",
@@ -62,35 +67,33 @@ def _settings() -> dict:
     return cfg
 
 
-def _verify_commit(tag: str, context: str, runner=subprocess.run) -> None:
-    """The image tag must be the full commit SHA checked out, unmodified, in the build context."""
+def _export_commit(tag: str, repo: str, dest: str, runner=subprocess.run) -> None:
+    """Write exactly the files of commit ``tag`` to ``dest``, so the image is that commit.
+
+    Building from an export (not the working tree) keeps uncommitted, untracked and
+    ignored files such as ``.env`` out of the image.
+    """
     if not re.fullmatch(r"[0-9a-f]{40}", tag):
         raise CloudProviderError(
             "--tag must be a full 40-character commit SHA", code="validation_error"
         )
-
-    def git(*args: str) -> str:
-        done = runner(["git", "-C", context, *args], capture_output=True, text=True, check=False)
-        if done.returncode != 0:
-            raise CloudProviderError(
-                f"build context is not a git checkout: {done.stderr.strip()}",
-                code="validation_error",
-            )
-        return done.stdout.strip()
-
-    head = git("rev-parse", "HEAD")
-    if head != tag:
+    done = runner(
+        ["git", "-C", repo, "archive", "--format=tar", tag], capture_output=True, check=False
+    )
+    if done.returncode != 0:
         raise CloudProviderError(
-            f"--tag {tag} does not match the build context HEAD {head}", code="validation_error"
+            f"cannot export commit {tag}: {done.stderr.decode(errors='replace').strip()[:300]}",
+            code="validation_error",
         )
-    if git("status", "--porcelain", "--untracked-files=no"):
-        raise CloudProviderError(
-            "build context has uncommitted changes to tracked files", code="validation_error"
-        )
+    with tarfile.open(fileobj=io.BytesIO(done.stdout)) as archive:
+        archive.extractall(dest, filter="data")
 
 
 def _emit(payload: dict) -> None:
     print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+REQUIRED_APP_ENV = ("ALICE_REQUIRE_SHORT_TOKEN", "ALICE_SHORT_TOKEN")
 
 
 def cmd_deploy(args: argparse.Namespace) -> dict:
@@ -100,17 +103,29 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
         raise CloudProviderError(
             f"environment variables not set: {', '.join(missing)}", code="validation_error"
         )
-    _verify_commit(args.tag, args.context)
+    # The service is public, so it must never start without the short-token gate.
+    if (
+        any(name not in args.env for name in REQUIRED_APP_ENV)
+        or os.environ["ALICE_REQUIRE_SHORT_TOKEN"] != "1"
+        or not os.environ["ALICE_SHORT_TOKEN"]
+    ):
+        raise CloudProviderError(
+            "deploy needs --env ALICE_REQUIRE_SHORT_TOKEN (set to 1) and --env ALICE_SHORT_TOKEN",
+            code="validation_error",
+        )
     registry = CloudRuRegistryClient()
     apps = CloudRuContainerAppsClient()
 
-    registry.ensure_registry(cfg["registry"])
-    image = registry.build_and_push(
-        registry_name=cfg["registry"],
-        repository=cfg["repository"],
-        tag=args.tag,
-        context_dir=args.context,
-    )
+    with tempfile.TemporaryDirectory(prefix="alice-build-") as build_dir:
+        _export_commit(args.tag, args.context, build_dir)
+        registry.ensure_registry(cfg["registry"])
+        image = registry.build_and_push(
+            registry_name=cfg["registry"],
+            repository=cfg["repository"],
+            tag=args.tag,
+            context_dir=build_dir,
+            dockerfile=os.path.join(build_dir, "Dockerfile"),
+        )
     spec = ContainerSpec(
         name=cfg["name"],
         image=image.pinned,
@@ -156,8 +171,10 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     deploy = sub.add_parser("deploy", help="build, push, deploy and health-check")
-    deploy.add_argument("--tag", required=True, help="full commit SHA checked out in --context")
-    deploy.add_argument("--context", default=".", help="docker build context")
+    deploy.add_argument(
+        "--tag", required=True, help="full commit SHA to build (exported from --context)"
+    )
+    deploy.add_argument("--context", default=".", help="git repository holding the commit")
     deploy.add_argument(
         "--env",
         action="append",
