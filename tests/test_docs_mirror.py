@@ -1,0 +1,186 @@
+import ast
+import json
+from pathlib import Path
+
+import pytest
+
+from docs_mirror import crawler
+from docs_mirror import FetchResult, Mirror, html_to_markdown, normalize_url, url_to_path
+
+
+def page(title, body, links=()):
+    anchors = "".join(f'<a href="{href}">{href}</a>' for href in links)
+    return (
+        f"<html><head><title>{title}</title><script>track()</script></head><body>"
+        f"<nav><a href='/docs/nav-only'>menu</a></nav>"
+        f"<main><h1>{title}</h1><p>{body}</p>{anchors}</main>"
+        f"<footer>© Cloud.ru</footer></body></html>"
+    )
+
+
+class FakeSite:
+    def __init__(self, pages):
+        self.pages = dict(pages)
+        self.requests = []
+
+    def __call__(self, url):
+        self.requests.append(url)
+        if url not in self.pages:
+            return FetchResult(status=404)
+        return FetchResult(status=200, text=self.pages[url])
+
+
+BASE = "https://cloud.ru/docs/svc/ug"
+
+
+def make_mirror(tmp_path, site):
+    return Mirror(tmp_path, host="cloud.ru", prefixes=["/docs/svc"], fetcher=site, delay_s=0)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("https://cloud.ru/docs/svc/ug/index.html", "https://cloud.ru/docs/svc/ug/index"),
+        ("http://WWW.Cloud.ru/ru/docs/svc/ug/a.html?utm=1#top", "https://cloud.ru/docs/svc/ug/a"),
+        ("https://cloud.ru/docs/svc/ug/a/", "https://cloud.ru/docs/svc/ug/a"),
+        ("https://cloud.ru//docs//svc", "https://cloud.ru/docs/svc"),
+        ("mailto:x@cloud.ru", None),
+        ("javascript:void(0)", None),
+    ],
+)
+def test_normalize_url(raw, expected):
+    assert normalize_url(raw) == expected
+
+
+def test_relative_links_resolve_against_page():
+    assert normalize_url("../topics/b.html", base=f"{BASE}/topics/a") == f"{BASE}/topics/b"
+
+
+def test_url_to_path_is_safe():
+    assert url_to_path(f"{BASE}/topics/a") == "svc/ug/topics/a.md"
+    assert url_to_path("https://cloud.ru/docs") == "index.md"
+    assert ".." not in url_to_path("https://cloud.ru/docs/%2e%2e/x")
+    assert url_to_path("https://cloud.ru/docs/a b/c?") == "a_b/c.md"
+
+
+def test_html_to_markdown_keeps_content_and_drops_chrome():
+    html = (
+        "<html><head><title>T</title><style>x{}</style></head><body><nav>menu</nav><main>"
+        "<h2>Setup</h2><p>Run <code>docker login</code> with <strong>key</strong>.</p>"
+        "<ul><li>one</li><li>two</li></ul><ol><li>first</li></ol>"
+        "<pre>curl -X POST \\\n  https://x</pre>"
+        "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2|3</td></tr></table>"
+        '<a href="/docs/svc/ug/b.html">B page</a>'
+        "</main><footer>foot</footer></body></html>"
+    )
+    title, md, links = html_to_markdown(html, f"{BASE}/a")
+    assert title == "T"
+    assert "## Setup" in md
+    assert "Run `docker login` with **key**." in md
+    assert "- one" in md and "- two" in md and "1. first" in md
+    assert "```\ncurl -X POST \\\n  https://x\n```" in md
+    assert "| A | B |" in md and "| 1 | 2\\|3 |" in md
+    assert "[B page](https://cloud.ru/docs/svc/ug/b)" in md
+    assert "menu" not in md and "foot" not in md and "x{}" not in md
+    assert "/docs/svc/ug/b.html" in links
+
+
+def test_crawl_follows_scope_dedupes_and_writes_manifest(tmp_path):
+    site = FakeSite(
+        {
+            f"{BASE}/index": page(
+                "Index", "hello", [f"{BASE}/a.html", "/ru/docs/svc/ug/a", "/docs/other/x"]
+            ),
+            f"{BASE}/a": page("A", "alpha", [f"{BASE}/index"]),
+        }
+    )
+    stats = make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+
+    assert stats.as_dict() == {
+        "created": 2,
+        "updated": 0,
+        "unchanged": 0,
+        "errors": 0,
+        "missing": 0,
+    }
+    assert site.requests == [f"{BASE}/index", f"{BASE}/a"]  # /docs/other and nav link out of scope
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    entry = next(p for p in manifest["pages"] if p["canonical_url"] == f"{BASE}/a")
+    assert entry["path"] == "svc/ug/a.md"
+    assert entry["status"] == "ok" and len(entry["sha256"]) == 64
+    content = (tmp_path / "svc/ug/a.md").read_text()
+    assert content.startswith(f"<!-- source: {BASE}/a -->")
+    assert "alpha" in content
+
+
+def test_incremental_refresh_detects_unchanged_changed_and_missing(tmp_path):
+    site = FakeSite(
+        {
+            f"{BASE}/index": page("Index", "hello", [f"{BASE}/a", f"{BASE}/b"]),
+            f"{BASE}/a": page("A", "alpha"),
+            f"{BASE}/b": page("B", "beta"),
+        }
+    )
+    make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+    first = json.loads((tmp_path / "manifest.json").read_text())
+    a_sha = next(p["sha256"] for p in first["pages"] if p["path"] == "svc/ug/a.md")
+    mtime = (tmp_path / "svc/ug/index.md").stat().st_mtime_ns
+
+    site.pages[f"{BASE}/a"] = page("A", "alpha v2")
+    del site.pages[f"{BASE}/b"]  # still linked, now 404
+    stats = make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+
+    assert stats.unchanged == 1 and stats.updated == 1 and stats.errors == 1
+    assert (tmp_path / "svc/ug/index.md").stat().st_mtime_ns == mtime
+    second = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert second["svc/ug/a.md"]["previous_sha256"] == a_sha
+    assert second["svc/ug/b.md"]["status"] == "missing"
+    assert (tmp_path / "svc/ug/b.md").exists()  # never deleted automatically
+
+
+def test_pages_no_longer_linked_are_marked_missing(tmp_path):
+    site = FakeSite(
+        {
+            f"{BASE}/index": page("Index", "hello", [f"{BASE}/b"]),
+            f"{BASE}/b": page("B", "beta"),
+        }
+    )
+    make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+    site.pages[f"{BASE}/index"] = page("Index", "hello")
+    stats = make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+
+    assert stats.missing == 1
+    manifest = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert manifest["svc/ug/b.md"]["status"] == "missing"
+
+
+def test_failed_fetch_is_recorded_and_crawl_continues(tmp_path):
+    def fetcher(url):
+        if url.endswith("/a"):
+            raise ConnectionError("down")
+        return FetchResult(status=200, text=page("Index", "hi", [f"{BASE}/a", f"{BASE}/c"]))
+
+    stats = make_mirror(tmp_path, fetcher).crawl([f"{BASE}/index"])
+    manifest = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert stats.errors == 1
+    assert manifest["svc/ug/a.md"]["status"] == "error"
+    assert manifest["svc/ug/a.md"]["error"] == "ConnectionError"
+    assert manifest["svc/ug/c.md"]["status"] == "ok"
+
+
+def test_crawler_path_has_no_llm_dependency():
+    tree = ast.parse(Path(crawler.__file__).read_text())
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported |= {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    forbidden = {
+        "anthropic",
+        "openai",
+        "yandex_client",
+        "agent_gateway",
+        "cloudru_api_key_provider",
+    }
+    assert not imported & forbidden

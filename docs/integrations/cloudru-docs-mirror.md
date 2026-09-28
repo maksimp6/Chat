@@ -1,6 +1,6 @@
 # Markdown-зеркало документации Cloud.ru
 
-Статус: planned  
+Статус: crawler implemented, first crawl pending  
 Issue: #428  
 Назначение: хранить максимально близкую к официальному источнику Markdown-копию документации Cloud.ru для Alice Pro и подключаемых AI-агентов.
 
@@ -250,7 +250,6 @@ LLM подключается только там, где нужна семант
 - репозиторий Alice Pro для контролируемого snapshot;
 - Google Drive для внешней копии.
 
-
 ## Наблюдаемость
 
 Сохранять минимум:
@@ -296,6 +295,27 @@ LLM подключается только там, где нужна семант
 - [ ] Alice/AI-агенты сначала читают notes, затем выборочные mirror-файлы;
 - [ ] есть тесты;
 - [ ] есть документация запуска и обновления.
+
+## Запуск и обновление
+
+Crawler: `docs_mirror/crawler.py`, CLI: `scripts/cloudru_docs_mirror.py`. LLM не вызывается.
+
+```bash
+python scripts/cloudru_docs_mirror.py                  # первая волна
+python scripts/cloudru_docs_mirror.py --wave all       # весь /docs
+python scripts/cloudru_docs_mirror.py --service pipeline --service s3e
+```
+
+- Сиды: `/docs/<slug>/ug/doc-contents` и `/docs/<slug>/ug/index`; обход только внутри `/docs/<slug>/`.
+- Путь файла повторяет URL без `/docs/`: `container-apps-evolution/ug/topics/api-ref.md`.
+  Используются официальные slug сервисов (`pipeline` = Workflow Studio, `s3e` = Object Storage).
+- В начале файла комментарий `<!-- source: URL -->`; время fetch хранится только в manifest,
+  поэтому неизменённая страница даёт тот же SHA-256 и файл не перезаписывается.
+- Страница, которая стала 404 или перестала находиться обходом, помечается `missing`; файл не удаляется.
+- Workflow `.github/workflows/cloudru-docs-mirror.yml` запускается вручную и раз в неделю,
+  публикует зеркало в ветку `mirror/cloudru-docs` и как artifact.
+
+Синхронизация в Google Drive пока не реализована.
 
 ## Связанные материалы
 

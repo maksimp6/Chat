@@ -1,0 +1,76 @@
+name: Cloud.ru docs mirror
+
+on:
+  workflow_dispatch:
+    inputs:
+      wave:
+        description: first = priority services, all = every page under /docs
+        required: true
+        default: first
+        type: choice
+        options:
+          - first
+          - all
+  schedule:
+    - cron: "17 3 * * 1"
+
+concurrency:
+  group: cloudru-docs-mirror
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  MIRROR_BRANCH: mirror/cloudru-docs
+
+jobs:
+  mirror:
+    name: Refresh Cloud.ru mirror
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Check out master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 1
+      - name: Restore previous mirror
+        run: |
+          # Start from the last published mirror so unchanged pages are detected.
+          if git fetch --depth 1 origin "$MIRROR_BRANCH"; then
+            git checkout FETCH_HEAD -- docs/mirrors/cloudru || true
+          fi
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version-file: .python-version
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Crawl
+        run: |
+          python scripts/cloudru_docs_mirror.py --wave "${{ inputs.wave || 'first' }}" | tee mirror-summary.json
+          {
+            echo '### Cloud.ru mirror'
+            echo '```json'
+            head -c 60000 mirror-summary.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish to mirror branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$MIRROR_BRANCH"
+          git add docs/mirrors/cloudru
+          if git diff --cached --quiet; then
+            echo "Mirror unchanged."
+            exit 0
+          fi
+          git commit -q -m "docs(mirror): refresh Cloud.ru documentation mirror"
+          git push --force origin "$MIRROR_BRANCH"
+      - name: Upload mirror artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cloudru-docs-mirror
+          path: docs/mirrors/cloudru
+          retention-days: 90
