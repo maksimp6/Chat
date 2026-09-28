@@ -188,6 +188,17 @@ jobs:
           pip install pytest
       - name: Run PostgreSQL integration tests
         run: pytest -q tests/test_postgres_integration.py
+      - name: Verify backup and restore of the application schema
+        # Client tools come from the server image so their version matches PostgreSQL 17.
+        env:
+          PG_DUMP: docker run --rm --network host -v /tmp/alice-backup:/tmp/alice-backup postgres:17-alpine pg_dump
+          PG_RESTORE: docker run --rm --network host -v /tmp/alice-backup:/tmp/alice-backup postgres:17-alpine pg_restore
+          PSQL: docker run --rm -i --network host postgres:17-alpine psql
+        run: |
+          mkdir -p /tmp/alice-backup
+          chmod 777 /tmp/alice-backup
+          scripts/pg_backup.sh backup /tmp/alice-backup/alice.dump
+          scripts/pg_backup.sh verify /tmp/alice-backup/alice.dump
 
   android:
     name: Android debug APK

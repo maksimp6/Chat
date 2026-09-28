@@ -113,6 +113,57 @@ Run the production workflow again with the previous known-good Git ref after res
 
 For an immediate service stop, remove the `alice-production` container on the VPS. Preview containers and the shared Traefik entry point remain separate resources.
 
+## Backups and restore
+
+Production data lives in Cloud.ru Managed PostgreSQL once `ALICE_DATABASE_URL` points at it. Two layers protect it:
+
+1. **Managed backups.** In the Cloud.ru console, enable scheduled automatic backups for the cluster and keep point-in-time recovery on. This is the first choice for disaster recovery: restore the cluster (or a new cluster) to a moment before the incident, then point `ALICE_DATABASE_URL` at it.
+2. **Logical dumps.** `scripts/pg_backup.sh` makes a portable `pg_dump` archive that can be restored into any PostgreSQL, including a local one. Use it before risky migrations and for off-cluster copies.
+
+```bash
+export ALICE_DATABASE_URL=postgresql://...        # never paste the value into issues or logs
+scripts/pg_backup.sh backup alice-$(date +%F).dump
+scripts/pg_backup.sh verify alice-$(date +%F).dump
+```
+
+`verify` restores the dump into a scratch database, compares exact row counts of every user table with the source, and drops the scratch database. Managed PostgreSQL users often cannot `CREATE DATABASE`; in that case create an empty database in the console and pass it as `ALICE_RESTORE_CHECK_URL`. Client tools must be at least the server's major version; set `PG_DUMP`, `PG_RESTORE` and `PSQL` to a matching client (the CI job uses the `postgres:17-alpine` image).
+
+CI runs `backup` and `verify` against the full application schema on every pull request (job **PostgreSQL integration**), so a schema change that breaks restore fails before merge.
+
+### Restore runbook
+
+1. Stop writes: scale the Container App to zero instances or stop the production container.
+2. Pick the source: a managed backup / point-in-time moment (preferred), or a dump file.
+3. Managed backup: restore into a **new** cluster from the console, run `scripts/pg_backup.sh verify` against a fresh dump of it if time allows, then switch `ALICE_DATABASE_URL` to the new cluster.
+4. Dump file: create an empty database, then run `ALICE_RESTORE_TARGET_URL=postgresql://... scripts/pg_backup.sh restore <dump>`. `restore` only writes to `ALICE_RESTORE_TARGET_URL` and never defaults to production.
+5. Start the app and check `/healthz`, sign-in, and the latest conversations.
+6. Keep the old cluster until the restored one has run for a day.
+
+Changing production data or `ALICE_DATABASE_URL` needs the owner's approval (see `AGENTS.md`).
+
+## Cloud budget limits
+
+Alice reads real spend from the Cloud.ru billing API (`organization.api.cloud.ru`, method `consumption`) and compares it with a monthly limit.
+
+| Variable | Meaning |
+| --- | --- |
+| `CLOUDRU_BILLING_ENDPOINT` | `https://organization.api.cloud.ru` |
+| `CLOUDRU_BILLING_SUMMARY_PATH` | consumption method path, may include query parameters such as `customer_id` or dates |
+| `CLOUDRU_MONTHLY_BUDGET` | monthly limit; unset disables the guard |
+| `CLOUDRU_BUDGET_WARN_RATIO` | warning threshold as a share of the limit, default `0.80` |
+| `CLOUDRU_BILLING_CURRENCY` | limit currency, default `RUB` |
+
+The service account needs the `platform.customer.expense-admin` role (or organization admin) to read consumption.
+
+Behaviour:
+
+- `cloud.budget.status` shows spend, limit, remaining amount and a status: `ok`, `warn`, `block`, `unconfigured` or `unknown`.
+- At `block`, cost-creating operations (`cloud.compute.start`) are refused with `budget_exceeded`. Stopping resources and backups are never blocked.
+- If billing is unreachable or returns a different currency, the status is `unknown` and nothing is blocked; the event is recorded in the trace.
+- Billing is read at most once every 5 minutes per process.
+
+For a hard stop that does not depend on Alice, also set a budget alert in the Cloud.ru console.
+
 ## Troubleshooting
 
 If certificate issuance fails, verify that both DNS names resolve to the VM, TCP ports 80/443 are reachable, and `/opt/alice-preview/keys/letsencrypt/acme.json` exists with mode `600`. The Traefik container logs contain the ACME validation error without requiring the account key to be copied elsewhere.

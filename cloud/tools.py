@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
 from runtime_tools import ssh_runtime_exec
@@ -41,6 +42,19 @@ def _result(fn):
     return wrapper
 
 
+# Spend-creating compute operations checked against the monthly cloud budget.
+BUDGET_GUARDED_COMPUTE_OPERATIONS = {"start"}
+_BUDGET_GUARDS: dict[str, CloudBudgetGuard] = {}
+
+
+def _budget_guard(provider) -> CloudBudgetGuard:
+    guard = _BUDGET_GUARDS.get(provider.name)
+    if guard is None or guard._provider is not provider:  # noqa: SLF001
+        guard = CloudBudgetGuard(provider)
+        _BUDGET_GUARDS[provider.name] = guard
+    return guard
+
+
 @_result
 def cloud_capabilities(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
@@ -72,6 +86,16 @@ def cloud_resources_get(args: dict[str, Any], cfg: dict | None = None) -> dict[s
 @_result
 def cloud_compute(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
     provider = _provider(args)
+    operation = str(args.get("operation") or "").strip().lower()
+    if operation in BUDGET_GUARDED_COMPUTE_OPERATIONS:
+        try:
+            _budget_guard(provider).enforce(f"cloud.compute.{operation}")
+        except BudgetLimitExceeded as exc:
+            return {
+                "success": False,
+                "error": str(exc),
+                "metadata": {"phase": "policy", "provider_code": "budget_exceeded"},
+            }
     return provider.compute(
         operation=str(args.get("operation") or ""),
         instance_id=(str(args.get("instance_id")) if args.get("instance_id") is not None else None),
@@ -117,6 +141,12 @@ def cloud_costs_summary(args: dict[str, Any], cfg: dict | None = None) -> dict[s
         period=(str(args.get("period")) if isinstance(args.get("period"), str) else None),
         group_by=(str(args.get("group_by")) if isinstance(args.get("group_by"), str) else None),
     )
+
+
+@_result
+def cloud_budget_status(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
+    provider = _provider(args)
+    return _budget_guard(provider).status(refresh=bool(args.get("refresh")))
 
 
 def cloud_ssh_exec(args: dict[str, Any], cfg: dict | None = None) -> dict[str, Any]:
@@ -346,6 +376,23 @@ CLOUD_TOOLS = {
         ),
         title="Cloud Costs Summary",
         description="Get provider cost/usage summary data.",
+    ),
+    "cloud.budget.status": _tool(
+        cloud_budget_status,
+        read_only=True,
+        requires_approval=False,
+        schema=_schema(
+            {
+                **_PROVIDER,
+                "refresh": {"anyOf": [{"type": "boolean"}, {"type": "null"}]},
+            },
+            [],
+        ),
+        title="Cloud Budget Status",
+        description=(
+            "Compare this month's cloud spend from provider billing with the "
+            "configured monthly limit (ok, warn, block)."
+        ),
     ),
     "cloud.ssh.exec": _tool(
         cloud_ssh_exec,
