@@ -40,11 +40,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           # Start from the last published mirror so unchanged pages are detected.
           # Only a branch that does not exist yet is skipped; any other failure stops the run
           # so a partial crawl never replaces the published mirror.
-          if [ -z "$(git -c http.https://github.com/.extraheader="$auth" ls-remote --heads origin "$MIRROR_BRANCH")" ]; then
+          # A plain assignment, so a failed ls-remote stops the step under set -e.
+          heads="$(git -c http.https://github.com/.extraheader="$auth" ls-remote --heads origin "$MIRROR_BRANCH")"
+          if [ -z "$heads" ]; then
             echo "No published mirror yet; starting fresh."
             exit 0
           fi

@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 import re
 import time
 from typing import Callable, Iterable
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 
 MANIFEST_NAME = "manifest.json"
 USER_AGENT = "AliceProDocsMirror/1.0 (+https://github.com/maksimp6/Chat)"
@@ -55,6 +55,9 @@ def normalize_url(url: str, *, base: str | None = None) -> str | None:
         return None
     host = parts.netloc.lower().removeprefix("www.")
     path = re.sub(r"/{2,}", "/", parts.path or "/")
+    # Dot segments (also percent-encoded) could resolve outside the allowed scope.
+    if any(unquote(segment) in {".", ".."} for segment in path.split("/")):
+        return None
     if path.startswith("/ru/docs/") or path == "/ru/docs":
         path = path[3:]
     path = path.removesuffix(".html")
@@ -252,7 +255,9 @@ class _MarkdownParser(HTMLParser):
 
     def handle_data(self, data):
         if self._in_title:
+            # The title is rendered as the page heading, never repeated in the body.
             self.title += data
+            return
         if self._skip:
             return
         if self._pre:
@@ -410,8 +415,9 @@ class Mirror:
             if queue and self.delay_s:
                 self._sleep(self.delay_s)
         # Pages in scope that we knew about but no longer reach are marked, never deleted.
-        # Only after a complete, error-free traversal: a failed page hides its children.
-        if not queue and not stats.errors:
+        # Only after a complete, error-free traversal from at least one accepted seed:
+        # a failed page hides its children, and no seed proves nothing.
+        if seen and not queue and not stats.errors:
             for url, entry in self.entries.items():
                 if (
                     url not in visited
@@ -442,10 +448,7 @@ class Mirror:
         entry["http_status"] = result.status
         if error or "html" not in (result.content_type or "html"):
             entry["error"] = error or f"unsupported content type {result.content_type}"
-            if result.status in {404, 410}:
-                entry["status"] = "missing" if entry.get("sha256") else "error"
-            else:
-                entry["status"] = "error"
+            entry["status"] = "missing" if result.status in {404, 410} else "error"
             self.entries[url] = entry
             stats.errors += 1
             stats.events.append({"url": url, "result": "error", "error": entry["error"]})

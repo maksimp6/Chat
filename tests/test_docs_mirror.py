@@ -331,3 +331,41 @@ def test_unsafe_image_schemes_are_dropped():
     assert "javascript:" not in md
     assert "data:" not in md
     assert "![ok](https://cloud.ru/ok.png)" in md
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "https://cloud.ru/docs/svc/../private",
+        "https://cloud.ru/docs/svc/%2e%2e/private",
+        "https://cloud.ru/docs/svc/%2E/x",
+    ],
+)
+def test_dot_segments_are_rejected(raw):
+    assert normalize_url(raw) is None
+
+
+def test_no_accepted_seed_does_not_sweep(tmp_path):
+    site = FakeSite({f"{BASE}/index": page("Index", "hello")})
+    make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+    stats = make_mirror(tmp_path, site).crawl(["https://evil.test/docs/svc"])
+    manifest = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert stats.missing == 0
+    assert manifest["svc/ug/index.md"]["status"] == "ok"
+
+
+def test_first_seen_404_is_missing(tmp_path):
+    site = FakeSite({f"{BASE}/index": page("Index", "hello", [f"{BASE}/gone"])})
+    stats = make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+    manifest = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert manifest["svc/ug/gone.md"]["status"] == "missing"
+    assert stats.errors == 1
+
+
+def test_title_is_not_repeated_in_body_without_main():
+    title, md, _ = html_to_markdown(
+        "<html><head><title>Only once</title></head><body><p>text</p></body></html>",
+        f"{BASE}/a",
+    )
+    assert title == "Only once"
+    assert "Only once" not in md
