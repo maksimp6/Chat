@@ -12,7 +12,9 @@
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
 - [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Alice Pro к ChatGPT через MCP
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
-- [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — локальная машиночитаемая копия официальной документации для Alice и AI-агентов
+- [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
+- [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
+- [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
 - [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
