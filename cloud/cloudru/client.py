@@ -9,7 +9,7 @@ from typing import Any
 import requests
 
 from cloud.base import CloudProviderError
-from cloudru_iam import CloudRuIamClient
+from cloudru_iam import CloudRuIamClient, CloudRuIamError
 from trace_manager import get_current_trace
 from trace_security import sanitize_trace_value
 
@@ -56,11 +56,18 @@ class CloudRuClient:
     def _auth_header(self) -> tuple[str, str]:
         if self.api_key:
             return "Api-Key", self.api_key
-        if self.iam_client is not None:
-            return "Bearer", self.iam_client._token()  # noqa: SLF001 - client owns token exchange
-        iam = CloudRuIamClient()
-        if iam.key_id and iam.key_secret:
-            return "Bearer", iam._token()  # noqa: SLF001
+        iam = self.iam_client
+        if iam is None:
+            iam = CloudRuIamClient()
+            if not (iam.key_id and iam.key_secret):
+                iam = None
+        if iam is not None:
+            try:
+                return "Bearer", iam._token()  # noqa: SLF001 - client owns token exchange
+            except CloudRuIamError as exc:
+                raise CloudProviderError(
+                    f"Cloud.ru IAM token request failed: {exc}", code="auth_failed"
+                ) from exc
         raise CloudProviderError(
             "Cloud.ru authentication is not configured",
             code="auth_not_configured",

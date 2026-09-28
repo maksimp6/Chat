@@ -32,18 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
-      CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
       CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
       CLOUDRU_REGISTRY_NAME: ${{ vars.CLOUDRU_REGISTRY_NAME || 'alice-pro' }}
+      CLOUDRU_REPOSITORY_NAME: ${{ vars.CLOUDRU_REPOSITORY_NAME || 'alice-pro' }}
       CLOUDRU_CONTAINER_NAME: ${{ vars.CLOUDRU_CONTAINER_NAME || 'alice-pro' }}
       CLOUDRU_CONTAINER_CPU: ${{ vars.CLOUDRU_CONTAINER_CPU || '0.5' }}
       CLOUDRU_MIN_INSTANCES: ${{ vars.CLOUDRU_MIN_INSTANCES || '0' }}
       CLOUDRU_MAX_INSTANCES: ${{ vars.CLOUDRU_MAX_INSTANCES || '1' }}
-      ALICE_REQUIRE_SHORT_TOKEN: "1"
-      ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
-      ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
-      ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
     steps:
       - name: Check out ref
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,27 +46,39 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
           fetch-depth: 0
+      - name: Require a commit on master
+        run: |
+          # Only reviewed code that has landed on master may run, before anything is
+          # installed or any secret is in scope.
+          git fetch --no-tags origin master
+          git merge-base --is-ancestor HEAD FETCH_HEAD
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version-file: .python-version
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Require a commit on master
-        if: inputs.action == 'deploy'
-        run: |
-          # Only reviewed code that has landed on master may be deployed.
-          git fetch --no-tags origin master
-          git merge-base --is-ancestor HEAD FETCH_HEAD
       - name: Validate configuration
         if: inputs.action != 'estimate'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          ACTION: ${{ inputs.action }}
         run: |
           test -n "$CLOUDRU_IAM_KEY_ID"
           test -n "$CLOUDRU_IAM_KEY_SECRET"
           test -n "$CLOUDRU_PROJECT_ID"
-          if [ "${{ inputs.action }}" = deploy ]; then test -n "$ALICE_SHORT_TOKEN"; fi
+          if [ "$ACTION" = deploy ]; then test -n "$ALICE_SHORT_TOKEN"; fi
       - name: Deploy
         if: inputs.action == 'deploy'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_REQUIRE_SHORT_TOKEN: "1"
+          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
+          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
         run: |
           # Pass only the app variables that are configured, by name; values never hit the log.
           env_args=(--env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN)
@@ -88,6 +95,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Status
         if: inputs.action == 'status'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: python scripts/cloudru_deploy.py status
       - name: Estimate
         if: inputs.action == 'estimate'

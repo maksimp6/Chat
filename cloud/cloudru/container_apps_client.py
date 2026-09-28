@@ -12,7 +12,6 @@ working community client; confirm them on the first real deploy.
 from __future__ import annotations
 
 import copy
-import dataclasses
 from dataclasses import dataclass, field
 import os
 import re
@@ -104,6 +103,21 @@ def estimate_monthly_cost(
         "gb_hours": round(gb_hours, 1),
         "rub_per_month": round(vcpu_cost + ram_cost, 2),
     }
+
+
+_READONLY_FIELDS = ("status", "id", "createdAt", "updatedAt")
+
+
+def _writable(app: dict[str, Any]) -> dict[str, Any]:
+    body = copy.deepcopy(app)
+    for readonly in _READONLY_FIELDS:
+        body.pop(readonly, None)
+    return body
+
+
+def _image_of(app: dict[str, Any]) -> str | None:
+    containers = (app.get("template") or {}).get("containers") or [{}]
+    return containers[0].get("image")
 
 
 class CloudRuContainerAppsClient:
@@ -200,9 +214,7 @@ class CloudRuContainerAppsClient:
         current = self.get(spec.name)
         if current is None:
             raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
-        body = copy.deepcopy(current)
-        for readonly in ("status", "id", "createdAt", "updatedAt"):
-            body.pop(readonly, None)
+        body = _writable(current)
         body.setdefault("configuration", {}).setdefault("ingress", {})["publiclyAccessible"] = (
             spec.public
         )
@@ -223,6 +235,16 @@ class CloudRuContainerAppsClient:
             json_body=body,
         )
 
+    def restore(self, name: str, previous: dict[str, Any]) -> dict[str, Any]:
+        """Roll out a revision with exactly the configuration captured in ``previous``."""
+        return self.client.request(
+            SERVICE,
+            "PATCH",
+            f"/v2/containers/{self._name(name)}",
+            params={"projectId": self._project()},
+            json_body=_writable(previous),
+        )
+
     def deploy(self, spec: ContainerSpec) -> dict[str, Any]:
         """Create the container service, or roll out a new revision if it exists."""
         if self.get(spec.name) is None:
@@ -230,10 +252,14 @@ class CloudRuContainerAppsClient:
         return {"action": "update", "operation": self.update(spec)}
 
     def deploy_verified(self, spec: ContainerSpec, *, timeout_s: float = 600) -> dict[str, Any]:
-        """Deploy, wait for the new image, health-check, and roll back to the previous image on failure."""
+        """Deploy, wait for the new image, health-check, and restore the previous revision on failure.
+
+        The rollback restores the whole previous configuration (image, env, scaling,
+        resources, ingress), not just the image.
+        """
         spec.validate()
-        previous = self.status(spec.name)
-        previous_image = previous.get("image") if previous["exists"] else None
+        previous = self.get(spec.name)
+        previous_image = _image_of(previous) if previous else None
         result = self.deploy(spec)
         try:
             ready = self.wait_until_ready(spec.name, image=spec.image, timeout_s=timeout_s)
@@ -241,7 +267,7 @@ class CloudRuContainerAppsClient:
         except CloudProviderError as exc:
             if not previous_image or previous_image == spec.image:
                 raise
-            self.update(dataclasses.replace(spec, image=previous_image))
+            self.restore(spec.name, previous)
             self.wait_until_ready(spec.name, image=previous_image, timeout_s=timeout_s)
             raise CloudProviderError(
                 f"{exc.message}; rolled back to {previous_image}",

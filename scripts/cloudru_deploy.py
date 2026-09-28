@@ -19,6 +19,8 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -60,6 +62,33 @@ def _settings() -> dict:
     return cfg
 
 
+def _verify_commit(tag: str, context: str, runner=subprocess.run) -> None:
+    """The image tag must be the full commit SHA checked out, unmodified, in the build context."""
+    if not re.fullmatch(r"[0-9a-f]{40}", tag):
+        raise CloudProviderError(
+            "--tag must be a full 40-character commit SHA", code="validation_error"
+        )
+
+    def git(*args: str) -> str:
+        done = runner(["git", "-C", context, *args], capture_output=True, text=True, check=False)
+        if done.returncode != 0:
+            raise CloudProviderError(
+                f"build context is not a git checkout: {done.stderr.strip()}",
+                code="validation_error",
+            )
+        return done.stdout.strip()
+
+    head = git("rev-parse", "HEAD")
+    if head != tag:
+        raise CloudProviderError(
+            f"--tag {tag} does not match the build context HEAD {head}", code="validation_error"
+        )
+    if git("status", "--porcelain", "--untracked-files=no"):
+        raise CloudProviderError(
+            "build context has uncommitted changes to tracked files", code="validation_error"
+        )
+
+
 def _emit(payload: dict) -> None:
     print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
 
@@ -71,6 +100,7 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
         raise CloudProviderError(
             f"environment variables not set: {', '.join(missing)}", code="validation_error"
         )
+    _verify_commit(args.tag, args.context)
     registry = CloudRuRegistryClient()
     apps = CloudRuContainerAppsClient()
 
@@ -126,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     deploy = sub.add_parser("deploy", help="build, push, deploy and health-check")
-    deploy.add_argument("--tag", required=True, help="image tag, normally the git commit SHA")
+    deploy.add_argument("--tag", required=True, help="full commit SHA checked out in --context")
     deploy.add_argument("--context", default=".", help="docker build context")
     deploy.add_argument(
         "--env",

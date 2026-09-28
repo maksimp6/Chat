@@ -29,7 +29,7 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
    - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `ALICE_SHORT_TOKEN`,
      and optionally `ALICE_PROVIDER_CREDENTIAL_KEY` and `ALICE_DATABASE_URL`;
    - variable `CLOUDRU_PROJECT_ID`, and optionally `CLOUDRU_REGISTRY_NAME`,
-     `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,
+     `CLOUDRU_REPOSITORY_NAME`, `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,
      `CLOUDRU_MIN_INSTANCES`, `CLOUDRU_MAX_INSTANCES`.
 3. Run **Cloud.ru Container Apps deployment** with `action: estimate`, then
    `action: deploy`.
@@ -37,10 +37,13 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
 `deploy` creates the registry if missing, pushes `<registry>.cr.cloud.ru/alice-pro:<sha>`,
 creates the service (or rolls out a new revision), waits until it runs the new
 digest with a public URL, and requires `GET /healthz` to return 200.
-If the new revision fails readiness or the health check, it redeploys the
-previous image and fails the run. The workflow only deploys commits that are
-already on `master`, and it fails closed if the registry reports no image
-digest.
+If the new revision fails readiness or the health check, it restores the
+previous revision's full configuration (image, env, scaling, resources) and
+fails the run. Every action runs only on commits that are already on `master`,
+checked before dependencies are installed, and secrets are scoped to the steps
+that call Cloud.ru (`estimate` gets none). The deploy script refuses a `--tag`
+that is not the full, clean `HEAD` commit of the build context, and it fails
+closed if the registry reports no image digest.
 
 ## Cost
 

@@ -357,24 +357,86 @@ def test_deploy_verified_success_reports_previous_image():
     assert result["health"]["http_status"] == 200
 
 
-def test_deploy_verified_rolls_back_on_failed_health_check():
+def test_deploy_verified_restores_whole_previous_configuration():
+    previous = _app(image="old")
+    previous["template"]["containers"][0]["env"] = [{"name": "ALICE_DATABASE_URL", "value": "a"}]
+    previous["template"]["scaling"] = {"minInstanceCount": 1, "maxInstanceCount": 1}
     apps = _verified_client(
         [
-            _app(image="old"),  # status before deploy
-            _app(image="old"),  # deploy -> get
-            _app(image="old"),  # update -> get
+            previous,  # captured before deploy
+            previous,  # deploy -> get
+            previous,  # update -> get
             {},  # patch
             _app(image="new"),  # ready on new image
-            _app(image="new"),  # rollback update -> get
-            {},  # rollback patch
+            {},  # restore patch
             _app(image="old"),  # ready on old image
         ],
         http_status=503,
     )
+    spec = ContainerSpec(name="alice-pro", image="new", env={"ALICE_DATABASE_URL": "b"})
     with pytest.raises(CloudProviderError, match="rolled back to old"):
-        apps.deploy_verified(ContainerSpec(name="alice-pro", image="new"))
+        apps.deploy_verified(spec)
     patches = [c for c in apps.client.calls if c[1] == "PATCH"]
-    assert [p[4]["template"]["containers"][0]["image"] for p in patches] == ["new", "old"]
+    assert len(patches) == 2
+    restored = patches[1][4]
+    assert restored["template"]["containers"][0]["env"] == [
+        {"name": "ALICE_DATABASE_URL", "value": "a"}
+    ]
+    assert restored["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
+    assert "status" not in restored and "id" not in restored
+
+
+def test_iam_failure_becomes_provider_error():
+    from cloudru_iam import CloudRuIamError
+
+    iam = Mock()
+    iam._token.side_effect = CloudRuIamError("invalid key")
+    client = CloudRuClient(iam_client=iam, api_key_auth=False)
+    with pytest.raises(CloudProviderError) as info:
+        client._auth_header()
+    assert info.value.code == "auth_failed"
+
+
+def _deploy_script():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "cloudru_deploy.py"
+    spec = importlib.util.spec_from_file_location("cloudru_deploy_script", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+SHA = "a" * 40
+
+
+def _git_runner(head=SHA, dirty="", fail=False):
+    def run(cmd, **_):
+        if fail:
+            return Mock(returncode=128, stdout="", stderr="not a git repository")
+        return Mock(returncode=0, stdout=head if "rev-parse" in cmd else dirty, stderr="")
+
+    return run
+
+
+@pytest.mark.parametrize(
+    ("tag", "runner", "message"),
+    [
+        ("latest", _git_runner(), "full 40-character"),
+        (SHA, _git_runner(fail=True), "not a git checkout"),
+        (SHA, _git_runner(head="b" * 40), "does not match"),
+        (SHA, _git_runner(dirty=" M app.py"), "uncommitted changes"),
+    ],
+)
+def test_deploy_requires_clean_checkout_of_tag(tag, runner, message):
+    script = _deploy_script()
+    with pytest.raises(CloudProviderError, match=message):
+        script._verify_commit(tag, ".", runner=runner)
+
+
+def test_deploy_accepts_matching_clean_checkout():
+    _deploy_script()._verify_commit(SHA, ".", runner=_git_runner())
 
 
 def test_deploy_verified_without_previous_image_just_raises():
