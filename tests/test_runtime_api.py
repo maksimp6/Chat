@@ -10,7 +10,7 @@ def client(tmp_path, monkeypatch):
     import db
     import runtime_migrations
     import session_manager
-    import invocation_manager
+    import invocation.manager as invocation_manager
     import app as app_module
 
     path = tmp_path / "api.db"
@@ -88,8 +88,8 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
     ).get_json()
 
     import db
-    from invocation_context import InvocationContext
-    from invocation_trace import create_invocation_trace
+    from invocation.context import InvocationContext
+    from invocation.trace import create_invocation_trace
 
     context = InvocationContext(
         session_id=invocation["session_id"],
