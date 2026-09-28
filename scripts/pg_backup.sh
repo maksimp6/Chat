@@ -34,6 +34,17 @@ with_database() {
   printf '%s/%s%s' "${base%/*}" "$db" "$query"
 }
 
+# host:port/database of a postgresql:// URL, used to refuse restoring over the source.
+same_database_key() {
+  local url=${1%%\?*}
+  url=${url#*://}
+  url=${url##*@}
+  url=${url%/}
+  local hostport=${url%%/*} db=${url#*/}
+  [[ "$hostport" == *:* ]] || hostport="$hostport:5432"
+  printf '%s/%s' "${hostport,,}" "$db"
+}
+
 row_counts() {
   # Exact per-table row counts, sorted, for every user table.
   $PSQL "$1" -v ON_ERROR_STOP=1 -X -q -A -t <<'SQL'
@@ -81,6 +92,8 @@ cmd_verify() {
   [[ -s "$dump" ]] || die "dump file $dump is missing or empty"
   if [[ -n "${ALICE_RESTORE_CHECK_URL:-}" ]]; then
     target=$ALICE_RESTORE_CHECK_URL
+    [[ "$(same_database_key "$target")" != "$(same_database_key "$ALICE_DATABASE_URL")" ]] ||
+      die "ALICE_RESTORE_CHECK_URL points at the source database; verify would overwrite it"
   else
     scratch="alice_restore_check_$(date +%s)_$$"
     $PSQL "$ALICE_DATABASE_URL" -v ON_ERROR_STOP=1 -X -q -c "CREATE DATABASE \"$scratch\""

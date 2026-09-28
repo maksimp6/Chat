@@ -16,6 +16,8 @@ import threading
 import uuid
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
+from cloud.base import CloudProviderError
+
 if TYPE_CHECKING:
     from budget_repository import BudgetRepository
 
@@ -529,6 +531,10 @@ class BudgetController:
             self._trace_sink(event)
 
 
+# Provider and transport failures that mean "billing unavailable", not a bug.
+_BILLING_OUTAGE_ERRORS: tuple[type[BaseException], ...] = (CloudProviderError, OSError)
+
+
 class CloudSpendStatus(str, Enum):
     OK = "ok"
     WARN = "warn"
@@ -623,28 +629,33 @@ class CloudBudgetGuard:
     def status(self, *, refresh: bool = False) -> Dict[str, Any]:
         with self._lock:
             now = self._clock()
+            period = self._period or now.strftime("%Y-%m")
             if (
                 not refresh
                 and self._cached is not None
                 and self._cached_at is not None
+                and self._cached.get("period") == period
                 and now - self._cached_at < timedelta(seconds=self._cache_seconds)
             ):
-                return dict(self._cached)
-            result = self._fetch()
+                result = dict(self._cached)
+                self._emit_if_not_ok(result)
+                return result
+            result = self._fetch(period)
+            result["period"] = period
             result["checked_at"] = now.isoformat()
             self._cached, self._cached_at = result, now
+            self._emit_if_not_ok(result)
             return dict(result)
 
-    def _fetch(self) -> Dict[str, Any]:
+    def _fetch(self, period: str) -> Dict[str, Any]:
         if self.limits.monthly_limit is None:
             return evaluate_cloud_spend(None, self.limits)
         try:
-            period = self._period or self._clock().strftime("%Y-%m")
             summary = self._provider.costs_summary(period=period, group_by=None)
-        except Exception as exc:  # billing outages must not break cloud operations
+        except _BILLING_OUTAGE_ERRORS as exc:
+            # Billing outages must not break cloud operations; anything else surfaces.
             result = evaluate_cloud_spend(None, self.limits)
             result["error"] = type(exc).__name__
-            self._emit("cloud_budget_unknown", result)
             return result
         try:
             result = evaluate_cloud_spend(summary.get("total_cost"), self.limits)
@@ -657,9 +668,11 @@ class CloudBudgetGuard:
             result["error"] = "currency_mismatch"
             result["billing_currency"] = currency
         result["provider"] = summary.get("provider")
-        if result["status"] != CloudSpendStatus.OK.value:
-            self._emit("cloud_budget_" + result["status"], result)
         return result
+
+    def _emit_if_not_ok(self, result: Dict[str, Any]) -> None:
+        if result["status"] not in {CloudSpendStatus.OK.value, CloudSpendStatus.UNCONFIGURED.value}:
+            self._emit("cloud_budget_" + result["status"], result)
 
     def enforce(self, operation: str) -> Dict[str, Any]:
         result = self.status()

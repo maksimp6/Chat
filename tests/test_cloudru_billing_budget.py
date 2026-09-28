@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -309,3 +309,43 @@ def test_tool_guard_without_trace_is_silent(fake_provider, monkeypatch):
     monkeypatch.setattr(cloud_tools, "get_current_trace", lambda: None)
     fake_provider.total = "1000"
     assert cloud_budget_status({})["status"] == "block"
+
+
+def test_guard_surfaces_unexpected_errors():
+    guard = CloudBudgetGuard(
+        FakeBillingProvider(error=AttributeError("bug")), CloudBudgetLimits(Decimal("10"))
+    )
+    with pytest.raises(AttributeError):
+        guard.enforce("op")
+
+
+def test_guard_treats_transport_errors_as_unknown():
+    guard = CloudBudgetGuard(
+        FakeBillingProvider(error=TimeoutError("slow")), CloudBudgetLimits(Decimal("10"))
+    )
+    assert guard.enforce("op")["error"] == "TimeoutError"
+
+
+def test_guard_cache_expires_when_month_changes():
+    now = [datetime(2026, 9, 30, 23, 59, tzinfo=UTC)]
+    provider = FakeBillingProvider(total="2000")
+    guard = CloudBudgetGuard(
+        provider, CloudBudgetLimits(Decimal("1000")), cache_seconds=300, clock=lambda: now[0]
+    )
+    assert guard.status()["status"] == "block"
+    now[0] += timedelta(minutes=2)
+    provider.total = "0"
+    result = guard.status()
+    assert result["status"] == "ok"
+    assert result["period"] == "2026-10"
+    assert provider.periods == ["2026-09", "2026-10"]
+
+
+def test_cached_non_ok_result_is_traced_again():
+    events = []
+    provider = FakeBillingProvider(total="2000")
+    guard = CloudBudgetGuard(provider, CloudBudgetLimits(Decimal("1000")), trace_sink=events.append)
+    guard.status()
+    guard.status()
+    assert provider.calls == 1
+    assert [event["event"] for event in events] == ["cloud_budget_block"] * 2
