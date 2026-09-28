@@ -58,6 +58,10 @@ verified the exact merged baseline `a0f1f5277f7d612fd3f44622b48342a21aadfb2d`:
   [official OpenAPI](https://cloud.ru/docs/api/specs/container-apps-evolution/ug/_specs/openapi.yaml)
   specifies `GET /v2/containers` for inventory; that request succeeds with HTTP
   200 and an empty `data` list. There are no Container Apps in the selected project.
+  [Follow-up diagnostics](https://github.com/maksimp6/Chat/issues/427#issuecomment-5879541960)
+  also observed HTTP 499 for the missing name on v2. A path change alone is not
+  enough: confirm absence through complete successful inventory, not a blanket
+  interpretation of 499 as "not found".
 - Managed PostgreSQL `GET /v1/clusters` succeeds with HTTP 200 and an empty
   `clusters` list. No existing cluster or authorized `ALICE_DATABASE_URL` source
   was found in the runner.
@@ -171,10 +175,11 @@ The first request after idle pays a cold start.
   work or Container Apps jobs.
 - **App secrets are plain container env vars**, visible to anyone with Container
   Apps read access in the project. Move them to a secret store as a follow-up.
-- **The baseline read path is obsolete.** The client still uses `/v1/containers`
-  and must be aligned with the current official OpenAPI linked above before
-  deployment. Live inventory has verified v2 listing; create/update bodies and
-  response/revision handling still need contract verification.
+- **The baseline API contract needs correction.** [PR #474](https://github.com/maksimp6/Chat/pull/474)
+  aligns reads with v2, confirms missing names through paginated inventory after
+  HTTP 499, and projects update/rollback bodies onto the official PATCH schema.
+  Merge and verify that correction before deployment. Live create/update and
+  revision behavior still need verification during the authorized first rollout.
 - **Readiness does not track revisions yet.** The deploy waits for the new image
   digest and a running status. A rollout that keeps the same digest (config
   only) can pass that check while the old revision still serves, so the health
