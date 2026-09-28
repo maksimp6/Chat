@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from invocation_context import InvocationContext
+from invocation.context import InvocationContext
 from plugin_manager import PluginError, PluginManager
 from runtime import RuntimeDispatcher
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
