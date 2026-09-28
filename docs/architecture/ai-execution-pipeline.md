@@ -65,10 +65,10 @@ tool protocols, поэтому обходили единые invocation, approva
 ## Уже переведено на canonical runtime
 
 - `cli_agent.py` — тонкий CLI/Termux-адаптер к `/api/conversations`, `/api/chat` и стандартному approval endpoint; прямых Yandex API calls и локального shell execution больше нет.
+- `alice_agent_runner.py` — GitHub issue adapter создаёт и запускает invocation, сохраняет финальный Execution Trace и завершает invocation как completed/failed.
 
 ## На апгрейд
 
-- `alice_agent_runner.py` — живой GitHub workflow adapter, должен использовать общий runtime;
 - `local_tool_agent.py` — живой Android/local transport adapter;
 - `agent_gateway.py` — provider-neutral/A2A routing;
 - `local_agent_gateway.py` — HTTP transport/runtime gateway, имя и границы нужно уточнить.
