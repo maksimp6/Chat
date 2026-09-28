@@ -32,6 +32,31 @@ def test_reachable_endpoint_is_ready(monkeypatch):
     assert checker.check_supabase_trace_mirror() == "ready"
 
 
+
+def test_secret_api_key_uses_apikey_without_bearer(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    captured = {}
+    monkeypatch.setattr(
+        checker,
+        "urlopen",
+        lambda request, timeout: captured.setdefault("request", request) and Response(),
+    )
+    assert checker.check_supabase_trace_mirror() == "ready"
+    request = captured["request"]
+    assert request.headers.get("Apikey") == "secret"
+    assert request.headers.get("Authorization") is None
+
 def test_missing_table_is_error(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret")
