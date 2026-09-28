@@ -152,3 +152,11 @@ def test_pruned_legacy_agent_modules_stay_deleted():
     }
     resurrected = sorted(name for name in pruned if (ROOT / name).exists())
     assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
+
+
+def test_claude_instructions_import_repository_rules():
+    claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "@AGENTS.md" in claude_md.splitlines()
+
+    codeowners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
+    assert any(line.split()[:1] == ["CLAUDE.md"] for line in codeowners.splitlines())
