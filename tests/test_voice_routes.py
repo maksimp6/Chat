@@ -258,6 +258,7 @@ def test_voice_closed_session_rejects_audio_and_second_close(client):
 def test_voice_unknown_session_is_not_found(client):
     assert client.post("/api/voice/close", json={}).status_code == 404
     assert client.get("/api/voice/events?session_id=missing").status_code == 404
+    assert client.post("/api/voice/audio?session_id=missing", data=b"x").status_code == 404
 
 
 def test_voice_non_voice_job_is_not_a_session(client):
@@ -306,7 +307,7 @@ def test_voice_close_keeps_audio_when_enqueue_fails(client, monkeypatch):
     monkeypatch.setattr(voice_routes, "enqueue", enqueue_down)
     failed = client.post("/api/voice/close", json={"session_id": session_id})
     assert failed.status_code == 503
-    assert "redis is down" in failed.get_json()["error"]
+    assert failed.get_json() == {"error": "voice queue is unavailable, retry close"}
 
     monkeypatch.setattr(voice_routes, "enqueue", real_enqueue)
     assert client.post("/api/voice/close", json={"session_id": session_id}).status_code == 200
@@ -339,4 +340,6 @@ def test_voice_closed_session_is_scoped_to_owner(client, monkeypatch):
     session_id = _closed_session(client)
     monkeypatch.setattr(voice_routes, "get_current_owner_id", lambda required=False: "mallory")
     assert client.get(f"/api/voice/output?session_id={session_id}").status_code == 403
+    assert client.get(f"/api/voice/events?session_id={session_id}").status_code == 403
+    assert client.post(f"/api/voice/audio?session_id={session_id}", data=b"x").status_code == 403
     assert client.post("/api/voice/close", json={"session_id": session_id}).status_code == 403

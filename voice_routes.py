@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import threading
 import time
@@ -23,6 +24,7 @@ from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 
 voice_bp = Blueprint("voice", __name__)
+logger = logging.getLogger(__name__)
 
 _MAX_AUDIO_BYTES = 1024 * 1024
 _SESSION_TTL_SECONDS = 10 * 60
@@ -379,9 +381,10 @@ def close_voice_session():
             },
             job_id=session.session_id,
         )
-    except Exception as exc:
+    except Exception:
         session.closed = False
-        return jsonify({"error": f"voice queue is unavailable: {str(exc)[:200]}"}), 503
+        logger.exception("Voice session %s could not be enqueued", session.session_id)
+        return jsonify({"error": "voice queue is unavailable, retry close"}), 503
     with _sessions_lock:
         _sessions.pop(session.session_id, None)
     return jsonify({"status": "processing"})
