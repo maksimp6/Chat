@@ -10,7 +10,7 @@ Keep PRs small enough to validate independently. Every behavior change should in
 
 Describe the user-visible behavior, technical change, risks, validation, and related issue. Do not paste credentials, provider keys, access tokens, or private URLs into GitHub.
 
-The `master` branch is the production branch for the current repository workflow. Database migrations are applied by the Supabase production workflow after changes reach `master`.
+The `master` branch is the production branch for the current repository workflow. Database schema changes are maintained in the repository's regular migration path and validated by CI before deployment.
 
 ## Local web assets
 

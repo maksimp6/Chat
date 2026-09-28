@@ -14,7 +14,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Alice GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Alice GitHub agent](docs/agents/alice-github-agent.md).
 - **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
 - **Treasury and billing controls**, internal usage accounting and demo balances.
-- **Files, knowledge and Departments** integrations, with optional Supabase trace mirroring.
+- **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
 - **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
 
@@ -29,7 +29,7 @@ flowchart TD
     T --> M[MCP / Local Tools]
     C --> R[RuntimeDispatcher]
     R --> X[ExecutionTrace]
-    X --> B[Billing / Supabase Mirror]
+    X --> B[Billing / Execution Trace]
 ```
 
 Secrets are sanitized at the trace/log boundary. Provider requests, continuations and tool calls retain scoped correlation through `InvocationContext` and `ExecutionTrace`.
@@ -57,7 +57,6 @@ Still experimental or roadmap unless the corresponding issue is complete:
 - Android SDK with API 37
 - Git
 - Optional PostgreSQL 17
-- Optional Supabase project for trace mirroring/migrations
 
 ### Backend
 
@@ -89,7 +88,6 @@ The debug APK is for development/testing. Release signing keys must never be com
 Use `.env` or a deployment secret manager. Never commit:
 
 - Yandex API keys or IAM tokens;
-- Supabase service-role keys;
 - Cloud.ru credentials or MCP bearer tokens;
 - signing keys/passwords;
 - user passwords or session secrets.
@@ -128,7 +126,6 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [Compute energy billing](docs/compute-energy-billing.md)
 - [Execution trace lifecycle](docs/execution-trace-lifecycle.md)
 - [Provider key rotation](docs/provider-key-rotation.md)
-- [Supabase migrations](docs/supabase-migrations-deploy.md)
 - [Security policy](SECURITY.md)
 - [Support](SUPPORT.md)
 

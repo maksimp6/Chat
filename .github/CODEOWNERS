@@ -12,7 +12,6 @@ Dockerfile                         @maksimp6
 docker-compose.postgres.yml        @maksimp6
 
 # Данные и миграции
-/supabase/migrations/              @maksimp6
 /db.py                             @maksimp6
 /db_backend.py                     @maksimp6
 
