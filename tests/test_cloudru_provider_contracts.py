@@ -87,7 +87,9 @@ def test_provider_capabilities_and_all_configured_read_write_operations(monkeypa
         for service in ("compute", "storage", "network", "database", "kubernetes", "security")
     )
     assert provider.list_resources(service="storage")["raw_count"] == 1
-    assert provider.get_resource(resource_type="storage", resource_id="resource-1")["resource"]["id"]
+    assert provider.get_resource(resource_type="storage", resource_id="resource-1")["resource"][
+        "id"
+    ]
     assert provider.compute(operation="list")["raw_count"] == 1
     assert provider.compute(operation="status", instance_id="resource-1")
     for operation in ("start", "stop", "reboot"):
