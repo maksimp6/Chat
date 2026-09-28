@@ -16,6 +16,7 @@
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
+- [Work Map и приватная обработка trips.db](integrations/work-map-trips.md) — статус прототипа, границы интеграции и защита данных маршрутов
 - [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
