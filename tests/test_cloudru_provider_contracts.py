@@ -91,7 +91,10 @@ def test_provider_capabilities_and_all_configured_read_write_operations(monkeypa
     assert provider.compute(operation="list")["raw_count"] == 1
     assert provider.compute(operation="status", instance_id="resource-1")
     for operation in ("start", "stop", "reboot"):
-        assert provider.compute(operation=operation, instance_id="resource-1")["operation"] == operation
+        assert (
+            provider.compute(operation=operation, instance_id="resource-1")["operation"]
+            == operation
+        )
     assert provider.query_logs(query="error", limit=0)["entries"]
     assert provider.query_metrics(query="cpu", limit=1001)["series"]
     for operation in ("create", "list", "restore", "delete"):
