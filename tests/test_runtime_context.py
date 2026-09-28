@@ -1,4 +1,4 @@
-from invocation_context import InvocationContext
+from invocation.context import InvocationContext
 
 
 def test_context_round_trip():

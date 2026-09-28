@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from mcp_routes import chat
 from app import app
-from invocation_manager import get_invocation
+from invocation.manager import get_invocation
 
 
 class ApiChatInvocationContextTests(unittest.TestCase):

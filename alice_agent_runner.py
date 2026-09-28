@@ -87,8 +87,8 @@ def run_issue_task(
     repo_root: Path = ROOT,
 ) -> Dict[str, Any]:
     import app  # noqa: F401  -- initializes the database schema and blueprints
-    from invocation_manager import create_invocation
-    from invocation_trace import create_invocation_trace
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
     from responses_tool_loop import extract_function_calls
     from yandex_client_modules.parsers import extract_reasoning_and_text
 

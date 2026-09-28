@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from db import get_conn
-from invocation_context import InvocationContext
+from .context import InvocationContext
 from runtime_migrations import init_runtime_tables
 from session_manager import create_session, restore_session
 

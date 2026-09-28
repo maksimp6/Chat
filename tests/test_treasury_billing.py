@@ -4,7 +4,7 @@ import pytest
 @pytest.fixture
 def treasury_db(tmp_path, monkeypatch):
     import db
-    import invocation_manager
+    import invocation.manager as invocation_manager
     import runtime_migrations
     import treasury
     import user_identity
@@ -129,8 +129,8 @@ def test_insufficient_balance_does_not_create_debit(treasury_db):
 
 
 def test_invocation_user_id_flows_into_trace_billing_context(treasury_db):
-    from invocation_manager import create_invocation
-    from invocation_trace import create_invocation_trace
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
     from session_manager import create_session
 
     session = create_session()

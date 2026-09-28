@@ -1,6 +1,6 @@
 """Invocation-scoped ExecutionTrace ownership helpers."""
 
-from invocation_context import InvocationContext
+from .context import InvocationContext
 from trace_manager import ExecutionTrace
 
 

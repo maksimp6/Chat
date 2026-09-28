@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from app import app
-from invocation_manager import get_invocation
+from invocation.manager import get_invocation
 
 
 class ApiChatSessionContextTests(unittest.TestCase):

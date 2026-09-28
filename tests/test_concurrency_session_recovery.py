@@ -4,7 +4,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 import db
-from invocation_manager import (
+from invocation.manager import (
     create_invocation,
     fail_invocation,
     finish_invocation,
@@ -12,7 +12,7 @@ from invocation_manager import (
     persist_invocation_trace,
     start_invocation,
 )
-from invocation_trace import create_invocation_trace
+from invocation.trace import create_invocation_trace
 from runtime_migrations import init_runtime_tables
 from session_manager import create_session, get_session, restore_session
 
