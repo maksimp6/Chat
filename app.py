@@ -22,7 +22,7 @@ from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
 from runtime_migrations import init_runtime_tables
-from local_agent_gateway import local_agent_bp, init_local_agent_tables
+from agents.local_gateway import local_agent_bp, init_local_agent_tables
 from cloudru_iam_routes import cloudru_iam_bp
 from provider_credentials_routes import provider_credentials_bp
 from provider_quota_routes import provider_quota_bp
