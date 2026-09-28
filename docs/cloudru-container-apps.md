@@ -35,6 +35,9 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
      `CLOUDRU_REPOSITORY_NAME`, `CLOUDRU_CONTAINER_NAME`, `CLOUDRU_CONTAINER_CPU`,
      `CLOUDRU_MIN_INSTANCES`, `CLOUDRU_MAX_INSTANCES`, `ALICE_GITHUB_ALLOWED_IDS`
      (defaults to the owner's immutable GitHub ID `293531601`).
+
+For Codex Cloud, keep the existing `CLOUDRU_KEY_ID` as an environment variable and `CLOUDRU_KEY_SECRET` as a secret in the `Chat` environment. The setup and maintenance scripts normalize those names into a mode-600 cache outside the checkout; `scripts/cloudru_deploy.py` reads that cache after Codex removes setup secrets from the agent phase. Set `CLOUDRU_PROJECT_ID` as an environment variable. Never commit the cache or put `ALICE_DATABASE_URL` in an issue, log, or repository file.
+
 3. Run **Cloud.ru Container Apps deployment** with `action: preflight`. It
    reports all missing configuration names without printing values, installing
    dependencies, or contacting Cloud.ru. Then run `action: estimate`, verify the
