@@ -38,7 +38,6 @@ docs/notes/
 ├── yandex-ai-studio/
 ├── openai/
 ├── github/
-├── supabase/
 └── ...
 ```
 
