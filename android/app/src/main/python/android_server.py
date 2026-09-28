@@ -92,7 +92,7 @@ def start_local_agent(
                 "agent_id": getattr(_LOCAL_AGENT_WORKER, "agent_id", agent_id),
             }, ensure_ascii=False)
 
-        from local_tool_agent import start_agent
+        from agents.local_worker import start_agent
 
         worker, _runtime_token = start_agent(
             gateway_url,
