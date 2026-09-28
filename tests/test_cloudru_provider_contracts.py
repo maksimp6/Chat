@@ -207,6 +207,9 @@ def test_cloud_registry_and_provider_resolution(monkeypatch):
 
 def test_client_auth_fallback_and_response_validation(monkeypatch):
     monkeypatch.delenv("CLOUDRU_COMPUTE_ENDPOINT", raising=False)
+    # Keep the no-credentials branch deterministic even on runners with Cloud.ru vars.
+    monkeypatch.delenv("CLOUDRU_IAM_KEY_ID", raising=False)
+    monkeypatch.delenv("CLOUDRU_IAM_KEY_SECRET", raising=False)
     assert CloudRuClient(api_key="token").endpoint("iam") == "https://iam.api.cloud.ru"
     with pytest.raises(CloudProviderError, match="not configured"):
         CloudRuClient(api_key="token").endpoint("unknown")

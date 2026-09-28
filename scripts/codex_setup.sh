@@ -9,10 +9,15 @@ mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
 # Setup runs from the checkout Codex already prepared. Network access and a
 # configured Git remote are not prerequisites: install the scripts we have.
-for name in codex_setup.sh codex_maintenance.sh; do
+for name in codex_setup.sh codex_maintenance.sh codex_cloudru_env.sh; do
   test -f "scripts/$name"
   install -m 700 "scripts/$name" "$INSTALL_DIR/$name"
 done
+
+# Cloud.ru secrets are available during setup only. Normalize the legacy
+# Codex names and materialize a mode-600 hand-off for the deploy CLI.
+# shellcheck disable=SC1091
+source scripts/codex_cloudru_env.sh
 
 python --version | grep -q '3.14'
 node --version | grep -q '^v22\.'

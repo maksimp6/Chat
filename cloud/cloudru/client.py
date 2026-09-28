@@ -9,7 +9,7 @@ from typing import Any
 import requests
 
 from cloud.base import CloudProviderError
-from cloudru_iam import CloudRuIamClient
+from cloudru_iam import CloudRuIamClient, CloudRuIamError
 from trace_manager import get_current_trace
 from trace_security import sanitize_trace_value
 
@@ -17,6 +17,8 @@ from trace_security import sanitize_trace_value
 DEFAULT_ENDPOINTS = {
     "iam": "https://iam.api.cloud.ru",
     "foundation_models": "https://foundation-models.api.cloud.ru/v1",
+    "artifact_registry": "https://ar.api.cloud.ru",
+    "container_apps": "https://containers.api.cloud.ru",
 }
 
 
@@ -27,8 +29,11 @@ class CloudRuClient:
         api_key: str | None = None,
         iam_client: CloudRuIamClient | None = None,
         timeout: float = 20.0,
+        api_key_auth: bool = True,
     ) -> None:
-        self.api_key = api_key or os.getenv("CLOUDRU_API_KEY")
+        # Evolution control-plane APIs accept only IAM bearer tokens; callers for
+        # those services pass api_key_auth=False so a Foundation Models key is ignored.
+        self.api_key = (api_key or os.getenv("CLOUDRU_API_KEY")) if api_key_auth else None
         self.iam_client = iam_client
         self.timeout = float(timeout)
 
@@ -51,11 +56,18 @@ class CloudRuClient:
     def _auth_header(self) -> tuple[str, str]:
         if self.api_key:
             return "Api-Key", self.api_key
-        if self.iam_client is not None:
-            return "Bearer", self.iam_client._token()  # noqa: SLF001 - client owns token exchange
-        iam = CloudRuIamClient()
-        if iam.key_id and iam.key_secret:
-            return "Bearer", iam._token()  # noqa: SLF001
+        iam = self.iam_client
+        if iam is None:
+            iam = CloudRuIamClient()
+            if not (iam.key_id and iam.key_secret):
+                iam = None
+        if iam is not None:
+            try:
+                return "Bearer", iam._token()  # noqa: SLF001 - client owns token exchange
+            except CloudRuIamError as exc:
+                raise CloudProviderError(
+                    f"Cloud.ru IAM token request failed: {exc}", code="auth_failed"
+                ) from exc
         raise CloudProviderError(
             "Cloud.ru authentication is not configured",
             code="auth_not_configured",
