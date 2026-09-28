@@ -1,4 +1,6 @@
+import os
 import subprocess
+import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +50,68 @@ def test_production_deployment_has_no_removed_backend_dependency():
     for source in (workflow, preview, production):
         assert ("SUPA" + "BASE_") not in source
         assert ("supa" + "base") not in source.lower()
+
+
+def test_deploy_passes_valid_preview_isolated_rules_to_docker(tmp_path):
+    root = tmp_path / "production-root"
+    acme = root / "keys" / "letsencrypt"
+    acme.mkdir(parents=True)
+    (acme / "acme.json").write_text("{}", encoding="utf-8")
+    archive = tmp_path / "production.tar.gz"
+    with tarfile.open(archive, "w:gz"):
+        pass
+    arguments_file = tmp_path / "docker-run-arguments"
+    # Run the real deployment script; replace only the Docker process boundary.
+    harness = r"""
+docker() {
+  case "$1" in
+    inspect)
+      case "${3:-}" in
+        '{{.State.Running}}') printf 'true\n' ;;
+        '{{.State.Health.Status}}') printf 'healthy\n' ;;
+        '{{join .Config.Cmd " "}}')
+          printf '%s\n' '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json' ;;
+        '{{range .Mounts}}{{println .Source}}{{end}}')
+          printf '%s\n' "$PREVIEW_SERVER_BASE_DIR/keys/letsencrypt" ;;
+        '') return 0 ;;
+        *) return 1 ;;
+      esac ;;
+    port) printf '0.0.0.0:443\n' ;;
+    network|build|rm) return 0 ;;
+    run) printf '%s\0' "$@" > "$DOCKER_ARGUMENTS_FILE" ;;
+    *) return 1 ;;
+  esac
+}
+export -f docker
+bash "$1" deploy "$2"
+"""
+    result = subprocess.run(
+        ["bash", "-c", harness, "test-deploy", str(SCRIPT), str(archive)],
+        env={
+            "PATH": os.defpath,
+            "HOME": str(tmp_path),
+            "PREVIEW_SERVER_BASE_DIR": str(root),
+            "ALICE_PROVIDER_CREDENTIAL_KEY": "test-provider-key",
+            "DOCKER_ARGUMENTS_FILE": str(arguments_file),
+        },
+        input="test-short-token\n\n\n\n",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    arguments = arguments_file.read_bytes().decode().split("\0")[:-1]
+    labels = dict(
+        arguments[index + 1].split("=", 1)
+        for index, argument in enumerate(arguments)
+        if argument == "--label"
+    )
+    expected = (
+        "(Host(`maxxxpavlov.ru`) || Host(`maxxxpavlov.online`))"
+        " && !PathPrefix(`/preview/`) && !PathRegexp(`^/[^/]+/preview/`)"
+    )
+    for router in ("http", "https"):
+        assert labels[f"traefik.http.routers.alice-production-{router}.rule"] == expected
 
 
 def _function_source(source, name):

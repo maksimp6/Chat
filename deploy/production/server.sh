@@ -93,8 +93,8 @@ deploy() {
   docker build --pull -t "$IMAGE_NAME" "$workdir" >/dev/null
   docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-  local host_rule='Host(\`maxxxpavlov.ru\`) || Host(\`maxxxpavlov.online\`)'
-  local route_rule="$host_rule && !PathPrefix(\`/preview/\`) && !PathRegexp(\`^/[^/]+/preview/\`)"
+  local host_rule='Host(`maxxxpavlov.ru`) || Host(`maxxxpavlov.online`)'
+  local route_rule="($host_rule) && !PathPrefix(\`/preview/\`) && !PathRegexp(\`^/[^/]+/preview/\`)"
 
   log "starting production container"
   docker run -d \
