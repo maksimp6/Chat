@@ -476,7 +476,11 @@ SHA = "a" * 40
 
 
 def _git(repo, *args):
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "commit.gpgsign=false", *args],
+        check=True,
+        capture_output=True,
+    )
 
 
 def test_export_commit_builds_only_committed_files(tmp_path):
