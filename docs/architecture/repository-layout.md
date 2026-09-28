@@ -21,6 +21,7 @@ Alice Pro больше не должна расти как набор несвя
 
 ```text
 agents/        agent context, gateways, runners, tools
+browser/       browser capability contracts and adapters
 invocation/    request-scoped context, lifecycle, API, trace binding
 mcp/           MCP transport, storage, routes, trace adapters and MCP tools
 providers/     credentials, quota and key rotation
@@ -67,3 +68,8 @@ from invocation.trace import create_invocation_trace
 9. shell helpers в `scripts/`.
 
 После каждой волны обновляются этот документ и guardrail allowlist.
+
+## Вторая волна
+
+`browser_adapters.py` и `browser_capabilities.py` перенесены в пакет `browser/`.
+Тесты и архитектурная документация используют новые package imports.
