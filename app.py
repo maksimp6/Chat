@@ -39,6 +39,13 @@ from government import government_bp, init_government_tables, ensure_government_
 from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
+from identity.github_oauth import (
+    current_github_login,
+    github_auth_bp,
+    github_login_enabled,
+    login_path,
+)
+from user_identity import init_github_accounts_table
 from conversation_ownership import (
     init_conversation_ownership_table,
     check_access,
@@ -102,6 +109,7 @@ app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 app.register_blueprint(voice_bp)
+app.register_blueprint(github_auth_bp)
 
 
 @app.errorhandler(Exception)
@@ -133,6 +141,7 @@ init_runtime_tables()
 init_local_agent_tables()
 init_treasury_tables()
 init_user_identity_table()
+init_github_accounts_table()
 init_conversation_ownership_table()
 init_department_tables()
 from provider_quotas import init_quota_tables
@@ -171,6 +180,9 @@ def index():
         selected_conversation=selected_conversation,
         selected_messages=selected_messages,
         donation_url=get_donation_url(),
+        github_login_enabled=github_login_enabled(),
+        github_login_url=login_path(),
+        github_login=current_github_login(),
     )
 
 
