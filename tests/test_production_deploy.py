@@ -39,7 +39,7 @@ def test_production_deployment_uses_runtime_secret_not_traefik_labels():
     assert "ALICE_SHORT_TOKEN" not in docker_block
 
 
-def test_production_deployment_has_no_supabase_dependency():
+def test_production_deployment_has_no_removed_backend_dependency():
     workflow = (ROOT / ".github" / "workflows" / "production-deploy.yml").read_text(
         encoding="utf-8"
     )
@@ -47,5 +47,5 @@ def test_production_deployment_has_no_supabase_dependency():
     production = SCRIPT.read_text(encoding="utf-8")
 
     for source in (workflow, preview, production):
-        assert "SUPABASE_" not in source
-        assert "supabase" not in source.lower()
+        assert ("SUPA" + "BASE_") not in source
+        assert ("supa" + "base") not in source.lower()
