@@ -47,9 +47,11 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
 
     currency = _currency(payload)
     for key in _TOTAL_KEYS:
-        total = _decimal(payload.get(key))
+        value = payload.get(key)
+        total = _decimal(value)
         if total is not None:
-            return {"total_cost": total, "currency": currency, "rows": 0}
+            nested = _currency(value) if isinstance(value, dict) else None
+            return {"total_cost": total, "currency": nested or currency, "rows": 0}
 
     summary = payload.get("summary")
     if isinstance(summary, dict):
@@ -68,11 +70,13 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
             if not isinstance(row, dict):
                 continue
             for cost_key in _ROW_COST_KEYS:
-                amount = _decimal(row.get(cost_key))
+                value = row.get(cost_key)
+                amount = _decimal(value)
                 if amount is not None:
                     total += amount
                     counted += 1
-                    currency = currency or _currency(row)
+                    nested = _currency(value) if isinstance(value, dict) else None
+                    currency = currency or nested or _currency(row)
                     break
         if counted:
             return {"total_cost": total, "currency": currency, "rows": counted}

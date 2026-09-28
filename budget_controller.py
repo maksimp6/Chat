@@ -639,20 +639,25 @@ class CloudBudgetGuard:
         if self.limits.monthly_limit is None:
             return evaluate_cloud_spend(None, self.limits)
         try:
-            summary = self._provider.costs_summary(period=self._period, group_by=None)
+            period = self._period or self._clock().strftime("%Y-%m")
+            summary = self._provider.costs_summary(period=period, group_by=None)
         except Exception as exc:  # billing outages must not break cloud operations
             result = evaluate_cloud_spend(None, self.limits)
             result["error"] = type(exc).__name__
             self._emit("cloud_budget_unknown", result)
             return result
-        result = evaluate_cloud_spend(summary.get("total_cost"), self.limits)
+        try:
+            result = evaluate_cloud_spend(summary.get("total_cost"), self.limits)
+        except BudgetError:
+            result = evaluate_cloud_spend(None, self.limits)
+            result["error"] = "invalid_total"
         currency = str(summary.get("currency") or "").upper()
         if currency and currency != self.limits.currency:
             result = evaluate_cloud_spend(None, self.limits)
             result["error"] = "currency_mismatch"
             result["billing_currency"] = currency
         result["provider"] = summary.get("provider")
-        if result["status"] in {CloudSpendStatus.WARN.value, CloudSpendStatus.BLOCK.value}:
+        if result["status"] != CloudSpendStatus.OK.value:
             self._emit("cloud_budget_" + result["status"], result)
         return result
 

@@ -26,6 +26,8 @@ from cloud.tools import CLOUD_TOOLS, cloud_budget_status, cloud_compute
     [
         ({"total_cost": "1234.50", "currency": "rub"}, Decimal("1234.50"), "RUB", 0),
         ({"total": {"value": "10,5"}}, Decimal("10.5"), None, 0),
+        ({"total": {"value": 10, "currency": "usd"}, "currency": "RUB"}, Decimal("10"), "USD", 0),
+        ({"items": [{"cost": {"amount": "3", "currency": "eur"}}]}, Decimal("3"), "EUR", 1),
         ({"summary": {"total": 12}, "currency": "RUB"}, Decimal("12"), "RUB", 0),
         (
             {
@@ -154,10 +156,12 @@ class FakeBillingProvider:
         self.currency = currency
         self.error = error
         self.calls = 0
+        self.periods = []
         self.compute_calls = []
 
     def costs_summary(self, *, period=None, group_by=None):
         self.calls += 1
+        self.periods.append(period)
         if self.error:
             raise self.error
         return {"provider": self.name, "total_cost": self.total, "currency": self.currency}
@@ -181,6 +185,26 @@ def test_guard_caches_and_refreshes():
     assert guard.status()["status"] == "warn"
     assert guard.status(refresh=True)["status"] == "warn"
     assert provider.calls == 3
+    assert provider.periods == ["2026-09"] * 3
+
+
+def test_guard_uses_explicit_period():
+    provider = FakeBillingProvider(total="1")
+    CloudBudgetGuard(provider, CloudBudgetLimits(Decimal("10")), period="2026-08").status()
+    assert provider.periods == ["2026-08"]
+
+
+def test_guard_treats_invalid_total_as_unknown():
+    events = []
+    guard = CloudBudgetGuard(
+        FakeBillingProvider(total="-5"),
+        CloudBudgetLimits(Decimal("10")),
+        trace_sink=events.append,
+    )
+    result = guard.enforce("op")
+    assert result["status"] == "unknown"
+    assert result["error"] == "invalid_total"
+    assert events[0]["event"] == "cloud_budget_unknown"
 
 
 def test_guard_blocks_and_traces_when_over_limit():
@@ -261,3 +285,27 @@ def test_compute_start_allowed_under_budget_and_guard_reused(fake_provider):
     assert cloud_compute({"operation": "start", "instance_id": "vm-1"})["ok"] is True
     assert cloud_compute({"operation": "start", "instance_id": "vm-2"})["ok"] is True
     assert fake_provider.calls == 1
+
+
+class RecordingTrace:
+    def __init__(self):
+        self.events = []
+
+    def add_event(self, event_type, payload=None):
+        self.events.append((event_type, payload))
+
+
+def test_tool_guard_writes_budget_events_to_current_trace(fake_provider, monkeypatch):
+    trace = RecordingTrace()
+    monkeypatch.setattr(cloud_tools, "get_current_trace", lambda: trace)
+    fake_provider.total = "1000"
+    cloud_compute({"operation": "start", "instance_id": "vm-1"})
+    assert [name for name, _ in trace.events] == ["cloud_budget_block"]
+    assert trace.events[0][1]["spent"] == "1000.00"
+    assert "event" not in trace.events[0][1]
+
+
+def test_tool_guard_without_trace_is_silent(fake_provider, monkeypatch):
+    monkeypatch.setattr(cloud_tools, "get_current_trace", lambda: None)
+    fake_provider.total = "1000"
+    assert cloud_budget_status({})["status"] == "block"

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
 from runtime_tools import ssh_runtime_exec
+from trace_manager import get_current_trace
 
 
 def _provider(args: dict[str, Any]):
@@ -45,14 +47,23 @@ def _result(fn):
 # Spend-creating compute operations checked against the monthly cloud budget.
 BUDGET_GUARDED_COMPUTE_OPERATIONS = {"start"}
 _BUDGET_GUARDS: dict[str, CloudBudgetGuard] = {}
+_BUDGET_GUARDS_LOCK = threading.Lock()
+
+
+def _trace_budget_event(event: dict[str, Any]) -> None:
+    trace = get_current_trace()
+    if trace is not None:
+        payload = dict(event)
+        trace.add_event(str(payload.pop("event")), payload)
 
 
 def _budget_guard(provider) -> CloudBudgetGuard:
-    guard = _BUDGET_GUARDS.get(provider.name)
-    if guard is None or guard._provider is not provider:  # noqa: SLF001
-        guard = CloudBudgetGuard(provider)
-        _BUDGET_GUARDS[provider.name] = guard
-    return guard
+    with _BUDGET_GUARDS_LOCK:
+        guard = _BUDGET_GUARDS.get(provider.name)
+        if guard is None or guard._provider is not provider:  # noqa: SLF001
+            guard = CloudBudgetGuard(provider, trace_sink=_trace_budget_event)
+            _BUDGET_GUARDS[provider.name] = guard
+        return guard
 
 
 @_result

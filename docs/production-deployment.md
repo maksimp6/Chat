@@ -159,8 +159,9 @@ Behaviour:
 
 - `cloud.budget.status` shows spend, limit, remaining amount and a status: `ok`, `warn`, `block`, `unconfigured` or `unknown`.
 - At `block`, cost-creating operations (`cloud.compute.start`) are refused with `budget_exceeded`. Stopping resources and backups are never blocked.
-- If billing is unreachable or returns a different currency, the status is `unknown` and nothing is blocked; the event is recorded in the trace.
-- Billing is read at most once every 5 minutes per process.
+- If billing is unreachable, returns an unusable total, or reports a different currency, the status is `unknown` and nothing is blocked.
+- The guard reads billing for the current month (`YYYY-MM`) at most once every 5 minutes per process; `cloud.budget.status` with `refresh: true` reads it immediately.
+- Warn, block and unknown results are recorded in the ExecutionTrace as `cloud_budget_<status>` events.
 
 For a hard stop that does not depend on Alice, also set a budget alert in the Cloud.ru console.
 
