@@ -87,7 +87,13 @@ def run_issue_task(
     repo_root: Path = ROOT,
 ) -> Dict[str, Any]:
     import app  # noqa: F401  -- initializes the database schema and blueprints
-    from invocation.manager import create_invocation
+    from invocation.manager import (
+        create_invocation,
+        fail_invocation,
+        finish_invocation,
+        persist_invocation_trace,
+        start_invocation,
+    )
     from invocation.trace import create_invocation_trace
     from responses_tool_loop import extract_function_calls
     from yandex_client_modules.parsers import extract_reasoning_and_text
@@ -106,7 +112,14 @@ def run_issue_task(
     session = f"github-issue-{issue_number}"
     invocation = create_invocation(session, session, metadata={"source": "alice.yml"})
     trace = create_invocation_trace(invocation)
-    result: Dict[str, Any] = {"issue": issue_number, "model": model_key, "pending_tools": []}
+    start_invocation(invocation.invocation_id)
+    result: Dict[str, Any] = {
+        "issue": issue_number,
+        "model": model_key,
+        "pending_tools": [],
+        "invocation_id": invocation.invocation_id,
+        "session_id": invocation.session_id,
+    }
 
     try:
         client = client_factory()
@@ -128,16 +141,38 @@ def run_issue_task(
         _, reply = extract_reasoning_and_text(response)
         result["summary"] = (reply or "").strip()[:MAX_SUMMARY_CHARS]
     except Exception as exc:
-        trace.record_error("alice_agent_runner", type(exc).__name__, exception=exc)
+        trace.record_error(
+            "alice_agent_runner",
+            "GitHub issue agent failed",
+            error_type=type(exc).__name__,
+        )
         result["status"] = "failed"
         result["error"] = type(exc).__name__
 
     files = sorted(set(changed_files(repo_root)) - before)
     result["changed_files"] = files
     result.setdefault("status", "changed" if files else "no_changes")
+
     finalized = trace.finalize()
+    persist_invocation_trace(invocation.invocation_id, finalized)
     result["trace_id"] = finalized.get("trace_id")
     result["billing"] = _billing_summary(finalized.get("billing") or {})
+
+    if result["status"] == "failed":
+        fail_invocation(
+            invocation.invocation_id,
+            error={"type": result.get("error") or "unknown"},
+        )
+    else:
+        finish_invocation(
+            invocation.invocation_id,
+            result={
+                "status": result["status"],
+                "changed_files": files,
+                "summary": result.get("summary") or "",
+                "pending_tools": result.get("pending_tools") or [],
+            },
+        )
     return result
 
 
