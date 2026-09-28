@@ -75,6 +75,7 @@ def _configure_services(monkeypatch):
     monkeypatch.setenv("CLOUDRU_OBSERVABILITY_ENDPOINT", "https://observability.example")
     monkeypatch.setenv("CLOUDRU_OBSERVABILITY_LOGS_PATH", "/v1/logs")
     monkeypatch.setenv("CLOUDRU_OBSERVABILITY_METRICS_PATH", "/v1/metrics")
+    monkeypatch.setenv("CLOUDRU_BILLING_SUMMARY_PATH", "/v1/billing-summary")
 
 
 def test_provider_capabilities_and_all_configured_read_write_operations(monkeypatch):
@@ -215,7 +216,7 @@ def test_client_auth_fallback_and_response_validation(monkeypatch):
     client = CloudRuClient(iam_client=iam)
     assert client._auth_header() == ("Bearer", "iam-token")
     with pytest.raises(CloudProviderError, match="authentication"):
-        CloudRuClient(api_key=None, iam_client=Mock(key_id=None, key_secret=None))._auth_header()
+        CloudRuClient(api_key=None, iam_client=None)._auth_header()
 
     monkeypatch.setenv("CLOUDRU_COMPUTE_ENDPOINT", "https://compute.example")
     bad_response = Mock(content=b"not-json", status_code=200)
