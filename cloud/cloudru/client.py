@@ -17,6 +17,8 @@ from trace_security import sanitize_trace_value
 DEFAULT_ENDPOINTS = {
     "iam": "https://iam.api.cloud.ru",
     "foundation_models": "https://foundation-models.api.cloud.ru/v1",
+    "artifact_registry": "https://ar.api.cloud.ru",
+    "container_apps": "https://containers.api.cloud.ru",
 }
 
 
@@ -27,8 +29,11 @@ class CloudRuClient:
         api_key: str | None = None,
         iam_client: CloudRuIamClient | None = None,
         timeout: float = 20.0,
+        api_key_auth: bool = True,
     ) -> None:
-        self.api_key = api_key or os.getenv("CLOUDRU_API_KEY")
+        # Evolution control-plane APIs accept only IAM bearer tokens; callers for
+        # those services pass api_key_auth=False so a Foundation Models key is ignored.
+        self.api_key = (api_key or os.getenv("CLOUDRU_API_KEY")) if api_key_auth else None
         self.iam_client = iam_client
         self.timeout = float(timeout)
 
