@@ -1,6 +1,7 @@
 # Cloud.ru Container Apps deployment (baseline)
 
-Status: baseline deploy path, not yet run against a live Cloud.ru project.
+Status: baseline merged; IAM authentication verified; production deployment blocked
+on API diagnostics and a supported durable-database connection (2026-09-28).
 Issue: #427
 
 Alice Pro runs as one Cloud.ru Evolution **Container Apps** service built from an
@@ -21,7 +22,55 @@ Both clients reuse `CloudRuClient`, so requests are traced the same way as the
 rest of the Cloud.ru provider. They authenticate with an IAM bearer token from
 the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
 
+## Database architecture blocker
+
+The current [Cloud.ru Container Apps FAQ](https://cloud.ru/docs/container-apps-evolution/ug/topics/faq__database-connection),
+checked on 2026-09-28, explicitly says that Container Apps cannot connect to
+Cloud.ru Managed PostgreSQL. The earlier plan to provision those two services
+and pass a connection string between them is therefore not a supported deployment
+architecture. A PostgreSQL URL passing the CLI's syntax check does not establish
+network connectivity from the application container.
+
+Before provisioning, choose and verify a durable database reachable from the
+selected runtime. Keeping Container Apps requires a separately evaluated external
+PostgreSQL service and its network/TLS/access controls; the FAQ describes external
+database access over the internet and warns about that exposure. Keeping Cloud.ru
+Managed PostgreSQL requires revisiting the runtime/network design. Do not create
+a VM or Kubernetes cluster as an implicit fallback: those are outside the agreed
+Container Apps scope of #427.
+
+Test the selected connection from the actual application runtime, including TLS,
+authentication, and persistence across an instance/revision restart. A connection
+from a Codex or GitHub runner alone does not prove that Container Apps can reach it.
+Keep the existing production data until its backup, transfer and verification
+procedure has been reviewed.
+
+## Verified readiness (2026-09-28)
+
+The [read-only runner report in #427](https://github.com/maksimp6/Chat/issues/427#issuecomment-5879256021)
+verified the exact merged baseline `a0f1f5277f7d612fd3f44622b48342a21aadfb2d`:
+
+- The existing protected Codex hand-off loads the IAM key pair and project ID;
+  IAM token exchange succeeds.
+- Artifact Registry inventory succeeds and returns resources. This does not yet
+  establish that a suitable private Docker registry has been selected.
+- IAM service-account listing returns HTTP 415; Container Apps status raises a
+  provider error whose precise response is being investigated. Neither result
+  establishes that credentials are absent or that the project has no containers.
+- PostgreSQL and Object Storage inventory, database connectivity, image rollout,
+  HTTPS/auth smoke checks, and persistence after restart remain unverified.
+
+No cloud deployment has been verified. The successful GitHub `estimate` run is
+an offline calculation. GitHub `preflight` currently reports missing
+`CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET` and `ALICE_DATABASE_URL`; credentials
+available in Codex are not automatically available to GitHub Actions. Diagnose
+through the runner that already has authorized access rather than copying keys
+between secret stores as part of an inventory check.
+
 ## One-time setup
+
+Resolve the database architecture blocker above before creating resources or
+running `action: deploy`.
 
 1. Create a service account in the target project with Artifact Registry
    (push) and Container Apps (admin) roles, and issue an access key.
@@ -44,7 +93,7 @@ For Codex Cloud, keep the existing `CLOUDRU_KEY_ID` as an environment variable a
    live project tariff and planned resources, and run `action: deploy`.
 
 The deploy action performs the build, push, rollout and health check automatically.
-It requires PostgreSQL and forwards the existing GitHub-login configuration.
+It requires a reachable durable PostgreSQL database and forwards the existing GitHub-login configuration.
 The application image installs `requirements-postgres.txt` as well as the main
 requirements. A successful preflight checks configuration only; it does not
 prove connectivity, IAM permissions, database readiness or a live deployment.
@@ -84,14 +133,25 @@ this size. Keeping one instance warm (`CLOUDRU_MIN_INSTANCES=1`) costs about
 the configured size. Check the live tariff before provisioning:
 https://cloud.ru/docs/container-apps-evolution/ug/topics/pricing__container-services
 
+The [published tariff effective 2026-09-28](https://cloud.ru/documents/tariffs/evolution/container-apps)
+lists 1.891 RUB per vCPU-hour and 1.256966 RUB per GiB-hour including VAT where
+applicable. At 730 running hours, 0.5 vCPU / 1 GiB is approximately 1,498 RUB with
+the full monthly free allowance available, or 1,608 RUB without it. These are
+container-compute estimates, not the project's total bill: database, registry,
+storage and other services must be priced separately. The CLI still uses the
+documentation's example rates, not a live billing API. A zero cost floor for
+`min_instances=0` does not mean that active instances are free.
+
 The first request after idle pays a cold start.
 
 ## Known limitations
 
 - **Postgres is mandatory for this deployment.** SQLite lives in the container
   filesystem and is lost whenever the instance sleeps or a new revision starts.
-  Store `ALICE_DATABASE_URL` (Cloud.ru Managed PostgreSQL) as a secret; the
-  deploy requires and passes it through and the existing Postgres backend takes over.
+  Store `ALICE_DATABASE_URL` for the selected reachable PostgreSQL service as a
+  secret; the deploy requires and passes it through and the existing Postgres
+  backend takes over. Cloud.ru Managed PostgreSQL is not directly supported by
+  Container Apps according to the FAQ linked above.
 - **In-process state is lost on sleep.** Branch environment runtimes (git
   worktrees under `.alice-environments`), voice sessions, and uploaded files
   live in the container. Keep `CLOUDRU_MAX_INSTANCES=1` until they move to
