@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Union
 
 try:
     import psycopg
@@ -31,6 +31,14 @@ _ALTER_ADD_COLUMN_RE = re.compile(
 )
 _INSERT_OR_IGNORE_RE = re.compile(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", re.IGNORECASE)
 _UNIQUE_VIOLATION_NAMES = {"UniqueViolation", "UniqueViolationError"}
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Backend-neutral exception types. Application code catches these instead of
+# importing sqlite3; the PostgreSQL adapter re-raises driver integrity errors
+# as IntegrityError so callers handle both backends the same way.
+DatabaseError = sqlite3.DatabaseError
+IntegrityError = sqlite3.IntegrityError
+OperationalError = sqlite3.OperationalError
 
 
 class PGRow:
@@ -63,6 +71,16 @@ class PGRow:
 
     def __repr__(self) -> str:
         return repr(self._mapping)
+
+
+Row = Union[sqlite3.Row, PGRow]
+"""A result row from either backend: supports ``row[0]``, ``row["name"]`` and ``keys()``."""
+
+
+def _is_integrity_error(exc: Exception) -> bool:
+    if psycopg is not None and isinstance(exc, psycopg.IntegrityError):
+        return True
+    return exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES
 
 
 def translate_sql(sql: str) -> str:
@@ -133,8 +151,8 @@ class PGCursor:
         try:
             self._raw.execute(translated, tuple(params))
         except Exception as exc:
-            if exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES:
-                raise sqlite3.IntegrityError(str(exc)) from exc
+            if _is_integrity_error(exc):
+                raise IntegrityError(str(exc)) from exc
             raise
         self._columns = tuple(desc.name for desc in self._raw.description or ())
         return self
@@ -144,8 +162,8 @@ class PGCursor:
         try:
             self._raw.executemany(translated, seq_of_params)
         except Exception as exc:
-            if exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES:
-                raise sqlite3.IntegrityError(str(exc)) from exc
+            if _is_integrity_error(exc):
+                raise IntegrityError(str(exc)) from exc
             raise
         self._columns = tuple(desc.name for desc in self._raw.description or ())
         return self
@@ -225,3 +243,27 @@ def connect_postgres(url: Optional[str] = None) -> PGConnection:
 
 def is_postgres_configured() -> bool:
     return bool(postgres_url_from_env())
+
+
+def table_names(conn) -> set[str]:
+    """Return the names of the application's tables on either backend."""
+    if isinstance(conn, PGConnection):
+        sql = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public'"
+    else:
+        sql = "SELECT name FROM sqlite_master WHERE type = 'table'"
+    return {row[0] for row in conn.execute(sql).fetchall()}
+
+
+def add_column_if_missing(conn, table: str, column: str, definition: str) -> bool:
+    """Add ``column`` to ``table`` unless it already exists, on either backend.
+
+    Returns True when the column was added. ``table`` and ``column`` must be
+    plain identifiers; ``definition`` is trusted DDL from application code.
+    """
+    if not _IDENTIFIER_RE.match(table) or not _IDENTIFIER_RE.match(column):
+        raise ValueError(f"invalid identifier: {table}.{column}")
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column in existing:
+        return False
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    return True

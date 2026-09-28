@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import db
+from db_backend import is_postgres_configured
 import mcp_routes
 from trace_manager import ExecutionTrace
 
@@ -85,7 +86,8 @@ class TestChatSQLiteIntegration(unittest.TestCase):
 
                 # Prove the data is really on disk and can be loaded by a new
                 # connection after the request has completed.
-                self.assertTrue(os.path.exists(db_path))
+                if not is_postgres_configured():
+                    self.assertTrue(os.path.exists(db_path))
                 reloaded = db.get_messages(conversation_id)
                 self.assertEqual(reloaded, messages)
 

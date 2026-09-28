@@ -3,6 +3,7 @@ import os
 import pytest
 
 import db
+from db_backend import table_names
 from observability_migrations import MIGRATION_VERSION, apply_observability_migrations
 
 
@@ -19,12 +20,7 @@ def test_observability_migration_is_idempotent(tmp_path, monkeypatch):
             (MIGRATION_VERSION,),
         ).fetchall()
         assert len(versions) == 1
-        tables = {
-            row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'"
-            ).fetchall()
-        }
+        tables = table_names(conn)
     finally:
         conn.close()
     assert {"schema_migrations", "project_tree_preferences", "frontend_error_events"} <= tables

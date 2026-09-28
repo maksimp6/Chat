@@ -5,6 +5,7 @@ import threading
 import pytest
 
 import db
+from db_backend import table_names
 from flask import Flask, Response, jsonify
 
 from environment_manager import (
@@ -258,12 +259,7 @@ def test_environment_gateway_isolates_sqlite_per_runtime(tmp_path, monkeypatch):
 
         control_conn = db.get_conn()
         try:
-            tables = {
-                row["name"]
-                for row in control_conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                ).fetchall()
-            }
+            tables = table_names(control_conn)
         finally:
             control_conn.close()
         assert "runtime_probe" not in tables

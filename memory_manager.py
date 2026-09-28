@@ -1,5 +1,4 @@
 import json
-import sqlite3
 from db import get_conn, get_config, set_config
 from memory_extractor import init_global_memory
 
@@ -40,7 +39,6 @@ def get_controlled_memory_summary() -> str:
     allowed_cats = cfg.get("categories_allowed", [])
 
     conn = get_conn()
-    conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
     if allowed_cats:

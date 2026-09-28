@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from db_backend import connect_postgres, postgres_url_from_env
+from db_backend import add_column_if_missing, connect_postgres, postgres_url_from_env
 from memory_db import Column, MemoryDatabase
 from runtime.request_context import current_runtime_data_root
 
@@ -150,15 +150,8 @@ def init_db():
         )
     """)
 
-    try:
-        cur.execute("ALTER TABLE messages ADD COLUMN timings_json TEXT DEFAULT '[]'")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cur.execute("ALTER TABLE messages ADD COLUMN trace_json TEXT DEFAULT '{}'")
-    except sqlite3.OperationalError:
-        pass
+    add_column_if_missing(conn, "messages", "timings_json", "TEXT DEFAULT '[]'")
+    add_column_if_missing(conn, "messages", "trace_json", "TEXT DEFAULT '{}'")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS conv_settings (
@@ -380,9 +373,10 @@ def delete_conversation(conv_id):
         return
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+    # Children first: PostgreSQL enforces the messages -> conversations key.
     cur.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
     cur.execute("DELETE FROM conv_settings WHERE conversation_id = ?", (conv_id,))
+    cur.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
     conn.commit()
     conn.close()
 

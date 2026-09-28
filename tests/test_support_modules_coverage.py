@@ -1,44 +1,40 @@
 import json
 import runpy
-import sqlite3
 from datetime import datetime, timezone
 
 import archiver
+import db
 import sdk
 import send_logs
 import yc_logging
 
 
-def _create_archive_database(path, rows=()):
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE messages (id INTEGER, content TEXT, created_at TEXT)")
-    conn.executemany("INSERT INTO messages VALUES (?, ?, ?)", rows)
+def _add_archive_message(conv_id, content, created_at):
+    conn = db.get_conn()
+    conn.execute(
+        "INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)",
+        (conv_id, "user", content, created_at),
+    )
     conn.commit()
     conn.close()
 
 
-def test_archiver_handles_sqlite_rows_empty_database_and_mutex(monkeypatch, tmp_path):
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: False)
-    db_path = tmp_path / "archive.sqlite"
-    _create_archive_database(
-        db_path,
-        [
-            (1, "old", "2000-01-01T00:00:00+00:00"),
-            (2, "new", datetime.now(timezone.utc).isoformat()),
-        ],
-    )
+def test_archiver_deletes_old_messages_on_the_application_database(monkeypatch, tmp_path):
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "archive.sqlite"))
+    db.init_db()
+    db.create_conversation("archive-conv", "Archive", "model")
+    now = int(datetime.now(timezone.utc).timestamp())
+    _add_archive_message("archive-conv", "old", now - 31 * 24 * 3600)
+    _add_archive_message("archive-conv", "new", now)
 
-    worker = archiver.DatabaseArchiver(str(db_path))
+    worker = archiver.DatabaseArchiver()
     assert worker.run_archive() is True
-    conn = sqlite3.connect(db_path)
-    assert conn.execute("SELECT content FROM messages ORDER BY id").fetchall() == [("new",)]
-    conn.close()
+    assert [m["text"] for m in db.get_messages("archive-conv")] == ["new"]
 
-    empty_path = tmp_path / "empty.sqlite"
-    _create_archive_database(empty_path)
-    assert archiver.DatabaseArchiver(str(empty_path)).run_archive() is True
+    # Nothing left to archive is still a successful run.
+    assert archiver.DatabaseArchiver().run_archive() is True
 
-    locked = archiver.DatabaseArchiver(str(empty_path))
+    locked = archiver.DatabaseArchiver()
     assert locked._mutex.acquire(blocking=False)
     try:
         assert locked.run_archive() is False
@@ -46,30 +42,7 @@ def test_archiver_handles_sqlite_rows_empty_database_and_mutex(monkeypatch, tmp_
         locked._mutex.release()
 
 
-def test_archiver_uses_postgres_connection_and_rolls_back_errors(monkeypatch):
-    class EmptyCursor:
-        def execute(self, sql, params):
-            self.last = (sql, params)
-
-        def fetchall(self):
-            return []
-
-    class EmptyConnection:
-        def __init__(self):
-            self.closed = False
-
-        def cursor(self):
-            return EmptyCursor()
-
-        def close(self):
-            self.closed = True
-
-    postgres_conn = EmptyConnection()
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: True)
-    monkeypatch.setattr(archiver.database, "get_conn", lambda: postgres_conn)
-    assert archiver.DatabaseArchiver("unused").run_archive() is True
-    assert postgres_conn.closed is True
-
+def test_archiver_rolls_back_errors(monkeypatch):
     class FailingCursor:
         def execute(self, sql, params):
             raise RuntimeError("database failure")
@@ -89,10 +62,9 @@ def test_archiver_uses_postgres_connection_and_rolls_back_errors(monkeypatch):
             self.closed = True
 
     failing_conn = FailingConnection()
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: False)
-    monkeypatch.setattr(archiver.sqlite3, "connect", lambda path: failing_conn)
+    monkeypatch.setattr(archiver.database, "get_conn", lambda: failing_conn)
 
-    assert archiver.DatabaseArchiver("broken").run_archive() is False
+    assert archiver.DatabaseArchiver().run_archive() is False
     assert failing_conn.rolled_back is True
     assert failing_conn.closed is True
 

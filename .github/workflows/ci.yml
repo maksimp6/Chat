@@ -156,6 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ALICE_DATABASE_URL: postgresql://alice:ci-postgres-password@localhost:5432/alice_pro
+      YANDEX_API_KEY: ci-test-placeholder
     services:
       postgres:
         image: postgres:17-alpine
@@ -184,10 +185,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install -r requirements-postgres.txt
-          pip install pytest
+          npm install --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Run PostgreSQL integration tests
         run: pytest -q tests/test_postgres_integration.py
+      - name: Run the full Python test suite on PostgreSQL
+        run: pytest -q
 
   android:
     name: Android debug APK

@@ -1,8 +1,7 @@
 """Schema additions for serverless/sessioned execution."""
 
-import sqlite3
-
 from db import get_conn
+from db_backend import PGConnection, add_column_if_missing
 
 
 def init_runtime_tables() -> None:
@@ -19,11 +18,7 @@ def init_runtime_tables() -> None:
             )
         """)
         # Existing installations created before completed_at need the additive migration.
-        try:
-            conn.execute("ALTER TABLE sessions ADD COLUMN completed_at INTEGER")
-        except sqlite3.OperationalError as exc:
-            if "duplicate column name" not in str(exc).lower():
-                raise
+        add_column_if_missing(conn, "sessions", "completed_at", "INTEGER")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS invocations (
                 id TEXT PRIMARY KEY,
@@ -38,16 +33,18 @@ def init_runtime_tables() -> None:
                 created_at INTEGER NOT NULL,
                 started_at INTEGER,
                 completed_at INTEGER,
-                FOREIGN KEY (session_id) REFERENCES sessions(id),
-                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         """)
         # Existing installations created before trace persistence need the additive migration.
-        try:
-            conn.execute("ALTER TABLE invocations ADD COLUMN trace_json TEXT NOT NULL DEFAULT '{}'")
-        except sqlite3.OperationalError as exc:
-            if "duplicate column name" not in str(exc).lower():
-                raise
+        add_column_if_missing(conn, "invocations", "trace_json", "TEXT NOT NULL DEFAULT '{}'")
+        if isinstance(conn, PGConnection):
+            # Invocations may belong to conversations that have no row in
+            # ``conversations`` (MCP calls, GitHub agent runs). SQLite never
+            # enforced this key; drop it where PostgreSQL created it earlier.
+            conn.execute(
+                "ALTER TABLE invocations DROP CONSTRAINT IF EXISTS invocations_conversation_id_fkey"
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_invocations_session ON invocations(session_id)"
         )
