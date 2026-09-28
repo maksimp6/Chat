@@ -15,8 +15,7 @@ import secrets
 import sqlite3
 import time
 import uuid
-from collections.abc import Mapping
-from typing import Any
+from typing import Any, Mapping, Optional
 
 from db import get_conn
 
@@ -81,7 +80,7 @@ def init_user_identity_table() -> None:
 
 def register_anonymous_user(
     installation_id: str,
-    metadata: Mapping[str, Any] | None = None,
+    metadata: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     installation_id = str(installation_id or "").strip()
     if not _INSTALLATION_RE.fullmatch(installation_id):
@@ -152,7 +151,7 @@ def register_anonymous_user(
         conn.close()
 
 
-def authenticate_user_token(token: str) -> str | None:
+def authenticate_user_token(token: str) -> Optional[str]:
     token = str(token or "").strip()
     if not token:
         return None
@@ -170,7 +169,7 @@ def authenticate_user_token(token: str) -> str | None:
     return str(row["id"]) if row else None
 
 
-def get_anonymous_user(user_id: str) -> dict[str, Any] | None:
+def get_anonymous_user(user_id: str) -> Optional[dict[str, Any]]:
     init_user_identity_table()
     conn = get_conn()
     try:
@@ -228,7 +227,7 @@ def _github_installation_id(github_id: str) -> str:
 def _link_github_account(
     github_id: str,
     login: str,
-    current_user_id: str | None,
+    current_user_id: Optional[str],
     auth_token: str,
 ) -> tuple[str, bool]:
     now = _now()
@@ -291,7 +290,7 @@ def _link_github_account(
 def sign_in_with_github(
     github_id: Any,
     login: str,
-    current_user_id: str | None = None,
+    current_user_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """Resolve the Alice user for a verified GitHub account and issue a fresh token.
 
@@ -320,8 +319,8 @@ def sign_in_with_github(
     }
 
 
-def get_github_login(user_id: str) -> str | None:
-    init_github_accounts_table()
+def get_github_login(user_id: str) -> Optional[str]:
+    # Runs on every page load; app.py creates the table at startup.
     conn = get_conn()
     try:
         row = conn.execute(

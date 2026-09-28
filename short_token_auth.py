@@ -17,7 +17,8 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 COOKIE_NAME = "alice_short_token_session"
 COOKIE_SALT = "alice-pro-short-token-v1"
 DEFAULT_MAX_AGE = 12 * 60 * 60
-_PUBLIC_PATHS = frozenset({"/healthz"})
+# Logout only deletes cookies, so it must work after the gate session expired.
+_PUBLIC_PATHS = frozenset({"/healthz", "/auth/logout"})
 # GitHub sign-in must be reachable before the visitor has the short token.
 _PUBLIC_PREFIXES = ("/auth/github/",)
 _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"

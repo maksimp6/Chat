@@ -372,3 +372,11 @@ def test_link_rolls_back_on_unique_violation(temp_db, monkeypatch):
     with pytest.raises(sqlite3.IntegrityError):
         user_identity._link_github_account("99", "octocat", None, "token")
     assert get_github_login(existing["user_id"]) is None
+
+
+def test_logout_works_after_gate_session_expired(github_env, monkeypatch):
+    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("ALICE_SHORT_TOKEN", "unit-test-token")
+    response = _app().post("/auth/logout")
+    assert response.status_code == 200
+    assert "alice_user_token=;" in " ".join(response.headers.getlist("Set-Cookie"))
