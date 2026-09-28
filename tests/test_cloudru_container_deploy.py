@@ -214,3 +214,114 @@ def test_cost_estimate_for_always_on_half_vcpu():
     assert estimate["gb_hours"] == 730.0
     assert 1400 < estimate["rub_per_month"] < 1600
     assert estimate_monthly_cost("0.5", 0)["rub_per_month"] == 0
+
+
+@pytest.mark.parametrize(
+    "overrides,match",
+    [
+        ({"name": "Bad_Name"}, "name must"),
+        ({"image": ""}, "image is required"),
+        ({"cpu": "3"}, "cpu must"),
+        ({"min_instances": 2, "max_instances": 1}, "min_instances"),
+    ],
+)
+def test_container_spec_validation(overrides, match):
+    spec = ContainerSpec(**{"name": "alice-pro", "image": "img", **overrides})
+    with pytest.raises(CloudProviderError, match=match):
+        spec.validate()
+
+
+def test_project_id_is_required(monkeypatch):
+    monkeypatch.delenv("CLOUDRU_PROJECT_ID", raising=False)
+    apps = CloudRuContainerAppsClient(client=RecordingClient())
+    with pytest.raises(CloudProviderError, match="CLOUDRU_PROJECT_ID"):
+        apps.delete("alice-pro")
+    reg = CloudRuRegistryClient(client=RecordingClient(), iam_client=_iam())
+    with pytest.raises(CloudProviderError, match="CLOUDRU_PROJECT_ID"):
+        reg.list_registries()
+
+
+def test_get_reraises_non_404_errors():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([CloudProviderError("boom", http_status=500)])
+    )
+    with pytest.raises(CloudProviderError, match="boom"):
+        apps.get("alice-pro")
+
+
+def test_update_requires_existing_service():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([CloudProviderError("nf", http_status=404)])
+    )
+    with pytest.raises(CloudProviderError, match="not found"):
+        apps.update(ContainerSpec(name="alice-pro", image="img"))
+
+
+def test_wait_until_ready_times_out():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([_app("DEPLOYING")]), sleep=lambda _: None
+    )
+    with pytest.raises(CloudProviderError, match="not ready"):
+        apps.wait_until_ready("alice-pro", timeout_s=0)
+
+
+def test_health_check_reports_last_error():
+    import requests
+
+    def boom(url, timeout):
+        raise requests.ConnectionError("down")
+
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient(), sleep=lambda _: None, http_get=boom
+    )
+    with pytest.raises(CloudProviderError, match="ConnectionError"):
+        apps.health_check("https://alice.example", attempts=2)
+
+
+def test_image_ref_without_digest_uses_tag():
+    ref = ImageRef("r.cr.cloud.ru", "alice-pro", "abc")
+    assert ref.pinned == ref.tagged == "r.cr.cloud.ru/alice-pro:abc"
+
+
+def test_registry_rejects_invalid_names_and_tags():
+    reg = CloudRuRegistryClient(project_id="p1", client=RecordingClient(), iam_client=_iam())
+    with pytest.raises(CloudProviderError, match="registry_name"):
+        reg.registry_host("Bad Name")
+    with pytest.raises(CloudProviderError, match="tag is invalid"):
+        reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="bad tag")
+
+
+def test_registry_list_payload_must_be_a_list():
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient([{"registries": "nope"}]), iam_client=_iam()
+    )
+    with pytest.raises(CloudProviderError, match="invalid"):
+        reg.list_registries()
+
+
+def test_delete_registry_validates_id():
+    client = RecordingClient()
+    reg = CloudRuRegistryClient(project_id="p1", client=client, iam_client=_iam())
+    reg.delete_registry("r-1")
+    assert client.calls[0][:3] == ("artifact_registry", "DELETE", "/v1/registries/r-1")
+    with pytest.raises(CloudProviderError):
+        reg.delete_registry("../x")
+
+
+def test_docker_login_needs_key_pair_and_reports_failure():
+    no_keys = CloudRuRegistryClient(
+        project_id="p1",
+        client=RecordingClient(),
+        iam_client=CloudRuIamClient(key_id="", key_secret=""),
+    )
+    with pytest.raises(CloudProviderError, match="CLOUDRU_IAM_KEY_ID"):
+        no_keys.docker_login("alice-pro")
+
+    def denied(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 1, stdout="", stderr="unauthorized")
+
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=denied
+    )
+    with pytest.raises(CloudProviderError, match="unauthorized"):
+        reg.docker_login("alice-pro")
