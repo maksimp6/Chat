@@ -127,3 +127,26 @@ def test_deploy_secrets_survive_the_ssh_stdin_handoff(tmp_path):
         "",
         "maksimp6,o'brien;x",
     ]
+
+
+def test_one_line_token_handoff_still_works(tmp_path):
+    # Older callers send only the short token; the optional values stay empty.
+    source = SCRIPT.read_text(encoding="utf-8")
+    script = (
+        "set -euo pipefail\n"
+        'die() { echo "$*" >&2; exit 1; }\n'
+        + _function_source(source, "require_runtime_secret")
+        + "require_runtime_secret\n"
+        'printf \'%s|%s|%s|%s\' "$ALICE_SHORT_TOKEN" "$ALICE_GITHUB_CLIENT_ID" '
+        '"$ALICE_GITHUB_CLIENT_SECRET" "$ALICE_GITHUB_ALLOWED_IDS"\n'
+    )
+    result = subprocess.run(
+        ["bash", "-c", script],
+        input="short-token-value\n",
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "short-token-value|||"

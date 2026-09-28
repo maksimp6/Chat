@@ -42,6 +42,8 @@ reach the server over the deploy SSH session's stdin, like `ALICE_SHORT_TOKEN`.
 The OAuth App must use the homepage `https://maxxxpavlov.ru` and the callback
 `https://maxxxpavlov.ru/auth/github/callback`. Visitors on `maxxxpavlov.online`
 are sent to the `.ru` host first, because an OAuth App has one callback host.
+Cookies are per host, so an anonymous history started on `.online` is not
+linked; the GitHub account gets the `.ru` browser's anonymous user or a new one.
 
 ## Limits
 
