@@ -12,7 +12,6 @@ PROJECT_ROOT_PYTHON = {
 LEGACY_ROOT_PYTHON = {
     "agent_context.py",
     "agent_gateway.py",
-    "agent_runner.py",
     "agent_tools.py",
     "alice_agent_runner.py",
     "api_contracts.py",
@@ -148,6 +147,6 @@ def test_browser_modules_live_in_package_not_repository_root():
 
 
 def test_pruned_legacy_agent_loops_stay_deleted():
-    pruned = {"run_agent.py", "run_agent_loop.py", "yandex_agent_loop.py"}
+    pruned = {"agent_runner.py", "run_agent.py", "run_agent_loop.py", "yandex_agent_loop.py"}
     resurrected = sorted(name for name in pruned if (ROOT / name).exists())
     assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
