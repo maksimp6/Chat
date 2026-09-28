@@ -15,10 +15,11 @@ RUN apt-get update \
 
 RUN addgroup --system --gid 10001 alice \
     && adduser --system --uid 10001 --gid 10001 --home /home/alice --no-create-home alice \
-    && mkdir -p /home/alice /app/data /app/logs \
-    && chown -R alice:alice /home/alice /app
+    && mkdir -p /home/alice /app/data /app/logs
 
-COPY --chown=alice:alice . .
+COPY . .
+
+RUN chown -R alice:alice /home/alice /app/data /app/logs
 
 ENV HOME=/home/alice
 USER alice
