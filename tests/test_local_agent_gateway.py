@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from flask import Flask
 
-import local_agent_gateway
+import agents.local_gateway as local_agent_gateway
 
 
 @pytest.fixture()
