@@ -269,19 +269,21 @@ def append_voice_audio():
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 403
-    if session.closed:
-        return _closed_error()
-
     chunk = request.get_data(cache=False)
     if not chunk:
         return jsonify({"error": "audio chunk is empty"}), 400
-    if len(session.audio) + len(chunk) > _MAX_AUDIO_BYTES:
-        return jsonify({"error": "audio exceeds 1 MiB limit"}), 413
-    if session.audio and session.audio_content_type != request.content_type:
-        return jsonify({"error": "audio content type cannot change within a session"}), 400
-    session.audio_content_type = request.content_type or "application/octet-stream"
-    session.audio.extend(chunk)
-    return jsonify({"accepted_bytes": len(chunk), "total_bytes": len(session.audio)})
+    # Same lock as close, so a chunk is either in the enqueued job or rejected.
+    with _sessions_lock:
+        if session.closed:
+            return _closed_error()
+        if len(session.audio) + len(chunk) > _MAX_AUDIO_BYTES:
+            return jsonify({"error": "audio exceeds 1 MiB limit"}), 413
+        if session.audio and session.audio_content_type != request.content_type:
+            return jsonify({"error": "audio content type cannot change within a session"}), 400
+        session.audio_content_type = request.content_type or "application/octet-stream"
+        session.audio.extend(chunk)
+        total = len(session.audio)
+    return jsonify({"accepted_bytes": len(chunk), "total_bytes": total})
 
 
 @voice_bp.get("/api/voice/events")
@@ -364,6 +366,8 @@ def close_voice_session():
         if session.closed:
             return _closed_error()
         session.closed = True
+        audio = bytes(session.audio)
+        audio_content_type = session.audio_content_type
     # The job id is the session id, so events and output survive a web restart.
     # The session (and its audio) is dropped only once the job is persisted, so a
     # failed enqueue can be retried with the same audio.
@@ -376,8 +380,8 @@ def close_voice_session():
                 "model": session.model,
                 "voice": session.voice,
                 "response_mode": session.response_mode,
-                "audio_content_type": session.audio_content_type,
-                "audio_b64": base64.b64encode(bytes(session.audio)).decode("ascii"),
+                "audio_content_type": audio_content_type,
+                "audio_b64": base64.b64encode(audio).decode("ascii"),
             },
             job_id=session.session_id,
         )

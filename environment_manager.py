@@ -664,9 +664,16 @@ def authorize_environment_runtime(
 def _local_runtime(environment_id: str) -> "EnvironmentRuntime":
     with _RUNTIME_WORKERS_LOCK:
         runtime = _RUNTIME_WORKERS.get(environment_id)
-    if runtime is not None:
-        return runtime
     item = _get(environment_id)
+    if runtime is not None:
+        lost = item is not None and (
+            item["status"] != "RUNNING" or item["runtime_instance"] != INSTANCE_ID
+        )
+        if not lost:
+            return runtime
+        # Another instance reclaimed or stopped this runtime: stop serving it here.
+        runtime.stop()
+        raise RuntimeError("environment runtime is no longer owned by this instance")
     if item and item["status"] == "RUNNING" and _owned_by_live_instance(item):
         raise RuntimeError(
             f"environment runtime is running on another instance: {item['runtime_instance']}"
@@ -791,24 +798,28 @@ def start_environment(
 ) -> Dict[str, Any]:
     item = _require(environment_id, owner_id)
     _transition(item["status"], "RUNNING")
+    # Reserve ownership atomically before starting the thread, so two instances
+    # that both saw STOPPED cannot both start the runtime.
+    conn = get_conn()
+    try:
+        reserved = conn.execute(
+            """
+            UPDATE environments
+               SET status = ?, runtime_pid = NULL, runtime_port = NULL,
+                   runtime_instance = ?, runtime_heartbeat_at = ?,
+                   started_at = ?, updated_at = ?, error = NULL
+             WHERE environment_id = ? AND status = ?
+            """,
+            ("RUNNING", INSTANCE_ID, _now(), _now(), _now(), environment_id, item["status"]),
+        ).rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    if reserved != 1:
+        raise ValueError("environment is already being started by another instance")
     runtime = EnvironmentRuntime(item)
     try:
         thread_id = runtime.start()
-        conn = get_conn()
-        try:
-            conn.execute(
-                """
-                UPDATE environments
-                   SET status = ?, runtime_pid = NULL, runtime_port = NULL,
-                       runtime_instance = ?, runtime_heartbeat_at = ?,
-                       started_at = ?, updated_at = ?, error = NULL
-                 WHERE environment_id = ?
-                """,
-                ("RUNNING", INSTANCE_ID, _now(), _now(), _now(), environment_id),
-            )
-            conn.commit()
-        finally:
-            conn.close()
         item.update(
             {
                 "status": "RUNNING",
@@ -833,7 +844,12 @@ def start_environment(
         conn = get_conn()
         try:
             conn.execute(
-                "UPDATE environments SET status = ?, error = ?, updated_at = ? WHERE environment_id = ?",
+                """
+                UPDATE environments
+                   SET status = ?, error = ?, runtime_instance = NULL,
+                       runtime_heartbeat_at = NULL, updated_at = ?
+                 WHERE environment_id = ?
+                """,
                 ("FAILED", str(exc), _now(), environment_id),
             )
             conn.commit()
@@ -851,6 +867,10 @@ def stop_environment(
     _transition(item["status"], "STOPPED")
     with _RUNTIME_WORKERS_LOCK:
         runtime = _RUNTIME_WORKERS.get(environment_id)
+    if runtime is None and _owned_by_live_instance(item):
+        raise ValueError(
+            f"environment runtime is running on another instance: {item['runtime_instance']}"
+        )
     if runtime is not None:
         runtime.stop()
     conn = get_conn()

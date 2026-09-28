@@ -30,6 +30,7 @@ RUNNING = "running"
 DONE = "done"
 FAILED = "failed"
 LEASE_EXPIRED_ERROR = "worker lease expired too many times"
+_EVENT_INSERT_ATTEMPTS = 5
 
 
 class DuplicateJobError(ValueError):
@@ -369,14 +370,24 @@ class SqlTaskQueue(TaskQueue):
     def append_event(self, job_id, event):
         conn = self._conn()
         try:
-            conn.execute(
-                """
-                INSERT INTO task_events (job_id, seq, event_json, created_at)
-                SELECT ?, COALESCE(MAX(seq), 0) + 1, ?, ? FROM task_events WHERE job_id = ?
-                """,
-                (job_id, json.dumps(event, ensure_ascii=False), _now_ms(), job_id),
-            )
-            conn.commit()
+            # MAX(seq)+1 can collide when two workers emit for one job at once
+            # (a lease expired mid-run); retry on the primary-key conflict.
+            for attempt in range(_EVENT_INSERT_ATTEMPTS):
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO task_events (job_id, seq, event_json, created_at)
+                        SELECT ?, COALESCE(MAX(seq), 0) + 1, ?, ?
+                          FROM task_events WHERE job_id = ?
+                        """,
+                        (job_id, json.dumps(event, ensure_ascii=False), _now_ms(), job_id),
+                    )
+                    conn.commit()
+                    return
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+                    if attempt == _EVENT_INSERT_ATTEMPTS - 1:
+                        raise
         finally:
             conn.close()
 

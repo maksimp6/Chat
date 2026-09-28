@@ -343,3 +343,15 @@ def test_voice_closed_session_is_scoped_to_owner(client, monkeypatch):
     assert client.get(f"/api/voice/events?session_id={session_id}").status_code == 403
     assert client.post(f"/api/voice/audio?session_id={session_id}", data=b"x").status_code == 403
     assert client.post("/api/voice/close", json={"session_id": session_id}).status_code == 403
+
+
+def test_voice_audio_content_type_cannot_change(client):
+    session_id = client.post("/api/voice/session", json={}).get_json()["session_id"]
+    first = client.post(
+        f"/api/voice/audio?session_id={session_id}", data=b"a", content_type="audio/ogg"
+    )
+    assert first.status_code == 200
+    second = client.post(
+        f"/api/voice/audio?session_id={session_id}", data=b"b", content_type="audio/webm"
+    )
+    assert second.status_code == 400

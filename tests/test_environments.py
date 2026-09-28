@@ -325,3 +325,51 @@ def test_environment_tables_add_runtime_owner_columns_to_old_schema(tmp_path, mo
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(environments)")}
     conn.close()
     assert {"runtime_instance", "runtime_heartbeat_at"} <= columns
+
+
+def test_environment_start_reserves_ownership_atomically(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    item = create_environment("feature/one")
+    environment_id = item["environment_id"]
+    stale = dict(_status(environment_id))
+    # Another instance won the race after this one read STOPPED.
+    _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now())
+    monkeypatch.setattr(environment_manager, "_require", lambda *args, **kwargs: dict(stale))
+    with pytest.raises(ValueError, match="already being started by another instance"):
+        start_environment(environment_id)
+    assert _status(environment_id)["runtime_instance"] == "other-host:1:abc"
+
+
+def test_environment_stop_rejects_runtime_on_another_live_instance(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    environment_id = create_environment("feature/one")["environment_id"]
+    _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now())
+    with pytest.raises(ValueError, match="running on another instance: other-host:1:abc"):
+        stop_environment(environment_id)
+    assert _status(environment_id)["status"] == "RUNNING"
+
+
+def test_local_runtime_that_lost_ownership_stops_serving(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    environment_id = create_environment("feature/one")["environment_id"]
+    start_environment(environment_id)
+    _set_runtime_owner(environment_id, "other-host:1:abc", environment_manager._now())
+    with pytest.raises(RuntimeError, match="no longer owned by this instance"):
+        dispatch_environment_revision(environment_id, "invoke", {"value": "x"})
+    with environment_manager._RUNTIME_WORKERS_LOCK:
+        assert environment_id not in environment_manager._RUNTIME_WORKERS
+
+
+def test_environment_start_failure_releases_ownership(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    environment_id = create_environment("feature/one")["environment_id"]
+
+    def broken_start(self):
+        raise RuntimeError("worktree unavailable")
+
+    monkeypatch.setattr(environment_manager.EnvironmentRuntime, "start", broken_start)
+    with pytest.raises(RuntimeError, match="worktree unavailable"):
+        start_environment(environment_id)
+    failed = _status(environment_id)
+    assert (failed["status"], failed["error"]) == ("FAILED", "worktree unavailable")
+    assert failed["runtime_instance"] is None

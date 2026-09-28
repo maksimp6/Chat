@@ -1,4 +1,5 @@
 import runpy
+import sqlite3
 import sys
 import threading
 
@@ -257,3 +258,35 @@ def test_cli_drains_queue(monkeypatch):
     assert exit_info.value.code == 0
     assert get_task_queue().get(job_id).status == DONE
     assert "voice_routes" in sys.modules
+
+
+class _ConflictingConnection:
+    """Wraps a SQLite connection and fails the first N task_events inserts."""
+
+    def __init__(self, conn, conflicts):
+        self._conn = conn
+        self._conflicts = conflicts
+
+    def execute(self, sql, params=()):
+        if "INSERT INTO task_events" in sql and self._conflicts[0] > 0:
+            self._conflicts[0] -= 1
+            raise sqlite3.IntegrityError("UNIQUE constraint failed: task_events.seq")
+        return self._conn.execute(sql, params)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+@pytest.mark.parametrize(("conflicts", "stored"), [(1, True), (5, False)])
+def test_sql_event_append_retries_sequence_conflicts(conflicts, stored):
+    remaining = [0]
+    queue = SqlTaskQueue(connect=lambda: _ConflictingConnection(db.get_conn(), remaining))
+    job_id = queue.enqueue("demo", {})
+    remaining[0] = conflicts
+    if stored:
+        queue.append_event(job_id, {"type": "x"})
+        assert queue.events(job_id) == [(1, {"type": "x"})]
+    else:
+        with pytest.raises(sqlite3.IntegrityError):
+            queue.append_event(job_id, {"type": "x"})
+        assert queue.events(job_id) == []
