@@ -92,6 +92,7 @@ Environment: `production`
 Secrets:
 
 - `ALICE_SHORT_TOKEN`
+- `SUPABASE_SECRET_KEY` (server-only Supabase API key used by Alice Pro at runtime; do not use the CLI personal access token here)
 - `PREVIEW_SSH_HOST`
 - `PREVIEW_SSH_USER`
 - `PREVIEW_SSH_PRIVATE_KEY`
