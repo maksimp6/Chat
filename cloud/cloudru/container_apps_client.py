@@ -186,6 +186,8 @@ class CloudRuContainerAppsClient:
         params = {"projectId": self._project(), "pageSize": 100}
         containers: list[dict[str, Any]] = []
         seen_tokens: set[str] = set()
+        seen_names: set[str] = set()
+        declared_total: int | None = None
         while True:
             body = self.client.request(SERVICE, "GET", "/v2/containers", params=dict(params))
             items = body.get("data")
@@ -198,20 +200,35 @@ class CloudRuContainerAppsClient:
                 raise CloudProviderError(
                     "Cloud.ru returned invalid container inventory", code="invalid_response"
                 )
+            for item in items:
+                if item["name"] in seen_names:
+                    raise CloudProviderError(
+                        "Cloud.ru returned duplicate container inventory", code="invalid_response"
+                    )
+                seen_names.add(item["name"])
+            if "total" in body:
+                total = body["total"]
+                if (
+                    type(total) is not int
+                    or total < 0
+                    or (declared_total is not None and total != declared_total)
+                ):
+                    raise CloudProviderError(
+                        "Cloud.ru returned invalid inventory total", code="invalid_response"
+                    )
+                declared_total = total
             containers.extend(items)
+            if declared_total is not None and len(containers) > declared_total:
+                raise CloudProviderError(
+                    "Cloud.ru returned inconsistent container inventory", code="invalid_response"
+                )
             token = body.get("nextPageToken")
             if token is None or token == "":
-                total = body.get("total")
-                if total is not None:
-                    try:
-                        incomplete = int(total) > len(containers)
-                    except (TypeError, ValueError, OverflowError):
-                        incomplete = True
-                    if incomplete:
-                        raise CloudProviderError(
-                            "Cloud.ru returned incomplete container inventory",
-                            code="invalid_response",
-                        )
+                if declared_total is not None and len(containers) != declared_total:
+                    raise CloudProviderError(
+                        "Cloud.ru returned incomplete container inventory",
+                        code="invalid_response",
+                    )
                 return containers
             if not isinstance(token, str) or token in seen_tokens:
                 raise CloudProviderError(
@@ -235,10 +252,13 @@ class CloudRuContainerAppsClient:
             # Live v2 returns 499 for a missing name in an empty project. Only
             # successful, complete inventory can establish absence in that case;
             # a 499 for an existing app must still fail, never trigger creation.
-            if exc.http_status == 499 and not any(
-                app["name"] == name for app in self.list_containers()
-            ):
-                return None
+            if exc.http_status == 499:
+                try:
+                    inventory = self.list_containers()
+                except CloudProviderError as inventory_error:
+                    raise exc from inventory_error
+                if not any(app["name"] == name for app in inventory):
+                    return None
             raise
 
     def status(self, name: str) -> dict[str, Any]:

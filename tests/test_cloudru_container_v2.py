@@ -91,9 +91,60 @@ def test_499_existing_name_on_later_page_must_not_create(monkeypatch):
 )
 def test_499_failed_or_invalid_inventory_must_not_create(monkeypatch, inventory):
     apps, calls = _client(monkeypatch, [(499, {}), *inventory])
-    with pytest.raises(CloudProviderError):
+    with pytest.raises(CloudProviderError) as error:
         apps.deploy(ContainerSpec(name="alice-pro", image="new-image"))
+    assert error.value.http_status == 499
+    assert isinstance(error.value.__cause__, CloudProviderError)
     assert all(call[0] == "GET" for call in calls)
+
+
+@pytest.mark.parametrize("total", [None, True, False, -1, 0.0, 0.5, "0", "invalid"])
+def test_inventory_rejects_invalid_totals_on_nonterminal_pages(monkeypatch, total):
+    apps, calls = _client(
+        monkeypatch,
+        [(499, {}), (200, {"data": [], "total": total, "nextPageToken": "next"})],
+    )
+    with pytest.raises(CloudProviderError) as error:
+        apps.deploy(ContainerSpec(name="alice-pro", image="new-image"))
+    assert error.value.http_status == 499
+    assert all(call[0] == "GET" for call in calls)
+
+
+@pytest.mark.parametrize(
+    "last_page",
+    [
+        {"data": []},  # Earlier total must not be forgotten.
+        {"data": [], "total": 1},  # Changed totals are not a complete snapshot.
+        {"data": [{"name": "other"}], "total": 2},  # Duplicates can hide an unseen app.
+        {"data": [{"name": "second"}, {"name": "third"}], "total": 2},
+    ],
+)
+def test_499_inconsistent_paginated_inventory_must_not_create(monkeypatch, last_page):
+    apps, calls = _client(
+        monkeypatch,
+        [
+            (499, {}),
+            (200, {"data": [{"name": "other"}], "total": 2, "nextPageToken": "next"}),
+            (200, last_page),
+        ],
+    )
+    with pytest.raises(CloudProviderError) as error:
+        apps.deploy(ContainerSpec(name="alice-pro", image="new-image"))
+    assert error.value.http_status == 499
+    assert error.value.__cause__.code == "invalid_response"
+    assert all(call[0] == "GET" for call in calls)
+
+
+@pytest.mark.parametrize("last_total", [{}, {"total": 2}])
+def test_inventory_retains_consistent_total_across_pages(monkeypatch, last_total):
+    apps, _ = _client(
+        monkeypatch,
+        [
+            (200, {"data": [{"name": "first"}], "total": 2, "nextPageToken": "next"}),
+            (200, {"data": [{"name": "second"}], **last_total}),
+        ],
+    )
+    assert [app["name"] for app in apps.list_containers()] == ["first", "second"]
 
 
 @pytest.mark.parametrize("operation", ["update", "restore"])
