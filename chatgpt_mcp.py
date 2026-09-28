@@ -18,15 +18,15 @@ from typing import Any, Callable, Mapping, Optional
 from flask import Blueprint, Response, jsonify, request
 
 from agent_gateway import AgentGateway
-from invocation_api import get_invocation_status, get_invocation_trace
-from invocation_manager import (
+from invocation.api import get_invocation_status, get_invocation_trace
+from invocation.manager import (
     create_invocation,
     start_invocation,
     persist_invocation_trace,
     finish_invocation,
     fail_invocation,
 )
-from invocation_trace import create_invocation_trace
+from invocation.trace import create_invocation_trace
 from session_manager import get_session
 from db import get_conversations, get_messages
 from conversation_ownership import list_owned_conversations, get_owned_conversation, check_access
