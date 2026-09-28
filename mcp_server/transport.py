@@ -8,10 +8,10 @@ from .protocol import (
     DEFAULT_PROTOCOL_VERSION,
     MCP_PATH,
     OAUTH_SCOPE,
-    PUBLIC_BASE_URL,
     SUPPORTED_PROTOCOL_VERSIONS,
     _error_response,
     _jsonrpc_result,
+    _public_base_url,
     _request_protocol_version,
     _server_info,
 )
@@ -24,7 +24,7 @@ chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
 @chatgpt_mcp_bp.route("/.well-known/oauth-protected-resource", methods=["GET"])
 def oauth_protected_resource() -> Response:
     issuer = os.getenv("ALICE_MCP_OAUTH_ISSUER", "").rstrip("/")
-    resource = PUBLIC_BASE_URL or request.url_root.rstrip("/")
+    resource = _public_base_url() or request.url_root.rstrip("/")
     body = {
         "resource": resource,
         "authorization_servers": [issuer] if issuer else [],

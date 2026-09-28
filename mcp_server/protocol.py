@@ -19,6 +19,10 @@ OAUTH_SCOPE = os.getenv("ALICE_MCP_OAUTH_SCOPE", "alice.read")
 PUBLIC_BASE_URL = os.getenv("ALICE_MCP_PUBLIC_URL", "").rstrip("/")
 
 
+def _public_base_url() -> str:
+    return os.getenv("ALICE_MCP_PUBLIC_URL", "").rstrip("/") or PUBLIC_BASE_URL
+
+
 def _sanitize_error_string(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
@@ -26,6 +30,18 @@ def _sanitize_error_string(value: Any) -> str:
     if "Traceback (most recent call last):" in text:
         return "Internal error"
     return text.splitlines()[0]
+
+
+def _sanitize_error_payload(value: Any) -> Any:
+    if isinstance(value, str):
+        return _sanitize_error_string(value)
+    if isinstance(value, list):
+        return [_sanitize_error_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_error_payload(item) for item in value]
+    if isinstance(value, Mapping):
+        return {str(key): _sanitize_error_payload(item) for key, item in value.items()}
+    return value
 
 
 def _server_info() -> dict[str, str]:
@@ -55,11 +71,7 @@ def _jsonrpc_error(
 ) -> Response:
     error: dict[str, Any] = {"code": code, "message": _sanitize_error_string(message)}
     if data is not None:
-        error["data"] = (
-            _sanitize_error_string(data)
-            if isinstance(data, str) and "Traceback (most recent call last):" in data
-            else data
-        )
+        error["data"] = _sanitize_error_payload(data)
     return Response(
         json.dumps(
             {"jsonrpc": "2.0", "id": request_id, "error": error},

@@ -5,7 +5,6 @@ from flask import Flask
 
 import chatgpt_mcp
 import mcp_server
-from mcp_server import auth as mcp_auth
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
 
@@ -122,7 +121,7 @@ def test_mcp_bearer_auth_is_enforced_even_when_anonymous_mode_was_enabled(client
 def test_mcp_unauthorized_challenge_includes_protected_resource_metadata(client, monkeypatch):
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "test-token")
     monkeypatch.setenv("ALICE_MCP_USER_ID", "user-1")
-    monkeypatch.setattr(mcp_auth, "PUBLIC_BASE_URL", "https://alice.example")
+    monkeypatch.setenv("ALICE_MCP_PUBLIC_URL", "https://alice.example")
     response = mcp_request(client, "tools/list")
     assert response.status_code == 401
     challenge = response.headers["WWW-Authenticate"]

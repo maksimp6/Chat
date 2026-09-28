@@ -6,7 +6,7 @@ from typing import Any, Mapping, Optional
 
 from flask import request
 
-from .protocol import OAUTH_SCOPE, PUBLIC_BASE_URL, _jsonrpc_error
+from .protocol import OAUTH_SCOPE, _jsonrpc_error, _public_base_url
 
 
 def _truthy(value: str | None) -> bool:
@@ -32,9 +32,10 @@ def _auth_mode() -> str:
 
 
 def _protected_resource_url() -> Optional[str]:
-    if not PUBLIC_BASE_URL:
+    public_base_url = _public_base_url()
+    if not public_base_url:
         return None
-    return f"{PUBLIC_BASE_URL}/.well-known/oauth-protected-resource"
+    return f"{public_base_url}/.well-known/oauth-protected-resource"
 
 
 def _www_authenticate() -> Optional[str]:
