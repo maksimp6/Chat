@@ -54,6 +54,16 @@ def test_registry_rejects_unknown_registration():
         BrowserAdapterRegistry().register("missing", FakeAdapter())
 
 
+def test_registry_registers_known_adapter():
+    registry = BrowserAdapterRegistry()
+    registry.register("browser_local", FakeAdapter({"success": True, "data": {"ok": True}}))
+
+    result = registry.execute(BrowserAction("browser_local", "inspect", "page"))
+
+    assert result["success"] is True
+    assert result["data"] == {"ok": True}
+
+
 def test_registry_sanitizes_successful_result():
     registry = BrowserAdapterRegistry(
         {"browser_local": FakeAdapter({"success": True, "data": {"cookie": "secret"}})}
