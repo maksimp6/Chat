@@ -193,7 +193,9 @@ def test_a2a_reads_endpoint_from_agent_card(monkeypatch):
         return R(json.dumps({"jsonrpc": "2.0", "id": body["id"], "result": {"ok": True}}).encode())
 
     monkeypatch.setattr("agent_gateway.urlopen", fake)
-    client = A2AClient(A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json"))
+    client = A2AClient(
+        A2AClientConfig(agent_card_url="https://agent.example/.well-known/agent.json")
+    )
     result = client.send_message({"message": {"role": "user", "parts": [{"text": "hi"}]}})
     assert result == {"ok": True}
     assert captured["method"] == "message/send"
