@@ -12,12 +12,12 @@ import hashlib
 import json
 import re
 import secrets
-import sqlite3
 import time
 import uuid
 from typing import Any, Mapping, Optional
 
 from db import get_conn
+from db_backend import IntegrityError
 
 _INSTALLATION_RE = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 _SENSITIVE_KEY_RE = re.compile(
@@ -289,7 +289,7 @@ def _link_github_account(
             (_hash_auth_token(auth_token), now, user_id),
         )
         conn.commit()
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         conn.rollback()
         raise
     finally:
@@ -317,7 +317,7 @@ def sign_in_with_github(
     auth_token = _new_auth_token()
     try:
         user_id, new_user = _link_github_account(github_id, login, current_user_id, auth_token)
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         # A concurrent sign-in created the link first; the retry signs in as it.
         user_id, new_user = _link_github_account(github_id, login, current_user_id, auth_token)
 
