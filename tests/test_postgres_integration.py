@@ -129,3 +129,45 @@ def test_postgres_observability_migration_is_idempotent():
     finally:
         conn.close()
     assert len(rows) == 1
+
+
+def test_postgres_github_sign_in_promotes_anonymous_user_once():
+    _require_postgres()
+    import threading
+    import uuid
+
+    from user_identity import (
+        authenticate_user_token,
+        get_github_login,
+        init_github_accounts_table,
+        register_anonymous_user,
+        sign_in_with_github,
+    )
+
+    init_github_accounts_table()  # app.py creates the table at startup
+    suffix = uuid.uuid4().hex
+    anon = register_anonymous_user(f"pg-installation-{suffix}", {})
+    base = int(uuid.uuid4().int % 10**12)
+    github_ids = (base, base + 1)
+    results = []
+    barrier = threading.Barrier(len(github_ids))
+
+    def sign_in(github_id):
+        barrier.wait()
+        results.append(sign_in_with_github(github_id, f"login-{github_id}", anon["user_id"]))
+
+    threads = [threading.Thread(target=sign_in, args=(gid,)) for gid in github_ids]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(results) == 2
+    promoted = [r for r in results if r["user_id"] == anon["user_id"]]
+    assert len(promoted) == 1
+    assert get_github_login(anon["user_id"]) == promoted[0]["github_login"]
+    for result in results:
+        assert authenticate_user_token(result["auth_token"]) == result["user_id"]
+
+    again = sign_in_with_github(promoted[0]["github_login"].split("-")[1], "renamed")
+    assert again["user_id"] == anon["user_id"]

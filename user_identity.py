@@ -250,18 +250,16 @@ def _link_github_account(
             if current_user_id:
                 # Only an anonymous user may be promoted; a user already backed by
                 # another GitHub account must never gain a second one this way.
-                row = conn.execute(
-                    "SELECT id FROM users WHERE id = ? AND status = 'anonymous'",
-                    (str(current_user_id),),
-                ).fetchone()
-                if row is not None:
-                    user_id = str(row["id"])
-                    # Retiring the installation id stops anonymous bootstrap from
-                    # minting tokens for the promoted user.
-                    conn.execute(
-                        "UPDATE users SET installation_id = ? WHERE id = ?",
-                        (_github_installation_id(github_id), user_id),
-                    )
+                # The status check sits in the UPDATE itself, so of two concurrent
+                # callbacks only one can promote the row. Retiring the installation
+                # id stops anonymous bootstrap from minting tokens for it.
+                promoted = conn.execute(
+                    """UPDATE users SET status = 'github', installation_id = ?
+                       WHERE id = ? AND status = 'anonymous'""",
+                    (_github_installation_id(github_id), str(current_user_id)),
+                )
+                if promoted.rowcount == 1:
+                    user_id = str(current_user_id)
             if user_id is None:
                 user_id = str(uuid.uuid4())
                 new_user = True

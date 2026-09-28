@@ -40,7 +40,7 @@ from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
 from identity.github_oauth import github_auth_bp, github_login_enabled, login_path
-from user_identity import get_github_login
+from user_identity import get_github_login, init_github_accounts_table
 from conversation_ownership import (
     init_conversation_ownership_table,
     check_access,
@@ -136,6 +136,7 @@ init_runtime_tables()
 init_local_agent_tables()
 init_treasury_tables()
 init_user_identity_table()
+init_github_accounts_table()
 init_conversation_ownership_table()
 init_department_tables()
 from provider_quotas import init_quota_tables
