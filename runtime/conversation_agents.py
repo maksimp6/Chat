@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from invocation_context import InvocationContext
+from invocation.context import InvocationContext
 from trace_manager import ExecutionTrace
 
 from .dispatcher import RuntimeDispatcher, RuntimeScopeViolation
