@@ -17,7 +17,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from flask import Blueprint, Response, jsonify, request
 
-from agent_gateway import AgentGateway
+from agents.gateway import AgentGateway
 from invocation.api import get_invocation_status, get_invocation_trace
 from invocation.manager import (
     create_invocation,
