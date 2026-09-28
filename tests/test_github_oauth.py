@@ -293,3 +293,30 @@ def test_invalid_user_token_is_treated_as_signed_out(github_env, temp_db):
     index.set_cookie("alice_user_token", "not-a-valid-token")
     html = index.get("/").get_data(as_text=True)
     assert "Войти через GitHub" in html
+
+
+def test_github_user_cannot_gain_second_github_account(temp_db):
+    first = sign_in_with_github(1, "account-a")
+    second = sign_in_with_github(2, "account-b", first["user_id"])
+    assert second["user_id"] != first["user_id"]
+    assert second["new_user"] is True
+    assert get_github_login(first["user_id"]) == "account-a"
+    assert get_github_login(second["user_id"]) == "account-b"
+
+
+def test_bootstrap_cannot_mint_token_for_promoted_user(temp_db):
+    anon = register_anonymous_user("web-installation-0003", {})
+    promoted = sign_in_with_github(3, "octocat", anon["user_id"])
+    assert promoted["user_id"] == anon["user_id"]
+
+    # After logout the browser bootstraps its old installation id again.
+    fresh = register_anonymous_user("web-installation-0003", {})
+    assert fresh["new_user"] is True
+    assert fresh["user_id"] != promoted["user_id"]
+    assert authenticate_user_token(fresh["auth_token"]) == fresh["user_id"]
+
+    # A GitHub user's installation id is not a way in either.
+    github_user = sign_in_with_github(293531601, "maksimp6")
+    with pytest.raises(ValueError):
+        register_anonymous_user("github-293531601", {})
+    assert get_github_login(github_user["user_id"]) == "maksimp6"

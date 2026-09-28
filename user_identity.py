@@ -123,6 +123,9 @@ def register_anonymous_user(
                 "auth_token": auth_token,
             }
 
+        if row["status"] != "anonymous":
+            raise ValueError("installation is linked to a signed-in account")
+
         conn.execute(
             """UPDATE users
                SET metadata_json = ?, auth_token_hash = ?, updated_at = ?
@@ -250,8 +253,11 @@ def sign_in_with_github(
         else:
             user_id = None
             if current_user_id:
+                # Only an anonymous user may be promoted; a user already backed by
+                # another GitHub account must never gain a second one this way.
                 row = conn.execute(
-                    "SELECT id FROM users WHERE id = ?", (str(current_user_id),)
+                    "SELECT id FROM users WHERE id = ? AND status = 'anonymous'",
+                    (str(current_user_id),),
                 ).fetchone()
                 if row is not None:
                     user_id = str(row["id"])
@@ -270,9 +276,13 @@ def sign_in_with_github(
                 (github_id, user_id, login, now, now),
             )
 
+        # Retiring the installation id stops anonymous bootstrap from minting
+        # tokens for the promoted user; that installation gets a fresh user.
         conn.execute(
-            "UPDATE users SET status = 'github', auth_token_hash = ?, updated_at = ? WHERE id = ?",
-            (_hash_auth_token(auth_token), now, user_id),
+            """UPDATE users
+               SET status = 'github', installation_id = ?, auth_token_hash = ?, updated_at = ?
+               WHERE id = ?""",
+            (f"github-{github_id}", _hash_auth_token(auth_token), now, user_id),
         )
         conn.commit()
     finally:

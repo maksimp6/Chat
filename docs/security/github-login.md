@@ -13,6 +13,9 @@ It is off until a GitHub OAuth App is configured.
 3. The GitHub account is linked to an Alice user in `github_accounts`:
    a returning account signs in as the same user; a new account is linked to
    the browser's current anonymous user (its history is kept) or to a new user.
+   A user already backed by GitHub never gains a second GitHub account. The
+   promoted user's installation id is retired, so anonymous bootstrap can no
+   longer mint tokens for it.
 4. The browser gets a fresh `alice_user_token` cookie. When the short-token
    gate is on and the login is allowlisted, it also gets the gate session, so
    GitHub sign-in replaces the secret URL.

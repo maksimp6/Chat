@@ -101,7 +101,7 @@ jobs:
         env:
           REMOTE_BASE_DIR: ${{ steps.remote.outputs.base_dir }}
         run: |
-          printf '%s\n%s\n%s\n' "$ALICE_SHORT_TOKEN" "$ALICE_GITHUB_CLIENT_ID" "$ALICE_GITHUB_CLIENT_SECRET" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "read -r token; export ALICE_SHORT_TOKEN=\"$token\"; export ALICE_GITHUB_ALLOWED_LOGINS='$ALICE_GITHUB_ALLOWED_LOGINS'; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
+          printf '%s\n%s\n%s\n' "$ALICE_SHORT_TOKEN" "$ALICE_GITHUB_CLIENT_ID" "$ALICE_GITHUB_CLIENT_SECRET" | ssh -p "$PREVIEW_SSH_PORT" -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 "$PREVIEW_SSH_USER@$PREVIEW_SSH_HOST" "export ALICE_GITHUB_ALLOWED_LOGINS='$ALICE_GITHUB_ALLOWED_LOGINS'; PREVIEW_SERVER_BASE_DIR='$REMOTE_BASE_DIR' bash '$REMOTE_BASE_DIR/production-server.sh' deploy '$REMOTE_BASE_DIR/incoming/production.tar.gz'"
       - name: Wait for trusted HTTPS certificate and health
         run: |
           for domain in maxxxpavlov.ru maxxxpavlov.online; do

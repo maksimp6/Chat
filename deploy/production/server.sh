@@ -15,18 +15,18 @@ ACME_FILE="$ACME_DIR/acme.json"
 log() { printf '[production] %s\n' "$*"; }
 die() { printf '[production] ERROR: %s\n' "$*" >&2; exit 1; }
 
+# Secrets arrive on stdin, one per line, so they never appear in process
+# arguments: the short token, then the optional GitHub OAuth App client id and
+# client secret. Values already in the environment win.
 require_runtime_secret() {
-  if [[ -z "${ALICE_SHORT_TOKEN:-}" ]]; then
-    IFS= read -r ALICE_SHORT_TOKEN || true
-  fi
+  local line
+  IFS= read -r line || true
+  ALICE_SHORT_TOKEN="${ALICE_SHORT_TOKEN:-$line}"
+  IFS= read -r line || true
+  ALICE_GITHUB_CLIENT_ID="${ALICE_GITHUB_CLIENT_ID:-$line}"
+  IFS= read -r line || true
+  ALICE_GITHUB_CLIENT_SECRET="${ALICE_GITHUB_CLIENT_SECRET:-$line}"
   [[ -n "${ALICE_SHORT_TOKEN:-}" ]] || die "ALICE_SHORT_TOKEN is required"
-  # Optional GitHub OAuth App credentials follow the token on stdin, one per line.
-  if [[ -z "${ALICE_GITHUB_CLIENT_ID:-}" ]]; then
-    IFS= read -r ALICE_GITHUB_CLIENT_ID || true
-  fi
-  if [[ -z "${ALICE_GITHUB_CLIENT_SECRET:-}" ]]; then
-    IFS= read -r ALICE_GITHUB_CLIENT_SECRET || true
-  fi
 }
 
 ensure_provider_credential_key() {
