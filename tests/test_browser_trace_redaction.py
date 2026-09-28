@@ -1,6 +1,10 @@
 from browser_adapters import BrowserAdapterRegistry, register_browser_tools
 from trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolCall, UniversalToolDefinition, UniversalToolExecutor
+from universal_tool_platform import (
+    UniversalToolCall,
+    UniversalToolDefinition,
+    UniversalToolExecutor,
+)
 
 
 class TraceAdapter:
@@ -23,7 +27,9 @@ class TraceToolRegistry:
 
     def get_universal_definition(self, name):
         definition = self.definitions.get(name)
-        return None if definition is None else UniversalToolDefinition.from_mapping(name, definition)
+        return (
+            None if definition is None else UniversalToolDefinition.from_mapping(name, definition)
+        )
 
     def execute(self, name, arguments, context=None):
         return self.functions[name](arguments, context or {})
