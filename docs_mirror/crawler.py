@@ -176,9 +176,11 @@ class _MarkdownParser(HTMLParser):
             self._emit("*")
         elif tag == "a":
             href = attrs.get("href")
+            # Links with other schemes (javascript:, mailto:, ...) become plain text.
             target = normalize_url(href, base=self.page_url) if href else None
-            self._href.append(target or href)
-            self._emit("[")
+            self._href.append(target)
+            if target:
+                self._emit("[")
         elif tag == "img":
             alt = (attrs.get("alt") or "").strip()
             src = attrs.get("src")
@@ -221,7 +223,8 @@ class _MarkdownParser(HTMLParser):
             self._emit("*")
         elif tag == "a" and self._href:
             href = self._href.pop()
-            self._emit(f"]({href})" if href else "]")
+            if href:
+                self._emit(f"]({href})")
         elif tag in {"td", "th"} and self._cell is not None and self._row is not None:
             self._row.append(" ".join("".join(self._cell).split()).replace("|", "\\|"))
             self._cell = None
@@ -373,7 +376,11 @@ class Mirror:
         seen: set[str] = set()
         for seed in seeds:
             canonical = normalize_url(seed)
-            if canonical and canonical not in seen:
+            if (
+                canonical
+                and canonical not in seen
+                and in_scope(canonical, self.host, self.prefixes)
+            ):
                 seen.add(canonical)
                 queue.append(canonical)
         visited: set[str] = set()
@@ -393,7 +400,8 @@ class Mirror:
             if queue and self.delay_s:
                 self._sleep(self.delay_s)
         # Pages in scope that we knew about but no longer reach are marked, never deleted.
-        if not queue:
+        # Only after a complete, error-free traversal: a failed page hides its children.
+        if not queue and not stats.errors:
             for url, entry in self.entries.items():
                 if (
                     url not in visited
@@ -417,6 +425,9 @@ class Mirror:
             error = type(exc).__name__
         else:
             error = None if 200 <= result.status < 300 else f"HTTP {result.status}"
+            final = normalize_url(result.final_url) if result.final_url else url
+            if not error and not (final and in_scope(final, self.host, self.prefixes)):
+                error = f"redirected out of scope to {result.final_url}"
         entry["checked_at"] = _now()
         entry["http_status"] = result.status
         if error or "html" not in (result.content_type or "html"):
@@ -424,7 +435,7 @@ class Mirror:
             if result.status in {404, 410}:
                 entry["status"] = "missing" if entry.get("sha256") else "error"
             else:
-                entry.setdefault("status", "error")
+                entry["status"] = "error"
             self.entries[url] = entry
             stats.errors += 1
             stats.events.append({"url": url, "result": "error", "error": entry["error"]})

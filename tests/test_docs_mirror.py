@@ -259,3 +259,52 @@ def test_requests_fetcher_maps_response(monkeypatch):
     result = crawler.requests_fetcher(timeout=3)(f"{BASE}/a")
     assert result == FetchResult(200, "<p>hi</p>", "text/html", "Mon", f"{BASE}/a")
     assert calls[0][1] == 3 and "AliceProDocsMirror" in calls[0][2]["User-Agent"]
+
+
+def test_unsupported_link_schemes_become_plain_text():
+    html = '<main><a href="javascript:alert(1)">bad</a> <a href="/docs/svc/ug/b">ok</a></main>'
+    _, md, _ = html_to_markdown(html, f"{BASE}/a")
+    assert "javascript" not in md
+    assert "bad [ok](https://cloud.ru/docs/svc/ug/b)" in md
+
+
+def test_out_of_scope_seeds_are_ignored(tmp_path):
+    site = FakeSite({"https://cloud.ru/docs/other/x": page("X", "x")})
+    stats = make_mirror(tmp_path, site).crawl(
+        ["https://cloud.ru/docs/other/x", "https://evil.test/docs/svc"]
+    )
+    assert site.requests == []
+    assert stats.as_dict()["created"] == 0
+
+
+def test_redirect_out_of_scope_is_not_stored(tmp_path):
+    def fetcher(url):
+        return FetchResult(status=200, text=page("Evil", "x"), final_url="https://evil.test/page")
+
+    stats = make_mirror(tmp_path, fetcher).crawl([f"{BASE}/index"])
+    manifest = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert stats.errors == 1
+    assert manifest["svc/ug/index.md"]["error"].startswith("redirected out of scope")
+    assert not (tmp_path / "svc/ug/index.md").exists()
+
+
+def test_failed_refresh_marks_error_and_skips_missing_sweep(tmp_path):
+    site = FakeSite(
+        {
+            f"{BASE}/index": page("Index", "hello", [f"{BASE}/a"]),
+            f"{BASE}/a": page("A", "alpha", [f"{BASE}/b"]),
+            f"{BASE}/b": page("B", "beta"),
+        }
+    )
+    make_mirror(tmp_path, site).crawl([f"{BASE}/index"])
+
+    def flaky(url):
+        if url.endswith("/a"):
+            return FetchResult(status=503)
+        return site(url)
+
+    stats = make_mirror(tmp_path, flaky).crawl([f"{BASE}/index"])
+    manifest = {p["path"]: p for p in json.loads((tmp_path / "manifest.json").read_text())["pages"]}
+    assert stats.errors == 1 and stats.missing == 0
+    assert manifest["svc/ug/a.md"]["status"] == "error"
+    assert manifest["svc/ug/b.md"]["status"] == "ok"
