@@ -52,9 +52,11 @@ Flask / app.py
 * `archiver.py` — архивация;
 * `file_manager.py` — управление файлами.
 
-### 4. AI‑агенты
-* `cli_agent.py` — CLI‑агент;
-* интеграция с **Yandex AI Studio** для генерации ответов.
+### 4. AI‑адаптеры и агенты
+* `cli_agent.py` — CLI/Termux‑адаптер к каноническому backend runtime;
+* `alice_agent_runner.py` — GitHub issue adapter;
+* `local_tool_agent.py` — Android/local tool adapter;
+* Yandex AI Studio подключается через общий provider/Responses pipeline, а не напрямую из интерфейсных адаптеров.
 
 ### 5. Система хранения
 * **SQLite** (`db.py`) — основное хранилище данных;

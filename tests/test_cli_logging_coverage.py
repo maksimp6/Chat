@@ -1,7 +1,5 @@
-import json
 import logging
 import runpy
-from types import SimpleNamespace
 
 import pytest
 from flask import Flask
@@ -28,131 +26,239 @@ class FakeLog:
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self.payload = payload
-        self.raised = False
-
-    def raise_for_status(self):
-        self.raised = True
+        self.status_code = status_code
 
     def json(self):
         return self.payload
 
 
-def test_cli_query_llm_builds_yandex_request(monkeypatch):
-    captured = {}
-    response = FakeResponse({"result": {"alternatives": [{"message": {"text": '{"text":"ok"}'}}]}})
+class FakeSession:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
 
-    def fake_post(url, headers, json, timeout):
-        captured.update(url=url, headers=headers, json=json, timeout=timeout)
-        return response
-
-    monkeypatch.setenv("YANDEX_PROJECT_ID", "project-1")
-    monkeypatch.setenv("YANDEX_API_KEY", "secret")
-    monkeypatch.setattr(cli_agent.requests, "post", fake_post)
-
-    result = cli_agent.query_llm([{"role": "user", "text": "hello"}])
-
-    assert result == '{"text":"ok"}'
-    assert response.raised is True
-    assert captured["url"] == cli_agent.API_URL
-    assert captured["headers"]["Authorization"] == "Api-Key secret"
-    assert captured["json"]["modelUri"] == "gpt://project-1/yandexgpt/latest"
-    assert captured["timeout"] == 60
+    def request(self, method, url, json, timeout):
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "json": json,
+                "timeout": timeout,
+            }
+        )
+        return self.responses.pop(0)
 
 
-@pytest.mark.parametrize(
-    ("stdout", "stderr", "returncode", "expected"),
-    [
-        ("hello\n", "", 0, "STDOUT:\nhello\n"),
-        ("", "boom\n", 2, "STDERR:\nboom\n"),
-        ("", "", 0, "(нет вывода)\n"),
-    ],
-)
-def test_cli_run_shell_formats_process_result(
-    monkeypatch, capsys, stdout, stderr, returncode, expected
-):
-    monkeypatch.setattr(
-        cli_agent.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            stdout=stdout,
-            stderr=stderr,
-            returncode=returncode,
-        ),
-    )
-
-    result = cli_agent.run_shell("echo test")
-
-    assert result.startswith(f"EXIT_CODE: {returncode}\n")
-    assert expected in result
-    assert "Выполняю: echo test" in capsys.readouterr().out
-
-
-def test_cli_parse_action_supports_plain_and_fenced_json():
-    assert cli_agent.parse_action('{"text":"plain"}') == {"text": "plain"}
-    assert cli_agent.parse_action('```json\n{"command":"pwd"}\n```') == {"command": "pwd"}
-    with pytest.raises(json.JSONDecodeError):
-        cli_agent.parse_action("not-json")
-
-
-def test_cli_main_runs_command_then_text(monkeypatch, capsys):
-    inputs = iter(["status", "exit"])
-    replies = iter(
+def test_cli_client_routes_conversation_and_chat_through_alice_backend():
+    session = FakeSession(
         [
-            '{"command":"pwd","explanation":"check directory"}',
-            '{"text":"done"}',
+            FakeResponse({"id": "conv-1"}, status_code=201),
+            FakeResponse({"reply": "done"}),
         ]
     )
-    histories = []
-
-    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
-    monkeypatch.setattr(
-        cli_agent,
-        "query_llm",
-        lambda history: histories.append(list(history)) or next(replies),
+    client = cli_agent.AliceCliClient(
+        base_url="https://alice.example",
+        short_token="short-token",
+        model="aliceai-llm",
+        timeout=12,
+        session=session,
     )
-    monkeypatch.setattr(cli_agent, "run_shell", lambda command: "EXIT_CODE: 0\nSTDOUT:\n/tmp\n")
 
-    cli_agent.main()
+    conversation_id = client.create_conversation(title="CLI test")
+    response = client.send_message(conversation_id, "hello", session_id="session-1")
 
-    output = capsys.readouterr().out
-    assert "CLI Agent активен" in output
-    assert "check directory" in output
-    assert "EXIT_CODE: 0" in output
-    assert "AI > done" in output
-    assert histories[0][-1] == {"role": "user", "text": "status"}
-    assert histories[1][-1]["text"].startswith("Вывод команды:")
+    assert conversation_id == "conv-1"
+    assert response["reply"] == "done"
+    assert session.calls[0]["url"] == "https://alice.example/short-token/api/conversations"
+    assert session.calls[0]["json"] == {"title": "CLI test", "model": "aliceai-llm"}
+    assert session.calls[1]["url"] == "https://alice.example/short-token/api/chat"
+    assert session.calls[1]["json"] == {
+        "conversation_id": "conv-1",
+        "session_id": "session-1",
+        "message": "hello",
+        "model": "aliceai-llm",
+    }
+    assert session.calls[1]["timeout"] == 12
 
 
-def test_cli_main_handles_invalid_reply_and_request_failure(monkeypatch, capsys):
-    inputs = iter(["first", "second", "exit"])
-    replies = iter(["not-json", RuntimeError("offline")])
+def test_cli_client_uses_standard_approval_endpoint():
+    session = FakeSession([FakeResponse({"reply": "approved"})])
+    client = cli_agent.AliceCliClient(
+        base_url="http://127.0.0.1:5000",
+        short_token="",
+        model="aliceai-llm",
+        session=session,
+    )
 
-    def fake_query(history):
-        value = next(replies)
-        if isinstance(value, Exception):
-            raise value
-        return value
+    result = client.execute_approved(
+        "conv-1",
+        {"name": "git_push", "arguments": {"remote": "origin"}},
+    )
 
+    assert result == {"reply": "approved"}
+    assert session.calls[0]["url"] == "http://127.0.0.1:5000/api/mcp/execute-approved"
+    assert session.calls[0]["json"] == {
+        "conversation_id": "conv-1",
+        "name": "git_push",
+        "arguments": {"remote": "origin"},
+        "model": "aliceai-llm",
+    }
+
+
+def test_cli_backend_error_does_not_disclose_short_token():
+    client = cli_agent.AliceCliClient(
+        base_url="https://alice.example",
+        short_token="do-not-leak",
+        session=FakeSession([FakeResponse({"error": "authentication required"}, status_code=401)]),
+    )
+
+    with pytest.raises(cli_agent.AliceCliError) as exc:
+        client.create_conversation()
+
+    assert "HTTP 401" in str(exc.value)
+    assert "do-not-leak" not in str(exc.value)
+
+
+def test_cli_main_handles_normal_reply_and_approval(monkeypatch, capsys):
+    class FakeClient:
+        def __init__(self):
+            self.messages = []
+            self.approved = []
+
+        def create_conversation(self, title="Alice Pro CLI"):
+            return "conv-1"
+
+        def send_message(self, conversation_id, message, session_id=None):
+            self.messages.append((conversation_id, message, session_id))
+            if message == "first":
+                return {"reply": "hello"}
+            return {
+                "requires_approval": True,
+                "tool_call": {
+                    "name": "git_push",
+                    "description": "Push changes",
+                    "arguments": {"remote": "origin"},
+                },
+            }
+
+        def execute_approved(self, conversation_id, tool_call):
+            self.approved.append((conversation_id, tool_call))
+            return {"reply": "push complete"}
+
+    fake = FakeClient()
+    inputs = iter(["first", "second", "y", "exit"])
+    monkeypatch.setattr(cli_agent, "AliceCliClient", lambda: fake)
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
-    monkeypatch.setattr(cli_agent, "query_llm", fake_query)
 
     cli_agent.main()
 
     output = capsys.readouterr().out
-    assert "AI > not-json" in output
-    assert "AI request failed: offline" in output
+    assert "каноническому runtime" in output
+    assert "AI > hello" in output
+    assert "Требуется подтверждение" in output
+    assert "AI > push complete" in output
+    assert fake.messages == [
+        ("conv-1", "first", "conv-1"),
+        ("conv-1", "second", "conv-1"),
+    ]
+    assert fake.approved[0][0] == "conv-1"
+    assert fake.approved[0][1]["name"] == "git_push"
 
 
-def test_cli_main_handles_eof_and_module_entrypoint(monkeypatch, capsys):
-    monkeypatch.setattr("builtins.input", lambda prompt: (_ for _ in ()).throw(EOFError()))
+def test_cli_main_handles_backend_failure_and_module_entrypoint(monkeypatch, capsys):
+    class FakeClient:
+        def create_conversation(self, title="Alice Pro CLI"):
+            return "conv-1"
+
+        def send_message(self, conversation_id, message, session_id=None):
+            raise cli_agent.AliceCliError("backend unavailable")
+
+    inputs = iter(["hello", "exit"])
+    monkeypatch.setattr(cli_agent, "AliceCliClient", lambda: FakeClient())
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+
     cli_agent.main()
-    assert "CLI Agent активен" in capsys.readouterr().out
 
+    output = capsys.readouterr().out
+    assert "Alice Pro request failed: backend unavailable" in output
+
+    monkeypatch.setenv("ALICE_CONVERSATION_ID", "conv-existing")
     monkeypatch.setattr("builtins.input", lambda prompt: "exit")
     runpy.run_path(cli_agent.__file__, run_name="__main__")
-    assert "CLI Agent активен" in capsys.readouterr().out
+    assert "Conversation: conv-existing" in capsys.readouterr().out
+
+
+def test_cli_client_handles_transport_invalid_json_and_invalid_payload():
+    class FailingSession:
+        def request(self, *args, **kwargs):
+            raise cli_agent.requests.ConnectionError("offline secret-url")
+
+    client = cli_agent.AliceCliClient(session=FailingSession())
+    with pytest.raises(cli_agent.AliceCliError, match="backend is unavailable"):
+        client.create_conversation()
+
+    class InvalidJsonResponse:
+        status_code = 200
+
+        def json(self):
+            raise ValueError("bad json")
+
+    client = cli_agent.AliceCliClient(session=FakeSession([InvalidJsonResponse()]))
+    with pytest.raises(cli_agent.AliceCliError, match="invalid JSON"):
+        client.create_conversation()
+
+    client = cli_agent.AliceCliClient(session=FakeSession([FakeResponse(["not", "object"])]))
+    with pytest.raises(cli_agent.AliceCliError, match="invalid response"):
+        client.create_conversation()
+
+    client = cli_agent.AliceCliClient(session=FakeSession([FakeResponse({})]))
+    with pytest.raises(cli_agent.AliceCliError, match="conversation id"):
+        client.create_conversation()
+
+
+def test_cli_prints_backend_error_payload(capsys):
+    cli_agent._print_reply({"error": "provider_unavailable"})
+    assert "AI error > provider_unavailable" in capsys.readouterr().out
+
+
+def test_cli_approval_can_be_declined_or_cancelled(monkeypatch, capsys):
+    class NeverApprove:
+        def execute_approved(self, *args, **kwargs):
+            raise AssertionError("approval must not execute")
+
+    payload = {
+        "tool_call": {
+            "name": "dangerous_tool",
+            "description": "Dangerous tool",
+            "arguments": {},
+        }
+    }
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+    cli_agent._handle_approval(NeverApprove(), "conv-1", payload)
+    assert "Действие не выполнено" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: (_ for _ in ()).throw(EOFError()),
+    )
+    cli_agent._handle_approval(NeverApprove(), "conv-1", payload)
+    assert "Действие не выполнено" in capsys.readouterr().out
+
+
+def test_cli_startup_failure_is_reported(monkeypatch, capsys):
+    class BrokenClient:
+        def create_conversation(self, title="Alice Pro CLI"):
+            raise cli_agent.AliceCliError("cannot create conversation")
+
+    monkeypatch.delenv("ALICE_CONVERSATION_ID", raising=False)
+    monkeypatch.setattr(cli_agent, "AliceCliClient", lambda: BrokenClient())
+
+    cli_agent.main()
+
+    assert "CLI startup failed: cannot create conversation" in capsys.readouterr().out
 
 
 def test_force_critical_filter_and_yc_handler(monkeypatch):
