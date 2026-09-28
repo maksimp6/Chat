@@ -1,7 +1,8 @@
 # Cloud.ru Container Apps deployment (baseline)
 
-Status: baseline merged; IAM authentication verified; production deployment blocked
-on API diagnostics and a supported durable-database connection (2026-09-28).
+Status: baseline merged; IAM and the proposed v2 inventory fix verified read-only;
+production rollout pending. API Gateway and persistent bucket volumes are documented,
+but SQLite on a bucket remains an unverified pilot option (2026-09-28 UTC).
 Issue: #427
 
 Alice Pro runs as one Cloud.ru Evolution **Container Apps** service built from an
@@ -22,7 +23,7 @@ Both clients reuse `CloudRuClient`, so requests are traced the same way as the
 rest of the Cloud.ru provider. They authenticate with an IAM bearer token from
 the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
 
-## Database architecture blocker
+## Persistence: current deployment versus the bucket-volume candidate
 
 The current [Cloud.ru Container Apps FAQ](https://cloud.ru/docs/container-apps-evolution/ug/topics/faq__database-connection),
 checked on 2026-09-28, explicitly says that Container Apps cannot connect to
@@ -31,19 +32,94 @@ and pass a connection string between them is therefore not a supported deploymen
 architecture. A PostgreSQL URL passing the CLI's syntax check does not establish
 network connectivity from the application container.
 
-Before provisioning, choose and verify a durable database reachable from the
-selected runtime. Keeping Container Apps requires a separately evaluated external
-PostgreSQL service and its network/TLS/access controls; the FAQ describes external
-database access over the internet and warns about that exposure. Keeping Cloud.ru
-Managed PostgreSQL requires revisiting the runtime/network design. Do not create
-a VM or Kubernetes cluster as an implicit fallback: those are outside the agreed
-Container Apps scope of #427.
+The current CLI and GitHub deployment workflow require `ALICE_DATABASE_URL` to
+select PostgreSQL. This is a guard in Alice's deployment implementation, not a
+claim that Container Apps has no persistent filesystem option. The official
+[volume documentation](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes)
+supports mounting an Object Storage bucket from the same project and explicitly
+includes a SQLite file among its examples. However, the provider's
+[Django tutorial](https://cloud.ru/docs/container-apps-evolution/ug/topics/tutorials__deploy-django-photo-app)
+labels this SQLite configuration as a demonstration and recommends PostgreSQL
+for production because of concurrent writes. A mount alone is not evidence that
+Alice's database workload is safe there.
+
+For the existing PostgreSQL path, evaluate an external database reachable from
+Container Apps, including network/TLS/access controls. The FAQ describes access
+over the internet and warns about exposure. In parallel, the owner's proposed
+bucket-volume architecture can be evaluated on synthetic data under the pilot
+criteria below. Neither a new VM nor Kubernetes is an implicit fallback; both
+remain outside the agreed scope of #427.
 
 Test the selected connection from the actual application runtime, including TLS,
 authentication, and persistence across an instance/revision restart. A connection
 from a Codex or GitHub runner alone does not prove that Container Apps can reach it.
 Keep the existing production data until its backup, transfer and verification
 procedure has been reviewed.
+
+## Proposed API Gateway and Object Storage pilot
+
+The candidate is API Gateway -> one Container Apps service -> Foundation Models,
+with private Object Storage for files and an experimental persistent SQLite
+volume. This can avoid a separately managed database service; it is not a design
+without a database. Alice's `db.py` persists conversations, messages, settings,
+provider credentials and key-management data independently of gateway access.
+
+According to the current
+[API Gateway release notes](https://cloud.ru/docs/api-gateway-svp/ug/topics/overview__release-notes),
+Evolution API Gateway is free during Public Preview and supports Container Apps
+backends plus IAM/API-key authentication. Its former internal username/password
+authorization was removed. The
+[policy guide](https://cloud.ru/docs/api-gateway-svp/ug/topics/guides__configure-policy)
+also documents OpenID Connect; this is not confirmation of arbitrary custom-JWT
+validation without an identity provider. Its remaining basic-auth instructions
+conflict with the newer release notes and should not be used.
+
+Gateway configuration must preserve Alice's existing owner login and MCP/OAuth
+flows until their replacement is designed and tested. IAM identities, service
+API keys and Alice users are different things. Never distribute the deployment
+service account's IAM key as an application login or embed a shared secret in
+browser code. Gateway caller authorization and authorization to the Container
+Apps backend must be configured and tested separately.
+
+For the pilot, keep response caching disabled for chat, authenticated data,
+OAuth and MCP/streaming routes. Check rate-limit responses (use 429), cold-start
+and streaming timeouts, cookies/redirects, MCP discovery and token exchange.
+Prove that the backend cannot bypass the intended access policy. API Gateway
+has a management API; Preview alone is not a reason to require manual console
+configuration.
+
+### Persistence acceptance criteria
+
+1. Use a separate private bucket and synthetic data. Pin the image digest and
+   record the tested revision. Mount a dedicated empty directory, for example
+   `/data/alice`, and verify read/write access as the image's UID/GID 10001.
+   The eventual database path would be `/data/alice/alice_pro.db`; setting
+   `ALICE_DB_PATH` alone does not create a persistent mount.
+2. Establish the provider's locking, flush/durability and revision-overlap
+   semantics. `db.py` currently forces `journal_mode=WAL` and
+   `synchronous=NORMAL`; [SQLite's WAL documentation](https://sqlite.org/wal.html)
+   excludes shared access across network hosts. Do not assume the bucket mount
+   meets WAL's requirements. A switch to a rollback journal also needs filesystem
+   guarantees and is not a generic fix for an object-store mount.
+3. Enforce a single active database writer across revisions as well as a maximum
+   of one instance. `maxInstanceCount=1` by itself is not proof that an old and
+   new revision cannot overlap. Requests/background threads inside one instance
+   can also write concurrently. Leave scale-to-zero disabled for initial tests;
+   exercise it explicitly before enabling it in the proposed 0-to-1 setup.
+4. Verify committed chats/settings after process termination, container stop/start,
+   idle scale-to-zero, a new revision and rollback. Check `PRAGMA integrity_check`,
+   concurrent transactions, backup restoration and write failures such as a full
+   bucket. Record committed transaction IDs outside the container so a fresh empty
+   database cannot accidentally pass the persistence test.
+5. Preserve a consistent SQLite backup and any required provider-credential
+   encryption key before considering real data. Do not copy an open SQLite file
+   without its transaction state. Local tests and one successful restart do not
+   establish the mount's production durability guarantees.
+
+Only after these criteria and the provider's demo-only guidance are resolved
+should a focused change allow persistent SQLite through production preflight.
+The existing PostgreSQL guard stays in place meanwhile. No volume-enabled Alice
+deployment or gateway has been created or verified by these documentation checks.
 
 ## Verified readiness (2026-09-28)
 
@@ -62,6 +138,10 @@ verified the exact merged baseline `a0f1f5277f7d612fd3f44622b48342a21aadfb2d`:
   also observed HTTP 499 for the missing name on v2. A path change alone is not
   enough: confirm absence through complete successful inventory, not a blanket
   interpretation of 499 as "not found".
+- The [published v2 fix's live smoke](https://github.com/maksimp6/Chat/pull/474#issuecomment-5879672549)
+  verified `b10dfeb`: status exits successfully with `NOT_FOUND` after the 499
+  detail response and successful empty v2 inventory. This verifies reads, not
+  create/update operations or a live application rollout.
 - Managed PostgreSQL `GET /v1/clusters` succeeds with HTTP 200 and an empty
   `clusters` list. No existing cluster or authorized `ALICE_DATABASE_URL` source
   was found in the runner.
@@ -83,8 +163,9 @@ between secret stores as part of an inventory check.
 
 ## One-time setup
 
-Resolve the database architecture blocker above before creating resources or
-running `action: deploy`.
+The steps below describe the implemented PostgreSQL deployment path. Resolve
+persistence and review the selected resources/cost before running `action: deploy`.
+The bucket-volume pilot does not yet have a production deployment path.
 
 1. Create a service account in the target project with Artifact Registry
    (push) and Container Apps (admin) roles, and issue an access key.
@@ -158,10 +239,24 @@ documentation's example rates, not a live billing API. A zero cost floor for
 
 The first request after idle pays a cold start.
 
+API Gateway is currently free in Public Preview; that is not a permanent pricing
+commitment. The current
+[Object Storage free tier](https://cloud.ru/docs/evolution/overview/topics/free-tier__object-storage)
+covers 15 GB in Standard storage, 100,000 LIST/POST/PUT and 1,000,000 GET/HEAD
+operations monthly, plus the first 10 TB of monthly outbound traffic. Excess
+usage is billed. The
+[Container Services free tier](https://cloud.ru/docs/evolution/overview/topics/free-tier__container-apps)
+is 25 vCPU-hours and 50 GB-hours per month, shared with any other qualifying
+usage; at the proposed 0.5 vCPU / 1 GiB size, this covers about 50 running hours
+if the allowance is unused. Foundation Models, registry and usage above free
+allowances still need their own estimate. A mounted database can generate storage
+operations even while its file size remains below 15 GB.
+
 ## Known limitations
 
-- **Postgres is mandatory for this deployment.** SQLite lives in the container
-  filesystem and is lost whenever the instance sleeps or a new revision starts.
+- **The current deployment code requires Postgres.** Unmounted SQLite lives in
+  ephemeral container storage. Persistent bucket volumes exist, but the SQLite
+  pilot above is not yet production-qualified for Alice.
   Store `ALICE_DATABASE_URL` for the selected reachable PostgreSQL service as a
   secret; the deploy requires and passes it through and the existing Postgres
   backend takes over. Cloud.ru Managed PostgreSQL is not directly supported by
