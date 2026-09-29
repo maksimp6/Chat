@@ -38,15 +38,6 @@ jobs:
           node-version: "22.22.2"
           cache: npm
           cache-dependency-path: package.json
-      - name: Generate hot-file modularity report
-        run: |
-          python scripts/hot_file_metrics.py \
-            --commits 200 \
-            --top 20 \
-            --json-out hot-file-metrics.json \
-            --markdown-out hot-file-metrics.md
-          cat hot-file-metrics.md
-          cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"
       - name: Install dependencies
         run: |
           started=$SECONDS
@@ -57,6 +48,15 @@ jobs:
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Check source formatting
         run: bash scripts/format.sh check
+      - name: Generate hot-file modularity report
+        run: |
+          python scripts/hot_file_metrics.py \
+            --commits 200 \
+            --top 20 \
+            --json-out hot-file-metrics.json \
+            --markdown-out hot-file-metrics.md
+          cat hot-file-metrics.md
+          cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
