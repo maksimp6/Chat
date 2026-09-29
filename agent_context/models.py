@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from trace_security import sanitize_trace_value
 
 
-_EVIDENCE_COMPONENTS = ("ci", "review", "trace", "files", "policy")
+_EVIDENCE_COMPONENTS = ("ci", "review", "trace", "files", "skills", "policy")
 
 
 def _clean_text(value: Any) -> str:
@@ -74,6 +74,7 @@ class EvidenceVersion:
     review: str = ""
     trace: str = ""
     files: str = ""
+    skills: str = ""
     policy: str = ""
 
     def __post_init__(self) -> None:
