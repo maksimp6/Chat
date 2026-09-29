@@ -127,7 +127,9 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         )
     else:
         for required_name in required_checks:
-            matches = [check for check in check_runs if str(check.get("name") or "") == required_name]
+            matches = [
+                check for check in check_runs if str(check.get("name") or "") == required_name
+            ]
             if not matches:
                 blockers.append(
                     {
