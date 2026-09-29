@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -156,3 +157,30 @@ def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(is
 
     snapshot = json.dumps(trace.make_snapshot(), ensure_ascii=False)
     assert "must-not-leak-anywhere" not in snapshot
+
+
+@pytest.mark.parametrize(
+    "purpose,secret_id,version_id",
+    [
+        ("", "secret-1", "v1"),
+        ("alice_short_token", "", "v1"),
+        ("alice_short_token", "secret-1", ""),
+    ],
+)
+def test_set_ref_rejects_missing_identifiers(isolated_db, purpose, secret_id, version_id):
+    with pytest.raises(ValueError, match="purpose, secret_id and version_id are required"):
+        set_secret_management_ref(isolated_db, purpose, secret_id, version_id)
+
+
+def test_resolve_constructs_default_backend_client(isolated_db):
+    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
+    fake = FakeSecretManagementClient({("secret-1", "v1"): "resolved-default"})
+    with patch(
+        "cloud.cloudru.secret_management.CloudRuSecretManagementClient",
+        return_value=fake,
+    ) as client_type:
+        value = resolve_secret_management_value(isolated_db, "alice_short_token")
+
+    assert value == "resolved-default"
+    client_type.assert_called_once_with()
+    assert fake.calls == [("secret-1", "v1")]
