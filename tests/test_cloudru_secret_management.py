@@ -1,3 +1,4 @@
+import base64
 import json
 from unittest.mock import Mock, patch
 
@@ -14,6 +15,10 @@ def _client(monkeypatch, **kwargs):
     monkeypatch.setenv("CLOUDRU_SECRET_MANAGEMENT_KEY_ID", "runtime-key-id")
     monkeypatch.setenv("CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET", "runtime-key-secret")
     return CloudRuSecretManagementClient(**kwargs)
+
+
+def _secret_payload(value: str):
+    return {"data": base64.b64encode(value.encode("utf-8")).decode("ascii")}
 
 
 def _ok_response(payload):
@@ -50,7 +55,7 @@ def test_get_secret_value_returns_plaintext_and_caches(monkeypatch):
         patch.object(client.iam_client, "_token", return_value="iam-token"),
         patch(
             "cloud.cloudru.secret_management.requests.get",
-            return_value=_ok_response({"value": "top-secret-value"}),
+            return_value=_ok_response(_secret_payload("top-secret-value")),
         ) as get,
     ):
         first = client.get_secret_value("secret-1", "v1")
@@ -66,8 +71,8 @@ def test_get_secret_value_returns_plaintext_and_caches(monkeypatch):
 def test_new_pinned_version_bypasses_stale_cache(monkeypatch):
     client = _client(monkeypatch, cache_ttl=30.0)
     responses = [
-        _ok_response({"value": "value-v1"}),
-        _ok_response({"value": "value-v2"}),
+        _ok_response(_secret_payload("value-v1")),
+        _ok_response(_secret_payload("value-v2")),
     ]
     with (
         patch.object(client.iam_client, "_token", return_value="iam-token"),
@@ -125,7 +130,7 @@ def test_disabled_cache_refetches_every_call(monkeypatch):
         patch.object(client.iam_client, "_token", return_value="iam-token"),
         patch(
             "cloud.cloudru.secret_management.requests.get",
-            return_value=_ok_response({"value": "v"}),
+            return_value=_ok_response(_secret_payload("v")),
         ) as get,
     ):
         client.get_secret_value("secret-1", "v1")
@@ -155,7 +160,7 @@ def test_secret_value_never_reaches_trace_on_success(monkeypatch):
         patch("cloud.cloudru.secret_management.get_current_trace", return_value=trace),
         patch(
             "cloud.cloudru.secret_management.requests.get",
-            return_value=_ok_response({"value": "never-trace-me"}),
+            return_value=_ok_response(_secret_payload("never-trace-me")),
         ),
     ):
         value = client.get_secret_value("secret-1", "v1")
@@ -298,7 +303,7 @@ def test_trace_helper_is_noop_without_trace():
 
 @pytest.mark.parametrize("payload", [None, ["not", "an", "object"]])
 def test_value_response_rejects_invalid_json_shapes(payload):
-    response = _ok_response({"value": "placeholder"})
+    response = _ok_response(_secret_payload("placeholder"))
     if payload is None:
         response.json.side_effect = ValueError("invalid json")
     else:
@@ -315,7 +320,7 @@ def test_uses_official_secret_manager_endpoint_and_payload_route(monkeypatch):
         patch.object(client.iam_client, "_token", return_value="iam-token"),
         patch(
             "cloud.cloudru.secret_management.requests.get",
-            return_value=_ok_response({"value": "secret-value"}),
+            return_value=_ok_response(_secret_payload("secret-value")),
         ) as get,
     ):
         assert client.get_secret_value("secret-1", "v7") == "secret-value"
@@ -352,3 +357,26 @@ def test_zero_ttl_sweep_clears_plaintext_cache(monkeypatch):
     client._value_cache[("secret-1", "v1")] = (1.0, "plaintext")
     client._sweep_cache(2.0)
     assert client._value_cache == {}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"data": "not-base64%%%"},
+        {"data": base64.b64encode(b"\xff\xfe").decode("ascii")},
+        {"data": ""},
+    ],
+)
+def test_payload_decoder_rejects_invalid_or_non_text_data(payload):
+    response = _ok_response(payload)
+    with pytest.raises(CloudProviderError) as exc:
+        CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
+    assert exc.value.code == "invalid_response"
+
+
+def test_payload_decoder_returns_decoded_utf8_secret():
+    response = _ok_response(_secret_payload("пароль-42"))
+    assert (
+        CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
+        == "пароль-42"
+    )
