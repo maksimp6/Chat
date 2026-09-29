@@ -289,3 +289,90 @@ def test_scope_invalidation_removes_all_evidence_versions():
     assert removed == 2
     assert len(cache) == 0
     assert cache.lookup(scope, _evidence(ci="ci-2")).status == "miss"
+
+def test_cache_lookup_rejects_invalid_status():
+    try:
+        from agent_context.cache import CacheLookup
+
+        CacheLookup(status="stale", cache_key="key")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid cache status must be rejected")
+
+
+def test_cache_missing_entry_behind_latest_pointer_fails_closed():
+    cache = TaskContextCache()
+    packet = _packet()
+    cache_key = cache.put(packet)
+    cache._entries.pop(cache_key)
+
+    result = cache.lookup(packet.scope, _evidence(ci="ci-2"))
+
+    assert result.status == "miss"
+    assert result.packet is None
+
+
+def test_evidence_fingerprint_is_deterministic():
+    first = _evidence()
+    second = _evidence()
+
+    assert first.fingerprint() == second.fingerprint()
+
+
+def test_evidence_ref_requires_kind_and_reference():
+    for kwargs in (
+        {"kind": "", "ref": "ref"},
+        {"kind": "github_pr", "ref": ""},
+    ):
+        try:
+            EvidenceRef(**kwargs)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("evidence kind and ref must be required")
+
+
+def test_context_slice_validates_name_dependencies_and_usage():
+    invalid_cases = (
+        {"name": "", "payload": {}},
+        {"name": "bad-dependency", "payload": {}, "depends_on": ("unknown",)},
+        {"name": "bad-bytes", "payload": {}, "source_bytes": -1},
+        {"name": "bad-tokens", "payload": {}, "input_tokens": -1},
+    )
+    for kwargs in invalid_cases:
+        try:
+            ContextSlice(**kwargs)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid context slice accepted: {kwargs['name']}")
+
+
+def test_task_packet_requires_objective_and_deliverable():
+    for objective, deliverable in (("", "result"), ("task", "")):
+        try:
+            TaskPacket(
+                scope=_scope(),
+                evidence=_evidence(),
+                objective=objective,
+                expected_deliverable=deliverable,
+            )
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("blank task packet contract field must be rejected")
+
+
+def test_task_packet_sanitizes_escalation_target():
+    packet = TaskPacket(
+        scope=_scope(),
+        evidence=_evidence(),
+        objective="Escalate safely",
+        expected_deliverable="Safe escalation",
+        escalation_target="authorization: Bearer supersecret",
+    )
+
+    assert "supersecret" not in packet.escalation_target
+    assert "<redacted>" in packet.escalation_target
+
