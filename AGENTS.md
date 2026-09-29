@@ -69,7 +69,7 @@ owner (@maksimp6) does not merge by hand.
   from the stale head.
 - After final-review fixes, do not request a second review cycle. Any new head
   still requires protected CI to pass and all review threads to remain resolved.
-- Prefer protected auto-merge once the gate is satisfied. Never force-update,
+- Use protected auto-merge once the gate is satisfied. Never force-update,
   rewrite, or bypass protection on `master`.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
