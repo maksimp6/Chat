@@ -8,7 +8,7 @@ WORKFLOW = ROOT / ".github" / "workflows" / "merge-readiness.yml"
 def test_merge_readiness_workflow_is_read_only_and_exact_head() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "name: Merge readiness" in workflow
+    assert "name: Merge readiness snapshot" in workflow
     assert "contents: read" in workflow
     assert "checks: read" in workflow
     assert "pull-requests: read" in workflow
@@ -61,5 +61,4 @@ def test_merge_readiness_workflow_rechecks_after_review_events() -> None:
     assert "types: [submitted, dismissed]" in workflow
     assert "pull_request_review_comment:" in workflow
     assert "types: [created, edited, deleted]" in workflow
-    assert "pull_request_review_thread:" in workflow
-    assert "types: [resolved, unresolved]" in workflow
+    assert "pull_request_review_thread:" not in workflow
