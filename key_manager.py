@@ -11,10 +11,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import os
-import sqlite3
 from typing import Any, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
+
+from db_backend import Row
 
 
 class KeyManagerError(RuntimeError):
@@ -118,7 +119,7 @@ def _ensure_schema() -> None:
         conn.close()
 
 
-def _get_row(key_ref: str) -> sqlite3.Row:
+def _get_row(key_ref: str) -> Row:
     from db import get_conn
 
     _ensure_schema()
@@ -135,7 +136,7 @@ def _get_row(key_ref: str) -> sqlite3.Row:
     return row
 
 
-def _check_active(row: sqlite3.Row) -> None:
+def _check_active(row: Row) -> None:
     status = row["status"]
     if status == "revoked":
         raise KeyRevokedError(f"Key '{row['key_ref']}' is revoked")
@@ -317,7 +318,7 @@ def rotate_key(
     return new_meta
 
 
-def _metadata(row: sqlite3.Row) -> KeyMetadata:
+def _metadata(row: Row) -> KeyMetadata:
     return KeyMetadata(
         key_ref=str(row["key_ref"]),
         name=str(row["name"]),

@@ -1,8 +1,7 @@
 """Schema additions for serverless/sessioned execution."""
 
-import sqlite3
-
 from db import get_conn
+from db_backend import OperationalError
 
 
 def init_runtime_tables() -> None:
@@ -21,7 +20,7 @@ def init_runtime_tables() -> None:
         # Existing installations created before completed_at need the additive migration.
         try:
             conn.execute("ALTER TABLE sessions ADD COLUMN completed_at INTEGER")
-        except sqlite3.OperationalError as exc:
+        except OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():
                 raise
         conn.execute("""
@@ -45,7 +44,7 @@ def init_runtime_tables() -> None:
         # Existing installations created before trace persistence need the additive migration.
         try:
             conn.execute("ALTER TABLE invocations ADD COLUMN trace_json TEXT NOT NULL DEFAULT '{}'")
-        except sqlite3.OperationalError as exc:
+        except OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():
                 raise
         conn.execute(

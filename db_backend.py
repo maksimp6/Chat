@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Union
 
 try:
     import psycopg
@@ -63,6 +63,15 @@ class PGRow:
 
     def __repr__(self) -> str:
         return repr(self._mapping)
+
+
+# Row returned by a cursor, regardless of the selected backend.
+Row = Union[sqlite3.Row, PGRow]
+
+# PGCursor raises these same sqlite3 exception types (see execute/executemany
+# below), so application code can catch one type across both backends.
+IntegrityError = sqlite3.IntegrityError
+OperationalError = sqlite3.OperationalError
 
 
 def translate_sql(sql: str) -> str:
