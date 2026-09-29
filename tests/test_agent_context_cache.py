@@ -96,7 +96,6 @@ def _packet(scope=None, evidence=None):
     )
 
 
-
 def test_scope_rejects_missing_authoritative_provenance():
     for field in ("repository", "work_item", "base_sha", "head_sha", "role"):
         kwargs = {
@@ -113,6 +112,7 @@ def test_scope_rejects_missing_authoritative_provenance():
             pass
         else:
             raise AssertionError(f"{field} must be required")
+
 
 def test_scope_and_cache_key_are_deterministic():
     first = _scope(skills=("github-pr-readiness", "github-ci-diagnosis"))
