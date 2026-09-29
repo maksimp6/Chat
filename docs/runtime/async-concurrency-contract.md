@@ -30,14 +30,11 @@ Concurrent tasks must preserve independent:
 - bound `ExecutionTrace` context.
 
 Crossing an `await` boundary must not leak another invocation's bound trace
-context. The current regression suite proves event-loop task isolation and proves
-persisted trace correlation when work is delegated with `asyncio.to_thread(...)`
-and the trace is passed explicitly.
-
-The suite does not currently prove implicit `ContextVar` propagation by reading
-`get_current_trace()` inside the worker thread. Code that depends on worker-side
-bound context needs a focused regression test before that behavior is treated as a
-runtime guarantee.
+context. The regression suite proves event-loop task isolation, persisted trace
+correlation when work is delegated with `asyncio.to_thread(...)`, and implicit
+`ContextVar` propagation by reading `get_current_trace()` inside worker threads.
+Concurrent workers must observe only the trace bound by their own originating
+task.
 
 Process-global mutable state is not a substitute for request/runtime context.
 
@@ -50,15 +47,11 @@ stopped. Code must distinguish:
 2. cancellation of the domain operation;
 3. physical termination of a running thread or provider operation.
 
-For invocation lifecycle state, cancellation is explicit. The current regression
-suite proves that cancelling one asyncio waiter does not corrupt a sibling
-invocation and that an already-cancelled invocation rejects the worker's later
-duplicate cancellation transition.
-
-The suite does not yet exercise a late worker calling `finish_invocation()` after
-external cancellation. Do not treat protection against a late
-`cancelled -> completed` transition as test-proven until that focused regression
-exists.
+For invocation lifecycle state, cancellation is explicit. The regression suite
+proves that cancelling one asyncio waiter does not corrupt a sibling invocation,
+that an already-cancelled invocation rejects a later duplicate cancellation
+transition, and that a late worker calling `finish_invocation()` after external
+cancellation cannot overwrite terminal `cancelled` state with `completed`.
 
 Sibling invocations/tasks must remain independent. Cancelling one waiter must not
 corrupt another invocation, session, trace, quota bucket, or budget account.
@@ -114,14 +107,14 @@ SQLite database when `ALICE_DATABASE_URL` is active.
 
 ## Task cleanup
 
-The async test harness includes a baseline cleanup check that snapshots the
-event-loop task set before and after harness-owned short-lived tasks complete. This
-guards against leaking tasks created by that harness pattern.
+The async test harness snapshots the event-loop task set before and after both
+short-lived harness tasks and representative invocation lifecycle work executed
+through `asyncio.to_thread(...)`. Newly created pending tasks must not remain
+after the operation completes.
 
-The current check does not wrap representative runtime work such as invocation,
-cancellation, or gateway timeout flows, so it is not evidence that the production
-runtime cannot leak asyncio tasks. Runtime-wide leak claims require a focused
-before/after regression around real runtime operations.
+This proves cleanup for the covered runtime pattern; it is not a universal claim
+that arbitrary future native-async code cannot leak tasks. New task-owning
+boundaries still require focused before/after cleanup coverage.
 
 Thread cleanup is a separate concern from asyncio task cleanup.
 
@@ -171,9 +164,11 @@ document, then add focused tests for the new cancellation and cleanup behavior.
 The current regression surface includes:
 
 - concurrent invocation/trace persistence isolation across event-loop tasks;
+- worker-side `ContextVar` / bound ExecutionTrace propagation through `asyncio.to_thread`;
 - cancellation without sibling corruption;
+- late `finish_invocation()` after external cancellation cannot overwrite terminal state;
 - AgentGateway timeout observation plus sibling isolation;
-- baseline async harness task cleanup;
+- representative invocation lifecycle task cleanup;
 - budget reservation contention and mutation-control;
 - provider quota reservation atomicity;
 - SQLite and PostgreSQL CI execution.
