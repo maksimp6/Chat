@@ -52,3 +52,32 @@ def test_bootstrap_rejects_falsey_non_object_metadata_without_registering(monkey
     assert response.status_code == 400
     assert response.get_json() == {"error": "metadata must be an object"}
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("request_kwargs", "expected_installation_id"),
+    [
+        ({}, None),
+        ({"json": {"installation_id": "existing-default-behavior"}}, "existing-default-behavior"),
+    ],
+)
+def test_bootstrap_defaults_missing_body_or_metadata_to_empty_object(
+    monkeypatch, request_kwargs, expected_installation_id
+):
+    calls = []
+
+    def register(installation_id, metadata):
+        calls.append((installation_id, metadata))
+        return {
+            "user_id": "anonymous-user",
+            "auth_token": "test-token",
+        }
+
+    monkeypatch.setattr(app_module, "register_anonymous_user", register)
+    app_module.app.config["TESTING"] = True
+
+    response = app_module.app.test_client().post("/api/users/bootstrap", **request_kwargs)
+
+    assert response.status_code == 200
+    assert response.get_json()["user_id"] == "anonymous-user"
+    assert calls == [(expected_installation_id, {})]
