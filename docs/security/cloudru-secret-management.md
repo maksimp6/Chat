@@ -132,10 +132,14 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   `version_disabled` (наилучшее известное соответствие, см. предупреждение
   выше). Код ошибки стабилен и пригоден для программной обработки вызывающим
   кодом.
-- Plaintext-значение **не кешируется в процессе вообще**. Каждый вызов
-  `get_secret_value` получает payload заново и передаёт его только прямому
-  backend-caller. Параметры `cache_ttl`/`cache_max_entries` сохранены лишь
-  для совместимости API и не разрешают хранение plaintext.
+- Secret Management client **не держит process-global plaintext cache**.
+  Каждый вызов `get_secret_value` получает payload заново и передаёт его
+  прямому backend-caller. Параметры `cache_ttl`/`cache_max_entries`
+  сохранены лишь для совместимости API и не разрешают client-side cache.
+- Пока request-scoped `ExecutionTrace` остаётся mutable, plaintext временно
+  хранится только во внутреннем redaction registry, чтобы очищать последующие
+  trace events по значению. После успешного `finalize()` registry очищается,
+  а frozen snapshot уже содержит только redacted данные.
 - Нет отдельного "разрешённого" fallback-пути на чтение/запись в открытом
   виде — при недоступности API вызывающий код получает исключение.
 
