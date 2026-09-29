@@ -44,10 +44,12 @@ def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
 def test_merge_readiness_workflow_wait_is_bounded_and_fail_closed() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "max_attempts=60" in workflow
+    assert "max_attempts=180" in workflow
     assert "sleep 5" in workflow
-    assert 'retryable = {"check_pending", "required_check_missing", "review_threads"}' in workflow
+    assert 'retryable = {"check_pending", "required_check_missing"}' in workflow
     assert "Merge readiness timed out waiting for required checks." in workflow
+    assert "emit_summary" in workflow
+    assert workflow.count("emit_summary") >= 3
     assert 'exit "$status"' in workflow
     assert "cancel-in-progress: true" in workflow
 
@@ -59,3 +61,5 @@ def test_merge_readiness_workflow_rechecks_after_review_events() -> None:
     assert "types: [submitted, dismissed]" in workflow
     assert "pull_request_review_comment:" in workflow
     assert "types: [created, edited, deleted]" in workflow
+    assert "pull_request_review_thread:" in workflow
+    assert "types: [resolved, unresolved]" in workflow
