@@ -16,9 +16,7 @@ def _call(action):
     return {
         "type": "function_call",
         "name": "browser_local",
-        "arguments": (
-            '{"action":"' + action + '","target":"page","value":null}'
-        ),
+        "arguments": ('{"action":"' + action + '","target":"page","value":null}'),
         "call_id": "browser-call",
     }
 
