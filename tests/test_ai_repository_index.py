@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 
 from scripts.build_ai_index import build_index
 
@@ -86,3 +87,45 @@ def test_python_ast_index_json_is_machine_readable(tmp_path):
 
     assert decoded == payload
     assert decoded["files"][0]["calls"] == ["print"]
+
+
+def test_python_ast_index_keeps_nested_functions_distinct_from_methods(tmp_path):
+    _write(
+        tmp_path,
+        "nested.py",
+        """
+def outer():
+    def inner():
+        return 1
+
+    class Local:
+        def method(self):
+            return inner()
+
+    return Local().method()
+""".strip()
+        + "\n",
+    )
+
+    payload = build_index(tmp_path)
+    nested = payload["files"][0]
+    kinds = {
+        symbol["qualified_name"]: symbol["kind"]
+        for symbol in nested["symbols"]
+    }
+
+    assert kinds["outer"] == "function"
+    assert kinds["outer.inner"] == "function"
+    assert kinds["outer.Local"] == "class"
+    assert kinds["outer.Local.method"] == "method"
+
+
+def test_python_ast_index_prefers_git_tracked_files(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    _write(tmp_path, "tracked.py", "def tracked():\n    return 1\n")
+    _write(tmp_path, "untracked.py", "def untracked():\n    return 2\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "tracked.py"], check=True)
+
+    payload = build_index(tmp_path)
+
+    assert [item["path"] for item in payload["files"]] == ["tracked.py"]
