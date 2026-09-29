@@ -12,7 +12,8 @@ def async_runtime_db(tmp_path, monkeypatch):
     import session_manager
 
     path = tmp_path / "async-concurrency.db"
-    monkeypatch.setattr(db, "DB_PATH", str(path))
+    if not db.postgres_url_from_env():
+        monkeypatch.setattr(db, "DB_PATH", str(path))
     monkeypatch.setattr(session_manager, "get_conn", db.get_conn)
     monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
     monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
@@ -277,3 +278,121 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypat
     assert slow_result.status == "error"
     assert slow_result.attempts == 1
     assert "timed out" in (slow_result.error or "")
+
+
+@pytest.mark.asyncio
+async def test_async_budget_reservations_do_not_oversubscribe_balance():
+    from decimal import Decimal
+
+    from budget_controller import (
+        AccountType,
+        BudgetAccount,
+        BudgetController,
+        BudgetLimitExceeded,
+        BudgetLimits,
+        InsufficientFunds,
+    )
+
+    limits = BudgetLimits("50", "300", "300")
+    controller = BudgetController(
+        "ASYNC-BUDGET-001",
+        BudgetAccount(AccountType.REAL, "EUR", allocated="100", limits=limits),
+        BudgetAccount(AccountType.DEMO, "EUR", allocated="1000", limits=limits),
+        fallback_to_demo=False,
+    )
+    start_barrier = threading.Barrier(4)
+
+    def attempt():
+        start_barrier.wait(timeout=5)
+        try:
+            controller.reserve("30", account_type=AccountType.REAL)
+            return True
+        except (InsufficientFunds, BudgetLimitExceeded):
+            return False
+
+    results = await asyncio.gather(*(asyncio.to_thread(attempt) for _ in range(4)))
+
+    real = controller.account(AccountType.REAL)
+    assert sum(results) == 3
+    assert real.reserved == Decimal("90.00")
+    assert real.spent == Decimal("0.00")
+    assert real.available == Decimal("10.00")
+
+
+@pytest.mark.asyncio
+async def test_async_budget_harness_exposes_missing_lock_oversubscription():
+    from decimal import Decimal
+
+    from budget_controller import AccountType, BudgetAccount, BudgetController, BudgetLimits
+
+    limits = BudgetLimits("50", "300", "300")
+    controller = BudgetController(
+        "ASYNC-BUDGET-MUTATION",
+        BudgetAccount(AccountType.REAL, "EUR", allocated="100", limits=limits),
+        BudgetAccount(AccountType.DEMO, "EUR", allocated="1000", limits=limits),
+        fallback_to_demo=False,
+    )
+    persist_barrier = threading.Barrier(4)
+
+    class NoOpLock:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    controller._lock = NoOpLock()
+    controller._persist = lambda *_args, **_kwargs: persist_barrier.wait(timeout=5)
+
+    async def attempt():
+        await asyncio.to_thread(controller.reserve, "30", account_type=AccountType.REAL)
+
+    await asyncio.gather(*(attempt() for _ in range(4)))
+
+    real = controller.account(AccountType.REAL)
+    assert real.reserved == Decimal("120.00")
+    assert real.available == Decimal("-20.00")
+
+
+@pytest.mark.asyncio
+async def test_async_provider_quota_reservations_are_atomic(async_runtime_db):
+    from provider_quotas import (
+        ProviderQuotaExceeded,
+        assign_user_policy,
+        get_usage,
+        init_quota_tables,
+        reserve_request,
+        upsert_policy,
+    )
+
+    await asyncio.to_thread(init_quota_tables)
+    await asyncio.to_thread(
+        upsert_policy,
+        "async-five",
+        period_seconds=3600,
+        max_requests=5,
+        max_requests_per_minute=0,
+    )
+    await asyncio.to_thread(assign_user_policy, "async-quota-user", "async-five")
+
+    async def attempt():
+        try:
+            reservation = await asyncio.to_thread(
+                reserve_request,
+                "async-quota-user",
+                now=3_600_001,
+            )
+            assert reservation is not None
+            return ("ok", reservation.reserved_request_number)
+        except ProviderQuotaExceeded as exc:
+            assert exc.reason == "period_quota_exhausted"
+            return ("denied", None)
+
+    results = await asyncio.gather(*(attempt() for _ in range(16)))
+
+    successful_numbers = sorted(number for kind, number in results if kind == "ok")
+    assert successful_numbers == [1, 2, 3, 4, 5]
+    assert sum(kind == "denied" for kind, _ in results) == 11
+
+    usage = await asyncio.to_thread(get_usage, "async-quota-user", now=3_600_001)
+    assert usage["usage"]["requests"] == 5
