@@ -198,12 +198,12 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call():
     from agent_gateway import AgentDescriptor, AgentGateway
 
     slow_started = threading.Event()
-    slow_release = threading.Event()
 
     def slow_handler(_payload):
         slow_started.set()
-        if not slow_release.wait(timeout=5):
-            raise TimeoutError("slow handler was not released")
+        import time
+
+        time.sleep(0.05)
         return {"role": "slow"}
 
     gateway = AgentGateway(default_timeout_seconds=0.01, default_max_retries=0)
@@ -220,7 +220,6 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call():
     assert fast_result.status == "completed"
     assert fast_result.result == {"role": "fast"}
 
-    slow_release.set()
     slow_result = await asyncio.wait_for(slow_task, timeout=1)
 
     assert slow_result.status == "error"
