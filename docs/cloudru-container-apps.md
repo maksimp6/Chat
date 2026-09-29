@@ -72,31 +72,6 @@ The registry host is fixed to the official `cr.cloud.ru` domain; any
 Container Apps image runs as the unprivileged `alice` user (UID/GID 10001) and
 only pre-creates its application data and log directories as writable paths.
 
-## Container Apps v2 control-plane contract
-
-The client in `master` uses the Cloud.ru Container Apps v2 control-plane
-contract covered by deterministic repository tests:
-
-- detail reads use `GET /v2/containers/{name}` with `projectId` in the query;
-- list reads use paginated `GET /v2/containers` and collect every object from
-  the response `data` array;
-- pagination continues through `nextPageToken`; missing, `null`, or an empty
-  string terminates the list, while non-string or repeated tokens fail with
-  `invalid_response` instead of silently returning a truncated inventory;
-- updates use `PATCH /v2/containers/{name}`; `projectId` is sent in the PATCH
-  body rather than as a query parameter;
-- PATCH and rollback payloads are built from an allowlist of supported writable
-  fields. Response-only values such as ingress `publicUri`, `internalUri`, and
-  generated port mapping URLs are not sent back to the API;
-- rollback restores the previous writable configuration, including image,
-  environment, scaling, resources and supported ingress settings, without
-  copying provider-owned response fields.
-
-These contracts describe the client code currently shipped in `master`. They
-do **not** prove that IAM permissions, database connectivity, rollout behavior,
-readiness, or health checks have been validated against a live Cloud.ru project.
-That remains a separate deployment verification step.
-
 ## Cost
 
 Defaults: 0.5 vCPU / 1 GiB, scale to zero (`CLOUDRU_MIN_INSTANCES=0`), at most
@@ -126,10 +101,9 @@ The first request after idle pays a cold start.
   work or Container Apps jobs.
 - **App secrets are plain container env vars**, visible to anyone with Container
   Apps read access in the project. Move them to a secret store as a follow-up.
-- **Live control-plane validation is still pending.** The v2 paths, pagination,
-  PATCH body placement and writable-field allowlists are covered by deterministic
-  repository tests, but a real project must still confirm IAM permissions,
-  connectivity, rollout behavior and provider responses end to end.
+- **API field names are unconfirmed.** The rendered API reference is not
+  machine-readable; paths and bodies were cross-checked against a working
+  community client. Confirm them on the first live deploy.
 - **Readiness does not track revisions yet.** The deploy waits for the new image
   digest and a running status. A rollout that keeps the same digest (config
   only) can pass that check while the old revision still serves, so the health
