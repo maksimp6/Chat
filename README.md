@@ -14,6 +14,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Alice GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Alice GitHub agent](docs/agents/alice-github-agent.md).
 - **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
 - **Treasury and billing controls**, internal usage accounting and demo balances.
+- **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
 - **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
@@ -125,6 +126,7 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [Current scope](docs/integration/current-scope.md)
 - [API overview](docs/api/overview.md)
 - [MCP overview](docs/mcp/overview.md)
+- [3D Printing Business](docs/printing3d.md)
 - [Agent architecture](docs/agents/overview.md)
 - [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
 - [Alice GitHub agent](docs/agents/alice-github-agent.md)
