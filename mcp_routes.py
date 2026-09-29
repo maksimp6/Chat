@@ -5,7 +5,7 @@ import logging
 import json as _json
 from yandex_client import YandexResponsesClient
 from config import Config, calculate_full_cost
-from trace_manager import ExecutionTrace
+from trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
     start_invocation,
@@ -119,6 +119,7 @@ def chat():
 
     t_start = _time.perf_counter()
     trace = None
+    trace_token = None
     invocation = None
     trace_data = {}
     conv_id = None
@@ -147,6 +148,7 @@ def chat():
             user_id=owner_id,
         )
         trace = create_invocation_trace(invocation)
+        trace_token = bind_current_trace(trace)
         start_invocation(invocation.invocation_id)
         trace.set_request(
             {
@@ -349,6 +351,7 @@ def chat():
                         session_id or conv_id, conv_id, metadata={"model": model_key}
                     )
                     trace = create_invocation_trace(invocation)
+                    trace_token = bind_current_trace(trace)
                     start_invocation(invocation.invocation_id)
                 else:
                     trace = ExecutionTrace()
@@ -422,7 +425,6 @@ def chat():
                     "trace": trace_data,
                 }
             ), 500
-
         except Exception:
             logger.exception("[CHAT] Не удалось сохранить ExecutionTrace")
             return jsonify(
@@ -433,6 +435,9 @@ def chat():
                     "trace": {},
                 }
             ), 500
+    finally:
+        if trace_token is not None:
+            reset_current_trace(trace_token)
 
 
 @mcp_bp.route("/api/tools/categories", methods=["GET"])

@@ -10,7 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
+import threading
 from typing import Any, Callable, Optional
+
+from trace_manager import get_current_trace
 
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)
@@ -170,6 +173,18 @@ def create_schema(db: Any) -> None:
     db.execute("""
         CREATE INDEX IF NOT EXISTS idx_provider_credentials_provider_status_expires
         ON provider_credentials (provider, status, expires_at)
+    """)
+
+    # Cloud.ru Secret Management refs: only the (immutable) secret/version
+    # identifiers live here, never a secret value. See SecretManagementRef.
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS secret_management_refs (
+            purpose TEXT PRIMARY KEY,
+            secret_id TEXT NOT NULL,
+            pinned_version_id TEXT NOT NULL,
+            previous_version_id TEXT,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
     """)
 
 
@@ -605,3 +620,165 @@ def record_health_check(
     )
     if commit and hasattr(db, "commit"):
         db.commit()
+
+
+@dataclass(frozen=True)
+class SecretManagementRef:
+    """A local pointer to one immutable Cloud.ru Secret Management version.
+
+    Cloud.ru versions cannot be edited in place, so "rotate" and "rollback"
+    are purely local: which version_id this app currently trusts for a given
+    purpose (e.g. ``alice_short_token``, ``github_oauth_client_secret``,
+    ``provider_credential:yandex``, ``alice_database_url``). The value itself
+    is never stored here; it is resolved on demand through
+    ``resolve_secret_management_value``.
+    """
+
+    purpose: str
+    secret_id: str
+    pinned_version_id: str
+    previous_version_id: Optional[str]
+    updated_at: datetime
+
+
+def set_secret_management_ref(
+    db: Any,
+    purpose: str,
+    secret_id: str,
+    version_id: str,
+    *,
+    now: Optional[datetime] = None,
+) -> SecretManagementRef:
+    """Pin (or switch) one purpose's Cloud.ru Secret Management version.
+
+    Switching to a new version_id for the same secret_id remembers the prior
+    pin so ``rollback_secret_management_ref`` can restore it explicitly.
+    """
+    purpose = (purpose or "").strip()
+    secret_id = (secret_id or "").strip()
+    version_id = (version_id or "").strip()
+    if not purpose or not secret_id or not version_id:
+        raise ValueError("purpose, secret_id and version_id are required")
+
+    db.execute(
+        """
+        INSERT INTO secret_management_refs
+        (purpose, secret_id, pinned_version_id, previous_version_id, updated_at)
+        VALUES (?, ?, ?, NULL, ?)
+        ON CONFLICT(purpose) DO UPDATE SET
+            previous_version_id = CASE
+                WHEN secret_management_refs.secret_id = excluded.secret_id
+                     AND secret_management_refs.pinned_version_id <> excluded.pinned_version_id
+                THEN secret_management_refs.pinned_version_id
+                WHEN secret_management_refs.secret_id = excluded.secret_id
+                THEN secret_management_refs.previous_version_id
+                ELSE NULL
+            END,
+            secret_id = excluded.secret_id,
+            pinned_version_id = excluded.pinned_version_id,
+            updated_at = excluded.updated_at
+        """,
+        (purpose, secret_id, version_id, _as_utc(now or utcnow())),
+    )
+    if hasattr(db, "commit"):
+        db.commit()
+    return get_secret_management_ref(db, purpose)
+
+
+def get_secret_management_ref(db: Any, purpose: str) -> Optional[SecretManagementRef]:
+    row = _fetch_one(
+        db,
+        "SELECT purpose, secret_id, pinned_version_id, previous_version_id, updated_at "
+        "FROM secret_management_refs WHERE purpose = ?",
+        (purpose,),
+    )
+    if not row:
+        return None
+    previous_version_id = row["previous_version_id"]
+    return SecretManagementRef(
+        purpose=str(row["purpose"]),
+        secret_id=str(row["secret_id"]),
+        pinned_version_id=str(row["pinned_version_id"]),
+        previous_version_id=str(previous_version_id) if previous_version_id else None,
+        updated_at=_as_utc(row["updated_at"]),
+    )
+
+
+def rollback_secret_management_ref(
+    db: Any,
+    purpose: str,
+    *,
+    now: Optional[datetime] = None,
+) -> SecretManagementRef:
+    """Swap the pinned version back to the previously pinned one, explicitly."""
+    current = get_secret_management_ref(db, purpose)
+    if current is None:
+        raise NoActiveCredentialError(f"No secret management ref configured for '{purpose}'")
+    if not current.previous_version_id:
+        raise CredentialError(f"No previous version to roll back to for '{purpose}'")
+
+    cursor = db.execute(
+        """
+        UPDATE secret_management_refs
+        SET pinned_version_id = ?, previous_version_id = ?, updated_at = ?
+        WHERE purpose = ?
+          AND pinned_version_id = ?
+          AND previous_version_id = ?
+        """,
+        (
+            current.previous_version_id,
+            current.pinned_version_id,
+            _as_utc(now or utcnow()),
+            purpose,
+            current.pinned_version_id,
+            current.previous_version_id,
+        ),
+    )
+    if cursor.rowcount != 1:
+        if hasattr(db, "rollback"):
+            db.rollback()
+        raise CredentialError(
+            f"Secret management ref changed concurrently for '{purpose}'; retry rollback"
+        )
+    if hasattr(db, "commit"):
+        db.commit()
+    return get_secret_management_ref(db, purpose)
+
+
+_SECRET_MANAGEMENT_CLIENT: Any = None
+_SECRET_MANAGEMENT_CLIENT_LOCK = threading.Lock()
+
+
+def _get_secret_management_client():
+    global _SECRET_MANAGEMENT_CLIENT
+    if _SECRET_MANAGEMENT_CLIENT is None:
+        with _SECRET_MANAGEMENT_CLIENT_LOCK:
+            if _SECRET_MANAGEMENT_CLIENT is None:
+                from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+
+                _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
+    return _SECRET_MANAGEMENT_CLIENT
+
+
+def resolve_secret_management_value(
+    db: Any,
+    purpose: str,
+    client: Any = None,
+) -> str:
+    """Resolve one purpose's pinned Cloud.ru secret to plaintext.
+
+    Backend-only: the caller must not log, trace, cache beyond the client's
+    own bounded cache, or return this value through any client-visible path.
+    There is no fallback path; if Secret Management cannot be reached this
+    raises instead of reading or writing an unencrypted copy anywhere.
+    """
+    ref = get_secret_management_ref(db, purpose)
+    if ref is None:
+        raise NoActiveCredentialError(f"No secret management ref configured for '{purpose}'")
+    if client is None:
+        client = _get_secret_management_client()
+    secret_value = client.get_secret_value(ref.secret_id, ref.pinned_version_id)
+    trace = get_current_trace()
+    if trace is not None:
+        trace.register_sensitive_value(secret_value)
+    return secret_value
