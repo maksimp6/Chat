@@ -1,0 +1,105 @@
+name: Merge readiness
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+
+concurrency:
+  group: merge-readiness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    name: Merge readiness
+    if: github.event.pull_request.base.ref == 'master'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      MERGE_REQUIRED_CHECKS: >-
+        Application tests,
+        PostgreSQL integration,
+        Android debug APK,
+        Auto-format repository,
+        Trivy repository scan,
+        Zizmor GitHub Actions audit,
+        CodeQL (python),
+        CodeQL (javascript-typescript)
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Wait for protected checks and evaluate readiness
+        id: readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          result_file="$RUNNER_TEMP/merge-readiness.json"
+          max_attempts=60
+          attempt=1
+
+          while true; do
+            set +e
+            output="$(python scripts/merge_readiness.py --repo "$GITHUB_REPOSITORY" --pr "$PR_NUMBER" --base master --pretty)"
+            status=$?
+            set -e
+
+            printf '%s\n' "$output" > "$result_file"
+
+            if [ "$status" -eq 0 ]; then
+              break
+            fi
+
+            if python - "$result_file" <<'PY'
+          import json
+          import sys
+
+          path = sys.argv[1]
+          with open(path, encoding="utf-8") as handle:
+              result = json.load(handle)
+
+          retryable = {"check_pending", "required_check_missing"}
+          blockers = result.get("blockers", [])
+          codes = {str(item.get("code") or "") for item in blockers}
+          if blockers and codes <= retryable:
+              raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+            then
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                echo "Merge readiness timed out waiting for required checks." >&2
+                cat "$result_file"
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              sleep 5
+              continue
+            fi
+
+            cat "$result_file"
+            exit "$status"
+          done
+
+          cat "$result_file"
+          {
+            echo "## Merge readiness"
+            echo
+            echo '~~~json'
+            cat "$result_file"
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
