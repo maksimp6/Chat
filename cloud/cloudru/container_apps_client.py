@@ -228,9 +228,16 @@ class CloudRuContainerAppsClient:
             items.extend(data)
 
             next_token = payload.get("nextPageToken")
-            if next_token is None or next_token == "":
+            if next_token is None:
                 return items
-            if not isinstance(next_token, str) or next_token in seen_tokens:
+            if not isinstance(next_token, str):
+                raise CloudProviderError(
+                    "Cloud.ru Container Apps returned invalid pagination token",
+                    code="invalid_response",
+                )
+            if next_token == "":
+                return items
+            if next_token in seen_tokens:
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid pagination token",
                     code="invalid_response",
