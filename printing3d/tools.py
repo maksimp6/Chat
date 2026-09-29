@@ -96,30 +96,16 @@ PRINTING3D_TOOLS = {
                         {"type": "null"},
                     ]
                 },
-                "equipment_price": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
-                "setup_cost": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
-                "down_payment": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
-                "credit_principal": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
+                "equipment_price": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "setup_cost": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "down_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "credit_principal": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
                 "credit_total_repayment": {
                     "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
                 },
-                "monthly_payment": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
-                "term_months": {
-                    "anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
-                },
-                "psk_percent": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
+                "monthly_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "term_months": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+                "psk_percent": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
                 "currency": {
                     "anyOf": [
                         {"type": "string", "minLength": 1, "maxLength": 8},
