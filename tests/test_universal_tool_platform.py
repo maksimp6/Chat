@@ -5,6 +5,7 @@ from universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
     UniversalToolResult,
+    tool_call_requires_approval,
     validate_json_schema,
 )
 
@@ -173,3 +174,22 @@ def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
     assert result["data"] == {"device": "android"}
     assert calls[0][0] == "enqueue"
     assert calls[1] == ("wait", "job-1", 7.0)
+
+
+
+def test_action_level_approval_helper_preserves_static_policy():
+    dynamic = definition(
+        requires_approval=False,
+        metadata={"approval_actions": ["click", "fill"]},
+    )
+
+    assert tool_call_requires_approval(dynamic, {"action": "click"}) is True
+    assert tool_call_requires_approval(dynamic, {"action": "fill"}) is True
+    assert tool_call_requires_approval(dynamic, {"action": "inspect"}) is False
+    assert tool_call_requires_approval(dynamic, {}) is False
+
+    static = definition(
+        requires_approval=True,
+        metadata={"approval_actions": ["click"]},
+    )
+    assert tool_call_requires_approval(static, {"action": "inspect"}) is True
