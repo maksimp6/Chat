@@ -50,7 +50,7 @@ def test_requires_runtime_credentials_not_admin_pair(monkeypatch):
     assert exc.value.code == "auth_not_configured"
 
 
-def test_get_secret_value_returns_plaintext_and_caches(monkeypatch):
+def test_get_secret_value_returns_plaintext_without_caching(monkeypatch):
     client = _client(monkeypatch, cache_ttl=30.0)
     with (
         patch.object(client.iam_client, "_token", return_value="iam-token"),
@@ -64,7 +64,8 @@ def test_get_secret_value_returns_plaintext_and_caches(monkeypatch):
 
     assert first == "top-secret-value"
     assert second == "top-secret-value"
-    get.assert_called_once()
+    assert get.call_count == 2
+    assert client._value_cache == {}
     assert "Bearer iam-token" == get.call_args.kwargs["headers"]["Authorization"]
     assert "v1" in get.call_args.args[0]
 
@@ -169,6 +170,7 @@ def test_secret_value_never_reaches_trace_on_success(monkeypatch):
 
     assert value == "never-trace-me"
     assert cached_value == value
+    assert client._value_cache == {}
     snapshot = json.dumps(trace.make_snapshot(), ensure_ascii=False)
     assert "never-trace-me" not in snapshot
 
@@ -333,29 +335,19 @@ def test_uses_official_secret_manager_endpoint_and_payload_route(monkeypatch):
     )
 
 
-def test_cache_sweeps_expired_entries_and_enforces_bound(monkeypatch):
-    client = _client(monkeypatch, cache_ttl=10.0, cache_max_entries=2)
-    client._value_cache = {
-        ("expired", "v1"): (1.0, "old-secret"),
-        ("keep", "v1"): (95.0, "keep-secret"),
-        ("also-keep", "v1"): (96.0, "also-secret"),
-    }
+def test_cache_compatibility_hooks_never_retain_plaintext(monkeypatch):
+    client = _client(monkeypatch, cache_ttl=30.0, cache_max_entries=8)
+    client._value_cache[("legacy", "v1")] = (1.0, "legacy-plaintext")
 
-    with patch("cloud.cloudru.secret_management.time.monotonic", return_value=100.0):
-        client._sweep_cache()
+    client._sweep_cache()
+    assert client._value_cache == {}
 
-    assert ("expired", "v1") not in client._value_cache
-    assert len(client._value_cache) <= 2
-
-    client._value_cache[("newer", "v1")] = (97.0, "newer-secret")
-    with patch("cloud.cloudru.secret_management.time.monotonic", return_value=100.0):
-        client._sweep_cache()
-
-    assert len(client._value_cache) == 2
-    assert ("keep", "v1") not in client._value_cache
+    client._value_cache[("legacy", "v1")] = (1.0, "legacy-plaintext")
+    client.invalidate_cache("legacy")
+    assert client._value_cache == {}
 
 
-def test_cache_sweep_and_insert_are_safe_under_concurrent_reads(monkeypatch):
+def test_concurrent_secret_reads_do_not_accumulate_plaintext(monkeypatch):
     client = _client(monkeypatch, cache_ttl=30.0, cache_max_entries=8)
     client._fetch_value = lambda secret_id, version_id: f"{secret_id}:{version_id}"
 
@@ -368,13 +360,6 @@ def test_cache_sweep_and_insert_are_safe_under_concurrent_reads(monkeypatch):
         )
 
     assert values == [f"secret-{index}:v1" for index in range(256)]
-    assert len(client._value_cache) <= 8
-
-
-def test_zero_ttl_sweep_clears_plaintext_cache(monkeypatch):
-    client = _client(monkeypatch, cache_ttl=0)
-    client._value_cache[("secret-1", "v1")] = (1.0, "plaintext")
-    client._sweep_cache(2.0)
     assert client._value_cache == {}
 
 
@@ -399,19 +384,6 @@ def test_payload_decoder_returns_decoded_utf8_secret():
         CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
         == "пароль-42"
     )
-
-
-def test_get_secret_value_sweeps_cache_before_lookup(monkeypatch):
-    client = _client(monkeypatch, cache_ttl=30.0)
-    client._value_cache[("secret-1", "v1")] = (95.0, "cached-secret")
-
-    with (
-        patch("cloud.cloudru.secret_management.time.monotonic", return_value=100.0),
-        patch.object(client, "_fetch_value") as fetch,
-    ):
-        assert client.get_secret_value("secret-1", "v1") == "cached-secret"
-
-    fetch.assert_not_called()
 
 
 def test_payload_decoder_rejects_invalid_utf8_explicitly():
