@@ -99,7 +99,7 @@ def test_rejects_nul_bytes_in_dsn(inputs, location):
     errors = preflight.validate(config, env)
     assert any("ALICE_DATABASE_URL" in error for error in errors)
     assert "p%00ssword" not in json.dumps(errors)
-    assert "p\u0000ssword" not in json.dumps(errors)
+    assert r"p\u0000ssword" not in json.dumps(errors)
 
 
 @pytest.mark.parametrize(
@@ -249,5 +249,6 @@ def test_probe_is_read_only_and_rejects_role_attributes_or_membership(
     assert captured["sql"].startswith("SELECT ")
     assert "pg_has_role" in captured["sql"]
     assert "FROM pg_roles p WHERE p.oid <> r.oid" in captured["sql"]
+    assert "p.rolname <> 'pg_database_owner'" in captured["sql"]
     assert "p.rolname IN" not in captured["sql"]
     assert captured["connect_timeout"] == 5

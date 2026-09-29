@@ -249,6 +249,7 @@ def probe_database(dsn: str, database: dict) -> str | None:
                 "SELECT current_database(), current_user, s.ssl, s.version, "
                 "r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication, r.rolbypassrls, "
                 "EXISTS (SELECT 1 FROM pg_roles p WHERE p.oid <> r.oid "
+                "AND p.rolname <> 'pg_database_owner' "
                 "AND pg_has_role(current_user, p.oid, 'MEMBER')) "
                 "FROM pg_stat_ssl s JOIN pg_roles r ON r.rolname = current_user "
                 "WHERE s.pid = pg_backend_pid()"
