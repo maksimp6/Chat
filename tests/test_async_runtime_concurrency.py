@@ -81,6 +81,9 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
         assert item["session_id"] == context.session_id
         assert item["conversation_id"] == context.conversation_id
         assert item["trace_id"] == context.trace_id
+        assert item["trace"]["trace_id"] == context.trace_id
+        assert item["trace"]["context"]["invocation_id"] == context.invocation_id
+        assert item["trace"]["context"]["conversation_id"] == context.conversation_id
         assert item["result"]["index"] == item["metadata"]["index"]
         trace_context = item["trace"]["context"]
         assert trace_context["invocation_id"] == context.invocation_id
@@ -128,7 +131,7 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
             if not release.wait(timeout=5):
                 raise TimeoutError("cancelled invocation worker was not released")
             finish_results.append(
-                finish_invocation(context.invocation_id, {"role": "cancelled"})
+                cancel_invocation(context.invocation_id, {"reason": "awaiter-cancelled"})
             )
         finally:
             worker_finished.set()
