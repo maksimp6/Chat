@@ -1,6 +1,6 @@
 ---
 name: cloudru-management
-description: "Prepare and operate Alice Pro on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, Foundation Models and AI Agents. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
+description: "Prepare and operate Alice Pro on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Alice's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
 ---
 
 # Cloud.ru / Alice Pro
