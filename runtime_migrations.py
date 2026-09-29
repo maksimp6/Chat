@@ -43,8 +43,7 @@ def init_runtime_tables() -> None:
                 created_at INTEGER NOT NULL,
                 started_at INTEGER,
                 completed_at INTEGER,
-                FOREIGN KEY (session_id) REFERENCES sessions(id),
-                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         """)
         # Existing installations created before trace persistence need the
