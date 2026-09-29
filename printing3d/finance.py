@@ -48,11 +48,11 @@ def calculate_financing_plan(data: Mapping[str, Any]) -> dict[str, Any]:
     monthly_payment = _number(data, "monthly_payment")
     term_months = _whole_months(data, "term_months")
     planned_monthly_profit = _number(data, "planned_monthly_profit")
-    target_coverage = _number(
-        data,
-        "target_payment_coverage",
-        2,
-        minimum=Decimal("1"),
+    target_coverage_raw = data.get("target_payment_coverage")
+    target_coverage = (
+        Decimal("2")
+        if target_coverage_raw is None
+        else _number(data, "target_payment_coverage", minimum=Decimal("1"))
     )
     psk_percent = data.get("psk_percent")
     if psk_percent is not None:
