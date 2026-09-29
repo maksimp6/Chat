@@ -236,9 +236,9 @@ def _append_table(lines: list[str], rows: list[dict]) -> None:
 
 def render_markdown(report: dict, *, top: int = 20) -> str:
     limit = max(1, int(top))
-    split_rows = [
-        row for row in report["files"] if row["candidate_kind"] == "split_candidate"
-    ][:limit]
+    split_rows = [row for row in report["files"] if row["candidate_kind"] == "split_candidate"][
+        :limit
+    ]
     shared_rows = [
         row for row in report["files"] if row["candidate_kind"] == "extract_shared_logic"
     ][: min(limit, 10)]
