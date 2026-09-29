@@ -252,6 +252,26 @@ def test_list_uses_v2_pagination_contract():
     )
 
 
+def test_list_rejects_non_positive_page_size():
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient())
+    with pytest.raises(CloudProviderError, match="page_size"):
+        apps.list(page_size=0)
+
+
+def test_list_rejects_repeated_pagination_token():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient(
+            [
+                {"data": [], "nextPageToken": "same"},
+                {"data": [], "nextPageToken": "same"},
+            ]
+        ),
+    )
+    with pytest.raises(CloudProviderError, match="pagination token"):
+        apps.list()
+
+
 def test_list_rejects_invalid_pagination_payload():
     apps = CloudRuContainerAppsClient(
         project_id="p1",
