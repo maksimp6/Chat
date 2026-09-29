@@ -241,7 +241,7 @@ class ExecutionTrace:
             locals_snapshot = {}
             for name, value in frame.f_locals.items():
                 if name.lower() in cls._SENSITIVE_KEYS or any(
-                    secret in name.lower() for secret in ("api_key", "password", "secret", "token")
+                    secret in name.lower() for secret in ("api_key", "password", "secret", "token", "credential")
                 ):
                     locals_snapshot[name] = "<redacted>"
                 else:
