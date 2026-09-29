@@ -32,7 +32,11 @@ from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_quotas import ProviderQuotaExceeded
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from universal_tool_platform import (
+    UniversalToolCall,
+    UniversalToolExecutor,
+    tool_call_requires_approval,
+)
 from conversation_ownership import (
     init_conversation_ownership_table,
     set_owner,
@@ -44,6 +48,28 @@ from conversation_ownership import (
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint("mcp", __name__)
+
+
+def _tool_call_parts(tool_call):
+    name = tool_call.get("name") or tool_call.get("function", {}).get("name")
+    if name and "<|" in name:
+        name = name.split("<|", 1)[0].strip()
+
+    arguments = tool_call.get("arguments") or tool_call.get("function", {}).get("arguments", {})
+    if isinstance(arguments, str):
+        try:
+            arguments = _json.loads(arguments)
+        except Exception:
+            arguments = {}
+    if not isinstance(arguments, dict):
+        arguments = {}
+    return name, arguments
+
+
+def _tool_call_needs_approval(tool_call):
+    name, arguments = _tool_call_parts(tool_call)
+    tool_config = registry.get_tool_meta(name) if name else None
+    return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
 
 
 class AliceClient(YandexResponsesClient):
@@ -58,17 +84,7 @@ class AliceClient(YandexResponsesClient):
 
         calls = extract_function_calls(response)
         if calls:
-            approval_required = any(
-                (
-                    registry.get_tool_meta(
-                        (call.get("name") or call.get("function", {}).get("name") or "")
-                        .split("<|", 1)[0]
-                        .strip()
-                    )
-                    or {}
-                ).get("requires_approval")
-                for call in calls
-            )
+            approval_required = any(_tool_call_needs_approval(call) for call in calls)
 
             if not approval_required:
                 tool_servers = mcp_storage.list_servers()
@@ -233,19 +249,10 @@ def chat():
                     )
 
             for tc in calls:
-                func_name = tc.get("name") or tc.get("function", {}).get("name")
-                if func_name and "<|" in func_name:
-                    func_name = func_name.split("<|")[0].strip()
-                tool_config = registry.get_tool_meta(func_name)
+                func_name, raw_args = _tool_call_parts(tc)
+                tool_config = registry.get_tool_meta(func_name) if func_name else None
 
-                if tool_config and tool_config.get("requires_approval"):
-                    raw_args = tc.get("arguments") or tc.get("function", {}).get("arguments", {})
-                    if isinstance(raw_args, str):
-                        try:
-                            raw_args = _json.loads(raw_args)
-                        except Exception:
-                            raw_args = {}
-
+                if tool_config and tool_call_requires_approval(tool_config, raw_args):
                     trace_data = trace.finalize()
                     persist_invocation_trace(invocation.invocation_id, trace_data)
                     return jsonify(
