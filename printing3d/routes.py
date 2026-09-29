@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
+from .finance import get_payback_status, set_financing_plan
 from .service import (
     calculate_quote,
     create_order,
@@ -122,3 +123,28 @@ def treasury_summary():
     if owner is None:
         return _auth_error()
     return jsonify(get_financial_summary(owner))
+
+
+@printing3d_bp.route("/finance/plan", methods=["PUT"])
+def finance_plan_set():
+    owner = _owner_id()
+    if owner is None:
+        return _auth_error()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "request body must be an object"}), 400
+    try:
+        return jsonify(set_financing_plan(owner, payload))
+    except ValueError:
+        return jsonify({"error": "invalid finance plan"}), 400
+
+
+@printing3d_bp.route("/finance/status", methods=["GET"])
+def finance_status():
+    owner = _owner_id()
+    if owner is None:
+        return _auth_error()
+    try:
+        return jsonify(get_payback_status(owner, month=request.args.get("month")))
+    except ValueError:
+        return jsonify({"error": "invalid finance status request"}), 400
