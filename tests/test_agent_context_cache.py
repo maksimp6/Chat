@@ -25,6 +25,7 @@ def _scope(*, head="head-1", skills=("github-ci-diagnosis", "github-pr-readiness
 
 def _evidence(
     *,
+    task="task-1",
     ci="ci-1",
     review="review-1",
     trace="trace-1",
@@ -32,6 +33,7 @@ def _evidence(
     skills="skills-1",
 ):
     return EvidenceVersion(
+        task=task,
         ci=ci,
         review=review,
         trace=trace,
@@ -60,7 +62,7 @@ def _packet(scope=None, evidence=None):
             ContextSlice(
                 name="code",
                 payload={"summary": "timezone parser and regression"},
-                depends_on=("files", "policy"),
+                depends_on=("task", "files", "policy"),
                 source_bytes=1200,
                 input_tokens=220,
             ),
@@ -210,6 +212,28 @@ def test_changed_skill_version_invalidates_only_skill_dependent_slice():
     assert [item.name for item in result.reusable_slices] == ["code", "ci", "review"]
 
 
+def test_changed_task_version_invalidates_task_dependent_context():
+    cache = TaskContextCache()
+    packet = _packet()
+    cache.put(packet)
+
+    result = cache.lookup(packet.scope, _evidence(task="task-2"))
+
+    assert result.status == "partial"
+    assert result.packet is None
+    assert result.stale_components == ("task",)
+    assert [item.name for item in result.reusable_slices] == ["ci", "review", "skills"]
+
+
+def test_evidence_version_requires_task_revision():
+    try:
+        EvidenceVersion(ci="ci-1")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("task evidence version must be required")
+
+
 def test_all_slice_dependencies_stale_becomes_miss():
     cache = TaskContextCache()
     packet = TaskPacket(
@@ -259,6 +283,38 @@ def test_sensitive_payloads_are_redacted_before_cache_storage():
     assert "supersecret" not in json.dumps(serialized)
     assert serialized["usage"]["access_token"] == "<redacted>"
     assert serialized["slices"][0]["payload"]["access_token"] == "<redacted>"
+
+
+def test_nested_payload_exports_do_not_mutate_cached_slice():
+    packet = TaskPacket(
+        scope=_scope(),
+        evidence=_evidence(),
+        objective="Keep nested context immutable",
+        expected_deliverable="Independent export",
+        usage={"nested": {"calls": [1, 2]}},
+        slices=(
+            ContextSlice(
+                name="nested",
+                payload={"facts": [{"name": "original"}]},
+                depends_on=("task",),
+            ),
+        ),
+    )
+
+    exported = packet.as_dict()
+    exported["slices"][0]["payload"]["facts"][0]["name"] = "mutated"
+    exported["usage"]["nested"]["calls"].append(3)
+
+    fresh = packet.as_dict()
+    assert fresh["slices"][0]["payload"]["facts"][0]["name"] == "original"
+    assert fresh["usage"]["nested"]["calls"] == [1, 2]
+
+    try:
+        packet.slices[0].payload["facts"][0]["name"] = "mutated-directly"
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("nested cached mappings must be immutable")
 
 
 def test_cache_lookup_is_recorded_on_execution_trace():
