@@ -155,18 +155,19 @@ jobs:
     name: PostgreSQL integration
     runs-on: ubuntu-latest
     env:
-      ALICE_DATABASE_URL: postgresql://alice:ci-postgres-password@localhost:5432/alice_pro
+      ALICE_DATABASE_URL: postgresql://alice:ci-postgres-password@localhost:5432/alice_pro_test
+      ALICE_PYTEST_POSTGRES_RESET: "1"
     services:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_DB: alice_pro
+          POSTGRES_DB: alice_pro_test
           POSTGRES_USER: alice
           POSTGRES_PASSWORD: ci-postgres-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U alice -d alice_pro"
+          --health-cmd="pg_isready -U alice -d alice_pro_test"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=12
@@ -185,9 +186,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-postgres.txt
-          pip install pytest
-      - name: Run PostgreSQL integration tests
-        run: pytest -q tests/test_postgres_integration.py
+          pip install -r requirements-dev.txt
+      - name: Run full application suite on PostgreSQL
+        run: pytest -q
       - name: Verify backup and restore of the application schema
         # Client tools come from the server image so their version matches PostgreSQL 17.
         env:

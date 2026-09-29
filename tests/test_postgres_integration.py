@@ -84,7 +84,7 @@ def test_postgres_is_the_same_store_used_by_application_modules():
 
     assert row["title"] == "Shared DB"
 
-    mcp_storage.create_server(
+    server_id = mcp_storage.create_server(
         {
             "name": "postgres-shared",
             "server_url": "http://example.invalid/mcp",
@@ -114,6 +114,7 @@ def test_postgres_is_the_same_store_used_by_application_modules():
         conn.close()
 
     assert count == 1
+    mcp_storage.delete_server(server_id)
 
 
 def test_postgres_observability_migration_is_idempotent():
@@ -190,3 +191,66 @@ def test_postgres_github_sign_in_promotes_anonymous_user_once():
     assert identity["new_user"] is True
     assert get_github_login(anon["user_id"]) is None
     assert authenticate_user_token(identity["auth_token"]) == identity["user_id"]
+
+
+def test_postgres_upgrade_drops_legacy_invocation_conversation_fk():
+    _require_postgres()
+    db.init_db()
+    init_runtime_tables()
+
+    conn = db.get_conn()
+    try:
+        conn.execute(
+            """
+            ALTER TABLE invocations
+            ADD CONSTRAINT invocations_conversation_id_fkey
+            FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    init_runtime_tables()
+
+    conn = db.get_conn()
+    try:
+        remaining = conn.execute(
+            """
+            SELECT count(*) AS count
+            FROM pg_constraint AS c
+            JOIN pg_attribute AS a
+              ON a.attrelid = c.conrelid
+             AND a.attnum = ANY(c.conkey)
+            WHERE c.conrelid = 'invocations'::regclass
+              AND c.contype = 'f'
+              AND a.attname = 'conversation_id'
+            """
+        ).fetchone()["count"]
+        assert remaining == 0
+
+        conn.execute(
+            """
+            INSERT INTO sessions
+                (id, status, metadata_json, created_at, updated_at)
+            VALUES (?, 'active', '{}', 1, 1)
+            """,
+            ("legacy-fk-session",),
+        )
+        conn.execute(
+            """
+            INSERT INTO invocations
+                (id, session_id, conversation_id, trace_id, status,
+                 metadata_json, trace_json, created_at)
+            VALUES (?, ?, ?, ?, 'created', '{}', '{}', 1)
+            """,
+            (
+                "legacy-fk-invocation",
+                "legacy-fk-session",
+                "mcp:synthetic-conversation",
+                "legacy-fk-trace",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()

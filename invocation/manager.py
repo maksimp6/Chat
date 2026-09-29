@@ -2,12 +2,12 @@
 
 import json
 import re
-import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from db import get_conn
+from db_backend import IntegrityError
 from .context import InvocationContext
 from runtime_migrations import init_runtime_tables
 from session_manager import create_session, restore_session
@@ -80,7 +80,7 @@ def create_invocation(
                 session_id,
                 metadata={"conversation_id": conversation_id, "legacy": True},
             )
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             # Another concurrent invocation won the first-use race. Reload the
             # now-existing session rather than failing the request.
             session = restore_session(session_id)
