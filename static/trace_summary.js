@@ -123,7 +123,10 @@
       items.push({
         kind: "tool",
         icon: tool && tool.error ? "❌" : "🔧",
-        label: tool && (tool.name || tool.tool_name) ? String(tool.name || tool.tool_name) : "Инструмент",
+        label:
+          tool && (tool.name || tool.tool_name)
+            ? String(tool.name || tool.tool_name)
+            : "Инструмент",
         detail: [server, duration].filter(Boolean).join(" · "),
         status: tool && tool.error ? "ошибка" : "готово",
       });
