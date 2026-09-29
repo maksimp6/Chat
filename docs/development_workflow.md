@@ -156,6 +156,30 @@ bash scripts/install_git_hooks.sh
 
 Hook выполняет только `bash scripts/format.sh check`. Если форматирование не проходит, он блокирует commit и показывает команду `bash scripts/format.sh write`. Существующий чужой `.git/hooks/pre-commit` installer не перезаписывает без явного `--force`. Полный pytest из hook не запускается; CI остаётся authoritative.
 
+### Code intelligence toolkit
+
+Machine-readable analysis for Alice and developers:
+
+```bash
+python scripts/code_intelligence_report.py --output-dir code-intelligence
+```
+
+The report combines the deterministic Python AST index, hot-file history, Ruff C90 complexity findings, Vulture dead-code candidates and a reverse import impact graph. On pull requests the impact graph compares against the PR base branch and reports changed Python files, transitively affected modules and related tests.
+
+Focused CPU profiling:
+
+```bash
+bash scripts/profile_runtime.sh tests/test_chat_api.py
+```
+
+Focused memory profiling without an extra package:
+
+```bash
+python scripts/profile_memory.py --module pytest -- -q tests/test_chat_api.py
+```
+
+CPU and memory profiling are opt-in to avoid slowing every PR. Regular Python tests also publish `test-results.xml` for machine-readable per-test durations. Analyzer findings are advisory; deterministic tests, coverage and security checks remain authoritative gates.
+
 ### Hot-file modularity report
 
 Для поиска файлов с высокой исторической стоимостью изменений используется read-only анализатор:
