@@ -141,22 +141,44 @@ def test_ref_table_only_ever_stores_identifiers_not_a_value_column(isolated_db):
     }
 
 
-def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(isolated_db):
+def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(
+    isolated_db, monkeypatch
+):
     """Regression for issue #477: nested errors after resolution must not leak."""
+    import provider_credentials as credentials
+
     set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
     client = FakeSecretManagementClient({("secret-1", "v1"): "must-not-leak-anywhere"})
     trace = ExecutionTrace(trace_id="secret-ref-nested-error-test")
+    monkeypatch.setattr(credentials, "get_current_trace", lambda: trace)
 
-    credential = resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
-    assert credential == "must-not-leak-anywhere"
+    opaque = resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+    assert opaque == "must-not-leak-anywhere"
+    trace.add_event("opaque_value", {"value": opaque})
 
     try:
-        raise RuntimeError("unrelated downstream failure while credential is still in scope")
+        raise RuntimeError(f"downstream failure: {opaque}")
     except RuntimeError as exc:
-        trace.record_error("test.nested", "downstream failure", exception=exc)
+        trace.record_error("test.nested", f"downstream failure: {opaque}", exception=exc)
 
-    snapshot = json.dumps(trace.make_snapshot(), ensure_ascii=False)
+    data = trace.make_snapshot()
+    snapshot = json.dumps(data, ensure_ascii=False)
     assert "must-not-leak-anywhere" not in snapshot
+    assert data["events"][-2]["payload"]["value"] == "<redacted>"
+    assert data["errors"][0]["error"] == "downstream failure: <redacted>"
+    assert any(
+        frame["locals"].get("opaque") == "<redacted>"
+        for frame in data["errors"][0]["python_exception"]["frames"]
+    )
+
+
+def test_trace_redacts_short_registered_values_inside_text():
+    trace = ExecutionTrace(trace_id="short-secret-redaction-test")
+    trace.register_sensitive_value("abc")
+
+    trace.add_event("message", {"text": "prefix abc suffix"})
+
+    assert trace.make_snapshot()["events"][0]["payload"]["text"] == ("prefix <redacted> suffix")
 
 
 @pytest.mark.parametrize(

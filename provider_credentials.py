@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from typing import Any, Callable, Optional
 
+from trace_manager import get_current_trace
+
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)
 ACTIVE = "active"
@@ -768,4 +770,8 @@ def resolve_secret_management_value(
         raise NoActiveCredentialError(f"No secret management ref configured for '{purpose}'")
     if client is None:
         client = _get_secret_management_client()
-    return client.get_secret_value(ref.secret_id, ref.pinned_version_id)
+    secret_value = client.get_secret_value(ref.secret_id, ref.pinned_version_id)
+    trace = get_current_trace()
+    if trace is not None:
+        trace.register_sensitive_value(secret_value)
+    return secret_value

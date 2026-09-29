@@ -163,9 +163,15 @@ class CloudRuSecretManagementClient:
         self._sweep_cache(now_monotonic)
         cached = self._value_cache.get(cache_key)
         if cached is not None and (now_monotonic - cached[0]) < self.cache_ttl:
+            trace = get_current_trace()
+            if trace is not None:
+                trace.register_sensitive_value(cached[1])
             return cached[1]
 
         fetched_secret_value = self._fetch_value(secret_id, version_id)
+        trace = get_current_trace()
+        if trace is not None:
+            trace.register_sensitive_value(fetched_secret_value)
         if self.cache_ttl > 0:
             self._value_cache[cache_key] = (now_monotonic, fetched_secret_value)
             self._sweep_cache(now_monotonic)
