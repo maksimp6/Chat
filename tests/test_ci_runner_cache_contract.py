@@ -22,4 +22,4 @@ def test_runner_cache_timings_are_reported() -> None:
     assert "Application dependency install:" in workflow
     assert "PostgreSQL dependency install:" in workflow
     assert "Android test/build:" in workflow
-    assert '$GITHUB_STEP_SUMMARY' in workflow
+    assert "$GITHUB_STEP_SUMMARY" in workflow
