@@ -167,10 +167,7 @@ def _tests_by_module(files: list[dict[str, Any]]) -> dict[str, list[str]]:
             first = module.split(".", 1)[0]
             mapping.setdefault(first, set()).add(test_path)
 
-    return {
-        module: sorted(paths)
-        for module, paths in sorted(mapping.items())
-    }
+    return {module: sorted(paths) for module, paths in sorted(mapping.items())}
 
 
 def build_index(root: Path) -> dict[str, Any]:
