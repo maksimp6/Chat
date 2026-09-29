@@ -89,7 +89,9 @@ class EvidenceVersion:
 
     def changed_components(self, other: "EvidenceVersion") -> tuple[str, ...]:
         return tuple(
-            name for name in _EVIDENCE_COMPONENTS if getattr(self, name) != getattr(other, name)
+            name
+            for name in _EVIDENCE_COMPONENTS
+            if getattr(self, name) != getattr(other, name)
         )
 
 
@@ -166,7 +168,10 @@ class TaskPacket:
     failed_attempts: tuple[str, ...] = ()
     evidence_refs: tuple[EvidenceRef, ...] = ()
     slices: tuple[ContextSlice, ...] = ()
+    changed_files: tuple[str, ...] = ()
+    owner: str | None = None
     budget_tier: str = "normal"
+    usage: Mapping[str, Any] = field(default_factory=dict)
     escalation_target: str | None = None
 
     def __post_init__(self) -> None:
@@ -181,9 +186,22 @@ class TaskPacket:
         object.__setattr__(self, "failed_attempts", _clean_text_tuple(self.failed_attempts))
         object.__setattr__(self, "evidence_refs", tuple(self.evidence_refs))
         object.__setattr__(self, "slices", tuple(self.slices))
-        object.__setattr__(self, "budget_tier", _clean_text(self.budget_tier).strip() or "normal")
+        object.__setattr__(self, "changed_files", _clean_text_tuple(self.changed_files))
+        if self.owner is not None:
+            object.__setattr__(self, "owner", _clean_text(self.owner))
+        object.__setattr__(
+            self,
+            "budget_tier",
+            _clean_text(self.budget_tier).strip() or "normal",
+        )
+        clean_usage = sanitize_trace_value(dict(self.usage))
+        object.__setattr__(self, "usage", MappingProxyType(dict(clean_usage)))
         if self.escalation_target is not None:
-            object.__setattr__(self, "escalation_target", _clean_text(self.escalation_target))
+            object.__setattr__(
+                self,
+                "escalation_target",
+                _clean_text(self.escalation_target),
+            )
 
     def cache_key(self) -> str:
         return _canonical_hash(
@@ -204,6 +222,9 @@ class TaskPacket:
             "failed_attempts": list(self.failed_attempts),
             "evidence_refs": [item.as_dict() for item in self.evidence_refs],
             "slices": [item.as_dict() for item in self.slices],
+            "changed_files": list(self.changed_files),
+            "owner": self.owner,
             "budget_tier": self.budget_tier,
+            "usage": dict(self.usage),
             "escalation_target": self.escalation_target,
         }
