@@ -38,6 +38,14 @@ jobs:
           node-version: "22.22.2"
           cache: npm
           cache-dependency-path: package.json
+      - name: Generate hot-file modularity report
+        run: |
+          python scripts/hot_file_metrics.py \
+            --commits 200 \
+            --top 20 \
+            --json-out hot-file-metrics.json \
+            --markdown-out hot-file-metrics.md
+          cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"
       - name: Install dependencies
         run: |
           started=$SECONDS
@@ -136,6 +144,8 @@ jobs:
             frontend-coverage.json
             frontend-test.log
             ci-validation-report.md
+            hot-file-metrics.json
+            hot-file-metrics.md
             flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
