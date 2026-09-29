@@ -151,9 +151,7 @@ def test_load_rejects_oversize_missing_sections_and_unclosed_body(tmp_path, monk
     registry = SkillRegistry(root)
 
     path.write_text(
-        "---\nname: docs-sync\ndescription: huge\n---\n"
-        + BODY
-        + ("x" * (70 * 1024)),
+        "---\nname: docs-sync\ndescription: huge\n---\n" + BODY + ("x" * (70 * 1024)),
         encoding="utf-8",
     )
     with pytest.raises(SkillFormatError, match="exceeds"):
