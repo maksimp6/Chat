@@ -302,3 +302,38 @@ def test_financing_tool_is_ai_first_read_only_and_uses_observed_profit(monkeypat
     assert result["observed_monthly_profit"] == 6000
     assert result["profit_source"] == "realized_3d_profit_last_30_days"
     assert result["plan"]["payment_coverage_ok"] is True
+
+
+
+def test_ai_assessment_can_start_with_no_manual_finance_fields():
+    from printing3d.finance import assess_financing_plan
+
+    result = assess_financing_plan(
+        {
+            "purchase_mode": None,
+            "equipment_price": None,
+            "startup_costs": None,
+            "financed_principal": None,
+            "monthly_payment": None,
+            "term_months": None,
+            "planned_monthly_profit": None,
+            "target_payment_coverage": None,
+            "psk_percent": None,
+            "currency": None,
+        },
+        observed_monthly_profit=0,
+    )
+
+    assert result["status"] == "needs_terms"
+    assert result["purchase_mode"] == "credit"
+    assert result["currency"] == "RUB"
+    assert result["missing_fields"] == [
+        "equipment_price",
+        "financed_principal",
+        "monthly_payment",
+        "term_months",
+    ]
+    assert result["known_inputs"]["startup_costs"] == 0
+    assert result["known_inputs"]["planned_monthly_profit"] == 0
+    assert result["known_inputs"]["target_payment_coverage"] == 2
+    assert result["plan"] is None
