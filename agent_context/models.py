@@ -15,6 +15,8 @@ _EVIDENCE_COMPONENTS = ("ci", "review", "trace", "files", "skills", "policy")
 
 
 def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
     return str(sanitize_trace_value(str(value)))
 
 
