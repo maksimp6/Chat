@@ -109,10 +109,7 @@ def outer():
 
     payload = build_index(tmp_path)
     nested = payload["files"][0]
-    kinds = {
-        symbol["qualified_name"]: symbol["kind"]
-        for symbol in nested["symbols"]
-    }
+    kinds = {symbol["qualified_name"]: symbol["kind"] for symbol in nested["symbols"]}
 
     assert kinds["outer"] == "function"
     assert kinds["outer.inner"] == "function"
