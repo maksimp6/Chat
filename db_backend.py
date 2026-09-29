@@ -147,7 +147,7 @@ class PGCursor:
             self._raw.execute(translated, tuple(params))
         except Exception as exc:
             if exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES:
-                raise IntegrityError(str(exc)) from exc
+                raise sqlite3.IntegrityError(str(exc)) from exc
             raise
         self._columns = tuple(desc.name for desc in self._raw.description or ())
         return self
@@ -158,7 +158,7 @@ class PGCursor:
             self._raw.executemany(translated, seq_of_params)
         except Exception as exc:
             if exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES:
-                raise IntegrityError(str(exc)) from exc
+                raise sqlite3.IntegrityError(str(exc)) from exc
             raise
         self._columns = tuple(desc.name for desc in self._raw.description or ())
         return self
