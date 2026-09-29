@@ -277,8 +277,10 @@ def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     saved = get_financing_plan(owner_id) or {}
     purchase_mode = str(data.get("purchase_mode") or "").strip().lower()
     if not purchase_mode:
-        saved_principal = saved.get("credit_principal")
-        purchase_mode = "credit" if saved_principal not in (None, 0, 0.0) else "credit"
+        if saved and saved.get("credit_principal") in (None, 0, 0.0):
+            purchase_mode = "cash"
+        else:
+            purchase_mode = "credit"
     if purchase_mode not in {"credit", "cash"}:
         raise ValueError("purchase_mode must be credit or cash")
 
@@ -293,7 +295,7 @@ def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     printer_model = resolve("printer_model")
     equipment_price = resolve("equipment_price")
     setup_cost = resolve("setup_cost", 0)
-    down_payment = resolve("down_payment", 0)
+    down_payment = resolve("down_payment")
     credit_principal = resolve("credit_principal")
     credit_total_repayment = resolve("credit_total_repayment")
     monthly_payment = resolve("monthly_payment")
@@ -341,7 +343,7 @@ def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     if data.get("setup_cost") is None and saved.get("setup_cost") is None:
         assumptions.append("setup_cost=0")
     if data.get("down_payment") is None and saved.get("down_payment") is None:
-        assumptions.append("down_payment=0")
+        assumptions.append("down_payment=derived_from_purchase_terms")
     if data.get("target_payment_coverage") is None:
         assumptions.append("target_payment_coverage=2")
 
@@ -377,8 +379,18 @@ def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
 
     equipment = _decimal(equipment_price, "equipment_price")
     setup = _decimal(setup_cost, "setup_cost")
-    down = _decimal(down_payment, "down_payment")
     principal = _decimal(credit_principal, "credit_principal")
+    if purchase_mode == "cash":
+        down = equipment
+    elif down_payment is None:
+        down = max(equipment - principal, Decimal("0"))
+    else:
+        down = _decimal(down_payment, "down_payment")
+    result["resolved_terms"]["down_payment"] = _money(down)
+
+    if psk_percent is not None:
+        result["resolved_terms"]["psk_percent"] = _money(_decimal(psk_percent, "psk_percent"))
+
     coverage_target = _decimal(target_coverage, "target_payment_coverage")
     if coverage_target < 1:
         raise ValueError("target_payment_coverage must be >= 1")
