@@ -154,6 +154,7 @@ class YandexMcpMixin:
                 "wikipedia",
                 "profiler",
                 "runtime",
+                "3d",
             ]
 
         hosted_tools = []
