@@ -266,7 +266,6 @@ def get_payback_status(owner_id: str, *, month: str | None = None) -> dict[str, 
     }
 
 
-
 def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     """Assess sparse candidate terms without persisting or choosing a lender."""
     if not owner_id:
