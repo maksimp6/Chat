@@ -300,25 +300,58 @@ async def test_async_budget_reservations_do_not_oversubscribe_balance():
         BudgetAccount(AccountType.DEMO, "EUR", allocated="1000", limits=limits),
         fallback_to_demo=False,
     )
+    start_barrier = threading.Barrier(4)
 
-    async def attempt():
+    def attempt():
+        start_barrier.wait(timeout=5)
         try:
-            await asyncio.to_thread(
-                controller.reserve,
-                "10",
-                account_type=AccountType.REAL,
-            )
+            controller.reserve("30", account_type=AccountType.REAL)
             return True
         except (InsufficientFunds, BudgetLimitExceeded):
             return False
 
-    results = await asyncio.gather(*(attempt() for _ in range(16)))
+    results = await asyncio.gather(*(asyncio.to_thread(attempt) for _ in range(4)))
 
     real = controller.account(AccountType.REAL)
-    assert sum(results) == 10
-    assert real.reserved == Decimal("100.00")
+    assert sum(results) == 3
+    assert real.reserved == Decimal("90.00")
     assert real.spent == Decimal("0.00")
-    assert real.available == Decimal("0.00")
+    assert real.available == Decimal("10.00")
+
+
+@pytest.mark.asyncio
+async def test_async_budget_harness_exposes_missing_lock_oversubscription():
+    from decimal import Decimal
+
+    from budget_controller import AccountType, BudgetAccount, BudgetController, BudgetLimits
+
+    limits = BudgetLimits("50", "300", "300")
+    controller = BudgetController(
+        "ASYNC-BUDGET-MUTATION",
+        BudgetAccount(AccountType.REAL, "EUR", allocated="100", limits=limits),
+        BudgetAccount(AccountType.DEMO, "EUR", allocated="1000", limits=limits),
+        fallback_to_demo=False,
+    )
+    persist_barrier = threading.Barrier(4)
+
+    class NoOpLock:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    controller._lock = NoOpLock()
+    controller._persist = lambda *_args, **_kwargs: persist_barrier.wait(timeout=5)
+
+    async def attempt():
+        await asyncio.to_thread(controller.reserve, "30", account_type=AccountType.REAL)
+
+    await asyncio.gather(*(attempt() for _ in range(4)))
+
+    real = controller.account(AccountType.REAL)
+    assert real.reserved == Decimal("120.00")
+    assert real.available == Decimal("-20.00")
 
 
 @pytest.mark.asyncio
