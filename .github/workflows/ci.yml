@@ -57,6 +57,10 @@ jobs:
             --markdown-out hot-file-metrics.md
           cat hot-file-metrics.md
           cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Build code intelligence report
+        run: |
+          python scripts/code_intelligence_report.py --output-dir code-intelligence
+          cat code-intelligence/report.json
       - name: Validate preview deployment script
         run: |
           bash -n deploy/preview/server.sh
@@ -128,7 +132,7 @@ jobs:
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
       - name: Run Python application tests with coverage
-        run: pytest --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+        run: pytest --durations=30 --junitxml=test-results.xml --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
       - name: Generate validation report
         if: always()
         run: |
@@ -148,6 +152,9 @@ jobs:
             ci-validation-report.md
             hot-file-metrics.json
             hot-file-metrics.md
+            code-intelligence/
+            test-results.xml
+            profiling/
             flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
