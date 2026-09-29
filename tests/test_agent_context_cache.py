@@ -96,6 +96,24 @@ def _packet(scope=None, evidence=None):
     )
 
 
+
+def test_scope_rejects_missing_authoritative_provenance():
+    for field in ("repository", "work_item", "base_sha", "head_sha", "role"):
+        kwargs = {
+            "repository": "maksimp6/Chat",
+            "work_item": "PR#548",
+            "base_sha": "base-1",
+            "head_sha": "head-1",
+            "role": "Test Engineer",
+        }
+        kwargs[field] = None
+        try:
+            TaskScope(**kwargs)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"{field} must be required")
+
 def test_scope_and_cache_key_are_deterministic():
     first = _scope(skills=("github-pr-readiness", "github-ci-diagnosis"))
     second = _scope(skills=("github-ci-diagnosis", "github-pr-readiness"))
