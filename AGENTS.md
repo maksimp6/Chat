@@ -69,8 +69,11 @@ owner (@maksimp6) does not merge by hand.
   from the stale head.
 - After final-review fixes, do not request a second review cycle. Any new head
   still requires protected CI to pass and all review threads to remain resolved.
-- Use protected auto-merge once the gate is satisfied. Never force-update,
-  rewrite, or bypass protection on `master`.
+- Use protected auto-merge while required checks or branch-protection gates are
+  still pending. If GitHub reports the pull request as already `clean` and
+  refuses to enable auto-merge, merge only through the protected GitHub merge
+  API with the exact current head SHA. Never force-update, rewrite, or bypass
+  protection on `master`.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
