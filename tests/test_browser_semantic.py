@@ -272,7 +272,6 @@ def test_validation(call, message):
         call()
 
 
-
 def test_semantic_edge_normalization_and_mapping_contracts():
     empty = SemanticNode.from_mapping(
         {"id": "empty", "role": "generic", "name": "   ", "states": "focusable"},
