@@ -19,7 +19,7 @@ DEFAULT_ENDPOINTS = {
     "foundation_models": "https://foundation-models.api.cloud.ru/v1",
     "artifact_registry": "https://ar.api.cloud.ru",
     "container_apps": "https://containers.api.cloud.ru",
-    "secret_management": "https://scsm.api.cloud.ru",
+    "secret_management": "https://secretmanager.api.cloud.ru",
 }
 
 
