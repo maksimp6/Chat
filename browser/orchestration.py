@@ -241,9 +241,7 @@ class BrowserRoleDag:
         running_tasks: Mapping[str, BrowserRoleTask],
     ) -> bool:
         same_session = [
-            running
-            for running in running_tasks.values()
-            if running.session_id == task.session_id
+            running for running in running_tasks.values() if running.session_id == task.session_id
         ]
         if not same_session:
             return True
@@ -269,10 +267,7 @@ class BrowserRoleDag:
                     consumed_tokens=consumed_tokens,
                     duration_ms=round(duration * 1000, 2),
                 )
-            if (
-                task.budget.max_tokens is not None
-                and consumed_tokens > task.budget.max_tokens
-            ):
+            if task.budget.max_tokens is not None and consumed_tokens > task.budget.max_tokens:
                 return BrowserTaskResult(
                     task.task_id,
                     "failed",
