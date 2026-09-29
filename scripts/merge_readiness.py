@@ -32,7 +32,12 @@ def _split_repo(repo: str) -> tuple[str, str]:
     return owner, name
 
 
-def collect_snapshot(repo: str, pr_number: int, base_ref: str = "master") -> dict[str, Any]:
+def collect_snapshot(
+    repo: str,
+    pr_number: int,
+    base_ref: str = "master",
+    required_checks: list[str] | None = None,
+) -> dict[str, Any]:
     owner, name = _split_repo(repo)
     pull = _gh_json([f"/repos/{repo}/pulls/{pr_number}"])
     head_sha = str(pull["head"]["sha"])
@@ -82,6 +87,7 @@ def collect_snapshot(repo: str, pr_number: int, base_ref: str = "master") -> dic
         "draft": bool(pull["draft"]),
         "behind_by": int(compare["behind_by"]),
         "check_runs": checks.get("check_runs", []),
+        "required_checks": list(dict.fromkeys(required_checks or [])),
         "review_threads": threads.get("nodes", []),
         "review_threads_truncated": bool(threads.get("pageInfo", {}).get("hasNextPage")),
     }
@@ -111,27 +117,44 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         )
 
     check_runs = snapshot["check_runs"]
-    if not check_runs:
-        blockers.append({"code": "checks_missing", "detail": "no check runs found on exact head"})
+    required_checks = [str(name) for name in snapshot.get("required_checks", []) if str(name)]
+    if not required_checks:
+        blockers.append(
+            {
+                "code": "required_checks_unconfigured",
+                "detail": "required check names were not configured; readiness cannot be proven",
+            }
+        )
     else:
-        for check in check_runs:
-            name = str(check.get("name") or "<unnamed>")
+        for required_name in required_checks:
+            matches = [check for check in check_runs if str(check.get("name") or "") == required_name]
+            if not matches:
+                blockers.append(
+                    {
+                        "code": "required_check_missing",
+                        "check": required_name,
+                        "detail": f"{required_name}: no check run found on exact head",
+                    }
+                )
+                continue
+
+            check = max(matches, key=lambda item: int(item.get("id") or 0))
             status = str(check.get("status") or "")
             conclusion = check.get("conclusion")
             if status != "completed":
                 blockers.append(
                     {
                         "code": "check_pending",
-                        "check": name,
-                        "detail": f"{name}: status={status or 'unknown'}",
+                        "check": required_name,
+                        "detail": f"{required_name}: status={status or 'unknown'}",
                     }
                 )
             elif conclusion not in _ALLOWED_CONCLUSIONS:
                 blockers.append(
                     {
                         "code": "check_failed",
-                        "check": name,
-                        "detail": f"{name}: conclusion={conclusion or 'missing'}",
+                        "check": required_name,
+                        "detail": f"{required_name}: conclusion={conclusion or 'missing'}",
                     }
                 )
 
@@ -169,6 +192,12 @@ def main() -> int:
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
     parser.add_argument("--pr", type=int, default=os.environ.get("PR_NUMBER"))
     parser.add_argument("--base", default="master")
+    parser.add_argument(
+        "--required-check",
+        action="append",
+        default=None,
+        help="exact required check-run name; repeat for each required check",
+    )
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args()
 
@@ -177,7 +206,14 @@ def main() -> int:
     if args.pr is None:
         parser.error("--pr or PR_NUMBER is required")
 
-    result = evaluate_snapshot(collect_snapshot(args.repo, int(args.pr), args.base))
+    required_checks = args.required_check
+    if required_checks is None:
+        raw_required_checks = os.environ.get("MERGE_REQUIRED_CHECKS", "")
+        required_checks = [name.strip() for name in raw_required_checks.split(",") if name.strip()]
+
+    result = evaluate_snapshot(
+        collect_snapshot(args.repo, int(args.pr), args.base, required_checks=required_checks)
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
     return 0 if result["ready"] else 1
 
