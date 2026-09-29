@@ -96,7 +96,7 @@ def _env_int(name: str, default: int, minimum: int = 0) -> int:
 
 
 def _begin_transaction(conn) -> None:
-    conn.execute("BEGIN IMMEDIATE" if not is_postgres_configured() else "BEGIN")
+    conn.execute("BEGIN" if is_postgres_connection(conn) else "BEGIN IMMEDIATE")
 
 
 def _default_policy_values() -> tuple[int, int, int]:
