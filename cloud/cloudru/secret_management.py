@@ -45,6 +45,8 @@ Design constraints from issue #477, enforced here rather than left to callers:
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 import time
 from typing import Any
@@ -290,16 +292,45 @@ class CloudRuSecretManagementClient:
                 code="invalid_response",
                 http_status=response.status_code,
             )
-        secret_value = response_body.get("value") or response_body.get("payload")
-        secret_value = secret_value or response_body.get("data")
+        # Cloud.ru v1 AccessSecretVersion returns v1SecretPayload:
+        # {"data": "<base64 bytes>"}. Decode here so callers receive the actual
+        # text secret, never the wire representation.
+        encoded_secret_value = response_body.get("data")
         # Drop the parsed body before any further branch can raise, so a
         # captured exception frame never holds the raw secret under a
         # generic name such as "response_body".
         response_body = None
-        if not isinstance(secret_value, str) or not secret_value:
+        if not isinstance(encoded_secret_value, str) or not encoded_secret_value:
+            encoded_secret_value = None
+            raise CloudProviderError(
+                "Cloud.ru Secret Management response did not include secret payload data",
+                code="invalid_response",
+                http_status=response.status_code,
+            )
+        try:
+            secret_bytes = base64.b64decode(encoded_secret_value, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            encoded_secret_value = None
+            raise CloudProviderError(
+                "Cloud.ru Secret Management returned invalid base64 payload data",
+                code="invalid_response",
+                http_status=response.status_code,
+            ) from exc
+        encoded_secret_value = None
+        try:
+            secret_value = secret_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            secret_bytes = None
+            raise CloudProviderError(
+                "Cloud.ru Secret Management payload is not UTF-8 text",
+                code="invalid_response",
+                http_status=response.status_code,
+            ) from exc
+        secret_bytes = None
+        if not secret_value:
             secret_value = None
             raise CloudProviderError(
-                "Cloud.ru Secret Management response did not include a secret value",
+                "Cloud.ru Secret Management returned an empty secret value",
                 code="invalid_response",
                 http_status=response.status_code,
             )
