@@ -160,3 +160,48 @@ def test_settlement_is_idempotent_when_retried_without_new_values(printing_db):
     assert second["settled_at"] == first["settled_at"]
     assert second["actual_revenue"] == pytest.approx(260)
     assert second["actual_cost"] == pytest.approx(80)
+
+
+def test_printing3d_tools_are_registered_read_only():
+    from tool_registry import ToolRegistry
+
+    registry = ToolRegistry()
+    definitions = {item["name"]: item for item in registry.get_definitions()}
+
+    assert "printing3d.treasury.summary" in definitions
+    assert "printing3d.orders.list" in definitions
+
+    treasury_tool = registry.get_tool("printing3d.treasury.summary")
+    orders_tool = registry.get_tool("printing3d.orders.list")
+    assert treasury_tool["read_only"] is True
+    assert treasury_tool["requires_approval"] is False
+    assert orders_tool["read_only"] is True
+    assert orders_tool["requires_approval"] is False
+
+
+def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
+    from printing3d import create_order, settle_order
+    from printing3d.tools import treasury_summary
+
+    order = create_order("trusted-owner", {"title": "Socket holder", "quoted_price": 300})
+    settle_order(
+        "trusted-owner",
+        order["id"],
+        actual_revenue=320,
+        actual_cost=100,
+    )
+    other = create_order("other-owner", {"title": "Hidden order", "quoted_price": 999})
+    settle_order(
+        "other-owner",
+        other["id"],
+        actual_revenue=999,
+        actual_cost=1,
+    )
+
+    class Call:
+        user_id = "trusted-owner"
+
+    result = treasury_summary({}, {"_universal_context": {"call": Call()}})
+
+    assert result["total_orders"] == 1
+    assert result["currencies"][0]["settled_profit"] == pytest.approx(220)
