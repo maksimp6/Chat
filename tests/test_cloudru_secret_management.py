@@ -245,7 +245,7 @@ def test_explicit_iam_client_is_used_without_env_lookup(monkeypatch):
     assert client.iam_client is iam
 
 
-def test_invalidate_cache_can_clear_one_secret_or_all(monkeypatch):
+def test_invalidate_cache_never_preserves_plaintext(monkeypatch):
     client = _client(monkeypatch)
     client._value_cache = {
         ("secret-1", "v1"): (1.0, "one"),
@@ -254,8 +254,9 @@ def test_invalidate_cache_can_clear_one_secret_or_all(monkeypatch):
     }
 
     client.invalidate_cache("secret-1")
-    assert set(client._value_cache) == {("secret-2", "v1")}
+    assert client._value_cache == {}
 
+    client._value_cache[("secret-2", "v1")] = (1.0, "other")
     client.invalidate_cache()
     assert client._value_cache == {}
 
