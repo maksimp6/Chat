@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import sys
 from pathlib import Path
 
 
@@ -18,6 +20,12 @@ def snapshot(**overrides):
         "base_ref": "master",
         "pr_base_ref": "master",
         "head_sha": "abc123",
+        "base_sha": "base123",
+        "final_head_sha": "abc123",
+        "final_base_sha": "base123",
+        "snapshot_changed": False,
+        "pr_state": "open",
+        "merged": False,
         "draft": False,
         "behind_by": 0,
         "required_checks": ["Application tests", "PostgreSQL integration"],
@@ -58,6 +66,18 @@ def test_merge_readiness_accepts_only_fully_ready_exact_head():
     assert result["ready"] is True
     assert result["head_sha"] == "abc123"
     assert result["blockers"] == []
+
+
+def test_merge_readiness_rejects_closed_merged_or_changed_snapshot():
+    closed = merge_readiness.evaluate_snapshot(snapshot(pr_state="closed"))
+    merged = merge_readiness.evaluate_snapshot(snapshot(pr_state="closed", merged=True))
+    changed = merge_readiness.evaluate_snapshot(
+        snapshot(final_head_sha="new-head", snapshot_changed=True)
+    )
+
+    assert blocker_codes(closed) == {"pull_request_not_open"}
+    assert blocker_codes(merged) == {"pull_request_not_open"}
+    assert blocker_codes(changed) == {"snapshot_changed"}
 
 
 def test_merge_readiness_fails_closed_for_draft_stale_pending_and_threads():
@@ -193,3 +213,152 @@ def test_merge_readiness_uses_latest_attempt_for_required_check():
     )
 
     assert result["ready"] is True
+
+
+def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monkeypatch):
+    calls = []
+    pulls = iter(
+        [
+            {
+                "head": {"sha": "head-1"},
+                "base": {"ref": "master", "sha": "base-1"},
+                "state": "open",
+                "merged": False,
+                "draft": False,
+            },
+            {
+                "head": {"sha": "head-1"},
+                "base": {"ref": "master", "sha": "base-1"},
+                "state": "open",
+                "merged": False,
+                "draft": False,
+            },
+        ]
+    )
+
+    def fake_gh_json(args):
+        calls.append(args)
+        joined = " ".join(args)
+        if "/pulls/123" in joined:
+            return next(pulls)
+        if "/compare/master...head-1" in joined:
+            return {"behind_by": 0}
+        if "/commits/head-1/check-runs?per_page=100" in joined:
+            return {
+                "check_runs": [
+                    {
+                        "id": 1,
+                        "name": "Application tests",
+                        "status": "completed",
+                        "conclusion": "success",
+                    }
+                ]
+            }
+        if args and args[0] == "graphql":
+            return {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [{"isResolved": True}],
+                                "pageInfo": {"hasNextPage": True},
+                            }
+                        }
+                    }
+                }
+            }
+        raise AssertionError(f"unexpected gh call: {args}")
+
+    monkeypatch.setattr(merge_readiness, "_gh_json", fake_gh_json)
+
+    result = merge_readiness.collect_snapshot(
+        "maksimp6/Chat",
+        123,
+        required_checks=["Application tests"],
+    )
+
+    assert result["head_sha"] == "head-1"
+    assert result["base_sha"] == "base-1"
+    assert result["snapshot_changed"] is False
+    assert result["review_threads_truncated"] is True
+    assert any("/compare/master...head-1" in " ".join(call) for call in calls)
+    assert any("/commits/head-1/check-runs?per_page=100" in " ".join(call) for call in calls)
+
+
+def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
+    pulls = iter(
+        [
+            {
+                "head": {"sha": "head-1"},
+                "base": {"ref": "master", "sha": "base-1"},
+                "state": "open",
+                "merged": False,
+                "draft": False,
+            },
+            {
+                "head": {"sha": "head-2"},
+                "base": {"ref": "master", "sha": "base-2"},
+                "state": "open",
+                "merged": False,
+                "draft": False,
+            },
+        ]
+    )
+
+    def fake_gh_json(args):
+        joined = " ".join(args)
+        if "/pulls/123" in joined:
+            return next(pulls)
+        if "/compare/master...head-1" in joined:
+            return {"behind_by": 0}
+        if "/commits/head-1/check-runs?per_page=100" in joined:
+            return {"check_runs": []}
+        if args and args[0] == "graphql":
+            return {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [],
+                                "pageInfo": {"hasNextPage": False},
+                            }
+                        }
+                    }
+                }
+            }
+        raise AssertionError(f"unexpected gh call: {args}")
+
+    monkeypatch.setattr(merge_readiness, "_gh_json", fake_gh_json)
+
+    result = merge_readiness.collect_snapshot("maksimp6/Chat", 123, required_checks=["CI"])
+
+    assert result["snapshot_changed"] is True
+    assert blocker_codes(merge_readiness.evaluate_snapshot(result)) >= {"snapshot_changed"}
+
+
+def test_main_emits_structured_collection_error(monkeypatch, capsys):
+    monkeypatch.setattr(
+        merge_readiness,
+        "collect_snapshot",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("secret provider output")),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "merge_readiness.py",
+            "--repo",
+            "maksimp6/Chat",
+            "--pr",
+            "123",
+            "--required-check",
+            "Application tests",
+        ],
+    )
+
+    assert merge_readiness.main() == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["ready"] is False
+    assert blocker_codes(payload) == {"collection_error"}
+    assert "secret provider output" not in payload["blockers"][0]["detail"]
