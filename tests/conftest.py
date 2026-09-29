@@ -39,6 +39,12 @@ def _require_disposable_postgres_target(database_url: str) -> None:
             f"{database_name or '<unknown>'!r}"
         )
 
+@pytest.fixture
+def require_disposable_postgres_target():
+    """Expose the destructive-reset guard to regression tests."""
+    return _require_disposable_postgres_target
+
+
 
 @pytest.fixture(autouse=True)
 def isolate_selected_database(request, monkeypatch):
