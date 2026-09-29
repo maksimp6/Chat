@@ -307,3 +307,48 @@ def test_value_response_rejects_invalid_json_shapes(payload):
     with pytest.raises(CloudProviderError) as exc:
         CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
     assert exc.value.code == "invalid_response"
+
+
+def test_uses_official_secret_manager_endpoint_and_payload_route(monkeypatch):
+    client = _client(monkeypatch, cache_ttl=0)
+    with (
+        patch.object(client.iam_client, "_token", return_value="iam-token"),
+        patch(
+            "cloud.cloudru.secret_management.requests.get",
+            return_value=_ok_response({"value": "secret-value"}),
+        ) as get,
+    ):
+        assert client.get_secret_value("secret-1", "v7") == "secret-value"
+
+    assert get.call_args.args[0] == (
+        "https://secretmanager.api.cloud.ru/v1/secrets/secret-1/versions/v7/payload"
+    )
+
+
+def test_cache_sweeps_expired_entries_and_enforces_bound(monkeypatch):
+    client = _client(monkeypatch, cache_ttl=10.0, cache_max_entries=2)
+    client._value_cache = {
+        ("expired", "v1"): (1.0, "old-secret"),
+        ("keep", "v1"): (95.0, "keep-secret"),
+        ("also-keep", "v1"): (96.0, "also-secret"),
+    }
+
+    with patch("cloud.cloudru.secret_management.time.monotonic", return_value=100.0):
+        client._sweep_cache()
+
+    assert ("expired", "v1") not in client._value_cache
+    assert len(client._value_cache) <= 2
+
+    client._value_cache[("newer", "v1")] = (97.0, "newer-secret")
+    with patch("cloud.cloudru.secret_management.time.monotonic", return_value=100.0):
+        client._sweep_cache()
+
+    assert len(client._value_cache) == 2
+    assert ("keep", "v1") not in client._value_cache
+
+
+def test_zero_ttl_sweep_clears_plaintext_cache(monkeypatch):
+    client = _client(monkeypatch, cache_ttl=0)
+    client._value_cache[("secret-1", "v1")] = (1.0, "plaintext")
+    client._sweep_cache(2.0)
+    assert client._value_cache == {}
