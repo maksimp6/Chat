@@ -77,7 +77,7 @@ class BrowserCapabilityContract:
             "capabilities": ["browser", self.mode],
             "risk_level": "high" if self.mode == "cloud" else "medium",
             "read_only": False,
-            "requires_approval": True,
+            "requires_approval": False,
             "supported_transports": ["responses_api", "local_agent", "mcp"],
             "executor": {"type": "browser_adapter", "mode": self.mode},
             "metadata": {
