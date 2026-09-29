@@ -48,6 +48,7 @@ from __future__ import annotations
 import base64
 import binascii
 import os
+import threading
 import time
 from typing import Any
 
@@ -117,6 +118,7 @@ class CloudRuSecretManagementClient:
             iam_client=self.iam_client, timeout=self.timeout, api_key_auth=False
         )
         self._value_cache: dict[tuple[str, str], tuple[float, str]] = {}
+        self._value_cache_lock = threading.RLock()
 
     def _ensure_configured(self) -> None:
         if not (self.iam_client.key_id and self.iam_client.key_secret):
@@ -129,26 +131,28 @@ class CloudRuSecretManagementClient:
 
     def _sweep_cache(self, now_monotonic: float | None = None) -> None:
         now_monotonic = time.monotonic() if now_monotonic is None else now_monotonic
-        if self.cache_ttl <= 0:
-            self._value_cache.clear()
-            return
-        expired = [
-            key
-            for key, (stored_at, _value) in self._value_cache.items()
-            if (now_monotonic - stored_at) >= self.cache_ttl
-        ]
-        for key in expired:
-            del self._value_cache[key]
-        while len(self._value_cache) > self.cache_max_entries:
-            oldest = min(self._value_cache, key=lambda key: self._value_cache[key][0])
-            del self._value_cache[oldest]
+        with self._value_cache_lock:
+            if self.cache_ttl <= 0:
+                self._value_cache.clear()
+                return
+            expired = [
+                key
+                for key, (stored_at, _value) in self._value_cache.items()
+                if (now_monotonic - stored_at) >= self.cache_ttl
+            ]
+            for key in expired:
+                del self._value_cache[key]
+            while len(self._value_cache) > self.cache_max_entries:
+                oldest = min(self._value_cache, key=lambda key: self._value_cache[key][0])
+                del self._value_cache[oldest]
 
     def invalidate_cache(self, secret_id: str | None = None) -> None:
-        if secret_id is None:
-            self._value_cache.clear()
-            return
-        for cache_key in [key for key in self._value_cache if key[0] == secret_id]:
-            del self._value_cache[cache_key]
+        with self._value_cache_lock:
+            if secret_id is None:
+                self._value_cache.clear()
+                return
+            for cache_key in [key for key in self._value_cache if key[0] == secret_id]:
+                del self._value_cache[cache_key]
 
     def get_secret_value(self, secret_id: str, version_id: str) -> str:
         """Return the plaintext payload for one pinned, immutable secret version."""
@@ -160,8 +164,9 @@ class CloudRuSecretManagementClient:
 
         cache_key = (secret_id, version_id)
         now_monotonic = time.monotonic()
-        self._sweep_cache(now_monotonic)
-        cached = self._value_cache.get(cache_key)
+        with self._value_cache_lock:
+            self._sweep_cache(now_monotonic)
+            cached = self._value_cache.get(cache_key)
         if cached is not None and (now_monotonic - cached[0]) < self.cache_ttl:
             trace = get_current_trace()
             if trace is not None:
@@ -173,8 +178,10 @@ class CloudRuSecretManagementClient:
         if trace is not None:
             trace.register_sensitive_value(fetched_secret_value)
         if self.cache_ttl > 0:
-            self._value_cache[cache_key] = (now_monotonic, fetched_secret_value)
-            self._sweep_cache(now_monotonic)
+            with self._value_cache_lock:
+                stored_at = time.monotonic()
+                self._value_cache[cache_key] = (stored_at, fetched_secret_value)
+                self._sweep_cache(stored_at)
         return fetched_secret_value
 
     def list_versions(self, secret_id: str) -> list[dict[str, Any]]:

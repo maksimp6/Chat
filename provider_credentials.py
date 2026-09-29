@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
+import threading
 from typing import Any, Callable, Optional
 
 from trace_manager import get_current_trace
@@ -667,7 +668,10 @@ def set_secret_management_ref(
         ON CONFLICT(purpose) DO UPDATE SET
             previous_version_id = CASE
                 WHEN secret_management_refs.secret_id = excluded.secret_id
+                     AND secret_management_refs.pinned_version_id <> excluded.pinned_version_id
                 THEN secret_management_refs.pinned_version_id
+                WHEN secret_management_refs.secret_id = excluded.secret_id
+                THEN secret_management_refs.previous_version_id
                 ELSE NULL
             END,
             secret_id = excluded.secret_id,
@@ -742,14 +746,17 @@ def rollback_secret_management_ref(
 
 
 _SECRET_MANAGEMENT_CLIENT: Any = None
+_SECRET_MANAGEMENT_CLIENT_LOCK = threading.Lock()
 
 
 def _get_secret_management_client():
     global _SECRET_MANAGEMENT_CLIENT
     if _SECRET_MANAGEMENT_CLIENT is None:
-        from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+        with _SECRET_MANAGEMENT_CLIENT_LOCK:
+            if _SECRET_MANAGEMENT_CLIENT is None:
+                from cloud.cloudru.secret_management import CloudRuSecretManagementClient
 
-        _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
+                _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
     return _SECRET_MANAGEMENT_CLIENT
 
 

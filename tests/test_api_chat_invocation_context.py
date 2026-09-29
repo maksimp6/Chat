@@ -4,6 +4,7 @@ from unittest.mock import patch
 from mcp_routes import chat
 from app import app
 from invocation.manager import get_invocation
+from trace_manager import get_current_trace
 
 
 class ApiChatInvocationContextTests(unittest.TestCase):
@@ -15,10 +16,14 @@ class ApiChatInvocationContextTests(unittest.TestCase):
             "status": "completed",
         }
 
+        def assert_trace_is_bound(*args, **kwargs):
+            self.assertIs(kwargs.get("trace"), get_current_trace())
+            return fake_response
+
         with (
             patch("mcp_routes.get_conv_settings", return_value={}),
             patch("mcp_routes.add_message"),
-            patch("mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response),
+            patch("mcp_routes.AliceClient.ask_with_mcp", side_effect=assert_trace_is_bound),
         ):
             response = client.post(
                 "/api/chat",
@@ -32,6 +37,7 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         self.assertEqual(payload["trace_id"], payload["trace"]["trace_id"])
         self.assertEqual(payload["trace"]["context"]["invocation_id"], payload["invocation_id"])
         self.assertEqual(payload["trace"]["context"]["conversation_id"], "conv-test")
+        self.assertIsNone(get_current_trace())
 
     def test_chat_failure_persists_failed_invocation_and_trace(self):
         client = app.test_client()

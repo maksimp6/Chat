@@ -1,5 +1,6 @@
 import base64
 import json
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import Mock, patch
 
 import pytest
@@ -350,6 +351,22 @@ def test_cache_sweeps_expired_entries_and_enforces_bound(monkeypatch):
 
     assert len(client._value_cache) == 2
     assert ("keep", "v1") not in client._value_cache
+
+
+def test_cache_sweep_and_insert_are_safe_under_concurrent_reads(monkeypatch):
+    client = _client(monkeypatch, cache_ttl=30.0, cache_max_entries=8)
+    client._fetch_value = lambda secret_id, version_id: f"{secret_id}:{version_id}"
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        values = list(
+            executor.map(
+                lambda index: client.get_secret_value(f"secret-{index}", "v1"),
+                range(256),
+            )
+        )
+
+    assert values == [f"secret-{index}:v1" for index in range(256)]
+    assert len(client._value_cache) <= 8
 
 
 def test_zero_ttl_sweep_clears_plaintext_cache(monkeypatch):

@@ -30,6 +30,16 @@ def get_current_trace() -> Optional["ExecutionTrace"]:
     return _current_trace.get()
 
 
+def bind_current_trace(trace: "ExecutionTrace"):
+    """Bind a trace to the current context and return its reset token."""
+    return _current_trace.set(trace)
+
+
+def reset_current_trace(token) -> None:
+    """Restore the previous trace context after an invocation completes."""
+    _current_trace.reset(token)
+
+
 def traced_operation(operation: str, *, include_request: bool = True):
     """Trace an important non-chat operation, including its final HTTP outcome."""
 
@@ -284,7 +294,10 @@ class ExecutionTrace:
                 ):
                     locals_snapshot[name] = "<redacted>"
                 else:
-                    locals_snapshot[name] = self._redact_registered_values(self._safe_repr(value))
+                    safe_value = self._redact_registered_values(value)
+                    locals_snapshot[name] = self._redact_registered_values(
+                        self._safe_repr(safe_value)
+                    )
             frames.append(
                 {
                     "file": frame.f_code.co_filename,
@@ -620,7 +633,8 @@ class ExecutionTrace:
         self._ensure_mutable()
         if event_type in self._INTERNAL_EVENT_TYPES:
             return
-        safe_payload = self._redact_registered_values(self._sanitize_trace_value(payload or {}))
+        redacted_payload = self._redact_registered_values(payload or {})
+        safe_payload = self._redact_registered_values(self._sanitize_trace_value(redacted_payload))
         self.trace["events"].append(
             {"type": event_type, "timestamp": time.time(), "payload": safe_payload}
         )
@@ -672,7 +686,8 @@ class ExecutionTrace:
         exception: Optional[BaseException] = None,
     ) -> None:
         self._ensure_mutable()
-        safe_message = self._redact_registered_values(self._sanitize_trace_value(message))
+        redacted_message = self._redact_registered_values(message)
+        safe_message = self._redact_registered_values(self._sanitize_trace_value(redacted_message))
         entry = {"source": source, "error": safe_message, "timestamp": time.time()}
         if error_type:
             entry["type"] = error_type
