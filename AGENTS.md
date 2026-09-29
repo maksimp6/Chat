@@ -17,18 +17,60 @@ Use the smallest independent change that satisfies an issue or subtask.
 
 ## Agent dispatch
 
-Describe the task with the "Agent task" issue template, then mention exactly one
-agent in a comment:
+Alice Pro uses **roles first, model providers second**. The repository roles are
+defined in `.github/agents/*.agent.md`; the underlying model/service is an
+execution backend, not the employee identity.
 
-- `@claude` — multi-file changes and investigations (`.github/workflows/claude.yml`).
-- `@codex` — test engineer: checks each pull request's tests and proposes the
-  missing regression tests; also takes focused, test-heavy issues. Uses
-  `scripts/codex_setup.sh`.
-- `@copilot` — assign the issue to Copilot; it also reviews pull requests
-  (`.github/copilot-instructions.md`).
-- `@alice` — self-improver: Alice Pro making small changes to her own code
-  (UI, translations, prompts, her tools, docs) through her filesystem tools
-  (`.github/workflows/alice.yml`, `docs/agents/alice-github-agent.md`).
+### Role agents
+
+For normal development, assign the issue through the GitHub Agents UI and choose
+the narrowest matching repository role:
+
+- **Team Lead** — triage, dependency analysis and delegation to specialists.
+- **Backend Engineer** — Flask/API/runtime/tools/database/Execution Trace.
+- **Frontend Engineer** — browser UI, static JavaScript, accessibility and
+  BrowserShim-compatible behavior.
+- **Android Engineer** — Android app, packaging, signing boundaries and device
+  integration.
+- **Test Engineer** — regression gaps, deterministic tests and CI diagnosis.
+- **Infra Engineer** — GitHub Actions, runners, caching, Cloud.ru and deployment
+  automation.
+- **Security Reviewer** — read-mostly security review; no implementation.
+- **Docs Engineer** — documentation and runbooks.
+- **Release Manager** — merge/release readiness, versions, artifacts and rollback
+  notes.
+
+Team Lead may use the custom-agent tool to delegate to these specialists. Keep one
+primary owner for an issue and split only truly independent work.
+
+### Execution backends and escalation
+
+- `@claude` is reserved for the **Anthropic Claude GitHub Partner Agent**.
+  Start it from the Agents UI or assign it to an issue; on an existing PR,
+  mention the partner agent. Use **Claude Sonnet 4.6** for the normal strong
+  path. Use it for architecture-heavy, ambiguous or multi-domain work.
+- `@claude-lite` is our repository GitHub Actions worker
+  (`.github/workflows/claude-lite.yml`): `claude-haiku-4-5`, maximum 10
+  turns. Use it for cheap, bounded maintenance tasks.
+- `@codex` is the OpenAI GitHub Partner Agent. Routine Codex sessions should
+  use **GPT-5.4 nano**; `.codex/config.toml` also sets nano/low defaults for
+  repository Codex tooling.
+- `@copilot` remains the native Copilot cloud agent and automatic PR reviewer.
+  The role profiles above run on Copilot cloud agent with lightweight models
+  unless explicitly escalated.
+- `@alice` remains Alice Pro's self-improver for her own UI, translations,
+  prompts, tools and docs.
+
+Do not create a new vendor-named agent profile when a reusable engineering role
+describes the work better. Prefer adding or refining a role profile, then choose
+the cheapest backend/model that can reliably perform that role.
+
+### Model policy
+
+Routine role agents use `gpt-5.4-mini`; Docs Engineer uses
+`gpt-5.4-nano`. Escalate to the Claude Partner Agent on Sonnet for a concrete
+architecture/reasoning need. Do not silently escalate routine work to a larger
+model.
 
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push to `master`.
