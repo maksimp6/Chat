@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 import subprocess
@@ -82,6 +83,7 @@ def build_report(root: Path, workdir: Path) -> dict[str, Any]:
     ast_path = workdir / "ai-index.json"
     hot_json = workdir / "hot-file-metrics.json"
     hot_md = workdir / "hot-file-metrics.md"
+    impact_path = workdir / "impact.json"
 
     _run(
         [
@@ -111,10 +113,25 @@ def build_report(root: Path, workdir: Path) -> dict[str, Any]:
         ]
     )
 
+    impact_base = os.environ.get("ALICE_IMPACT_BASE", "HEAD^")
+    _run(
+        [
+            sys.executable,
+            str(root / "scripts" / "build_impact_graph.py"),
+            "--index",
+            str(ast_path),
+            "--base",
+            impact_base,
+            "--output",
+            str(impact_path),
+        ]
+    )
+
     ast_index = _load_json(ast_path)
     hot_files = _load_json(hot_json)
     complexity = _ruff_complexity(root)
     dead_code = _vulture_findings(root)
+    impact = _load_json(impact_path)
 
     return {
         "schema_version": 1,
@@ -133,6 +150,8 @@ def build_report(root: Path, workdir: Path) -> dict[str, Any]:
             "hot_files": len(hot_files.get("files", [])),
             "complexity_findings": len(complexity),
             "dead_code_candidates": len(dead_code),
+            "affected_python_files": len(impact.get("impact", {}).get("affected_python_files", [])),
+            "affected_tests": len(impact.get("impact", {}).get("affected_tests", [])),
         },
         "complexity": complexity,
         "dead_code": dead_code,
@@ -140,6 +159,7 @@ def build_report(root: Path, workdir: Path) -> dict[str, Any]:
             "ai_index": ast_path.name,
             "hot_file_metrics": hot_json.name,
             "hot_file_markdown": hot_md.name,
+            "impact": impact_path.name,
         },
     }
 
