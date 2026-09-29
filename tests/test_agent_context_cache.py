@@ -23,12 +23,20 @@ def _scope(*, head="head-1", skills=("github-ci-diagnosis", "github-pr-readiness
     )
 
 
-def _evidence(*, ci="ci-1", review="review-1", trace="trace-1", files="files-1"):
+def _evidence(
+    *,
+    ci="ci-1",
+    review="review-1",
+    trace="trace-1",
+    files="files-1",
+    skills="skills-1",
+):
     return EvidenceVersion(
         ci=ci,
         review=review,
         trace=trace,
         files=files,
+        skills=skills,
         policy="policy-1",
     )
 
@@ -67,6 +75,13 @@ def _packet(scope=None, evidence=None):
                 source_bytes=200,
                 input_tokens=35,
             ),
+            ContextSlice(
+                name="skills",
+                payload={"versions": ["github-ci-diagnosis@1"]},
+                depends_on=("skills",),
+                source_bytes=100,
+                input_tokens=20,
+            ),
         ),
         budget_tier="cheap",
     )
@@ -90,9 +105,9 @@ def test_exact_head_and_evidence_reuse_is_a_hit():
 
     assert result.status == "hit"
     assert result.packet == packet
-    assert [item.name for item in result.reusable_slices] == ["code", "ci", "review"]
-    assert result.saved_source_bytes == 1800
-    assert result.saved_input_tokens == 325
+    assert [item.name for item in result.reusable_slices] == ["code", "ci", "review", "skills"]
+    assert result.saved_source_bytes == 1900
+    assert result.saved_input_tokens == 345
 
 
 def test_new_head_is_full_miss_even_when_other_evidence_matches():
@@ -115,9 +130,9 @@ def test_changed_ci_reuses_only_slices_independent_of_ci():
 
     assert result.status == "partial"
     assert result.stale_components == ("ci",)
-    assert [item.name for item in result.reusable_slices] == ["code", "review"]
-    assert result.saved_source_bytes == 1400
-    assert result.saved_input_tokens == 255
+    assert [item.name for item in result.reusable_slices] == ["code", "review", "skills"]
+    assert result.saved_source_bytes == 1500
+    assert result.saved_input_tokens == 275
 
 
 def test_multiple_evidence_changes_keep_only_independent_slices():
@@ -129,8 +144,20 @@ def test_multiple_evidence_changes_keep_only_independent_slices():
 
     assert result.status == "partial"
     assert result.stale_components == ("ci", "review")
-    assert [item.name for item in result.reusable_slices] == ["code"]
+    assert [item.name for item in result.reusable_slices] == ["code", "skills"]
 
+
+
+def test_changed_skill_version_invalidates_only_skill_dependent_slice():
+    cache = TaskContextCache()
+    packet = _packet()
+    cache.put(packet)
+
+    result = cache.lookup(packet.scope, _evidence(skills="skills-2"))
+
+    assert result.status == "partial"
+    assert result.stale_components == ("skills",)
+    assert [item.name for item in result.reusable_slices] == ["code", "ci", "review"]
 
 def test_all_slice_dependencies_stale_becomes_miss():
     cache = TaskContextCache()
@@ -187,7 +214,7 @@ def test_cache_lookup_is_recorded_on_execution_trace():
 
     assert entry["status"] == "hit"
     assert entry["head_sha"] == "head-1"
-    assert entry["saved_input_tokens"] == 325
+    assert entry["saved_input_tokens"] == 345
     assert trace.trace["context_cache_operations"][0]["work_item"] == "PR#548"
     assert trace.trace["events"][-1]["type"] == "context_cache_lookup"
     json.dumps(trace.finalize())
