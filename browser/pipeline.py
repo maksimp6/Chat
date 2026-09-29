@@ -56,7 +56,9 @@ class SemanticBrowserWorker:
 
         mode = str(task.metadata.get("semantic_mode") or "").strip().lower()
         if not mode:
-            mode = "snapshot" if task.role in {"observer", "extractor", "verifier"} else "passthrough"
+            mode = (
+                "snapshot" if task.role in {"observer", "extractor", "verifier"} else "passthrough"
+            )
         if mode == "passthrough":
             return raw_result
         if mode != "snapshot":
@@ -154,8 +156,7 @@ class BrowserSynthesisResult:
             "status": self.status,
             "task_statuses": dict(self.task_statuses),
             "snapshots": {
-                task_id: snapshot.to_mapping()
-                for task_id, snapshot in self.snapshots.items()
+                task_id: snapshot.to_mapping() for task_id, snapshot in self.snapshots.items()
             },
             "diffs": {task_id: diff.to_mapping() for task_id, diff in self.diffs.items()},
             "evidence": self.evidence.to_mapping(),
@@ -186,9 +187,7 @@ def _escalation(
     strong = False
 
     non_success = sorted(
-        task_id
-        for task_id, result in dag_result.tasks.items()
-        if result.status != "succeeded"
+        task_id for task_id, result in dag_result.tasks.items() if result.status != "succeeded"
     )
     if non_success:
         reasons.append("task_failures:" + ",".join(non_success))
@@ -202,9 +201,7 @@ def _escalation(
         reasons.append("missing_diff_sources:" + ",".join(sorted(missing_diff_sources)))
         strong = True
 
-    truncated = sorted(
-        task_id for task_id, snapshot in snapshots.items() if snapshot.truncated
-    )
+    truncated = sorted(task_id for task_id, snapshot in snapshots.items() if snapshot.truncated)
     if truncated and policy.escalate_on_truncation:
         reasons.append("truncated_state:" + ",".join(truncated))
 
@@ -289,10 +286,7 @@ def synthesize_browser_dag(
         missing_diff_sources,
         active_policy,
     )
-    task_statuses = {
-        task_id: result.status
-        for task_id, result in sorted(dag_result.tasks.items())
-    }
+    task_statuses = {task_id: result.status for task_id, result in sorted(dag_result.tasks.items())}
     return BrowserSynthesisResult(
         status=dag_result.status,
         task_statuses=task_statuses,
