@@ -1,7 +1,33 @@
 """Schema additions for serverless/sessioned execution."""
 
 from db import get_conn
-from db_backend import OperationalError
+from db_backend import OperationalError, is_postgres_connection
+
+
+def _drop_legacy_invocation_conversation_fk(conn) -> None:
+    """Remove the legacy PostgreSQL FK that rejects synthetic conversation IDs."""
+    if not is_postgres_connection(conn):
+        return
+
+    constraints = conn.execute(
+        """
+        SELECT DISTINCT constraint_info.conname AS name
+        FROM (
+            SELECT c.conname, unnest(c.conkey) AS attnum
+            FROM pg_constraint AS c
+            WHERE c.conrelid = 'invocations'::regclass
+              AND c.contype = 'f'
+        ) AS constraint_info
+        JOIN pg_attribute AS a
+          ON a.attrelid = 'invocations'::regclass
+         AND a.attnum = constraint_info.attnum
+        WHERE a.attname = 'conversation_id'
+        """
+    ).fetchall()
+    for row in constraints:
+        constraint_name = str(row["name"])
+        quoted_name = '"' + constraint_name.replace('"', '""') + '"'
+        conn.execute(f"ALTER TABLE invocations DROP CONSTRAINT {quoted_name}")
 
 
 def init_runtime_tables() -> None:
@@ -60,6 +86,7 @@ def init_runtime_tables() -> None:
             except OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
+        _drop_legacy_invocation_conversation_fk(conn)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_invocations_session ON invocations(session_id)"
         )
