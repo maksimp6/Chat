@@ -194,9 +194,7 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
         else:
             candidate_kind = "watch"
         row["candidate_kind"] = candidate_kind
-        row["score_components"] = {
-            key: round(value, 4) for key, value in components.items()
-        }
+        row["score_components"] = {key: round(value, 4) for key, value in components.items()}
 
     rows.sort(key=lambda row: (-row["score"], row["path"]))
     return {
