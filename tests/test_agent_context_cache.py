@@ -290,6 +290,7 @@ def test_scope_invalidation_removes_all_evidence_versions():
     assert len(cache) == 0
     assert cache.lookup(scope, _evidence(ci="ci-2")).status == "miss"
 
+
 def test_cache_lookup_rejects_invalid_status():
     try:
         from agent_context.cache import CacheLookup
@@ -375,4 +376,3 @@ def test_task_packet_sanitizes_escalation_target():
 
     assert "supersecret" not in packet.escalation_target
     assert "<redacted>" in packet.escalation_target
-
