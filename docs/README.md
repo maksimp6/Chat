@@ -9,6 +9,9 @@
 - [Координация архитектурной интеграции](architecture/integration-coordination.md) — порядок и границы активных потоков работ
 - [Текущий интеграционный реестр](integration/current-scope.md) — статус и правила допуска сфокусированных PR
 - [Настройка](setup/installation.md) — установка и конфигурация
+- [Рабочий процесс разработки](development_workflow.md) — formatter, локальные проверки, CI и fail-closed merge gate
+- [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
+- [Cloud.ru Container Apps](cloudru-container-apps.md) — baseline serverless deployment path; v2 client уже в `master`, live Cloud.ru rollout пока не подтверждён
 - [API](api/overview.md) — описание доступных API-интерфейсов
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
 - [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Alice Pro к ChatGPT через MCP
