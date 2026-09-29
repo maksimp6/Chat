@@ -84,7 +84,7 @@ def test_postgres_is_the_same_store_used_by_application_modules():
 
     assert row["title"] == "Shared DB"
 
-    mcp_storage.create_server(
+    server_id = mcp_storage.create_server(
         {
             "name": "postgres-shared",
             "server_url": "http://example.invalid/mcp",
@@ -114,6 +114,7 @@ def test_postgres_is_the_same_store_used_by_application_modules():
         conn.close()
 
     assert count == 1
+    mcp_storage.delete_server(server_id)
 
 
 def test_postgres_observability_migration_is_idempotent():
