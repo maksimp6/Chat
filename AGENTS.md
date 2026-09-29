@@ -60,6 +60,17 @@ owner (@maksimp6) does not merge by hand.
 - Do not request another Codex or Copilot review after feedback fixes. The final
   corrected head is validated by required CI plus resolved review threads. A
   repeated review is allowed only when the owner explicitly asks for it.
+- Merge is fail-closed. Immediately before merge, verify the pull request is
+  synchronized with the current `master` (`behind master = 0`). Required
+  checks must be green on the exact current PR head after that synchronization,
+  not merely on an earlier head or an older base.
+- If `master` advances before merge, synchronize the PR again and require the
+  protected checks to pass on the new synced head. Do not reuse green checks
+  from the stale head.
+- After final-review fixes, do not request a second review cycle. Any new head
+  still requires protected CI to pass and all review threads to remain resolved.
+- Prefer protected auto-merge once the gate is satisfied. Never force-update,
+  rewrite, or bypass protection on `master`.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
