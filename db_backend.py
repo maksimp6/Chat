@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Protocol
 
 try:
     import psycopg
@@ -31,6 +31,19 @@ _ALTER_ADD_COLUMN_RE = re.compile(
 )
 _INSERT_OR_IGNORE_RE = re.compile(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", re.IGNORECASE)
 _UNIQUE_VIOLATION_NAMES = {"UniqueViolation", "UniqueViolationError"}
+
+# Application code imports these backend-neutral names instead of sqlite3 errors.
+# PostgreSQL adapter failures are normalized to the same boundary types below.
+IntegrityError = sqlite3.IntegrityError
+OperationalError = sqlite3.OperationalError
+
+
+class DatabaseRow(Protocol):
+    """Minimal row contract shared by sqlite3.Row and PGRow."""
+
+    def __getitem__(self, key: int | str) -> Any: ...
+
+    def keys(self) -> Iterable[str]: ...
 
 
 class PGRow:
@@ -134,7 +147,7 @@ class PGCursor:
             self._raw.execute(translated, tuple(params))
         except Exception as exc:
             if exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES:
-                raise sqlite3.IntegrityError(str(exc)) from exc
+                raise IntegrityError(str(exc)) from exc
             raise
         self._columns = tuple(desc.name for desc in self._raw.description or ())
         return self
@@ -145,7 +158,7 @@ class PGCursor:
             self._raw.executemany(translated, seq_of_params)
         except Exception as exc:
             if exc.__class__.__name__ in _UNIQUE_VIOLATION_NAMES:
-                raise sqlite3.IntegrityError(str(exc)) from exc
+                raise IntegrityError(str(exc)) from exc
             raise
         self._columns = tuple(desc.name for desc in self._raw.description or ())
         return self
