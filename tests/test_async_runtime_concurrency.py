@@ -191,3 +191,89 @@ async def test_async_harness_leaves_no_owned_pending_tasks(async_runtime_db):
     after = set(asyncio.all_tasks())
     newly_pending = {task for task in after - before if task is not current and not task.done()}
     assert newly_pending == set()
+
+
+@pytest.mark.asyncio
+async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypatch):
+    import agent_gateway
+    from concurrent.futures import (
+        ThreadPoolExecutor as RealThreadPoolExecutor,
+        TimeoutError as FutureTimeoutError,
+    )
+
+    from agent_gateway import AgentDescriptor, AgentGateway
+
+    slow_started = threading.Event()
+    timeout_observed = threading.Event()
+    release_slow = threading.Event()
+
+    class TrackingFuture:
+        def __init__(self, future, *, track_timeout):
+            self._future = future
+            self._track_timeout = track_timeout
+
+        def result(self, timeout=None):
+            try:
+                return self._future.result(timeout=timeout)
+            except FutureTimeoutError:
+                if self._track_timeout:
+                    timeout_observed.set()
+                raise
+
+        def cancel(self):
+            return self._future.cancel()
+
+    class TrackingExecutor:
+        def __init__(self, *args, **kwargs):
+            self._executor = RealThreadPoolExecutor(*args, **kwargs)
+
+        def __enter__(self):
+            self._executor.__enter__()
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return self._executor.__exit__(exc_type, exc_value, traceback)
+
+        def submit(self, fn, payload):
+            future = self._executor.submit(fn, payload)
+            return TrackingFuture(
+                future,
+                track_timeout=payload.get("role") == "slow",
+            )
+
+    monkeypatch.setattr(agent_gateway, "ThreadPoolExecutor", TrackingExecutor)
+
+    def slow_handler(_payload):
+        slow_started.set()
+        if not release_slow.wait(timeout=5):
+            raise TimeoutError("slow handler was not released")
+        return {"role": "slow"}
+
+    gateway = AgentGateway(default_timeout_seconds=0.01, default_max_retries=0)
+    gateway.register(AgentDescriptor("slow", "Slow"), slow_handler)
+    gateway.register(AgentDescriptor("fast", "Fast"), lambda _: {"role": "fast"})
+
+    slow_task = asyncio.create_task(asyncio.to_thread(gateway.invoke, "slow", {"role": "slow"}))
+    assert await asyncio.to_thread(slow_started.wait, 5)
+    assert await asyncio.to_thread(timeout_observed.wait, 5)
+
+    try:
+        fast_result = await asyncio.wait_for(
+            asyncio.to_thread(gateway.invoke, "fast", {"role": "fast"}),
+            timeout=1,
+        )
+        assert fast_result.status == "completed"
+        assert fast_result.result == {"role": "fast"}
+
+        # The gateway has already observed the slow timeout, but its executor
+        # still waits for the running handler during shutdown. The sibling must
+        # complete without waiting for that worker to be released.
+        assert not slow_task.done()
+    finally:
+        release_slow.set()
+
+    slow_result = await asyncio.wait_for(slow_task, timeout=1)
+
+    assert slow_result.status == "error"
+    assert slow_result.attempts == 1
+    assert "timed out" in (slow_result.error or "")
