@@ -7,12 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`.
+Follow `AGENTS.md`. Primary skills: `github-ci-diagnosis`,
+`issue-to-pr`, `alice-runtime-debugging`.
 
-Focus on reproducing bugs, identifying missing regression coverage, and adding the
-smallest deterministic tests that prove the intended contract. Prefer focused test
-commands before broad suites. Do not create tests that merely mirror implementation
-details or preserve obsolete behavior.
-
-Production-code edits are allowed only when explicitly required to expose a testable
-boundary; otherwise keep the change test-focused.
+Own reproducible bugs, regression coverage and CI diagnosis. Prefer focused tests before
+broad suites and avoid tests that only mirror implementation details.
