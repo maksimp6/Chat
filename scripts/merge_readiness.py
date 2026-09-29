@@ -41,6 +41,7 @@ def collect_snapshot(
     owner, name = _split_repo(repo)
     pull = _gh_json([f"/repos/{repo}/pulls/{pr_number}"])
     head_sha = str(pull["head"]["sha"])
+    base_sha = str(pull["base"]["sha"])
 
     compare = _gh_json([f"/repos/{repo}/compare/{base_ref}...{head_sha}"])
     checks = _gh_json(
@@ -78,13 +79,23 @@ def collect_snapshot(
     )
     threads = thread_data["data"]["repository"]["pullRequest"]["reviewThreads"]
 
+    final_pull = _gh_json([f"/repos/{repo}/pulls/{pr_number}"])
+    final_head_sha = str(final_pull["head"]["sha"])
+    final_base_sha = str(final_pull["base"]["sha"])
+
     return {
         "repo": repo,
         "pr_number": pr_number,
         "base_ref": base_ref,
         "pr_base_ref": pull["base"]["ref"],
         "head_sha": head_sha,
-        "draft": bool(pull["draft"]),
+        "base_sha": base_sha,
+        "final_head_sha": final_head_sha,
+        "final_base_sha": final_base_sha,
+        "snapshot_changed": final_head_sha != head_sha or final_base_sha != base_sha,
+        "pr_state": str(final_pull.get("state") or ""),
+        "merged": bool(final_pull.get("merged")),
+        "draft": bool(final_pull["draft"]),
         "behind_by": int(compare["behind_by"]),
         "check_runs": checks.get("check_runs", []),
         "required_checks": list(dict.fromkeys(required_checks or [])),
@@ -96,6 +107,14 @@ def collect_snapshot(
 def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
 
+    if snapshot.get("pr_state") != "open" or bool(snapshot.get("merged")):
+        blockers.append(
+            {
+                "code": "pull_request_not_open",
+                "detail": "pull request must be open and unmerged",
+            }
+        )
+
     if snapshot["draft"]:
         blockers.append({"code": "draft", "detail": "pull request is draft"})
 
@@ -104,6 +123,14 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             {
                 "code": "wrong_base",
                 "detail": f"base is {snapshot['pr_base_ref']}, expected {snapshot['base_ref']}",
+            }
+        )
+
+    if snapshot.get("snapshot_changed"):
+        blockers.append(
+            {
+                "code": "snapshot_changed",
+                "detail": "pull request head or base changed while readiness was being collected",
             }
         )
 
@@ -189,6 +216,23 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _collection_error_result(repo: str, pr_number: int, base_ref: str, exc: Exception) -> dict[str, Any]:
+    return {
+        "ready": False,
+        "repo": repo,
+        "pr_number": pr_number,
+        "base_ref": base_ref,
+        "head_sha": None,
+        "behind_by": None,
+        "blockers": [
+            {
+                "code": "collection_error",
+                "detail": f"merge readiness snapshot collection failed ({type(exc).__name__})",
+            }
+        ],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
@@ -213,9 +257,17 @@ def main() -> int:
         raw_required_checks = os.environ.get("MERGE_REQUIRED_CHECKS", "")
         required_checks = [name.strip() for name in raw_required_checks.split(",") if name.strip()]
 
-    result = evaluate_snapshot(
-        collect_snapshot(args.repo, int(args.pr), args.base, required_checks=required_checks)
-    )
+    try:
+        snapshot = collect_snapshot(
+            args.repo,
+            int(args.pr),
+            args.base,
+            required_checks=required_checks,
+        )
+        result = evaluate_snapshot(snapshot)
+    except Exception as exc:
+        result = _collection_error_result(args.repo, int(args.pr), args.base, exc)
+
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
     return 0 if result["ready"] else 1
 
