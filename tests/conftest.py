@@ -27,7 +27,7 @@ _SQLITE_ONLY_MODULES = {
 }
 
 
-def _make_lazy_postgres_connector(connect_postgres):
+def _make_lazy_postgres_reset_connector(connect_postgres):
     reset_lock = threading.Lock()
     reset_done = False
 
@@ -92,7 +92,9 @@ def isolate_selected_database(request, monkeypatch):
             return ""
         return original_postgres_url_from_env()
 
-    connect_postgres_for_test = _make_lazy_postgres_connector(original_connect_postgres)
+    connect_postgres_for_test = _make_lazy_postgres_reset_connector(
+        original_connect_postgres
+    )
 
     monkeypatch.setattr(db, "postgres_url_from_env", selected_postgres_url)
     monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)
