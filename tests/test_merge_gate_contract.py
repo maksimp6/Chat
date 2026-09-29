@@ -15,7 +15,7 @@ def test_merge_gate_requires_current_master_and_exact_head_ci() -> None:
 
 
 def test_merge_gate_rechecks_when_master_moves() -> None:
-    policy = AGENTS.read_text(encoding="utf-8")
+    policy = " ".join(AGENTS.read_text(encoding="utf-8").split())
 
     assert "If `master` advances before merge" in policy
     assert "Do not reuse green checks from the stale head." in policy
