@@ -15,6 +15,7 @@
 - [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
 - [API](api/overview.md) — описание доступных API-интерфейсов
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
+- [3D Printing Business](printing3d.md) — shipped-контур заказов, P&L, финансирования и AI-first оценки
 - [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Alice Pro к ChatGPT через MCP
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
