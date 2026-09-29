@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "project_id": "REPLACE_PROJECT_UUID",
+  "source_commit": "REPLACE_FULL_MASTER_SHA",
+  "image": "REPLACE_REGISTRY/alice-pro@sha256:REPLACE_IMAGE_DIGEST",
+  "workflow_application_id": null,
+  "public_origin": "https://REPLACE_PUBLIC_HOST",
+  "container": {
+    "name": "alice-pro",
+    "cpu": "0.5",
+    "memory": "1024Mi",
+    "port": 8080,
+    "min_instances": 0,
+    "max_instances": 1,
+    "timeout": "300s",
+    "idle_timeout": "600s"
+  },
+  "database": {
+    "host": "REPLACE_POSTGRES_FQDN",
+    "port": 5432,
+    "name": "alice",
+    "user": "alice_app",
+    "allowed_client_cidrs": [],
+    "egress_evidence": ""
+  }
+}

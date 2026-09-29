@@ -1,0 +1,101 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Alice Pro API Gateway starter",
+    "version": "1.0.0",
+    "description": "Starter routing/policy example only. See deploy/cloudru/api-gateway/README.md before import."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/AliceContainer"
+        },
+        "responses": {
+          "200": {
+            "description": "Forwarded response"
+          }
+        },
+        "x-cloud-log-group": "REPLACE_LOG_GROUP_UUID"
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "operationId": "aliceChat",
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/AliceContainer"
+        },
+        "responses": {
+          "200": {
+            "description": "Forwarded response"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 120,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/mcp": {
+      "options": {
+        "operationId": "mcpOptions",
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/AliceContainer"
+        },
+        "responses": {
+          "200": {
+            "description": "Forwarded response"
+          },
+          "204": {
+            "description": "CORS preflight"
+          }
+        }
+      },
+      "get": {
+        "operationId": "mcpGet",
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/AliceContainer"
+        },
+        "responses": {
+          "200": {
+            "description": "Forwarded response"
+          }
+        }
+      },
+      "post": {
+        "operationId": "mcpPost",
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/AliceContainer"
+        },
+        "responses": {
+          "200": {
+            "description": "Forwarded response"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "x-cloud-backends": {
+      "AliceContainer": {
+        "name": "Alice_Container",
+        "description": "Cloud.ru Container Apps resource; ID resolved by operator",
+        "type": "serverless_container",
+        "scheme": "http",
+        "nodes": [
+          {
+            "container_id": "REPLACE_CONTAINER_APP_UUID",
+            "weight": 1
+          }
+        ],
+        "timeout": {
+          "connect": 3,
+          "send": 30,
+          "read": 300
+        }
+      }
+    }
+  }
+}

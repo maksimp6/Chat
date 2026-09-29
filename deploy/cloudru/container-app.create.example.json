@@ -1,0 +1,31 @@
+{
+  "name": "alice-pro",
+  "projectId": "REPLACE_PROJECT_UUID",
+  "description": "Alice Pro; source REPLACE_FULL_MASTER_SHA",
+  "configuration": {
+    "ingress": {"publiclyAccessible": true},
+    "autoDeployments": {"enabled": false}
+  },
+  "template": {
+    "timeout": "300s",
+    "idleTimeout": "600s",
+    "protocol": "http_1",
+    "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
+    "containers": [{
+      "name": "alice-pro",
+      "image": "REPLACE_REGISTRY/alice-pro@sha256:REPLACE_IMAGE_DIGEST",
+      "containerPort": 8080,
+      "resources": {"cpu": "0.5", "memory": "1024Mi"},
+      "env": [
+        {"name": "ALICE_REQUIRE_SHORT_TOKEN", "value": "1"},
+        {"name": "ALICE_SHORT_TOKEN", "value": "REPLACE_FROM_SECRET_STORE"},
+        {"name": "ALICE_DATABASE_URL", "value": "REPLACE_FROM_SECRET_STORE"},
+        {"name": "ALICE_PROVIDER_CREDENTIAL_KEY", "value": "REPLACE_FROM_SECRET_STORE"},
+        {"name": "ALICE_GITHUB_CLIENT_ID", "value": "REPLACE_FROM_SECRET_STORE"},
+        {"name": "ALICE_GITHUB_CLIENT_SECRET", "value": "REPLACE_FROM_SECRET_STORE"},
+        {"name": "ALICE_GITHUB_ALLOWED_IDS", "value": "293531601"},
+        {"name": "ALICE_GITHUB_REDIRECT_URI", "value": "https://REPLACE_PUBLIC_HOST/auth/github/callback"}
+      ]
+    }]
+  }
+}

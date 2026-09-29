@@ -1,3 +1,4 @@
 interface:
-  display_name: "Cloud.ru management"
-  short_description: "Manage Cloud.ru resources and IAM safely"
+  display_name: "Cloud.ru EDS / Alice Pro"
+  short_description: "Deploy Alice across Cloud.ru Evolution"
+  default_prompt: "Use $cloudru-management to configure or verify Alice's EDS, networking, security, logs, AI, and deployment setup without exposing secrets."
