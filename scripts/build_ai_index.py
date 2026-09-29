@@ -134,9 +134,7 @@ def _iter_python_files(root: Path) -> list[Path]:
             capture_output=True,
         )
         relative_paths = [
-            Path(item.decode("utf-8"))
-            for item in completed.stdout.split(b"\0")
-            if item
+            Path(item.decode("utf-8")) for item in completed.stdout.split(b"\0") if item
         ]
         return [
             root / relative
