@@ -49,7 +49,10 @@ assert(summary.title.includes("1 ош."), "summary should count errors");
 assert(summary.metrics.tokens === 15, "summary should aggregate token usage");
 assert(summary.metrics.cost === 0.42, "summary should expose numeric cost");
 assert(summary.metrics.model === "demo", "summary should expose model");
-assert(summary.items.some((item) => item.label === "filesystem.read_text"), "tool should be named");
+assert(
+  summary.items.some((item) => item.label === "filesystem.read_text"),
+  "tool should be named",
+);
 assert(
   JSON.stringify(summary).indexOf("must-not-render") === -1,
   "summary must not copy tool arguments or results",
