@@ -397,3 +397,26 @@ def test_payload_decoder_returns_decoded_utf8_secret():
         CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
         == "пароль-42"
     )
+
+
+def test_get_secret_value_sweeps_cache_before_lookup(monkeypatch):
+    client = _client(monkeypatch, cache_ttl=30.0)
+    client._value_cache[("secret-1", "v1")] = (95.0, "cached-secret")
+
+    with (
+        patch("cloud.cloudru.secret_management.time.monotonic", return_value=100.0),
+        patch.object(client, "_fetch_value") as fetch,
+    ):
+        assert client.get_secret_value("secret-1", "v1") == "cached-secret"
+
+    fetch.assert_not_called()
+
+
+def test_payload_decoder_rejects_invalid_utf8_explicitly():
+    response = _ok_response({"data": base64.b64encode(b"\xff\xfe").decode("ascii")})
+
+    with pytest.raises(CloudProviderError) as exc:
+        CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
+
+    assert exc.value.code == "invalid_response"
+    assert "UTF-8" in str(exc.value)
