@@ -194,12 +194,10 @@ def test_default_resolver_reuses_backend_scoped_client(isolated_db, monkeypatch)
     monkeypatch.setattr(credentials, "_SECRET_MANAGEMENT_CLIENT", fake)
 
     assert (
-        resolve_secret_management_value(isolated_db, "alice_short_token")
-        == "cached-client-value"
+        resolve_secret_management_value(isolated_db, "alice_short_token") == "cached-client-value"
     )
     assert (
-        resolve_secret_management_value(isolated_db, "alice_short_token")
-        == "cached-client-value"
+        resolve_secret_management_value(isolated_db, "alice_short_token") == "cached-client-value"
     )
     assert fake.calls == [("secret-1", "v1"), ("secret-1", "v1")]
 
