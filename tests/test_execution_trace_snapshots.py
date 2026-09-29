@@ -88,3 +88,22 @@ def test_snapshot_serializes_non_json_values_safely():
 
     assert isinstance(snapshot["request"]["opaque"], str)
     assert trace.finalize()["request"]["opaque"] == snapshot["request"]["opaque"]
+
+
+def test_finalized_property_reflects_frozen_state():
+    trace = _trace()
+    assert trace.finalized is False
+
+    trace.finalize()
+
+    assert trace.finalized is True
+
+
+def test_registered_secret_redaction_covers_strings_and_dicts():
+    trace = _trace()
+    trace.register_sensitive_value("sensitive-value")
+
+    assert trace._redact_registered_values("sensitive-value") == "<redacted>"
+    assert trace._redact_registered_values(
+        {"key-sensitive-value": "prefix sensitive-value suffix"}
+    ) == {"key-<redacted>": "prefix <redacted> suffix"}
