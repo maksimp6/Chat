@@ -112,7 +112,6 @@ def test_api_chat_returns_approval_only_for_interactive_browser_action():
     assert click_payload["tool_call"]["arguments"]["action"] == "click"
 
 
-
 def test_tool_call_parts_handles_decorated_and_malformed_arguments():
     name, arguments = _tool_call_parts(
         {
