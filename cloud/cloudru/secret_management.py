@@ -33,7 +33,7 @@ Design constraints from issue #477, enforced here rather than left to callers:
   ``CloudRuClient.request`` even though that method does not currently log
   response bodies: its response body IS the secret, so it uses its own
   request path that never hands the response to a trace event, an exception
-  message, or anything beyond the local, time-limited value cache.
+  message, or a process-global plaintext cache.
 - No silent fallback. If Cloud.ru Secret Management is unreachable or a
   version is disabled/missing, callers get a typed ``CloudProviderError``;
   nothing here falls back to reading or writing an unencrypted copy of the
@@ -48,7 +48,6 @@ from __future__ import annotations
 import base64
 import binascii
 import os
-import threading
 import time
 from typing import Any
 
@@ -110,16 +109,16 @@ class CloudRuSecretManagementClient:
             )
         self.timeout = float(timeout)
         self.max_retries = max(0, int(max_retries))
-        self.cache_ttl = max(0.0, float(cache_ttl))
+        # Deprecated compatibility knobs. Plaintext values are intentionally
+        # never cached in-process; keeping these attributes avoids breaking
+        # callers that still pass or inspect the old constructor options.
+        self.cache_ttl = 0.0
         self.cache_max_entries = max(1, int(cache_max_entries))
         # Metadata-only calls reuse the shared trace-safe client; it never
         # sees a secret payload because the value fetch bypasses it entirely.
         self._client = CloudRuClient(
             iam_client=self.iam_client, timeout=self.timeout, api_key_auth=False
         )
-        self._value_cache: dict[tuple[str, str], tuple[float, str]] = {}
-        self._value_cache_lock = threading.RLock()
-
     def _ensure_configured(self) -> None:
         if not (self.iam_client.key_id and self.iam_client.key_secret):
             raise CloudProviderError(
@@ -129,30 +128,9 @@ class CloudRuSecretManagementClient:
                 code="auth_not_configured",
             )
 
-    def _sweep_cache(self, now_monotonic: float | None = None) -> None:
-        now_monotonic = time.monotonic() if now_monotonic is None else now_monotonic
-        with self._value_cache_lock:
-            if self.cache_ttl <= 0:
-                self._value_cache.clear()
-                return
-            expired = [
-                key
-                for key, (stored_at, _value) in self._value_cache.items()
-                if (now_monotonic - stored_at) >= self.cache_ttl
-            ]
-            for key in expired:
-                del self._value_cache[key]
-            while len(self._value_cache) > self.cache_max_entries:
-                oldest = min(self._value_cache, key=lambda key: self._value_cache[key][0])
-                del self._value_cache[oldest]
-
     def invalidate_cache(self, secret_id: str | None = None) -> None:
-        with self._value_cache_lock:
-            if secret_id is None:
-                self._value_cache.clear()
-                return
-            for cache_key in [key for key in self._value_cache if key[0] == secret_id]:
-                del self._value_cache[cache_key]
+        """Compatibility no-op: plaintext Secret Management values are never cached."""
+        return None
 
     def get_secret_value(self, secret_id: str, version_id: str) -> str:
         """Return the plaintext payload for one pinned, immutable secret version."""
@@ -162,26 +140,10 @@ class CloudRuSecretManagementClient:
             raise ValueError("secret_id and version_id are required")
         self._ensure_configured()
 
-        cache_key = (secret_id, version_id)
-        now_monotonic = time.monotonic()
-        with self._value_cache_lock:
-            self._sweep_cache(now_monotonic)
-            cached = self._value_cache.get(cache_key)
-        if cached is not None and (now_monotonic - cached[0]) < self.cache_ttl:
-            trace = get_current_trace()
-            if trace is not None:
-                trace.register_sensitive_value(cached[1])
-            return cached[1]
-
         fetched_secret_value = self._fetch_value(secret_id, version_id)
         trace = get_current_trace()
         if trace is not None:
             trace.register_sensitive_value(fetched_secret_value)
-        if self.cache_ttl > 0:
-            with self._value_cache_lock:
-                stored_at = time.monotonic()
-                self._value_cache[cache_key] = (stored_at, fetched_secret_value)
-                self._sweep_cache(stored_at)
         return fetched_secret_value
 
     def list_versions(self, secret_id: str) -> list[dict[str, Any]]:
