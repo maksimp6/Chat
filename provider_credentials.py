@@ -657,28 +657,22 @@ def set_secret_management_ref(
     if not purpose or not secret_id or not version_id:
         raise ValueError("purpose, secret_id and version_id are required")
 
-    create_schema(db)
-    existing = _fetch_one(
-        db,
-        "SELECT secret_id, pinned_version_id FROM secret_management_refs WHERE purpose = ?",
-        (purpose,),
-    )
-    previous_version_id = None
-    if existing and str(existing["secret_id"]) == secret_id:
-        previous_version_id = str(existing["pinned_version_id"])
-
     db.execute(
         """
         INSERT INTO secret_management_refs
         (purpose, secret_id, pinned_version_id, previous_version_id, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, NULL, ?)
         ON CONFLICT(purpose) DO UPDATE SET
+            previous_version_id = CASE
+                WHEN secret_management_refs.secret_id = excluded.secret_id
+                THEN secret_management_refs.pinned_version_id
+                ELSE NULL
+            END,
             secret_id = excluded.secret_id,
             pinned_version_id = excluded.pinned_version_id,
-            previous_version_id = excluded.previous_version_id,
             updated_at = excluded.updated_at
         """,
-        (purpose, secret_id, version_id, previous_version_id, _as_utc(now or utcnow())),
+        (purpose, secret_id, version_id, _as_utc(now or utcnow())),
     )
     if hasattr(db, "commit"):
         db.commit()
@@ -686,7 +680,6 @@ def set_secret_management_ref(
 
 
 def get_secret_management_ref(db: Any, purpose: str) -> Optional[SecretManagementRef]:
-    create_schema(db)
     row = _fetch_one(
         db,
         "SELECT purpose, secret_id, pinned_version_id, previous_version_id, updated_at "
@@ -718,22 +711,44 @@ def rollback_secret_management_ref(
     if not current.previous_version_id:
         raise CredentialError(f"No previous version to roll back to for '{purpose}'")
 
-    db.execute(
+    cursor = db.execute(
         """
         UPDATE secret_management_refs
         SET pinned_version_id = ?, previous_version_id = ?, updated_at = ?
         WHERE purpose = ?
+          AND pinned_version_id = ?
+          AND previous_version_id = ?
         """,
         (
             current.previous_version_id,
             current.pinned_version_id,
             _as_utc(now or utcnow()),
             purpose,
+            current.pinned_version_id,
+            current.previous_version_id,
         ),
     )
+    if cursor.rowcount != 1:
+        if hasattr(db, "rollback"):
+            db.rollback()
+        raise CredentialError(
+            f"Secret management ref changed concurrently for '{purpose}'; retry rollback"
+        )
     if hasattr(db, "commit"):
         db.commit()
     return get_secret_management_ref(db, purpose)
+
+
+_SECRET_MANAGEMENT_CLIENT: Any = None
+
+
+def _get_secret_management_client():
+    global _SECRET_MANAGEMENT_CLIENT
+    if _SECRET_MANAGEMENT_CLIENT is None:
+        from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+
+        _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
+    return _SECRET_MANAGEMENT_CLIENT
 
 
 def resolve_secret_management_value(
@@ -752,7 +767,5 @@ def resolve_secret_management_value(
     if ref is None:
         raise NoActiveCredentialError(f"No secret management ref configured for '{purpose}'")
     if client is None:
-        from cloud.cloudru.secret_management import CloudRuSecretManagementClient
-
-        client = CloudRuSecretManagementClient()
+        client = _get_secret_management_client()
     return client.get_secret_value(ref.secret_id, ref.pinned_version_id)
