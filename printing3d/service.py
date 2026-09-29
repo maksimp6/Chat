@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
@@ -366,3 +366,38 @@ def get_financial_summary(owner_id: str) -> dict:
         "total_orders": len(orders),
         "currencies": currencies,
     }
+
+
+
+def get_recent_profit(owner_id: str, *, currency: str = "RUB", days: int = 30) -> float:
+    """Return realized 3D-printing profit for a recent rolling window."""
+    if days <= 0:
+        raise ValueError("days must be positive")
+    init_3d_printing_tables()
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT actual_revenue, actual_cost
+              FROM print_orders
+             WHERE owner_id = ?
+               AND currency = ?
+               AND status = 'paid'
+               AND settled_at IS NOT NULL
+               AND settled_at >= ?
+            """,
+            (owner_id, str(currency or "RUB"), cutoff),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    profit = sum(
+        (
+            Decimal(str(row["actual_revenue"] or 0))
+            - Decimal(str(row["actual_cost"] or 0))
+            for row in rows
+        ),
+        Decimal("0"),
+    )
+    return _money(profit)
