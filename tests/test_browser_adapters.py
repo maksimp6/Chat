@@ -107,7 +107,6 @@ def test_register_browser_tools_runs_through_universal_executor():
     assert set(registry.definitions) == {"browser_cloud", "browser_local"}
 
 
-
 def test_browser_click_still_requires_approval():
     adapters = BrowserAdapterRegistry(
         {"browser_local": FakeAdapter({"success": True, "data": {"clicked": True}})}
