@@ -41,9 +41,7 @@ def calculate_quote(data: dict) -> dict:
         raise ValueError("quote input must be an object")
 
     grams = _decimal(data.get("material_grams", 0), "material_grams")
-    material_cost_per_kg = _decimal(
-        data.get("material_cost_per_kg", 0), "material_cost_per_kg"
-    )
+    material_cost_per_kg = _decimal(data.get("material_cost_per_kg", 0), "material_cost_per_kg")
     print_hours = _decimal(data.get("print_hours", 0), "print_hours")
     power_watts = _decimal(data.get("printer_power_watts", 120), "printer_power_watts")
     electricity_per_kwh = _decimal(
@@ -115,10 +113,7 @@ def init_3d_printing_tables() -> None:
         )
         """
     )
-    columns = {
-        row["name"]
-        for row in conn.execute("PRAGMA table_info(print_orders)").fetchall()
-    }
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(print_orders)").fetchall()}
     if "actual_cost" not in columns:
         conn.execute("ALTER TABLE print_orders ADD COLUMN actual_cost REAL")
     if "settled_at" not in columns:
