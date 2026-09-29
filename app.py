@@ -57,6 +57,8 @@ from plugin_routes import plugin_bp
 from project_tree import project_tree_bp
 from voice_routes import voice_bp
 from observability_migrations import apply_observability_migrations
+from printing3d import init_3d_printing_tables
+from printing3d.routes import printing3d_bp
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -110,6 +112,7 @@ app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 app.register_blueprint(voice_bp)
 app.register_blueprint(github_auth_bp)
+app.register_blueprint(printing3d_bp)
 
 
 @app.errorhandler(Exception)
@@ -140,6 +143,7 @@ init_db()
 init_runtime_tables()
 init_local_agent_tables()
 init_treasury_tables()
+init_3d_printing_tables()
 init_user_identity_table()
 init_github_accounts_table()
 init_conversation_ownership_table()
