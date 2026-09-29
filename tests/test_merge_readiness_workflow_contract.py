@@ -18,6 +18,7 @@ def test_merge_readiness_workflow_is_read_only_and_exact_head() -> None:
     assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
     assert "persist-credentials: false" in workflow
     assert "github.event.pull_request.base.ref == 'master'" in workflow
+    assert "github.event.pull_request.draft == false" in workflow
 
 
 def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
@@ -45,7 +46,7 @@ def test_merge_readiness_workflow_wait_is_bounded_and_fail_closed() -> None:
 
     assert "max_attempts=60" in workflow
     assert "sleep 5" in workflow
-    assert 'retryable = {"check_pending", "required_check_missing"}' in workflow
+    assert 'retryable = {"check_pending", "required_check_missing", "review_threads"}' in workflow
     assert "Merge readiness timed out waiting for required checks." in workflow
     assert 'exit "$status"' in workflow
     assert "cancel-in-progress: true" in workflow
