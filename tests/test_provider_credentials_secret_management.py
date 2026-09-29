@@ -147,11 +147,11 @@ def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(is
     client = FakeSecretManagementClient({("secret-1", "v1"): "must-not-leak-anywhere"})
     trace = ExecutionTrace(trace_id="secret-ref-nested-error-test")
 
-    secret_value = resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
-    assert secret_value == "must-not-leak-anywhere"
+    credential = resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+    assert credential == "must-not-leak-anywhere"
 
     try:
-        raise RuntimeError("unrelated downstream failure while secret_value is still in scope")
+        raise RuntimeError("unrelated downstream failure while credential is still in scope")
     except RuntimeError as exc:
         trace.record_error("test.nested", "downstream failure", exception=exc)
 
@@ -184,3 +184,58 @@ def test_resolve_constructs_default_backend_client(isolated_db):
     assert value == "resolved-default"
     client_type.assert_called_once_with()
     assert fake.calls == [("secret-1", "v1")]
+
+
+def test_default_resolver_reuses_backend_scoped_client(isolated_db, monkeypatch):
+    import provider_credentials as credentials
+
+    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
+    fake = FakeSecretManagementClient({("secret-1", "v1"): "cached-client-value"})
+    monkeypatch.setattr(credentials, "_SECRET_MANAGEMENT_CLIENT", fake)
+
+    assert (
+        resolve_secret_management_value(isolated_db, "alice_short_token")
+        == "cached-client-value"
+    )
+    assert (
+        resolve_secret_management_value(isolated_db, "alice_short_token")
+        == "cached-client-value"
+    )
+    assert fake.calls == [("secret-1", "v1"), ("secret-1", "v1")]
+
+
+def test_atomic_upsert_tracks_immediately_previous_version(isolated_db):
+    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
+    latest = set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v3")
+
+    assert latest.pinned_version_id == "v3"
+    assert latest.previous_version_id == "v2"
+
+
+def test_rollback_detects_stale_concurrent_update(isolated_db, monkeypatch):
+    import provider_credentials as credentials
+
+    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v1")
+    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v2")
+
+    stale = get_secret_management_ref(isolated_db, "alice_database_url")
+    original_get = credentials.get_secret_management_ref
+    calls = {"count": 0}
+
+    def stale_then_real(db, purpose):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return stale
+        return original_get(db, purpose)
+
+    monkeypatch.setattr(credentials, "get_secret_management_ref", stale_then_real)
+    isolated_db.execute(
+        "UPDATE secret_management_refs SET pinned_version_id = ?, previous_version_id = ? "
+        "WHERE purpose = ?",
+        ("v3", "v2", "alice_database_url"),
+    )
+    isolated_db.commit()
+
+    with pytest.raises(CredentialError, match="changed concurrently"):
+        rollback_secret_management_ref(isolated_db, "alice_database_url")
