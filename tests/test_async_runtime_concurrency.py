@@ -532,9 +532,5 @@ async def test_runtime_invocation_work_leaves_no_owned_pending_tasks(async_runti
     await asyncio.sleep(0)
 
     after = set(asyncio.all_tasks())
-    newly_pending = {
-        task
-        for task in after - before
-        if task is not current and not task.done()
-    }
+    newly_pending = {task for task in after - before if task is not current and not task.done()}
     assert newly_pending == set()
