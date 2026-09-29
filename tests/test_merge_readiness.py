@@ -20,9 +20,26 @@ def snapshot(**overrides):
         "head_sha": "abc123",
         "draft": False,
         "behind_by": 0,
+        "required_checks": ["Application tests", "PostgreSQL integration"],
         "check_runs": [
-            {"name": "CI", "status": "completed", "conclusion": "success"},
-            {"name": "Format", "status": "completed", "conclusion": "success"},
+            {
+                "id": 10,
+                "name": "Application tests",
+                "status": "completed",
+                "conclusion": "success",
+            },
+            {
+                "id": 11,
+                "name": "PostgreSQL integration",
+                "status": "completed",
+                "conclusion": "success",
+            },
+            {
+                "id": 12,
+                "name": "Optional preview",
+                "status": "completed",
+                "conclusion": "skipped",
+            },
         ],
         "review_threads": [{"isResolved": True}],
         "review_threads_truncated": False,
@@ -48,7 +65,20 @@ def test_merge_readiness_fails_closed_for_draft_stale_pending_and_threads():
         snapshot(
             draft=True,
             behind_by=2,
-            check_runs=[{"name": "CI", "status": "in_progress", "conclusion": None}],
+            check_runs=[
+                {
+                    "id": 20,
+                    "name": "Application tests",
+                    "status": "in_progress",
+                    "conclusion": None,
+                },
+                {
+                    "id": 21,
+                    "name": "PostgreSQL integration",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+            ],
             review_threads=[{"isResolved": False}],
         )
     )
@@ -62,14 +92,46 @@ def test_merge_readiness_fails_closed_for_draft_stale_pending_and_threads():
     }
 
 
-def test_merge_readiness_rejects_failed_or_missing_checks():
+def test_merge_readiness_rejects_failed_or_missing_required_checks():
     failed = merge_readiness.evaluate_snapshot(
-        snapshot(check_runs=[{"name": "CI", "status": "completed", "conclusion": "failure"}])
+        snapshot(
+            check_runs=[
+                {
+                    "id": 30,
+                    "name": "Application tests",
+                    "status": "completed",
+                    "conclusion": "failure",
+                },
+                {
+                    "id": 31,
+                    "name": "PostgreSQL integration",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+            ]
+        )
     )
-    missing = merge_readiness.evaluate_snapshot(snapshot(check_runs=[]))
+    missing = merge_readiness.evaluate_snapshot(
+        snapshot(
+            check_runs=[
+                {
+                    "id": 32,
+                    "name": "Application tests",
+                    "status": "completed",
+                    "conclusion": "success",
+                }
+            ]
+        )
+    )
 
     assert blocker_codes(failed) == {"check_failed"}
-    assert blocker_codes(missing) == {"checks_missing"}
+    assert blocker_codes(missing) == {"required_check_missing"}
+
+
+def test_merge_readiness_rejects_unconfigured_required_checks():
+    result = merge_readiness.evaluate_snapshot(snapshot(required_checks=[]))
+
+    assert blocker_codes(result) == {"required_checks_unconfigured"}
 
 
 def test_merge_readiness_rejects_wrong_base_and_truncated_threads():
@@ -80,14 +142,53 @@ def test_merge_readiness_rejects_wrong_base_and_truncated_threads():
     assert blocker_codes(result) == {"wrong_base", "review_threads_truncated"}
 
 
-def test_merge_readiness_allows_success_neutral_and_skipped_checks():
+def test_merge_readiness_ignores_non_required_failed_checks():
     result = merge_readiness.evaluate_snapshot(
         snapshot(
             check_runs=[
-                {"name": "CI", "status": "completed", "conclusion": "success"},
-                {"name": "Optional", "status": "completed", "conclusion": "neutral"},
-                {"name": "Preview", "status": "completed", "conclusion": "skipped"},
+                {
+                    "id": 40,
+                    "name": "Application tests",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+                {
+                    "id": 41,
+                    "name": "PostgreSQL integration",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+                {
+                    "id": 42,
+                    "name": "Optional preview",
+                    "status": "completed",
+                    "conclusion": "failure",
+                },
             ]
+        )
+    )
+
+    assert result["ready"] is True
+
+
+def test_merge_readiness_uses_latest_attempt_for_required_check():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            required_checks=["Application tests"],
+            check_runs=[
+                {
+                    "id": 50,
+                    "name": "Application tests",
+                    "status": "completed",
+                    "conclusion": "failure",
+                },
+                {
+                    "id": 51,
+                    "name": "Application tests",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+            ],
         )
     )
 
