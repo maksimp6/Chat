@@ -1180,9 +1180,40 @@ body {
   margin-left: 4px;
 }
 
-.alice-pro-app .msg-trace-details {
+.alice-pro-app .msg-trace-details,
+.alice-pro-app .msg-technical-details {
   width: 100%;
   margin-top: 4px;
+}
+
+.alice-pro-app .msg-technical-list {
+  gap: 4px;
+}
+
+.alice-pro-app .msg-technical-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.alice-pro-app .msg-technical-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alice-pro-app .msg-technical-detail {
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.alice-pro-app .msg-technical-step[data-kind="error"] .msg-technical-label,
+.alice-pro-app .msg-technical-step[data-kind="error"] .msg-technical-detail {
+  color: var(--danger);
 }
 
 .alice-pro-app .alice-trace-open-viewer {
