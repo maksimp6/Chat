@@ -100,19 +100,11 @@ PRINTING3D_TOOLS = {
                 "credit_total_repayment": {
                     "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
                 },
-                "monthly_payment": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
-                "term_months": {
-                    "anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
-                },
-                "psk_percent": {
-                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
-                },
+                "monthly_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "term_months": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+                "psk_percent": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
                 "currency": {"type": "string", "minLength": 1, "maxLength": 8},
-                "started_at": {
-                    "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
-                },
+                "started_at": {"anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]},
             },
             [
                 "printer_model",
