@@ -51,7 +51,10 @@ def _packet(scope=None, evidence=None):
         open_questions=("Does current master still reproduce the failure?",),
         failed_attempts=("Do not trust stale green CI",),
         evidence_refs=(
-            EvidenceRef(kind="github_pr", ref="https://github.com/maksimp6/Chat/pull/548"),
+            EvidenceRef(
+                kind="github_pr",
+                ref="https://github.com/maksimp6/Chat/pull/548",
+            ),
         ),
         slices=(
             ContextSlice(
@@ -83,7 +86,13 @@ def _packet(scope=None, evidence=None):
                 input_tokens=20,
             ),
         ),
+        changed_files=(
+            "provider_credentials.py",
+            "tests/test_provider_credentials_secret_management.py",
+        ),
+        owner="Test Engineer",
         budget_tier="cheap",
+        usage={"cheap_calls": 2, "normal_calls": 0, "strong_calls": 0},
     )
 
 
@@ -96,6 +105,20 @@ def test_scope_and_cache_key_are_deterministic():
     assert _packet(scope=first).cache_key() == _packet(scope=second).cache_key()
 
 
+def test_task_packet_contains_canonical_handoff_fields():
+    packet = _packet()
+    payload = packet.as_dict()
+
+    assert payload["scope"]["work_item"] == "PR#548"
+    assert payload["changed_files"] == [
+        "provider_credentials.py",
+        "tests/test_provider_credentials_secret_management.py",
+    ]
+    assert payload["owner"] == "Test Engineer"
+    assert payload["budget_tier"] == "cheap"
+    assert payload["usage"]["cheap_calls"] == 2
+
+
 def test_exact_head_and_evidence_reuse_is_a_hit():
     cache = TaskContextCache()
     packet = _packet()
@@ -105,7 +128,12 @@ def test_exact_head_and_evidence_reuse_is_a_hit():
 
     assert result.status == "hit"
     assert result.packet == packet
-    assert [item.name for item in result.reusable_slices] == ["code", "ci", "review", "skills"]
+    assert [item.name for item in result.reusable_slices] == [
+        "code",
+        "ci",
+        "review",
+        "skills",
+    ]
     assert result.saved_source_bytes == 1900
     assert result.saved_input_tokens == 345
 
@@ -130,7 +158,11 @@ def test_changed_ci_reuses_only_slices_independent_of_ci():
 
     assert result.status == "partial"
     assert result.stale_components == ("ci",)
-    assert [item.name for item in result.reusable_slices] == ["code", "review", "skills"]
+    assert [item.name for item in result.reusable_slices] == [
+        "code",
+        "review",
+        "skills",
+    ]
     assert result.saved_source_bytes == 1500
     assert result.saved_input_tokens == 275
 
@@ -147,7 +179,6 @@ def test_multiple_evidence_changes_keep_only_independent_slices():
     assert [item.name for item in result.reusable_slices] == ["code", "skills"]
 
 
-
 def test_changed_skill_version_invalidates_only_skill_dependent_slice():
     cache = TaskContextCache()
     packet = _packet()
@@ -159,6 +190,7 @@ def test_changed_skill_version_invalidates_only_skill_dependent_slice():
     assert result.stale_components == ("skills",)
     assert [item.name for item in result.reusable_slices] == ["code", "ci", "review"]
 
+
 def test_all_slice_dependencies_stale_becomes_miss():
     cache = TaskContextCache()
     packet = TaskPacket(
@@ -168,7 +200,11 @@ def test_all_slice_dependencies_stale_becomes_miss():
         expected_deliverable="Readiness decision",
         slices=(
             ContextSlice(name="ci", payload={"ok": True}, depends_on=("ci",)),
-            ContextSlice(name="review", payload={"open": 0}, depends_on=("review",)),
+            ContextSlice(
+                name="review",
+                payload={"open": 0},
+                depends_on=("review",),
+            ),
         ),
     )
     cache.put(packet)
@@ -186,6 +222,7 @@ def test_sensitive_payloads_are_redacted_before_cache_storage():
         evidence=_evidence(),
         objective="Inspect auth without leaking token=supersecret",
         expected_deliverable="Safe result",
+        usage={"access_token": "supersecret"},
         slices=(
             ContextSlice(
                 name="auth",
@@ -200,6 +237,7 @@ def test_sensitive_payloads_are_redacted_before_cache_storage():
     serialized = packet.as_dict()
 
     assert "supersecret" not in json.dumps(serialized)
+    assert serialized["usage"]["access_token"] == "<redacted>"
     assert serialized["slices"][0]["payload"]["access_token"] == "<redacted>"
 
 
