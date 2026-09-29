@@ -210,6 +210,56 @@ def test_deploy_patches_existing_service_with_new_image():
     assert "status" not in body and "id" not in body
 
 
+def test_get_uses_v2_contract_with_project_query():
+    client = RecordingClient([_app()])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    assert apps.get("alice-pro")["id"] == "c-1"
+    assert client.calls == [
+        ("container_apps", "GET", "/v2/containers/alice-pro", {"projectId": "p1"}, None)
+    ]
+
+
+def test_list_uses_v2_pagination_contract():
+    client = RecordingClient(
+        [
+            {"data": [{"name": "one"}], "nextPageToken": "next", "total": 2},
+            {"data": [{"name": "two"}], "nextPageToken": "", "total": 2},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    assert apps.list(page_size=50, filter_expr="status=RUNNING", order_by="name") == [
+        {"name": "one"},
+        {"name": "two"},
+    ]
+    assert client.calls[0][1:4] == (
+        "GET",
+        "/v2/containers",
+        {"projectId": "p1", "pageSize": 50, "filter": "status=RUNNING", "orderBy": "name"},
+    )
+    assert client.calls[1][1:4] == (
+        "GET",
+        "/v2/containers",
+        {
+            "projectId": "p1",
+            "pageSize": 50,
+            "pageToken": "next",
+            "filter": "status=RUNNING",
+            "orderBy": "name",
+        },
+    )
+
+
+def test_list_rejects_invalid_pagination_payload():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": "not-a-list"}]),
+    )
+    with pytest.raises(CloudProviderError, match="invalid list payload"):
+        apps.list()
+
+
 def test_status_is_condensed_and_reports_missing():
     apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient([_app()]))
     status = apps.status("alice-pro")
