@@ -30,6 +30,23 @@ agent in a comment:
   (UI, translations, prompts, her tools, docs) through her filesystem tools
   (`.github/workflows/alice.yml`, `docs/agents/alice-github-agent.md`).
 
+### Lightweight model policy
+
+Routine repository work uses the lightest configured model by default:
+
+- `@claude`: `claude-haiku-4-5`, capped at 10 turns by
+  `.github/workflows/claude.yml`.
+- `@codex`: `gpt-5.4-nano` with low reasoning by default from
+  `.codex/config.toml`. When the GitHub Partner Agent model picker is shown,
+  select **GPT-5.4 nano**; an explicit session model overrides project config.
+- `@copilot`: use the repository custom agent **Copilot Lite**
+  (`.github/agents/copilot-lite.agent.md`), pinned to `gpt-5.4-mini`.
+  Native automatic Copilot PR review remains unchanged.
+
+Escalate to a larger model only for a concrete blocker, architecture-heavy
+change, or explicit maintainer request. Do not silently switch routine work to a
+larger model.
+
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push to `master`.
 
