@@ -77,9 +77,7 @@ def isolate_selected_database(request, monkeypatch):
                 ).fetchall()
                 tables = [str(row["tablename"]) for row in rows]
                 if tables:
-                    quoted = ", ".join(
-                        '"' + name.replace('"', '""') + '"' for name in tables
-                    )
+                    quoted = ", ".join('"' + name.replace('"', '""') + '"' for name in tables)
                     conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
                     conn.commit()
                 reset_done = True
