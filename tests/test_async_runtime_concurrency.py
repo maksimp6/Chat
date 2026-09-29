@@ -34,9 +34,7 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
     from session_manager import create_session
     from trace_manager import bind_current_trace, get_current_trace, reset_current_trace
 
-    session = await asyncio.to_thread(
-        create_session, metadata={"suite": "async-concurrency"}
-    )
+    session = await asyncio.to_thread(create_session, metadata={"suite": "async-concurrency"})
 
     async def run(index):
         context = await asyncio.to_thread(
@@ -91,8 +89,7 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
         assert trace_context["conversation_id"] == context.conversation_id
         assert trace_context["trace_id"] == context.trace_id
         assert any(
-            event.get("type") == "async_boundary_crossed"
-            for event in item["trace"]["events"]
+            event.get("type") == "async_boundary_crossed" for event in item["trace"]["events"]
         )
 
     assert get_current_trace() is None
@@ -109,9 +106,7 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
     )
     from session_manager import create_session
 
-    session = await asyncio.to_thread(
-        create_session, metadata={"suite": "async-cancellation"}
-    )
+    session = await asyncio.to_thread(create_session, metadata={"suite": "async-cancellation"})
     entered = threading.Event()
     release = threading.Event()
     worker_finished = threading.Event()
@@ -169,9 +164,7 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
     assert await asyncio.to_thread(worker_finished.wait, 5)
     assert finish_results == [False]
 
-    cancelled_invocation = await asyncio.to_thread(
-        get_invocation, cancelled_context.invocation_id
-    )
+    cancelled_invocation = await asyncio.to_thread(get_invocation, cancelled_context.invocation_id)
     assert cancelled_invocation["status"] == "cancelled"
     assert cancelled_invocation["conversation_id"] == cancelled_context.conversation_id
     assert cancelled_invocation["trace_id"] == cancelled_context.trace_id
@@ -196,9 +189,5 @@ async def test_async_harness_leaves_no_owned_pending_tasks(async_runtime_db):
     await asyncio.sleep(0)
 
     after = set(asyncio.all_tasks())
-    newly_pending = {
-        task
-        for task in after - before
-        if task is not current and not task.done()
-    }
+    newly_pending = {task for task in after - before if task is not current and not task.done()}
     assert newly_pending == set()
