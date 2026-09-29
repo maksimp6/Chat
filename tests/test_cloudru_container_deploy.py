@@ -258,6 +258,15 @@ def test_list_rejects_non_positive_page_size():
         apps.list(page_size=0)
 
 
+def test_list_stops_when_pagination_token_is_omitted():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": [{"name": "one"}]}]),
+    )
+
+    assert apps.list() == [{"name": "one"}]
+
+
 @pytest.mark.parametrize("next_token", [0, False, [], {}])
 def test_list_rejects_falsey_non_string_pagination_token(next_token):
     apps = CloudRuContainerAppsClient(
