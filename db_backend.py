@@ -238,3 +238,8 @@ def connect_postgres(url: Optional[str] = None) -> PGConnection:
 
 def is_postgres_configured() -> bool:
     return bool(postgres_url_from_env())
+
+
+def is_postgres_connection(connection: Any) -> bool:
+    """Return whether an already-open connection is PostgreSQL-backed."""
+    return isinstance(connection, PGConnection)
