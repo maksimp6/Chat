@@ -219,7 +219,7 @@ def test_task_token_and_time_budgets_fail_closed():
                 budget=BrowserTaskBudget(max_seconds=0.001),
             )
         ],
-        lambda _task: (time.sleep(0.01) or {"success": True, "data": "done"}),
+        lambda _task: time.sleep(0.01) or {"success": True, "data": "done"},
     ).run()
 
     assert time_result.status == "failed"
