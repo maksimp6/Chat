@@ -57,7 +57,9 @@ def test_missing_ref_returns_none(isolated_db):
 
 def test_switching_version_remembers_previous_for_rollback(isolated_db):
     set_secret_management_ref(isolated_db, "github_oauth_client_secret", "secret-1", "v1")
-    switched = set_secret_management_ref(isolated_db, "github_oauth_client_secret", "secret-1", "v2")
+    switched = set_secret_management_ref(
+        isolated_db, "github_oauth_client_secret", "secret-1", "v2"
+    )
 
     assert switched.pinned_version_id == "v2"
     assert switched.previous_version_id == "v1"
