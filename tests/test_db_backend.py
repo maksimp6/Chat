@@ -1,7 +1,7 @@
 import sqlite3
 
 import db
-from db_backend import is_postgres_configured, postgres_url_from_env
+from db_backend import is_postgres_configured, is_postgres_connection, postgres_url_from_env
 
 
 def test_postgres_backend_is_explicit_opt_in(monkeypatch):
@@ -53,3 +53,21 @@ def test_core_db_schema_and_conversations_work_on_sqlite(monkeypatch, tmp_path):
 
     assert db.get_conversations()[0]["id"] == "termux-test"
     assert db.get_messages("termux-test")[0]["text"] == "local database"
+
+
+def test_backend_detection_uses_open_connection_not_environment(monkeypatch, tmp_path):
+    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://configured-but-not-selected")
+    path = tmp_path / "runtime.db"
+    connection = sqlite3.connect(path)
+    try:
+        assert is_postgres_connection(connection) is False
+    finally:
+        connection.close()
+
+
+def test_postgres_selection_takes_precedence_over_explicit_sqlite_path(monkeypatch, tmp_path):
+    postgres_connection = object()
+    monkeypatch.setattr(db, "postgres_url_from_env", lambda: "postgresql://configured")
+    monkeypatch.setattr(db, "connect_postgres", lambda _url: postgres_connection)
+
+    assert db.get_conn(tmp_path / "local.sqlite") is postgres_connection

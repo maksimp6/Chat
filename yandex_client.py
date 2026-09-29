@@ -1,5 +1,4 @@
 from trace_manager import ExecutionTrace
-import sqlite3
 import uuid
 import json
 import time
