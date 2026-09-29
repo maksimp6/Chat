@@ -99,10 +99,49 @@ def test_register_browser_tools_runs_through_universal_executor():
             "tool_name": "browser_local",
             "arguments": {"action": "inspect", "target": "page", "value": None},
             "transport": "local_agent",
-            "approved": True,
         }
     )
 
     assert result["success"] is True
     assert result["data"] == {"title": "Alice"}
     assert set(registry.definitions) == {"browser_cloud", "browser_local"}
+
+
+
+def test_browser_click_still_requires_approval():
+    adapters = BrowserAdapterRegistry(
+        {"browser_local": FakeAdapter({"success": True, "data": {"clicked": True}})}
+    )
+    registry = FakeToolRegistry()
+    register_browser_tools(registry, adapters)
+    executor = UniversalToolExecutor(registry)
+
+    denied = executor.execute(
+        {
+            "tool_name": "browser_local",
+            "arguments": {"action": "click", "target": "button", "value": None},
+            "transport": "local_agent",
+        }
+    )
+    approved = executor.execute(
+        {
+            "tool_name": "browser_local",
+            "arguments": {"action": "click", "target": "button", "value": None},
+            "transport": "local_agent",
+            "approved": True,
+        }
+    )
+
+    assert denied["success"] is False
+    assert denied["metadata"]["phase"] == "approval_required"
+    assert approved["success"] is True
+    assert approved["data"] == {"clicked": True}
+
+
+def test_browser_contract_marks_only_interactive_actions_for_approval():
+    registry = FakeToolRegistry()
+    register_browser_tools(registry, BrowserAdapterRegistry())
+
+    definition = registry.definitions["browser_local"]
+    assert definition["requires_approval"] is False
+    assert definition["metadata"]["approval_actions"] == ["click", "fill"]
