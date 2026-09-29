@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from db_backend import connect_postgres, postgres_url_from_env
+from db_backend import OperationalError, connect_postgres, postgres_url_from_env
 from memory_db import Column, MemoryDatabase
 from runtime.request_context import current_runtime_data_root
 
@@ -152,12 +152,12 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE messages ADD COLUMN timings_json TEXT DEFAULT '[]'")
-    except sqlite3.OperationalError:
+    except OperationalError:
         pass
 
     try:
         cur.execute("ALTER TABLE messages ADD COLUMN trace_json TEXT DEFAULT '{}'")
-    except sqlite3.OperationalError:
+    except OperationalError:
         pass
 
     cur.execute("""
