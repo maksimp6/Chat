@@ -78,7 +78,12 @@ def test_new_pinned_version_bypasses_stale_cache(monkeypatch):
 
 @pytest.mark.parametrize(
     "status_code,expected_code",
-    [(401, "auth_failed"), (403, "authorization_failed"), (404, "not_found"), (409, "version_disabled")],
+    [
+        (401, "auth_failed"),
+        (403, "authorization_failed"),
+        (404, "not_found"),
+        (409, "version_disabled"),
+    ],
 )
 def test_status_codes_map_to_predictable_error_codes(monkeypatch, status_code, expected_code):
     client = _client(monkeypatch)
@@ -203,9 +208,7 @@ def test_list_versions_reuses_shared_trace_safe_client(monkeypatch):
         versions = client.list_versions("secret-1")
 
     assert versions == [{"id": "v1", "status": "enabled"}]
-    request.assert_called_once_with(
-        "secret_management", "GET", "/v1/secrets/secret-1/versions"
-    )
+    request.assert_called_once_with("secret_management", "GET", "/v1/secrets/secret-1/versions")
 
 
 def test_get_version_status_reports_disabled_without_leaking_value(monkeypatch):
