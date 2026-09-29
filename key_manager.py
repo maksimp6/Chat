@@ -318,7 +318,7 @@ def rotate_key(
     return new_meta
 
 
-def _metadata(row: sqlite3.Row) -> KeyMetadata:
+def _metadata(row: DatabaseRow) -> KeyMetadata:
     return KeyMetadata(
         key_ref=str(row["key_ref"]),
         name=str(row["name"]),
