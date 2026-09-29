@@ -152,6 +152,8 @@ def create_order(owner_id: str, data: dict) -> dict:
     status = str(data.get("status") or "lead").strip()
     if status not in ORDER_STATUSES:
         raise ValueError("invalid order status")
+    if status == "paid":
+        raise ValueError("paid status requires settlement")
 
     quote_input = data.get("quote")
     quote = calculate_quote(quote_input) if isinstance(quote_input, dict) else {}
@@ -273,6 +275,9 @@ def settle_order(
             return order
         raise ValueError("order is already settled")
 
+    if order.get("status") == "cancelled":
+        raise ValueError("cancelled order cannot be settled")
+
     revenue_source = actual_revenue
     if revenue_source is None:
         revenue_source = order.get("quoted_price")
@@ -282,7 +287,9 @@ def settle_order(
     quote = order.get("quote") or {}
     cost_source = actual_cost
     if cost_source is None:
-        cost_source = quote.get("estimated_total_cost", 0)
+        cost_source = quote.get("estimated_total_cost")
+    if cost_source is None:
+        raise ValueError("actual_cost is required")
 
     revenue = _money(_decimal(revenue_source, "actual_revenue"))
     cost = _money(_decimal(cost_source, "actual_cost"))
@@ -329,7 +336,7 @@ def get_financial_summary(owner_id: str) -> dict:
         bucket["orders"] += 1
 
         quoted_price = order.get("quoted_price")
-        if quoted_price is not None:
+        if order.get("status") != "cancelled" and quoted_price is not None:
             bucket["quoted_revenue"] += Decimal(str(quoted_price))
 
         if order.get("status") == "paid" and order.get("settled_at"):
