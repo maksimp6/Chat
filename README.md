@@ -36,9 +36,11 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-09-28, `master` includes the `invocation/` and `browser/` package moves, canonical CLI and GitHub-agent lifecycle work, removal of unused agent loops and Supabase, GitHub App identity support for Alice, and optional GitHub sign-in ([changelog](docs/changelog.md)). These are repository changes, not evidence that the public deployment or external MCP connection has been verified. Master is protected: production changes go through a PR, CI/status checks, review and post-merge verification. The configured protection currently has the status-check gate enabled; named required check contexts must be added when the repository's CI check names are finalized.
+As of 2026-09-29, `master` includes the fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and the Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Container Apps deployment, Object Storage, durable background workers and complete PostgreSQL compatibility remain work in progress; an open implementation PR does not establish production readiness.
+These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
+
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). The Container Apps v2 client and deterministic contract tests are now in `master`, but the baseline deployment path is still awaiting live validation against a real Cloud.ru project. Object Storage migration, durable background workers, and production cutover remain separate work.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
