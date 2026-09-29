@@ -140,10 +140,19 @@ Production-баги и блокеры могут временно обрабат
 
 ## 5. Локальная проверка
 
+Канонические formatter entrypoints:
+
+```bash
+bash scripts/format.sh write
+bash scripts/format.sh check
+```
+
 Минимальный backend-набор:
 
 ```bash
 python -m compileall -q .
+python tests/validate_frontend_modules.py
+python tests/validate_runtime_modules.py
 pytest -q
 ```
 
@@ -153,15 +162,32 @@ pytest -q
 pytest -q tests/test_responses_tool_loop.py test_partial_output.py tests/test_tool_execution_contract.py
 ```
 
-Для Android:
+Для Android CI-эквивалент выглядит так:
 
 ```bash
 cd android
 python scripts/stage_python.py
-gradle --no-daemon :app:assembleDebug
+gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug
 ```
 
-CI выполняет полный pytest, компиляцию Python и сборку debug APK. Поэтому локальная проверка должна сначала ловить обычные ошибки, а CI является обязательным подтверждением перед merge.
+Основной GitHub Actions pipeline дополнительно выполняет:
+
+- frontend JavaScript regression suite с V8 coverage и единым `frontend-test.log`;
+- live Flask resource contract tests;
+- полный Python suite с `--durations=30`, line/branch coverage и 100% diff coverage для изменённых Python-строк;
+- полный PostgreSQL suite с `pytest --durations=30 -q`;
+- PostgreSQL backup/restore verification;
+- Android unit tests, debug APK build, verification и artifact upload;
+- dependency cache для pip/npm/Gradle и timing telemetry в GitHub Step Summary.
+
+Destructive PostgreSQL isolation в тестах разрешён только для disposable test databases. Для него одновременно обязательны:
+
+- `ALICE_PYTEST_POSTGRES_RESET=1`;
+- имя БД, заканчивающееся на `_test` или `_ci`.
+
+`tests/postgres_test_guard.py` fail-closed отклоняет любой другой target. Никогда не направлять этот режим на production/staging database.
+
+Локальная проверка должна ловить обычные ошибки как можно раньше, но обязательный CI на exact current PR head остаётся merge-gate.
 
 ## 6. Что должно быть в PR
 
@@ -223,7 +249,14 @@ PR должен содержать:
 - соответствие изменения исходной Issue;
 - отсутствие очевидных регрессий;
 - корректность Execution Trace, UI и данных в БД, если они затронуты;
-- наличие понятного rollback-пути.
+- наличие понятного rollback-пути;
+- `behind master = 0`;
+- required checks зелёные на exact current PR head;
+- нет unresolved review threads;
+- Copilot review используется автоматически и не триггерится вручную;
+- `@codex review` запускается один раз на финальном ready-to-merge head.
+
+После review-fix повторный Codex/Copilot review не требуется: новый head должен пройти свежий CI, а исправленные threads должны оставаться закрытыми.
 
 ## 10. Rollback
 
