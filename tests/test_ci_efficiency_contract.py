@@ -2,7 +2,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from tests.conftest import _make_lazy_postgres_connector
+from tests.conftest import _make_lazy_postgres_reset_connector
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,54 +37,57 @@ def test_focused_python_suites_are_not_duplicated_before_full_suite() -> None:
 def test_postgres_matrix_resets_lazily_on_first_connection() -> None:
     conftest = (ROOT / "tests" / "conftest.py").read_text(encoding="utf-8")
 
-    assert "_make_lazy_postgres_connector" in conftest
     assert 'monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)' in conftest
+    assert "_make_lazy_postgres_reset_connector" in conftest
     assert "conn = db.get_conn()" not in conftest
 
 
-def test_lazy_postgres_reset_runs_once_under_concurrent_first_use() -> None:
-    start_barrier = threading.Barrier(2)
-    events = []
-    events_lock = threading.Lock()
-    connection_number = 0
+def test_postgres_lazy_reset_runs_once_under_concurrent_first_use() -> None:
+    barrier = threading.Barrier(2)
+    created_connections = []
+    created_lock = threading.Lock()
 
-    class FakeRows:
+    class FakeResult:
         def fetchall(self):
-            return [{"tablename": "example"}]
+            return [{"tablename": "invocations"}]
 
     class FakeConnection:
-        def __init__(self, name):
-            self.name = name
+        def __init__(self):
+            self.catalog_queries = 0
+            self.truncates = 0
+            self.commits = 0
+            self.closed = False
 
-        def execute(self, sql):
-            kind = "catalog" if "pg_catalog.pg_tables" in sql else "truncate"
-            with events_lock:
-                events.append((self.name, kind))
-            return FakeRows()
+        def execute(self, query):
+            if "FROM pg_catalog.pg_tables" in query:
+                self.catalog_queries += 1
+                return FakeResult()
+            if query.startswith("TRUNCATE TABLE"):
+                self.truncates += 1
+                return FakeResult()
+            raise AssertionError(f"unexpected query: {query}")
 
         def commit(self):
-            with events_lock:
-                events.append((self.name, "commit"))
+            self.commits += 1
 
         def close(self):
-            with events_lock:
-                events.append((self.name, "close"))
+            self.closed = True
 
     def connect_postgres(_url=None):
-        nonlocal connection_number
-        with events_lock:
-            connection_number += 1
-            name = f"conn-{connection_number}"
-        start_barrier.wait(timeout=5)
-        return FakeConnection(name)
+        connection = FakeConnection()
+        with created_lock:
+            created_connections.append(connection)
+        barrier.wait(timeout=5)
+        return connection
 
-    connect = _make_lazy_postgres_connector(connect_postgres)
+    connect = _make_lazy_postgres_reset_connector(connect_postgres)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(lambda _: connect(), range(2)))
+        connections = list(pool.map(lambda _: connect(), range(2)))
 
-    assert len(results) == 2
-    assert sum(kind == "catalog" for _, kind in events) == 1
-    assert sum(kind == "truncate" for _, kind in events) == 1
-    assert sum(kind == "commit" for _, kind in events) == 1
-    assert sum(kind == "close" for _, kind in events) == 0
+    assert len(connections) == 2
+    assert connections[0] is not connections[1]
+    assert sum(conn.catalog_queries for conn in created_connections) == 1
+    assert sum(conn.truncates for conn in created_connections) == 1
+    assert sum(conn.commits for conn in created_connections) == 1
+    assert not any(conn.closed for conn in created_connections)
