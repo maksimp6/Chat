@@ -92,6 +92,7 @@ def test_ci_publishes_hot_file_metrics():
     assert "python scripts/hot_file_metrics.py" in workflow
     assert "--json-out hot-file-metrics.json" in workflow
     assert "--markdown-out hot-file-metrics.md" in workflow
+    assert "cat hot-file-metrics.md" in workflow
     assert 'cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"' in workflow
     assert "hot-file-metrics.json" in workflow
     assert "hot-file-metrics.md" in workflow
