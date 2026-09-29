@@ -154,13 +154,14 @@ def test_financing_tool_is_registered_read_only_and_executes():
             "monthly_payment": 2500,
             "term_months": 10,
             "planned_monthly_profit": 6000,
-            "target_payment_coverage": 2,
+            "target_payment_coverage": None,
             "psk_percent": None,
             "currency": "RUB",
         },
     )
 
     assert result["total_business_outlay"] == 35000
+    assert result["target_payment_coverage"] == 2
     assert result["required_monthly_profit"] == 5000
     assert result["payment_coverage_ok"] is True
     assert result["planned_surplus_after_payment"] == 3500
