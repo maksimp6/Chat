@@ -110,3 +110,24 @@ def test_api_chat_returns_approval_only_for_interactive_browser_action():
     assert click_payload["requires_approval"] is True
     assert click_payload["tool_call"]["name"] == "browser_local"
     assert click_payload["tool_call"]["arguments"]["action"] == "click"
+
+
+
+def test_tool_call_parts_handles_decorated_and_malformed_arguments():
+    name, arguments = _tool_call_parts(
+        {
+            "name": "browser_cloud<|suffix",
+            "arguments": "{not-json",
+        }
+    )
+    assert name == "browser_cloud"
+    assert arguments == {}
+
+    name, arguments = _tool_call_parts(
+        {
+            "name": "browser_cloud",
+            "arguments": '["not", "an", "object"]',
+        }
+    )
+    assert name == "browser_cloud"
+    assert arguments == {}
