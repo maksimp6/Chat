@@ -87,7 +87,6 @@ class TaskContextCache:
             return CacheLookup(
                 status="miss",
                 cache_key=cache_key,
-                packet=previous,
                 stale_components=stale_components,
             )
 
@@ -95,7 +94,6 @@ class TaskContextCache:
         return CacheLookup(
             status="partial",
             cache_key=cache_key,
-            packet=previous,
             reusable_slices=reusable,
             stale_components=stale_components,
             saved_source_bytes=source_bytes,
