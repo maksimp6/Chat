@@ -7,6 +7,34 @@
 
 ## 2026-09-29 — безопасность, CI, async runtime и Cloud.ru
 
+### 3D business и AI-first tools
+
+- Добавлен базовый 3D business slice: quote, owner-scoped orders, settlement и
+  фактический P&L без изменения Treasury paper balance:
+  [#553](https://github.com/maksimp6/Chat/pull/553).
+- Добавлены owner-scoped finance plan и расчёт фактической окупаемости:
+  [#555](https://github.com/maksimp6/Chat/pull/555).
+- Добавлен read-only AI-first tool `printing3d.finance.assess`, который принимает
+  неполные условия, использует сохранённый plan/фактическую прибыль как fallback
+  и возвращает `missing_fields` без выбора банка и без банковских действий:
+  [#556](https://github.com/maksimp6/Chat/pull/556).
+- Категория локальных инструментов `3d` включена в standard discovery при
+  отсутствии явного списка категорий:
+  [#557](https://github.com/maksimp6/Chat/pull/557).
+- Hosted `web_search` стал opt-out: при отсутствии настройки он доступен модели,
+  явный `enabled=false` его отключает; `tool_choice=auto` не изменён:
+  [#559](https://github.com/maksimp6/Chat/pull/559).
+- Browser approval переведён на action-level policy: read-only navigation/inspect
+  actions не требуют подтверждения только из-за browser tool, а `click`/`fill`
+  остаются approval-gated:
+  [#562](https://github.com/maksimp6/Chat/pull/562).
+
+Это shipped-контур в `master`, но не весь roadmap
+[#552](https://github.com/maksimp6/Chat/issues/552): printer adapters,
+production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
+подтверждённый спрос, покупка оборудования и production rollout остаются
+отдельной работой.
+
 ### Безопасность и секреты
 
 - Добавлен backend-only адаптер Cloud.ru Secret Management и усилены границы хранения секретов:
