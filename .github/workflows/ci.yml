@@ -187,9 +187,7 @@ jobs:
           pip install -r requirements-postgres.txt
           pip install -r requirements-dev.txt
       - name: Run full application suite on PostgreSQL
-        run: |
-          python scripts/reset_postgres_test_db.py
-          pytest -q
+        run: pytest -q
       - name: Verify backup and restore of the application schema
         # Client tools come from the server image so their version matches PostgreSQL 17.
         env:
