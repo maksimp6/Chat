@@ -79,6 +79,8 @@ def test_finance_plan_validation(finance_db):
         set_financing_plan("owner-a", _full_plan(term_months=True))
     with pytest.raises(ValueError, match="term_months must be an integer"):
         set_financing_plan("owner-a", _full_plan(term_months="10.5"))
+    with pytest.raises(ValueError, match="term_months must be an integer"):
+        set_financing_plan("owner-a", _full_plan(term_months=10.0))
     with pytest.raises(ValueError, match="term_months must be >= 1"):
         set_financing_plan("owner-a", _full_plan(term_months=0))
 
