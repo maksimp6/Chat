@@ -176,7 +176,6 @@ def test_executor_remote_target_waits_for_gateway_result(monkeypatch):
     assert calls[1] == ("wait", "job-1", 7.0)
 
 
-
 def test_action_level_approval_helper_preserves_static_policy():
     dynamic = definition(
         requires_approval=False,
