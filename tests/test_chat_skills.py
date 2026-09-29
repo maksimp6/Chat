@@ -2,8 +2,34 @@
 
 from unittest.mock import patch
 
+import pytest
+
 import mcp_routes
+from agent_skills.registry import SkillRegistryError
 from app import app
+
+
+def test_requested_skill_normalization_variants():
+    assert mcp_routes._normalize_requested_skills({}, {"skills": None}) == []
+    assert mcp_routes._normalize_requested_skills({}, {"skills": "docs-sync"}) == ["docs-sync"]
+
+    with pytest.raises(SkillRegistryError):
+        mcp_routes._normalize_requested_skills({"skills": 123}, {})
+
+
+def test_skill_catalog_endpoint_filters_by_role_and_rejects_unknown_role():
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        response = client.get("/api/skills?role=docs-engineer")
+        invalid = client.get("/api/skills?role=mystery-wizard")
+
+    assert response.status_code == 200
+    assert [skill["name"] for skill in response.get_json()["skills"]] == [
+        "docs-sync",
+        "issue-to-pr",
+    ]
+    assert invalid.status_code == 400
+    assert invalid.get_json()["error"] == "invalid_role"
 
 
 def test_chat_lazily_loads_selected_skill_into_instructions_and_trace():
@@ -27,7 +53,9 @@ def test_chat_lazily_loads_selected_skill_into_instructions_and_trace():
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
         patch.object(
-            mcp_routes, "settle_billing_to_treasury", return_value={"status": "not_applicable"}
+            mcp_routes,
+            "settle_billing_to_treasury",
+            return_value={"status": "not_applicable"},
         ),
         patch.object(mcp_routes, "persist_invocation_trace"),
         patch.object(mcp_routes, "finish_invocation"),
@@ -72,6 +100,7 @@ def test_chat_rejects_skill_outside_role_policy():
                     "skills": ["security-review"],
                 },
             )
+
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["error"] == "invalid_skill_selection"
