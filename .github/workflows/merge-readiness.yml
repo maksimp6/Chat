@@ -1,4 +1,4 @@
-name: Merge readiness
+name: Merge readiness snapshot
 
 on:
   pull_request:
@@ -7,8 +7,6 @@ on:
     types: [submitted, dismissed]
   pull_request_review_comment:
     types: [created, edited, deleted]
-  pull_request_review_thread:
-    types: [resolved, unresolved]
 
 permissions:
   contents: read
@@ -21,7 +19,7 @@ concurrency:
 
 jobs:
   readiness:
-    name: Merge readiness
+    name: Merge readiness snapshot
     if: >-
       github.event.pull_request.base.ref == 'master' &&
       github.event.pull_request.draft == false
@@ -59,7 +57,7 @@ jobs:
 
           emit_summary() {
             {
-              echo "## Merge readiness"
+              echo "## Merge readiness snapshot"
               echo
               echo '~~~json'
               cat "$result_file"
