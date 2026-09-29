@@ -1,50 +1,71 @@
-"""Backend-selection rules for the cross-database CI matrix.
+"""Backend-selection and state-isolation rules for the cross-database CI matrix.
 
-Tests that explicitly replace db.DB_PATH are validating local SQLite isolation
-or a SQLite-only filesystem/runtime contract. When the PostgreSQL CI job exports
-ALICE_DATABASE_URL globally, that environment setting would otherwise override
-the test database path and make unrelated tests share one PostgreSQL database.
+When the PostgreSQL CI job exports ALICE_DATABASE_URL, normal application tests
+exercise PostgreSQL. Tests that explicitly choose a temporary SQLite database
+by replacing `db.DB_PATH` keep that isolation instead of being silently
+redirected to PostgreSQL.
 
-Keep those tests on SQLite; all other tests inherit the PostgreSQL URL.
+For PostgreSQL-backed tests the schema is preserved, but all table rows are
+truncated before each test so fixed IDs and stateful fixtures cannot leak across
+test cases.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
 
-_SQLITE_ISOLATION_MODULES = {
-    "test_alice_agent_runner.py",
+_SQLITE_ONLY_MODULES = {
     "test_chat_sqlite_integration.py",
-    "test_chatgpt_mcp.py",
-    "test_concurrency_session_recovery.py",
-    "test_conversation_titles.py",
-    "test_departments.py",
     "test_environment_gateway.py",
-    "test_environments.py",
-    "test_github_oauth.py",
-    "test_government.py",
-    "test_key_manager.py",
-    "test_memory_api_contract.py",
-    "test_observability_migrations.py",
-    "test_partner_relations.py",
-    "test_persistent_runtime_records.py",
-    "test_provider_credentials_routes.py",
-    "test_provider_quotas.py",
-    "test_runtime_api.py",
-    "test_runtime_concurrency.py",
-    "test_runtime_lifecycle.py",
-    "test_session_profiles.py",
-    "test_treasury_billing.py",
-    "test_user_identity.py",
 }
 
 
 @pytest.fixture(autouse=True)
-def preserve_explicit_sqlite_test_isolation(request, monkeypatch):
-    """Do not let PostgreSQL CI override tests that explicitly choose SQLite."""
+def isolate_selected_database(request, monkeypatch):
+    database_url = os.environ.get("ALICE_DATABASE_URL", "").strip()
+    if not database_url:
+        yield
+        return
 
-    if Path(str(request.fspath)).name in _SQLITE_ISOLATION_MODULES:
+    import db
+
+    module_name = Path(str(request.fspath)).name
+    original_db_path = db.DB_PATH
+    original_postgres_url_from_env = db.postgres_url_from_env
+
+    if module_name in _SQLITE_ONLY_MODULES:
         monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+        yield
+        return
+
+    def selected_postgres_url() -> str:
+        # Tests that replace DB_PATH are explicitly selecting a temporary
+        # SQLite database. Preserve that choice even in the PostgreSQL CI job.
+        if db.DB_PATH != original_db_path:
+            return ""
+        return original_postgres_url_from_env()
+
+    monkeypatch.setattr(db, "postgres_url_from_env", selected_postgres_url)
+
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT tablename
+            FROM pg_catalog.pg_tables
+            WHERE schemaname = 'public'
+            """
+        ).fetchall()
+        tables = [str(row["tablename"]) for row in rows]
+        if tables:
+            quoted = ", ".join('"' + name.replace('"', '""') + '"' for name in tables)
+            conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
+            conn.commit()
+    finally:
+        conn.close()
+
+    yield
