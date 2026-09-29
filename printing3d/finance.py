@@ -1,4 +1,4 @@
-"""Credit and payback calculator for the 3D-printing business."""
+"""AI-first credit and payback assessment for the 3D-printing business."""
 
 from __future__ import annotations
 
@@ -119,4 +119,75 @@ def calculate_financing_plan(data: Mapping[str, Any]) -> dict[str, Any]:
             else None
         ),
     }
-}
+
+
+def assess_financing_plan(
+    data: Mapping[str, Any],
+    *,
+    observed_monthly_profit: float = 0,
+) -> dict[str, Any]:
+    """Accept sparse AI-collected terms and explain what remains unknown."""
+    if not isinstance(data, Mapping):
+        raise ValueError("financing input must be an object")
+
+    purchase_mode = str(data.get("purchase_mode") or "credit").strip().lower()
+    if purchase_mode not in {"credit", "cash"}:
+        raise ValueError("purchase_mode must be credit or cash")
+
+    currency = str(data.get("currency") or "RUB")
+    inputs = {
+        "equipment_price": data.get("equipment_price"),
+        "startup_costs": data.get("startup_costs"),
+        "financed_principal": data.get("financed_principal"),
+        "monthly_payment": data.get("monthly_payment"),
+        "term_months": data.get("term_months"),
+        "planned_monthly_profit": data.get("planned_monthly_profit"),
+        "target_payment_coverage": data.get("target_payment_coverage"),
+        "psk_percent": data.get("psk_percent"),
+        "currency": currency,
+    }
+
+    missing_fields = []
+    if inputs["equipment_price"] is None:
+        missing_fields.append("equipment_price")
+
+    if purchase_mode == "credit":
+        for name in ("financed_principal", "monthly_payment", "term_months"):
+            if inputs[name] is None:
+                missing_fields.append(name)
+    else:
+        inputs["financed_principal"] = 0
+        inputs["monthly_payment"] = 0
+        inputs["term_months"] = 0
+
+    assumptions = []
+    if inputs["startup_costs"] is None:
+        inputs["startup_costs"] = 0
+        assumptions.append("startup_costs=0")
+
+    profit_source = "provided"
+    if inputs["planned_monthly_profit"] is None:
+        inputs["planned_monthly_profit"] = observed_monthly_profit
+        profit_source = "realized_3d_profit_last_30_days"
+        assumptions.append("planned_monthly_profit=observed_30d_profit")
+
+    if inputs["target_payment_coverage"] is None:
+        inputs["target_payment_coverage"] = 2
+        assumptions.append("target_payment_coverage=2")
+
+    assessment = {
+        "status": "needs_terms" if missing_fields else "ready",
+        "purchase_mode": purchase_mode,
+        "currency": currency,
+        "missing_fields": missing_fields,
+        "assumptions": assumptions,
+        "profit_source": profit_source,
+        "observed_monthly_profit": _money(Decimal(str(observed_monthly_profit))),
+        "known_inputs": inputs,
+        "plan": None,
+    }
+    if missing_fields:
+        return assessment
+
+    assessment["plan"] = calculate_financing_plan(inputs)
+    return assessment
