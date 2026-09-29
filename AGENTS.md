@@ -153,6 +153,7 @@ version in shell environment variables.
 Backend:
 `python -m compileall -q .`
 `python tests/validate_runtime_modules.py`
+`python tests/validate_skills.py`
 `pytest -q`
 
 Android:
