@@ -24,7 +24,8 @@ def test_quote_calculates_cost_risk_fee_and_profit():
     assert quote["depreciation_cost"] == pytest.approx(50)
     assert quote["cost_with_risk"] == pytest.approx(190.96)
     assert quote["recommended_price"] == pytest.approx(293.78)
-    assert quote["expected_profit"] == pytest.approx(88.13)
+    assert quote["estimated_total_cost"] == pytest.approx(205.65)
+    assert quote["expected_profit"] == pytest.approx(88.14)
 
 
 def test_quote_rejects_impossible_margin_and_fee():
@@ -75,7 +76,7 @@ def test_orders_are_owner_scoped(printing_db):
     assert list_orders("owner-b") == []
 
 
-def test_order_status_flow(printing_db):
+def test_order_status_flow_requires_settlement_for_paid(printing_db):
     from printing3d import create_order, update_order_status
 
     order = create_order("owner-a", {"title": "Adapter"})
@@ -84,3 +85,78 @@ def test_order_status_flow(printing_db):
 
     assert accepted["status"] == "accepted"
     assert printing["status"] == "printing"
+    with pytest.raises(ValueError, match="requires settlement"):
+        update_order_status("owner-a", order["id"], "paid")
+
+
+def test_settlement_updates_treasury_summary_without_mixing_owner_data(printing_db):
+    from printing3d import create_order, get_financial_summary, settle_order
+
+    order_a = create_order(
+        "owner-a",
+        {
+            "title": "Meter bracket",
+            "quoted_price": 500,
+            "currency": "RUB",
+        },
+    )
+    order_b = create_order(
+        "owner-b",
+        {
+            "title": "Other owner order",
+            "quoted_price": 900,
+            "currency": "RUB",
+        },
+    )
+
+    settled = settle_order(
+        "owner-a",
+        order_a["id"],
+        actual_revenue=520,
+        actual_cost=180,
+    )
+    settle_order(
+        "owner-b",
+        order_b["id"],
+        actual_revenue=900,
+        actual_cost=400,
+    )
+
+    assert settled["status"] == "paid"
+    assert settled["actual_revenue"] == pytest.approx(520)
+    assert settled["actual_cost"] == pytest.approx(180)
+    assert settled["settled_at"]
+
+    summary = get_financial_summary("owner-a")
+    assert summary["total_orders"] == 1
+    assert summary["currencies"] == [
+        {
+            "currency": "RUB",
+            "orders": 1,
+            "open_orders": 0,
+            "paid_orders": 1,
+            "quoted_revenue": 500.0,
+            "settled_revenue": 520.0,
+            "settled_cost": 180.0,
+            "settled_profit": 340.0,
+        }
+    ]
+
+
+def test_settlement_is_idempotent_when_retried_without_new_values(printing_db):
+    from printing3d import create_order, settle_order
+
+    order = create_order(
+        "owner-a",
+        {
+            "title": "DIN rail clip",
+            "quoted_price": 250,
+        },
+    )
+
+    first = settle_order("owner-a", order["id"], actual_revenue=260, actual_cost=80)
+    second = settle_order("owner-a", order["id"])
+
+    assert second["settled_at"] == first["settled_at"]
+    assert second["actual_revenue"] == pytest.approx(260)
+    assert second["actual_cost"] == pytest.approx(80)
