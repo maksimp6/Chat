@@ -264,3 +264,179 @@ def get_payback_status(owner_id: str, *, month: str | None = None) -> dict[str, 
         "monthly_payment_covered": payment_covered,
         "break_even_reached": break_even_reached,
     }
+
+
+def assess_financing(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Assess sparse candidate terms without persisting or choosing a lender."""
+    if not owner_id:
+        raise ValueError("owner identity is required")
+    if not isinstance(data, dict):
+        raise ValueError("finance assessment must be an object")
+
+    saved = get_financing_plan(owner_id) or {}
+    purchase_mode = str(data.get("purchase_mode") or "").strip().lower()
+    if not purchase_mode:
+        if saved and saved.get("credit_principal") in (None, 0, 0.0):
+            purchase_mode = "cash"
+        else:
+            purchase_mode = "credit"
+    if purchase_mode not in {"credit", "cash"}:
+        raise ValueError("purchase_mode must be credit or cash")
+
+    def resolve(name: str, default=None):
+        value = data.get(name)
+        if value is not None:
+            return value
+        if saved.get(name) is not None:
+            return saved.get(name)
+        return default
+
+    printer_model = resolve("printer_model")
+    equipment_price = resolve("equipment_price")
+    setup_cost = resolve("setup_cost", 0)
+    down_payment = resolve("down_payment")
+    credit_principal = resolve("credit_principal")
+    credit_total_repayment = resolve("credit_total_repayment")
+    monthly_payment = resolve("monthly_payment")
+    term_months = resolve("term_months")
+    psk_percent = resolve("psk_percent")
+    currency = str(resolve("currency", "RUB") or "RUB").strip().upper()
+    expected_monthly_profit = data.get("expected_monthly_profit")
+    target_coverage = data.get("target_payment_coverage")
+    if target_coverage is None:
+        target_coverage = 2
+
+    missing_fields: list[str] = []
+    if equipment_price is None:
+        missing_fields.append("equipment_price")
+
+    if purchase_mode == "cash":
+        credit_principal = 0
+        credit_total_repayment = 0
+        monthly_payment = 0
+        term_months = None
+        psk_percent = None
+    else:
+        for name, value in (
+            ("credit_principal", credit_principal),
+            ("monthly_payment", monthly_payment),
+            ("term_months", term_months),
+        ):
+            if value is None:
+                missing_fields.append(name)
+
+    observed_month = datetime.utcnow().strftime("%Y-%m")
+    observed_monthly_profit = _month_profit(owner_id, currency, observed_month)
+    cumulative_profit = _cumulative_profit(owner_id, currency)
+
+    profit_source = "none"
+    profit_basis: Decimal | None = None
+    if expected_monthly_profit is not None:
+        profit_basis = _decimal(expected_monthly_profit, "expected_monthly_profit")
+        profit_source = "provided_or_agent_estimate"
+    elif observed_monthly_profit > 0:
+        profit_basis = observed_monthly_profit
+        profit_source = "realized_current_month"
+
+    assumptions: list[str] = []
+    if data.get("setup_cost") is None and saved.get("setup_cost") is None:
+        assumptions.append("setup_cost=0")
+    if data.get("down_payment") is None and saved.get("down_payment") is None:
+        assumptions.append("down_payment=derived_from_purchase_terms")
+    if data.get("target_payment_coverage") is None:
+        assumptions.append("target_payment_coverage=2")
+
+    resolved = {
+        "printer_model": printer_model,
+        "equipment_price": equipment_price,
+        "setup_cost": setup_cost,
+        "down_payment": down_payment,
+        "credit_principal": credit_principal,
+        "credit_total_repayment": credit_total_repayment,
+        "monthly_payment": monthly_payment,
+        "term_months": term_months,
+        "psk_percent": psk_percent,
+        "currency": currency,
+    }
+
+    result: dict[str, Any] = {
+        "status": "needs_terms" if missing_fields else "ready",
+        "purchase_mode": purchase_mode,
+        "missing_fields": missing_fields,
+        "resolved_terms": resolved,
+        "assumptions": assumptions,
+        "saved_plan_used": bool(saved),
+        "observed_month": observed_month,
+        "observed_monthly_profit": _money(observed_monthly_profit),
+        "cumulative_realized_profit": _money(cumulative_profit),
+        "profit_source": profit_source,
+        "profit_basis": _money(profit_basis) if profit_basis is not None else None,
+        "analysis": None,
+    }
+    if missing_fields:
+        return result
+
+    equipment = _decimal(equipment_price, "equipment_price")
+    setup = _decimal(setup_cost, "setup_cost")
+    principal = _decimal(credit_principal, "credit_principal")
+    if purchase_mode == "cash":
+        down = equipment
+    elif down_payment is None:
+        down = max(equipment - principal, Decimal("0"))
+    else:
+        down = _decimal(down_payment, "down_payment")
+    result["resolved_terms"]["down_payment"] = _money(down)
+
+    if psk_percent is not None:
+        result["resolved_terms"]["psk_percent"] = _money(_decimal(psk_percent, "psk_percent"))
+
+    coverage_target = _decimal(target_coverage, "target_payment_coverage")
+    if coverage_target < 1:
+        raise ValueError("target_payment_coverage must be >= 1")
+
+    payment = Decimal("0")
+    months = None
+    repayment = Decimal("0")
+    financing_cost = Decimal("0")
+    if purchase_mode == "credit":
+        payment = _decimal(monthly_payment, "monthly_payment")
+        months = _optional_int(term_months, "term_months")
+        if payment <= 0:
+            raise ValueError("monthly_payment must be > 0")
+        if principal > equipment:
+            raise ValueError("credit_principal cannot exceed equipment_price")
+        repayment = (
+            _decimal(credit_total_repayment, "credit_total_repayment")
+            if credit_total_repayment is not None
+            else payment * Decimal(months)
+        )
+        if repayment < principal:
+            raise ValueError("credit_total_repayment must be >= credit_principal")
+        financing_cost = repayment - principal
+
+    known_cost_basis = equipment + setup + financing_cost
+    upfront_cash = down + setup
+    required_monthly_profit = payment * coverage_target
+
+    coverage_ratio = None
+    coverage_ok = None
+    payback_months = None
+    if profit_basis is not None and profit_basis > 0:
+        payback_months = known_cost_basis / profit_basis
+        if payment > 0:
+            coverage_ratio = profit_basis / payment
+            coverage_ok = profit_basis >= required_monthly_profit
+
+    result["analysis"] = {
+        "known_cost_basis": _money(known_cost_basis),
+        "upfront_cash_required": _money(upfront_cash),
+        "total_credit_repayment": _money(repayment),
+        "financing_cost": _money(financing_cost),
+        "target_payment_coverage": _money(coverage_target),
+        "required_monthly_profit": _money(required_monthly_profit),
+        "payment_coverage_ratio": _money(coverage_ratio) if coverage_ratio is not None else None,
+        "payment_coverage_ok": coverage_ok,
+        "estimated_payback_months": _money(payback_months) if payback_months is not None else None,
+        "profit_evidence_status": "available" if profit_basis is not None else "not_available",
+    }
+    return result

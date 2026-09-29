@@ -6,7 +6,7 @@ from typing import Any, Mapping, Optional
 
 from treasury_identity import get_current_owner_id
 
-from .finance import get_payback_status, set_financing_plan
+from .finance import assess_financing, get_payback_status, set_financing_plan
 from .service import ORDER_STATUSES, get_financial_summary, list_orders
 
 
@@ -55,6 +55,14 @@ def finance_plan_set(
     return set_financing_plan(_trusted_owner(cfg), dict(arguments))
 
 
+def finance_assess(
+    arguments: Mapping[str, Any],
+    cfg: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Assess sparse AI-collected financing terms without persisting them."""
+    return assess_financing(_trusted_owner(cfg), dict(arguments))
+
+
 def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {
         "type": "object",
@@ -65,6 +73,62 @@ def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, A
 
 
 PRINTING3D_TOOLS = {
+    "printing3d.finance.assess": {
+        "title": "3D Printing Finance Assess",
+        "description": (
+            "AI-first read-only оценка покупки 3D-принтера. Сначала используй уже известные "
+            "данные из диалога, поиска и подключённых финансовых инструментов. Не проси "
+            "пользователя повторно вводить известные значения; неизвестные поля передавай "
+            "как null. Инструмент объединяет найденные условия с уже сохранённым планом, "
+            "учитывает фактическую прибыль 3D-направления и возвращает missing_fields."
+        ),
+        "parameters": _tool_schema(
+            {
+                "purchase_mode": {
+                    "anyOf": [
+                        {"type": "string", "enum": ["credit", "cash"]},
+                        {"type": "null"},
+                    ]
+                },
+                "printer_model": {
+                    "anyOf": [
+                        {"type": "string", "minLength": 1, "maxLength": 200},
+                        {"type": "null"},
+                    ]
+                },
+                "equipment_price": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "setup_cost": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "down_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "credit_principal": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "credit_total_repayment": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "monthly_payment": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "term_months": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+                "psk_percent": {"anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "currency": {
+                    "anyOf": [
+                        {"type": "string", "minLength": 1, "maxLength": 8},
+                        {"type": "null"},
+                    ]
+                },
+                "expected_monthly_profit": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "target_payment_coverage": {
+                    "anyOf": [{"type": "number", "minimum": 1}, {"type": "null"}]
+                },
+            },
+            [],
+        ),
+        "capabilities": ["3d", "treasury", "finance", "read"],
+        "risk_level": "low",
+        "read_only": True,
+        "requires_approval": False,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": finance_assess,
+    },
     "printing3d.finance.status": {
         "title": "3D Printing Finance Status",
         "description": "Получить условия финансирования, окупаемость и покрытие платежа прибылью.",
