@@ -45,6 +45,7 @@ jobs:
             --top 20 \
             --json-out hot-file-metrics.json \
             --markdown-out hot-file-metrics.md
+          cat hot-file-metrics.md
           cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"
       - name: Install dependencies
         run: |
