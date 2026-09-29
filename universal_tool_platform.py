@@ -220,9 +220,7 @@ def tool_call_requires_approval(
         metadata = dict(definition_or_cfg.get("metadata") or {})
 
     approval_actions = {
-        str(action)
-        for action in (metadata.get("approval_actions") or ())
-        if str(action)
+        str(action) for action in (metadata.get("approval_actions") or ()) if str(action)
     }
     if approval_actions:
         action = str((arguments or {}).get("action") or "")
