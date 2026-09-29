@@ -114,8 +114,6 @@ def set_financing_plan(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     psk_percent = _decimal(data.get("psk_percent"), "psk_percent", nullable=True)
     term_months = _optional_int(data.get("term_months"), "term_months")
 
-    if equipment_price is None:
-        raise ValueError("equipment_price is required")
     if total_repayment is not None and total_repayment < credit_principal:
         raise ValueError("credit_total_repayment must be >= credit_principal")
     if monthly_payment is not None and term_months is None:
@@ -124,8 +122,6 @@ def set_financing_plan(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("monthly_payment is required when term_months is set")
 
     currency = str(data.get("currency") or "RUB").strip().upper()
-    if not currency:
-        raise ValueError("currency is required")
 
     now = datetime.utcnow().isoformat()
     started_at = str(data.get("started_at") or now).strip() or now
