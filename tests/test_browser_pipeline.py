@@ -152,8 +152,7 @@ def test_policy_can_ignore_truncation():
                     "success": True,
                     "data": {
                         "nodes": [
-                            {"id": str(i), "role": "button", "name": "x" * 100}
-                            for i in range(10)
+                            {"id": str(i), "role": "button", "name": "x" * 100} for i in range(10)
                         ]
                     },
                 }
@@ -212,9 +211,7 @@ def test_diff_from_builds_compact_state_change():
 def test_missing_diff_source_escalates_strong():
     dag = BrowserRoleDag(
         [task("after", diff_from="missing")],
-        semantic_worker(
-            {"after": {"success": True, "data": {"facts": {"stock": True}}}}
-        ),
+        semantic_worker({"after": {"success": True, "data": {"facts": {"stock": True}}}}),
     )
 
     synthesis = synthesize_browser_dag(dag, dag.run())
@@ -222,9 +219,7 @@ def test_missing_diff_source_escalates_strong():
     assert synthesis.diffs == {}
     assert synthesis.escalation.required is True
     assert synthesis.escalation.suggested_tier == "strong"
-    assert synthesis.escalation.reasons == (
-        "missing_diff_sources:after<-missing",
-    )
+    assert synthesis.escalation.reasons == ("missing_diff_sources:after<-missing",)
 
 
 def test_failed_task_escalates_strong():
