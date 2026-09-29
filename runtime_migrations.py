@@ -17,12 +17,18 @@ def init_runtime_tables() -> None:
                 completed_at INTEGER
             )
         """)
-        # Existing installations created before completed_at need the additive migration.
-        try:
-            conn.execute("ALTER TABLE sessions ADD COLUMN completed_at INTEGER")
-        except OperationalError as exc:
-            if "duplicate column name" not in str(exc).lower():
-                raise
+        # Existing installations created before completed_at need the additive
+        # migration. Introspect first so PostgreSQL does not take an
+        # AccessExclusiveLock on every request that calls init_runtime_tables().
+        session_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
+        }
+        if "completed_at" not in session_columns:
+            try:
+                conn.execute("ALTER TABLE sessions ADD COLUMN completed_at INTEGER")
+            except OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         conn.execute("""
             CREATE TABLE IF NOT EXISTS invocations (
                 id TEXT PRIMARY KEY,
@@ -41,12 +47,20 @@ def init_runtime_tables() -> None:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
         """)
-        # Existing installations created before trace persistence need the additive migration.
-        try:
-            conn.execute("ALTER TABLE invocations ADD COLUMN trace_json TEXT NOT NULL DEFAULT '{}'")
-        except OperationalError as exc:
-            if "duplicate column name" not in str(exc).lower():
-                raise
+        # Existing installations created before trace persistence need the
+        # additive migration. Avoid unconditional ALTER on PostgreSQL: even
+        # ADD COLUMN IF NOT EXISTS takes a strong table lock.
+        invocation_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(invocations)").fetchall()
+        }
+        if "trace_json" not in invocation_columns:
+            try:
+                conn.execute(
+                    "ALTER TABLE invocations ADD COLUMN trace_json TEXT NOT NULL DEFAULT '{}'"
+                )
+            except OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_invocations_session ON invocations(session_id)"
         )
