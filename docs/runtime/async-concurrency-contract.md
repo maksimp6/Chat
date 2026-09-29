@@ -29,9 +29,15 @@ Concurrent tasks must preserve independent:
 - session ownership;
 - bound `ExecutionTrace` context.
 
-Crossing an `await` or `asyncio.to_thread` boundary must not leak another
-invocation's context. Persisted traces must keep the same identifiers that were
-active when the invocation was created.
+Crossing an `await` boundary must not leak another invocation's bound trace
+context. The current regression suite proves event-loop task isolation and proves
+persisted trace correlation when work is delegated with `asyncio.to_thread(...)`
+and the trace is passed explicitly.
+
+The suite does not currently prove implicit `ContextVar` propagation by reading
+`get_current_trace()` inside the worker thread. Code that depends on worker-side
+bound context needs a focused regression test before that behavior is treated as a
+runtime guarantee.
 
 Process-global mutable state is not a substitute for request/runtime context.
 
@@ -44,26 +50,36 @@ stopped. Code must distinguish:
 2. cancellation of the domain operation;
 3. physical termination of a running thread or provider operation.
 
-For invocation lifecycle state, cancellation is explicit and fail-closed:
-a cancelled invocation must remain cancelled, and a worker that finishes later
-must not overwrite it with `completed`.
+For invocation lifecycle state, cancellation is explicit. The current regression
+suite proves that cancelling one asyncio waiter does not corrupt a sibling
+invocation and that an already-cancelled invocation rejects the worker's later
+duplicate cancellation transition.
+
+The suite does not yet exercise a late worker calling `finish_invocation()` after
+external cancellation. Do not treat protection against a late
+`cancelled -> completed` transition as test-proven until that focused regression
+exists.
 
 Sibling invocations/tasks must remain independent. Cancelling one waiter must not
 corrupt another invocation, session, trace, quota bucket, or budget account.
 
 ## Timeout semantics
 
-`AgentGateway` timeout means the gateway has stopped waiting for the handler and
-returns an error result. A timed-out worker may still be running until its thread
-finishes or is otherwise released.
+`AgentGateway` can observe a handler timeout while that handler's worker thread is
+still running. The current implementation performs the call inside a
+`ThreadPoolExecutor` context; leaving that context waits for the running worker.
+Consequently the same `invoke()` call does not return its final error result until
+that worker finishes or is released. The timeout is therefore not a hard
+caller-visible deadline.
 
-Required behavior:
+Required behavior proven by the current regression:
 
-- timeout result is `error`, never a false `completed`;
-- sibling agent calls remain able to complete while the timed-out worker is still
-  alive;
+- once the slow invocation can return, its result is `error`, never a false
+  `completed`;
+- an independent sibling gateway call can complete after the slow timeout has been
+  observed and before the slow worker is released;
 - timeout accounting is based on observed timeout behavior, not arbitrary sleeps;
-- tests must synchronize on the timeout transition when proving ordering.
+- tests synchronize on the timeout transition when proving ordering.
 
 Native cancellation of running Python threads is not part of the contract.
 
@@ -98,10 +114,14 @@ SQLite database when `ALICE_DATABASE_URL` is active.
 
 ## Task cleanup
 
-Async harnesses must leave no owned pending asyncio tasks after completion.
-A test that merely `gather()`s tasks and then asserts those same task objects are
-done is insufficient; the suite compares task sets before and after the operation
-to detect newly leaked pending tasks.
+The async test harness includes a baseline cleanup check that snapshots the
+event-loop task set before and after harness-owned short-lived tasks complete. This
+guards against leaking tasks created by that harness pattern.
+
+The current check does not wrap representative runtime work such as invocation,
+cancellation, or gateway timeout flows, so it is not evidence that the production
+runtime cannot leak asyncio tasks. Runtime-wide leak claims require a focused
+before/after regression around real runtime operations.
 
 Thread cleanup is a separate concern from asyncio task cleanup.
 
@@ -150,10 +170,10 @@ document, then add focused tests for the new cancellation and cleanup behavior.
 
 The current regression surface includes:
 
-- concurrent invocation/context/trace isolation;
+- concurrent invocation/trace persistence isolation across event-loop tasks;
 - cancellation without sibling corruption;
-- AgentGateway timeout isolation;
-- leaked asyncio task detection;
+- AgentGateway timeout observation plus sibling isolation;
+- baseline async harness task cleanup;
 - budget reservation contention and mutation-control;
 - provider quota reservation atomicity;
 - SQLite and PostgreSQL CI execution.
