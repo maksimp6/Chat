@@ -21,6 +21,7 @@
 - [Бэкенд](backend/overview.md) — архитектура серверной части
 - [База данных](database/overview.md) — модели данных и схема БД
 - [Безопасность](security/overview.md) — меры защиты и безопасность системы
+- [Cloud.ru Secret Management](security/cloudru-secret-management.md) — адаптер и границы прав для секретов Alice Pro
 - [Журнал изменений](changelog.md) — история релизов и изменений
 - [Синхронизация с bare-репозиторием](bare_sync.md) — процесс зеркалирования изменений в `local_bare`
 - [Работа с памятью](memory/overview.md) — управление данными в оперативной памяти

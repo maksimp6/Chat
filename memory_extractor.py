@@ -1,5 +1,4 @@
 import json
-import sqlite3
 import requests
 import os
 from db import get_conn, DB_PATH

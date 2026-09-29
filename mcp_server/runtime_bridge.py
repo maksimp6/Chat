@@ -12,6 +12,7 @@ from invocation.manager import (
     start_invocation,
 )
 from invocation.trace import create_invocation_trace
+from trace_manager import bind_current_trace, reset_current_trace
 from runtime import (
     RuntimeDispatcher,
     RuntimeNotFound,
@@ -109,6 +110,7 @@ def _handle_call(
         metadata={"source": "chatgpt_mcp", "runtime_id": runtime_id},
     )
 
+    trace_token = bind_current_trace(trace)
     try:
         if runtime_id:
             result = mcp_runtime_dispatcher.dispatch(
@@ -190,3 +192,5 @@ def _handle_call(
         persist_invocation_trace(context.invocation_id, trace_data)
         fail_invocation(context.invocation_id, error={"tool": name, "error": str(exc)})
         raise
+    finally:
+        reset_current_trace(trace_token)

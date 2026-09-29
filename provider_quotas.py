@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from db import get_conn
-from db_backend import is_postgres_configured
+from db_backend import is_postgres_connection
 
 
 DEFAULT_POLICY = "default"
@@ -96,7 +96,7 @@ def _env_int(name: str, default: int, minimum: int = 0) -> int:
 
 
 def _begin_transaction(conn) -> None:
-    conn.execute("BEGIN IMMEDIATE" if not is_postgres_configured() else "BEGIN")
+    conn.execute("BEGIN" if is_postgres_connection(conn) else "BEGIN IMMEDIATE")
 
 
 def _default_policy_values() -> tuple[int, int, int]:
@@ -309,7 +309,7 @@ def reserve_request(
         _begin_transaction(conn)
         select_sql = (
             "SELECT * FROM provider_quota_usage WHERE user_id = ? FOR UPDATE"
-            if is_postgres_configured()
+            if is_postgres_connection(conn)
             else "SELECT * FROM provider_quota_usage WHERE user_id = ?"
         )
         usage = conn.execute(select_sql, (trusted_user_id,)).fetchone()

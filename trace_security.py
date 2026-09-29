@@ -15,6 +15,8 @@ SENSITIVE_KEYS: Set[str] = {
     "password",
     "passwd",
     "secret",
+    "credential",
+    "credentials",
     "token",
     "access_token",
     "refresh_token",
