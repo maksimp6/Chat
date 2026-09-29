@@ -175,6 +175,7 @@ def test_changed_ci_reuses_only_slices_independent_of_ci():
     result = cache.lookup(packet.scope, _evidence(ci="ci-2"))
 
     assert result.status == "partial"
+    assert result.packet is None
     assert result.stale_components == ("ci",)
     assert [item.name for item in result.reusable_slices] == [
         "code",
@@ -230,6 +231,7 @@ def test_all_slice_dependencies_stale_becomes_miss():
     result = cache.lookup(packet.scope, _evidence(ci="ci-2", review="review-2"))
 
     assert result.status == "miss"
+    assert result.packet is None
     assert result.stale_components == ("ci", "review")
     assert result.reusable_slices == ()
 
