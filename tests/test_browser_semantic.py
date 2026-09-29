@@ -270,3 +270,57 @@ def test_mapping_contracts_are_compact_and_stable():
 def test_validation(call, message):
     with pytest.raises((TypeError, ValueError), match=message):
         call()
+
+
+
+def test_semantic_edge_normalization_and_mapping_contracts():
+    empty = SemanticNode.from_mapping(
+        {"id": "empty", "role": "generic", "name": "   ", "states": "focusable"},
+        index=0,
+    )
+    assert empty.name is None
+    assert empty.states == ("focusable",)
+
+    long = SemanticNode.from_mapping(
+        {"id": "long", "role": "generic", "name": "x" * 300},
+        index=1,
+    )
+    assert long.name is not None
+    assert len(long.name) == 240
+    assert long.name.endswith("…")
+
+    snapshot = build_semantic_snapshot(
+        {
+            "version": "v1",
+            "nodes": [
+                "ignore-me",
+                {"id": "real", "role": "button", "name": "Real"},
+            ],
+        }
+    )
+    assert [node.node_id for node in snapshot.nodes] == ["real"]
+
+    after = build_semantic_snapshot(
+        {
+            "version": "v2",
+            "nodes": [{"id": "real", "role": "button", "name": "Updated"}],
+            "facts": {"price": 10},
+        }
+    )
+    diff = diff_semantic_snapshots(snapshot, after)
+    mapped_diff = diff.to_mapping()
+    assert mapped_diff["from_version"] == "v1"
+    assert mapped_diff["to_version"] == "v2"
+    assert mapped_diff["changed_nodes"][0]["name"] == "Updated"
+
+    merged = merge_evidence(
+        [
+            Evidence("stock", True, "shop-a", 1.0),
+            Evidence("price", 10, "shop-a", 0.8),
+            Evidence("price", 11, "shop-b", 0.9),
+        ]
+    )
+    mapped_merged = merged.to_mapping()
+    assert mapped_merged["facts"] == {"stock": True}
+    assert mapped_merged["sources"] == {"stock": ["shop-a"]}
+    assert [item["value"] for item in mapped_merged["conflicts"]["price"]] == [11, 10]
