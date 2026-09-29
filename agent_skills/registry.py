@@ -9,7 +9,7 @@ import re
 from typing import Iterable, Optional
 
 
-DEFAULT_SKILL_ROOT = Path(__file__).resolve().parent / ".agents" / "skills"
+DEFAULT_SKILL_ROOT = Path(__file__).resolve().parents[1] / ".agents" / "skills"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 MAX_SELECTED_SKILLS = 4
 MAX_SKILL_BYTES = 64 * 1024

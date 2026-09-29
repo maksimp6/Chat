@@ -151,6 +151,15 @@ TRACE_CONTEXT = _object(
     },
 )
 
+TRACE_SKILL = _object(
+    {
+        "name": NONEMPTY_STRING,
+        "source": NONEMPTY_STRING,
+        "version": NONEMPTY_STRING,
+    },
+    optional={"role": NONEMPTY_STRING},
+)
+
 TRACE = _object(
     {
         "trace_id": NONEMPTY_STRING,
@@ -168,6 +177,7 @@ TRACE = _object(
         "billing": JSON_OBJECT,
         "provider_key": NULLABLE_JSON,
         "provider_keys": _list(ANY_JSON),
+        "skills": _list(TRACE_SKILL),
     },
 )
 

@@ -32,7 +32,7 @@ from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_quotas import ProviderQuotaExceeded
-from skill_registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
+from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
 from universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,

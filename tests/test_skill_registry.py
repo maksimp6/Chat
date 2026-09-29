@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from skill_registry import (
+from agent_skills.registry import (
     SkillFormatError,
     SkillPolicyError,
     SkillRegistry,

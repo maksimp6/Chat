@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from skill_registry import SkillRegistry
+from agent_skills.registry import SkillRegistry
 
 
 def main() -> int:
