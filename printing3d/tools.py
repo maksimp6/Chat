@@ -50,8 +50,7 @@ PRINTING3D_TOOLS = {
     "printing3d.treasury.summary": {
         "title": "3D Printing Treasury Summary",
         "description": (
-            "Получить фактическую выручку, расходы и прибыль 3D-печати "
-            "для текущего пользователя."
+            "Получить фактическую выручку, расходы и прибыль 3D-печати для текущего пользователя."
         ),
         "parameters": _tool_schema({}, []),
         "capabilities": ["3d", "treasury", "read"],
