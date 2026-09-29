@@ -193,9 +193,18 @@ def healthz():
 
 @app.route("/api/users/bootstrap", methods=["POST"])
 def bootstrap_anonymous_user():
-    data = request.get_json(silent=True) or {}
-    metadata = data.get("metadata") or {}
-    if not isinstance(metadata, dict):
+    payload = request.get_json(silent=True)
+    if payload is None:
+        data = {}
+    elif not isinstance(payload, dict):
+        return jsonify({"error": "request body must be an object"}), 400
+    else:
+        data = payload
+
+    metadata = data.get("metadata")
+    if metadata is None:
+        metadata = {}
+    elif not isinstance(metadata, dict):
         return jsonify({"error": "metadata must be an object"}), 400
 
     try:
