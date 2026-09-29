@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from postgres_test_guard import require_disposable_postgres_target
+from tests.postgres_test_guard import require_disposable_postgres_target
 
 
 _SQLITE_ONLY_MODULES = {
