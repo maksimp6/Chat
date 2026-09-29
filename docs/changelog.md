@@ -42,6 +42,15 @@
   [#523](https://github.com/maksimp6/Chat/pull/523).
   Snapshot не синхронизирует ветку, не заменяет strict up-to-date branch protection и не является самостоятельным required merge gate.
 
+### Developer tooling
+
+- Добавлен deterministic read-only hot-file analyzer с прозрачным score по touches/churn/churn-LOC/authors/recency и JSON/Markdown CI report без автоматического refactor и без отдельного blocking gate:
+  [#534](https://github.com/maksimp6/Chat/pull/534).
+- Добавлен первый deterministic Python-only AST index slice: tracked Python files, symbols/imports/syntactic calls и эвристический reverse test map. Semantic resolution, JS/TS, incremental cache, query tool и автоматическая agent integration остаются roadmap:
+  [#540](https://github.com/maksimp6/Chat/pull/540).
+- Добавлен optional pre-commit hook, который использует только canonical `bash scripts/format.sh check`, не запускает полный pytest и не заменяет authoritative CI:
+  [#542](https://github.com/maksimp6/Chat/pull/542).
+
 ### Async/runtime validation
 
 - Добавлен `pytest-asyncio` harness для параллельных invocation/trace contexts, cancellation и leaked-task checks:

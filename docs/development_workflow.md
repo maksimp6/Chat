@@ -156,6 +156,36 @@ bash scripts/install_git_hooks.sh
 
 Hook выполняет только `bash scripts/format.sh check`. Если форматирование не проходит, он блокирует commit и показывает команду `bash scripts/format.sh write`. Существующий чужой `.git/hooks/pre-commit` installer не перезаписывает без явного `--force`. Полный pytest из hook не запускается; CI остаётся authoritative.
 
+### Hot-file modularity report
+
+Для поиска файлов с высокой исторической стоимостью изменений используется read-only анализатор:
+
+```bash
+python scripts/hot_file_metrics.py \
+  --commits 200 \
+  --top 20 \
+  --json-out hot-file-metrics.json \
+  --markdown-out hot-file-metrics.md
+```
+
+Команда читает Git history, поэтому для воспроизводимого результата нужна доступная история репозитория. В CI Application job делает checkout с `fetch-depth: 0`, запускает тот же анализ на окне 200 commits, печатает Markdown в log и GitHub Step Summary, а `hot-file-metrics.json` и `hot-file-metrics.md` входят в существующий artifact `coverage-<run_number>`.
+
+Score прозрачно комбинирует touches, churn, churn/LOC, число authors и recency. Результат классифицируется как `split_candidate`, `extract_shared_logic` или `watch`. Это **сигнал для архитектурного review**, а не merge gate и не команда на автоматический refactor. Текущие exclusions заданы в коде анализатора и пока не настраиваются отдельными CLI allow/deny rules.
+
+### Python AST repository map
+
+Первый deterministic AI-index slice строится вручную:
+
+```bash
+python scripts/build_ai_index.py \
+  --root . \
+  --output ai-index.json
+```
+
+Без `--output` JSON печатается в stdout; `--compact` меняет только форматирование. В Git working tree индексируются только tracked `*.py` через `git ls-files`. Для каждого файла сохраняются path/module, SHA-256, test flag, symbols с line/end_line, imports и синтаксические call names; также формируются summary и эвристический `tests_by_module`.
+
+Индекс не хранит исходный текст, env values или secrets и не содержит timestamps, поэтому при одинаковом дереве результат детерминирован. Граница текущего slice намеренно узкая: только Python AST. Call names не являются resolved cross-module call graph, `tests_by_module` не доказывает фактическое coverage, а JS/TS index, semantic resolution, routes/docs/issues/PR links, incremental cache, query API/tool и автоматическая agent integration пока не реализованы. #540 не добавляет отдельный CI artifact и не делает индекс обязательным gate.
+
 Минимальный backend-набор:
 
 ```bash
