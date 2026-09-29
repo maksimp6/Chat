@@ -20,6 +20,8 @@ def _commit(repo: Path, message: str, author_name: str, author_email: str) -> No
             f"user.name={author_name}",
             "-c",
             f"user.email={author_email}",
+            "-c",
+            "commit.gpgsign=false",
             "commit",
             "-m",
             message,
@@ -119,3 +121,57 @@ def test_large_hot_file_is_split_candidate(tmp_path):
     assert row["loc"] >= 300
     assert row["candidate_kind"] == "split_candidate"
     assert "`large.py`" in render_markdown(report, top=5)
+
+
+def test_hot_file_metric_preserves_history_across_rename(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+
+    old = repo / "old_name.py"
+    old.write_text("\n".join(f"value_{i} = {i}" for i in range(320)) + "\n", encoding="utf-8")
+    _commit(repo, "initial old file", "Alice", "alice@example.test")
+
+    for index in range(3):
+        with old.open("a", encoding="utf-8") as handle:
+            handle.write(f"before_rename_{index} = {index}\n")
+        _commit(repo, f"touch old {index}", "Alice", "alice@example.test")
+
+    _git(repo, "mv", "old_name.py", "new_name.py")
+    _commit(repo, "rename hot file", "Codex", "codex@example.test")
+
+    report = analyze_repository(repo, commits=20)
+
+    paths = {row["path"] for row in report["files"]}
+    assert "old_name.py" not in paths
+    row = next(item for item in report["files"] if item["path"] == "new_name.py")
+    assert row["touches"] >= 5
+    assert row["candidate_kind"] == "split_candidate"
+
+
+def test_android_test_sources_are_excluded(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+
+    production = repo / "android" / "app" / "src" / "main" / "java"
+    unit_tests = repo / "android" / "app" / "src" / "test" / "java"
+    android_tests = repo / "android" / "app" / "src" / "androidTest" / "java"
+    production.mkdir(parents=True)
+    unit_tests.mkdir(parents=True)
+    android_tests.mkdir(parents=True)
+
+    (production / "Main.kt").write_text("class Main\n", encoding="utf-8")
+    (unit_tests / "MainTest.kt").write_text("class MainTest\n", encoding="utf-8")
+    (android_tests / "MainInstrumentedTest.kt").write_text(
+        "class MainInstrumentedTest\n",
+        encoding="utf-8",
+    )
+    _commit(repo, "android sources", "Alice", "alice@example.test")
+
+    report = analyze_repository(repo, commits=5)
+    paths = {row["path"] for row in report["files"]}
+
+    assert "android/app/src/main/java/Main.kt" in paths
+    assert "android/app/src/test/java/MainTest.kt" not in paths
+    assert "android/app/src/androidTest/java/MainInstrumentedTest.kt" not in paths
