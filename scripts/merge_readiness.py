@@ -216,7 +216,9 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _collection_error_result(repo: str, pr_number: int, base_ref: str, exc: Exception) -> dict[str, Any]:
+def _collection_error_result(
+    repo: str, pr_number: int, base_ref: str, exc: Exception
+) -> dict[str, Any]:
     return {
         "ready": False,
         "repo": repo,
