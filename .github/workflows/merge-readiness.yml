@@ -20,7 +20,9 @@ concurrency:
 jobs:
   readiness:
     name: Merge readiness
-    if: github.event.pull_request.base.ref == 'master'
+    if: >-
+      github.event.pull_request.base.ref == 'master' &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -73,7 +75,7 @@ jobs:
           with open(path, encoding="utf-8") as handle:
               result = json.load(handle)
 
-          retryable = {"check_pending", "required_check_missing"}
+          retryable = {"check_pending", "required_check_missing", "review_threads"}
           blockers = result.get("blockers", [])
           codes = {str(item.get("code") or "") for item in blockers}
           if blockers and codes <= retryable:
