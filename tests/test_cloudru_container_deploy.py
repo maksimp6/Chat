@@ -204,7 +204,8 @@ def test_deploy_patches_existing_service_with_new_image():
 
     assert result["action"] == "update"
     _, method, path, params, body = client.calls[2]
-    assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", {"projectId": "p1"})
+    assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", None)
+    assert body["projectId"] == "p1"
     assert body["template"]["containers"][0]["image"] == "new@sha"
     assert body["template"]["scaling"]["minInstanceCount"] == 0
     assert "status" not in body and "id" not in body
