@@ -46,16 +46,20 @@ owner (@maksimp6) does not merge by hand.
 - Draft pull requests are not merged; the author marks them ready first.
   Alice always opens drafts, so the maintainer marks an Alice draft ready once
   its CI is green, then reviews it like any other pull request.
-- Every ready pull request gets a GitHub Copilot code review. Claude requests it
-  when it was not requested automatically, waits for it, and fixes or answers
-  each Copilot comment before merging. If the code changed materially after
-  that review, Claude requests one more Copilot review on the final head;
-  typo and formatting fixes do not need one.
-- Every ready pull request also gets a test check from `@codex`. Claude
-  comments `@codex review` (one agent per comment) when Codex has not reviewed
-  the pull request yet, and adds or answers each test Codex proposes. If Codex
-  has not responded by the next hourly maintainer pass, Claude merges without
-  it.
+- Keep a pull request in working/draft state while implementation and CI are
+  still changing. Do not request Codex or Copilot review during this phase.
+- A pull request enters its single final review cycle only when the current head
+  has passed required CI and there are no open review threads from earlier work.
+  At that point mark it ready for review.
+- Request GitHub Copilot review once for that ready-to-merge head. Fix or answer
+  every Copilot comment and resolve each thread before merging.
+- Request `@codex review` once in the same final review cycle. Add or answer
+  every regression test Codex proposes. If Codex has not responded by the next
+  hourly maintainer pass, Claude may continue once CI and other review gates are
+  satisfied.
+- Do not request another Codex or Copilot review after feedback fixes. The final
+  corrected head is validated by required CI plus resolved review threads. A
+  repeated review is allowed only when the owner explicitly asks for it.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
@@ -73,6 +77,18 @@ owner (@maksimp6) does not merge by hand.
 - A preview runtime must never access another runtime's resources directly. Preserve the caller `runtime_id` and fail cross-runtime access with `RuntimeScopeViolation`.
 - Python threads are execution units, not isolation boundaries. Do not use process-global mutable runtime state as a substitute for `RuntimeContext` or dispatcher-owned scoped resources.
 - When delegating runtime/preview work to an AI agent, apply `docs/agents/runtime-dispatcher-contract.md` and keep `docs/runtime/runtime-dispatcher-policy.md` authoritative.
+
+## Formatter policy
+
+The only formatter entrypoints are:
+
+`bash scripts/format.sh write`
+`bash scripts/format.sh check`
+
+All local, agent, and CI formatting must use those commands. Ruff is pinned by
+`requirements-dev.txt`; Prettier is pinned by `package.json`. Workflows must
+not install a floating/latest formatter version or maintain a second formatter
+version in shell environment variables.
 
 ## Validation
 
