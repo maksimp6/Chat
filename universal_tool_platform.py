@@ -207,6 +207,31 @@ def validate_json_schema(value: Any, schema: Mapping[str, Any], path: str = "$")
     return errors
 
 
+def tool_call_requires_approval(
+    definition_or_cfg: UniversalToolDefinition | Mapping[str, Any],
+    arguments: Mapping[str, Any] | None = None,
+) -> bool:
+    """Return whether this concrete tool call crosses an approval boundary."""
+    if isinstance(definition_or_cfg, UniversalToolDefinition):
+        requires_approval = definition_or_cfg.requires_approval
+        metadata = dict(definition_or_cfg.metadata or {})
+    else:
+        requires_approval = bool(definition_or_cfg.get("requires_approval", True))
+        metadata = dict(definition_or_cfg.get("metadata") or {})
+
+    approval_actions = {
+        str(action)
+        for action in (metadata.get("approval_actions") or ())
+        if str(action)
+    }
+    if approval_actions:
+        action = str((arguments or {}).get("action") or "")
+        if action in approval_actions:
+            return True
+
+    return requires_approval
+
+
 class UniversalToolExecutor:
     """Run every provider's tool call through one validation/policy boundary."""
 
@@ -284,7 +309,7 @@ class UniversalToolExecutor:
                 metadata={**base_meta, "phase": "authorization"},
             ).to_mapping()
 
-        if definition.requires_approval and not call.approved:
+        if tool_call_requires_approval(definition, call.arguments) and not call.approved:
             try:
                 approved = approval(definition, call) if approval is not None else False
             except Exception as exc:
@@ -492,5 +517,6 @@ __all__ = [
     "UniversalToolDefinition",
     "UniversalToolExecutor",
     "UniversalToolResult",
+    "tool_call_requires_approval",
     "validate_json_schema",
 ]
