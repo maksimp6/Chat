@@ -62,9 +62,11 @@ def test_hot_file_metric_ranks_repeated_source_churn_above_single_touch(tmp_path
     assert hot["touches"] == 5
     assert hot["authors"] == 2
     assert hot["score"] > stable["score"]
+    assert hot["candidate_kind"] == "extract_shared_logic"
     assert all(not row["path"].startswith("tests/") for row in report["files"])
 
     markdown = render_markdown(report, top=1)
+    assert "Small hot files / shared-logic candidates" in markdown
     assert "`hot.py`" in markdown
     assert "`stable.py`" not in markdown
 
@@ -96,3 +98,24 @@ def test_ci_publishes_hot_file_metrics():
     assert 'cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"' in workflow
     assert "hot-file-metrics.json" in workflow
     assert "hot-file-metrics.md" in workflow
+
+
+def test_large_hot_file_is_split_candidate(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    large = repo / "large.py"
+    large.write_text("\n".join(f"value_{i} = {i}" for i in range(350)) + "\n", encoding="utf-8")
+    _commit(repo, "initial", "Alice", "alice@example.test")
+
+    for index in range(3):
+        with large.open("a", encoding="utf-8") as handle:
+            handle.write(f"extra_{index} = {index}\n")
+        _commit(repo, f"touch large {index}", "Codex", "codex@example.test")
+
+    report = analyze_repository(repo, commits=10)
+    row = next(item for item in report["files"] if item["path"] == "large.py")
+
+    assert row["loc"] >= 300
+    assert row["candidate_kind"] == "split_candidate"
+    assert "`large.py`" in render_markdown(report, top=5)
