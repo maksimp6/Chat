@@ -350,20 +350,6 @@ class BrowserRoleDag:
                         running_tasks[task.task_id] = task
                         available_slots -= 1
 
-                if not running:
-                    if pending:
-                        for task_id in sorted(pending):
-                            task = self._task_map[task_id]
-                            results[task_id] = BrowserTaskResult(
-                                task_id,
-                                "blocked",
-                                task.role,
-                                task.session_id,
-                                error="scheduler could not make progress",
-                            )
-                        pending.clear()
-                    break
-
                 done, _ = wait(tuple(running), return_when=FIRST_COMPLETED)
                 for future in done:
                     task = running.pop(future)
@@ -399,14 +385,7 @@ class BrowserRoleDag:
 
         duration = max(0.0, self.clock() - started)
         statuses = {result.status for result in results.values()}
-        if not results:
-            status = "succeeded"
-        elif statuses == {"succeeded"}:
-            status = "succeeded"
-        elif "failed" in statuses:
-            status = "failed"
-        else:
-            status = "blocked"
+        status = "failed" if "failed" in statuses else "succeeded"
 
         return BrowserDagResult(
             status=status,
