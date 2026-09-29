@@ -6,8 +6,8 @@ from typing import Any, Mapping, Optional
 
 from treasury_identity import get_current_owner_id
 
-from .finance import calculate_financing_plan
-from .service import ORDER_STATUSES, get_financial_summary, list_orders
+from .finance import assess_financing_plan
+from .service import ORDER_STATUSES, get_financial_summary, get_recent_profit, list_orders
 
 
 def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
@@ -38,12 +38,15 @@ def orders_list(
     return {"orders": list_orders(owner_id, status=status)}
 
 
-def finance_calculate(
+def finance_assess(
     arguments: Mapping[str, Any],
-    _cfg: Optional[dict[str, Any]] = None,
+    cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """Calculate credit burden and payback from explicit user-supplied terms."""
-    return calculate_financing_plan(arguments)
+    """Assess sparse AI-collected credit terms using realized 3D profit when needed."""
+    owner_id = _trusted_owner(cfg)
+    currency = str(arguments.get("currency") or "RUB")
+    observed_profit = get_recent_profit(owner_id, currency=currency, days=30)
+    return assess_financing_plan(arguments, observed_monthly_profit=observed_profit)
 
 
 def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -56,31 +59,47 @@ def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, A
 
 
 PRINTING3D_TOOLS = {
-    "printing3d.finance.calculate": {
-        "title": "3D Printing Financing Calculator",
+    "printing3d.finance.assess": {
+        "title": "3D Printing Financing Assessment",
         "description": (
-            "Рассчитать нагрузку кредита и окупаемость 3D-принтера по явным условиям "
-            "покупки без выбора банка или кредитора."
+            "AI-first оценка кредита и окупаемости 3D-принтера. Перед вызовом модель "
+            "использует уже известные условия из диалога и доступных инструментов, "
+            "не просит пользователя повторно вводить известные цифры и передаёт null "
+            "для неизвестных значений. Инструмент сам учитывает фактическую прибыль "
+            "3D-направления за последние 30 дней и возвращает missing_fields, если "
+            "каких-то условий кредита ещё не хватает."
         ),
         "parameters": _tool_schema(
             {
-                "equipment_price": {"type": "number", "minimum": 0},
-                "startup_costs": {"type": "number", "minimum": 0},
-                "financed_principal": {"type": "number", "minimum": 0},
-                "monthly_payment": {"type": "number", "minimum": 0},
-                "term_months": {"type": "integer", "minimum": 0},
-                "planned_monthly_profit": {"type": "number", "minimum": 0},
-                "target_payment_coverage": {
+                "purchase_mode": {
                     "anyOf": [
-                        {"type": "number", "minimum": 1},
+                        {"type": "string", "enum": ["credit", "cash"]},
                         {"type": "null"},
                     ]
                 },
+                "equipment_price": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "startup_costs": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "financed_principal": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "monthly_payment": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "term_months": {
+                    "anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]
+                },
+                "planned_monthly_profit": {
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
+                },
+                "target_payment_coverage": {
+                    "anyOf": [{"type": "number", "minimum": 1}, {"type": "null"}]
+                },
                 "psk_percent": {
-                    "anyOf": [
-                        {"type": "number", "minimum": 0},
-                        {"type": "null"},
-                    ]
+                    "anyOf": [{"type": "number", "minimum": 0}, {"type": "null"}]
                 },
                 "currency": {
                     "anyOf": [
@@ -89,14 +108,7 @@ PRINTING3D_TOOLS = {
                     ]
                 },
             },
-            [
-                "equipment_price",
-                "startup_costs",
-                "financed_principal",
-                "monthly_payment",
-                "term_months",
-                "planned_monthly_profit",
-            ],
+            [],
         ),
         "capabilities": ["3d", "treasury", "finance", "read"],
         "risk_level": "low",
@@ -104,7 +116,7 @@ PRINTING3D_TOOLS = {
         "requires_approval": False,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": finance_calculate,
+        "func": finance_assess,
     },
     "printing3d.treasury.summary": {
         "title": "3D Printing Treasury Summary",
