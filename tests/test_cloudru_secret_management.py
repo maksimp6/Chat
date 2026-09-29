@@ -6,6 +6,7 @@ import requests
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.secret_management import CloudRuSecretManagementClient
+from cloudru_iam import CloudRuIamError
 from trace_manager import ExecutionTrace
 
 
@@ -224,3 +225,85 @@ def test_get_version_status_reports_disabled_without_leaking_value(monkeypatch):
         with pytest.raises(CloudProviderError) as exc:
             client.get_version_status("secret-1", "missing")
     assert exc.value.code == "not_found"
+
+
+def test_explicit_iam_client_is_used_without_env_lookup(monkeypatch):
+    monkeypatch.delenv("CLOUDRU_SECRET_MANAGEMENT_KEY_ID", raising=False)
+    monkeypatch.delenv("CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET", raising=False)
+    iam = Mock(key_id="explicit-id", key_secret="explicit-secret")
+    client = CloudRuSecretManagementClient(iam_client=iam)
+    assert client.iam_client is iam
+
+
+def test_invalidate_cache_can_clear_one_secret_or_all(monkeypatch):
+    client = _client(monkeypatch)
+    client._value_cache = {
+        ("secret-1", "v1"): (1.0, "one"),
+        ("secret-1", "v2"): (1.0, "two"),
+        ("secret-2", "v1"): (1.0, "other"),
+    }
+
+    client.invalidate_cache("secret-1")
+    assert set(client._value_cache) == {("secret-2", "v1")}
+
+    client.invalidate_cache()
+    assert client._value_cache == {}
+
+
+@pytest.mark.parametrize(
+    "secret_id,version_id",
+    [("", "v1"), ("secret-1", ""), ("  ", "v1")],
+)
+def test_get_secret_value_rejects_missing_identifiers(monkeypatch, secret_id, version_id):
+    client = _client(monkeypatch)
+    with pytest.raises(ValueError, match="secret_id and version_id are required"):
+        client.get_secret_value(secret_id, version_id)
+
+
+def test_list_versions_validates_secret_id_and_payload(monkeypatch):
+    client = _client(monkeypatch)
+    with pytest.raises(ValueError, match="secret_id is required"):
+        client.list_versions(" ")
+
+    with patch.object(client._client, "request", return_value={"items": ["not-an-object"]}):
+        with pytest.raises(CloudProviderError) as exc:
+            client.list_versions("secret-1")
+    assert exc.value.code == "invalid_response"
+
+
+def test_version_status_accepts_alternate_metadata_names(monkeypatch):
+    client = _client(monkeypatch)
+    with patch.object(
+        client,
+        "list_versions",
+        return_value=[{"version_id": "v2", "state": "active"}, {"id": "v3"}],
+    ):
+        assert client.get_version_status("secret-1", "v2") == "active"
+        assert client.get_version_status("secret-1", "v3") == "unknown"
+
+
+def test_iam_token_failure_is_normalized(monkeypatch):
+    client = _client(monkeypatch)
+    with patch.object(client.iam_client, "_token", side_effect=CloudRuIamError("denied")):
+        with pytest.raises(CloudProviderError) as exc:
+            client.get_secret_value("secret-1", "v1")
+    assert exc.value.code == "auth_failed"
+
+
+def test_trace_helper_is_noop_without_trace():
+    CloudRuSecretManagementClient._trace_value_response(
+        None, secret_id="secret-1", started=0.0, status=200, success=True
+    )
+
+
+@pytest.mark.parametrize("payload", [None, ["not", "an", "object"]])
+def test_value_response_rejects_invalid_json_shapes(payload):
+    response = _ok_response({"value": "placeholder"})
+    if payload is None:
+        response.json.side_effect = ValueError("invalid json")
+    else:
+        response.json.return_value = payload
+
+    with pytest.raises(CloudProviderError) as exc:
+        CloudRuSecretManagementClient._parse_value_response(response, secret_id="secret-1")
+    assert exc.value.code == "invalid_response"
