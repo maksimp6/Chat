@@ -114,7 +114,14 @@ PRINTING3D_TOOLS = {
                     "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}]
                 },
             },
-            ["printer_model", "equipment_price", "setup_cost", "down_payment", "credit_principal", "currency"],
+            [
+                "printer_model",
+                "equipment_price",
+                "setup_cost",
+                "down_payment",
+                "credit_principal",
+                "currency",
+            ],
         ),
         "capabilities": ["3d", "treasury", "finance", "write"],
         "risk_level": "medium",
