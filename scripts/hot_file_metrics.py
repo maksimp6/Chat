@@ -141,7 +141,7 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
             loc = len(absolute.read_text(encoding="utf-8").splitlines())
         except UnicodeDecodeError:
             continue
-        churn_per_loc = history.churn / max(loc, 1)
+        churn_per_loc = history.churn / max(loc, 100)
         if commit_count <= 1 or history.newest_commit_index is None:
             recency = 1.0
         else:
@@ -187,6 +187,13 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
             + 0.10 * components["recency"]
         )
         row["score"] = round(score, 2)
+        if row["loc"] >= 300:
+            candidate_kind = "split_candidate"
+        elif row["touches"] >= 5:
+            candidate_kind = "extract_shared_logic"
+        else:
+            candidate_kind = "watch"
+        row["candidate_kind"] = candidate_kind
         row["score_components"] = {
             key: round(value, 4) for key, value in components.items()
         }
@@ -206,21 +213,13 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
     }
 
 
-def render_markdown(report: dict, *, top: int = 20) -> str:
-    rows = report["files"][: max(1, int(top))]
-    lines = [
-        "# Hot-file modularity report",
-        "",
-        (
-            f"History window: {report['commit_window']} commits; "
-            f"observed: {report['commits_observed']}."
-        ),
-        "",
-        "High churn is a review signal, not proof that a file must be split.",
-        "",
-        "| Rank | File | Score | Touches | Churn | LOC | Churn/LOC | Authors |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ]
+def _append_table(lines: list[str], rows: list[dict]) -> None:
+    lines.extend(
+        [
+            "| Rank | File | Score | Touches | Churn | LOC | Churn/LOC | Authors |",
+            "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for index, row in enumerate(rows, 1):
         lines.append(
             "| {rank} | `{path}` | {score:.2f} | {touches} | {churn} | "
@@ -235,6 +234,42 @@ def render_markdown(report: dict, *, top: int = 20) -> str:
                 authors=row["authors"],
             )
         )
+
+
+def render_markdown(report: dict, *, top: int = 20) -> str:
+    limit = max(1, int(top))
+    split_rows = [
+        row for row in report["files"] if row["candidate_kind"] == "split_candidate"
+    ][:limit]
+    shared_rows = [
+        row for row in report["files"] if row["candidate_kind"] == "extract_shared_logic"
+    ][: min(limit, 10)]
+
+    lines = [
+        "# Hot-file modularity report",
+        "",
+        (
+            f"History window: {report['commit_window']} commits; "
+            f"observed: {report['commits_observed']}."
+        ),
+        "",
+        "High churn is a review signal, not proof that a file must be split.",
+        "Churn/LOC uses a 100-line denominator floor so recently collapsed stubs do not dominate.",
+        "",
+        "## Module split candidates (current LOC >= 300)",
+        "",
+    ]
+    _append_table(lines, split_rows)
+    lines.extend(
+        [
+            "",
+            "## Small hot files / shared-logic candidates",
+            "",
+            "These files are too small to justify splitting by size; repeated touches may instead suggest shared logic, configuration extraction, or a forwarding stub.",
+            "",
+        ]
+    )
+    _append_table(lines, shared_rows)
     lines.extend(
         [
             "",
@@ -242,7 +277,7 @@ def render_markdown(report: dict, *, top: int = 20) -> str:
             "",
             "- touches: 30%",
             "- line churn: 30%",
-            "- churn / current LOC: 20%",
+            "- churn / current LOC (100-line floor): 20%",
             "- unique authors: 10%",
             "- recency: 10%",
             "",
