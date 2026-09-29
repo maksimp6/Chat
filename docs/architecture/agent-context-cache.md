@@ -52,10 +52,14 @@ repository
 
 Changing base/head or role creates a different scope and therefore a full miss.
 
+The task/objective revision is also mandatory evidence. A user or issue update can
+therefore invalidate task-dependent context even when the Git commit does not move.
+
 ## Evidence versions and partial reuse
 
 Evidence has independent versions for:
 
+- task/objective revision;
 - CI;
 - reviews;
 - trace/reproduction;
@@ -71,7 +75,7 @@ Independent slices can be reused and the lookup reports `partial`.
 Example:
 
 ```text
-code slice    -> files + policy
+code slice    -> task + files + policy
 CI slice      -> CI
 review slice  -> review
 skills slice  -> skills
