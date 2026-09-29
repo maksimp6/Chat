@@ -22,7 +22,7 @@ def test_merge_gate_rechecks_when_master_moves() -> None:
 
 
 def test_merge_gate_uses_one_review_cycle_and_protected_merge() -> None:
-    policy = AGENTS.read_text(encoding="utf-8")
+    policy = " ".join(AGENTS.read_text(encoding="utf-8").split())
 
     assert "GitHub Copilot reviews pull requests automatically." in policy
     assert "Do not manually request a Copilot review" in policy
