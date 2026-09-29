@@ -13,6 +13,7 @@ test cases.
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,7 @@ def isolate_selected_database(request, monkeypatch):
     module_name = Path(str(request.fspath)).name
     original_db_path = db.DB_PATH
     original_postgres_url_from_env = db.postgres_url_from_env
+    original_connect_postgres = db.connect_postgres
 
     if module_name in _SQLITE_ONLY_MODULES:
         monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
@@ -53,23 +55,40 @@ def isolate_selected_database(request, monkeypatch):
             return ""
         return original_postgres_url_from_env()
 
-    monkeypatch.setattr(db, "postgres_url_from_env", selected_postgres_url)
+    reset_lock = threading.Lock()
+    reset_done = False
 
-    conn = db.get_conn()
-    try:
-        rows = conn.execute(
-            """
-            SELECT tablename
-            FROM pg_catalog.pg_tables
-            WHERE schemaname = 'public'
-            """
-        ).fetchall()
-        tables = [str(row["tablename"]) for row in rows]
-        if tables:
-            quoted = ", ".join('"' + name.replace('"', '""') + '"' for name in tables)
-            conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
-            conn.commit()
-    finally:
-        conn.close()
+    def connect_postgres_for_test(url=None):
+        nonlocal reset_done
+        conn = original_connect_postgres(url)
+        if reset_done:
+            return conn
+
+        with reset_lock:
+            if reset_done:
+                return conn
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT tablename
+                    FROM pg_catalog.pg_tables
+                    WHERE schemaname = 'public'
+                    """
+                ).fetchall()
+                tables = [str(row["tablename"]) for row in rows]
+                if tables:
+                    quoted = ", ".join(
+                        '"' + name.replace('"', '""') + '"' for name in tables
+                    )
+                    conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
+                    conn.commit()
+                reset_done = True
+                return conn
+            except Exception:
+                conn.close()
+                raise
+
+    monkeypatch.setattr(db, "postgres_url_from_env", selected_postgres_url)
+    monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)
 
     yield
