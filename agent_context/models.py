@@ -91,9 +91,7 @@ class EvidenceVersion:
 
     def changed_components(self, other: "EvidenceVersion") -> tuple[str, ...]:
         return tuple(
-            name
-            for name in _EVIDENCE_COMPONENTS
-            if getattr(self, name) != getattr(other, name)
+            name for name in _EVIDENCE_COMPONENTS if getattr(self, name) != getattr(other, name)
         )
 
 
