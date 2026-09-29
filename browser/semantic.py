@@ -233,10 +233,7 @@ def diff_semantic_snapshots(before: SemanticSnapshot, after: SemanticSnapshot) -
         if before_nodes[node_id] != after_nodes[node_id]
     )
 
-    added_facts = {
-        key: after.facts[key]
-        for key in sorted(set(after.facts) - set(before.facts))
-    }
+    added_facts = {key: after.facts[key] for key in sorted(set(after.facts) - set(before.facts))}
     removed_facts = tuple(sorted(set(before.facts) - set(after.facts)))
     changed_facts = {
         key: {"before": before.facts[key], "after": after.facts[key]}
@@ -282,8 +279,7 @@ class MergedEvidence:
         return {
             "facts": dict(self.facts),
             "conflicts": {
-                field: [dict(item) for item in values]
-                for field, values in self.conflicts.items()
+                field: [dict(item) for item in values] for field, values in self.conflicts.items()
             },
             "sources": {field: list(values) for field, values in self.sources.items()},
         }
