@@ -34,6 +34,9 @@ def test_focused_python_suites_are_not_duplicated_before_full_suite() -> None:
 def test_postgres_matrix_resets_lazily_on_first_connection() -> None:
     conftest = (ROOT / "tests" / "conftest.py").read_text(encoding="utf-8")
 
-    assert 'monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)' in conftest
+    assert (
+        'monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)'
+        in conftest
+    )
     assert "reset_done = False" in conftest
     assert "conn = db.get_conn()" not in conftest
