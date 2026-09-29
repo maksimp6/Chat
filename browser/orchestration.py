@@ -338,8 +338,9 @@ class BrowserRoleDag:
                 available_slots = self.budget.max_parallel_workers - len(running)
                 if available_slots > 0:
                     running_tasks = {task.task_id: task for task in running.values()}
-                    ready = []
-                    for task_id in sorted(pending):
+                    for task_id in sorted(tuple(pending)):
+                        if available_slots <= 0:
+                            break
                         task = self._task_map[task_id]
                         if not all(
                             dep in results and results[dep].status == "succeeded"
@@ -348,13 +349,11 @@ class BrowserRoleDag:
                             continue
                         if not self._session_can_start(task, running_tasks):
                             continue
-                        ready.append(task)
-
-                    for task in ready[:available_slots]:
                         future = pool.submit(self._run_task, task)
                         running[future] = task
                         pending.remove(task.task_id)
                         running_tasks[task.task_id] = task
+                        available_slots -= 1
 
                 if not running:
                     if pending:
@@ -391,6 +390,16 @@ class BrowserRoleDag:
                             output_chars=result.output_chars,
                             duration_ms=result.duration_ms,
                         )
+                        for pending_id in sorted(tuple(pending)):
+                            pending_task = self._task_map[pending_id]
+                            results[pending_id] = BrowserTaskResult(
+                                pending_id,
+                                "cancelled",
+                                pending_task.role,
+                                pending_task.session_id,
+                                error="DAG token budget exhausted",
+                            )
+                            pending.remove(pending_id)
                     results[task.task_id] = result
 
         duration = max(0.0, self.clock() - started)
