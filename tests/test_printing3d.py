@@ -171,8 +171,8 @@ def test_printing3d_tools_are_registered_read_only():
     assert "printing3d.treasury.summary" in definitions
     assert "printing3d.orders.list" in definitions
 
-    treasury_tool = registry.get_tool("printing3d.treasury.summary")
-    orders_tool = registry.get_tool("printing3d.orders.list")
+    treasury_tool = registry.get_tool_meta("printing3d.treasury.summary")
+    orders_tool = registry.get_tool_meta("printing3d.orders.list")
     assert treasury_tool["read_only"] is True
     assert treasury_tool["requires_approval"] is False
     assert orders_tool["read_only"] is True
