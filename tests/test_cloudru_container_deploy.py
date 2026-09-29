@@ -204,10 +204,110 @@ def test_deploy_patches_existing_service_with_new_image():
 
     assert result["action"] == "update"
     _, method, path, params, body = client.calls[2]
-    assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", {"projectId": "p1"})
+    assert (method, path, params) == ("PATCH", "/v2/containers/alice-pro", None)
+    assert body["projectId"] == "p1"
     assert body["template"]["containers"][0]["image"] == "new@sha"
     assert body["template"]["scaling"]["minInstanceCount"] == 0
     assert "status" not in body and "id" not in body
+
+
+def test_get_uses_v2_contract_with_project_query():
+    client = RecordingClient([_app()])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    assert apps.get("alice-pro")["id"] == "c-1"
+    assert client.calls == [
+        ("container_apps", "GET", "/v2/containers/alice-pro", {"projectId": "p1"}, None)
+    ]
+
+
+def test_list_uses_v2_pagination_contract():
+    client = RecordingClient(
+        [
+            {"data": [{"name": "one"}], "nextPageToken": "next", "total": 2},
+            {"data": [{"name": "two"}], "nextPageToken": "", "total": 2},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    assert apps.list(page_size=50, filter_expr="status=RUNNING", order_by="name") == [
+        {"name": "one"},
+        {"name": "two"},
+    ]
+    assert client.calls[0][1:4] == (
+        "GET",
+        "/v2/containers",
+        {"projectId": "p1", "pageSize": 50, "filter": "status=RUNNING", "orderBy": "name"},
+    )
+    assert client.calls[1][1:4] == (
+        "GET",
+        "/v2/containers",
+        {
+            "projectId": "p1",
+            "pageSize": 50,
+            "pageToken": "next",
+            "filter": "status=RUNNING",
+            "orderBy": "name",
+        },
+    )
+
+
+def test_list_rejects_non_positive_page_size():
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient())
+    with pytest.raises(CloudProviderError, match="page_size"):
+        apps.list(page_size=0)
+
+
+def test_list_stops_when_pagination_token_is_omitted():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": [{"name": "one"}]}]),
+    )
+
+    assert apps.list() == [{"name": "one"}]
+
+
+@pytest.mark.parametrize("next_token", [0, False, [], {}])
+def test_list_rejects_falsey_non_string_pagination_token(next_token):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": [], "nextPageToken": next_token}]),
+    )
+    with pytest.raises(CloudProviderError, match="pagination token"):
+        apps.list()
+
+
+def test_list_rejects_repeated_pagination_token():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient(
+            [
+                {"data": [], "nextPageToken": "same"},
+                {"data": [], "nextPageToken": "same"},
+            ]
+        ),
+    )
+    with pytest.raises(CloudProviderError, match="pagination token"):
+        apps.list()
+
+
+def test_list_rejects_invalid_pagination_payload():
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": "not-a-list"}]),
+    )
+    with pytest.raises(CloudProviderError, match="invalid list payload"):
+        apps.list()
+
+
+@pytest.mark.parametrize("next_page_token", [0, False, [], {}])
+def test_list_rejects_falsey_non_string_pagination_tokens(next_page_token):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": [], "nextPageToken": next_page_token}]),
+    )
+    with pytest.raises(CloudProviderError, match="pagination token"):
+        apps.list()
 
 
 def test_status_is_condensed_and_reports_missing():
@@ -423,6 +523,12 @@ def test_deploy_verified_success_reports_previous_image():
 
 def test_deploy_verified_restores_whole_previous_configuration():
     previous = _app(image="old")
+    previous["configuration"]["ingress"].update(
+        {
+            "internalUri": "internal.example",
+            "additionalPortMappings": [{"targetPort": 9000, "url": "https://response-only"}],
+        }
+    )
     previous["template"]["containers"][0]["env"] = [{"name": "ALICE_DATABASE_URL", "value": "a"}]
     previous["template"]["scaling"] = {"minInstanceCount": 1, "maxInstanceCount": 1}
     apps = _verified_client(
@@ -443,11 +549,16 @@ def test_deploy_verified_restores_whole_previous_configuration():
     patches = [c for c in apps.client.calls if c[1] == "PATCH"]
     assert len(patches) == 2
     restored = patches[1][4]
+    assert patches[1][3] is None
+    assert restored["projectId"] == "p1"
     assert restored["template"]["containers"][0]["env"] == [
         {"name": "ALICE_DATABASE_URL", "value": "a"}
     ]
     assert restored["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
     assert "status" not in restored and "id" not in restored
+    ingress = restored["configuration"]["ingress"]
+    assert "publicUri" not in ingress and "internalUri" not in ingress
+    assert ingress["additionalPortMappings"] == [{"targetPort": 9000}]
 
 
 def test_iam_failure_becomes_provider_error():
@@ -691,7 +802,13 @@ def test_deploy_verified_restores_config_even_with_same_image():
         apps.deploy_verified(ContainerSpec(name="alice-pro", image="same", cpu="1"))
     patches = [c for c in apps.client.calls if c[1] == "PATCH"]
     assert len(patches) == 2
-    assert patches[1][4] == {k: v for k, v in previous.items() if k not in {"status", "id"}}
+    restored = patches[1][4]
+    assert patches[1][3] is None
+    assert restored["projectId"] == "p1"
+    assert restored["name"] == previous["name"]
+    assert restored["configuration"]["ingress"]["publiclyAccessible"] is True
+    assert "publicUri" not in restored["configuration"]["ingress"]
+    assert restored["template"] == previous["template"]
 
 
 def test_deploy_verified_without_previous_image_just_raises():
