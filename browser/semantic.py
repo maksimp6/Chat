@@ -141,7 +141,9 @@ def build_semantic_snapshot(
             break
         nodes.append(node)
 
-    raw_facts = raw.get("facts") or {}
+    raw_facts = raw.get("facts")
+    if raw_facts is None:
+        raw_facts = {}
     if not isinstance(raw_facts, Mapping):
         raise ValueError("facts must be an object")
     facts = {str(key): value for key, value in raw_facts.items()}
