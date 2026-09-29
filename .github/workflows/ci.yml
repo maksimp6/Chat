@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: "22.22.2"
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: package.json
       - name: Install dependencies
         run: |
           started=$SECONDS
