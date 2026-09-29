@@ -281,6 +281,16 @@ def test_list_rejects_invalid_pagination_payload():
         apps.list()
 
 
+@pytest.mark.parametrize("next_page_token", [0, False, [], {}])
+def test_list_rejects_falsey_non_string_pagination_tokens(next_page_token):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": [], "nextPageToken": next_page_token}]),
+    )
+    with pytest.raises(CloudProviderError, match="pagination token"):
+        apps.list()
+
+
 def test_status_is_condensed_and_reports_missing():
     apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient([_app()]))
     status = apps.status("alice-pro")
