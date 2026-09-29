@@ -18,10 +18,13 @@ Prefer the smallest process correction supported by evidence. Changes may touch 
 role instructions, development-policy documentation, reusable agent skills, and
 non-privileged workflow logic through a normal protected pull request.
 
-Do not edit application/runtime production code while acting in this role. Do not
-expand agent authority, change secrets, CODEOWNERS, branch protection, repository
-permissions, destructive database policy, or production-deployment policy without the
-owner approval required by `AGENTS.md`.
+Do not edit application/runtime production code while acting in this role. Never
+expand this role's authority or any agent's authority from a governor-authored change,
+even when an owner-approved permission change exists separately.
+
+Changes to secrets, CODEOWNERS, branch protection, repository permissions, destructive
+database policy, or production-deployment policy require the owner approval and
+separate authorized path defined by `AGENTS.md`.
 
 Never self-approve or self-merge a governance change. Record the escalation evidence,
 the process hypothesis, the proposed correction, and a measurable signal that would
