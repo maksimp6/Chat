@@ -166,8 +166,6 @@ class SkillRegistry:
         metadata = _parse_frontmatter_lines(lines, str(path))
         if metadata["name"] != name:
             raise SkillFormatError(f"{name}: frontmatter name must match directory name")
-        if not NAME_RE.fullmatch(metadata["name"]):
-            raise SkillFormatError(f"{name}: invalid frontmatter name")
         return metadata
 
     def _names(self) -> list[str]:
