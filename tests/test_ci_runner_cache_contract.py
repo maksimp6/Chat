@@ -8,7 +8,7 @@ CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 def test_runner_cache_contract() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "cache-dependency-path: package-lock.json" in workflow
+    assert "cache-dependency-path: package.json" in workflow
     assert "cache: npm" in workflow
     assert "requirements-postgres.txt" in workflow
     assert workflow.count("cache: pip") >= 2
