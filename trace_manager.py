@@ -127,7 +127,7 @@ class ExecutionTrace:
         self._finalized = False
         self._final_result: Optional[Dict[str, Any]] = None
         self._sensitive_values: set[str] = set()
-        self._sensitive_values_lock = threading.Lock()
+        self._sensitive_values_lock = threading.RLock()
         self.trace: Dict[str, Any] = {
             "trace_id": self.trace_id,
             "schema_version": self.SCHEMA_VERSION,
@@ -161,7 +161,8 @@ class ExecutionTrace:
         if not isinstance(value, str) or not value:
             return
         with self._sensitive_values_lock:
-            self._sensitive_values.add(value)
+            if not self._finalized:
+                self._sensitive_values.add(value)
 
     def _redact_registered_values(self, value: Any) -> Any:
         with self._sensitive_values_lock:
@@ -778,16 +779,15 @@ class ExecutionTrace:
 
     def finalize(self) -> Dict[str, Any]:
         """Freeze one validated terminal snapshot; repeated calls are idempotent."""
-        if self._finalized:
-            return copy.deepcopy(self._final_result)
-
-        # Build before changing terminal state, so a failed rebuild leaves the
-        # live trace open for diagnosis or retry. The snapshot is already JSON-safe.
-        final = self._build_snapshot(end_perf=time.perf_counter())
-        self._final_result = final
-        self._finalized = True
-        # The frozen result is already value-redacted. Raw values were needed
-        # only while the mutable trace could still receive later events.
         with self._sensitive_values_lock:
+            if self._finalized:
+                return copy.deepcopy(self._final_result)
+
+            # Build before changing terminal state, so a failed rebuild leaves the
+            # live trace open for diagnosis or retry. The snapshot is already JSON-safe.
+            final = self._build_snapshot(end_perf=time.perf_counter())
+            self.trace = self._redact_registered_values(self.trace)
+            self._final_result = final
             self._sensitive_values.clear()
-        return copy.deepcopy(final)
+            self._finalized = True
+            return copy.deepcopy(final)
