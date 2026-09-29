@@ -8,6 +8,7 @@ import ast
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 from typing import Any
 
 
@@ -33,6 +34,7 @@ def _module_name(relative: Path) -> str:
 class _IndexVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.scope: list[str] = []
+        self.scope_kinds: list[str] = []
         self.symbols: list[dict[str, Any]] = []
         self.imports: list[dict[str, Any]] = []
         self.calls: set[str] = set()
@@ -54,21 +56,31 @@ class _IndexVisitor(ast.NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._add_symbol(node, node.name, "class")
         self.scope.append(node.name)
+        self.scope_kinds.append("class")
         self.generic_visit(node)
+        self.scope_kinds.pop()
         self.scope.pop()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        kind = "method" if self.scope else "function"
+        kind = "method" if self.scope_kinds and self.scope_kinds[-1] == "class" else "function"
         self._add_symbol(node, node.name, kind)
         self.scope.append(node.name)
+        self.scope_kinds.append("function")
         self.generic_visit(node)
+        self.scope_kinds.pop()
         self.scope.pop()
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        kind = "async_method" if self.scope else "async_function"
+        kind = (
+            "async_method"
+            if self.scope_kinds and self.scope_kinds[-1] == "class"
+            else "async_function"
+        )
         self._add_symbol(node, node.name, kind)
         self.scope.append(node.name)
+        self.scope_kinds.append("function")
         self.generic_visit(node)
+        self.scope_kinds.pop()
         self.scope.pop()
 
     def visit_Import(self, node: ast.Import) -> None:
@@ -115,9 +127,27 @@ def _sha256(data: bytes) -> str:
 
 
 def _iter_python_files(root: Path) -> list[Path]:
+    if (root / ".git").exists():
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--", "*.py"],
+            check=True,
+            capture_output=True,
+        )
+        relative_paths = [
+            Path(item.decode("utf-8"))
+            for item in completed.stdout.split(b"\0")
+            if item
+        ]
+        return [
+            root / relative
+            for relative in sorted(relative_paths, key=lambda item: item.as_posix())
+            if not any(part in EXCLUDED_PARTS for part in relative.parts)
+        ]
+
     files: list[Path] = []
     for path in root.rglob("*.py"):
-        if any(part in EXCLUDED_PARTS for part in path.parts):
+        relative = path.relative_to(root)
+        if any(part in EXCLUDED_PARTS for part in relative.parts):
             continue
         if path.is_file():
             files.append(path)
