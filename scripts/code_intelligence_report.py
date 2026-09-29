@@ -57,20 +57,22 @@ def _vulture_findings(root: Path) -> list[dict[str, Any]]:
         allow_findings=True,
     )
     findings: list[dict[str, Any]] = []
+    pattern = re.compile(r"^(.*?):(\\d+):\\s+(.*)$")
     for raw in completed.stdout.splitlines():
         line = raw.strip()
         if not line:
             continue
-        path_part, _, detail = line.partition(": ")
-        location, _, message = path_part.rpartition(":")
-        path, _, line_number = location.rpartition(":")
-        try:
-            number = int(line_number)
-        except ValueError:
-            path = path_part
-            number = 0
-            message = detail
-        findings.append({"path": path, "line": number, "message": message or detail})
+        match = pattern.match(line)
+        if match:
+            findings.append(
+                {
+                    "path": match.group(1),
+                    "line": int(match.group(2)),
+                    "message": match.group(3),
+                }
+            )
+        else:
+            findings.append({"path": "", "line": 0, "message": line})
     return findings
 
 
