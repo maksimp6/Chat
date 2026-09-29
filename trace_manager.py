@@ -786,4 +786,8 @@ class ExecutionTrace:
         final = self._build_snapshot(end_perf=time.perf_counter())
         self._final_result = final
         self._finalized = True
+        # The frozen result is already value-redacted. Raw values were needed
+        # only while the mutable trace could still receive later events.
+        with self._sensitive_values_lock:
+            self._sensitive_values.clear()
         return copy.deepcopy(final)
