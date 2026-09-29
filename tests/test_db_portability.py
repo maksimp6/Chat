@@ -115,3 +115,21 @@ def test_create_invocation_reraises_when_race_winner_cannot_be_reloaded(monkeypa
 
     with pytest.raises(IntegrityError, match="session already exists"):
         invocation_manager.create_invocation("session-race", "conversation-race")
+
+
+class _InvocationAlterFailureConnection(_MigrationConnection):
+    def execute(self, sql, params=None):
+        normalized = " ".join(sql.split())
+        if normalized.startswith("ALTER TABLE invocations"):
+            self.statements.append(normalized)
+            raise OperationalError("invocation migration unavailable")
+        return super().execute(sql, params)
+
+
+def test_runtime_migrations_reraise_unexpected_invocation_alter_failure(monkeypatch):
+    conn = _InvocationAlterFailureConnection()
+    monkeypatch.setattr(runtime_migrations, "get_conn", lambda: conn)
+
+    with pytest.raises(OperationalError, match="invocation migration unavailable"):
+        runtime_migrations.init_runtime_tables()
+    assert conn.closed is True
