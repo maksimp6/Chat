@@ -175,9 +175,7 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
         components = {
             "touches": _normalize(row["touches"], maxima["touches"]),
             "churn": _normalize(row["churn"], maxima["churn"]),
-            "churn_per_loc": _normalize(
-                row["churn_per_loc"], maxima["churn_per_loc"]
-            ),
+            "churn_per_loc": _normalize(row["churn_per_loc"], maxima["churn_per_loc"]),
             "authors": _normalize(row["authors"], maxima["authors"]),
             "recency": row["recency"],
         }
