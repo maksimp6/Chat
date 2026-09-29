@@ -185,9 +185,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-postgres.txt
-          pip install pytest
+          pip install -r requirements-dev.txt
       - name: Run PostgreSQL integration tests
         run: pytest -q tests/test_postgres_integration.py
+      - name: Run full application suite on PostgreSQL
+        run: pytest -q
       - name: Verify backup and restore of the application schema
         # Client tools come from the server image so their version matches PostgreSQL 17.
         env:
