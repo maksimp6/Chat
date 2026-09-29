@@ -63,3 +63,11 @@ def test_backend_detection_uses_open_connection_not_environment(monkeypatch, tmp
         assert is_postgres_connection(connection) is False
     finally:
         connection.close()
+
+
+def test_postgres_selection_takes_precedence_over_explicit_sqlite_path(monkeypatch, tmp_path):
+    postgres_connection = object()
+    monkeypatch.setattr(db, "postgres_url_from_env", lambda: "postgresql://configured")
+    monkeypatch.setattr(db, "connect_postgres", lambda _url: postgres_connection)
+
+    assert db.get_conn(tmp_path / "local.sqlite") is postgres_connection

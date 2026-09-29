@@ -93,7 +93,7 @@ def _next_message_id():
     return max((row["id"] for row in rows), default=0) + 1
 
 
-def get_conn():
+def get_conn(sqlite_path: str | os.PathLike[str] | None = None):
     runtime_db_path = _runtime_db_path()
     if runtime_db_path:
         conn = sqlite3.connect(
@@ -109,7 +109,9 @@ def get_conn():
         database_url = postgres_url_from_env()
         if database_url:
             return connect_postgres(database_url)
-        conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15)
+        conn = sqlite3.connect(
+            sqlite_path or DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES, timeout=15
+        )
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")

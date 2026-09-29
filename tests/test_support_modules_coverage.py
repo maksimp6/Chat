@@ -18,7 +18,7 @@ def _create_archive_database(path, rows=()):
 
 
 def test_archiver_handles_sqlite_rows_empty_database_and_mutex(monkeypatch, tmp_path):
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: False)
+    monkeypatch.setattr(archiver.database, "postgres_url_from_env", lambda: "")
     db_path = tmp_path / "archive.sqlite"
     _create_archive_database(
         db_path,
@@ -65,9 +65,15 @@ def test_archiver_uses_postgres_connection_and_rolls_back_errors(monkeypatch):
             self.closed = True
 
     postgres_conn = EmptyConnection()
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: True)
-    monkeypatch.setattr(archiver.database, "get_conn", lambda: postgres_conn)
+    selected_paths = []
+
+    def select_connection(sqlite_path=None):
+        selected_paths.append(sqlite_path)
+        return postgres_conn
+
+    monkeypatch.setattr(archiver.database, "get_conn", select_connection)
     assert archiver.DatabaseArchiver("unused").run_archive() is True
+    assert selected_paths == ["unused"]
     assert postgres_conn.closed is True
 
     class FailingCursor:
@@ -89,8 +95,7 @@ def test_archiver_uses_postgres_connection_and_rolls_back_errors(monkeypatch):
             self.closed = True
 
     failing_conn = FailingConnection()
-    monkeypatch.setattr(archiver, "is_postgres_configured", lambda: False)
-    monkeypatch.setattr(archiver.sqlite3, "connect", lambda path: failing_conn)
+    monkeypatch.setattr(archiver.database, "get_conn", lambda _sqlite_path=None: failing_conn)
 
     assert archiver.DatabaseArchiver("broken").run_archive() is False
     assert failing_conn.rolled_back is True
