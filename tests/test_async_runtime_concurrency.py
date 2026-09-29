@@ -12,7 +12,8 @@ def async_runtime_db(tmp_path, monkeypatch):
     import session_manager
 
     path = tmp_path / "async-concurrency.db"
-    monkeypatch.setattr(db, "DB_PATH", str(path))
+    if not db.postgres_url_from_env():
+        monkeypatch.setattr(db, "DB_PATH", str(path))
     monkeypatch.setattr(session_manager, "get_conn", db.get_conn)
     monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
     monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
