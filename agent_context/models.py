@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from trace_security import sanitize_trace_value
 
 
-_EVIDENCE_COMPONENTS = ("ci", "review", "trace", "files", "skills", "policy")
+_EVIDENCE_COMPONENTS = ("task", "ci", "review", "trace", "files", "skills", "policy")
 
 
 def _clean_text(value: Any) -> str:
@@ -32,6 +32,22 @@ def _canonical_hash(payload: Mapping[str, Any]) -> str:
         ensure_ascii=True,
     )
     return sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _freeze_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze_value(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_value(item) for item in value)
+    return value
+
+
+def _thaw_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_value(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True)
@@ -72,6 +88,7 @@ class TaskScope:
 class EvidenceVersion:
     """Versions of evidence that may invalidate only part of a task packet."""
 
+    task: str = ""
     ci: str = ""
     review: str = ""
     trace: str = ""
@@ -82,6 +99,8 @@ class EvidenceVersion:
     def __post_init__(self) -> None:
         for name in _EVIDENCE_COMPONENTS:
             object.__setattr__(self, name, _clean_text(getattr(self, name)))
+        if not self.task.strip():
+            raise ValueError("task evidence version is required")
 
     def as_dict(self) -> dict[str, str]:
         return {name: getattr(self, name) for name in _EVIDENCE_COMPONENTS}
@@ -135,7 +154,7 @@ class ContextSlice:
             raise ValueError("slice usage estimates must be non-negative")
         clean_payload = sanitize_trace_value(dict(self.payload))
         object.__setattr__(self, "name", name)
-        object.__setattr__(self, "payload", MappingProxyType(dict(clean_payload)))
+        object.__setattr__(self, "payload", _freeze_value(dict(clean_payload)))
         object.__setattr__(
             self,
             "depends_on",
@@ -148,7 +167,7 @@ class ContextSlice:
     def as_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "payload": dict(self.payload),
+            "payload": _thaw_value(self.payload),
             "depends_on": list(self.depends_on),
             "source_bytes": self.source_bytes,
             "input_tokens": self.input_tokens,
@@ -195,7 +214,7 @@ class TaskPacket:
             _clean_text(self.budget_tier).strip() or "normal",
         )
         clean_usage = sanitize_trace_value(dict(self.usage))
-        object.__setattr__(self, "usage", MappingProxyType(dict(clean_usage)))
+        object.__setattr__(self, "usage", _freeze_value(dict(clean_usage)))
         if self.escalation_target is not None:
             object.__setattr__(
                 self,
@@ -225,6 +244,6 @@ class TaskPacket:
             "changed_files": list(self.changed_files),
             "owner": self.owner,
             "budget_tier": self.budget_tier,
-            "usage": dict(self.usage),
+            "usage": _thaw_value(self.usage),
             "escalation_target": self.escalation_target,
         }
