@@ -49,7 +49,11 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
     loaded = await asyncio.gather(
         *(asyncio.to_thread(get_invocation, context.invocation_id) for context in contexts)
     )
-    for item in loaded:
+    for context, item in zip(contexts, loaded):
+        assert item["id"] == context.invocation_id
+        assert item["session_id"] == context.session_id
+        assert item["conversation_id"] == context.conversation_id
+        assert item["trace_id"] == context.trace_id
         assert item["result"]["index"] == item["metadata"]["index"]
 
 
@@ -61,6 +65,8 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
     session = await asyncio.to_thread(create_session, metadata={"suite": "async-cancellation"})
     entered = threading.Event()
     release = threading.Event()
+    worker_finished = threading.Event()
+    cancelled_contexts = []
 
     def blocked_create():
         context = create_invocation(
@@ -68,9 +74,14 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
             "cancelled-conversation",
             metadata={"role": "cancelled"},
         )
+        cancelled_contexts.append(context)
         entered.set()
-        release.wait(timeout=5)
-        finish_invocation(context.invocation_id, {"role": "cancelled"})
+        try:
+            if not release.wait(timeout=5):
+                raise TimeoutError("cancelled invocation worker was not released")
+            finish_invocation(context.invocation_id, {"role": "cancelled"})
+        finally:
+            worker_finished.set()
         return context
 
     cancelled = asyncio.create_task(asyncio.to_thread(blocked_create))
@@ -93,10 +104,19 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
         await cancelled
 
     release.set()
-    await asyncio.sleep(0.05)
+    assert await asyncio.to_thread(worker_finished.wait, 5)
+
+    cancelled_invocation = await asyncio.to_thread(
+        get_invocation, cancelled_contexts[0].invocation_id
+    )
+    assert cancelled_invocation["status"] == "completed"
+    assert cancelled_invocation["conversation_id"] == cancelled_contexts[0].conversation_id
+    assert cancelled_invocation["trace_id"] == cancelled_contexts[0].trace_id
 
     sibling = await asyncio.to_thread(get_invocation, sibling_context.invocation_id)
     assert sibling["status"] == "completed"
+    assert sibling["conversation_id"] == sibling_context.conversation_id
+    assert sibling["trace_id"] == sibling_context.trace_id
     assert sibling["result"] == {"role": "sibling"}
 
 
