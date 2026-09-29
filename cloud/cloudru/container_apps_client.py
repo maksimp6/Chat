@@ -228,7 +228,7 @@ class CloudRuContainerAppsClient:
             items.extend(data)
 
             next_token = payload.get("nextPageToken")
-            if not next_token:
+            if next_token is None or next_token == "":
                 return items
             if not isinstance(next_token, str) or next_token in seen_tokens:
                 raise CloudProviderError(
