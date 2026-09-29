@@ -27,6 +27,43 @@ _SQLITE_ONLY_MODULES = {
 }
 
 
+def _make_lazy_postgres_connector(connect_postgres):
+    reset_lock = threading.Lock()
+    reset_done = False
+
+    def connect_postgres_for_test(url=None):
+        nonlocal reset_done
+        conn = connect_postgres(url)
+        if reset_done:
+            return conn
+
+        with reset_lock:
+            if reset_done:
+                return conn
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT tablename
+                    FROM pg_catalog.pg_tables
+                    WHERE schemaname = 'public'
+                    """
+                ).fetchall()
+                tables = [str(row["tablename"]) for row in rows]
+                if tables:
+                    quoted = ", ".join(
+                        '"' + name.replace('"', '""') + '"' for name in tables
+                    )
+                    conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
+                    conn.commit()
+                reset_done = True
+                return conn
+            except Exception:
+                conn.close()
+                raise
+
+    return connect_postgres_for_test
+
+
 @pytest.fixture(autouse=True)
 def isolate_selected_database(request, monkeypatch):
     database_url = os.environ.get("ALICE_DATABASE_URL", "").strip()
@@ -55,36 +92,7 @@ def isolate_selected_database(request, monkeypatch):
             return ""
         return original_postgres_url_from_env()
 
-    reset_lock = threading.Lock()
-    reset_done = False
-
-    def connect_postgres_for_test(url=None):
-        nonlocal reset_done
-        conn = original_connect_postgres(url)
-        if reset_done:
-            return conn
-
-        with reset_lock:
-            if reset_done:
-                return conn
-            try:
-                rows = conn.execute(
-                    """
-                    SELECT tablename
-                    FROM pg_catalog.pg_tables
-                    WHERE schemaname = 'public'
-                    """
-                ).fetchall()
-                tables = [str(row["tablename"]) for row in rows]
-                if tables:
-                    quoted = ", ".join('"' + name.replace('"', '""') + '"' for name in tables)
-                    conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
-                    conn.commit()
-                reset_done = True
-                return conn
-            except Exception:
-                conn.close()
-                raise
+    connect_postgres_for_test = _make_lazy_postgres_connector(original_connect_postgres)
 
     monkeypatch.setattr(db, "postgres_url_from_env", selected_postgres_url)
     monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)
