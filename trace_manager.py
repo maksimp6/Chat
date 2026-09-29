@@ -23,7 +23,6 @@ from trace_security import (
     sanitize_trace_value,
 )
 from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
-from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
 
 
 def get_current_trace() -> Optional["ExecutionTrace"]:
