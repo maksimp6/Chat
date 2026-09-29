@@ -85,6 +85,23 @@ def test_rejects_malformed_or_noncanonical_dsn(inputs, mutation):
     assert "p%zzssword" not in json.dumps(errors)
 
 
+@pytest.mark.parametrize("location", ["password", "application_name", "raw-nul"])
+def test_rejects_nul_bytes_in_dsn(inputs, location):
+    config, env = inputs
+    dsn = env["ALICE_DATABASE_URL"]
+    if location == "password":
+        dsn = dsn.replace("p%40ssword", "p%00ssword", 1)
+    elif location == "application_name":
+        dsn += "&application_name=%00"
+    else:
+        dsn = dsn.replace("p%40ssword", "p\x00ssword", 1)
+    env["ALICE_DATABASE_URL"] = dsn
+    errors = preflight.validate(config, env)
+    assert any("ALICE_DATABASE_URL" in error for error in errors)
+    assert "p%00ssword" not in json.dumps(errors)
+    assert r"p\u0000ssword" not in json.dumps(errors)
+
+
 @pytest.mark.parametrize(
     "cidrs",
     [
@@ -184,11 +201,17 @@ def test_driver_failure_does_not_leak_dsn(inputs, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "tls,superuser,inherited_privileged_role",
-    [(False, False, False), (True, True, False), (True, False, False), (True, False, True)],
+    "tls,role_attributes,has_role_membership",
+    [
+        (False, (False, False, False, False, False), False),
+        (True, (True, False, False, False, False), False),
+        (True, (False, True, False, False, False), False),
+        (True, (False, False, True, False, False), False),
+        (True, (False, False, False, False, False), True),
+    ],
 )
-def test_probe_is_read_only_and_checks_tls_and_role(
-    inputs, monkeypatch, tls, superuser, inherited_privileged_role
+def test_probe_is_read_only_and_rejects_role_attributes_or_membership(
+    inputs, monkeypatch, tls, role_attributes, has_role_membership
 ):
     config, env = inputs
     captured = {}
@@ -209,12 +232,8 @@ def test_probe_is_read_only_and_checks_tls_and_role(
                     "alice_app",
                     tls,
                     "TLSv1.3",
-                    superuser,
-                    False,
-                    False,
-                    False,
-                    False,
-                    inherited_privileged_role,
+                    *role_attributes,
+                    has_role_membership,
                 )
             )
 
@@ -224,10 +243,12 @@ def test_probe_is_read_only_and_checks_tls_and_role(
 
     monkeypatch.setitem(sys.modules, "psycopg", SimpleNamespace(connect=connect))
     error = preflight.probe_database(env["ALICE_DATABASE_URL"], config["database"])
-    assert (error is None) == (tls and not superuser and not inherited_privileged_role)
+    assert (error is None) == (tls and not any(role_attributes) and not has_role_membership)
     assert "default_transaction_read_only=on" in captured["options"]
     assert "statement_timeout=5000" in captured["options"]
     assert captured["sql"].startswith("SELECT ")
     assert "pg_has_role" in captured["sql"]
-    assert "pg_execute_server_program" in captured["sql"]
+    assert "FROM pg_roles p WHERE p.oid <> r.oid" in captured["sql"]
+    assert "p.rolname <> 'pg_database_owner'" in captured["sql"]
+    assert "p.rolname IN" not in captured["sql"]
     assert captured["connect_timeout"] == 5

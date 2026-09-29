@@ -143,9 +143,14 @@ requirements.
 
 ## AI services in Evolution
 
+Alice's current AI backend is Yandex Cloud / Yandex AI Studio. The services below
+are documented for a separate future evaluation; this Cloud.ru skill must not
+switch Alice's model provider or request Cloud.ru model credentials as part of
+the current deployment.
+
 | Service | Role and integration | Guardrail / cost boundary |
 |---|---|---|
-| Foundation Models | Model API endpoint documented as `https://foundation-models.api.cloud.ru/v1`; service-account API key. Alice currently has a provider integration; preserve its primary-model behavior and encrypted key store |
+| Foundation Models | Model API endpoint documented as `https://foundation-models.api.cloud.ru/v1`; service-account API key. Optional integration exists in the repository, but it is not Alice's active AI backend |
 | Foundation Models Guardrails | Input/output sensitive-data masking/restore and monitoring alerts; test model prompts, traces, tool arguments and cross-user isolation |
 | AI Agents | Public APIs can manage agents, agent systems and MCP servers; use service invoker/viewer roles for runtime calls and admin only for lifecycle |
 | Agents Space | Separate user-facing agent workspace built on EvoClaw; depends on AI Agents, Foundation Models and Object Storage. Keep it a pilot, not an implicit Alice runtime migration |

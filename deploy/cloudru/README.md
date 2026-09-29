@@ -11,6 +11,11 @@
 справочник сервисов Evolution. Навык лежит в репозитории: он не устанавливает
 EDS и не создаёт ресурсы сам.
 
+Текущий AI backend Алисы — Yandex Cloud через Yandex AI Studio. Этот Cloud.ru
+runbook готовит инфраструктуру приложения и не переключает AI-провайдера.
+Foundation Models, Guardrails и AI Agents в справочнике Evolution — каталог для
+отдельной будущей оценки, не часть текущего runtime или rollout.
+
 ```bash
 python scripts/install_eds.py
 export PATH="$HOME/.local/bin:$PATH"
@@ -57,7 +62,7 @@ python scripts/cloudru_deploy_preflight.py --help
 | Encrypted credentials | `ALICE_PROVIDER_CREDENTIAL_KEY`; сохранить прежний при миграции |
 | Вход владельца | GitHub client ID/secret, явные allowed IDs, HTTPS callback URI |
 | S3, если включён | Bucket/region/tenant + отдельные S3 key ID/secret, минимум прав |
-| Foundation Models | Существующий backend provider credential store, отдельный model key |
+| AI backend | Alice currently uses Yandex AI Studio in Yandex Cloud; this deployment needs no Cloud.ru model key |
 
 Для новых app/encryption/DB secrets использовать случайные высокоэнтропийные
 значения через защищённый генератор и Secret Management. Не менять существующий

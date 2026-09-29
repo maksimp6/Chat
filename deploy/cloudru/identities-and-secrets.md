@@ -12,7 +12,7 @@ placing secret values in the repo. See the Codex instructions at
 | `EDS_API_KEY` + project UUID | EDS v0.4.0 | Repo/Workflow Studio product key, `X-API-KEY`; use `master` explicitly | IAM fields, image, Git remote URL, output |
 | Workflow Studio direct API | Direct product REST requests | IAM auth per published Workflow Studio API | EDS config and runtime env |
 | Gateway static API key | Machine-to-machine callers where selected by Gateway policy | A gateway-client credential; exact key lifecycle is per API-key page | Browser JavaScript, public config, GitHub variable summary |
-| Foundation Models API key | Model inference | Issued for Foundation Models on a service account; expiry 1 day–1 year; docs recommend a moderate interval such as 90 days | IAM/EDS slots, user session, trace |
+| Foundation Models API key | Optional future Cloud.ru AI evaluation; not Alice's current AI backend | Issued for Foundation Models on a service account; expiry 1 day–1 year; docs recommend a moderate interval such as 90 days | IAM/EDS slots, user session, trace |
 | S3 access key pair + tenant ID | Object Storage S3 client | Separate storage principal; restrict bucket/prefix/operations | PostgreSQL password, FM key |
 | Alice short token / GitHub OAuth secret | Alice's own auth middleware | Application-level identity; owner IDs checked in backend | Cloud API key slots |
 | PostgreSQL role password | `alice_app` over TLS | One DB, non-superuser, max connections; rotate as a DB operation | URLs in stdout/process args/issues |
