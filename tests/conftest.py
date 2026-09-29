@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.parse import urlparse
 
 import pytest
 
@@ -23,6 +24,20 @@ _SQLITE_ONLY_MODULES = {
     "test_chat_sqlite_integration.py",
     "test_environment_gateway.py",
 }
+
+
+def _assert_disposable_postgres_target(database_url: str) -> None:
+    if os.environ.get("ALICE_TEST_POSTGRES_RESET") != "1":
+        raise RuntimeError(
+            "PostgreSQL test reset requires ALICE_TEST_POSTGRES_RESET=1"
+        )
+
+    database_name = urlparse(database_url).path.lstrip("/")
+    if not database_name or not database_name.endswith(("_test", "_ci")):
+        raise RuntimeError(
+            "Refusing destructive PostgreSQL test reset for non-test database "
+            f"{database_name or '<unknown>'!r}"
+        )
 
 
 def _require_disposable_postgres_target(database_url: str) -> None:
@@ -59,6 +74,8 @@ def isolate_selected_database(request, monkeypatch):
         monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
         yield
         return
+
+    _assert_disposable_postgres_target(database_url)
 
     def selected_postgres_url() -> str:
         # Tests that replace DB_PATH are explicitly selecting a temporary
