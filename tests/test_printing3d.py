@@ -205,3 +205,34 @@ def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
 
     assert result["total_orders"] == 1
     assert result["currencies"][0]["settled_profit"] == pytest.approx(220)
+
+
+def test_create_order_rejects_paid_without_settlement(printing_db):
+    from printing3d import create_order
+
+    with pytest.raises(ValueError, match="requires settlement"):
+        create_order("owner-a", {"title": "Impossible paid order", "status": "paid"})
+
+
+def test_settlement_requires_cost_when_no_quote_exists(printing_db):
+    from printing3d import create_order, settle_order
+
+    order = create_order("owner-a", {"title": "Manual quote", "quoted_price": 500})
+
+    with pytest.raises(ValueError, match="actual_cost is required"):
+        settle_order("owner-a", order["id"], actual_revenue=500)
+
+
+def test_cancelled_orders_do_not_inflate_quoted_revenue(printing_db):
+    from printing3d import create_order, get_financial_summary, update_order_status
+
+    active = create_order("owner-a", {"title": "Active", "quoted_price": 300})
+    cancelled = create_order("owner-a", {"title": "Cancelled", "quoted_price": 700})
+    update_order_status("owner-a", cancelled["id"], "cancelled")
+
+    summary = get_financial_summary("owner-a")
+
+    assert active["quoted_price"] == pytest.approx(300)
+    assert summary["total_orders"] == 2
+    assert summary["currencies"][0]["quoted_revenue"] == pytest.approx(300)
+    assert summary["currencies"][0]["open_orders"] == 1
