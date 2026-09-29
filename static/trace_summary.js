@@ -150,7 +150,8 @@
           icon: "🤖",
           label: "Модель" + (apiCount > 1 ? " #" + (step === null ? index + 1 : step) : ""),
           detail: [operationModelName, duration].filter(Boolean).join(" · "),
-          status: response && response.raw && response.raw.status ? String(response.raw.status) : "",
+          status:
+            response && response.raw && response.raw.status ? String(response.raw.status) : "",
         },
         timestamp: firstTimestamp(
           response && response.start_timestamp,
@@ -216,9 +217,7 @@
     var standaloneErrors = [];
     errors.forEach(function (error) {
       var callId =
-        error && error.call_id !== undefined && error.call_id !== null
-          ? String(error.call_id)
-          : "";
+        error && error.call_id !== undefined && error.call_id !== null ? String(error.call_id) : "";
       var source = error && error.source ? String(error.source) : "";
       if ((callId && failedToolCallIds[callId]) || (source && failedToolSources[source])) return;
       standaloneErrors.push(error);
