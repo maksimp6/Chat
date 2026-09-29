@@ -51,15 +51,17 @@ owner (@maksimp6) does not merge by hand.
 - A pull request enters its single final review cycle only when the current head
   has passed required CI and there are no open review threads from earlier work.
   At that point mark it ready for review.
-- Request GitHub Copilot review once for that ready-to-merge head. Fix or answer
-  every Copilot comment and resolve each thread before merging.
-- Request `@codex review` once in the same final review cycle. Add or answer
+- GitHub Copilot reviews pull requests automatically. Do not manually request
+  a Copilot review; duplicate triggers waste resources and can create redundant
+  review findings. Fix or answer every automatic Copilot comment and resolve each
+  thread before merging.
+- Request `@codex review` exactly once for the ready-to-merge head. Add or answer
   every regression test Codex proposes. If Codex has not responded by the next
   hourly maintainer pass, Claude may continue once CI and other review gates are
   satisfied.
-- Do not request another Codex or Copilot review after feedback fixes. The final
-  corrected head is validated by required CI plus resolved review threads. A
-  repeated review is allowed only when the owner explicitly asks for it.
+- After feedback fixes, do not request another Codex review and do not retrigger
+  Copilot. The final corrected head is validated by required CI plus resolved
+  review threads. A repeated review is allowed only when the owner explicitly asks for it.
 - Merge is fail-closed. Immediately before merge, verify the pull request is
   synchronized with the current `master` (`behind master = 0`). Required
   checks must be green on the exact current PR head after that synchronization,
