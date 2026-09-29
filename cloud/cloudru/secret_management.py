@@ -61,7 +61,7 @@ from trace_manager import get_current_trace
 # model; unconfirmed against a live tenant (see module docstring).
 SECRET_PATH = "/v1/secrets/{secret_id}"
 VERSIONS_PATH = "/v1/secrets/{secret_id}/versions"
-VALUE_PATH = "/v1/secrets/{secret_id}/versions/{version_id}:access"
+VALUE_PATH = "/v1/secrets/{secret_id}/versions/{version_id}/payload"
 
 # HTTP status -> stable error code for predictable handling by callers.
 _STATUS_CODES = {
@@ -89,6 +89,7 @@ class CloudRuSecretManagementClient:
         timeout: float = 10.0,
         max_retries: int = 2,
         cache_ttl: float = 30.0,
+        cache_max_entries: int = 32,
     ) -> None:
         if iam_client is not None:
             self.iam_client = iam_client
@@ -107,6 +108,7 @@ class CloudRuSecretManagementClient:
         self.timeout = float(timeout)
         self.max_retries = max(0, int(max_retries))
         self.cache_ttl = max(0.0, float(cache_ttl))
+        self.cache_max_entries = max(1, int(cache_max_entries))
         # Metadata-only calls reuse the shared trace-safe client; it never
         # sees a secret payload because the value fetch bypasses it entirely.
         self._client = CloudRuClient(
@@ -122,6 +124,22 @@ class CloudRuSecretManagementClient:
                 "to a viewer-scoped IAM key pair",
                 code="auth_not_configured",
             )
+
+    def _sweep_cache(self, now_monotonic: float | None = None) -> None:
+        now_monotonic = time.monotonic() if now_monotonic is None else now_monotonic
+        if self.cache_ttl <= 0:
+            self._value_cache.clear()
+            return
+        expired = [
+            key
+            for key, (stored_at, _value) in self._value_cache.items()
+            if (now_monotonic - stored_at) >= self.cache_ttl
+        ]
+        for key in expired:
+            del self._value_cache[key]
+        while len(self._value_cache) > self.cache_max_entries:
+            oldest = min(self._value_cache, key=lambda key: self._value_cache[key][0])
+            del self._value_cache[oldest]
 
     def invalidate_cache(self, secret_id: str | None = None) -> None:
         if secret_id is None:
@@ -140,6 +158,7 @@ class CloudRuSecretManagementClient:
 
         cache_key = (secret_id, version_id)
         now_monotonic = time.monotonic()
+        self._sweep_cache(now_monotonic)
         cached = self._value_cache.get(cache_key)
         if cached is not None and (now_monotonic - cached[0]) < self.cache_ttl:
             return cached[1]
@@ -147,6 +166,7 @@ class CloudRuSecretManagementClient:
         fetched_secret_value = self._fetch_value(secret_id, version_id)
         if self.cache_ttl > 0:
             self._value_cache[cache_key] = (now_monotonic, fetched_secret_value)
+            self._sweep_cache(now_monotonic)
         return fetched_secret_value
 
     def list_versions(self, secret_id: str) -> list[dict[str, Any]]:
