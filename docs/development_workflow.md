@@ -242,6 +242,97 @@ PR должен содержать:
 
 Подробные правила: [API Contracts](api/contracts.md).
 
+## 8.2 Read-only merge readiness
+
+После #516 и #523 в репозитории есть два read-only инструмента проверки готовности PR:
+
+- CLI `scripts/merge_readiness.py`;
+- GitHub Actions workflow `.github/workflows/merge-readiness.yml`.
+
+Они собирают и оценивают состояние PR, но **не выполняют merge, не синхронизируют ветку и не меняют branch protection**.
+
+### Ручной CLI
+
+Для запуска нужен установленный и аутентифицированный `gh` с read-доступом к PR, checks и review threads.
+
+Пример:
+
+```bash
+python scripts/merge_readiness.py \
+  --repo maksimp6/Chat \
+  --pr 123 \
+  --base master \
+  --required-check "Application tests" \
+  --required-check "PostgreSQL integration" \
+  --required-check "Android debug APK" \
+  --pretty
+```
+
+Вместо повторяемых `--required-check` можно использовать переменную
+`MERGE_REQUIRED_CHECKS` со списком точных имён check-run через запятую.
+
+CLI печатает JSON с полями `ready`, `head_sha`, `behind_by` и `blockers`.
+Код завершения:
+
+- `0` — snapshot подтверждает `ready=true`;
+- `1` — есть blocker или snapshot не удалось собрать.
+
+Основные blocker codes:
+
+- `pull_request_not_open`;
+- `draft`;
+- `wrong_base`;
+- `snapshot_changed`;
+- `behind_master`;
+- `required_checks_unconfigured`;
+- `required_check_missing`;
+- `check_pending`;
+- `check_failed`;
+- `review_threads`;
+- `review_threads_truncated`;
+- `collection_error`.
+
+Проверка fail-closed: без явной конфигурации required checks readiness не считается доказанной.
+
+### GitHub Actions snapshot
+
+Workflow `Merge readiness snapshot` запускается для non-draft PR в `master` на:
+
+- `opened`, `synchronize`, `reopened`, `ready_for_review`;
+- review `submitted` / `dismissed`;
+- review-comment `created` / `edited` / `deleted`.
+
+Он checkout'ит exact `pull_request.head.sha`, использует только read-permissions и проверяет:
+
+- `Application tests`;
+- `PostgreSQL integration`;
+- `Android debug APK`;
+- `Auto-format repository`;
+- `Trivy repository scan`;
+- `Zizmor GitHub Actions audit`;
+- `CodeQL (python)`;
+- `CodeQL (javascript-typescript)`.
+
+Для missing/pending checks workflow ждёт не более `180 × 5` секунд, то есть 15 минут.
+Результат JSON публикуется в job log и GitHub Step Summary.
+При новом событии того же PR устаревший snapshot run отменяется.
+
+### Ограничения snapshot
+
+Snapshot относится только к состоянию, которое было собрано в конкретном run.
+
+- обычное продвижение `master` само по себе не создаёт новый snapshot run для старого PR head;
+- resolve/unresolve review thread сам по себе не является workflow trigger;
+- snapshot не обновляет ветку и не заменяет strict up-to-date policy ruleset;
+- snapshot сейчас информационный и не является самостоятельной заменой защищённого merge gate.
+
+Поэтому непосредственно перед merge всё равно проверяем:
+
+1. `behind master = 0`;
+2. required checks зелёные на exact current PR head;
+3. unresolved review threads отсутствуют;
+4. merge выполняется только защищённым GitHub-путём.
+
 ## 9. Проверка перед merge
 
 Одного зелёного CI недостаточно. Перед merge проверяем:

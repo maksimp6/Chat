@@ -36,6 +36,11 @@
   [#495](https://github.com/maksimp6/Chat/pull/495).
 - Copilot review закреплён как автоматический; ручной `@copilot review` больше не используется, а Codex запускается один раз на финальном ready-to-merge head:
   [#504](https://github.com/maksimp6/Chat/pull/504).
+- Добавлен read-only CLI `scripts/merge_readiness.py`, который fail-closed проверяет draft/base/head/behind/required checks/review threads и возвращает структурированный JSON без write-side effects:
+  [#516](https://github.com/maksimp6/Chat/pull/516).
+- Добавлен информационный GitHub Actions `Merge readiness snapshot` на exact PR head с read-only permissions и bounded polling missing/pending checks до 15 минут:
+  [#523](https://github.com/maksimp6/Chat/pull/523).
+  Snapshot не синхронизирует ветку, не заменяет strict up-to-date branch protection и не является самостоятельным required merge gate.
 
 ### Async/runtime validation
 
