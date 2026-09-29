@@ -27,8 +27,8 @@ _SQLITE_ONLY_MODULES = {
 }
 
 
-def _make_lazy_postgres_reset_connector(connect_postgres):
-    reset_lock = threading.Lock()
+def _make_lazy_postgres_reset_connector(connect_postgres, lock_factory=threading.Lock):
+    reset_lock = lock_factory()
     reset_done = False
 
     def connect_postgres_for_test(url=None):
@@ -50,9 +50,7 @@ def _make_lazy_postgres_reset_connector(connect_postgres):
                 ).fetchall()
                 tables = [str(row["tablename"]) for row in rows]
                 if tables:
-                    quoted = ", ".join(
-                        '"' + name.replace('"', '""') + '"' for name in tables
-                    )
+                    quoted = ", ".join('"' + name.replace('"', '""') + '"' for name in tables)
                     conn.execute(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE")
                     conn.commit()
                 reset_done = True
@@ -92,9 +90,7 @@ def isolate_selected_database(request, monkeypatch):
             return ""
         return original_postgres_url_from_env()
 
-    connect_postgres_for_test = _make_lazy_postgres_reset_connector(
-        original_connect_postgres
-    )
+    connect_postgres_for_test = _make_lazy_postgres_reset_connector(original_connect_postgres)
 
     monkeypatch.setattr(db, "postgres_url_from_env", selected_postgres_url)
     monkeypatch.setattr(db, "connect_postgres", connect_postgres_for_test)
