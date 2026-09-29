@@ -31,6 +31,8 @@ EXCLUDED_PREFIXES = (
     "tests/",
     "docs/",
     ".github/",
+    "android/app/src/test/",
+    "android/app/src/androidTest/",
     "android/app/build/",
     "build/",
     "dist/",
@@ -76,8 +78,35 @@ def _is_source_candidate(path: str) -> bool:
     return Path(normalized).suffix.lower() in SOURCE_SUFFIXES
 
 
+def _split_rename_path(path: str) -> tuple[str, str] | None:
+    if "=>" not in path:
+        return None
+    if "{" in path and "}" in path:
+        left = path.index("{")
+        right = path.index("}", left)
+        prefix = path[:left]
+        suffix = path[right + 1 :]
+        inner = path[left + 1 : right]
+        if "=>" not in inner:
+            return None
+        old_inner, new_inner = (part.strip() for part in inner.split("=>", 1))
+        return prefix + old_inner + suffix, prefix + new_inner + suffix
+    old_path, new_path = (part.strip() for part in path.split("=>", 1))
+    return old_path, new_path
+
+
+def _resolve_alias(path: str, aliases: dict[str, str]) -> str:
+    seen: set[str] = set()
+    current = path
+    while current in aliases and current not in seen:
+        seen.add(current)
+        current = aliases[current]
+    return current
+
+
 def _parse_history(raw: str) -> tuple[dict[str, FileHistory], int]:
     histories: dict[str, FileHistory] = defaultdict(FileHistory)
+    aliases: dict[str, str] = {}
     commit_index = -1
     author = ""
     touched_this_commit: set[str] = set()
@@ -95,6 +124,15 @@ def _parse_history(raw: str) -> tuple[dict[str, FileHistory], int]:
         if len(parts) != 3:
             continue
         additions_raw, deletions_raw, path = parts
+        rename = _split_rename_path(path)
+        if rename is not None:
+            old_path, new_path = rename
+            canonical_new = _resolve_alias(new_path, aliases)
+            aliases[old_path] = canonical_new
+            path = canonical_new
+        else:
+            path = _resolve_alias(path, aliases)
+
         if not _is_source_candidate(path):
             continue
         if additions_raw == "-" or deletions_raw == "-":
@@ -127,6 +165,7 @@ def analyze_repository(repo_root: Path, *, commits: int = 200) -> dict:
         "log",
         f"-n{max(1, int(commits))}",
         "--numstat",
+        "--find-renames",
         "--format=@@@%H%x09%an%x09%ct",
         "--",
     )
