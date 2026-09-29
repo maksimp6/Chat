@@ -354,7 +354,6 @@ def test_task_validation(kwargs, message):
         BrowserRoleTask(**values)
 
 
-
 def test_helper_fallbacks_and_nonempty_result_mapping():
     serialized, length = _serialized_size({1: "one", "2": "two"})
     assert serialized.startswith("{")
