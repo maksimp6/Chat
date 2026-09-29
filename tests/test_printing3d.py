@@ -579,3 +579,24 @@ def test_treasury_summary_route(printing_client):
     payload = response.get_json()
     assert payload["total_orders"] == 1
     assert payload["currencies"][0]["settled_profit"] == pytest.approx(300)
+
+
+def test_all_owner_scoped_3d_routes_reject_unauthenticated_requests(printing_db, monkeypatch):
+    monkeypatch.delenv("ALICE_OWNER_ID", raising=False)
+    from app import app
+
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    requests = [
+        ("post", "/api/3d/orders", {"title": "Unauthorized"}),
+        ("get", "/api/3d/orders/not-found", None),
+        ("patch", "/api/3d/orders/not-found/status", {"status": "accepted"}),
+        ("post", "/api/3d/orders/not-found/settle", {"actual_revenue": 1, "actual_cost": 1}),
+        ("get", "/api/3d/treasury/summary", None),
+    ]
+
+    for method, path, payload in requests:
+        response = getattr(client, method)(path, json=payload)
+        assert response.status_code == 401
+        assert response.get_json()["error"] == "authenticated owner identity is required"
