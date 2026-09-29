@@ -7,6 +7,8 @@ on:
     types: [submitted, dismissed]
   pull_request_review_comment:
     types: [created, edited, deleted]
+  pull_request_review_thread:
+    types: [resolved, unresolved]
 
 permissions:
   contents: read
@@ -52,8 +54,18 @@ jobs:
           set -euo pipefail
 
           result_file="$RUNNER_TEMP/merge-readiness.json"
-          max_attempts=60
+          max_attempts=180
           attempt=1
+
+          emit_summary() {
+            {
+              echo "## Merge readiness"
+              echo
+              echo '~~~json'
+              cat "$result_file"
+              echo '~~~'
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
 
           while true; do
             set +e
@@ -75,7 +87,7 @@ jobs:
           with open(path, encoding="utf-8") as handle:
               result = json.load(handle)
 
-          retryable = {"check_pending", "required_check_missing", "review_threads"}
+          retryable = {"check_pending", "required_check_missing"}
           blockers = result.get("blockers", [])
           codes = {str(item.get("code") or "") for item in blockers}
           if blockers and codes <= retryable:
@@ -86,6 +98,7 @@ jobs:
               if [ "$attempt" -ge "$max_attempts" ]; then
                 echo "Merge readiness timed out waiting for required checks." >&2
                 cat "$result_file"
+                emit_summary
                 exit 1
               fi
               attempt=$((attempt + 1))
@@ -94,14 +107,9 @@ jobs:
             fi
 
             cat "$result_file"
+            emit_summary
             exit "$status"
           done
 
           cat "$result_file"
-          {
-            echo "## Merge readiness"
-            echo
-            echo '~~~json'
-            cat "$result_file"
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
+          emit_summary
