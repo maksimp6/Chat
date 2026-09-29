@@ -105,5 +105,21 @@ def test_registered_secret_redaction_covers_strings_and_dicts():
 
     assert trace._redact_registered_values("sensitive-value") == "<redacted>"
     assert trace._redact_registered_values(
-        {"key-sensitive-value": "prefix sensitive-value suffix"}
-    ) == {"key-<redacted>": "prefix <redacted> suffix"}
+        {"key-sensitive-value": "prior <redacted> prefix sensitive-value suffix"}
+    ) == {"key-sensitive-value": "prior <redacted> prefix <redacted> suffix"}
+
+
+def test_short_redaction_preserves_trace_keys_and_marker_across_snapshots():
+    trace = _trace()
+    trace.register_sensitive_value("e")
+    trace.register_sensitive_value("redacted")
+    trace.add_event("short_secret", {"value": "e"})
+
+    first = trace.make_snapshot()
+    second = trace.make_snapshot()
+
+    assert first["trace_id"] == "snapshot-trace"
+    assert first["schema_version"] == trace.SCHEMA_VERSION
+    assert first["events"][-1]["type"] == "short_secret"
+    assert first["events"][-1]["payload"]["value"] == "<redacted>"
+    assert second["events"][-1]["payload"]["value"] == "<redacted>"

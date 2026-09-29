@@ -340,13 +340,6 @@ class CloudRuSecretManagementClient:
                 http_status=response.status_code,
             ) from exc
         secret_bytes = None
-        if not secret_value:
-            secret_value = None
-            raise CloudProviderError(
-                "Cloud.ru Secret Management returned an empty secret value",
-                code="invalid_response",
-                http_status=response.status_code,
-            )
         return secret_value
 
 

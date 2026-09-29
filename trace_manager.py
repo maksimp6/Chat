@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 import threading
 import time
 import uuid
@@ -167,22 +168,45 @@ class ExecutionTrace:
             sensitive_values = tuple(sorted(self._sensitive_values, key=len, reverse=True))
         if not sensitive_values:
             return value
+        substring_values = tuple(secret for secret in sensitive_values if len(secret) >= 4)
+        substring_pattern = (
+            re.compile("|".join(re.escape(secret) for secret in substring_values))
+            if substring_values
+            else None
+        )
+        redaction_marker = "<redacted>"
 
         def redact_text(text: str) -> str:
-            for secret in sensitive_values:
-                if text == secret:
-                    return "<redacted>"
-                text = text.replace(secret, "<redacted>")
-            return text
+            if text in sensitive_values:
+                return redaction_marker
+            if substring_pattern is None:
+                return text
+
+            marker_spans = [
+                match.span() for match in re.finditer(re.escape(redaction_marker), text)
+            ]
+            marker_index = 0
+
+            def replace_secret(match: re.Match) -> str:
+                nonlocal marker_index
+                while (
+                    marker_index < len(marker_spans)
+                    and marker_spans[marker_index][1] <= match.start()
+                ):
+                    marker_index += 1
+                if marker_index < len(marker_spans):
+                    marker_start, marker_end = marker_spans[marker_index]
+                    if marker_start <= match.start() and match.end() <= marker_end:
+                        return match.group(0)
+                return redaction_marker
+
+            return substring_pattern.sub(replace_secret, text)
 
         def redact(item: Any) -> Any:
             if isinstance(item, str):
                 return redact_text(item)
             if isinstance(item, dict):
-                return {
-                    redact_text(key) if isinstance(key, str) else key: redact(value)
-                    for key, value in item.items()
-                }
+                return {key: redact(entry) for key, entry in item.items()}
             if isinstance(item, list):
                 return [redact(entry) for entry in item]
             if isinstance(item, tuple):

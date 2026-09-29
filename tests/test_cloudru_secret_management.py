@@ -165,8 +165,10 @@ def test_secret_value_never_reaches_trace_on_success(monkeypatch):
         ),
     ):
         value = client.get_secret_value("secret-1", "v1")
+        cached_value = client.get_secret_value("secret-1", "v1")
 
     assert value == "never-trace-me"
+    assert cached_value == value
     snapshot = json.dumps(trace.make_snapshot(), ensure_ascii=False)
     assert "never-trace-me" not in snapshot
 

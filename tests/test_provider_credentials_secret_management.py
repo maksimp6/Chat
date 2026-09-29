@@ -176,11 +176,20 @@ def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(is
 
 def test_trace_redacts_short_registered_values_inside_text():
     trace = ExecutionTrace(trace_id="short-secret-redaction-test")
+    trace.register_sensitive_value(None)
+    trace.register_sensitive_value("")
     trace.register_sensitive_value("abc")
 
-    trace.add_event("message", {"text": "prefix abc suffix"})
+    trace.add_event(
+        "message",
+        {"text": "abc", "inline": "prefix abc suffix", "tuple": ("abc",), "set": {"abc"}},
+    )
 
-    assert trace.make_snapshot()["events"][0]["payload"]["text"] == ("prefix <redacted> suffix")
+    payload = trace.make_snapshot()["events"][0]["payload"]
+    assert payload["text"] == "<redacted>"
+    assert payload["inline"] == "prefix abc suffix"
+    assert payload["tuple"] == ["<redacted>"]
+    assert payload["set"] == ["<redacted>"]
 
 
 def test_trace_redacts_long_secret_before_repr_truncation():

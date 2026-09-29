@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from mcp_routes import chat
 from app import app
+from invocation.context import InvocationContext
 from invocation.manager import get_invocation
 from trace_manager import get_current_trace
 
@@ -62,6 +63,35 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         self.assertIsNotNone(invocation)
         self.assertEqual(invocation["status"], "failed")
         self.assertEqual(invocation["trace_id"], payload["trace_id"])
+
+    def test_chat_binds_fallback_trace_after_invocation_creation_failure(self):
+        client = app.test_client()
+        context = InvocationContext(
+            "session-fallback", "conv-fallback", "inv-fallback", "trace-fallback"
+        )
+
+        def assert_trace_is_bound(trace):
+            self.assertIs(trace, get_current_trace())
+            return 0
+
+        with (
+            patch(
+                "mcp_routes.create_invocation",
+                side_effect=[RuntimeError("before trace"), context],
+            ),
+            patch("mcp_routes.start_invocation"),
+            patch("mcp_routes.persist_invocation_trace"),
+            patch("mcp_routes.fail_invocation"),
+            patch("mcp_routes.add_message"),
+            patch("mcp_routes.record_yandex_mcp_activity", side_effect=assert_trace_is_bound),
+        ):
+            response = client.post(
+                "/api/chat",
+                json={"conversation_id": "conv-fallback", "message": "hello"},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIsNone(get_current_trace())
 
 
 if __name__ == "__main__":
