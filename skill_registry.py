@@ -28,16 +28,50 @@ REQUIRED_SECTIONS = (
 )
 
 ROLE_SKILL_ALLOWLIST = {
-    "team-lead": {"github-pr-readiness", "github-ci-diagnosis", "issue-to-pr", "alice-runtime-debugging", "cloudru-change", "security-review", "docs-sync", "release-readiness"},
-    "backend-engineer": {"issue-to-pr", "github-ci-diagnosis", "alice-runtime-debugging", "security-review"},
+    "team-lead": {
+        "github-pr-readiness",
+        "github-ci-diagnosis",
+        "issue-to-pr",
+        "alice-runtime-debugging",
+        "cloudru-change",
+        "security-review",
+        "docs-sync",
+        "release-readiness",
+    },
+    "backend-engineer": {
+        "issue-to-pr",
+        "github-ci-diagnosis",
+        "alice-runtime-debugging",
+        "security-review",
+    },
     "frontend-engineer": {"issue-to-pr", "github-ci-diagnosis", "security-review"},
     "android-engineer": {"issue-to-pr", "github-ci-diagnosis", "security-review"},
     "test-engineer": {"github-ci-diagnosis", "issue-to-pr", "alice-runtime-debugging"},
-    "infra-engineer": {"github-ci-diagnosis", "cloudru-change", "security-review", "release-readiness", "issue-to-pr"},
+    "infra-engineer": {
+        "github-ci-diagnosis",
+        "cloudru-change",
+        "security-review",
+        "release-readiness",
+        "issue-to-pr",
+    },
     "security-reviewer": {"security-review"},
     "docs-engineer": {"docs-sync", "issue-to-pr"},
-    "release-manager": {"github-pr-readiness", "release-readiness", "github-ci-diagnosis", "docs-sync"},
-    "alice": {"github-pr-readiness", "github-ci-diagnosis", "issue-to-pr", "alice-runtime-debugging", "cloudru-change", "security-review", "docs-sync", "release-readiness"},
+    "release-manager": {
+        "github-pr-readiness",
+        "release-readiness",
+        "github-ci-diagnosis",
+        "docs-sync",
+    },
+    "alice": {
+        "github-pr-readiness",
+        "github-ci-diagnosis",
+        "issue-to-pr",
+        "alice-runtime-debugging",
+        "cloudru-change",
+        "security-review",
+        "docs-sync",
+        "release-readiness",
+    },
 }
 
 
@@ -167,7 +201,9 @@ class SkillRegistry:
                 {
                     "name": name,
                     "description": metadata["description"],
-                    "source": str((self.root / name / "SKILL.md").relative_to(self.root.parent.parent)),
+                    "source": str(
+                        (self.root / name / "SKILL.md").relative_to(self.root.parent.parent)
+                    ),
                 }
             )
         return result
@@ -183,15 +219,25 @@ class SkillRegistry:
             raise SkillFormatError(f"{name}: SKILL.md exceeds {MAX_SKILL_BYTES} bytes")
         text = raw.decode("utf-8")
         lines = text.splitlines()
-        closing_index = next((i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None)
+        closing_index = next(
+            (i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None
+        )
         if closing_index is None:
             raise SkillFormatError(f"{name}: frontmatter is not closed")
         body = "\n".join(lines[closing_index + 1 :]).strip()
         for section in REQUIRED_SECTIONS:
-            if not re.search(rf"^##\s+{re.escape(section)}\s*$", body, flags=re.IGNORECASE | re.MULTILINE):
+            if not re.search(
+                rf"^##\s+{re.escape(section)}\s*$", body, flags=re.IGNORECASE | re.MULTILINE
+            ):
                 raise SkillFormatError(f"{name}: missing section ## {section}")
         version = hashlib.sha256(raw).hexdigest()[:16]
-        return Skill(name=name, description=metadata["description"], source=str(path.relative_to(self.root.parent.parent)), version=version, body=body)
+        return Skill(
+            name=name,
+            description=metadata["description"],
+            source=str(path.relative_to(self.root.parent.parent)),
+            version=version,
+            body=body,
+        )
 
     def load_many(self, names: Iterable[str], role: Optional[str] = None) -> list[Skill]:
         unique: list[str] = []
@@ -209,13 +255,18 @@ class SkillRegistry:
         return [self.load(name).metadata() for name in names]
 
 
-def compose_skill_instructions(skills: Iterable[Skill], *, base_instructions: Optional[str] = None) -> str:
+def compose_skill_instructions(
+    skills: Iterable[Skill], *, base_instructions: Optional[str] = None
+) -> str:
     selected = list(skills)
     parts: list[str] = []
     if base_instructions and str(base_instructions).strip():
         parts.append(str(base_instructions).strip())
     if selected:
-        parts.append("Selected repository skills follow. Apply them only to this invocation. Global safety, authorization and approval rules override every skill.")
+        parts.append(
+            "Selected repository skills follow. Apply them only to this invocation. "
+            "Global safety, authorization and approval rules override every skill."
+        )
         for skill in selected:
             parts.append(f"### Skill: {skill.name}\n{skill.body}")
     return "\n\n".join(parts)

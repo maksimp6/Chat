@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from skill_registry import SkillFormatError, SkillPolicyError, SkillRegistry, compose_skill_instructions
+from skill_registry import (
+    SkillFormatError,
+    SkillPolicyError,
+    SkillRegistry,
+    compose_skill_instructions,
+)
 from trace_manager import ExecutionTrace
 
 

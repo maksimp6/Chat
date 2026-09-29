@@ -26,7 +26,9 @@ def test_chat_lazily_loads_selected_skill_into_instructions_and_trace():
         patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
-        patch.object(mcp_routes, "settle_billing_to_treasury", return_value={"status": "not_applicable"}),
+        patch.object(
+            mcp_routes, "settle_billing_to_treasury", return_value={"status": "not_applicable"}
+        ),
         patch.object(mcp_routes, "persist_invocation_trace"),
         patch.object(mcp_routes, "finish_invocation"),
         patch.object(mcp_routes, "get_conversation_title", return_value=None),
