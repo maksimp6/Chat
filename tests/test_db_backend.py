@@ -56,7 +56,9 @@ def test_core_db_schema_and_conversations_work_on_sqlite(monkeypatch, tmp_path):
 
 
 
-def test_backend_detection_uses_open_connection_not_environment(monkeypatch, tmp_path):
+def test_backend_detection_uses_open_connection_not_environment(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://configured-but-not-selected")
     path = tmp_path / "runtime.db"
     connection = sqlite3.connect(path)
