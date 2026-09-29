@@ -38,12 +38,7 @@ def test_semantic_snapshot_filters_to_interactive_nodes():
 
 def test_semantic_snapshot_applies_node_budget_deterministically():
     snapshot = build_semantic_snapshot(
-        {
-            "nodes": [
-                {"id": f"n{i}", "role": "button", "name": f"Button {i}"}
-                for i in range(10)
-            ]
-        },
+        {"nodes": [{"id": f"n{i}", "role": "button", "name": f"Button {i}"} for i in range(10)]},
         max_nodes=3,
     )
 
@@ -131,9 +126,7 @@ def test_semantic_diff_returns_only_changes():
     assert [node.node_id for node in diff.changed_nodes] == ["price"]
     assert diff.added_facts == {"delivery": "tomorrow"}
     assert diff.removed_facts == ("seller",)
-    assert diff.changed_facts == {
-        "price": {"before": 29990, "after": 28990}
-    }
+    assert diff.changed_facts == {"price": {"before": 29990, "after": 28990}}
 
 
 def test_equal_snapshots_have_empty_diff():
@@ -191,14 +184,8 @@ def test_evidence_merge_preserves_conflicts():
 
 
 def test_evidence_merge_bounds_fields_and_conflicts():
-    evidence = [
-        Evidence(f"field-{i}", i, f"source-{i}", 1.0)
-        for i in range(10)
-    ]
-    evidence.extend(
-        Evidence("conflict", value, f"source-{value}", 0.5)
-        for value in range(10)
-    )
+    evidence = [Evidence(f"field-{i}", i, f"source-{i}", 1.0) for i in range(10)]
+    evidence.extend(Evidence("conflict", value, f"source-{value}", 0.5) for value in range(10))
 
     result = merge_evidence(
         evidence,
