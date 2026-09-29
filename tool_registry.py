@@ -181,6 +181,14 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Partner Relations: {e}")
 
         try:
+            from printing3d.tools import PRINTING3D_TOOLS
+
+            for name, cfg in PRINTING3D_TOOLS.items():
+                self._register("3d", name, cfg)
+        except Exception as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки 3D Printing: {e}")
+
+        try:
             from cloud.tools import CLOUD_TOOLS
 
             for name, cfg in CLOUD_TOOLS.items():
