@@ -396,3 +396,145 @@ async def test_async_provider_quota_reservations_are_atomic(async_runtime_db):
 
     usage = await asyncio.to_thread(get_usage, "async-quota-user", now=3_600_001)
     assert usage["usage"]["requests"] == 5
+
+
+@pytest.mark.asyncio
+async def test_to_thread_worker_keeps_bound_trace_context_isolated(async_runtime_db):
+    from invocation.manager import create_invocation
+    from invocation.trace import create_invocation_trace
+    from session_manager import create_session
+    from trace_manager import bind_current_trace, get_current_trace, reset_current_trace
+
+    session = await asyncio.to_thread(
+        create_session,
+        metadata={"suite": "async-worker-trace-context"},
+    )
+
+    async def run(index):
+        context = await asyncio.to_thread(
+            create_invocation,
+            session["id"],
+            f"worker-trace-conversation-{index}",
+            metadata={"index": index},
+        )
+        trace = create_invocation_trace(context)
+        token = bind_current_trace(trace)
+        try:
+            await asyncio.sleep(0)
+            first_seen = await asyncio.to_thread(get_current_trace)
+            await asyncio.sleep(0)
+            second_seen = await asyncio.to_thread(get_current_trace)
+            assert first_seen is trace
+            assert second_seen is trace
+            return trace.trace_id
+        finally:
+            reset_current_trace(token)
+
+    trace_ids = await asyncio.gather(*(run(index) for index in range(16)))
+
+    assert len(set(trace_ids)) == 16
+    assert get_current_trace() is None
+
+
+@pytest.mark.asyncio
+async def test_late_worker_finish_cannot_overwrite_cancelled_invocation(async_runtime_db):
+    from invocation.manager import (
+        cancel_invocation,
+        create_invocation,
+        finish_invocation,
+        get_invocation,
+        start_invocation,
+    )
+    from session_manager import create_session
+
+    session = await asyncio.to_thread(
+        create_session,
+        metadata={"suite": "async-late-finish-after-cancel"},
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    worker_finished = threading.Event()
+    contexts = []
+    finish_results = []
+
+    def blocked_worker():
+        context = create_invocation(
+            session["id"],
+            "late-finish-conversation",
+            metadata={"role": "late-finisher"},
+        )
+        assert start_invocation(context.invocation_id)
+        contexts.append(context)
+        entered.set()
+        try:
+            if not release.wait(timeout=5):
+                raise TimeoutError("late-finishing worker was not released")
+            finish_results.append(
+                finish_invocation(
+                    context.invocation_id,
+                    {"role": "late-finisher", "source": "worker"},
+                )
+            )
+        finally:
+            worker_finished.set()
+
+    task = asyncio.create_task(asyncio.to_thread(blocked_worker))
+    assert await asyncio.to_thread(entered.wait, 5)
+
+    context = contexts[0]
+    assert await asyncio.to_thread(
+        cancel_invocation,
+        context.invocation_id,
+        {"reason": "external-cancellation"},
+    )
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    release.set()
+    assert await asyncio.to_thread(worker_finished.wait, 5)
+    assert finish_results == [False]
+
+    invocation = await asyncio.to_thread(get_invocation, context.invocation_id)
+    assert invocation["status"] == "cancelled"
+    assert invocation["result"] is None
+    assert invocation["error"] == {"reason": "external-cancellation"}
+
+
+@pytest.mark.asyncio
+async def test_runtime_invocation_work_leaves_no_owned_pending_tasks(async_runtime_db):
+    from invocation.manager import create_invocation, finish_invocation, start_invocation
+    from session_manager import create_session
+
+    current = asyncio.current_task()
+    before = set(asyncio.all_tasks())
+    session = await asyncio.to_thread(
+        create_session,
+        metadata={"suite": "async-runtime-task-cleanup"},
+    )
+
+    async def run(index):
+        context = await asyncio.to_thread(
+            create_invocation,
+            session["id"],
+            f"runtime-cleanup-conversation-{index}",
+            metadata={"index": index},
+        )
+        assert await asyncio.to_thread(start_invocation, context.invocation_id)
+        assert await asyncio.to_thread(
+            finish_invocation,
+            context.invocation_id,
+            {"index": index},
+        )
+
+    await asyncio.gather(*(run(index) for index in range(12)))
+    await asyncio.sleep(0)
+
+    after = set(asyncio.all_tasks())
+    newly_pending = {
+        task
+        for task in after - before
+        if task is not current and not task.done()
+    }
+    assert newly_pending == set()
