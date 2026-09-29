@@ -1,0 +1,29 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+AGENTS = ROOT / "AGENTS.md"
+
+
+def test_merge_gate_requires_current_master_and_exact_head_ci() -> None:
+    policy = AGENTS.read_text(encoding="utf-8")
+
+    assert "Merge is fail-closed." in policy
+    assert "behind master = 0" in policy
+    assert "exact current PR head" in policy
+    assert "older base" in policy
+
+
+def test_merge_gate_rechecks_when_master_moves() -> None:
+    policy = AGENTS.read_text(encoding="utf-8")
+
+    assert "If `master` advances before merge" in policy
+    assert "Do not reuse green checks from the stale head." in policy
+
+
+def test_merge_gate_uses_one_review_cycle_and_protected_merge() -> None:
+    policy = AGENTS.read_text(encoding="utf-8")
+
+    assert "do not request a second review cycle" in policy
+    assert "Prefer protected auto-merge" in policy
+    assert "Never force-update" in policy
