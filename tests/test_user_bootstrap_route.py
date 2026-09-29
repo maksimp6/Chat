@@ -31,9 +31,7 @@ def test_bootstrap_rejects_non_object_json_without_registering(monkeypatch, payl
 
 
 @pytest.mark.parametrize("metadata", [[], "", 0, False])
-def test_bootstrap_rejects_falsey_non_object_metadata_without_registering(
-    monkeypatch, metadata
-):
+def test_bootstrap_rejects_falsey_non_object_metadata_without_registering(monkeypatch, metadata):
     calls = []
 
     def should_not_register(*args, **kwargs):
