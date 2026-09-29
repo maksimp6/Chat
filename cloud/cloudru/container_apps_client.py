@@ -105,13 +105,40 @@ def estimate_monthly_cost(
     }
 
 
-_READONLY_FIELDS = ("status", "id", "createdAt", "updatedAt")
+_PATCH_TOP_LEVEL_FIELDS = ("name", "description", "configuration", "template")
+_PATCH_CONFIGURATION_FIELDS = ("ingress", "autoDeployments", "ssh", "loggingService")
+_PATCH_INGRESS_FIELDS = (
+    "publiclyAccessible",
+    "corsPolicy",
+    "additionalPortMappings",
+    "accessSettings",
+    "customDomains",
+)
 
 
-def _writable(app: dict[str, Any]) -> dict[str, Any]:
-    body = copy.deepcopy(app)
-    for readonly in _READONLY_FIELDS:
-        body.pop(readonly, None)
+def _patch_body(app: dict[str, Any], *, project_id: str) -> dict[str, Any]:
+    body: dict[str, Any] = {"projectId": project_id}
+
+    for key in _PATCH_TOP_LEVEL_FIELDS:
+        if key not in app:
+            continue
+        value = copy.deepcopy(app[key])
+        if key == "configuration" and isinstance(value, dict):
+            value = {name: value[name] for name in _PATCH_CONFIGURATION_FIELDS if name in value}
+            ingress = value.get("ingress")
+            if isinstance(ingress, dict):
+                ingress = {name: ingress[name] for name in _PATCH_INGRESS_FIELDS if name in ingress}
+                mappings = ingress.get("additionalPortMappings")
+                if isinstance(mappings, list):
+                    ingress["additionalPortMappings"] = [
+                        {k: v for k, v in mapping.items() if k != "url"}
+                        if isinstance(mapping, dict)
+                        else mapping
+                        for mapping in mappings
+                    ]
+                value["ingress"] = ingress
+        body[key] = value
+
     return body
 
 
@@ -157,13 +184,59 @@ class CloudRuContainerAppsClient:
             return self.client.request(
                 SERVICE,
                 "GET",
-                f"/v1/containers/{self._name(name)}",
+                f"/v2/containers/{self._name(name)}",
                 params={"projectId": self._project()},
             )
         except CloudProviderError as exc:
             if exc.http_status == 404:
                 return None
             raise
+
+    def list(
+        self,
+        *,
+        page_size: int = 100,
+        filter_expr: str | None = None,
+        order_by: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return all Container Services using the documented v2 pagination contract."""
+        if page_size < 1:
+            raise CloudProviderError("page_size must be positive", code="validation_error")
+
+        items: list[dict[str, Any]] = []
+        page_token: str | None = None
+        seen_tokens: set[str] = set()
+        while True:
+            params: dict[str, Any] = {
+                "projectId": self._project(),
+                "pageSize": page_size,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            if filter_expr:
+                params["filter"] = filter_expr
+            if order_by:
+                params["orderBy"] = order_by
+
+            payload = self.client.request(SERVICE, "GET", "/v2/containers", params=params)
+            data = payload.get("data", [])
+            if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
+                raise CloudProviderError(
+                    "Cloud.ru Container Apps returned invalid list payload",
+                    code="invalid_response",
+                )
+            items.extend(data)
+
+            next_token = payload.get("nextPageToken")
+            if not next_token:
+                return items
+            if not isinstance(next_token, str) or next_token in seen_tokens:
+                raise CloudProviderError(
+                    "Cloud.ru Container Apps returned invalid pagination token",
+                    code="invalid_response",
+                )
+            seen_tokens.add(next_token)
+            page_token = next_token
 
     def status(self, name: str) -> dict[str, Any]:
         """Condensed, secret-free view: status, public URL, image, scaling."""
@@ -214,7 +287,7 @@ class CloudRuContainerAppsClient:
         current = self.get(spec.name)
         if current is None:
             raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
-        body = _writable(current)
+        body = _patch_body(current, project_id=self._project())
         body.setdefault("configuration", {}).setdefault("ingress", {})["publiclyAccessible"] = (
             spec.public
         )
@@ -231,7 +304,6 @@ class CloudRuContainerAppsClient:
             SERVICE,
             "PATCH",
             f"/v2/containers/{spec.name}",
-            params={"projectId": self._project()},
             json_body=body,
         )
 
@@ -241,8 +313,7 @@ class CloudRuContainerAppsClient:
             SERVICE,
             "PATCH",
             f"/v2/containers/{self._name(name)}",
-            params={"projectId": self._project()},
-            json_body=_writable(previous),
+            json_body=_patch_body(previous, project_id=self._project()),
         )
 
     def deploy(self, spec: ContainerSpec) -> dict[str, Any]:
