@@ -81,3 +81,17 @@ def test_hot_file_report_is_json_serializable(tmp_path):
     encoded = json.dumps(report)
     assert '"module.py"' in encoded
     assert report["weights"]["touches"] == 0.30
+
+
+def test_ci_publishes_hot_file_metrics():
+    workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Generate hot-file modularity report" in workflow
+    assert "python scripts/hot_file_metrics.py" in workflow
+    assert "--json-out hot-file-metrics.json" in workflow
+    assert "--markdown-out hot-file-metrics.md" in workflow
+    assert 'cat hot-file-metrics.md >> "$GITHUB_STEP_SUMMARY"' in workflow
+    assert "hot-file-metrics.json" in workflow
+    assert "hot-file-metrics.md" in workflow
