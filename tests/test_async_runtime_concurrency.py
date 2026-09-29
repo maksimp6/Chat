@@ -253,9 +253,7 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypat
     gateway.register(AgentDescriptor("slow", "Slow"), slow_handler)
     gateway.register(AgentDescriptor("fast", "Fast"), lambda _: {"role": "fast"})
 
-    slow_task = asyncio.create_task(
-        asyncio.to_thread(gateway.invoke, "slow", {"role": "slow"})
-    )
+    slow_task = asyncio.create_task(asyncio.to_thread(gateway.invoke, "slow", {"role": "slow"}))
     assert await asyncio.to_thread(slow_started.wait, 5)
     assert await asyncio.to_thread(timeout_observed.wait, 5)
 
@@ -279,4 +277,3 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypat
     assert slow_result.status == "error"
     assert slow_result.attempts == 1
     assert "timed out" in (slow_result.error or "")
-
