@@ -688,7 +688,8 @@ def set_secret_management_ref(
 def get_secret_management_ref(db: Any, purpose: str) -> Optional[SecretManagementRef]:
     row = _fetch_one(
         db,
-        "SELECT purpose, secret_id, pinned_version_id, previous_version_id, updated_at "
+        "SELECT purpose, secret_id, pinned_version_id, previous_version_id, "
+        "CAST(updated_at AS TEXT) AS updated_at "
         "FROM secret_management_refs WHERE purpose = ?",
         (purpose,),
     )
