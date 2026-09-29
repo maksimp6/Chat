@@ -474,6 +474,12 @@ def test_deploy_verified_success_reports_previous_image():
 
 def test_deploy_verified_restores_whole_previous_configuration():
     previous = _app(image="old")
+    previous["configuration"]["ingress"].update(
+        {
+            "internalUri": "internal.example",
+            "additionalPortMappings": [{"targetPort": 9000, "url": "https://response-only"}],
+        }
+    )
     previous["template"]["containers"][0]["env"] = [{"name": "ALICE_DATABASE_URL", "value": "a"}]
     previous["template"]["scaling"] = {"minInstanceCount": 1, "maxInstanceCount": 1}
     apps = _verified_client(
@@ -494,11 +500,16 @@ def test_deploy_verified_restores_whole_previous_configuration():
     patches = [c for c in apps.client.calls if c[1] == "PATCH"]
     assert len(patches) == 2
     restored = patches[1][4]
+    assert patches[1][3] is None
+    assert restored["projectId"] == "p1"
     assert restored["template"]["containers"][0]["env"] == [
         {"name": "ALICE_DATABASE_URL", "value": "a"}
     ]
     assert restored["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
     assert "status" not in restored and "id" not in restored
+    ingress = restored["configuration"]["ingress"]
+    assert "publicUri" not in ingress and "internalUri" not in ingress
+    assert ingress["additionalPortMappings"] == [{"targetPort": 9000}]
 
 
 def test_iam_failure_becomes_provider_error():
