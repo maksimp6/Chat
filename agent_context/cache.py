@@ -82,9 +82,7 @@ class TaskContextCache:
             return CacheLookup(status="miss", cache_key=cache_key)
 
         stale_components = previous.evidence.changed_components(evidence)
-        reusable = tuple(
-            item for item in previous.slices if item.reusable_when(stale_components)
-        )
+        reusable = tuple(item for item in previous.slices if item.reusable_when(stale_components))
         if not reusable:
             return CacheLookup(
                 status="miss",
@@ -108,9 +106,7 @@ class TaskContextCache:
         """Invalidate all exact-evidence entries for one exact GitHub/task scope."""
         scope_key = scope.scope_key()
         keys = [
-            key
-            for key, packet in self._entries.items()
-            if packet.scope.scope_key() == scope_key
+            key for key, packet in self._entries.items() if packet.scope.scope_key() == scope_key
         ]
         for key in keys:
             self._entries.pop(key, None)
