@@ -258,6 +258,16 @@ def test_list_rejects_non_positive_page_size():
         apps.list(page_size=0)
 
 
+@pytest.mark.parametrize("next_token", [0, False, [], {}])
+def test_list_rejects_falsey_non_string_pagination_token(next_token):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient([{"data": [], "nextPageToken": next_token}]),
+    )
+    with pytest.raises(CloudProviderError, match="pagination token"):
+        apps.list()
+
+
 def test_list_rejects_repeated_pagination_token():
     apps = CloudRuContainerAppsClient(
         project_id="p1",
