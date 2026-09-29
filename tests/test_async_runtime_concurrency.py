@@ -191,3 +191,38 @@ async def test_async_harness_leaves_no_owned_pending_tasks(async_runtime_db):
     after = set(asyncio.all_tasks())
     newly_pending = {task for task in after - before if task is not current and not task.done()}
     assert newly_pending == set()
+
+
+@pytest.mark.asyncio
+async def test_agent_gateway_timeout_does_not_block_sibling_async_call():
+    from agent_gateway import AgentDescriptor, AgentGateway
+
+    slow_started = threading.Event()
+    slow_release = threading.Event()
+
+    def slow_handler(_payload):
+        slow_started.set()
+        if not slow_release.wait(timeout=5):
+            raise TimeoutError("slow handler was not released")
+        return {"role": "slow"}
+
+    gateway = AgentGateway(default_timeout_seconds=0.01, default_max_retries=0)
+    gateway.register(AgentDescriptor("slow", "Slow"), slow_handler)
+    gateway.register(AgentDescriptor("fast", "Fast"), lambda _: {"role": "fast"})
+
+    slow_task = asyncio.create_task(asyncio.to_thread(gateway.invoke, "slow", {}))
+    assert await asyncio.to_thread(slow_started.wait, 5)
+
+    fast_result = await asyncio.wait_for(
+        asyncio.to_thread(gateway.invoke, "fast", {}),
+        timeout=1,
+    )
+    assert fast_result.status == "completed"
+    assert fast_result.result == {"role": "fast"}
+
+    slow_release.set()
+    slow_result = await asyncio.wait_for(slow_task, timeout=1)
+
+    assert slow_result.status == "error"
+    assert slow_result.attempts == 1
+    assert "timed out" in (slow_result.error or "")
