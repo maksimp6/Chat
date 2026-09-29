@@ -377,6 +377,41 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
       }
     }
     if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
+      if (window.AliceTraceSummary && typeof window.AliceTraceSummary.build === "function") {
+        const technical = window.AliceTraceSummary.build(traceObj);
+        if (technical && technical.items && technical.items.length > 0) {
+          const technicalEl = document.createElement("details");
+          technicalEl.className = "msg-meta-details msg-technical-details";
+          const technicalSummary = document.createElement("summary");
+          technicalSummary.className = "msg-meta-summary";
+          technicalSummary.textContent = technical.title;
+          const technicalList = document.createElement("div");
+          technicalList.className = "msg-meta-detail-list msg-technical-list";
+
+          technical.items.forEach(function (item) {
+            const row = document.createElement("div");
+            row.className = "msg-technical-step";
+            row.dataset.kind = item.kind || "event";
+
+            const label = document.createElement("span");
+            label.className = "msg-technical-label";
+            label.textContent = (item.icon ? item.icon + " " : "") + item.label;
+
+            const detail = document.createElement("span");
+            detail.className = "msg-technical-detail";
+            detail.textContent = [item.detail, item.status].filter(Boolean).join(" · ");
+
+            row.appendChild(label);
+            row.appendChild(detail);
+            technicalList.appendChild(row);
+          });
+
+          technicalEl.appendChild(technicalSummary);
+          technicalEl.appendChild(technicalList);
+          metaWrap.appendChild(technicalEl);
+        }
+      }
+
       const traceEl = document.createElement("details");
       traceEl.className = "msg-meta-details msg-trace-details";
       const summary = document.createElement("summary");
