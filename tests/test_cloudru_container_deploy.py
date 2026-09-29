@@ -753,7 +753,13 @@ def test_deploy_verified_restores_config_even_with_same_image():
         apps.deploy_verified(ContainerSpec(name="alice-pro", image="same", cpu="1"))
     patches = [c for c in apps.client.calls if c[1] == "PATCH"]
     assert len(patches) == 2
-    assert patches[1][4] == {k: v for k, v in previous.items() if k not in {"status", "id"}}
+    restored = patches[1][4]
+    assert patches[1][3] is None
+    assert restored["projectId"] == "p1"
+    assert restored["name"] == previous["name"]
+    assert restored["configuration"]["ingress"]["publiclyAccessible"] is True
+    assert "publicUri" not in restored["configuration"]["ingress"]
+    assert restored["template"] == previous["template"]
 
 
 def test_deploy_verified_without_previous_image_just_raises():
