@@ -8,6 +8,9 @@ from browser.orchestration import (
     BrowserRoleDag,
     BrowserRoleTask,
     BrowserTaskBudget,
+    _extract_data,
+    _extract_tokens,
+    _serialized_size,
 )
 
 
@@ -349,3 +352,30 @@ def test_task_validation(kwargs, message):
 
     with pytest.raises(ValueError, match=message):
         BrowserRoleTask(**values)
+
+
+
+def test_helper_fallbacks_and_nonempty_result_mapping():
+    serialized, length = _serialized_size({1: "one", "2": "two"})
+    assert serialized.startswith("{")
+    assert length == len(serialized)
+
+    assert _extract_tokens("plain") == 0
+    assert _extract_tokens({"metadata": {"total_tokens": 4}}) == 4
+    assert _extract_tokens({"metadata": {"token_usage": 3}}) == 3
+    assert _extract_tokens({"usage": {"total_tokens": 2}}) == 2
+    assert _extract_tokens({"metadata": {"consumed_tokens": True}}) == 0
+
+    raw = {"success": True, "other": "value"}
+    assert _extract_data(raw) == raw
+
+    result = BrowserRoleDag(
+        [task("mapped")],
+        lambda _task: {"success": True, "data": {"ok": True}},
+    ).run()
+    mapped = result.to_mapping()
+
+    assert mapped["status"] == "succeeded"
+    assert mapped["tasks"]["mapped"]["status"] == "succeeded"
+    assert mapped["tasks"]["mapped"]["data"] == {"ok": True}
+    assert "duration_ms" in mapped["tasks"]["mapped"]
