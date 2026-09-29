@@ -161,8 +161,10 @@ class YandexMcpMixin:
         conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
 
-        web_cfg = tools_config.get("web_search") or {}
-        if web_cfg.get("enabled"):
+        raw_web_cfg = tools_config.get("web_search")
+        web_cfg = raw_web_cfg if isinstance(raw_web_cfg, dict) else {}
+        web_enabled = True if raw_web_cfg is None else bool(web_cfg.get("enabled"))
+        if web_enabled:
             web_tool = {
                 "type": "web_search",
                 "search_context_size": web_cfg.get("context_size") or "medium",
