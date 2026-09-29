@@ -25,5 +25,5 @@ def test_merge_gate_uses_one_review_cycle_and_protected_merge() -> None:
     policy = AGENTS.read_text(encoding="utf-8")
 
     assert "do not request a second review cycle" in policy
-    assert "Prefer protected auto-merge" in policy
+    assert "Use protected auto-merge" in policy
     assert "Never force-update" in policy
