@@ -18,7 +18,7 @@
 | Key Management | Ключевые операции для зашифрованных PostgreSQL backups в Object Storage | #479/#447; verify decrypt/restore с той же версией ключа. Не включать plaintext fallback |
 | Container Apps logs / Cloud Logging | Runtime stdout/stderr, platform/request logs | JSON stdout идёт отдельной задачей #478; request logs включать после проверки чувствительных полей |
 | Cloud audit logs | Кто менял control-plane ресурсы и когда | Это отдельный поток от приложения, HTTP request и EDS job logs |
-| Foundation Models + Guardrails | Model inference и проверяемое masking чувствительных данных | Model inference/зависимости тарифицируются отдельно; canary тесты prompt, tools, traces и межпользовательской изоляции |
+| Foundation Models + Guardrails | Возможная отдельная будущая оценка AI сервисов Evolution | Не являются текущим AI backend Алисы: inference сейчас идёт только через Yandex Cloud / Yandex AI Studio; не включать в текущий runtime |
 | AI Agents / EvoClaw / AI Workflows | Изолированный пилот агентов, MCP servers и AI workflows | Самостоятельные сервисы Evolution; не переключать Alice runtime и не обходить `UniversalToolExecutor`/approvals |
 | Agents Space | Песочница на базе EvoClaw | Оплата pay-as-you-go: текущая документация указывает baseline 2 vCPU/4 GB за 3.84 ₽/час на работающего агента, плюс model/storage/egress |
 | Distributed Train | Трекинг ML экспериментов и отдельно — обучение | Бесплатный tracking preview не означает бесплатные GPU compute/jobs |

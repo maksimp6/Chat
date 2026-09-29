@@ -60,6 +60,8 @@ def database_parameters(dsn: str, database: dict) -> tuple[dict, list[str]]:
             not filled(dsn)
             or not dsn.startswith(("postgres://", "postgresql://"))
             or re.search(r"%(?![0-9A-Fa-f]{2})", dsn)
+            or "\x00" in dsn
+            or re.search(r"%00", dsn, re.IGNORECASE)
         ):
             return {}, ["ALICE_DATABASE_URL: invalid URI"]
         uri = urlsplit(dsn)
@@ -246,11 +248,9 @@ def probe_database(dsn: str, database: dict) -> str | None:
             row = conn.execute(
                 "SELECT current_database(), current_user, s.ssl, s.version, "
                 "r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolreplication, r.rolbypassrls, "
-                "EXISTS (SELECT 1 FROM pg_roles p WHERE p.rolname IN ("
-                "'pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', "
-                "'pg_read_all_data', 'pg_write_all_data', 'pg_monitor', 'pg_signal_backend', "
-                "'pg_checkpoint', 'pg_create_subscription', 'pg_use_reserved_connections', "
-                "'pg_maintain') AND pg_has_role(current_user, p.oid, 'MEMBER')) "
+                "EXISTS (SELECT 1 FROM pg_roles p WHERE p.oid <> r.oid "
+                "AND p.rolname <> 'pg_database_owner' "
+                "AND pg_has_role(current_user, p.oid, 'MEMBER')) "
                 "FROM pg_stat_ssl s JOIN pg_roles r ON r.rolname = current_user "
                 "WHERE s.pid = pg_backend_pid()"
             ).fetchone()
