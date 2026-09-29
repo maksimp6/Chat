@@ -128,7 +128,11 @@ class TaskContextCache:
         )
 
 
-def record_context_cache_lookup(trace: Any, lookup: CacheLookup, scope: TaskScope) -> dict[str, Any]:
+def record_context_cache_lookup(
+    trace: Any,
+    lookup: CacheLookup,
+    scope: TaskScope,
+) -> dict[str, Any]:
     """Record bounded cache telemetry on the existing ExecutionTrace surface."""
     entry = {
         **lookup.as_trace_payload(),
