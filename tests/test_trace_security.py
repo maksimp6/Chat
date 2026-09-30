@@ -33,6 +33,22 @@ class TraceSecurityTests(unittest.TestCase):
             "private_key=<redacted> --client-secret <redacted> secret_key: <redacted>",
         )
 
+    def test_private_key_redaction_handles_malformed_and_non_key_markers(self):
+        malformed = sanitize_trace_value("before -----BEGIN PRIVATE KEY")
+        self.assertEqual(malformed, "before -----BEGIN PRIVATE KEY")
+
+        certificate = sanitize_trace_value(
+            "before -----BEGIN CERTIFICATE-----data-----END CERTIFICATE----- after"
+        )
+        self.assertIn("BEGIN CERTIFICATE", certificate)
+        self.assertIn("data", certificate)
+
+        unterminated = sanitize_trace_value(
+            "before -----BEGIN RSA PRIVATE KEY-----SECRET-MATERIAL"
+        )
+        self.assertEqual(unterminated, "before <redacted-private-key>")
+        self.assertNotIn("SECRET-MATERIAL", unterminated)
+
     def test_sanitize_trace_value_limits_items(self):
         value = sanitize_trace_value({str(index): index for index in range(51)})
         self.assertIn("<truncated>", value)
