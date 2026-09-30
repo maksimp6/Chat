@@ -1,10 +1,16 @@
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _workflow() -> str:
     return (ROOT / ".github" / "workflows" / "claude-lite.yml").read_text(encoding="utf-8")
+
+
+def _workflow_parsed() -> dict:
+    return yaml.safe_load(_workflow())
 
 
 def test_claude_lite_action_trigger_matches_outer_workflow_trigger():
@@ -60,3 +66,32 @@ def test_claude_direct_implementation_profile_has_bounded_write_and_validation_t
     assert "Bash(git push --force:*)" not in workflow
     assert "Bash(gh secret:*)" not in workflow
     assert "Bash(gh api repos/*/branches:*)" not in workflow
+
+
+def test_concurrency_is_at_job_level_not_workflow_level():
+    """Bot progress comments must not acquire the concurrency lock.
+
+    Workflow-level concurrency is evaluated before any job `if:` condition, so
+    a bot-triggered event that would be skipped by the actor guard still holds
+    the lock while its (empty) run is pending.  Moving concurrency to job level
+    lets the `if:` guard skip the job without ever touching the lock.
+    """
+    doc = _workflow_parsed()
+
+    # No workflow-level concurrency — the lock must not be acquired before the
+    # job-level actor guard runs.
+    assert "concurrency" not in doc, (
+        "concurrency must be at job level, not workflow level; "
+        "a top-level concurrency block is acquired before the job `if:` guard "
+        "can skip bot-triggered runs"
+    )
+
+    job = doc["jobs"]["claude"]
+
+    # Job-level concurrency is present with the expected key shape.
+    assert "concurrency" in job, (
+        "jobs.claude must declare a concurrency block so human task runs "
+        "serialize per issue/PR"
+    )
+    assert job["concurrency"]["cancel-in-progress"] is False
+    assert job["concurrency"]["group"].startswith("claude-lite-")
