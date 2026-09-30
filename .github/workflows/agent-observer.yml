@@ -40,11 +40,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python -m agent_office.observer --repo "$GITHUB_REPOSITORY" --publish --json-out agent-observer.json > /dev/null
-      - name: Save threads as JSON
+      - name: Build reliability snapshot
+        run: >-
+          python -m agent_office.reliability_sources
+          --observer agent-observer.json
+          --json-out reliability-snapshot.json
+          --pretty
+      - name: Evaluate live control health
+        run: >-
+          python -m agent_office.reliability
+          reliability-snapshot.json
+          --controls-only
+          --pretty
+          > reliability-report.json
+      - name: Save observer and reliability evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: agent-observer
-          path: agent-observer.json
+          path: |
+            agent-observer.json
+            reliability-snapshot.json
+            reliability-report.json
           if-no-files-found: ignore
           retention-days: 7
