@@ -39,10 +39,41 @@ _INLINE_CLI_SECRET = re.compile(
     r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|client[_-]?secret))\s+)([^\s;&|]+)"
 )
 _BEARER_SECRET = re.compile(r"(?i)(\bbearer\s+)([^\s;&|]+)")
-_PRIVATE_KEY_BLOCK = re.compile(
-    r"-----BEGIN [^-\n]*PRIVATE KEY-----.*?-----END [^-\n]*PRIVATE KEY-----",
-    re.DOTALL,
-)
+_PRIVATE_KEY_BEGIN = "-----BEGIN "
+
+
+def _redact_private_key_blocks(value: str) -> str:
+    """Redact PEM-like private-key blocks with a deterministic linear scan."""
+    parts: list[str] = []
+    cursor = 0
+    length = len(value)
+
+    while cursor < length:
+        begin = value.find(_PRIVATE_KEY_BEGIN, cursor)
+        if begin < 0:
+            parts.append(value[cursor:])
+            break
+
+        label_end = value.find("-----", begin + len(_PRIVATE_KEY_BEGIN))
+        if label_end < 0:
+            parts.append(value[cursor:])
+            break
+
+        label = value[begin + len(_PRIVATE_KEY_BEGIN) : label_end]
+        if not label.endswith("PRIVATE KEY"):
+            parts.append(value[cursor : label_end + 5])
+            cursor = label_end + 5
+            continue
+
+        parts.append(value[cursor:begin])
+        end_marker = f"-----END {label}-----"
+        end = value.find(end_marker, label_end + 5)
+        parts.append("<redacted-private-key>")
+        if end < 0:
+            break
+        cursor = end + len(end_marker)
+
+    return "".join(parts)
 
 
 def _sanitize_string(value: str) -> str:
@@ -50,7 +81,7 @@ def _sanitize_string(value: str) -> str:
     value = _INLINE_SECRET.sub(r"\1<redacted>", value)
     value = _INLINE_CLI_SECRET.sub(r"\1<redacted>", value)
     value = _BEARER_SECRET.sub(r"\1<redacted>", value)
-    return _PRIVATE_KEY_BLOCK.sub("<redacted-private-key>", value)
+    return _redact_private_key_blocks(value)
 
 
 def safe_repr(value: Any, depth: int = 0) -> Any:
