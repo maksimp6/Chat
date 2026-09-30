@@ -42,12 +42,6 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK components
-        shell: bash
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-36" "ndk;29.0.14206865"
-
       - name: Apply Alice Root Agent overlay
         shell: bash
         run: |
