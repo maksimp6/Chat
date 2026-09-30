@@ -78,5 +78,5 @@ def run_desktop() -> None:
         server_thread.join(timeout=5)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - executable entrypoint
     run_desktop()
