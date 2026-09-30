@@ -26,11 +26,20 @@ def _snapshot(**overrides):
     return values
 
 
-def test_single_proven_valid_decision_meets_target():
-    result = evaluate_snapshot(_snapshot())
+def test_single_proven_valid_decision_meets_target_when_evidence_floor_is_satisfied():
+    result = evaluate_snapshot(_snapshot(), minimum_decisions=1)
     assert result["ready"] is True
+    assert result["controls_healthy"] is True
     assert result["reliability"] == 1.0
     assert result["target"] == SLO_TARGET
+
+
+def test_four_nines_is_not_claimed_from_a_tiny_sample():
+    result = evaluate_snapshot(_snapshot())
+    assert result["ready"] is False
+    assert result["controls_healthy"] is True
+    assert result["sufficient_evidence"] is False
+    assert result["minimum_decisions"] == 10_000
 
 
 def test_unknown_evidence_does_not_count_as_success():
@@ -90,14 +99,16 @@ def test_material_maintainer_outcome_is_accepted():
     result = evaluate_snapshot(
         _snapshot(
             maintainer_handoffs=[{"id": "pr:591", "observer_passes": 2, "outcome": "blocked"}]
-        )
+        ),
+        minimum_decisions=1,
     )
     assert result["ready"] is True
 
 
 def test_cost_waste_signals_are_visible_but_not_false_catastrophes():
     result = evaluate_snapshot(
-        _snapshot(strong_retries_without_new_evidence=2, duplicate_exact_context_reads=3)
+        _snapshot(strong_retries_without_new_evidence=2, duplicate_exact_context_reads=3),
+        minimum_decisions=1,
     )
     codes = {item["code"] for item in result["findings"]}
     assert result["ready"] is True
