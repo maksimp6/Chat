@@ -124,7 +124,10 @@ def test_memory_record_sanitizes_and_deep_freezes_payload():
         memory_id="m1",
         kind="task",
         scope="issue:578",
-        text="authorization: Bearer supersecret",
+        text=(
+            "authorization: Bearer supersecret\n"
+            "-----BEGIN PRIVATE KEY-----\nPRIVATE-MATERIAL\n-----END PRIVATE KEY-----"
+        ),
         provenance={
             "source_type": "github",
             "repository": "maksimp6/Chat",
@@ -133,13 +136,19 @@ def test_memory_record_sanitizes_and_deep_freezes_payload():
         source_version="sha",
         payload={
             "access_token": "supersecret",
+            "private_key": "raw-private-key",
             "nested": {"items": [{"value": "safe"}]},
         },
         now=10,
     )
 
     exported = record.as_dict()
-    assert "supersecret" not in json.dumps(exported)
+    serialized = json.dumps(exported)
+    assert "supersecret" not in serialized
+    assert "raw-private-key" not in serialized
+    assert "PRIVATE-MATERIAL" not in serialized
+    assert exported["payload"]["private_key"] == "<redacted>"
+    assert "<redacted-private-key>" in exported["text"]
     exported["payload"]["nested"]["items"][0]["value"] = "changed"
     assert record.as_dict()["payload"]["nested"]["items"][0]["value"] == "safe"
 
@@ -170,8 +179,24 @@ def test_sqlite_round_trip_freshness_and_visibility(tmp_path):
     stored = store.upsert(record)
 
     assert stored.memory_id == record.memory_id
-    assert store.lookup("memory-1", source_version="sha-1", now=101).status == "hit"
-    changed = store.lookup("memory-1", source_version="sha-2", now=101)
+    assert (
+        store.lookup(
+            "memory-1",
+            source_version="sha-1",
+            visible_to="backend-engineer",
+            now=101,
+        ).status
+        == "hit"
+    )
+    hidden = store.lookup("memory-1", source_version="sha-1", now=101)
+    assert hidden.status == "miss"
+    assert hidden.reason == "not_visible"
+    changed = store.lookup(
+        "memory-1",
+        source_version="sha-2",
+        visible_to="backend-engineer",
+        now=101,
+    )
     assert changed.status == "stale"
     assert changed.reason == "source_version_changed"
     assert store.lookup("missing").status == "miss"
@@ -220,7 +245,12 @@ def test_mark_stale_and_supersede_require_existing_records(tmp_path):
 
     assert store.mark_stale("missing", reason="nope", now=150) is False
     assert store.mark_stale("old", reason="master_changed", now=150) is True
-    stale = store.lookup("old", source_version="sha-1", now=150)
+    stale = store.lookup(
+        "old",
+        source_version="sha-1",
+        visible_to="backend-engineer",
+        now=150,
+    )
     assert stale.status == "stale"
     assert stale.reason == "marked_stale"
     assert stale.record.as_dict()["freshness"]["stale_reason"] == "master_changed"
@@ -232,7 +262,7 @@ def test_mark_stale_and_supersede_require_existing_records(tmp_path):
     with pytest.raises(ValueError, match="replacement"):
         store.supersede("third", replacement_id="missing")
     assert store.supersede("third", replacement_id="new", now=160) is True
-    superseded = store.lookup("third")
+    superseded = store.lookup("third", visible_to="backend-engineer")
     assert superseded.status == "superseded"
     assert superseded.record.superseded_by == "new"
     assert store.supersede("missing", replacement_id="new") is False
@@ -243,9 +273,17 @@ def test_expired_record_is_stale_and_export_is_stable(tmp_path):
     store.upsert(_github_record(memory_id="b", expires_at=105))
     store.upsert(_github_record(memory_id="a", source_version="sha-2"))
 
-    expired = store.lookup("b", source_version="sha-1", now=105)
+    expired = store.lookup(
+        "b",
+        source_version="sha-1",
+        visible_to="backend-engineer",
+        now=105,
+    )
     assert expired.status == "stale"
     assert expired.reason == "expired"
+    assert store.list_records(status="active", now=105) == [
+        store.get("a")
+    ]
 
     exported = store.export_records()
     assert [item["memory_id"] for item in exported] == ["a", "b"]

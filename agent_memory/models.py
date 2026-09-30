@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Mapping
+import re
 import time
 import uuid
 
@@ -14,12 +15,44 @@ from trace_security import sanitize_trace_value
 MEMORY_KINDS = frozenset({"task", "project", "role", "process", "user_status"})
 MEMORY_STATUSES = frozenset({"active", "stale", "superseded"})
 SENSITIVITY_LEVELS = frozenset({"public", "internal", "sensitive"})
+_MEMORY_SECRET_KEYS = frozenset(
+    {
+        "private_key",
+        "privatekey",
+        "ssh_private_key",
+        "secret_key",
+        "client_secret",
+    }
+)
+_PRIVATE_KEY_BLOCK = re.compile(
+    r"-----BEGIN [^-\n]*PRIVATE KEY-----.*?-----END [^-\n]*PRIVATE KEY-----",
+    re.DOTALL,
+)
+
+
+def _sanitize_memory_value(value: Any) -> Any:
+    sanitized = sanitize_trace_value(value)
+    if isinstance(sanitized, str):
+        return _PRIVATE_KEY_BLOCK.sub("<redacted-private-key>", sanitized)
+    if isinstance(sanitized, dict):
+        result = {}
+        for key, item in sanitized.items():
+            normalized = str(key).lower().replace("-", "_")
+            result[str(key)] = (
+                "<redacted>"
+                if normalized in _MEMORY_SECRET_KEYS
+                else _sanitize_memory_value(item)
+            )
+        return result
+    if isinstance(sanitized, (list, tuple, set)):
+        return [_sanitize_memory_value(item) for item in sanitized]
+    return sanitized
 
 
 def _clean_text(value: Any) -> str:
     if value is None:
         return ""
-    return str(sanitize_trace_value(str(value)))
+    return str(_sanitize_memory_value(str(value)))
 
 
 def _freeze(value: Any) -> Any:
@@ -82,7 +115,7 @@ class MemoryRecord:
             raise ValueError("confidence must be between 0 and 1")
         object.__setattr__(self, "confidence", float(self.confidence))
 
-        provenance = sanitize_trace_value(dict(self.provenance))
+        provenance = _sanitize_memory_value(dict(self.provenance))
         source_type = str(provenance.get("source_type") or "").strip()
         refs = provenance.get("refs")
         if not source_type or not isinstance(refs, list | tuple) or not refs:
@@ -91,8 +124,8 @@ class MemoryRecord:
             raise ValueError("GitHub provenance requires repository")
         object.__setattr__(self, "provenance", _freeze(provenance))
 
-        payload = sanitize_trace_value(dict(self.payload))
-        freshness = sanitize_trace_value(dict(self.freshness))
+        payload = _sanitize_memory_value(dict(self.payload))
+        freshness = _sanitize_memory_value(dict(self.freshness))
         invalidate_on = freshness.get("invalidate_on")
         if not isinstance(invalidate_on, list | tuple) or not invalidate_on:
             raise ValueError("freshness requires non-empty invalidate_on")

@@ -45,7 +45,8 @@ Each `MemoryRecord` includes:
 GitHub provenance additionally requires the repository name.
 
 Nested payload/provenance values are immutable inside a record and are exported as
-independent copies.
+independent copies. Memory applies an additional secret boundary for private-key
+fields and PEM private-key blocks before a record can be persisted.
 
 ## Write policy
 
@@ -59,10 +60,14 @@ promoted into durable organizational knowledge.
 
 A lookup returns:
 
-- `hit` when the record is active, unexpired and matches the requested source version;
+- `hit` when the record is active, unexpired, visible to the requesting role and
+  matches the requested source version;
 - `stale` when it was explicitly invalidated, expired or the source version changed;
 - `superseded` when a newer memory record replaced it;
 - `miss` when no record exists.
+
+Restricted point lookups fail closed when the caller does not supply an allowed role,
+and the default active listing excludes expired records.
 
 The store does not automatically overwrite current GitHub facts with remembered data.
 

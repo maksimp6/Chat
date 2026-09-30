@@ -158,11 +158,20 @@ class AgentMemoryStore:
         memory_id: str,
         *,
         source_version: str | None = None,
+        visible_to: str | None = None,
         now: int | None = None,
     ) -> MemoryLookup:
         record = self.get(memory_id)
         if record is None:
             return MemoryLookup(status="miss", memory_id=str(memory_id), reason="not_found")
+        if record.visibility and (
+            visible_to is None or str(visible_to) not in record.visibility
+        ):
+            return MemoryLookup(
+                status="miss",
+                memory_id=record.memory_id,
+                reason="not_visible",
+            )
         if record.status == "superseded":
             return MemoryLookup(
                 status="superseded",
@@ -200,6 +209,7 @@ class AgentMemoryStore:
         scope: str | None = None,
         status: str | None = "active",
         visible_to: str | None = None,
+        now: int | None = None,
     ) -> list[MemoryRecord]:
         conditions: list[str] = []
         params: list[Any] = []
@@ -226,6 +236,8 @@ class AgentMemoryStore:
         finally:
             conn.close()
 
+        if status == "active":
+            records = [record for record in records if not record.is_expired(now=now)]
         if visible_to is None:
             return records
         role = str(visible_to)
