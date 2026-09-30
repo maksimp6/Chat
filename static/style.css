@@ -1804,7 +1804,8 @@ body {
   }
 
   .alice-pro-app #chatbox,
-  .alice-pro-app #input-area {
+  .alice-pro-app #text-ui,
+  .alice-pro-app #voice-ui {
     width: min(100%, 1100px);
     margin-left: auto;
     margin-right: auto;
