@@ -146,9 +146,7 @@ def test_system_keyring_provisions_and_reuses_key(monkeypatch):
 
     first = credential_protection.ensure_provider_credential_key()
 
-    assert stored[
-        (credential_protection.SERVICE_NAME, credential_protection.KEY_NAME)
-    ] == first
+    assert stored[(credential_protection.SERVICE_NAME, credential_protection.KEY_NAME)] == first
     assert os.environ["ALICE_PROVIDER_CREDENTIAL_KEY"] == first
 
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
