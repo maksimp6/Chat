@@ -96,7 +96,9 @@ def _eligible_memory(record: MemoryRecord, query: RetrievalQuery) -> bool:
     if record.kind == "task":
         return (
             str(provenance.get("work_item") or "") == query.work_item
+            and str(provenance.get("branch") or "") == query.branch
             and str(provenance.get("head_sha") or "") == query.head_sha
+            and str(provenance.get("skills_version") or "") == query.skills_version
         )
 
     if record.kind == "role" and record.scope.startswith("role:"):
@@ -182,8 +184,13 @@ def _code_hits(
     query: RetrievalQuery,
     repository_index: Mapping[str, Any] | None,
     repository_index_version: str | None,
+    repository_index_repository: str | None,
 ) -> list[RetrievalHit]:
-    if not repository_index or repository_index_version != query.head_sha:
+    if (
+        not repository_index
+        or repository_index_version != query.head_sha
+        or repository_index_repository != query.repository
+    ):
         return []
 
     files = list(repository_index.get("files") or [])
@@ -288,10 +295,12 @@ class HybridRetriever:
         memory_store: AgentMemoryStore,
         repository_index: Mapping[str, Any] | None = None,
         repository_index_version: str | None = None,
+        repository_index_repository: str | None = None,
     ) -> None:
         self.memory_store = memory_store
         self.repository_index = repository_index
         self.repository_index_version = repository_index_version
+        self.repository_index_repository = repository_index_repository
 
     def retrieve(
         self,
@@ -318,6 +327,7 @@ class HybridRetriever:
                 query,
                 self.repository_index,
                 self.repository_index_version,
+                self.repository_index_repository,
             ),
         ]
         hits = _bound_hits(candidates, query)
@@ -356,8 +366,10 @@ def record_retrieval(trace: Any, bundle: RetrievalBundle, query: RetrievalQuery)
         "cache_status": bundle.cache_status,
         "repository": query.repository,
         "work_item": query.work_item,
+        "branch": query.branch,
         "head_sha": query.head_sha,
         "role": query.role,
+        "skills_version": query.skills_version,
         "source_counts": dict(bundle.source_counts),
         "hit_refs": [hit.ref for hit in bundle.hits],
         "total_chars": bundle.total_chars,

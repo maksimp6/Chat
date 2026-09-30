@@ -33,11 +33,12 @@ optional ranking signal behind the same freshness/provenance contract.
 Task memory is fail-closed:
 
 - GitHub repository must match;
-- provenance work item must match;
-- provenance head SHA must match the current query head.
+- provenance work item and branch must match;
+- provenance head SHA must match the current query head;
+- provenance skill-version fingerprint must match the selected skill set.
 
-Code-index evidence is used only when the index source version exactly matches the
-query head SHA. A stale index therefore returns no code hits rather than pretending to
+Code-index evidence is used only when both the repository identity and index source
+version exactly match the query repository/head SHA. A stale index therefore returns no code hits rather than pretending to
 be current.
 
 Project/process memory remains governed by the shared memory store's

@@ -40,14 +40,24 @@ class RetrievalQuery:
     text: str
     repository: str
     work_item: str
+    branch: str
     head_sha: str
     role: str
+    skills_version: str
     selected_skills: tuple[str, ...] = ()
     max_results: int = 8
     max_chars: int = 6000
 
     def __post_init__(self) -> None:
-        for name in ("text", "repository", "work_item", "head_sha", "role"):
+        for name in (
+            "text",
+            "repository",
+            "work_item",
+            "branch",
+            "head_sha",
+            "role",
+            "skills_version",
+        ):
             value = _clean(getattr(self, name))
             if not value:
                 raise ValueError(f"{name} is required")

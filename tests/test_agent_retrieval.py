@@ -27,8 +27,10 @@ def _query(**overrides):
         "text": "settle payment invoice",
         "repository": "maksimp6/Chat",
         "work_item": "PR#900",
+        "branch": "feat/retrieval",
         "head_sha": HEAD,
         "role": "backend-engineer",
+        "skills_version": "skills-v1",
         "selected_skills": ("github-ci-diagnosis",),
         "max_results": 8,
         "max_chars": 6000,
@@ -53,7 +55,14 @@ def _memory(
         "refs": [f"memory:{memory_id}"],
     }
     if kind == "task":
-        provenance.update({"work_item": work_item, "head_sha": head})
+        provenance.update(
+            {
+                "work_item": work_item,
+                "branch": "feat/retrieval",
+                "head_sha": head,
+                "skills_version": "skills-v1",
+            }
+        )
     return MemoryRecord.create(
         memory_id=memory_id,
         kind=kind,
@@ -175,6 +184,7 @@ def test_exact_cache_hit_short_circuits_memory_and_code(tmp_path):
         memory_store=store,
         repository_index=_index(),
         repository_index_version=HEAD,
+        repository_index_repository="maksimp6/Chat",
     )
 
     bundle = retriever.retrieve(_query(), cache_lookup=_cache("hit"), now=101)
@@ -199,6 +209,7 @@ def test_partial_cache_continues_into_memory_and_code(tmp_path):
         memory_store=store,
         repository_index=_index(),
         repository_index_version=HEAD,
+        repository_index_repository="maksimp6/Chat",
     )
 
     bundle = retriever.retrieve(_query(), cache_lookup=_cache("partial"), now=101)
@@ -208,6 +219,33 @@ def test_partial_cache_continues_into_memory_and_code(tmp_path):
     assert bundle.source_counts["cache"] == 1
     assert bundle.source_counts["memory"] >= 1
     assert bundle.source_counts["code"] >= 1
+
+
+def test_task_memory_requires_branch_and_skill_version(tmp_path):
+    store = _store(tmp_path)
+    wrong_branch = _memory(
+        memory_id="wrong-branch",
+        kind="task",
+        text="settle payment invoice wrong branch",
+    )
+    wrong_branch_payload = wrong_branch.as_dict()
+    wrong_branch_payload["provenance"]["branch"] = "other"
+    store.upsert(MemoryRecord(**wrong_branch_payload))
+
+    wrong_skills = _memory(
+        memory_id="wrong-skills",
+        kind="task",
+        text="settle payment invoice wrong skills",
+    )
+    wrong_skills_payload = wrong_skills.as_dict()
+    wrong_skills_payload["provenance"]["skills_version"] = "skills-v2"
+    store.upsert(MemoryRecord(**wrong_skills_payload))
+
+    retriever = HybridRetriever(memory_store=store)
+    refs = [hit.ref for hit in retriever.retrieve(_query(), now=101).hits]
+
+    assert "memory:wrong-branch" not in refs
+    assert "memory:wrong-skills" not in refs
 
 
 def test_stale_or_wrong_task_memory_is_not_returned(tmp_path):
@@ -269,14 +307,24 @@ def test_repository_index_must_match_exact_head(tmp_path):
         memory_store=store,
         repository_index=_index(),
         repository_index_version="old-head",
+        repository_index_repository="maksimp6/Chat",
     )
     current = HybridRetriever(
         memory_store=store,
         repository_index=_index(),
         repository_index_version=HEAD,
+        repository_index_repository="maksimp6/Chat",
+    )
+
+    wrong_repo = HybridRetriever(
+        memory_store=store,
+        repository_index=_index(),
+        repository_index_version=HEAD,
+        repository_index_repository="other/repo",
     )
 
     assert stale.retrieve(_query(), now=101).status == "miss"
+    assert wrong_repo.retrieve(_query(), now=101).status == "miss"
     bundle = current.retrieve(_query(), now=101)
     assert bundle.status == "hit"
     assert bundle.hits[0].ref == "billing/service.py"
