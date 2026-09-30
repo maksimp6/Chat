@@ -210,6 +210,11 @@ def main() -> int:
     parser.add_argument("--pretty", action="store_true")
     parser.add_argument("--target", type=float, default=SLO_TARGET)
     parser.add_argument("--minimum-decisions", type=int, default=MIN_DECISIONS_FOR_SLO)
+    parser.add_argument(
+        "--controls-only",
+        action="store_true",
+        help="exit zero when deterministic controls are healthy even if the SLO sample is not proven",
+    )
     args = parser.parse_args()
 
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
@@ -219,7 +224,8 @@ def main() -> int:
         minimum_decisions=args.minimum_decisions,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
-    return 0 if result["ready"] else 1
+    success = result["controls_healthy"] if args.controls_only else result["ready"]
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
