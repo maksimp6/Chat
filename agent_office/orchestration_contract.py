@@ -83,6 +83,10 @@ class OrchestratedTaskPacket:
     accepted_contract_head: Optional[str] = None
     brief_opinion: Optional[BriefOpinion] = None
     role: Optional[str] = None
+    objective: Optional[str] = None
+    current_head: Optional[str] = None
+    expected_deliverable: Optional[str] = None
+    approval_boundary: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.stage not in CANONICAL_LIFECYCLE_STAGES:
@@ -102,7 +106,8 @@ class OrchestratedTaskPacket:
             )
             if required not in self.evidence_refs:
                 raise ValueError(
-                    "evidence_refs must contain a contract EvidenceRef from implementation onward"
+                    "contract provenance: evidence_refs must contain a contract"
+                    " EvidenceRef from implementation onward"
                 )
 
     @property
@@ -155,6 +160,14 @@ class TaskRegistry:
                 if not (new_evidence - prior_evidence):
                     raise MissingEvidenceError(
                         "retry after failed/stalled requires at least one new EvidenceRef"
+                    )
+            else:
+                allowed = next_stage_after(prior.packet.stage, prior.material_outcome)
+                if packet.stage != allowed:
+                    raise DuplicateActiveTaskError(
+                        f"work item {packet.work_item_ref!r}: prior stage"
+                        f" {prior.packet.stage!r} with outcome {prior.material_outcome!r}"
+                        f" allows {allowed!r} next but got {packet.stage!r}"
                     )
         else:
             allowed = next_stage_after(prior.packet.stage, prior.material_outcome)
