@@ -138,7 +138,7 @@ def _cache(status="hit"):
     )
     packet = TaskPacket(
         scope=scope,
-        evidence=EvidenceVersion(task="task-1", ci="ci-1"),
+        evidence=EvidenceVersion(task="task-1", ci="ci-1", skills="skills-v1"),
         objective="settle payment invoice",
         expected_deliverable="fix",
         slices=(
@@ -155,6 +155,8 @@ def _cache(status="hit"):
         status=status,
         cache_key=packet.cache_key(),
         packet=packet if status == "hit" else None,
+        scope=scope,
+        evidence=packet.evidence,
         reusable_slices=packet.slices,
         stale_components=() if status == "hit" else ("ci",),
         saved_source_bytes=500,
@@ -194,6 +196,22 @@ def test_exact_cache_hit_short_circuits_memory_and_code(tmp_path):
     assert bundle.source_counts == {"cache": 1}
     assert [hit.source_type for hit in bundle.hits] == ["cache"]
     assert bundle.saved_input_tokens == 100
+
+
+def test_cache_provenance_must_match_retrieval_query(tmp_path):
+    store = _store(tmp_path)
+    retriever = HybridRetriever(memory_store=store)
+    mismatched = _cache("hit")
+
+    bundle = retriever.retrieve(
+        _query(head_sha="different-head"),
+        cache_lookup=mismatched,
+        now=101,
+    )
+
+    assert bundle.status == "miss"
+    assert bundle.cache_status == "miss"
+    assert bundle.hits == ()
 
 
 def test_partial_cache_continues_into_memory_and_code(tmp_path):

@@ -15,6 +15,8 @@ class CacheLookup:
     status: str
     cache_key: str
     packet: TaskPacket | None = None
+    scope: TaskScope | None = None
+    evidence: EvidenceVersion | None = None
     reusable_slices: tuple[ContextSlice, ...] = ()
     stale_components: tuple[str, ...] = ()
     saved_source_bytes: int = 0
@@ -68,6 +70,8 @@ class TaskContextCache:
                 status="hit",
                 cache_key=cache_key,
                 packet=exact,
+                scope=scope,
+                evidence=evidence,
                 reusable_slices=exact.slices,
                 saved_source_bytes=source_bytes,
                 saved_input_tokens=input_tokens,
@@ -75,11 +79,21 @@ class TaskContextCache:
 
         previous_key = self._latest_by_scope.get(scope.scope_key())
         if previous_key is None:
-            return CacheLookup(status="miss", cache_key=cache_key)
+            return CacheLookup(
+                status="miss",
+                cache_key=cache_key,
+                scope=scope,
+                evidence=evidence,
+            )
 
         previous = self._entries.get(previous_key)
         if previous is None:
-            return CacheLookup(status="miss", cache_key=cache_key)
+            return CacheLookup(
+                status="miss",
+                cache_key=cache_key,
+                scope=scope,
+                evidence=evidence,
+            )
 
         stale_components = previous.evidence.changed_components(evidence)
         reusable = tuple(item for item in previous.slices if item.reusable_when(stale_components))
@@ -87,6 +101,8 @@ class TaskContextCache:
             return CacheLookup(
                 status="miss",
                 cache_key=cache_key,
+                scope=scope,
+                evidence=evidence,
                 stale_components=stale_components,
             )
 
@@ -94,6 +110,8 @@ class TaskContextCache:
         return CacheLookup(
             status="partial",
             cache_key=cache_key,
+            scope=scope,
+            evidence=evidence,
             reusable_slices=reusable,
             stale_components=stale_components,
             saved_source_bytes=source_bytes,

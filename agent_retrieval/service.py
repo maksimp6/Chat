@@ -235,8 +235,26 @@ def _code_hits(
     return hits
 
 
-def _cache_hits(lookup: CacheLookup | None) -> list[RetrievalHit]:
-    if lookup is None or lookup.status not in {"hit", "partial"}:
+def _cache_matches_query(lookup: CacheLookup, query: RetrievalQuery) -> bool:
+    if lookup.scope is None or lookup.evidence is None:
+        return False
+    scope = lookup.scope
+    return (
+        scope.repository == query.repository
+        and scope.work_item == query.work_item
+        and scope.head_sha == query.head_sha
+        and scope.role == query.role
+        and tuple(scope.selected_skills) == tuple(query.selected_skills)
+        and lookup.evidence.skills == query.skills_version
+    )
+
+
+def _cache_hits(lookup: CacheLookup | None, query: RetrievalQuery) -> list[RetrievalHit]:
+    if (
+        lookup is None
+        or lookup.status not in {"hit", "partial"}
+        or not _cache_matches_query(lookup, query)
+    ):
         return []
     hits: list[RetrievalHit] = []
     for index, context_slice in enumerate(lookup.reusable_slices):
@@ -310,13 +328,14 @@ class HybridRetriever:
         now: int | None = None,
     ) -> RetrievalBundle:
         cache_status = cache_lookup.status if cache_lookup is not None else "miss"
-        cached = _cache_hits(cache_lookup)
+        cached = _cache_hits(cache_lookup, query)
+        effective_cache_status = cache_status if cached else "miss"
 
-        if cache_status == "hit" and cached:
+        if effective_cache_status == "hit" and cached:
             hits = _bound_hits(cached, query)
             return self._bundle(
                 hits,
-                cache_status=cache_status,
+                cache_status=effective_cache_status,
                 cache_lookup=cache_lookup,
             )
 
@@ -333,7 +352,7 @@ class HybridRetriever:
         hits = _bound_hits(candidates, query)
         return self._bundle(
             hits,
-            cache_status=cache_status,
+            cache_status=effective_cache_status,
             cache_lookup=cache_lookup,
         )
 

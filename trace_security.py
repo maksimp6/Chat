@@ -22,6 +22,11 @@ SENSITIVE_KEYS: Set[str] = {
     "refresh_token",
     "cookie",
     "set-cookie",
+    "private_key",
+    "privatekey",
+    "ssh_private_key",
+    "secret_key",
+    "client_secret",
 }
 MAX_REPR = 4000
 MAX_DEPTH = 12
@@ -34,13 +39,18 @@ _INLINE_CLI_SECRET = re.compile(
     r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization))\s+)([^\s;&|]+)"
 )
 _BEARER_SECRET = re.compile(r"(?i)(\bbearer\s+)([^\s;&|]+)")
+_PRIVATE_KEY_BLOCK = re.compile(
+    r"-----BEGIN [^-\n]*PRIVATE KEY-----.*?-----END [^-\n]*PRIVATE KEY-----",
+    re.DOTALL,
+)
 
 
 def _sanitize_string(value: str) -> str:
     """Retain useful trace text while removing common inline credentials."""
     value = _INLINE_SECRET.sub(r"\1<redacted>", value)
     value = _INLINE_CLI_SECRET.sub(r"\1<redacted>", value)
-    return _BEARER_SECRET.sub(r"\1<redacted>", value)
+    value = _BEARER_SECRET.sub(r"\1<redacted>", value)
+    return _PRIVATE_KEY_BLOCK.sub("<redacted-private-key>", value)
 
 
 def safe_repr(value: Any, depth: int = 0) -> Any:
