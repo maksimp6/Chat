@@ -25,6 +25,14 @@ class TraceSecurityTests(unittest.TestCase):
         self.assertNotIn("PRIVATE-MATERIAL", value["text"])
         self.assertIn("<redacted-private-key>", value["text"])
 
+        inline = sanitize_trace_value(
+            "private_key=raw --client-secret client-value secret_key: secret-value"
+        )
+        self.assertEqual(
+            inline,
+            "private_key=<redacted> --client-secret <redacted> secret_key: <redacted>",
+        )
+
     def test_sanitize_trace_value_limits_items(self):
         value = sanitize_trace_value({str(index): index for index in range(51)})
         self.assertIn("<truncated>", value)

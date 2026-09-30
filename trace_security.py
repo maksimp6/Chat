@@ -33,10 +33,10 @@ MAX_DEPTH = 12
 MAX_ITEMS = 50
 
 _INLINE_SECRET = re.compile(
-    r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization)\b\s*(?:=|:)\s*)((?:bearer\s+)?[^\s;&|]+)"
+    r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|client[_-]?secret)\b\s*(?:=|:)\s*)((?:bearer\s+)?[^\s;&|]+)"
 )
 _INLINE_CLI_SECRET = re.compile(
-    r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization))\s+)([^\s;&|]+)"
+    r"(?i)((?:--(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|token|authorization|private[_-]?key|ssh[_-]?private[_-]?key|secret[_-]?key|client[_-]?secret))\s+)([^\s;&|]+)"
 )
 _BEARER_SECRET = re.compile(r"(?i)(\bbearer\s+)([^\s;&|]+)")
 _PRIVATE_KEY_BLOCK = re.compile(
