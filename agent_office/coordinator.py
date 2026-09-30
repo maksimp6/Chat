@@ -53,8 +53,6 @@ def _freeze(value: Any) -> Any:
         return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
     if isinstance(value, (list, tuple)):
         return tuple(_freeze(item) for item in value)
-    if isinstance(value, (set, frozenset)):
-        return frozenset(_freeze(item) for item in value)
     return value
 
 
@@ -63,8 +61,6 @@ def _thaw(value: Any) -> Any:
         return {str(key): _thaw(item) for key, item in value.items()}
     if isinstance(value, tuple):
         return [_thaw(item) for item in value]
-    if isinstance(value, frozenset):
-        return sorted(_thaw(item) for item in value)
     return value
 
 
@@ -333,16 +329,14 @@ def _build_payload(
             "do_not_repeat": list(packet.failed_attempts),
             "blocker": soft.blocker,
         }
-    if audience == "governor":
-        return {
-            **common,
-            "evidence_refs": evidence_refs,
-            "open_questions": list(packet.open_questions),
-            "do_not_repeat": list(packet.failed_attempts),
-            "escalation_target": packet.escalation_target,
-            "blocker": soft.blocker,
-        }
-    raise CoordinatorPolicyError(f"unsupported handoff audience: {audience}")
+    return {
+        **common,
+        "evidence_refs": evidence_refs,
+        "open_questions": list(packet.open_questions),
+        "do_not_repeat": list(packet.failed_attempts),
+        "escalation_target": packet.escalation_target,
+        "blocker": soft.blocker,
+    }
 
 
 def _recipient_role(audience: str, owner_role: str) -> str:

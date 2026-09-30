@@ -4,6 +4,7 @@ import pytest
 
 from agent_context import EvidenceRef, EvidenceVersion, TaskPacket, TaskScope
 from agent_office.coordinator import (
+    CoordinatorHandoff,
     CoordinatorPolicyError,
     CoordinatorScopeError,
     CoordinatorSoftContext,
@@ -287,6 +288,82 @@ def test_head_change_counts_as_new_evidence_for_strong_reasoning():
     )
 
 
+def test_coordinator_handoff_contract_validation_fails_closed():
+    with pytest.raises(CoordinatorPolicyError, match="audience"):
+        CoordinatorHandoff(
+            audience="mystery",
+            recipient_role="backend-engineer",
+            owner_role="backend-engineer",
+            stage="implementation",
+            backend="codex",
+            task_state="working",
+            reasoning_tier="cheap",
+            evidence_fingerprint="fp",
+            repository="maksimp6/Chat",
+            work_item="issue#580",
+            head_sha="head-1",
+        )
+
+    with pytest.raises(CoordinatorPolicyError, match="recipient_role"):
+        CoordinatorHandoff(
+            audience="specialist",
+            recipient_role="",
+            owner_role="backend-engineer",
+            stage="implementation",
+            backend="codex",
+            task_state="working",
+            reasoning_tier="cheap",
+            evidence_fingerprint="fp",
+            repository="maksimp6/Chat",
+            work_item="issue#580",
+            head_sha="head-1",
+        )
+
+    with pytest.raises(CoordinatorPolicyError, match="reasoning tier"):
+        CoordinatorHandoff(
+            audience="specialist",
+            recipient_role="backend-engineer",
+            owner_role="backend-engineer",
+            stage="implementation",
+            backend="codex",
+            task_state="working",
+            reasoning_tier="magic",
+            evidence_fingerprint="fp",
+            repository="maksimp6/Chat",
+            work_item="issue#580",
+            head_sha="head-1",
+        )
+
+
+def test_prepare_handoff_rejects_invalid_audience_and_missing_owner():
+    coordinator = WorkCoordinator(FakeRetriever())
+    with pytest.raises(CoordinatorPolicyError, match="audience"):
+        coordinator.prepare_handoff(
+            plan=_plan(),
+            packet=_packet(),
+            branch="feat/580",
+            task_evidence=_evidence(),
+            trace=ExecutionTrace("trace-bad-audience"),
+            audience="mystery",
+        )
+
+    ownerless = resolve_task_plan(
+        stage="verification",
+        role=None,
+        backend="claude-direct",
+    )
+    packet = _packet()
+    object.__setattr__(packet.scope, "role", None)
+    with pytest.raises(CoordinatorScopeError, match="already-selected owner"):
+        coordinator.prepare_handoff(
+            plan=ownerless,
+            packet=packet,
+            branch="feat/580",
+            task_evidence=_evidence(),
+            trace=ExecutionTrace("trace-no-owner"),
+        )
+
+
 def test_reasoning_and_soft_context_validation_fail_closed():
     with pytest.raises(CoordinatorPolicyError, match="unsupported reasoning"):
         assert_reasoning_allowed(_packet(), requested_tier="magic")
@@ -299,19 +376,38 @@ def test_reasoning_and_soft_context_validation_fail_closed():
 
 
 def test_usage_counters_must_be_nonnegative_integers():
-    packet = _packet()
+    coordinator = WorkCoordinator(FakeRetriever())
+
+    negative = _packet()
     object.__setattr__(
-        packet,
+        negative,
         "usage",
         MappingProxyType({"cheap_calls": -1, "normal_calls": 0, "strong_calls": 0}),
     )
     with pytest.raises(CoordinatorPolicyError, match="non-negative"):
-        WorkCoordinator(FakeRetriever()).prepare_handoff(
+        coordinator.prepare_handoff(
             plan=_plan(),
-            packet=packet,
+            packet=negative,
             branch="feat/580",
             task_evidence=_evidence(),
             trace=ExecutionTrace("trace-negative-usage"),
+        )
+
+    non_integer = _packet()
+    object.__setattr__(
+        non_integer,
+        "usage",
+        MappingProxyType(
+            {"cheap_calls": "not-a-number", "normal_calls": 0, "strong_calls": 0}
+        ),
+    )
+    with pytest.raises(CoordinatorPolicyError, match="integer"):
+        coordinator.prepare_handoff(
+            plan=_plan(),
+            packet=non_integer,
+            branch="feat/580",
+            task_evidence=_evidence(),
+            trace=ExecutionTrace("trace-invalid-usage"),
         )
 
 
