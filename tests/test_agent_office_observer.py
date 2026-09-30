@@ -504,6 +504,15 @@ def test_observer_workflow_is_hourly_pinned_and_least_privilege():
     assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref) for ref in uses)
     assert "permissions: {}" in workflow
     assert "persist-credentials: false" in workflow
+    assert "repository_dispatch:" in workflow
+    assert "types: [agent_observer_tick]" in workflow
+    assert "issue_comment:" in workflow
+    assert "pull_request_review:" in workflow
+    assert "workflow_run:" in workflow
+    assert "Merge readiness snapshot" in workflow
+    workflow_run_block = workflow.split("workflow_run:", 1)[1].split("jobs:", 1)[0]
+    assert "Agent observer" not in workflow_run_block
+    assert "ref: ${{ github.event.repository.default_branch }}" in workflow
     assert 'cron: "17 * * * *"' in workflow
     assert "issues: write" in workflow
     assert "contents: write" not in workflow
