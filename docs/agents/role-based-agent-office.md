@@ -72,3 +72,16 @@ CODEOWNERS and branch protection still require the owner's explicit approval.
 
 Use the lightest configured model by default. Escalation must have a concrete reason,
 not merely a preference for a larger model.
+
+
+## Skill layer
+
+Roles describe responsibility; repository skills describe repeatable procedures.
+Canonical skills live under `.agents/skills/<name>/SKILL.md`.
+
+Alice exposes a compact skill catalog and loads the full body only for skills selected
+for one invocation. The selected skill name, source and content version are recorded in
+Execution Trace, while the full skill prompt is not copied into the trace.
+
+Role prompts reference reusable skills instead of restating their procedures. Global
+safety, authorization and approval policy always overrides a skill.

@@ -68,6 +68,8 @@ jobs:
         run: python tests/validate_frontend_modules.py
       - name: Validate runtime Python policy
         run: python tests/validate_runtime_modules.py
+      - name: Validate agent skills
+        run: python tests/validate_skills.py
       - name: Run frontend JavaScript regression tests with coverage
         run: |
           set -euo pipefail

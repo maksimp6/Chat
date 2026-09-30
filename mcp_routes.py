@@ -32,6 +32,7 @@ from responses_tool_loop import run_tool_loop, extract_function_calls
 from billing import settle_billing_to_treasury
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_quotas import ProviderQuotaExceeded
+from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
 from universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
@@ -48,6 +49,7 @@ from conversation_ownership import (
 
 logger = logging.getLogger("mcp_routes")
 mcp_bp = Blueprint("mcp", __name__)
+skill_registry = SkillRegistry()
 
 
 def _tool_call_parts(tool_call):
@@ -70,6 +72,19 @@ def _tool_call_needs_approval(tool_call):
     name, arguments = _tool_call_parts(tool_call)
     tool_config = registry.get_tool_meta(name) if name else None
     return bool(tool_config and tool_call_requires_approval(tool_config, arguments))
+
+
+def _normalize_requested_skills(data, params):
+    raw = data.get("skills")
+    if raw is None:
+        raw = params.pop("skills", [])
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        raise SkillRegistryError("skills must be a string or a list of strings")
+    return [item.strip() for item in raw if item.strip()]
 
 
 class AliceClient(YandexResponsesClient):
@@ -144,13 +159,16 @@ def chat():
     model_key = "aliceai-llm"
     partial_output = None
     error_message = None
+    selected_skill_metadata = []
 
     try:
         data = request.get_json(silent=True) or {}
         conv_id = data.get("conversation_id")
         session_id = data.get("session_id") or conv_id
         message = data.get("message")
-        params = data.get("params", {})
+        params = dict(data.get("params") or {})
+        role = data.get("role") or params.pop("role", None)
+        requested_skills = _normalize_requested_skills(data, params)
         model_key = data.get("model") or params.get("model", "aliceai-llm")
 
         if not conv_id or not message:
@@ -160,7 +178,7 @@ def chat():
         invocation = create_invocation(
             session_id,
             conv_id,
-            metadata={"model": model_key},
+            metadata={"model": model_key, "role": role, "skills": requested_skills},
             user_id=owner_id,
         )
         trace = create_invocation_trace(invocation)
@@ -172,11 +190,45 @@ def chat():
                 "message": message,
                 "model": model_key,
                 "params": params,
+                "role": role,
+                "skills": requested_skills,
                 "invocation_id": invocation.invocation_id,
                 "session_id": invocation.session_id,
                 "trace_id": invocation.trace_id,
             }
         )
+
+        try:
+            selected_skills = skill_registry.load_many(requested_skills, role=role)
+        except SkillRegistryError as exc:
+            trace.record_error("skills", "invalid skill selection", error_type=type(exc).__name__)
+            trace_data = trace.finalize()
+            persist_invocation_trace(invocation.invocation_id, trace_data)
+            public_message = "Selected skills are invalid or unavailable"
+            fail_invocation(
+                invocation.invocation_id,
+                error={"code": "invalid_skill_selection", "message": public_message},
+            )
+            return jsonify(
+                {
+                    "error": "invalid_skill_selection",
+                    "message": public_message,
+                    "invocation_id": invocation.invocation_id,
+                    "session_id": invocation.session_id,
+                    "conversation_id": invocation.conversation_id,
+                    "trace_id": invocation.trace_id,
+                    "trace": trace_data,
+                }
+            ), 400
+
+        for skill in selected_skills:
+            trace.add_skill(skill.name, source=skill.source, version=skill.version, role=role)
+        selected_skill_metadata = [skill.metadata() for skill in selected_skills]
+        if selected_skills:
+            params["instructions"] = compose_skill_instructions(
+                selected_skills,
+                base_instructions=params.get("instructions"),
+            )
 
         conv_settings = get_conv_settings(invocation.conversation_id) or {}
         active_tools = conv_settings.get("active_tool_categories")
@@ -336,6 +388,7 @@ def chat():
                 "conversation_id": invocation.conversation_id,
                 "trace_id": invocation.trace_id,
                 "trace": trace_data,
+                "skills": selected_skill_metadata,
                 "title": conversation_title or get_conversation_title(invocation.conversation_id),
             }
         )
@@ -445,6 +498,20 @@ def chat():
     finally:
         if trace_token is not None:
             reset_current_trace(trace_token)
+
+
+@mcp_bp.route("/api/skills", methods=["GET"])
+def list_skills():
+    role = request.args.get("role")
+    try:
+        return jsonify({"skills": skill_registry.catalog(role=role)})
+    except SkillRegistryError:
+        return jsonify(
+            {
+                "error": "invalid_role",
+                "message": "Role is invalid or unsupported",
+            }
+        ), 400
 
 
 @mcp_bp.route("/api/tools/categories", methods=["GET"])

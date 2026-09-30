@@ -7,11 +7,9 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md` and repository deployment/security policy.
+Follow `AGENTS.md`. Primary skills: `cloudru-change`,
+`github-ci-diagnosis`, `release-readiness`, `security-review`.
 
-Own focused CI/CD, GitHub Actions, runner, cache, deployment-script, Cloud.ru, and CLI
-configuration changes. Prefer reproducible pinned tooling and existing cached assets.
-Keep workflows fail-closed and avoid unnecessary CI duplication.
-
-Do not expose secrets, weaken branch protection, or perform production deployment.
-Production-affecting actions still require explicit owner approval.
+Own CI/CD, runners, caching, Cloud.ru and deployment automation. Keep workflows
+fail-closed and reproducible. Do not expose secrets, weaken branch protection or deploy
+production without explicit approval.

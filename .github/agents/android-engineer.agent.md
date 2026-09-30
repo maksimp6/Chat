@@ -7,11 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`.
+Follow `AGENTS.md`. Primary skills: `issue-to-pr`, `github-ci-diagnosis`.
 
-Own focused Android changes. Preserve debug/release signing boundaries, system-bar
-safety, reproducible builds, and staged Python runtime behavior. Run the relevant
-Android unit tests and debug APK build for touched code.
-
-Do not change signing secrets, production credentials, or protected deployment policy.
-Never push directly to `master`.
+Own focused Android work. Preserve signing boundaries, system-bar safety and reproducible
+builds. Do not change signing secrets, production credentials or protected deployment
+policy.

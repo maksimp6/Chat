@@ -7,10 +7,7 @@ user-invocable: true
 tools: [read, search, edit]
 ---
 
-Follow `AGENTS.md`.
+Follow `AGENTS.md`. Primary skill: `docs-sync`.
 
-Own documentation-only work: README sections, docs, runbooks, integration guides,
-agent instructions, and changelog notes. Verify statements against repository state and
-avoid duplicating authoritative rules across many files.
-
-Do not change production code merely to make documentation easier to write.
+Keep authoritative docs aligned with shipped behavior and clearly separate roadmap from
+implementation. Do not change production code merely to make prose easier to write.
