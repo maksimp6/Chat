@@ -346,6 +346,27 @@ def test_task_memory_source_version_must_match_head(tmp_path):
     assert "memory:wrong-source-version" not in [hit.ref for hit in bundle.hits]
 
 
+def test_non_github_memory_from_other_repository_is_not_returned(tmp_path):
+    store = _store(tmp_path)
+    record = _memory(
+        memory_id="external-other-repository",
+        kind="project",
+        text="settle payment invoice external foreign repository",
+        visibility=(),
+        scope="repo:other/repo",
+    )
+    payload = record.as_dict()
+    payload["provenance"] = {
+        "source_type": "trace",
+        "refs": ["trace:foreign-project"],
+    }
+    store.upsert(MemoryRecord(**payload))
+
+    bundle = HybridRetriever(memory_store=store).retrieve(_query(), now=101)
+
+    assert "memory:external-other-repository" not in [hit.ref for hit in bundle.hits]
+
+
 def test_github_memory_from_other_repository_is_not_returned(tmp_path):
     store = _store(tmp_path)
     record = _memory(
