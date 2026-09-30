@@ -233,21 +233,30 @@ def test_observer_pass_alignment_handles_dispatch_around_cron_minute():
     before = datetime(2026, 9, 28, 17, 16, tzinfo=UTC)
     after = datetime(2026, 9, 28, 17, 18, tzinfo=UTC)
 
-    assert observer._observer_passes_since(
-        before,
-        datetime(2026, 9, 28, 18, 17, tzinfo=UTC),
-        17,
-    ) == 2
-    assert observer._observer_passes_since(
-        after,
-        datetime(2026, 9, 28, 19, 17, tzinfo=UTC),
-        17,
-    ) == 2
-    assert observer._observer_passes_since(
-        after,
-        datetime(2026, 9, 28, 18, 16, tzinfo=UTC),
-        17,
-    ) == 0
+    assert (
+        observer._observer_passes_since(
+            before,
+            datetime(2026, 9, 28, 18, 17, tzinfo=UTC),
+            17,
+        )
+        == 2
+    )
+    assert (
+        observer._observer_passes_since(
+            after,
+            datetime(2026, 9, 28, 19, 17, tzinfo=UTC),
+            17,
+        )
+        == 2
+    )
+    assert (
+        observer._observer_passes_since(
+            after,
+            datetime(2026, 9, 28, 18, 16, tzinfo=UTC),
+            17,
+        )
+        == 0
+    )
 
 
 def test_green_reviewed_pr_waiting_for_merge_is_reported():
