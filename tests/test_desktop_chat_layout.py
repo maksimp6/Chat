@@ -21,5 +21,7 @@ def test_desktop_chat_layout_disables_mobile_overlay_controls():
 
 def test_desktop_chat_layout_caps_reading_width():
     assert ".alice-pro-app #chatbox," in STYLE
-    assert ".alice-pro-app #input-area" in STYLE
+    assert ".alice-pro-app #text-ui," in STYLE
+    assert ".alice-pro-app #voice-ui" in STYLE
+    assert "#input-area" not in STYLE
     assert "width: min(100%, 1100px);" in STYLE
