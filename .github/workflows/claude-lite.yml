@@ -60,5 +60,5 @@ jobs:
           track_progress: true
           claude_args: |
             --model claude-sonnet-4-6
-            --max-turns 30
+            --max-turns 45
             --allowedTools "Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(pytest:*),Bash(python:*),Bash(bash scripts/format.sh:*)"
