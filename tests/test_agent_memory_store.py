@@ -281,9 +281,7 @@ def test_expired_record_is_stale_and_export_is_stable(tmp_path):
     )
     assert expired.status == "stale"
     assert expired.reason == "expired"
-    assert store.list_records(status="active", now=105) == [
-        store.get("a")
-    ]
+    assert store.list_records(status="active", now=105) == [store.get("a")]
 
     exported = store.export_records()
     assert [item["memory_id"] for item in exported] == ["a", "b"]

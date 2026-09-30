@@ -164,9 +164,7 @@ class AgentMemoryStore:
         record = self.get(memory_id)
         if record is None:
             return MemoryLookup(status="miss", memory_id=str(memory_id), reason="not_found")
-        if record.visibility and (
-            visible_to is None or str(visible_to) not in record.visibility
-        ):
+        if record.visibility and (visible_to is None or str(visible_to) not in record.visibility):
             return MemoryLookup(
                 status="miss",
                 memory_id=record.memory_id,

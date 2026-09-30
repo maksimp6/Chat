@@ -39,9 +39,7 @@ def _sanitize_memory_value(value: Any) -> Any:
         for key, item in sanitized.items():
             normalized = str(key).lower().replace("-", "_")
             result[str(key)] = (
-                "<redacted>"
-                if normalized in _MEMORY_SECRET_KEYS
-                else _sanitize_memory_value(item)
+                "<redacted>" if normalized in _MEMORY_SECRET_KEYS else _sanitize_memory_value(item)
             )
         return result
     if isinstance(sanitized, (list, tuple, set)):
