@@ -21,13 +21,12 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: claude-lite-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   claude:
     name: Respond to @claude-lite
+    concurrency:
+      group: claude-lite-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
     environment: production
     if: |
       (github.event_name == 'issue_comment' &&
