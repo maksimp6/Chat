@@ -434,7 +434,7 @@ def test_remaining_synthesis_edge_contracts():
             "semantic_type": "snapshot",
             "snapshot": {
                 "nodes": [],
-                "facts": [],
+                "facts": [1],
             },
         }
     )
