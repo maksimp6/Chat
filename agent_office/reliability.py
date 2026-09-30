@@ -11,6 +11,7 @@ from typing import Any
 
 
 SLO_TARGET = 0.9999
+MIN_DECISIONS_FOR_SLO = 10_000
 VALID_STATUSES = {"valid", "invalid", "unknown"}
 MATERIAL_MAINTAINER_OUTCOMES = {"merged", "blocked", "deferred", "changes_requested"}
 CATASTROPHIC_CODES = {
@@ -41,7 +42,12 @@ def _parse_time(value: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
-def evaluate_snapshot(snapshot: dict[str, Any], *, target: float = SLO_TARGET) -> dict[str, Any]:
+def evaluate_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    target: float = SLO_TARGET,
+    minimum_decisions: int = MIN_DECISIONS_FOR_SLO,
+) -> dict[str, Any]:
     generated_at = _parse_time(snapshot["generated_at"])
     findings: list[ReliabilityFinding] = []
     decisions = list(snapshot.get("decisions") or [])
@@ -156,12 +162,14 @@ def evaluate_snapshot(snapshot: dict[str, Any], *, target: float = SLO_TARGET) -
         "maintainer_stall",
     }
     blocking = catastrophic > 0 or any(item.code in blocking_codes for item in findings)
-    sufficient_evidence = total > 0
+    controls_healthy = total > 0 and not blocking
+    sufficient_evidence = total >= minimum_decisions
     meets_target = sufficient_evidence and reliability >= target
-    ready = meets_target and not blocking
+    ready = controls_healthy and meets_target
 
     return {
         "ready": ready,
+        "controls_healthy": controls_healthy,
         "target": target,
         "reliability": reliability,
         "decisions_total": total,
@@ -170,6 +178,7 @@ def evaluate_snapshot(snapshot: dict[str, Any], *, target: float = SLO_TARGET) -
         "decisions_unknown": unknown,
         "catastrophic_violations": catastrophic,
         "error_budget_fraction": max(0.0, 1.0 - target),
+        "minimum_decisions": minimum_decisions,
         "sufficient_evidence": sufficient_evidence,
         "findings": [asdict(item) for item in findings],
     }
@@ -180,10 +189,15 @@ def main() -> int:
     parser.add_argument("snapshot", type=Path, help="JSON reliability snapshot")
     parser.add_argument("--pretty", action="store_true")
     parser.add_argument("--target", type=float, default=SLO_TARGET)
+    parser.add_argument("--minimum-decisions", type=int, default=MIN_DECISIONS_FOR_SLO)
     args = parser.parse_args()
 
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
-    result = evaluate_snapshot(snapshot, target=args.target)
+    result = evaluate_snapshot(
+        snapshot,
+        target=args.target,
+        minimum_decisions=args.minimum_decisions,
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
     return 0 if result["ready"] else 1
 
