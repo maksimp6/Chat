@@ -186,3 +186,62 @@ def test_module_entrypoint_exits_nonzero_for_unproven_snapshot(tmp_path, monkeyp
         runpy.run_module("agent_office.reliability", run_name="__main__")
 
     assert exc.value.code == 1
+
+
+def test_invalid_slo_parameters_are_rejected():
+    with pytest.raises(ValueError, match="target"):
+        evaluate_snapshot(_snapshot(), target=0)
+    with pytest.raises(ValueError, match="minimum_decisions"):
+        evaluate_snapshot(_snapshot(), minimum_decisions=0)
+
+
+def test_future_observer_heartbeat_blocks_claim():
+    result = evaluate_snapshot(
+        _snapshot(observer_last_success_at=(NOW + timedelta(minutes=1)).isoformat()),
+        minimum_decisions=1,
+    )
+    assert result["ready"] is False
+    assert "observer_future" in {item["code"] for item in result["findings"]}
+
+
+def test_catastrophic_flag_forces_decision_invalid():
+    result = evaluate_snapshot(
+        _snapshot(
+            decisions=[
+                {
+                    "id": "unsafe",
+                    "status": "valid",
+                    "provenance": ["trace:unsafe"],
+                    "catastrophic": True,
+                }
+            ]
+        ),
+        minimum_decisions=1,
+    )
+    assert result["decisions_valid"] == 0
+    assert result["decisions_invalid"] == 1
+    assert result["reliability"] == 0.0
+
+
+def test_cli_cannot_weaken_four_nines_or_evidence_floor(tmp_path, monkeypatch, capsys):
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-office-reliability",
+            str(snapshot),
+            "--target",
+            "0.5",
+            "--minimum-decisions",
+            "1",
+        ],
+    )
+
+    from agent_office import reliability
+
+    assert reliability.main() == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["target"] == SLO_TARGET
+    assert output["minimum_decisions"] == 10_000
