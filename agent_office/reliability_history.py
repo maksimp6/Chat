@@ -73,10 +73,11 @@ def deduplicate_events(events: Iterable[DecisionEvent]) -> tuple[DecisionEvent, 
             latest[event.event_id] = event
             continue
         if event.at == previous.at and event != previous:
+            kinds = {event.kind, previous.kind}
             latest[event.event_id] = DecisionEvent(
                 event_id=event.event_id,
                 at=event.at,
-                kind=event.kind,
+                kind=next(iter(kinds)) if len(kinds) == 1 else "conflicting_duplicate",
                 status="unknown",
                 provenance=tuple(sorted(set(event.provenance + previous.provenance))),
                 violation_code="conflicting_duplicate",
