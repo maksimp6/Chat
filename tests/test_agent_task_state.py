@@ -31,6 +31,8 @@ def test_workflow_queued_is_dispatched():
 
 
 def test_workflow_in_progress_without_backend_trigger_is_not_working():
+    # Workflow advanced past queued, so progress is monotonic: dispatched.
+    # It must never reach working without an explicit backend/session trigger.
     state = derive_agent_task_state(
         AgentTaskEvidence(
             dispatch_created=True,
@@ -39,7 +41,7 @@ def test_workflow_in_progress_without_backend_trigger_is_not_working():
         )
     )
 
-    assert state == "acknowledged"
+    assert state == "dispatched"
 
 
 def test_backend_trigger_proves_working():
@@ -157,6 +159,60 @@ def test_stall_requires_explicit_deadline_evidence():
     )
 
     assert state == "stalled"
+
+
+def test_terminal_precedence_cancelled_beats_blocked():
+    # cancelled > blocked: explicit operator cancellation is the strongest terminal.
+    state = derive_agent_task_state(
+        AgentTaskEvidence(
+            dispatch_created=True,
+            cancelled=True,
+            blocker="BLOCKED: dependency missing",
+        )
+    )
+
+    assert state == "cancelled"
+
+
+def test_terminal_precedence_blocked_beats_failed():
+    # blocked > failed: an explicit material blocker is more informative than backend failure.
+    state = derive_agent_task_state(
+        AgentTaskEvidence(
+            dispatch_created=True,
+            blocker="BLOCKED: upstream review rejected",
+            backend_status="failed",
+        )
+    )
+
+    assert state == "blocked"
+
+
+def test_terminal_precedence_failed_beats_stalled():
+    # failed > stalled: concrete backend failure beats timeout/stall inference.
+    state = derive_agent_task_state(
+        AgentTaskEvidence(
+            dispatch_created=True,
+            backend_status="failed",
+            stall_detected=True,
+        )
+    )
+
+    assert state == "failed"
+
+
+def test_terminal_precedence_all_signals_cancelled():
+    # All four terminal signals present: precedence order yields cancelled.
+    state = derive_agent_task_state(
+        AgentTaskEvidence(
+            dispatch_created=True,
+            cancelled=True,
+            blocker="BLOCKED: contract violated",
+            backend_status="failed",
+            stall_detected=True,
+        )
+    )
+
+    assert state == "cancelled"
 
 
 def test_unknown_backend_state_fails_closed():
