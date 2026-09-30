@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "status": "awaiting_provisioning_and_security_review",
+  "public_repository": "maksimp6/Chat",
+  "private_repository": "maksimp6/Chat-business-docs",
+  "base_branch": "master",
+  "default_classification": "private",
+  "mapping": {
+    "public_prefix": "docs/business/public/",
+    "private_public_prefix": "public/",
+    "direction": "bidirectional"
+  },
+  "private_only_prefixes": ["private/", ".mirror/"],
+  "export": {
+    "approval": "owner_exact_content_before_publication",
+    "write_mode": "protected_pull_request",
+    "history": "public_only"
+  },
+  "conflict_policy": "block_entire_batch",
+  "allow_deletions": false,
+  "allow_reverts": false,
+  "allow_force_push": false,
+  "allow_private_history_export": false,
+  "orchestration": {
+    "execution_repository": "private",
+    "private_credentials_in_public_ci": false,
+    "llm_required": false,
+    "no_op_creates_commit": false
+  }
+}
