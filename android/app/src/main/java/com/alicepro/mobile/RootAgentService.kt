@@ -1,35 +1,41 @@
 package com.alicepro.mobile
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.security.SecureRandom
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Foreground service that exposes a local HTTP API for root-level device control.
  *
- * The server binds exclusively to 127.0.0.1 (never 0.0.0.0), requires a
- * bearer token on every request, and enforces a 10-second timeout and 64 KB
- * output cap on every su invocation.  The token is stored in private
- * SharedPreferences and is never written to any log or returned in any response
- * body.
+ * Binding is exclusively to 127.0.0.1. Every request requires a bearer token checked
+ * before any su call. Binary screenshot responses use Content-Type image/png; all
+ * other responses use application/json.
  */
 class RootAgentService : Service() {
 
-    private var serverSocket: ServerSocket? = null
-    private var serverThread: Thread? = null
+    @Volatile private var serverSocket: ServerSocket? = null
+    @Volatile private var serverThread: Thread? = null
+    private val activeClients = CopyOnWriteArrayList<Socket>()
+    private val ioExecutor: ExecutorService = Executors.newCachedThreadPool()
 
     // -------------------------------------------------------------------------
     // Service lifecycle
@@ -47,14 +53,20 @@ class RootAgentService : Service() {
 
     override fun onDestroy() {
         stopServer()
+        ioExecutor.shutdownNow()
         super.onDestroy()
     }
 
     // -------------------------------------------------------------------------
-    // Start / stop helpers
+    // Start / stop – idempotent
     // -------------------------------------------------------------------------
 
     private fun handleStart() {
+        // Guard against competing listeners from repeated START intents
+        if (serverSocket?.isClosed == false) {
+            AppLogger.info("RootAgentService", "Already running; ignoring duplicate start")
+            return
+        }
         AppLogger.info("RootAgentService", "Start requested")
         val token = loadOrCreateToken()
         startForeground(NOTIF_ID, buildNotification())
@@ -87,11 +99,15 @@ class RootAgentService : Service() {
     }
 
     // -------------------------------------------------------------------------
-    // Notification
+    // Notification – includes a visible user-operable Stop action
     // -------------------------------------------------------------------------
 
     private fun buildNotification(): Notification {
-        // Channel is created in MainActivity.onCreate for API 26+.
+        val stopPending = PendingIntent.getService(
+            this, 0,
+            Intent(this, RootAgentService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -103,6 +119,7 @@ class RootAgentService : Service() {
             .setContentText("Listening on localhost:${currentPort()}")
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setOngoing(true)
+            .addAction(android.R.drawable.ic_delete, "Stop", stopPending)
             .build()
     }
 
@@ -114,267 +131,292 @@ class RootAgentService : Service() {
     // -------------------------------------------------------------------------
 
     private fun startServer(token: String) {
-        serverThread = Thread {
+        if (serverSocket?.isClosed == false) return
+        val t = Thread {
             try {
-                val loopback = InetAddress.getByName("127.0.0.1")
-                val ss = ServerSocket(DEFAULT_PORT, 50, loopback)
+                val ss = ServerSocket(DEFAULT_PORT, 50, InetAddress.getByName("127.0.0.1"))
                 serverSocket = ss
-                // Save the actual bound port so the bridge can expose it.
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
-                    .putInt(PREF_PORT, ss.localPort)
-                    .apply()
+                    .putInt(PREF_PORT, ss.localPort).apply()
                 AppLogger.info("RootAgentService", "Listening on 127.0.0.1:${ss.localPort}")
                 while (!ss.isClosed) {
                     try {
                         val client = ss.accept()
-                        handleClient(client, token)
-                    } catch (e: Exception) {
-                        if (!ss.isClosed) {
-                            AppLogger.warning("RootAgentService", "Accept error: ${e.message}")
+                        activeClients.add(client)
+                        ioExecutor.execute {
+                            try {
+                                handleClient(client, token)
+                            } finally {
+                                activeClients.remove(client)
+                                try { client.close() } catch (_: Exception) {}
+                            }
                         }
+                    } catch (e: Exception) {
+                        if (!ss.isClosed) AppLogger.warning("RootAgentService", "Accept error: ${e.message}")
                     }
                 }
             } catch (e: Exception) {
                 AppLogger.error("RootAgentService", "Server error", e)
             }
         }
-        serverThread!!.isDaemon = true
-        serverThread!!.start()
+        t.isDaemon = true
+        serverThread = t
+        t.start()
     }
 
     private fun stopServer() {
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
+        // Close all active clients so no idle connection blocks service stop
+        activeClients.forEach { try { it.close() } catch (_: Exception) {} }
+        activeClients.clear()
         serverThread?.interrupt()
         serverThread = null
     }
 
     private fun handleClient(client: Socket, token: String) {
+        // Bound idle time so one slow client cannot hold the service indefinitely
+        client.soTimeout = SOCKET_TIMEOUT_MS
         try {
-            client.use {
-                val reader = BufferedReader(InputStreamReader(it.getInputStream(), Charsets.UTF_8))
+            val stream = client.getInputStream()
+            val out    = client.getOutputStream()
 
-                // Parse request line.
-                val requestLine = reader.readLine() ?: return
-                val parts = requestLine.split(" ")
-                if (parts.size < 2) {
-                    writeResponse(it, 400, "Bad Request", """{"error":"bad request"}""")
-                    return
+            // Parse request line
+            val requestLine = readHttpLine(stream) ?: return
+            val parts = requestLine.split(" ")
+            if (parts.size < 2) { writeJson(out, 400, "Bad Request", """{"error":"bad request"}"""); return }
+            val method = parts[0].uppercase()
+            val path   = parts[1]
+
+            // Parse headers with count and per-line length bounds
+            val headers = mutableMapOf<String, String>()
+            var headerCount = 0
+            var hLine = readHttpLine(stream)
+            while (hLine != null && hLine.isNotEmpty()) {
+                if (++headerCount > MAX_HEADER_COUNT) {
+                    writeJson(out, 431, "Request Header Fields Too Large", """{"error":"too many headers"}"""); return
                 }
-                val method = parts[0].uppercase()
-                val path   = parts[1]
-
-                // Parse headers.
-                val headers = mutableMapOf<String, String>()
-                var line = reader.readLine()
-                while (line != null && line.isNotEmpty()) {
-                    val idx = line.indexOf(':')
-                    if (idx > 0) {
-                        val key   = line.substring(0, idx).trim().lowercase()
-                        val value = line.substring(idx + 1).trim()
-                        headers[key] = value
-                    }
-                    line = reader.readLine()
-                }
-
-                // Read body if present.
-                val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
-                val body = if (contentLength > 0) {
-                    val buf = CharArray(contentLength.coerceAtMost(MAX_OUTPUT_BYTES))
-                    reader.read(buf, 0, buf.size)
-                    String(buf)
-                } else ""
-
-                // Authenticate — every endpoint requires a valid bearer token.
-                val authHeader = headers["authorization"] ?: ""
-                if (!authHeader.equals("Bearer $token", ignoreCase = false)) {
-                    writeResponse(it, 401, "Unauthorized", """{"error":"unauthorized"}""")
-                    return
-                }
-
-                // Route.
-                val responseBody = when {
-                    method == "GET"  && path == "/health"    -> handleHealth()
-                    method == "POST" && path == "/exec"       -> handleExec(body)
-                    method == "POST" && path == "/screenshot" -> handleScreenshot()
-                    method == "POST" && path == "/tap"        -> handleTap(body)
-                    method == "POST" && path == "/swipe"      -> handleSwipe(body)
-                    method == "POST" && path == "/text"       -> handleText(body)
-                    method == "GET"  && path == "/packages"  -> handlePackages()
-                    method == "GET"  && path == "/processes" -> handleProcesses()
-                    else -> { writeResponse(it, 404, "Not Found", """{"error":"not found"}"""); return }
-                }
-
-                writeResponse(it, 200, "OK", responseBody)
+                val idx = hLine.indexOf(':')
+                if (idx > 0) headers[hLine.substring(0, idx).trim().lowercase()] = hLine.substring(idx + 1).trim()
+                hLine = readHttpLine(stream)
             }
+
+            // Authenticate BEFORE reading body and before any su call
+            if (!checkAuth(headers["authorization"] ?: "", token)) {
+                writeJson(out, 401, "Unauthorized", """{"error":"unauthorized"}"""); return
+            }
+
+            // Read body as exact bytes with byte-correct Content-Length
+            val clVal = headers["content-length"]?.toLongOrNull()
+            if (clVal != null && (clVal < 0 || clVal > MAX_BODY_BYTES)) {
+                writeJson(out, 413, "Content Too Large", """{"error":"body too large"}"""); return
+            }
+            val bodyBytes = if (clVal != null && clVal > 0) readExactBytes(stream, clVal.toInt()) else ByteArray(0)
+            val bodyStr = try {
+                bodyBytes.toString(Charsets.UTF_8)
+            } catch (_: Exception) {
+                writeJson(out, 400, "Bad Request", """{"error":"invalid utf-8 body"}"""); return
+            }
+
+            when {
+                method == "GET"  && path == "/health"    -> writeJson(out, 200, "OK", handleHealth())
+                method == "POST" && path == "/exec"       -> writeJson(out, 200, "OK", handleExec(bodyStr))
+                method == "POST" && path == "/screenshot" -> handleScreenshotResponse(out)
+                method == "POST" && path == "/tap"        -> writeJson(out, 200, "OK", handleTap(bodyStr))
+                method == "POST" && path == "/swipe"      -> writeJson(out, 200, "OK", handleSwipe(bodyStr))
+                method == "POST" && path == "/text"       -> writeJson(out, 200, "OK", handleText(bodyStr))
+                method == "GET"  && path == "/packages"  -> writeJson(out, 200, "OK", handlePackages())
+                method == "GET"  && path == "/processes" -> writeJson(out, 200, "OK", handleProcesses())
+                else -> writeJson(out, 404, "Not Found", """{"error":"not found"}""")
+            }
+        } catch (e: SocketTimeoutException) {
+            AppLogger.warning("RootAgentService", "Client read timeout")
         } catch (e: Exception) {
-            AppLogger.warning("RootAgentService", "Client handler error: ${e.message}")
+            // Log only the class name – never log request bodies, tokens, or credential text
+            AppLogger.warning("RootAgentService", "Client handler error: ${e.javaClass.simpleName}")
         }
     }
 
-    private fun writeResponse(socket: Socket, status: Int, statusText: String, body: String) {
-        val bytes = body.toByteArray(Charsets.UTF_8)
-        val response = buildString {
-            append("HTTP/1.1 $status $statusText\r\n")
-            append("Content-Type: application/json\r\n")
-            append("Content-Length: ${bytes.size}\r\n")
-            append("Connection: close\r\n")
-            append("\r\n")
-        }
-        socket.getOutputStream().apply {
-            write(response.toByteArray(Charsets.UTF_8))
-            write(bytes)
-            flush()
-        }
+    private fun writeJson(out: java.io.OutputStream, status: Int, statusText: String, body: String) {
+        writeBytes(out, status, statusText, "application/json", body.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun writeBytes(out: java.io.OutputStream, status: Int, statusText: String, contentType: String, body: ByteArray) {
+        val header = "HTTP/1.1 $status $statusText\r\nContent-Type: $contentType\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n"
+        out.write(header.toByteArray(Charsets.US_ASCII))
+        out.write(body)
+        out.flush()
     }
 
     // -------------------------------------------------------------------------
     // Endpoint handlers
     // -------------------------------------------------------------------------
 
-    private fun handleHealth(): String {
-        return try {
-            val result = runSu("id")
-            if (result.exitCode == 0) {
-                """{"ok":true}"""
-            } else {
-                """{"ok":false,"error":"root unavailable"}"""
-            }
-        } catch (e: Exception) {
-            """{"ok":false,"error":"root unavailable"}"""
-        }
-    }
+    private fun handleHealth(): String = try {
+        val r = runSu("id")
+        if (r.exitCode == 0) """{"ok":true}""" else """{"ok":false,"error":"root unavailable"}"""
+    } catch (_: Exception) { """{"ok":false,"error":"root unavailable"}""" }
 
     private fun handleExec(body: String): String {
-        val cmd = try { JSONObject(body).getString("cmd") } catch (e: Exception) {
-            return """{"error":"missing cmd field"}"""
-        }
-        val result = runSu(cmd)
-        return JSONObject().apply {
-            put("stdout", result.stdout)
-            put("stderr", result.stderr)
-            put("exit_code", result.exitCode)
-        }.toString()
+        val cmd = try { JSONObject(body).getString("cmd") }
+        catch (_: Exception) { return """{"error":"missing cmd field"}""" }
+        return try {
+            val r = runSu(cmd)
+            JSONObject().apply {
+                put("stdout", r.stdout)
+                put("stderr", r.stderr)
+                put("exit_code", r.exitCode)
+                if (r.stdoutTruncated) put("stdout_truncated", true)
+            }.toString()
+        } catch (_: Exception) { JSONObject().put("error", "exec failed").toString() }
     }
 
-    private fun handleScreenshot(): String {
-        val result = runSuRaw(listOf("su", "-c", "screencap -p"))
-        val b64 = android.util.Base64.encodeToString(result, android.util.Base64.NO_WRAP)
-        return """{"image_b64":"$b64"}"""
+    private fun handleScreenshotResponse(out: java.io.OutputStream) {
+        // runSuRaw completes before any response bytes are written; exceptions map to JSON errors
+        try {
+            val bytes = runSuRaw(listOf("su", "-c", "screencap -p"))
+            writeBytes(out, 200, "OK", "image/png", bytes)
+        } catch (_: ScreenshotTooLargeException) {
+            writeJson(out, 500, "Internal Server Error", """{"error":"screenshot too large"}""")
+        } catch (_: RootDeniedException) {
+            writeJson(out, 500, "Internal Server Error", """{"error":"root denied"}""")
+        } catch (_: Exception) {
+            writeJson(out, 500, "Internal Server Error", """{"error":"screenshot failed"}""")
+        }
     }
 
     private fun handleTap(body: String): String {
+        val json = try { JSONObject(body) } catch (_: Exception) { return """{"error":"invalid json"}""" }
+        val x = json.optInt("x", -1)
+        val y = json.optInt("y", -1)
+        if (x < 0 || y < 0) return """{"error":"x and y must be non-negative integers"}"""
         return try {
-            val json = JSONObject(body)
-            val x = json.getInt("x")
-            val y = json.getInt("y")
-            runSu("input tap $x $y")
-            """{"ok":true}"""
-        } catch (e: Exception) {
-            """{"error":"${e.message?.replace("\"", "\\\"")}"}"""
-        }
+            val r = runSu("input tap $x $y")
+            if (r.exitCode != 0) JSONObject().put("error", "tap failed (exit ${r.exitCode})").toString()
+            else """{"ok":true}"""
+        } catch (_: Exception) { """{"error":"tap failed"}""" }
     }
 
     private fun handleSwipe(body: String): String {
+        val json = try { JSONObject(body) } catch (_: Exception) { return """{"error":"invalid json"}""" }
+        val x1 = json.optInt("x1", -1); val y1 = json.optInt("y1", -1)
+        val x2 = json.optInt("x2", -1); val y2 = json.optInt("y2", -1)
+        val dur = json.optInt("duration", 300)
+        if (x1 < 0 || y1 < 0 || x2 < 0 || y2 < 0) return """{"error":"x1,y1,x2,y2 must be non-negative integers"}"""
+        if (dur < 0 || dur > 60_000) return """{"error":"duration must be 0-60000 ms"}"""
         return try {
-            val json = JSONObject(body)
-            val x1 = json.getInt("x1")
-            val y1 = json.getInt("y1")
-            val x2 = json.getInt("x2")
-            val y2 = json.getInt("y2")
-            val duration = json.optInt("duration", 300)
-            runSu("input swipe $x1 $y1 $x2 $y2 $duration")
-            """{"ok":true}"""
-        } catch (e: Exception) {
-            """{"error":"${e.message?.replace("\"", "\\\"")}"}"""
-        }
+            val r = runSu("input swipe $x1 $y1 $x2 $y2 $dur")
+            if (r.exitCode != 0) JSONObject().put("error", "swipe failed (exit ${r.exitCode})").toString()
+            else """{"ok":true}"""
+        } catch (_: Exception) { """{"error":"swipe failed"}""" }
     }
 
     private fun handleText(body: String): String {
+        val json = try { JSONObject(body) } catch (_: Exception) { return """{"error":"invalid json"}""" }
+        val raw = try { json.getString("text") } catch (_: Exception) { return """{"error":"missing text field"}""" }
+        val escaped = shellEscapeText(raw)
         return try {
-            val rawText = JSONObject(body).getString("text")
-            // Shell-escape single quotes: replace ' with '\''
-            val escaped = rawText.replace("'", "'\\''")
-            runSu("input text '$escaped'")
-            """{"ok":true}"""
-        } catch (e: Exception) {
-            """{"error":"${e.message?.replace("\"", "\\\"")}"}"""
-        }
+            val r = runSu("input text '$escaped'")
+            if (r.exitCode != 0) JSONObject().put("error", "text input failed (exit ${r.exitCode})").toString()
+            else """{"ok":true}"""
+        } catch (_: Exception) { """{"error":"text input failed"}""" }
     }
 
     private fun handlePackages(): String {
-        val result = runSu("pm list packages")
-        val lines = result.stdout.lines()
-        val packages = JSONArray()
-        for (l in lines) {
-            val trimmed = l.trim()
-            if (trimmed.startsWith("package:")) {
-                packages.put(trimmed.removePrefix("package:"))
-            }
+        val r = runSu("pm list packages")
+        val arr = JSONArray()
+        r.stdout.lines().forEach { l ->
+            val t = l.trim()
+            if (t.startsWith("package:")) arr.put(t.removePrefix("package:"))
         }
-        return JSONObject().put("packages", packages).toString()
+        return JSONObject().put("packages", arr).toString()
     }
 
-    private fun handleProcesses(): String {
-        val result = runSu("ps -A")
-        val output = result.stdout.trim().take(MAX_OUTPUT_BYTES)
-        return JSONObject().put("processes", output).toString()
-    }
+    private fun handleProcesses(): String = JSONObject().put("processes", runSu("ps -A").stdout).toString()
 
     // -------------------------------------------------------------------------
     // su execution helpers
     // -------------------------------------------------------------------------
 
-    private data class SuResult(val stdout: String, val stderr: String, val exitCode: Int)
+    data class SuResult(
+        val stdout: String,
+        val stderr: String,
+        val exitCode: Int,
+        val stdoutTruncated: Boolean = false,
+    )
 
+    class ScreenshotTooLargeException : Exception("screenshot exceeds size limit")
+    class RootDeniedException : Exception("root execution denied")
+
+    /**
+     * Runs [cmd] under su, draining stdout and stderr concurrently before the process
+     * exits. Applies a single end-to-end deadline; cleans up process and executors on
+     * timeout or error.
+     */
     private fun runSu(cmd: String): SuResult {
-        val process = ProcessBuilder("su", "-c", cmd)
-            .redirectErrorStream(false)
-            .start()
-        val stdoutFuture = readStreamAsync(process.inputStream)
-        val stderrFuture = readStreamAsync(process.errorStream)
-        val finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        if (!finished) {
-            process.destroy()
+        val process = ProcessBuilder("su", "-c", cmd).redirectErrorStream(false).start()
+        val deadline = System.currentTimeMillis() + TIMEOUT_SECONDS * 1000
+
+        val stdoutF: Future<Pair<String, Boolean>> =
+            ioExecutor.submit<Pair<String, Boolean>> { collectBounded(process.inputStream, MAX_TEXT_OUTPUT_BYTES) }
+        val stderrF: Future<Pair<String, Boolean>> =
+            ioExecutor.submit<Pair<String, Boolean>> { collectBounded(process.errorStream, MAX_TEXT_OUTPUT_BYTES) }
+
+        if (!process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            stdoutF.cancel(true)
+            stderrF.cancel(true)
             return SuResult("", "timeout", -1)
         }
-        val stdout = stdoutFuture.get().take(MAX_OUTPUT_BYTES)
-        val stderr = stderrFuture.get().take(MAX_OUTPUT_BYTES)
-        return SuResult(stdout, stderr, process.exitValue())
+
+        val remainMs = (deadline - System.currentTimeMillis()).coerceAtLeast(1000L)
+        val (stdout, truncated) = try {
+            stdoutF.get(remainMs, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) { stdoutF.cancel(true); Pair("", false) }
+        val (stderr, _) = try {
+            stderrF.get(remainMs, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) { stderrF.cancel(true); Pair("", false) }
+
+        return SuResult(stdout, stderr, process.exitValue(), truncated)
     }
 
     /**
-     * Variant that returns raw bytes (for screenshot).
+     * Runs [command] and returns raw stdout bytes, draining stderr concurrently.
+     * Throws [ScreenshotTooLargeException] if output exceeds [MAX_SCREENSHOT_BYTES],
+     * [RootDeniedException] if process exits non-zero, or [IOException] on timeout.
+     * Never returns truncated image data as success.
      */
     private fun runSuRaw(command: List<String>): ByteArray {
-        val process = ProcessBuilder(command)
-            .redirectErrorStream(false)
-            .start()
-        val finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        if (!finished) {
-            process.destroy()
-            return ByteArray(0)
-        }
-        return process.inputStream.readBytes().let {
-            if (it.size > MAX_OUTPUT_BYTES) it.copyOf(MAX_OUTPUT_BYTES) else it
-        }
-    }
-
-    private fun readStreamAsync(stream: java.io.InputStream): java.util.concurrent.Future<String> {
-        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
-        return executor.submit<String> {
-            try {
-                stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            } catch (e: Exception) {
-                ""
-            } finally {
-                executor.shutdown()
+        val process = ProcessBuilder(command).redirectErrorStream(false).start()
+        val stderrDrain: Future<Unit> =
+            ioExecutor.submit<Unit> { try { process.errorStream.copyTo(NullOutputStream) } catch (_: Exception) {} }
+        try {
+            val baos = ByteArrayOutputStream()
+            val buf = ByteArray(8192)
+            var total = 0L
+            while (true) {
+                val n = process.inputStream.read(buf)
+                if (n == -1) break
+                total += n
+                if (total > MAX_SCREENSHOT_BYTES) {
+                    process.destroyForcibly()
+                    throw ScreenshotTooLargeException()
+                }
+                baos.write(buf, 0, n)
             }
+            if (!process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                throw IOException("screenshot process timeout")
+            }
+            if (process.exitValue() != 0) throw RootDeniedException()
+            return baos.toByteArray()
+        } finally {
+            stderrDrain.cancel(true)
         }
     }
 
     // -------------------------------------------------------------------------
-    // Companion
+    // Companion – static utilities exposed for unit testing
     // -------------------------------------------------------------------------
 
     companion object {
@@ -383,21 +425,91 @@ class RootAgentService : Service() {
         const val CHANNEL_ID   = "root_agent_channel"
         const val NOTIF_ID     = 9001
 
-        private const val PREFS_NAME       = "alice_pro"
-        private const val PREF_TOKEN       = "root_agent_token"
-        private const val PREF_PORT        = "root_agent_port"
-        private const val DEFAULT_PORT     = 7327
-        private const val TIMEOUT_SECONDS  = 10L
-        const val MAX_OUTPUT_BYTES = 65536
+        private const val PREFS_NAME         = "alice_pro"
+        private const val PREF_TOKEN         = "root_agent_token"
+        private const val PREF_PORT          = "root_agent_port"
+        private const val DEFAULT_PORT       = 7327
+        private const val TIMEOUT_SECONDS    = 10L
+        const val MAX_TEXT_OUTPUT_BYTES      = 65_536
+        const val MAX_SCREENSHOT_BYTES       = 10L * 1024 * 1024  // 10 MB
+        const val MAX_BODY_BYTES             = 65_536L
+        private const val SOCKET_TIMEOUT_MS  = 30_000
+        private const val MAX_HEADER_COUNT   = 64
+        const val MAX_HEADER_LINE_BYTES      = 8_192
 
-        /**
-         * Generates a 64-character lowercase hex token backed by 32 bytes of
-         * SecureRandom entropy.  The token is never written to any log.
-         */
+        private val NullOutputStream = object : java.io.OutputStream() {
+            override fun write(b: Int) {}
+            override fun write(b: ByteArray, off: Int, len: Int) {}
+        }
+
+        /** Generates a 64-char lowercase hex token from 32 bytes of SecureRandom. Never logged. */
         fun generateToken(): String {
             val bytes = ByteArray(32)
             SecureRandom().nextBytes(bytes)
             return bytes.joinToString("") { "%02x".format(it) }
+        }
+
+        /** Shell-escapes text for embedding inside a single-quoted sh argument. */
+        fun shellEscapeText(text: String): String = text.replace("'", "'\\''")
+
+        /** Returns true only when [header] is exactly "Bearer <token>" (case-sensitive). */
+        fun checkAuth(header: String, token: String): Boolean = header == "Bearer $token"
+
+        /**
+         * Reads one HTTP line from [stream], stripping the trailing CR.
+         * Returns null on immediate EOF. Throws [IOException] if line exceeds
+         * [MAX_HEADER_LINE_BYTES].
+         */
+        fun readHttpLine(stream: InputStream): String? {
+            val sb = StringBuilder()
+            while (true) {
+                val b = stream.read()
+                if (b == -1) return if (sb.isEmpty()) null else sb.toString()
+                if (b == '\n'.code) {
+                    val s = sb.toString()
+                    return if (s.endsWith('\r')) s.dropLast(1) else s
+                }
+                if (sb.length >= MAX_HEADER_LINE_BYTES) throw IOException("header line too long")
+                sb.append(b.toChar())
+            }
+        }
+
+        /**
+         * Reads exactly [length] bytes from [stream], handling short reads.
+         * Returns a shorter array only on premature EOF.
+         */
+        fun readExactBytes(stream: InputStream, length: Int): ByteArray {
+            val buf = ByteArray(length)
+            var offset = 0
+            while (offset < length) {
+                val n = stream.read(buf, offset, length - offset)
+                if (n == -1) break
+                offset += n
+            }
+            return if (offset == length) buf else buf.copyOf(offset)
+        }
+
+        /**
+         * Collects up to [limit] bytes from [stream] into a UTF-8 string.
+         * Continues draining (discarding) bytes past [limit] so the producing
+         * process is never blocked by a full pipe.
+         * Returns the collected string and whether data was discarded.
+         */
+        fun collectBounded(stream: InputStream, limit: Int): Pair<String, Boolean> {
+            val baos = ByteArrayOutputStream(minOf(limit, 4096))
+            val buf = ByteArray(4096)
+            var truncated = false
+            try {
+                while (true) {
+                    val n = stream.read(buf)
+                    if (n == -1) break
+                    val remaining = limit - baos.size()
+                    val written = if (remaining > 0) minOf(n, remaining) else 0
+                    if (written > 0) baos.write(buf, 0, written)
+                    if (n > written) truncated = true
+                }
+            } catch (_: Exception) {}
+            return Pair(baos.toByteArray().toString(Charsets.UTF_8), truncated)
         }
     }
 }

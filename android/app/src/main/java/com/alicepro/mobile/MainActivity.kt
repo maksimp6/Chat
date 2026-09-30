@@ -170,10 +170,27 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun startRootAgent() {
-            AppLogger.info("RootAgent", "Root agent start requested from web UI")
-            val intent = Intent(this@MainActivity, RootAgentService::class.java)
-                .setAction(RootAgentService.ACTION_START)
-            startForegroundService(intent)
+            // Trusted app-side confirmation – token never passes through JS
+            runOnUiThread {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Enable Root Control")
+                    .setMessage(
+                        "Allow Alice to control this device at root level?\n\n" +
+                        "This grants the local AI agent full device access via a " +
+                        "loopback-only, authenticated API. You can stop it at any " +
+                        "time from the notification.",
+                    )
+                    .setPositiveButton("Enable") { _, _ ->
+                        AppLogger.info("RootAgent", "Root agent confirmed by user")
+                        val intent = Intent(this@MainActivity, RootAgentService::class.java)
+                            .setAction(RootAgentService.ACTION_START)
+                        startForegroundService(intent)
+                    }
+                    .setNegativeButton("Cancel") { _, _ ->
+                        AppLogger.info("RootAgent", "Root agent start declined by user")
+                    }
+                    .show()
+            }
         }
 
         @JavascriptInterface
