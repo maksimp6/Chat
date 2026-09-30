@@ -21,10 +21,12 @@ issue/PR, participating roles, trigger, round/attempt count, exact evidence, cur
 blocker, and recommended escalation target. Keep secrets and raw credentials out of
 the record.
 
-Treat a `@claude` PR handoff as incomplete until a later material Claude event or
-merge occurs. After two hourly Observer passes without either, report
-`maintainer_stall`. Reactions are acknowledgements, not terminal status, and must not
-trigger another paid-model ping by themselves.
+Treat a `@claude` PR handoff as incomplete until the PR merges or Claude posts a
+machine-recognizable material status: `BLOCKED:`, `DEFERRED:`, or a
+changes-requested review. Ordinary comments, commits, labels, and reactions are
+acknowledgements/progress only. Report `maintainer_stall` on the second scheduled
+hourly Observer pass without a material outcome, without triggering another paid-model
+ping.
 
 Send ordinary technical blockers back to Team Lead or the relevant specialist. Send
 repeated cross-role/process failures to Process Governor. Send decisions that require

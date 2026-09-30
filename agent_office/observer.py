@@ -63,7 +63,8 @@ class Thresholds:
     agent_silent: timedelta = timedelta(hours=2)
     review_wait: timedelta = timedelta(hours=1)
     merge_wait: timedelta = timedelta(hours=2)
-    maintainer_wait: timedelta = timedelta(hours=2)
+    maintainer_passes: int = 2
+    observer_minute: int = 17
     checks_pending: timedelta = timedelta(hours=2)
     stale: timedelta = timedelta(hours=24)
     recent_window: timedelta = timedelta(hours=24)
@@ -410,8 +411,34 @@ def _latest_dispatch(thread: Thread, agent: str) -> datetime | None:
     return max((at for target, at in thread.dispatches if target == agent), default=None)
 
 
-def _agent_responded_after(thread: Thread, agent: str, since: datetime) -> bool:
-    return any(event.agent == agent and event.at > since for event in thread.events)
+_MAINTAINER_STATUS = re.compile(
+    r"^\s*(?:BLOCKED|DEFERRED|ЗАБЛОКИРОВАНО|ОТЛОЖЕНО)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _maintainer_outcome_after(thread: Thread, since: datetime) -> bool:
+    for event in thread.events:
+        if event.agent != "claude" or event.at <= since:
+            continue
+        if event.action == "запросил изменения":
+            return True
+        if event.kind == "commented":
+            body = event.action.removeprefix("комментарий:").strip()
+            if _MAINTAINER_STATUS.match(body):
+                return True
+    return False
+
+
+def _observer_passes_since(since: datetime, now: datetime, minute: int) -> int:
+    if now <= since:
+        return 0
+    boundary = since.replace(minute=minute, second=0, microsecond=0)
+    if boundary <= since:
+        boundary += timedelta(hours=1)
+    if boundary > now:
+        return 0
+    return int((now - boundary).total_seconds() // 3600) + 1
 
 
 def detect_findings(
@@ -434,8 +461,13 @@ def detect_findings(
         maintainer_since = _latest_dispatch(thread, "claude")
         if (
             maintainer_since is not None
-            and now - maintainer_since > limits.maintainer_wait
-            and not _agent_responded_after(thread, "claude", maintainer_since)
+            and _observer_passes_since(
+                maintainer_since,
+                now,
+                limits.observer_minute,
+            )
+            >= limits.maintainer_passes
+            and not _maintainer_outcome_after(thread, maintainer_since)
         ):
             found.append(
                 finding(

@@ -170,31 +170,84 @@ def test_red_ci_and_merge_conflict_are_high():
     assert "Application tests" in next(f.message for f in findings if f.kind == "ci_failed")
 
 
-def test_pr_maintainer_handoff_stalls_after_two_hourly_passes():
+def test_pr_maintainer_handoff_stalls_after_two_scheduled_observer_passes():
+    dispatch_at = datetime(2026, 9, 28, 17, 18, tzinfo=UTC)
     base_timeline = [
+        review("copilot-pull-request-reviewer[bot]", 5),
+        comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        {
+            "event": "commented",
+            "user": {"login": "maksimp6"},
+            "body": "@claude maintainer pass on exact head",
+            "created_at": dispatch_at.isoformat(),
+        },
+    ]
+    stalled = build_thread(pr_item(), base_timeline, pull(), [run("tests", "success")])
+
+    first_pass = datetime(2026, 9, 28, 18, 17, tzinfo=UTC)
+    second_pass = datetime(2026, 9, 28, 19, 17, tzinfo=UTC)
+    assert "maintainer_stall" not in kinds(detect_findings(stalled, first_pass))
+    assert "maintainer_stall" in kinds(detect_findings(stalled, second_pass))
+
+
+def test_only_material_maintainer_status_completes_handoff():
+    base = [
         review("copilot-pull-request-reviewer[bot]", 5),
         comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
         comment("maksimp6", "@claude maintainer pass on exact head", 3),
     ]
-    stalled = build_thread(pr_item(), base_timeline, pull(), [run("tests", "success")])
-    assert stalled.dispatches == [("claude", NOW - timedelta(hours=3))]
-    assert "maintainer_stall" in kinds(detect_findings(stalled, NOW))
-
-    fresh = build_thread(
+    acknowledged = build_thread(
         pr_item(),
-        [*base_timeline[:-1], comment("maksimp6", "@claude maintainer pass", 1)],
+        [*base, comment("claude[bot]", "Looking into it", 2.5)],
         pull(),
         [run("tests", "success")],
     )
-    assert "maintainer_stall" not in kinds(detect_findings(fresh, NOW))
+    assert "maintainer_stall" in kinds(detect_findings(acknowledged, NOW))
 
-    answered = build_thread(
+    blocked = build_thread(
         pr_item(),
-        [*base_timeline, comment("claude[bot]", "Blocked: required check missing", 2.5)],
+        [*base, comment("claude[bot]", "BLOCKED: required check missing", 2.5)],
         pull(),
         [run("tests", "success")],
     )
-    assert "maintainer_stall" not in kinds(detect_findings(answered, NOW))
+    assert "maintainer_stall" not in kinds(detect_findings(blocked, NOW))
+
+    deferred = build_thread(
+        pr_item(),
+        [*base, comment("claude[bot]", "DEFERRED: wait for master sync", 2.5)],
+        pull(),
+        [run("tests", "success")],
+    )
+    assert "maintainer_stall" not in kinds(detect_findings(deferred, NOW))
+
+    changes = build_thread(
+        pr_item(),
+        [*base, review("claude[bot]", 2.5, state="CHANGES_REQUESTED")],
+        pull(),
+        [run("tests", "success")],
+    )
+    assert "maintainer_stall" not in kinds(detect_findings(changes, NOW))
+
+
+def test_observer_pass_alignment_handles_dispatch_around_cron_minute():
+    before = datetime(2026, 9, 28, 17, 16, tzinfo=UTC)
+    after = datetime(2026, 9, 28, 17, 18, tzinfo=UTC)
+
+    assert observer._observer_passes_since(
+        before,
+        datetime(2026, 9, 28, 18, 17, tzinfo=UTC),
+        17,
+    ) == 2
+    assert observer._observer_passes_since(
+        after,
+        datetime(2026, 9, 28, 19, 17, tzinfo=UTC),
+        17,
+    ) == 2
+    assert observer._observer_passes_since(
+        after,
+        datetime(2026, 9, 28, 18, 16, tzinfo=UTC),
+        17,
+    ) == 0
 
 
 def test_green_reviewed_pr_waiting_for_merge_is_reported():

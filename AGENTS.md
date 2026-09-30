@@ -105,9 +105,10 @@ The maintainer is Claude, working from the Alice Pro project on claude.ai. The
 owner (@maksimp6) does not merge by hand.
 
 A maintainer handoff is complete only when it reaches a material terminal/status
-transition: merged, an evidence-backed blocker comment, or an explicit defer reason with
-the next trigger. A reaction such as 👀 is acknowledgement only. If a `@claude`
-maintainer handoff has no material Claude response for two hourly Observer passes, the
+transition: merged, a `BLOCKED:` comment (or changes-requested review) with evidence,
+or a `DEFERRED:` comment with the next trigger. Ordinary progress/acknowledgement
+comments and reactions such as 👀 are not completion. If a `@claude` maintainer
+handoff has no material outcome by the second scheduled hourly Observer pass, the
 Observer emits `maintainer_stall` for Process Governor instead of repeatedly pinging a
 paid model.
 
