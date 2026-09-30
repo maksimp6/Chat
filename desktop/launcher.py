@@ -7,6 +7,8 @@ from typing import Any
 
 from werkzeug.serving import BaseWSGIServer, make_server
 
+from desktop.credential_protection import ensure_provider_credential_key
+
 
 APP_NAME = "Alice Pro"
 SERVER_HOST = "127.0.0.1"
@@ -31,6 +33,7 @@ def configure_environment() -> Path:
     data_dir = desktop_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    ensure_provider_credential_key(data_dir)
     os.environ.setdefault("ALICE_DB_PATH", str(data_dir / "alice_pro.db"))
     os.environ.setdefault("HOST", SERVER_HOST)
     os.environ.setdefault("FLASK_DEBUG", "0")
