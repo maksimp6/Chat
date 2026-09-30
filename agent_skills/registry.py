@@ -62,6 +62,17 @@ ROLE_SKILL_ALLOWLIST = {
         "github-ci-diagnosis",
         "docs-sync",
     },
+    "operations-observer": {
+        "github-pr-readiness",
+        "github-ci-diagnosis",
+        "security-review",
+    },
+    "process-governor": {
+        "github-ci-diagnosis",
+        "issue-to-pr",
+        "security-review",
+        "docs-sync",
+    },
     "alice": {
         "github-pr-readiness",
         "github-ci-diagnosis",
@@ -239,11 +250,14 @@ class SkillRegistry:
 
     def load_many(self, names: Iterable[str], role: Optional[str] = None) -> list[Skill]:
         unique: list[str] = []
+        seen: set[str] = set()
         for name in names:
-            if name not in unique:
-                unique.append(name)
-        if len(unique) > MAX_SELECTED_SKILLS:
-            raise SkillPolicyError(f"at most {MAX_SELECTED_SKILLS} skills may be selected")
+            if name in seen:
+                continue
+            if len(seen) >= MAX_SELECTED_SKILLS:
+                raise SkillPolicyError(f"at most {MAX_SELECTED_SKILLS} skills may be selected")
+            seen.add(name)
+            unique.append(name)
         return [self.load(name, role=role) for name in unique]
 
     def validate_all(self) -> list[dict[str, str]]:

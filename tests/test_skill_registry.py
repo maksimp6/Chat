@@ -139,6 +139,13 @@ def test_registry_role_catalog_and_empty_root_policy(tmp_path):
     registry = SkillRegistry(root)
 
     assert [item["name"] for item in registry.catalog(role="Docs Engineer")] == ["docs-sync"]
+    assert [item["name"] for item in registry.catalog(role="Operations Observer")] == [
+        "security-review"
+    ]
+    assert [item["name"] for item in registry.catalog(role="Process Governor")] == [
+        "docs-sync",
+        "security-review",
+    ]
     assert [item["name"] for item in registry.validate_all()] == [
         "docs-sync",
         "security-review",
@@ -190,6 +197,14 @@ def test_load_many_deduplicates_and_enforces_limit(tmp_path):
 
     with pytest.raises(SkillPolicyError, match="at most"):
         registry.load_many([f"skill-{index}" for index in range(MAX_SELECTED_SKILLS + 1)])
+
+    def too_many_unique_names():
+        for index in range(MAX_SELECTED_SKILLS + 1):
+            yield f"skill-{index}"
+        raise AssertionError("load_many iterated beyond the first rejected unique skill")
+
+    with pytest.raises(SkillPolicyError, match="at most"):
+        registry.load_many(too_many_unique_names())
 
 
 def test_compose_and_trace_record_only_selected_skill_metadata(tmp_path):
