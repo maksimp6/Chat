@@ -1775,7 +1775,6 @@ body {
   color: var(--m-text, #222);
 }
 
-
 /* === DESKTOP CHAT LAYOUT === */
 @media (min-width: 960px) {
   .alice-pro-app #sidebar {
