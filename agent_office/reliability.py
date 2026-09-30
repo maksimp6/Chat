@@ -68,7 +68,9 @@ def evaluate_snapshot(
                 )
             )
 
-        provenance = [str(item).strip() for item in raw.get("provenance") or [] if str(item).strip()]
+        provenance = [
+            str(item).strip() for item in raw.get("provenance") or [] if str(item).strip()
+        ]
         if status == "valid" and not provenance:
             status = "invalid"
             findings.append(
