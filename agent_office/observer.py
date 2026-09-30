@@ -63,6 +63,8 @@ class Thresholds:
     agent_silent: timedelta = timedelta(hours=2)
     review_wait: timedelta = timedelta(hours=1)
     merge_wait: timedelta = timedelta(hours=2)
+    maintainer_passes: int = 2
+    observer_minute: int = 17
     checks_pending: timedelta = timedelta(hours=2)
     stale: timedelta = timedelta(hours=24)
     recent_window: timedelta = timedelta(hours=24)
@@ -323,7 +325,7 @@ def build_thread(
             source = (raw.get("source") or {}).get("issue") or {}
             if "pull_request" in source and source.get("number") not in thread.linked_prs:
                 thread.linked_prs.append(source["number"])
-        elif not is_pr and kind == "commented":
+        elif kind == "commented":
             _record_dispatch(thread, raw.get("body"), event.at, event.actor)
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
@@ -405,6 +407,40 @@ def _has_codex_check(thread: Thread) -> bool:
     )
 
 
+def _latest_dispatch(thread: Thread, agent: str) -> datetime | None:
+    return max((at for target, at in thread.dispatches if target == agent), default=None)
+
+
+_MAINTAINER_STATUS = re.compile(
+    r"^\s*(?:BLOCKED|DEFERRED|ЗАБЛОКИРОВАНО|ОТЛОЖЕНО)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _maintainer_outcome_after(thread: Thread, since: datetime) -> bool:
+    for event in thread.events:
+        if event.agent != "claude" or event.at <= since:
+            continue
+        if event.action == "запросил изменения":
+            return True
+        if event.kind == "commented":
+            body = event.action.removeprefix("комментарий:").strip()
+            if _MAINTAINER_STATUS.match(body):
+                return True
+    return False
+
+
+def _observer_passes_since(since: datetime, now: datetime, minute: int) -> int:
+    if now <= since:
+        return 0
+    boundary = since.replace(minute=minute, second=0, microsecond=0)
+    if boundary <= since:
+        boundary += timedelta(hours=1)
+    if boundary > now:
+        return 0
+    return int((now - boundary).total_seconds() // 3600) + 1
+
+
 def detect_findings(
     thread: Thread, now: datetime, limits: Thresholds = DEFAULT_LIMITS
 ) -> list[Finding]:
@@ -422,6 +458,24 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
+        maintainer_since = _latest_dispatch(thread, "claude")
+        if (
+            maintainer_since is not None
+            and _observer_passes_since(
+                maintainer_since,
+                now,
+                limits.observer_minute,
+            )
+            >= limits.maintainer_passes
+            and not _maintainer_outcome_after(thread, maintainer_since)
+        ):
+            found.append(
+                finding(
+                    "medium",
+                    "maintainer_stall",
+                    "maintainer handoff без merge, blocker/defer статуса или ответа Claude",
+                )
+            )
         if state == "failed":
             failed = sorted(
                 name for name, value in thread.checks.items() if value in FAILED_CONCLUSIONS
