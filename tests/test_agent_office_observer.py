@@ -508,10 +508,7 @@ def test_observer_workflow_is_hourly_pinned_and_least_privilege():
     assert "types: [agent_observer_tick]" in workflow
     assert "issue_comment:" in workflow
     assert "pull_request_review:" in workflow
-    assert "workflow_run:" in workflow
-    assert "Merge readiness snapshot" in workflow
-    workflow_run_block = workflow.split("workflow_run:", 1)[1].split("jobs:", 1)[0]
-    assert "Agent observer" not in workflow_run_block
+    assert "workflow_run:" not in workflow
     assert "ref: ${{ github.event.repository.default_branch }}" in workflow
     assert 'cron: "17 * * * *"' in workflow
     assert "issues: write" in workflow
