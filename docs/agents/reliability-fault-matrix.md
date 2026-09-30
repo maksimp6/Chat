@@ -32,6 +32,7 @@ Run from Python:
 
 ```python
 from agent_office.fault_matrix import report_fault_matrix
+
 print(report_fault_matrix())
 ```
 
