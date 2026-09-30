@@ -4,7 +4,14 @@ import pytest
 
 from agent_context import CacheLookup, ContextSlice, EvidenceVersion, TaskPacket, TaskScope
 from agent_memory import AgentMemoryStore, MemoryRecord
-from agent_retrieval import HybridRetriever, RetrievalQuery, record_retrieval
+from agent_retrieval import (
+    HybridRetriever,
+    RetrievalBundle,
+    RetrievalHit,
+    RetrievalQuery,
+    record_retrieval,
+)
+from agent_retrieval.service import _bm25_scores, _bound_hits, _cache_matches_query
 from trace_manager import ExecutionTrace
 
 
@@ -173,6 +180,61 @@ def test_query_contract_is_bounded():
         _query(max_chars=100)
 
 
+def test_query_and_result_contract_edge_cases_are_explicit():
+    with pytest.raises(ValueError, match="repository is required"):
+        _query(repository=None)
+
+    with pytest.raises(ValueError, match="source_type is required"):
+        RetrievalHit(source_type="", ref="ref", score=1, text="text")
+
+    with pytest.raises(ValueError, match="retrieval status"):
+        RetrievalBundle(status="unknown")
+
+    with pytest.raises(ValueError, match="unsupported cache status"):
+        RetrievalBundle(status="miss", cache_status="stale")
+
+    hit = RetrievalHit(
+        source_type="memory",
+        ref="memory:test",
+        score=1,
+        text="evidence",
+        metadata={"nested": ["value"]},
+    )
+    bundle = RetrievalBundle(
+        status="hit",
+        hits=(hit,),
+        source_counts={"memory": 1},
+        total_chars=len(hit.text),
+    )
+    assert bundle.as_dict()["hits"][0]["metadata"] == {"nested": ["value"]}
+
+
+def test_private_retrieval_guards_cover_defensive_paths():
+    assert _bm25_scores("=", ["settle invoice"]) == [0.0]
+
+    lookup = _cache("hit")
+    lookup_without_scope = CacheLookup(
+        status=lookup.status,
+        cache_key=lookup.cache_key,
+        packet=lookup.packet,
+        scope=None,
+        evidence=lookup.evidence,
+        reusable_slices=lookup.reusable_slices,
+        stale_components=lookup.stale_components,
+        saved_source_bytes=lookup.saved_source_bytes,
+        saved_input_tokens=lookup.saved_input_tokens,
+    )
+    assert not _cache_matches_query(lookup_without_scope, _query())
+
+    class EmptyHit:
+        score = 1.0
+        source_type = "test"
+        ref = "empty"
+        text = ""
+
+    assert _bound_hits([EmptyHit()], _query()) == ()
+
+
 def test_exact_cache_hit_short_circuits_memory_and_code(tmp_path):
     store = _store(tmp_path)
     store.upsert(
@@ -282,6 +344,23 @@ def test_task_memory_source_version_must_match_head(tmp_path):
     bundle = HybridRetriever(memory_store=store).retrieve(_query(), now=101)
 
     assert "memory:wrong-source-version" not in [hit.ref for hit in bundle.hits]
+
+
+def test_github_memory_from_other_repository_is_not_returned(tmp_path):
+    store = _store(tmp_path)
+    record = _memory(
+        memory_id="other-repository",
+        kind="project",
+        text="settle payment invoice foreign repository",
+        visibility=(),
+    )
+    payload = record.as_dict()
+    payload["provenance"]["repository"] = "other/repo"
+    store.upsert(MemoryRecord(**payload))
+
+    bundle = HybridRetriever(memory_store=store).retrieve(_query(), now=101)
+
+    assert "memory:other-repository" not in [hit.ref for hit in bundle.hits]
 
 
 def test_stale_or_wrong_task_memory_is_not_returned(tmp_path):
