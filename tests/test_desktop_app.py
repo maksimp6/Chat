@@ -3,11 +3,11 @@ from pathlib import Path
 
 from flask import Flask
 
-import desktop_app
+from desktop import launcher
 
 
 def test_desktop_host_is_loopback_only():
-    assert desktop_app.SERVER_HOST == "127.0.0.1"
+    assert launcher.SERVER_HOST == "127.0.0.1"
 
 
 def test_configure_environment_uses_local_app_data(tmp_path, monkeypatch):
@@ -16,7 +16,7 @@ def test_configure_environment_uses_local_app_data(tmp_path, monkeypatch):
     monkeypatch.delenv("HOST", raising=False)
     monkeypatch.delenv("FLASK_DEBUG", raising=False)
 
-    data_dir = desktop_app.configure_environment()
+    data_dir = launcher.configure_environment()
 
     assert data_dir == tmp_path / "Alice Pro"
     assert data_dir.is_dir()
@@ -33,7 +33,7 @@ def test_create_server_uses_ephemeral_loopback_port():
     def healthz():
         return {"status": "ok"}
 
-    server = desktop_app.create_server(app)
+    server = launcher.create_server(app)
     try:
         assert server.host == "127.0.0.1"
         assert server.server_port > 0
@@ -45,4 +45,4 @@ def test_window_url_uses_server_port():
     class Server:
         server_port = 43210
 
-    assert desktop_app.server_url(Server()) == "http://127.0.0.1:43210/"
+    assert launcher.server_url(Server()) == "http://127.0.0.1:43210/"
