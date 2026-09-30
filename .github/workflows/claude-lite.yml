@@ -21,13 +21,12 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: claude-lite-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   claude:
     name: Respond to @claude-lite
+    concurrency:
+      group: claude-lite-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
     environment: production
     if: |
       (github.event_name == 'issue_comment' &&
@@ -56,6 +55,9 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          trigger_phrase: "@claude-lite"
+          track_progress: true
           claude_args: |
-            --model claude-haiku-4-5
-            --max-turns 10
+            --model claude-sonnet-4-6
+            --max-turns 45
+            --allowedTools "Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(pytest:*),Bash(python:*),Bash(bash scripts/format.sh:*)"
