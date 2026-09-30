@@ -10,7 +10,7 @@ CANONICAL_LIFECYCLE_STAGES = (
     "contract-review",
     "implementation",
     "verification",
-    "review",
+    "solution-review",
     "maintain",
 )
 
@@ -68,6 +68,7 @@ class AgentTaskPlan:
     can_implement: bool = False
     can_write_contract_tests: bool = False
     can_review_contract: bool = False
+    can_review_solution: bool = False
 
 
 def resolve_task_plan(
@@ -97,10 +98,22 @@ def resolve_task_plan(
                 " and cannot be used for implementation"
             )
 
+    if stage == "solution-review":
+        if role in IMPLEMENTATION_ROLES:
+            raise AgentDispatchError(
+                f"{role!r} is an implementation role and cannot perform solution review;"
+                " use a non-implementation supervisory role"
+            )
+
     can_merge = stage == "maintain" and role == "release-manager"
     can_implement = stage == "implementation" and role in IMPLEMENTATION_ROLES
     can_write_contract_tests = stage == "contract" and role == "test-engineer"
     can_review_contract = stage == "contract-review" and role == "team-lead"
+    can_review_solution = (
+        stage == "solution-review"
+        and role is not None
+        and role not in IMPLEMENTATION_ROLES
+    )
 
     return AgentTaskPlan(
         stage=stage,
@@ -111,4 +124,5 @@ def resolve_task_plan(
         can_implement=can_implement,
         can_write_contract_tests=can_write_contract_tests,
         can_review_contract=can_review_contract,
+        can_review_solution=can_review_solution,
     )
