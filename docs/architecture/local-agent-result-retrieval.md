@@ -8,7 +8,7 @@ This is a prerequisite repair for the native laptop integration discussed in
 `UniversalToolExecutor._execute_remote` already enqueues authorized calls and
 imports `local_agent_gateway.wait_for_local_tool_job`. That function was missing.
 The gateway now delegates result retrieval to the dependency-free
-`local_agent_results.wait_for_job_result` helper, using the configured `get_conn`.
+`local_agents.results.wait_for_job_result` helper, using the configured `get_conn`.
 No public enqueue/result-read endpoint or new tool permission is introduced.
 
 `execute_with_trace` attaches a live `execution_trace` object to call metadata.

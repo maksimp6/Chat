@@ -167,7 +167,7 @@ def test_executor_uses_real_gateway_with_trace(
     """Do not replace local_agent_gateway in sys.modules: that hid the broken import."""
     from types import SimpleNamespace
 
-    import local_agent_results
+    from local_agents import results as local_agent_results
     from universal_tool_platform import (
         UniversalToolCall,
         UniversalToolDefinition,

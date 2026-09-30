@@ -5,7 +5,7 @@ import sqlite3
 
 import pytest
 
-import local_agent_results as results
+from local_agents import results
 
 
 @pytest.fixture()
@@ -116,8 +116,19 @@ def test_failure_never_becomes_success_or_echoes_remote_error(queue, status, pay
         "[" * 1100 + "]" * 1100,
         " " * (results._MAX_RESULT_CHARACTERS + 1),
     ],
-    ids=["missing", "empty", "broken", "nan", "infinity", "overflow",
-         "string-success", "integer-success", "null-success", "deep", "oversized"],
+    ids=[
+        "missing",
+        "empty",
+        "broken",
+        "nan",
+        "infinity",
+        "overflow",
+        "string-success",
+        "integer-success",
+        "null-success",
+        "deep",
+        "oversized",
+    ],
 )
 def test_corrupt_or_oversized_result_fails_closed(queue, payload):
     finish(queue, payload)
@@ -138,7 +149,9 @@ def test_zero_timeout_does_not_change_pending_job(queue, status):
         conn.close()
 
 
-@pytest.mark.parametrize("timeout", [-1, float("nan"), float("inf"), 301, True, "1", None, 10**1000])
+@pytest.mark.parametrize(
+    "timeout", [-1, float("nan"), float("inf"), 301, True, "1", None, 10**1000]
+)
 def test_invalid_timeout_is_rejected_before_database_access(timeout):
     def forbidden():
         pytest.fail("invalid wait settings must not access the database")
@@ -178,7 +191,9 @@ def test_polling_uses_monotonic_deadline_and_closes_connections(queue, monkeypat
 
     monkeypatch.setattr(results.time, "monotonic", lambda: current[0])
     monkeypatch.setattr(results.time, "sleep", sleep)
-    monkeypatch.setattr(results.time, "time", lambda: pytest.fail("wall clock must not set deadline"))
+    monkeypatch.setattr(
+        results.time, "time", lambda: pytest.fail("wall clock must not set deadline")
+    )
     assert results.wait_for_job_result(connect, "job-1", timeout_seconds=0.12) is None
     assert sum(sleeps) == pytest.approx(0.12)
     assert len(sleeps) == 3
@@ -214,7 +229,7 @@ def test_database_error_still_closes_connection():
 
 
 def test_json_depth_ignores_brackets_inside_escaped_strings(queue):
-    data = {"text": '[' * 100 + '\\"' + ']' * 100, "number": 1.25}
+    data = {"text": "[" * 100 + '\\"' + "]" * 100, "number": 1.25}
     finish(queue, json.dumps(data))
     response = results.wait_for_job_result(queue, "job-1", timeout_seconds=0)
     assert response["data"] == data

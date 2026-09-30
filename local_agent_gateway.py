@@ -14,7 +14,7 @@ from uuid import uuid4
 from flask import Blueprint, jsonify, request
 
 from db import get_conn
-from local_agent_results import wait_for_job_result
+from local_agents.results import wait_for_job_result
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
 
@@ -171,7 +171,11 @@ def enqueue_local_tool_job(
                 tool_name,
                 _json(dict(arguments)),
                 _json(
-                    {key: value for key, value in (metadata or {}).items() if key != "execution_trace"}
+                    {
+                        key: value
+                        for key, value in (metadata or {}).items()
+                        if key != "execution_trace"
+                    }
                 ),
                 trace_id,
                 invocation_id,
@@ -184,9 +188,7 @@ def enqueue_local_tool_job(
         conn.close()
 
 
-def wait_for_local_tool_job(
-    job_id: str, *, timeout_seconds: float = 30.0
-) -> dict[str, Any] | None:
+def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> dict[str, Any] | None:
     """Internal result path for UniversalToolExecutor; never a public read route."""
     return wait_for_job_result(get_conn, job_id, timeout_seconds=timeout_seconds)
 
