@@ -16,7 +16,7 @@ def test_lifecycle_stages_are_not_agent_roles():
         "contract-review",
         "implementation",
         "verification",
-        "review",
+        "solution-review",
         "maintain",
     )
     assert "implementation" not in IMPLEMENTATION_ROLES
