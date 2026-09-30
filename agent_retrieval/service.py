@@ -18,7 +18,15 @@ _TOKEN_RE = re.compile(r"[\w./#:-]+", re.UNICODE)
 
 
 def _tokens(value: str) -> list[str]:
-    return [token for token in _TOKEN_RE.findall(str(value).lower()) if len(token) > 1]
+    tokens: list[str] = []
+    for token in _TOKEN_RE.findall(str(value).lower()):
+        if len(token) <= 1:
+            continue
+        tokens.append(token)
+        for part in re.split(r"[_./#:-]+", token):
+            if len(part) > 1 and part != token:
+                tokens.append(part)
+    return tokens
 
 
 def _bm25_scores(query: str, documents: list[str]) -> list[float]:
