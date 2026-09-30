@@ -44,7 +44,11 @@ dist/AlicePro.exe
 ```
 
 The executable bundles repository-local `templates/` and `static/` assets.
-Credentials are not embedded in the executable.
+Credentials are not embedded in the executable. On first launch Alice Pro generates
+its provider-credential encryption key and stores it in the operating system keyring
+(Windows Credential Locker via Python `keyring`) before the Flask backend is imported.
+If the system keyring cannot read or persist the key, startup fails closed instead of
+saving provider credentials without encryption.
 
 ## GitHub Actions
 
