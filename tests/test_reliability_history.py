@@ -133,3 +133,14 @@ def test_conflicting_duplicate_is_order_independent():
     assert forward[0].kind == "conflicting_duplicate"
     assert forward[0].status == "unknown"
     assert forward[0].provenance == ("github:a", "trace:b")
+
+
+def test_naive_event_timestamp_is_normalized_to_utc():
+    event = normalize_event(
+        {
+            **raw("naive"),
+            "at": NOW.replace(tzinfo=None).isoformat(),
+        }
+    )
+    assert event.at.tzinfo is UTC
+    assert event.at == NOW
