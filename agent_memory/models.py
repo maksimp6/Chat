@@ -93,6 +93,9 @@ class MemoryRecord:
 
         payload = sanitize_trace_value(dict(self.payload))
         freshness = sanitize_trace_value(dict(self.freshness))
+        invalidate_on = freshness.get("invalidate_on")
+        if not isinstance(invalidate_on, list | tuple) or not invalidate_on:
+            raise ValueError("freshness requires non-empty invalidate_on")
         object.__setattr__(self, "payload", _freeze(payload))
         object.__setattr__(self, "freshness", _freeze(freshness))
         object.__setattr__(
