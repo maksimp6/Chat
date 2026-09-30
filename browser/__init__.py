@@ -16,4 +16,23 @@ __all__ = [
     "BrowserRoleTask",
     "BrowserTaskBudget",
     "BrowserTaskResult",
+    "Evidence",
+    "MergedEvidence",
+    "SemanticDiff",
+    "SemanticNode",
+    "SemanticSnapshot",
+    "build_semantic_snapshot",
+    "diff_semantic_snapshots",
+    "merge_evidence",
 ]
+
+from .semantic import (
+    Evidence,
+    MergedEvidence,
+    SemanticDiff,
+    SemanticNode,
+    SemanticSnapshot,
+    build_semantic_snapshot,
+    diff_semantic_snapshots,
+    merge_evidence,
+)

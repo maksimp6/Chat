@@ -26,6 +26,8 @@ versions change.
 | Security review | Security Reviewer | GPT-5.4 mini |
 | Documentation | Docs Engineer | GPT-5.4 nano |
 | Merge/release preparation | Release Manager | GPT-5.4 mini |
+| Cross-agent non-convergence observation | Operations Observer | GPT-5.4 mini |
+| Process-gap diagnosis and correction | Process Governor | GPT-5.4 mini |
 | Architecture-heavy or ambiguous work | Anthropic Claude Partner Agent | Claude Sonnet 4.6 |
 | Cheap bounded maintenance | Claude Lite workflow | Claude Haiku 4.5 |
 | Focused Codex session | OpenAI Codex Partner Agent | GPT-5.4 nano |
@@ -44,6 +46,23 @@ Use provider agents as escalation/backends, not as permanent job titles:
 
 One issue has one primary owner. Split an issue only when independent deliverables can
 be reviewed and merged separately.
+
+## Supervision and process improvement
+
+Operations Observer and Process Governor sit above normal task execution; they are not
+extra implementers in every issue.
+
+Operations Observer is read-mostly and watches for the deterministic non-convergence
+signals defined in `process-observation-and-governance.md`. It emits compact evidence
+instead of deciding which disputing specialist is correct.
+
+Process Governor consumes repeated or structural escalations and may propose changes to
+agent role instructions, skills, development policy/docs, or non-privileged workflow
+logic through an ordinary protected PR. It does not take ownership of the disputed
+production code and cannot approve or merge its own governance changes.
+
+Escalate to the owner only when an existing approval boundary is crossed, rather than
+turning every agent disagreement into an owner interruption.
 
 ## Safety and cost
 

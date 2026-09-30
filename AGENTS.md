@@ -39,9 +39,33 @@ the narrowest matching repository role:
 - **Docs Engineer** — documentation and runbooks.
 - **Release Manager** — merge/release readiness, versions, artifacts and rollback
   notes.
+- **Operations Observer** — read-mostly detection of stalled coordination, retry loops,
+  contradictory agent conclusions, and delegation cycles.
+- **Process Governor** — evidence-backed process diagnosis and focused improvements to
+  agent policy/skills/workflow, without taking over production implementation.
 
-Team Lead may use the custom-agent tool to delegate to these specialists. Keep one
-primary owner for an issue and split only truly independent work.
+Team Lead may use the custom-agent tool to delegate normal implementation to the
+engineering specialists. Operations Observer and Process Governor are supervisory
+roles, not ordinary implementation owners. Keep one primary owner for an issue and
+split only truly independent work.
+
+### Observation and process governance
+
+Use `docs/agents/process-observation-and-governance.md` when normal agent coordination
+stops converging.
+
+- Operations Observer watches repository evidence and emits a structured escalation
+  only when a documented deterministic threshold is met. It does not choose the
+  disputed implementation or edit files.
+- Process Governor consumes repeated/structural escalations, classifies the process
+  gap, and proposes the smallest process correction through a normal protected PR.
+- An escalation is not a blame report. Prefer deterministic counts and state changes
+  before spending model tokens on diagnosis.
+- Process Governor must not edit application/runtime production code while acting in
+  that role, expand its own authority, self-approve, or self-merge governance changes.
+- Existing owner-approval boundaries remain authoritative for deployment, destructive
+  data changes, secrets, CODEOWNERS, branch protection, permissions, and any expansion
+  of agent authority.
 
 ### Execution backends and escalation
 
