@@ -72,6 +72,8 @@ def test_memory_record_requires_supported_contract():
         MemoryRecord(**{**base, "sensitivity": "secret"})
     with pytest.raises(ValueError, match="confidence"):
         MemoryRecord(**{**base, "confidence": 1.5})
+    with pytest.raises(ValueError, match="freshness"):
+        MemoryRecord(**{**base, "freshness": {}})
 
 
 def test_memory_record_requires_provenance_and_github_repository():
@@ -181,6 +183,8 @@ def test_mark_stale_and_supersede_require_existing_records(tmp_path):
 
     third = _github_record(memory_id="third")
     store.upsert(third)
+    with pytest.raises(ValueError, match="itself"):
+        store.supersede("third", replacement_id="third")
     with pytest.raises(ValueError, match="replacement"):
         store.supersede("third", replacement_id="missing")
     assert store.supersede("third", replacement_id="new", now=160) is True
