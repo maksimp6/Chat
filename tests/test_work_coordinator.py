@@ -303,9 +303,7 @@ def test_usage_counters_must_be_nonnegative_integers():
     object.__setattr__(
         packet,
         "usage",
-        MappingProxyType(
-            {"cheap_calls": -1, "normal_calls": 0, "strong_calls": 0}
-        ),
+        MappingProxyType({"cheap_calls": -1, "normal_calls": 0, "strong_calls": 0}),
     )
     with pytest.raises(CoordinatorPolicyError, match="non-negative"):
         WorkCoordinator(FakeRetriever()).prepare_handoff(

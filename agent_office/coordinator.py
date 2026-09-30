@@ -144,9 +144,7 @@ class CoordinatorHandoff:
                 raise CoordinatorPolicyError(f"{name} is required")
             object.__setattr__(self, name, value)
         if self.reasoning_tier not in REASONING_TIERS:
-            raise CoordinatorPolicyError(
-                f"unsupported reasoning tier: {self.reasoning_tier}"
-            )
+            raise CoordinatorPolicyError(f"unsupported reasoning tier: {self.reasoning_tier}")
         clean_payload = sanitize_trace_value(dict(self.payload))
         object.__setattr__(self, "payload", _freeze(clean_payload))
 
@@ -180,9 +178,7 @@ def assert_reasoning_allowed(
     if budget not in _BUDGET_RANK:
         raise CoordinatorPolicyError(f"unsupported budget tier: {budget}")
     if _BUDGET_RANK[tier] > _BUDGET_RANK[budget]:
-        raise CoordinatorPolicyError(
-            f"reasoning tier {tier} exceeds task budget {budget}"
-        )
+        raise CoordinatorPolicyError(f"reasoning tier {tier} exceeds task budget {budget}")
 
     fingerprint = packet.cache_key()
     if (
@@ -190,9 +186,7 @@ def assert_reasoning_allowed(
         and previous_strong_evidence_fingerprint is not None
         and _clean(previous_strong_evidence_fingerprint) == fingerprint
     ):
-        raise NoNewEvidenceError(
-            "strong reasoning rejected because no new evidence is available"
-        )
+        raise NoNewEvidenceError("strong reasoning rejected because no new evidence is available")
     return fingerprint
 
 
