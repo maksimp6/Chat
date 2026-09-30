@@ -16,17 +16,15 @@ class AgentMemoryStore:
 
     def __init__(self, connection_factory: Callable[[], Any] | None = None) -> None:
         self._connection_factory = connection_factory or get_conn
-        self._schema_ready = False
 
     def _connect(self):
-        return self._connection_factory()
+        conn = self._connection_factory()
+        self._ensure_schema(conn)
+        return conn
 
-    def create_schema(self) -> None:
-        if self._schema_ready:
-            return
-        conn = self._connect()
-        try:
-            cur = conn.cursor()
+    @staticmethod
+    def _ensure_schema(conn: Any) -> None:
+        cur = conn.cursor()
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS agent_memory (
@@ -55,8 +53,12 @@ class AgentMemoryStore:
                 ON agent_memory(kind, scope, status)
                 """
             )
-            conn.commit()
-            self._schema_ready = True
+        conn.commit()
+
+    def create_schema(self) -> None:
+        conn = self._connection_factory()
+        try:
+            self._ensure_schema(conn)
         finally:
             conn.close()
 
@@ -86,7 +88,6 @@ class AgentMemoryStore:
         )
 
     def upsert(self, record: MemoryRecord) -> MemoryRecord:
-        self.create_schema()
         conn = self._connect()
         try:
             cur = conn.cursor()
@@ -143,7 +144,6 @@ class AgentMemoryStore:
         return stored
 
     def get(self, memory_id: str) -> MemoryRecord | None:
-        self.create_schema()
         conn = self._connect()
         try:
             cur = conn.cursor()
@@ -280,7 +280,6 @@ class AgentMemoryStore:
         return True
 
     def delete(self, memory_id: str) -> bool:
-        self.create_schema()
         conn = self._connect()
         try:
             cur = conn.cursor()
