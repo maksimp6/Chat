@@ -91,9 +91,7 @@ def resolve_task_plan(
 
     if stage == "implementation":
         if role is None:
-            raise AgentDispatchError(
-                "implementation stage requires a concrete implementation role"
-            )
+            raise AgentDispatchError("implementation stage requires a concrete implementation role")
         if role not in IMPLEMENTATION_ROLES:
             raise AgentDispatchError(f"{role!r} is not an implementation role")
         if effective_backend in REVIEW_ONLY_BACKENDS:
