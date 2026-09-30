@@ -58,6 +58,49 @@ class AgentDispatchError(Exception):
     pass
 
 
+class InvalidReviewOutcome(Exception):
+    pass
+
+
+class SolutionReviewRequiredError(Exception):
+    pass
+
+
+VALID_REVIEW_OUTCOMES = frozenset({"ACCEPTED", "CHANGES_REQUESTED", "BLOCKED"})
+
+
+@dataclass
+class SolutionReviewArtifact:
+    outcome: str
+    reviewed_head_sha: str
+    reviewer_role: str
+
+    def __post_init__(self) -> None:
+        if self.outcome not in VALID_REVIEW_OUTCOMES:
+            raise InvalidReviewOutcome(
+                f"outcome {self.outcome!r} is not valid; must be one of {sorted(VALID_REVIEW_OUTCOMES)}"
+            )
+
+
+def assert_solution_review_accepted_for_head(
+    artifact: Optional[SolutionReviewArtifact],
+    current_head: str,
+) -> None:
+    if artifact is None:
+        raise SolutionReviewRequiredError(
+            "no solution review artifact found; solution review is required before merge"
+        )
+    if artifact.outcome != "ACCEPTED":
+        raise SolutionReviewRequiredError(
+            f"solution review outcome is {artifact.outcome}; merge is not permitted"
+        )
+    if artifact.reviewed_head_sha != current_head:
+        raise SolutionReviewRequiredError(
+            f"solution review was for head SHA {artifact.reviewed_head_sha!r},"
+            f" but current head SHA is {current_head!r}; a new review is required"
+        )
+
+
 @dataclass
 class AgentTaskPlan:
     stage: str
