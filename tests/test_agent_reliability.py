@@ -158,19 +158,15 @@ def test_missing_observer_heartbeat_blocks_claim():
 def test_cli_returns_success_and_pretty_json(tmp_path, monkeypatch, capsys):
     snapshot = tmp_path / "snapshot.json"
     snapshot.write_text(json.dumps(_snapshot()), encoding="utf-8")
+
+    from agent_office import reliability
+
+    monkeypatch.setattr(reliability, "MIN_DECISIONS_FOR_SLO", 1)
     monkeypatch.setattr(
         sys,
         "argv",
-        [
-            "agent-office-reliability",
-            str(snapshot),
-            "--pretty",
-            "--minimum-decisions",
-            "1",
-        ],
+        ["agent-office-reliability", str(snapshot), "--pretty", "--minimum-decisions", "1"],
     )
-
-    from agent_office import reliability
 
     assert reliability.main() == 0
     output = json.loads(capsys.readouterr().out)
