@@ -57,7 +57,9 @@ def evaluate_snapshot(snapshot: dict[str, Any], *, target: float = SLO_TARGET) -
         if status not in VALID_STATUSES:
             status = "unknown"
             findings.append(
-                ReliabilityFinding("high", "invalid_status", "decision status is unsupported", evidence_id)
+                ReliabilityFinding(
+                    "high", "invalid_status", "decision status is unsupported", evidence_id
+                )
             )
 
         provenance = [str(item).strip() for item in raw.get("provenance") or [] if str(item).strip()]
