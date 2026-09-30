@@ -211,9 +211,10 @@ def _trace_evidence(
             elif all(key):
                 exact_context_seen.add(key)
 
-        if event_type in {"strong_model_call", "model_call"} and str(
-            payload.get("tier") or ""
-        ).lower() == "strong":
+        if (
+            event_type in {"strong_model_call", "model_call"}
+            and str(payload.get("tier") or "").lower() == "strong"
+        ):
             evidence_version = str(payload.get("evidence_version") or "").strip()
             if evidence_version and evidence_version == last_strong_evidence:
                 strong_retries_without_new_evidence += 1
