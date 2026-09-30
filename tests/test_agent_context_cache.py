@@ -178,6 +178,8 @@ def test_changed_ci_reuses_only_slices_independent_of_ci():
 
     assert result.status == "partial"
     assert result.packet is None
+    assert result.scope == packet.scope
+    assert result.evidence == _evidence(ci="ci-2")
     assert result.stale_components == ("ci",)
     assert [item.name for item in result.reusable_slices] == [
         "code",

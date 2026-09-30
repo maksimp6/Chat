@@ -9,6 +9,44 @@ class TraceSecurityTests(unittest.TestCase):
         self.assertEqual(value["api_key"], "<redacted>")
         self.assertEqual(value["nested"]["token"], "<redacted>")
 
+    def test_sanitize_trace_value_redacts_private_keys_and_pem_blocks(self):
+        value = sanitize_trace_value(
+            {
+                "private_key": "raw-key",
+                "nested": {"client_secret": "client-secret"},
+                "text": (
+                    "before\n-----BEGIN PRIVATE KEY-----\n"
+                    "PRIVATE-MATERIAL\n-----END PRIVATE KEY-----\nafter"
+                ),
+            }
+        )
+        self.assertEqual(value["private_key"], "<redacted>")
+        self.assertEqual(value["nested"]["client_secret"], "<redacted>")
+        self.assertNotIn("PRIVATE-MATERIAL", value["text"])
+        self.assertIn("<redacted-private-key>", value["text"])
+
+        inline = sanitize_trace_value(
+            "private_key=raw --client-secret client-value secret_key: secret-value"
+        )
+        self.assertEqual(
+            inline,
+            "private_key=<redacted> --client-secret <redacted> secret_key: <redacted>",
+        )
+
+    def test_private_key_redaction_handles_malformed_and_non_key_markers(self):
+        malformed = sanitize_trace_value("before -----BEGIN PRIVATE KEY")
+        self.assertEqual(malformed, "before -----BEGIN PRIVATE KEY")
+
+        certificate = sanitize_trace_value(
+            "before -----BEGIN CERTIFICATE-----data-----END CERTIFICATE----- after"
+        )
+        self.assertIn("BEGIN CERTIFICATE", certificate)
+        self.assertIn("data", certificate)
+
+        unterminated = sanitize_trace_value("before -----BEGIN RSA PRIVATE KEY-----SECRET-MATERIAL")
+        self.assertEqual(unterminated, "before <redacted-private-key>")
+        self.assertNotIn("SECRET-MATERIAL", unterminated)
+
     def test_sanitize_trace_value_limits_items(self):
         value = sanitize_trace_value({str(index): index for index in range(51)})
         self.assertIn("<truncated>", value)
