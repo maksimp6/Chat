@@ -287,3 +287,75 @@ def test_separate_database_connections_each_initialize_schema(tmp_path):
     assert first.get("second-memory") is None
     assert second.get("second-memory") is not None
     assert second.get("first-memory") is None
+
+
+def test_memory_record_rejects_none_and_negative_timestamps():
+    common = dict(
+        memory_id="m1",
+        kind="project",
+        scope="repo",
+        text="fact",
+        provenance={
+            "source_type": "github",
+            "repository": "repo",
+            "refs": ["PR#1"],
+        },
+        source_version="sha",
+        created_at=1,
+        updated_at=1,
+    )
+
+    with pytest.raises(ValueError):
+        MemoryRecord(**{**common, "text": None})
+    with pytest.raises(ValueError, match="created_at"):
+        MemoryRecord(**{**common, "created_at": -1})
+    with pytest.raises(ValueError, match="updated_at"):
+        MemoryRecord(**{**common, "updated_at": -1})
+    with pytest.raises(ValueError, match="expires_at"):
+        MemoryRecord(**{**common, "expires_at": -1})
+
+
+def test_create_schema_is_explicitly_callable_and_closes_connection(tmp_path):
+    path = tmp_path / "explicit-schema.db"
+    connections = []
+
+    def connect():
+        conn = sqlite3.connect(path)
+        conn.row_factory = sqlite3.Row
+        connections.append(conn)
+        return conn
+
+    store = AgentMemoryStore(connect)
+    store.create_schema()
+
+    probe = sqlite3.connect(path)
+    try:
+        table = probe.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agent_memory'"
+        ).fetchone()
+    finally:
+        probe.close()
+
+    assert table == ("agent_memory",)
+    with pytest.raises(sqlite3.ProgrammingError):
+        connections[0].execute("SELECT 1")
+
+
+def test_upsert_fails_closed_if_persisted_record_cannot_be_reloaded(tmp_path, monkeypatch):
+    store = _sqlite_store(tmp_path)
+    record = _github_record(memory_id="reload-failure")
+    monkeypatch.setattr(store, "get", lambda _memory_id: None)
+
+    with pytest.raises(RuntimeError, match="did not persist"):
+        store.upsert(record)
+
+
+def test_list_records_filters_by_scope(tmp_path):
+    store = _sqlite_store(tmp_path)
+    store.upsert(_github_record(memory_id="repo", scope="repo:maksimp6/Chat"))
+    store.upsert(_github_record(memory_id="issue", scope="issue:578"))
+
+    scoped = store.list_records(scope="issue:578")
+
+    assert [record.memory_id for record in scoped] == ["issue"]
+
