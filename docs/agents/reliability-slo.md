@@ -7,6 +7,9 @@ Issue #592 defines the measurable meaning of the Alice Pro “99.99% reliable”
 The target is **99.99% valid control-plane decisions** over a real evidence window.
 It does not claim that an LLM is correct 99.99% of the time.
 
+A four-nines claim requires at least **10,000 measured decisions**. Below that floor the
+auditor may report the controls as healthy, but it must not claim the SLO is proven.
+
 Countable decisions include task dispatch, retrieval preparation, readiness decisions,
 maintainer outcomes, Observer escalation, approval-boundary decisions and merge
 decisions.
