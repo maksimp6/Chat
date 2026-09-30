@@ -397,9 +397,7 @@ def test_usage_counters_must_be_nonnegative_integers():
     object.__setattr__(
         non_integer,
         "usage",
-        MappingProxyType(
-            {"cheap_calls": "not-a-number", "normal_calls": 0, "strong_calls": 0}
-        ),
+        MappingProxyType({"cheap_calls": "not-a-number", "normal_calls": 0, "strong_calls": 0}),
     )
     with pytest.raises(CoordinatorPolicyError, match="integer"):
         coordinator.prepare_handoff(
