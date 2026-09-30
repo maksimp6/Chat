@@ -79,12 +79,12 @@ class OrchestratedTaskPacket:
     stage: str
     backend: str
     base_ref: str
+    current_head: str
     evidence_refs: tuple[EvidenceRef, ...] = field(default_factory=tuple)
     accepted_contract_head: Optional[str] = None
     brief_opinion: Optional[BriefOpinion] = None
     role: Optional[str] = None
     objective: Optional[str] = None
-    current_head: Optional[str] = None
     expected_deliverable: Optional[str] = None
     approval_boundary: Optional[str] = None
 
