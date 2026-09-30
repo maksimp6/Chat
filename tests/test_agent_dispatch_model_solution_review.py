@@ -6,6 +6,7 @@ solution-quality review stage required between verification and maintain/merge.
 ALL tests are expected to FAIL (RED) until the production implementation is added.
 Do not add implementation code here.
 """
+
 import pytest
 
 from agent_office.dispatch_model import (
