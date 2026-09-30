@@ -341,12 +341,31 @@ class TestSingleActiveTaskRule:
         registry.register(p)
         registry.register(p)
 
-    def test_terminal_task_allows_next_stage_registration(self):
+    def test_contract_red_ready_allows_contract_review_registration(self):
+        # After contract terminates with material_outcome=RED_READY,
+        # contract-review is the only permitted next stage.
         registry = TaskRegistry()
         p = _packet(task_id="t1", work_item_ref="issues/1", stage="contract")
         registry.register(p)
-        registry.record_terminal(task_id="t1", state="done", evidence_refs=(_ref("pr", "42"),))
-        registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
+        registry.record_terminal(
+            task_id="t1", state="done", material_outcome="RED_READY",
+            evidence_refs=(_ref("pr", "42"),),
+        )
+        registry.register(
+            _packet(task_id="t2", work_item_ref="issues/1", stage="contract-review")
+        )
+
+    def test_wrong_stage_after_contract_red_ready_is_rejected(self):
+        # contract + RED_READY -> contract-review; skipping to implementation is invalid.
+        registry = TaskRegistry()
+        p = _packet(task_id="t1", work_item_ref="issues/1", stage="contract")
+        registry.register(p)
+        registry.record_terminal(
+            task_id="t1", state="done", material_outcome="RED_READY",
+            evidence_refs=(_ref("pr", "42"),),
+        )
+        with pytest.raises((DuplicateActiveTaskError, ValueError)):
+            registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
 
     def test_authoritative_task_id_not_replaced_by_duplicate(self):
         registry = TaskRegistry()
@@ -516,16 +535,91 @@ class TestContractReviewDispatch:
         with pytest.raises(DuplicateActiveTaskError):
             registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
 
-    def test_implementation_accepted_after_contract_terminates(self):
+    def test_contract_review_accepted_allows_implementation_registration(self):
+        # Full two-step dispatch: contract+RED_READY->contract-review,
+        # then contract-review+ACCEPTED->implementation.
+        registry = TaskRegistry()
+        p_contract = _packet(task_id="t1", work_item_ref="issues/1", stage="contract")
+        registry.register(p_contract)
+        registry.record_terminal(
+            task_id="t1", state="done", material_outcome="RED_READY",
+            evidence_refs=(_ref("pr", "42"),),
+        )
+        p_cr = _packet(task_id="t2", work_item_ref="issues/1", stage="contract-review")
+        registry.register(p_cr)
+        registry.record_terminal(
+            task_id="t2", state="done", material_outcome="ACCEPTED",
+            evidence_refs=(_ref("pr", "43"),),
+        )
+        registry.register(_impl_packet(task_id="t3", work_item_ref="issues/1"))
+
+    def test_contract_done_without_material_outcome_rejects_stage_advance(self):
+        # A terminal "done" without a material_outcome cannot advance the lifecycle.
         registry = TaskRegistry()
         p = _packet(task_id="t1", work_item_ref="issues/1", stage="contract")
         registry.register(p)
-        registry.record_terminal(task_id="t1", state="done", evidence_refs=(_ref("pr", "42"),))
-        registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
+        registry.record_terminal(
+            task_id="t1", state="done", evidence_refs=(_ref("pr", "42"),)
+        )
+        with pytest.raises((DuplicateActiveTaskError, ValueError)):
+            registry.register(
+                _packet(task_id="t2", work_item_ref="issues/1", stage="contract-review")
+            )
 
 
 # ===========================================================================
-# 8. CHANGES_REQUESTED is a review outcome, not a canonical task state
+# 8. Registry admission is wired to lifecycle transitions via material_outcome
+# ===========================================================================
+
+
+class TestRegistryLifecycleAdmission:
+    def test_registry_rejects_stage_not_matching_next_stage_after(self):
+        # Registering stage S2 when next_stage_after(S1, outcome) != S2 must fail.
+        registry = TaskRegistry()
+        registry.register(_packet(task_id="t1", work_item_ref="issues/5", stage="contract"))
+        registry.record_terminal(
+            task_id="t1", state="done", material_outcome="RED_READY",
+            evidence_refs=(_ref("pr", "10"),),
+        )
+        # contract + RED_READY -> contract-review, NOT implementation
+        with pytest.raises((DuplicateActiveTaskError, ValueError)):
+            registry.register(_impl_packet(task_id="t2", work_item_ref="issues/5"))
+
+    def test_registry_admits_stage_matching_next_stage_after(self):
+        registry = TaskRegistry()
+        registry.register(_packet(task_id="t1", work_item_ref="issues/5", stage="contract"))
+        registry.record_terminal(
+            task_id="t1", state="done", material_outcome="RED_READY",
+            evidence_refs=(_ref("pr", "10"),),
+        )
+        # contract + RED_READY -> contract-review: valid
+        registry.register(_packet(task_id="t2", work_item_ref="issues/5", stage="contract-review"))
+
+    def test_failed_task_does_not_unlock_next_stage(self):
+        # A failed terminal with no material_outcome must not advance the lifecycle.
+        registry = TaskRegistry()
+        registry.register(_packet(task_id="t1", work_item_ref="issues/6", stage="contract"))
+        registry.record_terminal(
+            task_id="t1", state="failed", evidence_refs=(_ref("pr", "10"),)
+        )
+        # next_stage_after("contract", None/"failed") == None, so contract-review is invalid
+        with pytest.raises((DuplicateActiveTaskError, ValueError, MissingEvidenceError)):
+            registry.register(
+                _packet(task_id="t2", work_item_ref="issues/6", stage="contract-review")
+            )
+
+    def test_contract_review_red_ready_does_not_unlock_implementation(self):
+        # contract-review + RED_READY is not a defined transition; only ACCEPTED unlocks implementation.
+        assert next_stage_after("contract-review", "RED_READY") != "implementation"
+
+    def test_implementation_success_does_not_unlock_solution_review_directly(self):
+        # implementation + success -> verification, NOT solution-review directly.
+        assert next_stage_after("implementation", "success") == "verification"
+        assert next_stage_after("implementation", "success") != "solution-review"
+
+
+# ===========================================================================
+# 9. CHANGES_REQUESTED is a review outcome, not a canonical task state
 # ===========================================================================
 
 
@@ -557,37 +651,44 @@ class TestChangesRequestedAsReviewOutcome:
             assert_solution_review_accepted_for_head(artifact, current_head="impl-sha")
 
     def test_implementation_redispatch_after_changes_requested(self):
-        # After CHANGES_REQUESTED terminal on solution-review, a fresh implementation
-        # packet for the same work item is accepted (prior tasks are terminal).
+        # After CHANGES_REQUESTED: solution-review -> implementation -> verification -> solution-review.
         registry = TaskRegistry()
+        work_item = "issues/1"
+
+        # First implementation pass
         p_impl_v1 = _impl_packet(
-            task_id="t-impl-v1",
-            work_item_ref="issues/1",
-            current_head="impl-sha-v1",
+            task_id="t-impl-v1", work_item_ref=work_item, current_head="impl-sha-v1"
         )
         registry.register(p_impl_v1)
         registry.record_terminal(
-            task_id="t-impl-v1",
-            state="done",
+            task_id="t-impl-v1", state="done", material_outcome="success",
             evidence_refs=(_ref("pr", "10"),),
         )
+
+        # Verification pass (required before solution-review)
+        p_verify_v1 = _impl_packet(
+            task_id="t-verify-v1", work_item_ref=work_item, stage="verification"
+        )
+        registry.register(p_verify_v1)
+        registry.record_terminal(
+            task_id="t-verify-v1", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "11"),),
+        )
+
+        # First solution-review: CHANGES_REQUESTED
         p_review = _impl_packet(
-            task_id="t-review",
-            work_item_ref="issues/1",
-            stage="solution-review",
-            role="team-lead",
-            current_head="impl-sha-v1",
+            task_id="t-review", work_item_ref=work_item,
+            stage="solution-review", role="team-lead", current_head="impl-sha-v1",
         )
         registry.register(p_review)
         registry.record_terminal(
-            task_id="t-review",
-            state="done",
+            task_id="t-review", state="done", material_outcome="CHANGES_REQUESTED",
             evidence_refs=(_ref("pr-review", "10"),),
-            review_outcome="CHANGES_REQUESTED",  # review outcome, not task state
         )
+
+        # Re-implementation: valid (solution-review + CHANGES_REQUESTED -> implementation)
         p_impl_v2 = _impl_packet(
-            task_id="t-impl-v2",
-            work_item_ref="issues/1",
+            task_id="t-impl-v2", work_item_ref=work_item,
             current_head="impl-sha-v2",
             evidence_refs=(
                 _contract_provenance("contract-sha"),
@@ -618,7 +719,7 @@ class TestChangesRequestedAsReviewOutcome:
 
 
 # ===========================================================================
-# 9. BriefOpinion is advisory only — cannot alter state or transitions
+# 10. BriefOpinion is advisory only — cannot alter state or transitions
 # ===========================================================================
 
 
@@ -679,7 +780,7 @@ class TestBriefOpinionAdvisory:
 
 
 # ===========================================================================
-# 10. Integration: orchestration uses the canonical task-state machine
+# 11. Integration: orchestration uses the canonical task-state machine
 # ===========================================================================
 
 
@@ -704,3 +805,143 @@ class TestCanonicalStateMachineIntegration:
                 assert result is None or result in CANONICAL_LIFECYCLE_STAGES, (
                     f"next_stage_after({stage!r}, {outcome!r}) = {result!r} is not canonical"
                 )
+
+
+# ===========================================================================
+# 12. Full lifecycle integration: TaskRegistry wired to next_stage_after
+# ===========================================================================
+
+
+class TestLifecycleIntegration:
+    def test_full_forward_lifecycle_drives_one_work_item_through_all_stages(self):
+        """
+        Proves TaskRegistry and next_stage_after cannot be implemented as
+        unrelated components: each stage registration is gate-kept by the
+        previous stage's material_outcome via next_stage_after.
+        """
+        registry = TaskRegistry()
+        work_item = "issues/634"
+
+        # contract -> contract-review
+        p_contract = _packet(task_id="t-contract", work_item_ref=work_item, stage="contract")
+        registry.register(p_contract)
+        assert next_stage_after("contract", "RED_READY") == "contract-review"
+        registry.record_terminal(
+            task_id="t-contract", state="done", material_outcome="RED_READY",
+            evidence_refs=(_ref("pr", "1"),),
+        )
+
+        # contract-review -> implementation
+        p_cr = _packet(task_id="t-cr", work_item_ref=work_item, stage="contract-review")
+        registry.register(p_cr)
+        assert next_stage_after("contract-review", "ACCEPTED") == "implementation"
+        registry.record_terminal(
+            task_id="t-cr", state="done", material_outcome="ACCEPTED",
+            evidence_refs=(_ref("pr", "2"),),
+        )
+
+        # implementation -> verification
+        p_impl = _impl_packet(task_id="t-impl", work_item_ref=work_item)
+        registry.register(p_impl)
+        assert next_stage_after("implementation", "success") == "verification"
+        registry.record_terminal(
+            task_id="t-impl", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "3"),),
+        )
+
+        # verification -> solution-review
+        p_verify = _impl_packet(task_id="t-verify", work_item_ref=work_item, stage="verification")
+        registry.register(p_verify)
+        assert next_stage_after("verification", "success") == "solution-review"
+        registry.record_terminal(
+            task_id="t-verify", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "4"),),
+        )
+
+        # solution-review -> maintain
+        p_review = _impl_packet(
+            task_id="t-review", work_item_ref=work_item,
+            stage="solution-review", role="team-lead",
+        )
+        registry.register(p_review)
+        assert next_stage_after("solution-review", "ACCEPTED") == "maintain"
+        registry.record_terminal(
+            task_id="t-review", state="done", material_outcome="ACCEPTED",
+            evidence_refs=(_ref("pr", "5"),),
+        )
+
+        # maintain -> None (protected merge action takes over)
+        p_maintain = _impl_packet(task_id="t-maintain", work_item_ref=work_item, stage="maintain")
+        registry.register(p_maintain)
+        assert next_stage_after("maintain", "READY") is None
+
+    def test_changes_requested_path_requires_verification_before_second_solution_review(self):
+        """After CHANGES_REQUESTED, path must be implementation -> verification -> solution-review."""
+        registry = TaskRegistry()
+        work_item = "issues/635"
+
+        # First implementation pass
+        p_impl_v1 = _impl_packet(task_id="t-impl-v1", work_item_ref=work_item)
+        registry.register(p_impl_v1)
+        registry.record_terminal(
+            task_id="t-impl-v1", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "10"),),
+        )
+
+        # Verification required before first solution-review
+        p_verify_v1 = _impl_packet(
+            task_id="t-verify-v1", work_item_ref=work_item, stage="verification"
+        )
+        registry.register(p_verify_v1)
+        registry.record_terminal(
+            task_id="t-verify-v1", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "11"),),
+        )
+
+        # First solution-review returns CHANGES_REQUESTED
+        p_review_v1 = _impl_packet(
+            task_id="t-review-v1", work_item_ref=work_item,
+            stage="solution-review", role="team-lead",
+        )
+        registry.register(p_review_v1)
+        assert next_stage_after("solution-review", "CHANGES_REQUESTED") == "implementation"
+        registry.record_terminal(
+            task_id="t-review-v1", state="done", material_outcome="CHANGES_REQUESTED",
+            evidence_refs=(_ref("pr-review", "10"),),
+        )
+
+        # Re-implementation: valid (next_stage_after == "implementation")
+        p_impl_v2 = _impl_packet(
+            task_id="t-impl-v2", work_item_ref=work_item, current_head="impl-sha-v2",
+            evidence_refs=(_contract_provenance("contract-sha"), _ref("pr-review", "10")),
+        )
+        registry.register(p_impl_v2)
+        registry.record_terminal(
+            task_id="t-impl-v2", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "20"),),
+        )
+
+        # Attempting solution-review without verification must fail
+        with pytest.raises((DuplicateActiveTaskError, ValueError)):
+            registry.register(
+                _impl_packet(
+                    task_id="t-review-v2-bad", work_item_ref=work_item,
+                    stage="solution-review", role="team-lead",
+                )
+            )
+
+        # Verification completes: solution-review is now valid
+        p_verify_v2 = _impl_packet(
+            task_id="t-verify-v2", work_item_ref=work_item, stage="verification"
+        )
+        registry.register(p_verify_v2)
+        registry.record_terminal(
+            task_id="t-verify-v2", state="done", material_outcome="success",
+            evidence_refs=(_ref("pr", "21"),),
+        )
+        registry.register(
+            _impl_packet(
+                task_id="t-review-v2", work_item_ref=work_item,
+                stage="solution-review", role="team-lead",
+            )
+        )
