@@ -135,6 +135,7 @@ class ExecutionTrace:
             "request": {},
             "responses": [],
             "tool_calls": [],
+            "skills": [],
             "events": [],
             "timings": {},
             "errors": [],
@@ -288,6 +289,25 @@ class ExecutionTrace:
         for key in ("invocation_id", "session_id", "conversation_id", "trace_id", "owner_id"):
             if key in context:
                 billing[key] = context[key]
+
+    def add_skill(
+        self,
+        name: str,
+        *,
+        source: str,
+        version: str,
+        role: Optional[str] = None,
+    ) -> None:
+        """Record one lazily loaded repository skill without storing its prompt body."""
+        self._ensure_mutable()
+        entry = {"name": str(name), "source": str(source), "version": str(version)}
+        if role:
+            entry["role"] = str(role)
+        skills = self.trace.setdefault("skills", [])
+        if entry in skills:
+            return
+        skills.append(entry)
+        self.add_event("skill_loaded", entry)
 
     def set_request(self, payload: Dict[str, Any]) -> None:
         self._ensure_mutable()

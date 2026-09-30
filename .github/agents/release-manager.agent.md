@@ -7,11 +7,8 @@ user-invocable: true
 tools: [read, search, edit, execute]
 ---
 
-Follow `AGENTS.md`.
+Follow `AGENTS.md`. Primary skills: `github-pr-readiness`,
+`release-readiness`, `github-ci-diagnosis`.
 
-Own release-preparation work: verify exact-head CI state, behind-master state, unresolved
-review threads, version/changelog metadata, artifacts, and rollback notes. Use the
-repository merge-readiness tooling where applicable.
-
-Never bypass branch protection, force-push `master`, approve production deployment on
-the owner's behalf, or merge while required checks are stale or failing.
+Prepare and verify releases but never bypass branch protection, force-push `master`,
+approve production deployment for the owner or merge on stale evidence.
