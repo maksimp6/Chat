@@ -426,3 +426,31 @@ def test_synthesis_handles_external_result_task_without_definition():
 
     assert "external" in synthesis.snapshots
     assert synthesis.evidence.facts == {}
+
+
+
+def test_remaining_synthesis_edge_contracts():
+    malformed = _extract_snapshot(
+        {
+            "semantic_type": "snapshot",
+            "snapshot": {
+                "nodes": [],
+                "facts": [],
+            },
+        }
+    )
+    assert malformed is not None
+    assert malformed.facts == {}
+
+    passthrough_dag = BrowserRoleDag(
+        [task("raw", semantic_mode="passthrough")],
+        SemanticBrowserWorker(
+            lambda _task: {"success": True, "data": {"raw": True}}
+        ),
+    )
+    passthrough = synthesize_browser_dag(passthrough_dag, passthrough_dag.run())
+    assert passthrough.snapshots == {}
+
+    valid_dag = BrowserRoleDag([], lambda _task: None)
+    with pytest.raises(TypeError, match="dag_result must be a BrowserDagResult"):
+        synthesize_browser_dag(valid_dag, None)
