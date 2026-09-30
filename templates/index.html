@@ -88,6 +88,7 @@
     <link rel="stylesheet" href="{{ static_root }}/departments.css?v={{ static_version }}" />
     <link rel="stylesheet" href="{{ static_root }}/environments.css?v={{ static_version }}" />
     <script src="{{ static_root }}/departments.js?v={{ static_version }}" defer></script>
+    <script src="{{ static_root }}/app_surfaces.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/partner_relations.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/environments.js?v={{ static_version }}" defer></script>
   </head>
@@ -226,6 +227,15 @@
               data-action="header.departments.open"
             >
               🏢</button
+            ><button
+              id="apps-btn"
+              type="button"
+              class="header-btn alice-btn"
+              title="Приложения"
+              aria-label="Приложения"
+              data-action="app-surfaces.open"
+            >
+              🪟</button
             ><button
               id="update-app-btn"
               type="button"
