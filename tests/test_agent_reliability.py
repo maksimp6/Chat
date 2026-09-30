@@ -79,9 +79,7 @@ def test_observer_staleness_blocks_reliability_claim():
 def test_maintainer_stall_after_two_passes_blocks():
     result = evaluate_snapshot(
         _snapshot(
-            maintainer_handoffs=[
-                {"id": "pr:548", "observer_passes": 2, "outcome": "acknowledged"}
-            ]
+            maintainer_handoffs=[{"id": "pr:548", "observer_passes": 2, "outcome": "acknowledged"}]
         )
     )
     assert result["ready"] is False
