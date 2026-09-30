@@ -24,6 +24,11 @@ __all__ = [
     "build_semantic_snapshot",
     "diff_semantic_snapshots",
     "merge_evidence",
+    "BrowserSynthesisPolicy",
+    "BrowserSynthesisResult",
+    "EscalationDecision",
+    "SemanticBrowserWorker",
+    "synthesize_browser_dag",
 ]
 
 from .semantic import (
@@ -35,4 +40,12 @@ from .semantic import (
     build_semantic_snapshot,
     diff_semantic_snapshots,
     merge_evidence,
+)
+
+from .pipeline import (
+    BrowserSynthesisPolicy,
+    BrowserSynthesisResult,
+    EscalationDecision,
+    SemanticBrowserWorker,
+    synthesize_browser_dag,
 )
