@@ -1,0 +1,75 @@
+name: Windows desktop app
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "desktop_app.py"
+      - "requirements-desktop.txt"
+      - "desktop/**"
+      - "templates/**"
+      - "static/**"
+      - "tests/test_desktop_app.py"
+      - ".github/workflows/windows-desktop.yml"
+  push:
+    branches: [master]
+    paths:
+      - "desktop_app.py"
+      - "requirements-desktop.txt"
+      - "desktop/**"
+      - "templates/**"
+      - "static/**"
+      - ".github/workflows/windows-desktop.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build AlicePro.exe
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-desktop.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-desktop.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run desktop launcher tests
+        run: pytest -q tests/test_desktop_app.py
+
+      - name: Build executable
+        run: pyinstaller --noconfirm --clean desktop/AlicePro.spec
+
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/AlicePro.exe")) {
+            throw "dist/AlicePro.exe was not created"
+          }
+          Get-Item "dist/AlicePro.exe" | Format-List Name,Length,LastWriteTime
+
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: AlicePro-Windows-${{ github.run_number }}
+          path: dist/AlicePro.exe
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
