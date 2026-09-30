@@ -126,7 +126,9 @@ def _readiness_evidence(
         status=status,
         provenance=_provenance(
             source_ref,
-            f"github:pr:{repo}#{pr_number}@{head_sha}" if repo and pr_number is not None and head_sha else None,
+            f"github:pr:{repo}#{pr_number}@{head_sha}"
+            if repo and pr_number is not None and head_sha
+            else None,
         ),
     )
 
