@@ -1,8 +1,6 @@
 import os
 
 import pytest
-from pathlib import Path
-
 from flask import Flask
 
 from desktop import launcher
@@ -123,85 +121,106 @@ def test_run_desktop_starts_window_and_shuts_server_down(monkeypatch):
     assert events[-3:] == ["shutdown", "close", ("thread-join", 5)]
 
 
-def test_non_windows_desktop_fails_closed_without_credential_key(tmp_path, monkeypatch):
-    from desktop import credential_protection
-
-    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
-    monkeypatch.setattr(credential_protection.os, "name", "posix")
-
-    with pytest.raises(
-        credential_protection.DesktopCredentialProtectionError,
-        match="must be configured outside Windows desktop",
-    ):
-        credential_protection.ensure_provider_credential_key(tmp_path)
-
-
-def test_existing_environment_credential_key_is_reused(tmp_path, monkeypatch):
+def test_existing_environment_credential_key_is_reused(monkeypatch):
     from desktop import credential_protection
 
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "already-configured")
 
-    assert (
-        credential_protection.ensure_provider_credential_key(tmp_path)
-        == "already-configured"
-    )
-    assert not (tmp_path / credential_protection.KEY_FILE_NAME).exists()
+    assert credential_protection.ensure_provider_credential_key() == "already-configured"
 
 
-def test_windows_desktop_provisions_and_reuses_protected_key(tmp_path, monkeypatch):
+def test_system_keyring_provisions_and_reuses_key(monkeypatch):
+    import sys
+    import types
+
     from desktop import credential_protection
 
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
-    monkeypatch.setattr(credential_protection.os, "name", "nt")
+    stored = {}
 
-    protected_values = []
-    plaintext_values = []
-
-    def fake_protect(value):
-        plaintext_values.append(value)
-        protected = ("protected:" + value).encode("utf-8")
-        protected_values.append(protected)
-        return protected
-
-    def fake_unprotect(value):
-        assert value in protected_values
-        return value.decode("utf-8").removeprefix("protected:")
-
-    first = credential_protection.ensure_provider_credential_key(
-        tmp_path,
-        protect=fake_protect,
-        unprotect=fake_unprotect,
+    fake_keyring = types.SimpleNamespace(
+        get_password=lambda service, name: stored.get((service, name)),
+        set_password=lambda service, name, value: stored.__setitem__((service, name), value),
     )
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
 
-    key_path = tmp_path / credential_protection.KEY_FILE_NAME
-    assert key_path.exists()
-    assert first not in key_path.read_text(encoding="ascii")
-    assert plaintext_values == [first]
+    first = credential_protection.ensure_provider_credential_key()
+
+    assert stored[
+        (credential_protection.SERVICE_NAME, credential_protection.KEY_NAME)
+    ] == first
     assert os.environ["ALICE_PROVIDER_CREDENTIAL_KEY"] == first
 
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
-    second = credential_protection.ensure_provider_credential_key(
-        tmp_path,
-        protect=fake_protect,
-        unprotect=fake_unprotect,
-    )
+    second = credential_protection.ensure_provider_credential_key()
 
     assert second == first
-    assert plaintext_values == [first]
 
 
-def test_windows_desktop_rejects_unreadable_protected_key(tmp_path, monkeypatch):
+def test_system_keyring_read_failure_fails_closed(monkeypatch):
+    import sys
+    import types
+
     from desktop import credential_protection
 
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
-    monkeypatch.setattr(credential_protection.os, "name", "nt")
-    (tmp_path / credential_protection.KEY_FILE_NAME).write_text(
-        "not-valid-base64",
-        encoding="ascii",
+
+    def fail_read(*_args):
+        raise RuntimeError("backend unavailable")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "keyring",
+        types.SimpleNamespace(get_password=fail_read),
     )
 
     with pytest.raises(
         credential_protection.DesktopCredentialProtectionError,
-        match="Unable to unlock",
+        match="Unable to read",
     ):
-        credential_protection.ensure_provider_credential_key(tmp_path)
+        credential_protection.ensure_provider_credential_key()
+
+
+def test_system_keyring_write_failure_fails_closed(monkeypatch):
+    import sys
+    import types
+
+    from desktop import credential_protection
+
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
+
+    def fail_write(*_args):
+        raise RuntimeError("backend unavailable")
+
+    fake_keyring = types.SimpleNamespace(
+        get_password=lambda *_args: None,
+        set_password=fail_write,
+    )
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+    with pytest.raises(
+        credential_protection.DesktopCredentialProtectionError,
+        match="Unable to store",
+    ):
+        credential_protection.ensure_provider_credential_key()
+
+
+def test_system_keyring_verifies_persistence(monkeypatch):
+    import sys
+    import types
+
+    from desktop import credential_protection
+
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
+    reads = iter([None, "different-value"])
+    fake_keyring = types.SimpleNamespace(
+        get_password=lambda *_args: next(reads),
+        set_password=lambda *_args: None,
+    )
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+    with pytest.raises(
+        credential_protection.DesktopCredentialProtectionError,
+        match="did not persist",
+    ):
+        credential_protection.ensure_provider_credential_key()
