@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "desktop_app.py"
       - "requirements-desktop.txt"
       - "desktop/**"
       - "templates/**"
@@ -14,7 +13,6 @@ on:
   push:
     branches: [master]
     paths:
-      - "desktop_app.py"
       - "requirements-desktop.txt"
       - "desktop/**"
       - "templates/**"
