@@ -38,7 +38,7 @@ def test_claude_direct_implementation_profile_uses_sonnet_and_enough_turns():
     workflow = _workflow()
 
     assert "--model claude-sonnet-4-6" in workflow
-    assert "--max-turns 30" in workflow
+    assert "--max-turns 45" in workflow
 
 
 def test_claude_direct_implementation_profile_has_bounded_write_and_validation_tools():
