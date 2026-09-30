@@ -115,3 +115,23 @@ def test_export_window_is_json_serializable_shape():
     exported = export_window([normalize_event(raw("a"))])
     assert exported[0]["at"].endswith("+00:00")
     assert exported[0]["provenance"] == ["github:x"]
+
+
+def test_conflicting_duplicate_is_order_independent():
+    first = normalize_event(
+        {**raw("same", provenance=("github:a",)), "kind": "merge_readiness"}
+    )
+    second = normalize_event(
+        {
+            **raw("same", status="invalid", provenance=("trace:b",)),
+            "kind": "approval_boundary",
+        }
+    )
+
+    forward = deduplicate_events([first, second])
+    reverse = deduplicate_events([second, first])
+
+    assert forward == reverse
+    assert forward[0].kind == "conflicting_duplicate"
+    assert forward[0].status == "unknown"
+    assert forward[0].provenance == ("github:a", "trace:b")
