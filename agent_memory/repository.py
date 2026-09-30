@@ -229,11 +229,7 @@ class AgentMemoryStore:
         if visible_to is None:
             return records
         role = str(visible_to)
-        return [
-            record
-            for record in records
-            if not record.visibility or role in record.visibility
-        ]
+        return [record for record in records if not record.visibility or role in record.visibility]
 
     def mark_stale(self, memory_id: str, *, reason: str, now: int | None = None) -> bool:
         record = self.get(memory_id)

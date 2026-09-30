@@ -116,7 +116,9 @@ class MemoryRecord:
                 raise ValueError("expires_at must be non-negative")
             object.__setattr__(self, "expires_at", expires_at)
         if self.superseded_by is not None:
-            object.__setattr__(self, "superseded_by", _clean_text(self.superseded_by).strip() or None)
+            object.__setattr__(
+                self, "superseded_by", _clean_text(self.superseded_by).strip() or None
+            )
 
     @classmethod
     def create(
