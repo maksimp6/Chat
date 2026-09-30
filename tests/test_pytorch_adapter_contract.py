@@ -345,9 +345,7 @@ def test_runtime_dispatcher_keeps_adapter_instances_and_owners_isolated(monkeypa
 
     def handler(context, payload):
         executed.append(context.runtime_id)
-        return invoke(
-            executors[context.runtime_id], payload["tool"], runtime_id=context.runtime_id
-        )
+        return invoke(executors[context.runtime_id], payload["tool"], runtime_id=context.runtime_id)
 
     dispatcher.register_operation("contract.pytorch.call", handler)
     for _ in range(2):

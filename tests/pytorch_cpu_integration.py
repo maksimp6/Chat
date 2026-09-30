@@ -33,6 +33,7 @@ def test_real_cpu_tensor_smoke(monkeypatch):
         return tensor
 
     monkeypatch.setattr(torch, "tensor", observed_tensor)
+
     def forbidden_side_effect(*args, **kwargs):
         raise AssertionError("Smoke must not access network or alter global settings")
 
