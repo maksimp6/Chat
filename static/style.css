@@ -1774,3 +1774,40 @@ body {
   background: var(--m-card, #fff);
   color: var(--m-text, #222);
 }
+
+
+/* === DESKTOP CHAT LAYOUT === */
+@media (min-width: 960px) {
+  .alice-pro-app #sidebar {
+    position: relative !important;
+    flex: 0 0 280px;
+    width: 280px;
+    height: 100dvh;
+    transform: none;
+    transition: none;
+    z-index: 20;
+  }
+
+  .alice-pro-app #main {
+    width: calc(100% - 280px);
+    min-width: 0;
+  }
+
+  .alice-pro-app #overlay,
+  .alice-pro-app #menu-btn,
+  .alice-pro-app #close-sidebar-btn {
+    display: none !important;
+  }
+
+  .alice-pro-app #header {
+    position: relative;
+    z-index: 10;
+  }
+
+  .alice-pro-app #chatbox,
+  .alice-pro-app #input-area {
+    width: min(100%, 1100px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
