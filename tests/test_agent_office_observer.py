@@ -170,6 +170,33 @@ def test_red_ci_and_merge_conflict_are_high():
     assert "Application tests" in next(f.message for f in findings if f.kind == "ci_failed")
 
 
+def test_pr_maintainer_handoff_stalls_after_two_hourly_passes():
+    base_timeline = [
+        review("copilot-pull-request-reviewer[bot]", 5),
+        comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        comment("maksimp6", "@claude maintainer pass on exact head", 3),
+    ]
+    stalled = build_thread(pr_item(), base_timeline, pull(), [run("tests", "success")])
+    assert stalled.dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert "maintainer_stall" in kinds(detect_findings(stalled, NOW))
+
+    fresh = build_thread(
+        pr_item(),
+        [*base_timeline[:-1], comment("maksimp6", "@claude maintainer pass", 1)],
+        pull(),
+        [run("tests", "success")],
+    )
+    assert "maintainer_stall" not in kinds(detect_findings(fresh, NOW))
+
+    answered = build_thread(
+        pr_item(),
+        [*base_timeline, comment("claude[bot]", "Blocked: required check missing", 2.5)],
+        pull(),
+        [run("tests", "success")],
+    )
+    assert "maintainer_stall" not in kinds(detect_findings(answered, NOW))
+
+
 def test_green_reviewed_pr_waiting_for_merge_is_reported():
     timeline = [
         review("copilot-pull-request-reviewer[bot]", 4),

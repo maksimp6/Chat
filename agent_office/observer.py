@@ -63,6 +63,7 @@ class Thresholds:
     agent_silent: timedelta = timedelta(hours=2)
     review_wait: timedelta = timedelta(hours=1)
     merge_wait: timedelta = timedelta(hours=2)
+    maintainer_wait: timedelta = timedelta(hours=2)
     checks_pending: timedelta = timedelta(hours=2)
     stale: timedelta = timedelta(hours=24)
     recent_window: timedelta = timedelta(hours=24)
@@ -323,7 +324,7 @@ def build_thread(
             source = (raw.get("source") or {}).get("issue") or {}
             if "pull_request" in source and source.get("number") not in thread.linked_prs:
                 thread.linked_prs.append(source["number"])
-        elif not is_pr and kind == "commented":
+        elif kind == "commented":
             _record_dispatch(thread, raw.get("body"), event.at, event.actor)
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
@@ -405,6 +406,14 @@ def _has_codex_check(thread: Thread) -> bool:
     )
 
 
+def _latest_dispatch(thread: Thread, agent: str) -> datetime | None:
+    return max((at for target, at in thread.dispatches if target == agent), default=None)
+
+
+def _agent_responded_after(thread: Thread, agent: str, since: datetime) -> bool:
+    return any(event.agent == agent and event.at > since for event in thread.events)
+
+
 def detect_findings(
     thread: Thread, now: datetime, limits: Thresholds = DEFAULT_LIMITS
 ) -> list[Finding]:
@@ -422,6 +431,19 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
+        maintainer_since = _latest_dispatch(thread, "claude")
+        if (
+            maintainer_since is not None
+            and now - maintainer_since > limits.maintainer_wait
+            and not _agent_responded_after(thread, "claude", maintainer_since)
+        ):
+            found.append(
+                finding(
+                    "medium",
+                    "maintainer_stall",
+                    "maintainer handoff без merge, blocker/defer статуса или ответа Claude",
+                )
+            )
         if state == "failed":
             failed = sorted(
                 name for name, value in thread.checks.items() if value in FAILED_CONCLUSIONS

@@ -54,6 +54,9 @@ these conditions is supported by repository evidence:
    maintainer passes.
 6. **Replacement churn** — more than two replacement pull requests are opened for the
    same unchanged objective.
+7. **Maintainer stall** — a PR receives a `@claude` maintainer handoff but has no
+   material Claude response, blocker/defer status, or merge after two hourly Observer
+   passes. A reaction alone is acknowledgement, not completion.
 
 These signals trigger investigation. They do not prove fault, incompetence, or that a
 specific role should be replaced.
@@ -106,6 +109,17 @@ owner only when an approval boundary is crossed
 
 A one-off technical failure normally goes to Team Lead or the relevant specialist.
 Process Governor is for repeated or structural failures, not ordinary bug triage.
+
+### Maintainer handoff state
+
+The hourly Observer tracks `@claude` mentions on pull requests as maintainer
+dispatches. The handoff is considered progressing only when a later Claude-authored
+event appears or the PR leaves the open state. After two hourly passes without either,
+it emits `maintainer_stall`.
+
+This is intentionally deterministic and does not call another model merely to discover
+that nothing changed. The finding is evidence for Process Governor to inspect dispatch
+or workflow policy; it never weakens merge protection.
 
 ## Process-change contract
 
