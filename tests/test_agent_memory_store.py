@@ -358,4 +358,3 @@ def test_list_records_filters_by_scope(tmp_path):
     scoped = store.list_records(scope="issue:578")
 
     assert [record.memory_id for record in scoped] == ["issue"]
-
