@@ -25,7 +25,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Base64;
+import android.util.Base64;
 import java.util.Locale;
 
 public class AliceRootAgentService extends Service {
@@ -87,7 +87,7 @@ public class AliceRootAgentService extends Service {
 
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
-        String created = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String created = Base64.encodeToString(bytes, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
         prefs.edit().putString("token", created).apply();
 
         try {
