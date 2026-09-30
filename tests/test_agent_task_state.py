@@ -234,9 +234,7 @@ _CANONICAL_EVIDENCE_INPUTS = [
     AgentTaskEvidence(
         dispatch_created=True, workflow_status="in_progress", backend_triggered=False
     ),
-    AgentTaskEvidence(
-        dispatch_created=True, workflow_status="in_progress", backend_triggered=True
-    ),
+    AgentTaskEvidence(dispatch_created=True, workflow_status="in_progress", backend_triggered=True),
     AgentTaskEvidence(
         dispatch_created=True,
         backend_triggered=True,
@@ -271,9 +269,7 @@ _CANONICAL_EVIDENCE_INPUTS = [
         backend_triggered=True,
         blocker="BLOCKED: dependency missing",
     ),
-    AgentTaskEvidence(
-        dispatch_created=True, backend_triggered=True, backend_status="failed"
-    ),
+    AgentTaskEvidence(dispatch_created=True, backend_triggered=True, backend_status="failed"),
     AgentTaskEvidence(dispatch_created=True, cancelled=True, backend_triggered=True),
     AgentTaskEvidence(dispatch_created=True, mention_delivered=True, stall_detected=True),
 ]
