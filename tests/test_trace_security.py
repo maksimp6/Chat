@@ -43,9 +43,7 @@ class TraceSecurityTests(unittest.TestCase):
         self.assertIn("BEGIN CERTIFICATE", certificate)
         self.assertIn("data", certificate)
 
-        unterminated = sanitize_trace_value(
-            "before -----BEGIN RSA PRIVATE KEY-----SECRET-MATERIAL"
-        )
+        unterminated = sanitize_trace_value("before -----BEGIN RSA PRIVATE KEY-----SECRET-MATERIAL")
         self.assertEqual(unterminated, "before <redacted-private-key>")
         self.assertNotIn("SECRET-MATERIAL", unterminated)
 
