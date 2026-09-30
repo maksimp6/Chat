@@ -81,7 +81,7 @@ SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL
 
 ```powershell
 pip install -r requirements-desktop.txt
-python desktop_app.py
+python -m desktop.launcher
 ```
 
 The Windows client opens Alice Pro in a native pywebview/WebView2 window while the Flask backend stays bound to `127.0.0.1`. Desktop SQLite data is stored under `%LOCALAPPDATA%\\Alice Pro`. Build `AlicePro.exe` with `pyinstaller --noconfirm --clean desktop/AlicePro.spec`; the dedicated GitHub Actions workflow also publishes the executable as an artifact. See [Windows desktop setup](docs/setup/windows-desktop.md).
