@@ -192,3 +192,27 @@ Android:
 `gradle --no-daemon -PaliceBuildNumber=<run> -PaliceCommitHash=<sha> :app:testDebugUnitTest :app:assembleDebug`
 
 For security-sensitive or schema changes, add focused regression coverage and document the operational setup required outside the repository.
+
+## Owner prohibition: deletions and reversions
+
+The owner prohibits deletion actions and reversions throughout this repository.
+This restriction supersedes earlier rollback/cleanup instructions and applies to
+all agents, maintainers, automation and operational work.
+
+- Do not delete files, branches, tags, releases, artifacts, issues/comments,
+  databases, records, backups, secrets or infrastructure resources.
+- Do not revert commits or PRs, roll back deployments, discard existing work,
+  run destructive resets/cleanups, force-push, or rewrite published history.
+- Disable automatic branch deletion after merge; retain existing work and history.
+- Fix problems through forward changes on a focused branch and a protected PR.
+- If a task requires a prohibited action, stop that action and report BLOCKED.
+  Do not infer an exception from older approvals or ordinary merge authorization.
+  Only a new explicit owner instruction can change this prohibition.
+- Before merge, require the `preservation-policy` check on the exact current head.
+  Do not bypass its failure or weaken protection to complete a merge.
+
+The CI check rejects deleted repository files and explicitly marked revert PRs
+or commits. It cannot detect every semantic rollback or prevent out-of-band
+resource deletion. Repository administrators must also prohibit branch/tag
+removal and force pushes through active GitHub rulesets with no agent bypass,
+make the check required, and restrict destructive external credentials.
