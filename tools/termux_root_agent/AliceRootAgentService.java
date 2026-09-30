@@ -221,7 +221,7 @@ public class AliceRootAgentService extends Service {
             JSONObject json = new JSONObject(new String(body, 0, offset, StandardCharsets.UTF_8));
             String value = json.getString("text");
             String safe = value.replace("%", "%25").replace(" ", "%s");
-            safe = safe.replace("\\", "\\\\").replace(""", "\\"");
+            safe = safe.replace("\\", "\\\\").replace("\"", "\\\"");
             sendJson(output, 200, execRoot("input text \"" + safe + "\"", false).toJson());
             return;
         }
