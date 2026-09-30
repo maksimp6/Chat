@@ -32,8 +32,10 @@ class DecisionEvent:
 
 
 def _parse_time(value: Any) -> datetime:
-    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(
-        str(value).replace("Z", "+00:00")
+    parsed = (
+        value
+        if isinstance(value, datetime)
+        else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     )
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -96,11 +98,7 @@ def rolling_events(
         raise ValueError("window_days must be at least 1")
     now = _parse_time(generated_at)
     cutoff = now - timedelta(days=window_days)
-    selected = [
-        event
-        for event in deduplicate_events(events)
-        if cutoff <= event.at <= now
-    ]
+    selected = [event for event in deduplicate_events(events) if cutoff <= event.at <= now]
     return tuple(selected)
 
 
