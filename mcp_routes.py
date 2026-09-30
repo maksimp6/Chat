@@ -204,14 +204,15 @@ def chat():
             trace.record_error("skills", "invalid skill selection", error_type=type(exc).__name__)
             trace_data = trace.finalize()
             persist_invocation_trace(invocation.invocation_id, trace_data)
+            public_message = "Selected skills are invalid or unavailable"
             fail_invocation(
                 invocation.invocation_id,
-                error={"code": "invalid_skill_selection", "message": str(exc)},
+                error={"code": "invalid_skill_selection", "message": public_message},
             )
             return jsonify(
                 {
                     "error": "invalid_skill_selection",
-                    "message": str(exc),
+                    "message": public_message,
                     "invocation_id": invocation.invocation_id,
                     "session_id": invocation.session_id,
                     "conversation_id": invocation.conversation_id,
@@ -504,8 +505,13 @@ def list_skills():
     role = request.args.get("role")
     try:
         return jsonify({"skills": skill_registry.catalog(role=role)})
-    except SkillRegistryError as exc:
-        return jsonify({"error": "invalid_role", "message": str(exc)}), 400
+    except SkillRegistryError:
+        return jsonify(
+            {
+                "error": "invalid_role",
+                "message": "Role is invalid or unsupported",
+            }
+        ), 400
 
 
 @mcp_bp.route("/api/tools/categories", methods=["GET"])

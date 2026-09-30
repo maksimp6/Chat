@@ -139,6 +139,10 @@ def test_registry_role_catalog_and_empty_root_policy(tmp_path):
     registry = SkillRegistry(root)
 
     assert [item["name"] for item in registry.catalog(role="Docs Engineer")] == ["docs-sync"]
+    assert [item["name"] for item in registry.validate_all()] == [
+        "docs-sync",
+        "security-review",
+    ]
     with pytest.raises(SkillPolicyError, match="unknown role"):
         registry.catalog(role="Mystery Wizard")
     with pytest.raises(SkillPolicyError):

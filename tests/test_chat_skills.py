@@ -29,7 +29,9 @@ def test_skill_catalog_endpoint_filters_by_role_and_rejects_unknown_role():
         "issue-to-pr",
     ]
     assert invalid.status_code == 400
-    assert invalid.get_json()["error"] == "invalid_role"
+    invalid_payload = invalid.get_json()
+    assert invalid_payload["error"] == "invalid_role"
+    assert invalid_payload["message"] == "Role is invalid or unsupported"
 
 
 def test_chat_lazily_loads_selected_skill_into_instructions_and_trace():
@@ -104,4 +106,6 @@ def test_chat_rejects_skill_outside_role_policy():
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["error"] == "invalid_skill_selection"
+    assert payload["message"] == "Selected skills are invalid or unavailable"
+    assert "security-review" not in payload["message"]
     assert payload["trace"]["errors"][0]["source"] == "skills"
