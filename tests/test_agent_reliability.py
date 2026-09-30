@@ -179,11 +179,10 @@ def test_cli_returns_success_and_pretty_json(tmp_path, monkeypatch, capsys):
 
     from agent_office import reliability
 
-    monkeypatch.setattr(reliability, "MIN_DECISIONS_FOR_SLO", 1)
     monkeypatch.setattr(
         sys,
         "argv",
-        ["agent-office-reliability", str(snapshot), "--pretty", "--minimum-decisions", "1"],
+        ["agent-office-reliability", str(snapshot), "--pretty"],
     )
 
     assert reliability.main() == 0
@@ -233,7 +232,6 @@ def test_catastrophic_flag_forces_decision_invalid():
     assert result["decisions_valid"] == 0
     assert result["decisions_invalid"] == 1
     assert result["reliability"] == 0.0
-
 
 
 def test_library_call_cannot_weaken_four_nines_or_evidence_floor():
