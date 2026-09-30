@@ -428,7 +428,6 @@ def test_synthesis_handles_external_result_task_without_definition():
     assert synthesis.evidence.facts == {}
 
 
-
 def test_remaining_synthesis_edge_contracts():
     malformed = _extract_snapshot(
         {
@@ -444,9 +443,7 @@ def test_remaining_synthesis_edge_contracts():
 
     passthrough_dag = BrowserRoleDag(
         [task("raw", semantic_mode="passthrough")],
-        SemanticBrowserWorker(
-            lambda _task: {"success": True, "data": {"raw": True}}
-        ),
+        SemanticBrowserWorker(lambda _task: {"success": True, "data": {"raw": True}}),
     )
     passthrough = synthesize_browser_dag(passthrough_dag, passthrough_dag.run())
     assert passthrough.snapshots == {}
