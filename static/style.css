@@ -1775,7 +1775,6 @@ body {
   color: var(--m-text, #222);
 }
 
-
 /* === APP SURFACES === */
 .alice-pro-app .app-surfaces-card {
   width: min(1100px, calc(100vw - 32px));
