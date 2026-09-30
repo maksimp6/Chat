@@ -59,10 +59,11 @@ def test_memory_record_requires_supported_contract():
         "updated_at": 1,
     }
     for field in ("memory_id", "kind", "scope", "text", "source_version"):
-        values = dict(base)
-        values[field] = ""
-        with pytest.raises(ValueError):
-            MemoryRecord(**values)
+        for missing in ("", None):
+            values = dict(base)
+            values[field] = missing
+            with pytest.raises(ValueError):
+                MemoryRecord(**values)
 
     with pytest.raises(ValueError, match="unsupported memory kind"):
         MemoryRecord(**{**base, "kind": "guess"})
@@ -74,6 +75,29 @@ def test_memory_record_requires_supported_contract():
         MemoryRecord(**{**base, "confidence": 1.5})
     with pytest.raises(ValueError, match="freshness"):
         MemoryRecord(**{**base, "freshness": {}})
+
+
+def test_memory_record_rejects_negative_timestamps_and_expiry():
+    base = {
+        "memory_id": "m1",
+        "kind": "project",
+        "scope": "repo",
+        "text": "fact",
+        "provenance": {
+            "source_type": "github",
+            "repository": "repo",
+            "refs": ["PR#1"],
+        },
+        "source_version": "sha",
+        "created_at": 1,
+        "updated_at": 1,
+    }
+    with pytest.raises(ValueError, match="created_at"):
+        MemoryRecord(**{**base, "created_at": -1})
+    with pytest.raises(ValueError, match="updated_at"):
+        MemoryRecord(**{**base, "updated_at": -1})
+    with pytest.raises(ValueError, match="expires_at"):
+        MemoryRecord(**{**base, "expires_at": -1})
 
 
 def test_memory_record_requires_provenance_and_github_repository():
@@ -131,6 +155,15 @@ def test_expiration_and_lookup_status_validation():
         MemoryLookup(status="maybe", memory_id="m1")
 
 
+def test_explicit_schema_creation_is_idempotent(tmp_path):
+    store = _sqlite_store(tmp_path)
+
+    store.create_schema()
+    store.create_schema()
+
+    assert store.list_records() == []
+
+
 def test_sqlite_round_trip_freshness_and_visibility(tmp_path):
     store = _sqlite_store(tmp_path)
     record = _github_record()
@@ -144,8 +177,19 @@ def test_sqlite_round_trip_freshness_and_visibility(tmp_path):
     assert store.lookup("missing").status == "miss"
 
     assert [item.memory_id for item in store.list_records(kind="project")] == ["memory-1"]
+    assert [item.memory_id for item in store.list_records(scope="repo:maksimp6/Chat")] == [
+        "memory-1"
+    ]
     assert store.list_records(visible_to="backend-engineer")
     assert store.list_records(visible_to="frontend-engineer") == []
+
+
+def test_upsert_fails_closed_when_persisted_record_cannot_be_read(tmp_path, monkeypatch):
+    store = _sqlite_store(tmp_path)
+    monkeypatch.setattr(store, "get", lambda _memory_id: None)
+
+    with pytest.raises(RuntimeError, match="did not persist"):
+        store.upsert(_github_record())
 
 
 def test_upsert_preserves_created_at_and_updates_content(tmp_path):
