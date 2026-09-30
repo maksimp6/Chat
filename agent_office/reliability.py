@@ -52,6 +52,8 @@ def evaluate_snapshot(
         raise ValueError("target must be within (0, 1]")
     if int(minimum_decisions) < 1:
         raise ValueError("minimum_decisions must be at least 1")
+    target = max(float(target), SLO_TARGET)
+    minimum_decisions = max(int(minimum_decisions), MIN_DECISIONS_FOR_SLO)
 
     generated_at = _parse_time(snapshot["generated_at"])
     findings: list[ReliabilityFinding] = []
@@ -213,8 +215,8 @@ def main() -> int:
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     result = evaluate_snapshot(
         snapshot,
-        target=max(args.target, SLO_TARGET),
-        minimum_decisions=max(args.minimum_decisions, MIN_DECISIONS_FOR_SLO),
+        target=args.target,
+        minimum_decisions=args.minimum_decisions,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
     return 0 if result["ready"] else 1
