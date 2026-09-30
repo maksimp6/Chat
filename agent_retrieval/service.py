@@ -97,6 +97,9 @@ def _memory_ref(record: MemoryRecord) -> str:
 
 def _eligible_memory(record: MemoryRecord, query: RetrievalQuery) -> bool:
     provenance = record.as_dict()["provenance"]
+    if record.scope.startswith("repo:") and record.scope != f"repo:{query.repository}":
+        return False
+
     if provenance.get("source_type") == "github":
         if str(provenance.get("repository") or "") != query.repository:
             return False
