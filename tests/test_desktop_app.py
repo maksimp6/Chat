@@ -1,4 +1,6 @@
 import os
+
+import pytest
 from pathlib import Path
 
 from flask import Flask
@@ -15,6 +17,7 @@ def test_configure_environment_uses_local_app_data(tmp_path, monkeypatch):
     monkeypatch.delenv("ALICE_DB_PATH", raising=False)
     monkeypatch.delenv("HOST", raising=False)
     monkeypatch.delenv("FLASK_DEBUG", raising=False)
+    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "test-desktop-key")
 
     data_dir = launcher.configure_environment()
 
@@ -118,3 +121,87 @@ def test_run_desktop_starts_window_and_shuts_server_down(monkeypatch):
     assert any(item[0] == "window" for item in events if isinstance(item, tuple))
     assert ("webview-start", {"debug": False}) in events
     assert events[-3:] == ["shutdown", "close", ("thread-join", 5)]
+
+
+def test_non_windows_desktop_fails_closed_without_credential_key(tmp_path, monkeypatch):
+    from desktop import credential_protection
+
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
+    monkeypatch.setattr(credential_protection.os, "name", "posix")
+
+    with pytest.raises(
+        credential_protection.DesktopCredentialProtectionError,
+        match="must be configured outside Windows desktop",
+    ):
+        credential_protection.ensure_provider_credential_key(tmp_path)
+
+
+def test_existing_environment_credential_key_is_reused(tmp_path, monkeypatch):
+    from desktop import credential_protection
+
+    monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "already-configured")
+
+    assert (
+        credential_protection.ensure_provider_credential_key(tmp_path)
+        == "already-configured"
+    )
+    assert not (tmp_path / credential_protection.KEY_FILE_NAME).exists()
+
+
+def test_windows_desktop_provisions_and_reuses_protected_key(tmp_path, monkeypatch):
+    from desktop import credential_protection
+
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
+    monkeypatch.setattr(credential_protection.os, "name", "nt")
+
+    protected_values = []
+    plaintext_values = []
+
+    def fake_protect(value):
+        plaintext_values.append(value)
+        protected = ("protected:" + value).encode("utf-8")
+        protected_values.append(protected)
+        return protected
+
+    def fake_unprotect(value):
+        assert value in protected_values
+        return value.decode("utf-8").removeprefix("protected:")
+
+    first = credential_protection.ensure_provider_credential_key(
+        tmp_path,
+        protect=fake_protect,
+        unprotect=fake_unprotect,
+    )
+
+    key_path = tmp_path / credential_protection.KEY_FILE_NAME
+    assert key_path.exists()
+    assert first not in key_path.read_text(encoding="ascii")
+    assert plaintext_values == [first]
+    assert os.environ["ALICE_PROVIDER_CREDENTIAL_KEY"] == first
+
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
+    second = credential_protection.ensure_provider_credential_key(
+        tmp_path,
+        protect=fake_protect,
+        unprotect=fake_unprotect,
+    )
+
+    assert second == first
+    assert plaintext_values == [first]
+
+
+def test_windows_desktop_rejects_unreadable_protected_key(tmp_path, monkeypatch):
+    from desktop import credential_protection
+
+    monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
+    monkeypatch.setattr(credential_protection.os, "name", "nt")
+    (tmp_path / credential_protection.KEY_FILE_NAME).write_text(
+        "not-valid-base64",
+        encoding="ascii",
+    )
+
+    with pytest.raises(
+        credential_protection.DesktopCredentialProtectionError,
+        match="Unable to unlock",
+    ):
+        credential_protection.ensure_provider_credential_key(tmp_path)
