@@ -119,6 +119,9 @@ class CoordinatorHandoff:
     task_state: str
     reasoning_tier: str
     evidence_fingerprint: str
+    repository: str
+    work_item: str
+    head_sha: str
     payload: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -132,6 +135,9 @@ class CoordinatorHandoff:
             "task_state",
             "reasoning_tier",
             "evidence_fingerprint",
+            "repository",
+            "work_item",
+            "head_sha",
         ):
             value = _clean(getattr(self, name))
             if not value:
@@ -154,6 +160,9 @@ class CoordinatorHandoff:
             "task_state": self.task_state,
             "reasoning_tier": self.reasoning_tier,
             "evidence_fingerprint": self.evidence_fingerprint,
+            "repository": self.repository,
+            "work_item": self.work_item,
+            "head_sha": self.head_sha,
             "payload": _thaw(self.payload),
         }
 
@@ -175,7 +184,7 @@ def assert_reasoning_allowed(
             f"reasoning tier {tier} exceeds task budget {budget}"
         )
 
-    fingerprint = packet.evidence.fingerprint()
+    fingerprint = packet.cache_key()
     if (
         tier == "strong"
         and previous_strong_evidence_fingerprint is not None
@@ -274,6 +283,19 @@ def _build_payload(
     reasoning_tier: str,
 ) -> dict[str, Any]:
     evidence_refs = [item.as_dict() for item in packet.evidence_refs]
+    if audience == "user":
+        return {
+            "objective": packet.objective,
+            "task_state": task_state,
+            "next_meaningful_step": packet.expected_deliverable,
+            "latest_event": soft.latest_event,
+            "blocker": soft.blocker,
+            "budget_tier": packet.budget_tier,
+            "usage": dict(usage),
+            "soft_context": soft.as_dict(),
+            "guidance": list(_guidance(audience)),
+        }
+
     common = {
         "repository": packet.scope.repository,
         "work_item": packet.scope.work_item,
@@ -326,12 +348,7 @@ def _build_payload(
             "escalation_target": packet.escalation_target,
             "blocker": soft.blocker,
         }
-    return {
-        **common,
-        "next_meaningful_step": packet.expected_deliverable,
-        "latest_event": soft.latest_event,
-        "blocker": soft.blocker,
-    }
+    raise CoordinatorPolicyError(f"unsupported handoff audience: {audience}")
 
 
 def _recipient_role(audience: str, owner_role: str) -> str:
@@ -356,9 +373,9 @@ def record_handoff(trace: ExecutionTrace, handoff: CoordinatorHandoff) -> dict[s
         "task_state": handoff.task_state,
         "reasoning_tier": handoff.reasoning_tier,
         "evidence_fingerprint": handoff.evidence_fingerprint,
-        "repository": payload.get("repository"),
-        "work_item": payload.get("work_item"),
-        "head_sha": payload.get("head_sha"),
+        "repository": handoff.repository,
+        "work_item": handoff.work_item,
+        "head_sha": handoff.head_sha,
         "cache_status": usage.get("cache_status"),
         "retrieval_status": usage.get("retrieval_status"),
         "saved_source_bytes": usage.get("saved_source_bytes", 0),
@@ -478,6 +495,9 @@ class WorkCoordinator:
             task_state=task_state,
             reasoning_tier=reasoning_tier,
             evidence_fingerprint=evidence_fingerprint,
+            repository=packet.scope.repository,
+            work_item=packet.scope.work_item,
+            head_sha=packet.scope.head_sha,
             payload=payload,
         )
         record_handoff(trace, handoff)

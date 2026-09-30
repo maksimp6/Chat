@@ -132,6 +132,9 @@ def test_specialist_handoff_reuses_existing_contracts_and_records_trace():
     assert "hybrid_retrieval" in types
     assert "coordinator_handoff_prepared" in types
     assert trace.trace["coordinator_handoffs"][0]["head_sha"] == "head-1"
+    assert handoff.repository == "maksimp6/Chat"
+    assert handoff.work_item == "issue#580"
+    assert handoff.head_sha == "head-1"
 
 
 @pytest.mark.parametrize(
@@ -171,6 +174,12 @@ def test_recipient_specific_handoffs_do_not_dump_specialist_context(
     if audience == "user":
         assert "context_refs" not in payload
         assert "evidence_refs" not in payload
+        assert "repository" not in payload
+        assert "work_item" not in payload
+        assert "branch" not in payload
+        assert "base_sha" not in payload
+        assert "head_sha" not in payload
+        assert "reasoning_tier" not in payload
         assert payload["latest_event"] == "CI passed"
         assert payload["next_meaningful_step"] == "Focused backend PR"
 
@@ -231,7 +240,7 @@ def test_reasoning_budget_rejects_over_budget_and_repeated_strong_call():
         assert_reasoning_allowed(cheap, requested_tier="strong")
 
     packet = _packet(budget="strong")
-    fingerprint = packet.evidence.fingerprint()
+    fingerprint = packet.cache_key()
     with pytest.raises(NoNewEvidenceError, match="no new evidence"):
         assert_reasoning_allowed(
             packet,
@@ -248,6 +257,29 @@ def test_reasoning_budget_rejects_over_budget_and_repeated_strong_call():
     assert (
         assert_reasoning_allowed(
             changed,
+            requested_tier="strong",
+            previous_strong_evidence_fingerprint=fingerprint,
+        )
+        != fingerprint
+    )
+
+
+def test_head_change_counts_as_new_evidence_for_strong_reasoning():
+    packet = _packet(budget="strong")
+    fingerprint = packet.cache_key()
+    changed_scope = TaskScope(
+        repository=packet.scope.repository,
+        work_item=packet.scope.work_item,
+        base_sha=packet.scope.base_sha,
+        head_sha="head-2",
+        role=packet.scope.role,
+        selected_skills=packet.scope.selected_skills,
+    )
+    object.__setattr__(packet, "scope", changed_scope)
+
+    assert (
+        assert_reasoning_allowed(
+            packet,
             requested_tier="strong",
             previous_strong_evidence_fingerprint=fingerprint,
         )

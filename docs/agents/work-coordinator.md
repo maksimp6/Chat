@@ -86,12 +86,13 @@ Supported tiers are `cheap`, `normal` and `strong`.
 A task's `budget_tier` is a hard ceiling. A requested tier above the ceiling fails
 closed.
 
-For strong reasoning:
+For strong reasoning the fingerprint is the TaskPacket cache identity, so it includes
+repository/work item/base/head/role/selected skills plus evidence versions:
 
 ```text
 no previous strong call -> allowed
-new evidence fingerprint -> allowed
-same evidence fingerprint -> rejected
+new task/base/head/CI/review/trace/files/skills/policy evidence -> allowed
+same task-context fingerprint -> rejected
 ```
 
 This implements the repository rule:
