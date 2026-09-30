@@ -118,9 +118,7 @@ def test_export_window_is_json_serializable_shape():
 
 
 def test_conflicting_duplicate_is_order_independent():
-    first = normalize_event(
-        {**raw("same", provenance=("github:a",)), "kind": "merge_readiness"}
-    )
+    first = normalize_event({**raw("same", provenance=("github:a",)), "kind": "merge_readiness"})
     second = normalize_event(
         {
             **raw("same", status="invalid", provenance=("trace:b",)),
