@@ -4,6 +4,9 @@ from browser.orchestration import BrowserDagBudget, BrowserRoleDag, BrowserRoleT
 from browser.pipeline import (
     BrowserSynthesisPolicy,
     SemanticBrowserWorker,
+    _copy_usage,
+    _extract_snapshot,
+    _raw_data,
     synthesize_browser_dag,
 )
 
@@ -315,3 +318,112 @@ def test_synthesis_mapping_is_compact_and_serializable():
 def test_synthesis_validation(call, message):
     with pytest.raises((TypeError, ValueError), match=message):
         call()
+
+
+
+def test_pipeline_private_edge_contracts_and_limits():
+    assert _raw_data({"success": False, "error": "x"}) == {
+        "success": False,
+        "error": "x",
+    }
+    assert _raw_data({"success": True, "other": 1}) == {
+        "success": True,
+        "other": 1,
+    }
+
+    target = {}
+    _copy_usage("plain", target)
+    assert target == {}
+    _copy_usage(
+        {
+            "metadata": {"consumed_tokens": 2},
+            "usage": {"total_tokens": 3},
+        },
+        target,
+    )
+    assert target == {
+        "metadata": {"consumed_tokens": 2},
+        "usage": {"total_tokens": 3},
+    }
+
+    assert _extract_snapshot("bad") is None
+    assert _extract_snapshot({"semantic_type": "other"}) is None
+    assert _extract_snapshot({"semantic_type": "snapshot", "snapshot": "bad"}) is None
+
+    dag = BrowserRoleDag(
+        [
+            task("a", confidence="not-a-number"),
+            task("b", confidence=3),
+            task("c", confidence=-2),
+        ],
+        semantic_worker(
+            {
+                "a": {"success": True, "data": {"facts": {"a": 1}}},
+                "b": {"success": True, "data": {"facts": {"b": 2}}},
+                "c": {"success": True, "data": {"facts": {"c": 3}}},
+            }
+        ),
+    )
+    synthesis = synthesize_browser_dag(
+        dag,
+        dag.run(),
+        policy=BrowserSynthesisPolicy(max_snapshots=2),
+    )
+    assert set(synthesis.snapshots) == {"a", "b"}
+    assert synthesis.evidence.facts == {"a": 1, "b": 2}
+
+    diff_dag = BrowserRoleDag(
+        [
+            task("base"),
+            task("one", diff_from="base"),
+            task("two", diff_from="base"),
+        ],
+        semantic_worker(
+            {
+                "base": {"success": True, "data": {"version": "v0", "facts": {"x": 0}}},
+                "one": {"success": True, "data": {"version": "v1", "facts": {"x": 1}}},
+                "two": {"success": True, "data": {"version": "v2", "facts": {"x": 2}}},
+            }
+        ),
+    )
+    limited = synthesize_browser_dag(
+        diff_dag,
+        diff_dag.run(),
+        policy=BrowserSynthesisPolicy(max_diffs=1),
+    )
+    assert len(limited.diffs) == 1
+
+
+def test_synthesis_handles_external_result_task_without_definition():
+    from browser.orchestration import BrowserDagResult, BrowserTaskResult
+
+    dag = BrowserRoleDag([], lambda _task: None)
+    external = BrowserDagResult(
+        status="succeeded",
+        tasks={
+            "external": BrowserTaskResult(
+                task_id="external",
+                status="succeeded",
+                role="observer",
+                session_id="outside",
+                data={
+                    "semantic_type": "snapshot",
+                    "snapshot": {
+                        "url": None,
+                        "title": None,
+                        "version": None,
+                        "nodes": [],
+                        "facts": {"price": 10},
+                        "truncated": False,
+                    },
+                },
+            )
+        },
+        consumed_tokens=0,
+        duration_ms=0,
+    )
+
+    synthesis = synthesize_browser_dag(dag, external)
+
+    assert "external" in synthesis.snapshots
+    assert synthesis.evidence.facts == {}
