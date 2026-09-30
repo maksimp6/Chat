@@ -1,0 +1,10 @@
+# Optional CPU-only PyTorch profile for Alice Pro pytorch foundation (#652).
+# Not included in default requirements.txt, Android, or desktop packaging.
+# Installation: pip install -r requirements-pytorch-cpu.txt
+# See docs/pytorch-cpu-foundation.md for opt-in, rollback and platform notes.
+#
+# Pin: torch 2.5.1 CPU-only wheel from the official PyTorch index.
+# Verify: python -c "import torch; assert torch.version.cuda is None"
+# Python 3.14 wheel availability must be confirmed against the index below
+# before merging; update the pin if a newer verified wheel is available.
+torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
