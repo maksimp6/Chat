@@ -387,6 +387,51 @@ def test_results_are_bounded_by_count_and_characters(tmp_path):
     assert bundle.total_chars <= 128
 
 
+def test_non_task_github_memory_honors_declared_freshness_metadata(tmp_path):
+    store = _store(tmp_path)
+    current = _memory(
+        memory_id="current-process",
+        kind="process",
+        text="settle payment invoice current process evidence",
+        visibility=(),
+    )
+    current_payload = current.as_dict()
+    current_payload["provenance"].update(
+        {
+            "work_item": "PR#900",
+            "branch": "feat/retrieval",
+            "head_sha": HEAD,
+            "skills_version": "skills-v1",
+        }
+    )
+    store.upsert(MemoryRecord(**current_payload))
+
+    stale = _memory(
+        memory_id="stale-process",
+        kind="process",
+        text="settle payment invoice stale process evidence",
+        visibility=(),
+    )
+    stale_payload = stale.as_dict()
+    stale_payload["provenance"].update(
+        {
+            "work_item": "PR#900",
+            "branch": "feat/retrieval",
+            "head_sha": "old-head",
+            "skills_version": "skills-v1",
+        }
+    )
+    store.upsert(MemoryRecord(**stale_payload))
+
+    refs = [
+        hit.ref
+        for hit in HybridRetriever(memory_store=store).retrieve(_query(), now=101).hits
+    ]
+
+    assert "memory:current-process" in refs
+    assert "memory:stale-process" not in refs
+
+
 def test_role_memory_only_matches_receiving_role(tmp_path):
     store = _store(tmp_path)
     store.upsert(

@@ -92,6 +92,16 @@ def _eligible_memory(record: MemoryRecord, query: RetrievalQuery) -> bool:
     if provenance.get("source_type") == "github":
         if str(provenance.get("repository") or "") != query.repository:
             return False
+        optional_matches = {
+            "work_item": query.work_item,
+            "branch": query.branch,
+            "head_sha": query.head_sha,
+            "skills_version": query.skills_version,
+        }
+        for key, expected in optional_matches.items():
+            value = provenance.get(key)
+            if value is not None and str(value) != expected:
+                return False
 
     if record.kind == "task":
         return (
