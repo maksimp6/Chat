@@ -320,7 +320,6 @@ def test_synthesis_validation(call, message):
         call()
 
 
-
 def test_pipeline_private_edge_contracts_and_limits():
     assert _raw_data({"success": False, "error": "x"}) == {
         "success": False,
