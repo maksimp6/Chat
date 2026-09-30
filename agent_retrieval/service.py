@@ -95,7 +95,8 @@ def _eligible_memory(record: MemoryRecord, query: RetrievalQuery) -> bool:
 
     if record.kind == "task":
         return (
-            str(provenance.get("work_item") or "") == query.work_item
+            record.source_version == query.head_sha
+            and str(provenance.get("work_item") or "") == query.work_item
             and str(provenance.get("branch") or "") == query.branch
             and str(provenance.get("head_sha") or "") == query.head_sha
             and str(provenance.get("skills_version") or "") == query.skills_version
@@ -330,13 +331,14 @@ class HybridRetriever:
         cache_status = cache_lookup.status if cache_lookup is not None else "miss"
         cached = _cache_hits(cache_lookup, query)
         effective_cache_status = cache_status if cached else "miss"
+        effective_cache_lookup = cache_lookup if cached else None
 
         if effective_cache_status == "hit" and cached:
             hits = _bound_hits(cached, query)
             return self._bundle(
                 hits,
                 cache_status=effective_cache_status,
-                cache_lookup=cache_lookup,
+                cache_lookup=effective_cache_lookup,
             )
 
         candidates = [
@@ -353,7 +355,7 @@ class HybridRetriever:
         return self._bundle(
             hits,
             cache_status=effective_cache_status,
-            cache_lookup=cache_lookup,
+            cache_lookup=effective_cache_lookup,
         )
 
     @staticmethod

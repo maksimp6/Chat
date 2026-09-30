@@ -212,6 +212,8 @@ def test_cache_provenance_must_match_retrieval_query(tmp_path):
     assert bundle.status == "miss"
     assert bundle.cache_status == "miss"
     assert bundle.hits == ()
+    assert bundle.saved_source_bytes == 0
+    assert bundle.saved_input_tokens == 0
 
 
 def test_partial_cache_continues_into_memory_and_code(tmp_path):
@@ -264,6 +266,22 @@ def test_task_memory_requires_branch_and_skill_version(tmp_path):
 
     assert "memory:wrong-branch" not in refs
     assert "memory:wrong-skills" not in refs
+
+
+def test_task_memory_source_version_must_match_head(tmp_path):
+    store = _store(tmp_path)
+    record = _memory(
+        memory_id="wrong-source-version",
+        kind="task",
+        text="settle payment invoice stale source version",
+    )
+    payload = record.as_dict()
+    payload["source_version"] = "old-head"
+    store.upsert(MemoryRecord(**payload))
+
+    bundle = HybridRetriever(memory_store=store).retrieve(_query(), now=101)
+
+    assert "memory:wrong-source-version" not in [hit.ref for hit in bundle.hits]
 
 
 def test_stale_or_wrong_task_memory_is_not_returned(tmp_path):
