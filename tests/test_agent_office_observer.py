@@ -257,6 +257,15 @@ def test_observer_pass_alignment_handles_dispatch_around_cron_minute():
         )
         == 0
     )
+    assert observer._observer_passes_since(after, after, 17) == 0
+    assert (
+        observer._observer_passes_since(
+            after,
+            datetime(2026, 9, 28, 17, 0, tzinfo=UTC),
+            17,
+        )
+        == 0
+    )
 
 
 def test_green_reviewed_pr_waiting_for_merge_is_reported():
