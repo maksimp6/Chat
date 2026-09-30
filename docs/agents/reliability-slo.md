@@ -16,6 +16,8 @@ decisions.
 
 Unknown evidence is not counted as success.
 
+A four-nines claim also requires an evidence floor of at least **10,000 observed control-plane decisions**. Before that threshold, the evaluator may report that deterministic controls are healthy, but it must not report the 99.99% SLO as proven. Neither the CLI nor library callers may lower the 99.99% target or this evidence floor.
+
 ## Catastrophic error budget
 
 The catastrophic error budget is zero. Any observed instance blocks a reliability claim:
