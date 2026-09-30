@@ -60,3 +60,15 @@ def test_claude_direct_implementation_profile_has_bounded_write_and_validation_t
     assert "Bash(git push --force:*)" not in workflow
     assert "Bash(gh secret:*)" not in workflow
     assert "Bash(gh api repos/*/branches:*)" not in workflow
+
+
+def test_claude_lite_concurrency_is_job_scoped_after_trigger_guard():
+    workflow = _workflow()
+
+    assert "\nconcurrency:\n" not in workflow
+    job_marker = "  claude:\n    name: Respond to @claude-lite\n"
+    assert job_marker in workflow
+    job_section = workflow.split(job_marker, 1)[1]
+    assert "    concurrency:\n" in job_section
+    assert "      group: claude-lite-" in job_section
+    assert "      cancel-in-progress: false" in job_section
