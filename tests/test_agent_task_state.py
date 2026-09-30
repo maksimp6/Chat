@@ -215,6 +215,78 @@ def test_terminal_precedence_all_signals_cancelled():
     assert state == "cancelled"
 
 
+def test_dispatch_created_alone_is_queued():
+    # dispatch_created=True with no further evidence is the canonical "queued" state:
+    # orchestration accepted the task but no backend dispatch evidence exists yet.
+    state = derive_agent_task_state(
+        AgentTaskEvidence(
+            dispatch_created=True,
+        )
+    )
+
+    assert state == "queued"
+
+
+_CANONICAL_EVIDENCE_INPUTS = [
+    AgentTaskEvidence(dispatch_created=True),
+    AgentTaskEvidence(dispatch_created=True, mention_delivered=True, subscribed=True),
+    AgentTaskEvidence(dispatch_created=True, workflow_status="queued"),
+    AgentTaskEvidence(
+        dispatch_created=True, workflow_status="in_progress", backend_triggered=False
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True, workflow_status="in_progress", backend_triggered=True
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True,
+        backend_triggered=True,
+        deliverable_refs=("commit:abc",),
+        validation_status="in_progress",
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True,
+        backend_triggered=True,
+        deliverable_refs=("pr:42",),
+        validation_status="success",
+        review_complete=False,
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True,
+        backend_triggered=True,
+        backend_status="completed",
+        deliverable_refs=("pr:42",),
+        validation_status="success",
+        review_complete=True,
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True,
+        workflow_status="completed",
+        workflow_conclusion="success",
+        backend_triggered=False,
+        backend_status="completed",
+        deliverable_refs=(),
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True,
+        backend_triggered=True,
+        blocker="BLOCKED: dependency missing",
+    ),
+    AgentTaskEvidence(
+        dispatch_created=True, backend_triggered=True, backend_status="failed"
+    ),
+    AgentTaskEvidence(dispatch_created=True, cancelled=True, backend_triggered=True),
+    AgentTaskEvidence(dispatch_created=True, mention_delivered=True, stall_detected=True),
+]
+
+
+@pytest.mark.parametrize("evidence", _CANONICAL_EVIDENCE_INPUTS)
+def test_no_canonical_state_is_pending(evidence):
+    # "pending" is not a canonical state in the #614 contract; the implementation
+    # must never return it from derive_agent_task_state.
+    state = derive_agent_task_state(evidence)
+    assert state != "pending", f"non-canonical 'pending' returned for {evidence!r}"
+
+
 def test_unknown_backend_state_fails_closed():
     with pytest.raises(AgentTaskStateError, match="unsupported backend status"):
         derive_agent_task_state(
