@@ -25,34 +25,34 @@ class AgentMemoryStore:
     @staticmethod
     def _ensure_schema(conn: Any) -> None:
         cur = conn.cursor()
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS agent_memory (
-                    memory_id TEXT PRIMARY KEY,
-                    kind TEXT NOT NULL,
-                    scope TEXT NOT NULL,
-                    text TEXT NOT NULL,
-                    provenance_json TEXT NOT NULL,
-                    source_version TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    confidence REAL NOT NULL,
-                    freshness_json TEXT NOT NULL,
-                    sensitivity TEXT NOT NULL,
-                    visibility_json TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL,
-                    expires_at INTEGER,
-                    superseded_by TEXT
-                )
-                """
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_memory (
+                memory_id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                scope TEXT NOT NULL,
+                text TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                source_version TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                freshness_json TEXT NOT NULL,
+                sensitivity TEXT NOT NULL,
+                visibility_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                expires_at INTEGER,
+                superseded_by TEXT
             )
-            cur.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_agent_memory_kind_scope_status
-                ON agent_memory(kind, scope, status)
-                """
-            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_agent_memory_kind_scope_status
+            ON agent_memory(kind, scope, status)
+            """
+        )
         conn.commit()
 
     def create_schema(self) -> None:
