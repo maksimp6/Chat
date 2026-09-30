@@ -7,27 +7,34 @@ All tests in this file are intentionally RED: the production module
 the expected public surface so the Team Lead review can validate the contract
 before any implementation starts.
 
-Uses the merged canonical task-state model from agent_office.task_state (#614/#632)
-and the lifecycle stage vocabulary from agent_office.dispatch_model. Neither is
-redefined here.
+Reuses without re-implementing:
+- CANONICAL_LIFECYCLE_STAGES, SolutionReviewArtifact,
+  SolutionReviewRequiredError, assert_solution_review_accepted_for_head
+  from agent_office.dispatch_model
+- AgentTaskEvidence, derive_agent_task_state from agent_office.task_state
+- EvidenceRef (frozen dataclass with value equality) from agent_context
 """
 
 from __future__ import annotations
 
 import pytest
 
-# This import is intentionally unresolvable until implementation is written.
+# Intentionally unresolvable until production implementation is written.
 from agent_office.orchestration_contract import (
     BriefOpinion,
     DuplicateActiveTaskError,
     MissingEvidenceError,
     OrchestratedTaskPacket,
-    StaleReviewError,
     TaskRegistry,
     derive_active_task_key,
     next_stage_after,
 )
-from agent_office.dispatch_model import CANONICAL_LIFECYCLE_STAGES
+from agent_office.dispatch_model import (
+    CANONICAL_LIFECYCLE_STAGES,
+    SolutionReviewArtifact,
+    SolutionReviewRequiredError,
+    assert_solution_review_accepted_for_head,
+)
 from agent_office.task_state import AgentTaskEvidence, derive_agent_task_state
 from agent_context import EvidenceRef
 
@@ -41,21 +48,26 @@ def _ref(kind: str = "issue", ref: str = "634", version: str = "v1") -> Evidence
     return EvidenceRef(kind=kind, ref=ref, version=version)
 
 
+def _contract_provenance(sha: str = "contract-sha") -> EvidenceRef:
+    """Evidence that the accepted contract at ``sha`` was materialized in the working base."""
+    return EvidenceRef(kind="contract", ref=sha, version="accepted")
+
+
 def _packet(
     *,
     task_id: str = "task-001",
     work_item_ref: str = "issues/634",
     stage: str = "contract",
     backend: str = "claude-direct",
-    accepted_contract_head: str = "abc123",
-    base_ref: str = "abc123",
-    current_head: str = "abc123",
+    accepted_contract_head: str | None = None,
+    base_ref: str = "master-sha",
+    current_head: str = "master-sha",
     role: str = "test-engineer",
     objective: str = "define orchestration contract",
     expected_deliverable: str = "red test suite",
     evidence_refs: tuple = (),
     approval_boundary: str | None = None,
-    brief_opinion: BriefOpinion | None = None,
+    brief_opinion: "BriefOpinion | None" = None,
 ) -> OrchestratedTaskPacket:
     return OrchestratedTaskPacket(
         task_id=task_id,
@@ -74,18 +86,49 @@ def _packet(
     )
 
 
+def _impl_packet(**kwargs) -> OrchestratedTaskPacket:
+    """Valid implementation-stage packet with required contract provenance evidence."""
+    defaults: dict = dict(
+        stage="implementation",
+        role="backend-engineer",
+        accepted_contract_head="contract-sha",
+        base_ref="master-sha",
+        current_head="impl-sha",
+        evidence_refs=(_contract_provenance("contract-sha"),),
+    )
+    defaults.update(kwargs)
+    return _packet(**defaults)
+
+
 # ===========================================================================
 # 1. OrchestratedTaskPacket schema and immutable identity fields
 # ===========================================================================
 
 
 class TestTaskPacketSchema:
-    def test_minimal_packet_constructs(self):
+    def test_minimal_contract_packet_constructs(self):
         p = _packet()
         assert p.task_id == "task-001"
         assert p.work_item_ref == "issues/634"
         assert p.stage == "contract"
         assert p.backend == "claude-direct"
+
+    def test_accepted_contract_head_optional_at_contract_stage(self):
+        p = _packet(stage="contract", accepted_contract_head=None)
+        assert p.accepted_contract_head is None
+
+    def test_accepted_contract_head_optional_at_contract_review_stage(self):
+        p = _packet(stage="contract-review", accepted_contract_head=None)
+        assert p.accepted_contract_head is None
+
+    def test_accepted_contract_head_required_at_implementation_stage(self):
+        with pytest.raises((TypeError, ValueError)):
+            _packet(
+                stage="implementation",
+                role="backend-engineer",
+                accepted_contract_head=None,
+                evidence_refs=(_contract_provenance("contract-sha"),),
+            )
 
     def test_task_id_is_required(self):
         with pytest.raises((TypeError, ValueError)):
@@ -93,9 +136,9 @@ class TestTaskPacketSchema:
                 work_item_ref="issues/1",
                 stage="contract",
                 backend="claude-direct",
-                accepted_contract_head="abc",
-                base_ref="abc",
-                current_head="abc",
+                accepted_contract_head=None,
+                base_ref="master",
+                current_head="master",
                 role="test-engineer",
                 objective="x",
                 expected_deliverable="y",
@@ -107,9 +150,9 @@ class TestTaskPacketSchema:
                 task_id="t1",
                 stage="contract",
                 backend="claude-direct",
-                accepted_contract_head="abc",
-                base_ref="abc",
-                current_head="abc",
+                accepted_contract_head=None,
+                base_ref="master",
+                current_head="master",
                 role="test-engineer",
                 objective="x",
                 expected_deliverable="y",
@@ -121,26 +164,15 @@ class TestTaskPacketSchema:
 
     def test_stage_accepts_every_canonical_stage(self):
         for stage in CANONICAL_LIFECYCLE_STAGES:
-            p = _packet(stage=stage)
+            if stage in ("contract", "contract-review"):
+                p = _packet(stage=stage, accepted_contract_head=None)
+            else:
+                p = _impl_packet(stage=stage)
             assert p.stage == stage
 
     def test_backend_must_be_known(self):
         with pytest.raises(ValueError):
             _packet(backend="imaginary-backend")
-
-    def test_accepted_contract_head_required(self):
-        with pytest.raises((TypeError, ValueError)):
-            OrchestratedTaskPacket(
-                task_id="t1",
-                work_item_ref="issues/1",
-                stage="contract",
-                backend="claude-direct",
-                base_ref="abc",
-                current_head="abc",
-                role="test-engineer",
-                objective="x",
-                expected_deliverable="y",
-            )
 
     def test_base_ref_required(self):
         with pytest.raises((TypeError, ValueError)):
@@ -149,8 +181,8 @@ class TestTaskPacketSchema:
                 work_item_ref="issues/1",
                 stage="contract",
                 backend="claude-direct",
-                accepted_contract_head="abc",
-                current_head="abc",
+                accepted_contract_head=None,
+                current_head="master",
                 role="test-engineer",
                 objective="x",
                 expected_deliverable="y",
@@ -163,8 +195,8 @@ class TestTaskPacketSchema:
                 work_item_ref="issues/1",
                 stage="contract",
                 backend="claude-direct",
-                accepted_contract_head="abc",
-                base_ref="abc",
+                accepted_contract_head=None,
+                base_ref="master",
                 role="test-engineer",
                 objective="x",
                 expected_deliverable="y",
@@ -174,23 +206,20 @@ class TestTaskPacketSchema:
         p = _packet()
         for field_name in ("task_id", "work_item_ref", "stage", "backend"):
             with pytest.raises((AttributeError, TypeError)):
-                object.__setattr__(p, field_name, "mutated")
+                setattr(p, field_name, "mutated")
 
-    def test_active_task_key_is_derived_from_work_item_and_stage(self):
+    def test_active_task_key_is_derived_from_work_item(self):
         p = _packet(work_item_ref="issues/99", stage="contract")
-        expected = derive_active_task_key("issues/99", "contract")
-        assert p.active_task_key == expected
+        assert p.active_task_key == derive_active_task_key("issues/99")
 
     def test_approval_boundary_optional(self):
         p = _packet(approval_boundary="security-review-required")
         assert p.approval_boundary == "security-review-required"
-
         p_none = _packet(approval_boundary=None)
         assert p_none.approval_boundary is None
 
     def test_brief_opinion_optional_default_none(self):
-        p = _packet()
-        assert p.brief_opinion is None
+        assert _packet().brief_opinion is None
 
     def test_brief_opinion_stored_when_supplied(self):
         opinion = BriefOpinion(
@@ -208,38 +237,78 @@ class TestTaskPacketSchema:
 
 
 # ===========================================================================
-# 2. active_task_key derivation
+# 2. Contract provenance (EvidenceRef, not base_ref string equality)
+# ===========================================================================
+
+
+class TestContractProvenance:
+    def test_implementation_requires_contract_provenance_evidence(self):
+        with pytest.raises(ValueError, match="contract provenance"):
+            _packet(
+                stage="implementation",
+                role="backend-engineer",
+                accepted_contract_head="contract-sha",
+                base_ref="master-sha",
+                current_head="impl-sha",
+                evidence_refs=(),
+            )
+
+    def test_implementation_with_provenance_evidence_is_valid(self):
+        p = _impl_packet()
+        assert any(e.kind == "contract" for e in p.evidence_refs)
+
+    def test_contract_stage_does_not_require_provenance_evidence(self):
+        p = _packet(stage="contract", accepted_contract_head=None, evidence_refs=())
+        assert p.stage == "contract"
+
+    def test_contract_review_stage_does_not_require_provenance_evidence(self):
+        p = _packet(stage="contract-review", accepted_contract_head=None, evidence_refs=())
+        assert p.stage == "contract-review"
+
+    def test_base_ref_may_be_branch_name_not_sha(self):
+        # base_ref is a git ref; it is not required to equal accepted_contract_head.
+        p = _impl_packet(base_ref="main", current_head="impl-sha")
+        assert p.base_ref == "main"
+
+    def test_provenance_evidence_ref_equality_is_value_based(self):
+        # EvidenceRef is frozen; same args must compare equal.
+        r1 = _contract_provenance("abc123")
+        r2 = _contract_provenance("abc123")
+        assert r1 == r2
+
+    def test_different_contract_sha_gives_different_provenance(self):
+        assert _contract_provenance("sha-1") != _contract_provenance("sha-2")
+
+
+# ===========================================================================
+# 3. active_task_key derivation (work-item-wide, no stage component)
 # ===========================================================================
 
 
 class TestActiveTaskKeyDerivation:
-    def test_same_inputs_produce_same_key(self):
-        assert derive_active_task_key("issues/100", "contract") == derive_active_task_key(
-            "issues/100", "contract"
-        )
+    def test_same_work_item_produces_same_key(self):
+        assert derive_active_task_key("issues/100") == derive_active_task_key("issues/100")
 
-    def test_different_stage_produces_different_key(self):
-        k1 = derive_active_task_key("issues/100", "contract")
-        k2 = derive_active_task_key("issues/100", "implementation")
-        assert k1 != k2
-
-    def test_different_work_item_produces_different_key(self):
-        k1 = derive_active_task_key("issues/100", "contract")
-        k2 = derive_active_task_key("issues/200", "contract")
-        assert k1 != k2
+    def test_different_work_items_produce_different_keys(self):
+        assert derive_active_task_key("issues/100") != derive_active_task_key("issues/200")
 
     def test_key_is_non_empty_string(self):
-        k = derive_active_task_key("issues/1", "contract")
-        assert isinstance(k, str)
-        assert len(k) > 0
+        k = derive_active_task_key("issues/1")
+        assert isinstance(k, str) and len(k) > 0
 
     def test_packet_active_task_key_matches_pure_function(self):
-        p = _packet(work_item_ref="issues/55", stage="verification")
-        assert p.active_task_key == derive_active_task_key("issues/55", "verification")
+        p = _packet(work_item_ref="issues/55", stage="contract")
+        assert p.active_task_key == derive_active_task_key("issues/55")
+
+    def test_different_stages_same_work_item_produce_same_key(self):
+        # Work-item-wide lock: stage does not affect the key.
+        p_contract = _packet(work_item_ref="issues/55", stage="contract")
+        p_impl = _impl_packet(work_item_ref="issues/55")
+        assert p_contract.active_task_key == p_impl.active_task_key
 
 
 # ===========================================================================
-# 3. Single-active-task rule (TaskRegistry)
+# 4. Single-active-task rule (one non-terminal per work item across all stages)
 # ===========================================================================
 
 
@@ -248,16 +317,18 @@ class TestSingleActiveTaskRule:
         registry = TaskRegistry()
         registry.register(_packet(task_id="t1"))
 
-    def test_second_non_terminal_task_for_same_key_is_rejected(self):
+    def test_second_non_terminal_task_same_stage_is_rejected(self):
         registry = TaskRegistry()
         registry.register(_packet(task_id="t1", work_item_ref="issues/1", stage="contract"))
         with pytest.raises(DuplicateActiveTaskError):
             registry.register(_packet(task_id="t2", work_item_ref="issues/1", stage="contract"))
 
-    def test_different_stages_may_coexist(self):
+    def test_implementation_rejected_while_contract_active(self):
+        # Stage overlap is forbidden: one non-terminal task per work item.
         registry = TaskRegistry()
         registry.register(_packet(task_id="t1", work_item_ref="issues/1", stage="contract"))
-        registry.register(_packet(task_id="t2", work_item_ref="issues/1", stage="implementation"))
+        with pytest.raises(DuplicateActiveTaskError):
+            registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
 
     def test_different_work_items_may_coexist(self):
         registry = TaskRegistry()
@@ -270,27 +341,23 @@ class TestSingleActiveTaskRule:
         registry.register(p)
         registry.register(p)
 
-    def test_terminal_task_allows_next_stage_dispatch(self):
+    def test_terminal_task_allows_next_stage_registration(self):
         registry = TaskRegistry()
-        p = _packet(task_id="t1", stage="contract")
+        p = _packet(task_id="t1", work_item_ref="issues/1", stage="contract")
         registry.register(p)
-        registry.record_terminal(
-            task_id="t1",
-            state="done",
-            evidence_refs=(_ref("pr", "42"),),
-        )
-        registry.register(_packet(task_id="t2", stage="implementation"))
+        registry.record_terminal(task_id="t1", state="done", evidence_refs=(_ref("pr", "42"),))
+        registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
 
-    def test_second_duplicate_is_not_authoritative(self):
+    def test_authoritative_task_id_not_replaced_by_duplicate(self):
         registry = TaskRegistry()
         registry.register(_packet(task_id="t1", work_item_ref="issues/1", stage="contract"))
         with pytest.raises(DuplicateActiveTaskError):
             registry.register(_packet(task_id="t2", work_item_ref="issues/1", stage="contract"))
-        assert registry.active_task_id_for("issues/1", "contract") == "t1"
+        assert registry.active_task_id_for("issues/1") == "t1"
 
 
 # ===========================================================================
-# 4. New-evidence requirement for retry after terminal state
+# 5. New-evidence requirement for retry after terminal failure/stall
 # ===========================================================================
 
 
@@ -301,11 +368,14 @@ class TestNewEvidenceRequirement:
         p = _packet(task_id="t1", evidence_refs=original)
         registry.register(p)
         registry.record_terminal(task_id="t1", state="failed", evidence_refs=original)
-
         with pytest.raises(MissingEvidenceError):
             registry.register(
-                _packet(task_id="t2", work_item_ref=p.work_item_ref, stage=p.stage,
-                        evidence_refs=original)
+                _packet(
+                    task_id="t2",
+                    work_item_ref=p.work_item_ref,
+                    stage=p.stage,
+                    evidence_refs=original,
+                )
             )
 
     def test_retry_after_stall_without_new_evidence_is_rejected(self):
@@ -314,117 +384,97 @@ class TestNewEvidenceRequirement:
         p = _packet(task_id="t1", evidence_refs=original)
         registry.register(p)
         registry.record_terminal(task_id="t1", state="stalled", evidence_refs=original)
-
         with pytest.raises(MissingEvidenceError):
             registry.register(
-                _packet(task_id="t2", work_item_ref=p.work_item_ref, stage=p.stage,
-                        evidence_refs=original)
+                _packet(
+                    task_id="t2",
+                    work_item_ref=p.work_item_ref,
+                    stage=p.stage,
+                    evidence_refs=original,
+                )
             )
 
-    def test_retry_after_failure_with_new_evidence_is_accepted(self):
+    def test_retry_with_genuinely_new_evidence_is_accepted(self):
         registry = TaskRegistry()
         original = (_ref("issue", "634"),)
         p = _packet(task_id="t1", evidence_refs=original)
         registry.register(p)
         registry.record_terminal(task_id="t1", state="failed", evidence_refs=original)
-
-        new_evidence = original + (_ref("pr", "999"),)
         registry.register(
-            _packet(task_id="t2", work_item_ref=p.work_item_ref, stage=p.stage,
-                    evidence_refs=new_evidence)
+            _packet(
+                task_id="t2",
+                work_item_ref=p.work_item_ref,
+                stage=p.stage,
+                evidence_refs=original + (_ref("pr", "999"),),
+            )
         )
 
-    def test_continuation_does_not_require_new_evidence(self):
+    def test_continuation_of_same_task_does_not_require_new_evidence(self):
+        registry = TaskRegistry()
+        p = _packet(task_id="t1", evidence_refs=(_ref("issue", "634"),))
+        registry.register(p)
+        registry.register(p)
+
+    def test_evidence_ref_equality_is_value_based(self):
+        # Identical-args EvidenceRef values are equal; retry with the same set is not new.
+        assert _ref("issue", "634") == _ref("issue", "634")
+
+    def test_opinion_does_not_count_as_new_evidence_for_retry(self):
         registry = TaskRegistry()
         original = (_ref("issue", "634"),)
         p = _packet(task_id="t1", evidence_refs=original)
         registry.register(p)
-        registry.register(p)
+        registry.record_terminal(task_id="t1", state="failed", evidence_refs=original)
+        retry = _packet(
+            task_id="t2",
+            work_item_ref=p.work_item_ref,
+            stage=p.stage,
+            evidence_refs=original,
+            brief_opinion=BriefOpinion(likes="x", concerns="y", improvement="z"),
+        )
+        with pytest.raises(MissingEvidenceError):
+            registry.register(retry)
 
 
 # ===========================================================================
-# 5. Exact-head / base-ref contract inheritance
-# ===========================================================================
-
-
-class TestBaseRefContractInheritance:
-    def test_implementation_base_ref_must_match_accepted_contract_head(self):
-        with pytest.raises(ValueError, match="base_ref"):
-            _packet(
-                stage="implementation",
-                role="backend-engineer",
-                accepted_contract_head="contract-sha",
-                base_ref="some-other-sha",
-                current_head="impl-sha",
-            )
-
-    def test_implementation_with_matching_base_ref_is_valid(self):
-        p = _packet(
-            stage="implementation",
-            role="backend-engineer",
-            accepted_contract_head="contract-sha",
-            base_ref="contract-sha",
-            current_head="impl-sha",
-        )
-        assert p.base_ref == p.accepted_contract_head
-
-    def test_contract_stage_base_ref_not_constrained_to_accepted_head(self):
-        p = _packet(
-            stage="contract",
-            accepted_contract_head="initial-sha",
-            base_ref="master-sha",
-            current_head="master-sha",
-        )
-        assert p.stage == "contract"
-
-    def test_current_head_may_differ_from_accepted_contract_head(self):
-        p = _packet(
-            stage="implementation",
-            role="backend-engineer",
-            accepted_contract_head="contract-sha",
-            base_ref="contract-sha",
-            current_head="impl-sha-after-push",
-        )
-        assert p.current_head != p.accepted_contract_head
-
-
-# ===========================================================================
-# 6. Deterministic stage transitions
+# 6. Deterministic stage transitions — complete lifecycle
 # ===========================================================================
 
 
 class TestStageTransitions:
-    def test_accepted_contract_transitions_to_implementation(self):
-        assert next_stage_after("contract", "ACCEPTED") == "implementation"
+    def test_contract_red_ready_transitions_to_contract_review(self):
+        assert next_stage_after("contract", "RED_READY") == "contract-review"
 
-    def test_implementation_success_transitions_to_solution_review(self):
-        assert next_stage_after("implementation", "success") == "solution-review"
+    def test_contract_review_accepted_transitions_to_implementation(self):
+        assert next_stage_after("contract-review", "ACCEPTED") == "implementation"
 
-    def test_accepted_solution_review_transitions_to_maintain(self):
+    def test_implementation_success_transitions_to_verification(self):
+        assert next_stage_after("implementation", "success") == "verification"
+
+    def test_verification_success_transitions_to_solution_review(self):
+        assert next_stage_after("verification", "success") == "solution-review"
+
+    def test_solution_review_accepted_transitions_to_maintain(self):
         assert next_stage_after("solution-review", "ACCEPTED") == "maintain"
 
-    def test_ready_maintain_outcome_is_terminal(self):
-        # No automatic forward stage beyond maintain; merge action takes over.
+    def test_maintain_ready_is_terminal(self):
+        # No automatic forward stage past maintain; protected merge action takes over.
         assert next_stage_after("maintain", "READY") is None
 
     @pytest.mark.parametrize("outcome", ["BLOCKED", "failed", "stalled", "cancelled"])
-    def test_terminal_outcomes_stop_all_transitions(self, outcome):
+    def test_blocking_outcomes_stop_all_transitions(self, outcome):
         for stage in CANONICAL_LIFECYCLE_STAGES:
             result = next_stage_after(stage, outcome)
             assert result is None, (
-                f"next_stage_after({stage!r}, {outcome!r}) returned {result!r}; expected None"
+                f"next_stage_after({stage!r}, {outcome!r}) = {result!r}; expected None"
             )
-
-    def test_transition_result_is_canonical_or_none(self):
-        for stage in CANONICAL_LIFECYCLE_STAGES:
-            for outcome in ("ACCEPTED", "CHANGES_REQUESTED", "BLOCKED", "success", "failed"):
-                result = next_stage_after(stage, outcome)
-                assert result is None or result in CANONICAL_LIFECYCLE_STAGES
 
     def test_full_forward_path_is_deterministic(self):
         forward = [
-            ("contract", "ACCEPTED", "implementation"),
-            ("implementation", "success", "solution-review"),
+            ("contract", "RED_READY", "contract-review"),
+            ("contract-review", "ACCEPTED", "implementation"),
+            ("implementation", "success", "verification"),
+            ("verification", "success", "solution-review"),
             ("solution-review", "ACCEPTED", "maintain"),
         ]
         for stage, outcome, expected in forward:
@@ -433,64 +483,86 @@ class TestStageTransitions:
                 f"next_stage_after({stage!r}, {outcome!r}) = {result!r}; expected {expected!r}"
             )
 
+    def test_transition_result_is_canonical_or_none(self):
+        outcomes = ("RED_READY", "ACCEPTED", "CHANGES_REQUESTED", "BLOCKED", "success", "failed")
+        for stage in CANONICAL_LIFECYCLE_STAGES:
+            for outcome in outcomes:
+                result = next_stage_after(stage, outcome)
+                assert result is None or result in CANONICAL_LIFECYCLE_STAGES
+
     def test_unknown_outcome_returns_none(self):
         assert next_stage_after("contract", "WHATS_THIS") is None
 
 
 # ===========================================================================
-# 7. CHANGES_REQUESTED returns to implementation and invalidates stale review
+# 7. Contract-review dispatch requires ACCEPTED evidence, not mere completion
 # ===========================================================================
 
 
-class TestChangesRequestedTransition:
+class TestContractReviewDispatch:
+    def test_contract_review_accepted_dispatches_implementation(self):
+        assert next_stage_after("contract-review", "ACCEPTED") == "implementation"
+
+    def test_contract_task_completion_alone_does_not_dispatch_implementation(self):
+        # "done"/"success" is a task-state outcome; without an explicit ACCEPTED
+        # contract-review the lifecycle must stop, not jump to implementation.
+        assert next_stage_after("contract", "done") != "implementation"
+        assert next_stage_after("contract", "success") != "implementation"
+
+    def test_implementation_rejected_while_contract_non_terminal(self):
+        # Stage advancement requires prior stage material outcome.
+        registry = TaskRegistry()
+        registry.register(_packet(task_id="t1", work_item_ref="issues/1", stage="contract"))
+        with pytest.raises(DuplicateActiveTaskError):
+            registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
+
+    def test_implementation_accepted_after_contract_terminates(self):
+        registry = TaskRegistry()
+        p = _packet(task_id="t1", work_item_ref="issues/1", stage="contract")
+        registry.register(p)
+        registry.record_terminal(task_id="t1", state="done", evidence_refs=(_ref("pr", "42"),))
+        registry.register(_impl_packet(task_id="t2", work_item_ref="issues/1"))
+
+
+# ===========================================================================
+# 8. CHANGES_REQUESTED is a review outcome, not a canonical task state
+# ===========================================================================
+
+
+class TestChangesRequestedAsReviewOutcome:
     def test_changes_requested_from_solution_review_returns_to_implementation(self):
         assert next_stage_after("solution-review", "CHANGES_REQUESTED") == "implementation"
 
-    def test_changes_requested_does_not_advance_past_implementation(self):
+    def test_changes_requested_does_not_advance_to_maintain_or_loop_review(self):
         result = next_stage_after("solution-review", "CHANGES_REQUESTED")
         assert result not in ("maintain", "solution-review")
 
-    def test_head_mismatch_on_existing_solution_review_raises(self):
-        # The existing assert_solution_review_accepted_for_head already detects head mismatch;
-        # the orchestration layer must propagate or wrap this as StaleReviewError.
-        from agent_office.dispatch_model import SolutionReviewArtifact
+    def test_stale_solution_review_rejected_by_dispatch_model_api(self):
+        # assert_solution_review_accepted_for_head from dispatch_model detects head mismatch.
         artifact = SolutionReviewArtifact(
             outcome="ACCEPTED",
             reviewed_head_sha="old-sha",
             reviewer_role="team-lead",
         )
-        registry = TaskRegistry()
-        p = _packet(
-            task_id="t-impl",
-            stage="implementation",
-            role="backend-engineer",
-            accepted_contract_head="contract-sha",
-            base_ref="contract-sha",
-            current_head="new-sha-after-push",
-        )
-        registry.register(p)
-        registry.record_solution_review(
-            work_item_ref=p.work_item_ref,
-            reviewed_head_sha="old-sha",
-            outcome="ACCEPTED",
+        with pytest.raises(SolutionReviewRequiredError):
+            assert_solution_review_accepted_for_head(artifact, current_head="new-sha")
+
+    def test_changes_requested_review_outcome_rejects_merge(self):
+        artifact = SolutionReviewArtifact(
+            outcome="CHANGES_REQUESTED",
+            reviewed_head_sha="impl-sha",
             reviewer_role="team-lead",
         )
-        with pytest.raises(StaleReviewError):
-            registry.assert_ready_to_merge(
-                work_item_ref=p.work_item_ref,
-                current_head="new-sha-after-push",
-            )
+        with pytest.raises(SolutionReviewRequiredError):
+            assert_solution_review_accepted_for_head(artifact, current_head="impl-sha")
 
     def test_implementation_redispatch_after_changes_requested(self):
-        # After CHANGES_REQUESTED, a fresh implementation packet for the same item
-        # must be accepted (the prior solution-review task is terminal/stale).
+        # After CHANGES_REQUESTED terminal on solution-review, a fresh implementation
+        # packet for the same work item is accepted (prior tasks are terminal).
         registry = TaskRegistry()
-        p_impl_v1 = _packet(
+        p_impl_v1 = _impl_packet(
             task_id="t-impl-v1",
-            stage="implementation",
-            role="backend-engineer",
-            accepted_contract_head="contract-sha",
-            base_ref="contract-sha",
+            work_item_ref="issues/1",
             current_head="impl-sha-v1",
         )
         registry.register(p_impl_v1)
@@ -499,49 +571,67 @@ class TestChangesRequestedTransition:
             state="done",
             evidence_refs=(_ref("pr", "10"),),
         )
-
-        p_review = _packet(
+        p_review = _impl_packet(
             task_id="t-review",
+            work_item_ref="issues/1",
             stage="solution-review",
             role="team-lead",
-            accepted_contract_head="contract-sha",
-            base_ref="contract-sha",
             current_head="impl-sha-v1",
         )
         registry.register(p_review)
         registry.record_terminal(
             task_id="t-review",
-            state="done",  # CHANGES_REQUESTED outcome
+            state="done",
             evidence_refs=(_ref("pr-review", "10"),),
+            review_outcome="CHANGES_REQUESTED",  # review outcome, not task state
         )
-
-        p_impl_v2 = _packet(
+        p_impl_v2 = _impl_packet(
             task_id="t-impl-v2",
-            stage="implementation",
-            role="backend-engineer",
-            accepted_contract_head="contract-sha",
-            base_ref="contract-sha",
+            work_item_ref="issues/1",
             current_head="impl-sha-v2",
-            evidence_refs=(_ref("pr-review", "10"), _ref("pr", "10")),
+            evidence_refs=(
+                _contract_provenance("contract-sha"),
+                _ref("pr-review", "10"),
+            ),
         )
         registry.register(p_impl_v2)
 
+    def test_verification_required_before_second_solution_review(self):
+        # After CHANGES_REQUESTED -> re-implementation, verification must complete
+        # before another solution-review can be registered.
+        registry = TaskRegistry()
+        p_verify = _impl_packet(
+            task_id="t-verify",
+            work_item_ref="issues/1",
+            stage="verification",
+        )
+        registry.register(p_verify)
+        with pytest.raises(DuplicateActiveTaskError):
+            registry.register(
+                _impl_packet(
+                    task_id="t-review2",
+                    work_item_ref="issues/1",
+                    stage="solution-review",
+                    role="team-lead",
+                )
+            )
+
 
 # ===========================================================================
-# 8. BriefOpinion is advisory and cannot alter state or transition decisions
+# 9. BriefOpinion is advisory only — cannot alter state or transitions
 # ===========================================================================
 
 
 class TestBriefOpinionAdvisory:
     def test_opinion_does_not_change_next_stage(self):
-        # next_stage_after has no opinion parameter; result is identical with or without opinion.
-        assert next_stage_after("contract", "ACCEPTED") == "implementation"
+        # next_stage_after accepts no opinion argument.
+        assert next_stage_after("contract-review", "ACCEPTED") == "implementation"
 
     def test_packet_with_and_without_opinion_have_same_active_task_key(self):
         p_plain = _packet(work_item_ref="issues/1", stage="contract")
         opinion = BriefOpinion(likes="clean", concerns="scope", improvement="split")
-        p_opinion = _packet(work_item_ref="issues/1", stage="contract", brief_opinion=opinion)
-        assert p_plain.active_task_key == p_opinion.active_task_key
+        p_with = _packet(work_item_ref="issues/1", stage="contract", brief_opinion=opinion)
+        assert p_plain.active_task_key == p_with.active_task_key
 
     def test_opinion_does_not_count_as_new_evidence_for_retry(self):
         registry = TaskRegistry()
@@ -549,14 +639,12 @@ class TestBriefOpinionAdvisory:
         p = _packet(task_id="t1", evidence_refs=original)
         registry.register(p)
         registry.record_terminal(task_id="t1", state="failed", evidence_refs=original)
-
-        opinion = BriefOpinion(likes="x", concerns="y", improvement="z")
         retry = _packet(
             task_id="t2",
             work_item_ref=p.work_item_ref,
             stage=p.stage,
             evidence_refs=original,
-            brief_opinion=opinion,
+            brief_opinion=BriefOpinion(likes="x", concerns="y", improvement="z"),
         )
         with pytest.raises(MissingEvidenceError):
             registry.register(retry)
@@ -591,14 +679,13 @@ class TestBriefOpinionAdvisory:
 
 
 # ===========================================================================
-# 9. Integration: orchestration contract uses the canonical state machine
+# 10. Integration: orchestration uses the canonical task-state machine
 # ===========================================================================
 
 
 class TestCanonicalStateMachineIntegration:
-    def test_terminal_state_names_stop_forward_transitions(self):
-        # Terminal state names from the canonical model (task_state.py) must also
-        # stop forward transitions in the orchestration layer.
+    def test_terminal_task_outcomes_stop_forward_transitions(self):
+        # Terminal state names from the canonical model must stop transitions.
         for outcome in ("done", "failed", "blocked", "cancelled", "stalled"):
             result = next_stage_after("contract", outcome)
             assert result is None, (
@@ -609,8 +696,8 @@ class TestCanonicalStateMachineIntegration:
         for stage in CANONICAL_LIFECYCLE_STAGES:
             next_stage_after(stage, "ACCEPTED")
 
-    def test_stage_returned_by_next_stage_after_is_always_canonical(self):
-        outcomes = ("ACCEPTED", "success", "CHANGES_REQUESTED")
+    def test_stage_returned_is_always_canonical_or_none(self):
+        outcomes = ("RED_READY", "ACCEPTED", "success", "CHANGES_REQUESTED")
         for stage in CANONICAL_LIFECYCLE_STAGES:
             for outcome in outcomes:
                 result = next_stage_after(stage, outcome)
