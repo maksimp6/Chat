@@ -423,10 +423,7 @@ def test_non_task_github_memory_honors_declared_freshness_metadata(tmp_path):
     )
     store.upsert(MemoryRecord(**stale_payload))
 
-    refs = [
-        hit.ref
-        for hit in HybridRetriever(memory_store=store).retrieve(_query(), now=101).hits
-    ]
+    refs = [hit.ref for hit in HybridRetriever(memory_store=store).retrieve(_query(), now=101).hits]
 
     assert "memory:current-process" in refs
     assert "memory:stale-process" not in refs

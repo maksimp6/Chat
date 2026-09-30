@@ -382,12 +382,8 @@ class HybridRetriever:
             cache_status=cache_status,
             source_counts=dict(counts),
             total_chars=sum(len(hit.text) for hit in hits),
-            saved_source_bytes=(
-                cache_lookup.saved_source_bytes if cache_lookup is not None else 0
-            ),
-            saved_input_tokens=(
-                cache_lookup.saved_input_tokens if cache_lookup is not None else 0
-            ),
+            saved_source_bytes=(cache_lookup.saved_source_bytes if cache_lookup is not None else 0),
+            saved_input_tokens=(cache_lookup.saved_input_tokens if cache_lookup is not None else 0),
         )
 
 
