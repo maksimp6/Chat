@@ -1,4 +1,9 @@
 from datetime import UTC, datetime, timedelta
+import json
+import runpy
+import sys
+
+import pytest
 
 from agent_office.reliability import SLO_TARGET, evaluate_snapshot
 
@@ -121,3 +126,63 @@ def test_no_decisions_means_insufficient_evidence():
     result = evaluate_snapshot(_snapshot(decisions=[]))
     assert result["ready"] is False
     assert result["sufficient_evidence"] is False
+
+
+def test_naive_timestamp_is_treated_as_utc():
+    naive_now = NOW.replace(tzinfo=None).isoformat()
+    result = evaluate_snapshot(
+        _snapshot(
+            generated_at=naive_now,
+            observer_last_success_at=(NOW - timedelta(minutes=5)).replace(tzinfo=None).isoformat(),
+        ),
+        minimum_decisions=1,
+    )
+    assert result["controls_healthy"] is True
+
+
+def test_unsupported_decision_status_fails_closed():
+    result = evaluate_snapshot(
+        _snapshot(decisions=[{"id": "bad-status", "status": "maybe", "provenance": ["x"]}]),
+        minimum_decisions=1,
+    )
+    assert result["ready"] is False
+    assert "invalid_status" in {item["code"] for item in result["findings"]}
+
+
+def test_missing_observer_heartbeat_blocks_claim():
+    result = evaluate_snapshot(_snapshot(observer_last_success_at=None), minimum_decisions=1)
+    assert result["ready"] is False
+    assert "observer_unknown" in {item["code"] for item in result["findings"]}
+
+
+def test_cli_returns_success_and_pretty_json(tmp_path, monkeypatch, capsys):
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-office-reliability",
+            str(snapshot),
+            "--pretty",
+            "--minimum-decisions",
+            "1",
+        ],
+    )
+
+    from agent_office import reliability
+
+    assert reliability.main() == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["ready"] is True
+
+
+def test_module_entrypoint_exits_nonzero_for_unproven_snapshot(tmp_path, monkeypatch):
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(_snapshot(decisions=[])), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["agent-office-reliability", str(snapshot)])
+
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_module("agent_office.reliability", run_name="__main__")
+
+    assert exc.value.code == 1
