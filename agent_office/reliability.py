@@ -48,6 +48,11 @@ def evaluate_snapshot(
     target: float = SLO_TARGET,
     minimum_decisions: int = MIN_DECISIONS_FOR_SLO,
 ) -> dict[str, Any]:
+    if not 0.0 < float(target) <= 1.0:
+        raise ValueError("target must be within (0, 1]")
+    if int(minimum_decisions) < 1:
+        raise ValueError("minimum_decisions must be at least 1")
+
     generated_at = _parse_time(snapshot["generated_at"])
     findings: list[ReliabilityFinding] = []
     decisions = list(snapshot.get("decisions") or [])
@@ -84,6 +89,8 @@ def evaluate_snapshot(
 
         violation_code = str(raw.get("violation_code") or "").strip()
         is_catastrophic = bool(raw.get("catastrophic")) or violation_code in CATASTROPHIC_CODES
+        if is_catastrophic:
+            status = "invalid"
 
         if status == "valid":
             valid += 1
@@ -114,7 +121,15 @@ def evaluate_snapshot(
     else:
         observer_age = generated_at - _parse_time(str(observer_last_success))
         max_age = timedelta(hours=float(snapshot.get("observer_max_age_hours", 2)))
-        if observer_age > max_age:
+        if observer_age < timedelta(0):
+            findings.append(
+                ReliabilityFinding(
+                    "high",
+                    "observer_future",
+                    "Observer heartbeat is in the future relative to snapshot time",
+                )
+            )
+        elif observer_age > max_age:
             findings.append(
                 ReliabilityFinding(
                     "high",
@@ -160,6 +175,7 @@ def evaluate_snapshot(
         "invalid_status",
         "missing_provenance",
         "observer_unknown",
+        "observer_future",
         "observer_stale",
         "maintainer_stall",
     }
@@ -197,8 +213,8 @@ def main() -> int:
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     result = evaluate_snapshot(
         snapshot,
-        target=args.target,
-        minimum_decisions=args.minimum_decisions,
+        target=max(args.target, SLO_TARGET),
+        minimum_decisions=max(args.minimum_decisions, MIN_DECISIONS_FOR_SLO),
     )
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))
     return 0 if result["ready"] else 1
