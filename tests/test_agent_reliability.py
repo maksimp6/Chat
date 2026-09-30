@@ -267,3 +267,42 @@ def test_cli_cannot_weaken_four_nines_or_evidence_floor(tmp_path, monkeypatch, c
     output = json.loads(capsys.readouterr().out)
     assert output["target"] == SLO_TARGET
     assert output["minimum_decisions"] == 10_000
+
+
+def test_controls_only_cli_passes_healthy_unproven_snapshot(tmp_path, monkeypatch, capsys):
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "agent-office-reliability",
+            str(snapshot),
+            "--controls-only",
+            "--pretty",
+        ],
+    )
+
+    from agent_office import reliability
+
+    assert reliability.main() == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["controls_healthy"] is True
+    assert output["ready"] is False
+
+
+def test_controls_only_cli_fails_on_blocking_control_finding(tmp_path, monkeypatch):
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(
+        json.dumps(_snapshot(observer_last_success_at=None)),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["agent-office-reliability", str(snapshot), "--controls-only"],
+    )
+
+    from agent_office import reliability
+
+    assert reliability.main() == 1
