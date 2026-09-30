@@ -18,14 +18,6 @@ on:
     types: [opened, closed, assigned, unassigned, labeled, unlabeled]
   pull_request_review:
     types: [submitted, dismissed]
-  workflow_run:
-    workflows:
-      - CI
-      - Format
-      - Security checks
-      - CodeQL
-      - Merge readiness snapshot
-    types: [completed]
 
 permissions: {}
 
