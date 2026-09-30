@@ -219,3 +219,28 @@ def test_delete_and_selected_database_backend_round_trip():
     finally:
         store.delete(memory_id)
     assert store.get(memory_id) is None
+
+
+def test_separate_database_connections_each_initialize_schema(tmp_path):
+    first_path = tmp_path / "first.db"
+    second_path = tmp_path / "second.db"
+
+    def factory(path):
+        def connect():
+            conn = sqlite3.connect(path)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+        return connect
+
+    first = AgentMemoryStore(factory(first_path))
+    second = AgentMemoryStore(factory(second_path))
+
+    first.upsert(_github_record(memory_id="first-memory"))
+    second.upsert(_github_record(memory_id="second-memory"))
+
+    assert first.get("first-memory") is not None
+    assert first.get("second-memory") is None
+    assert second.get("second-memory") is not None
+    assert second.get("first-memory") is None
+
