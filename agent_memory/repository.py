@@ -201,7 +201,6 @@ class AgentMemoryStore:
         status: str | None = "active",
         visible_to: str | None = None,
     ) -> list[MemoryRecord]:
-        self.create_schema()
         conditions: list[str] = []
         params: list[Any] = []
         if kind is not None:
@@ -265,6 +264,8 @@ class AgentMemoryStore:
         record = self.get(memory_id)
         if record is None:
             return False
+        if str(replacement_id) == record.memory_id:
+            raise ValueError("memory cannot supersede itself")
         if self.get(replacement_id) is None:
             raise ValueError("replacement memory does not exist")
         timestamp = int(time.time()) if now is None else int(now)
