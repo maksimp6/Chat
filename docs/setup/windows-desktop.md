@@ -5,7 +5,7 @@ It does not duplicate the frontend or run an Electron/Node production runtime.
 
 ## Runtime model
 
-1. `desktop_app.py` chooses the desktop data directory.
+1. `desktop/launcher.py` chooses the desktop data directory.
 2. Before importing `app.py`, it sets `ALICE_DB_PATH` to
    `%LOCALAPPDATA%\\Alice Pro\\alice_pro.db`.
 3. Alice Pro starts a local WSGI server on `127.0.0.1` with an ephemeral port.
@@ -23,7 +23,7 @@ Use Python 3.13 for the Windows desktop packaging path.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements-desktop.txt
-python desktop_app.py
+python -m desktop.launcher
 ```
 
 Windows uses the installed WebView2 runtime through pywebview. Current Windows
@@ -58,7 +58,7 @@ For testing or portable development, override the data directory:
 
 ```powershell
 $env:ALICE_DESKTOP_DATA_DIR = "D:\\AliceProData"
-python desktop_app.py
+python -m desktop.launcher
 ```
 
 Do not point production desktop data at a temporary directory.
