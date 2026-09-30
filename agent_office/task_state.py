@@ -36,9 +36,7 @@ def derive_agent_task_state(evidence: AgentTaskEvidence) -> str:
         evidence.backend_status is not None
         and evidence.backend_status not in _KNOWN_BACKEND_STATUSES
     ):
-        raise AgentTaskStateError(
-            f"unsupported backend status: {evidence.backend_status!r}"
-        )
+        raise AgentTaskStateError(f"unsupported backend status: {evidence.backend_status!r}")
     if evidence.review_complete and evidence.validation_status != "success":
         raise AgentTaskStateError("review cannot complete before validation")
 
