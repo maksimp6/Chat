@@ -27,6 +27,8 @@ For normal development, assign the issue through the GitHub Agents UI and choose
 the narrowest matching repository role:
 
 - **Team Lead** — triage, dependency analysis and delegation to specialists.
+- **Work Coordinator** — shared cache/memory/retrieval preparation, budget checks and
+  recipient-specific handoffs after Team Lead selects the owner.
 - **Backend Engineer** — Flask/API/runtime/tools/database/Execution Trace.
 - **Frontend Engineer** — browser UI, static JavaScript, accessibility and
   BrowserShim-compatible behavior.
@@ -45,8 +47,10 @@ the narrowest matching repository role:
   agent policy/skills/workflow, without taking over production implementation.
 
 Team Lead may use the custom-agent tool to delegate normal implementation to the
-engineering specialists. Operations Observer and Process Governor are supervisory
-roles, not ordinary implementation owners. Keep one primary owner for an issue and
+engineering specialists. Work Coordinator prepares context after ownership is chosen;
+it is coordination-only and never becomes the implementation owner, solution reviewer
+or maintainer. Operations Observer and Process Governor are supervisory roles, not
+ordinary implementation owners. Keep one primary owner for an issue and
 split only truly independent work.
 
 ### Observation and process governance
@@ -91,7 +95,7 @@ the cheapest backend/model that can reliably perform that role.
 
 ### Model policy
 
-Routine role agents use `gpt-5.4-mini`; Docs Engineer uses
+Routine role agents use `gpt-5.4-mini`; Docs Engineer and Work Coordinator use
 `gpt-5.4-nano`. Escalate to the Claude Partner Agent on Sonnet for a concrete
 architecture/reasoning need. Do not silently escalate routine work to a larger
 model.

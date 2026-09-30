@@ -4,6 +4,7 @@ from agent_office.dispatch_model import (
     AgentDispatchError,
     AgentTaskPlan,
     CANONICAL_LIFECYCLE_STAGES,
+    COORDINATION_ONLY_ROLES,
     IMPLEMENTATION_ROLES,
     REVIEW_ONLY_BACKENDS,
     resolve_task_plan,
@@ -41,6 +42,7 @@ def test_implementation_requires_a_concrete_engineering_role():
 def test_implementation_rejects_supervisory_and_review_roles():
     for role in (
         "team-lead",
+        "work-coordinator",
         "test-engineer",
         "security-reviewer",
         "release-manager",
@@ -53,6 +55,17 @@ def test_implementation_rejects_supervisory_and_review_roles():
                 role=role,
                 backend="claude-direct",
             )
+
+
+def test_work_coordinator_is_coordination_only_and_cannot_review_solution():
+    assert "work-coordinator" in COORDINATION_ONLY_ROLES
+    plan = resolve_task_plan(stage="verification", role="work-coordinator")
+    assert plan.can_implement is False
+    assert plan.can_merge is False
+    assert plan.can_review_solution is False
+
+    with pytest.raises(AgentDispatchError, match="coordination-only"):
+        resolve_task_plan(stage="solution-review", role="work-coordinator")
 
 
 def test_current_default_backend_for_test_and_implementation_is_claude_direct():
