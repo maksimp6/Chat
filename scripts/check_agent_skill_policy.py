@@ -16,6 +16,7 @@ Exit code 0 on success; 1 on any policy, schema, registry, or path failure.
 import argparse
 import ast
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -36,6 +37,30 @@ _CONSTRAINED_ROLES: dict = {
 
 # Tools forbidden on constrained read-only role profiles.
 _MUTATION_TOOLS = frozenset({"edit", "write", "merge", "deploy"})
+
+# Mutating methods on the literal dict and its set values. Pure reads such as
+# get(), keys(), and copy() do not change the allowlist.
+_ALLOWLIST_MUTATORS = frozenset(
+    {
+        "update",
+        "pop",
+        "popitem",
+        "setdefault",
+        "clear",
+        "add",
+        "remove",
+        "discard",
+        "difference_update",
+        "intersection_update",
+        "symmetric_difference_update",
+        "__setitem__",
+        "__delitem__",
+        "__ior__",
+        "__iand__",
+        "__isub__",
+        "__ixor__",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +114,7 @@ def _load_effects_json(path: Path) -> dict:
 def _rooted_at_allowlist(node: ast.expr) -> bool:
     """Return True if node is ROLE_SKILL_ALLOWLIST or a subscript/attribute chain rooted there.
 
-    Used to detect mutations in all expression contexts (direct, subscript, chained).
+    This follows direct subscript/attribute receivers, not aliases or call results.
     """
     if isinstance(node, ast.Name):
         return node.id == "ROLE_SKILL_ALLOWLIST"
@@ -135,16 +160,6 @@ def _read_allowlist(root: Path) -> dict:
                         "REGISTRY_ERROR",
                         "ROLE_SKILL_ALLOWLIST has a dynamic subscript/attribute assignment",
                     )
-            # Also reject if RHS is a mutating call rooted at ROLE_SKILL_ALLOWLIST
-            # (e.g. result = ROLE_SKILL_ALLOWLIST.update(...) or .pop(...))
-            if isinstance(node.value, ast.Call):
-                call = node.value
-                if isinstance(call.func, ast.Attribute) and _rooted_at_allowlist(call.func.value):
-                    raise _PolicyError(
-                        "REGISTRY_ERROR",
-                        f"ROLE_SKILL_ALLOWLIST has a mutating call in assignment RHS:"
-                        f" .{call.func.attr}()",
-                    )
         elif isinstance(node, ast.AugAssign):
             if isinstance(node.target, ast.Name) and node.target.id == "ROLE_SKILL_ALLOWLIST":
                 raise _PolicyError(
@@ -163,14 +178,17 @@ def _read_allowlist(root: Path) -> dict:
                         "REGISTRY_ERROR",
                         "ROLE_SKILL_ALLOWLIST has a delete statement",
                     )
-        elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-            call = node.value
-            # Reject any standalone method call rooted at ROLE_SKILL_ALLOWLIST,
-            # including chained subscript access: ROLE_SKILL_ALLOWLIST['key'].add(...)
-            if isinstance(call.func, ast.Attribute) and _rooted_at_allowlist(call.func.value):
+        elif isinstance(node, ast.Call):
+            # ast.walk reaches calls in assignments, wrappers, and other expression
+            # contexts. Reject mutations, while allowing direct rooted read methods.
+            if (
+                isinstance(node.func, ast.Attribute)
+                and _rooted_at_allowlist(node.func.value)
+                and node.func.attr in _ALLOWLIST_MUTATORS
+            ):
                 raise _PolicyError(
                     "REGISTRY_ERROR",
-                    f"ROLE_SKILL_ALLOWLIST has a dynamic method call: .{call.func.attr}()",
+                    f"ROLE_SKILL_ALLOWLIST has a mutating method call: .{node.func.attr}()",
                 )
 
     if not assignments:
@@ -256,13 +274,45 @@ def _check_profile_path_safe(root: Path, profile_rel: str, role: str) -> Path:
 # ---------------------------------------------------------------------------
 
 
+def _strip_tools_comment(value: str) -> str:
+    """Strip a YAML comment outside quotes in the supported tools grammar."""
+    quote = None
+    for i, char in enumerate(value):
+        if quote is not None:
+            if char == quote:
+                quote = None
+        elif char in {"\"", "'"}:
+            quote = char
+        elif char == "#":
+            return value[:i].strip()
+    return value.strip()
+
+
+def _parse_tool_scalar(value: str, profile_path: Path) -> str:
+    """Accept one plain identifier, optionally enclosed in matching quotes."""
+    value = value.strip()
+    if value.startswith(("\"", "'")):
+        if len(value) < 2 or value[-1] != value[0]:
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"profile {profile_path.name!r}: malformed quoted tool name",
+            )
+        value = value[1:-1]
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", value) is None:
+        raise _PolicyError(
+            "SCHEMA_ERROR",
+            f"profile {profile_path.name!r}: tools must contain flat scalar identifiers",
+        )
+    return value
+
+
 def _parse_profile_tools(profile_path: Path) -> list:
     """Return tool names from YAML frontmatter 'tools:'.
 
-    Handles inline unquoted arrays ([read, search]), inline quoted arrays
-    (["read","edit"]), and YAML block sequences (- item lines).
+    Handles flat inline arrays ([read, search], ["read","edit"]) and
+    YAML block sequences (- item lines), with comments outside quotes.
     Unknown/unsupported formats fail closed with SCHEMA_ERROR.
-    Returns [] only when no 'tools:' key is present in the frontmatter.
+    Returns [] for an empty inline array or no 'tools:' key in the frontmatter.
     """
     text = profile_path.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -278,7 +328,7 @@ def _parse_profile_tools(profile_path: Path) -> list:
         stripped = line.strip()
         if not stripped.startswith("tools:"):
             continue
-        val = stripped[len("tools:") :].strip()
+        val = _strip_tools_comment(stripped[len("tools:") :])
 
         if val.startswith("["):
             if not val.endswith("]"):
@@ -287,25 +337,35 @@ def _parse_profile_tools(profile_path: Path) -> list:
                     f"profile {profile_path.name!r}: malformed tools inline array: {val!r}",
                 )
             inner = val[1:-1]
-            return [t.strip().strip("\"'") for t in inner.split(",") if t.strip()]
+            if not inner.strip():
+                return []
+            return [_parse_tool_scalar(item, profile_path) for item in inner.split(",")]
 
         if val == "":
             # YAML block sequence: collect "- item" lines that follow
             tools: list = []
+            item_indent = None
+            key_indent = len(line) - len(line.lstrip())
             for j in range(i + 1, len(fm_lines)):
-                item_stripped = fm_lines[j].strip()
-                if item_stripped.startswith("- "):
-                    raw = item_stripped[2:].strip()
-                    # Strip inline YAML comment (# outside quoted strings).
-                    # Tool names are simple identifiers; # never appears in them.
-                    comment_start = raw.find("#")
-                    if comment_start >= 0:
-                        raw = raw[:comment_start].strip()
-                    tools.append(raw.strip("\"'"))
-                elif item_stripped == "-":
+                item_line = fm_lines[j]
+                item_stripped = _strip_tools_comment(item_line)
+                if not item_stripped:
                     continue
-                elif not item_stripped:
-                    continue
+                indent = len(item_line) - len(item_line.lstrip())
+                if item_stripped.startswith("- ") or item_stripped == "-":
+                    if item_indent is None:
+                        item_indent = indent
+                    elif indent != item_indent:
+                        raise _PolicyError(
+                            "SCHEMA_ERROR",
+                            f"profile {profile_path.name!r}: nested tools block sequence",
+                        )
+                    tools.append(_parse_tool_scalar(item_stripped[1:], profile_path))
+                elif indent > key_indent:
+                    raise _PolicyError(
+                        "SCHEMA_ERROR",
+                        f"profile {profile_path.name!r}: unsupported tools block structure",
+                    )
                 else:
                     break
             if tools:
@@ -406,9 +466,11 @@ def _run_checks(root: Path) -> None:
 
     # Step 1: Load and parse skill-effects.json with duplicate-key detection.
     effects_data = _load_effects_json(effects_path)
+    if not isinstance(effects_data, dict):
+        raise _PolicyError("SCHEMA_ERROR", "skill-effects.json must be a JSON object")
 
     # Step 2a: Validate version.
-    if effects_data.get("version") != 1:
+    if type(effects_data.get("version")) is not int or effects_data["version"] != 1:
         raise _PolicyError(
             "SCHEMA_ERROR",
             f"unsupported skill-effects.json version: {effects_data.get('version')!r}",
@@ -467,7 +529,35 @@ def _run_checks(root: Path) -> None:
                 "SCHEMA_ERROR",
                 f"role {role!r} entry in skill-effects.json must be a JSON object",
             )
-        allowed_effects = role_entry.get("allowed_effects", [])
+        if "allowed_effects" not in role_entry:
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"role {role!r} missing 'allowed_effects' in skill-effects.json",
+            )
+        allowed_effects = role_entry["allowed_effects"]
+        if not isinstance(allowed_effects, list):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"role {role!r} 'allowed_effects' must be a JSON array",
+            )
+        for effect in allowed_effects:
+            if not isinstance(effect, str) or effect not in _KNOWN_EFFECTS:
+                raise _PolicyError(
+                    "SCHEMA_ERROR",
+                    f"role {role!r} has invalid effect {effect!r} in 'allowed_effects'",
+                )
+        if "profile" in role_entry and (
+            not isinstance(role_entry["profile"], str) or not role_entry["profile"]
+        ):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"role {role!r} 'profile' must be a nonempty string",
+            )
+        if "optional" in role_entry and not isinstance(role_entry["optional"], bool):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"role {role!r} 'optional' must be a JSON boolean",
+            )
         non_read = [e for e in allowed_effects if e != "read"]
         if non_read:
             raise _PolicyError(
@@ -532,7 +622,7 @@ def _run_checks(root: Path) -> None:
                 "SCHEMA_ERROR",
                 f"role {role!r} entry in skill-effects.json must be a JSON object",
             )
-        allowed_effects: list = role_meta.get("allowed_effects", ["read"])
+        allowed_effects: list = role_meta["allowed_effects"]
 
         # Profile must not be a symlink.
         if profile_path.is_symlink():
