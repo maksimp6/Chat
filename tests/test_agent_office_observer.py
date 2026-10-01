@@ -179,7 +179,7 @@ def test_pr_maintainer_handoff_stalls_after_two_scheduled_observer_passes():
         {
             "event": "commented",
             "user": {"login": "maksimp6"},
-            "body": "@claude maintainer pass on exact head",
+            "body": "@claude-lite maintainer pass on exact head",
             "created_at": dispatch_at.isoformat(),
         },
     ]
@@ -191,11 +191,37 @@ def test_pr_maintainer_handoff_stalls_after_two_scheduled_observer_passes():
     assert "maintainer_stall" in kinds(detect_findings(stalled, second_pass))
 
 
+def test_role_only_claude_mention_is_not_executable_maintainer_dispatch():
+    timeline = [
+        review("copilot-pull-request-reviewer[bot]", 5),
+        comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        comment("maksimp6", "@claude maintainer pass on exact head", 3),
+    ]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+
+    assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.executable_dispatches == []
+    assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
+
+
+def test_claude_lite_mention_is_executable_maintainer_dispatch():
+    timeline = [
+        review("copilot-pull-request-reviewer[bot]", 5),
+        comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        comment("maksimp6", "@claude-lite maintainer pass on exact head", 3),
+    ]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+
+    assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
+
+
 def test_only_material_maintainer_status_completes_handoff():
     base = [
         review("copilot-pull-request-reviewer[bot]", 5),
         comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
-        comment("maksimp6", "@claude maintainer pass on exact head", 3),
+        comment("maksimp6", "@claude-lite maintainer pass on exact head", 3),
     ]
     acknowledged = build_thread(
         pr_item(),
@@ -448,6 +474,8 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
     assert result["threads"][0]["agent"] == "codex"
     assert result["threads"][0]["behind_by"] == 0
     assert result["threads"][0]["freshness"] == "current"
+    assert result["threads"][0]["dispatches"] == []
+    assert result["threads"][0]["executable_dispatches"] == []
     assert {f["kind"] for f in result["findings"]} == {"ci_failed", "no_codex_check"}
     assert result["tracking_issue"].endswith("/99")
     patch = next(call for call in fake.calls if call[0] == "PATCH")
