@@ -182,6 +182,7 @@ _EXECUTABLE_AGENT = {
 }
 _MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
 _EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+_CLAUDE_ACTION_RUN = re.compile(r"https://github\.com/[^)\s]+/actions/runs/\d+")
 
 
 def mentioned_agents(text: str | None) -> list[str]:
@@ -359,7 +360,11 @@ def build_thread(
             if "pull_request" in source and source.get("number") not in thread.linked_prs:
                 thread.linked_prs.append(source["number"])
         elif kind == "commented":
-            if event.agent in AGENTS and classify_login(event.actor) == event.agent:
+            if (
+                event.agent in AGENTS
+                and classify_login(event.actor) == event.agent
+                and _is_backend_acknowledgement(event.agent, raw.get("body"), kind)
+            ):
                 _acknowledge_backend_dispatch(thread, event.agent, event.at)
             _record_dispatch(
                 thread,
@@ -369,7 +374,11 @@ def build_thread(
                 author_association=raw.get("author_association"),
             )
         elif kind == "reviewed":
-            if event.agent in AGENTS and classify_login(event.actor) == event.agent:
+            if (
+                event.agent in AGENTS
+                and classify_login(event.actor) == event.agent
+                and _is_backend_acknowledgement(event.agent, raw.get("body"), kind)
+            ):
                 _acknowledge_backend_dispatch(thread, event.agent, event.at)
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
@@ -422,6 +431,13 @@ def _record_dispatch(
     for agent in executable_mentioned_agents(text):
         if agent != poster:
             thread.trigger_eligible_dispatches.append((agent, at, maintainer_intent))
+
+
+def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
+    """Require provider-specific evidence that a trigger reached the execution backend."""
+    if agent == "claude":
+        return kind == "commented" and bool(_CLAUDE_ACTION_RUN.search(body or ""))
+    return kind in {"commented", "reviewed"}
 
 
 def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
