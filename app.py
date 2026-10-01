@@ -50,6 +50,7 @@ from plugin_routes import plugin_bp
 from project_tree import project_tree_bp
 from voice_routes import voice_bp
 from observability_migrations import apply_observability_migrations
+from rag.routes import rag_bp
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
@@ -102,6 +103,7 @@ app.register_blueprint(environment_gateway_bp)
 app.register_blueprint(plugin_bp)
 app.register_blueprint(project_tree_bp)
 app.register_blueprint(voice_bp)
+app.register_blueprint(rag_bp)
 
 
 @app.errorhandler(Exception)
@@ -144,6 +146,8 @@ init_government_tables()
 ensure_government_department()
 init_environment_tables()
 apply_observability_migrations()
+from rag import init_rag_tables
+init_rag_tables()
 logger.info("[BOOT] hello: database initialization completed")
 
 
