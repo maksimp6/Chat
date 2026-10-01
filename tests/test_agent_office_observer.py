@@ -47,6 +47,7 @@ def pr_item(number=2, hours_ago=10):
 def pull(ref="claude/feature", draft=False, mergeable_state="clean", merged_at=None):
     return {
         "head": {"ref": ref, "sha": "abc"},
+        "base": {"ref": "master", "sha": "base"},
         "draft": draft,
         "mergeable_state": mergeable_state,
         "merged_at": merged_at,
@@ -297,6 +298,25 @@ def test_ready_pr_without_reviews_and_quiet_drafts():
     assert kinds(detect_findings(draft, NOW)) == ["stale"]
 
 
+def test_exact_behind_by_marks_green_ci_as_stale_immediately():
+    thread = build_thread(
+        pr_item(),
+        [
+            review("copilot-pull-request-reviewer[bot]", 5),
+            comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        ],
+        pull(),
+        [run("tests", "success")],
+        behind_by=3,
+    )
+    findings = detect_findings(thread, NOW)
+    assert kinds(findings) == ["branch_stale"]
+    assert "3 commit(s)" in findings[0].message
+    assert "зелёный CI" in findings[0].message
+    digest = render_digest([thread], findings, NOW, "o/r")
+    assert "freshness: behind 3" in digest
+
+
 def test_long_pending_checks_and_behind_base():
     thread = build_thread(
         pr_item(),
@@ -418,6 +438,7 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
             "GET /repos/o/r/issues/5/timeline": [review("Copilot", 2)],
             "GET /repos/o/r/pulls/5": pull(ref="codex/tests"),
             "GET /repos/o/r/commits/abc/check-runs": {"check_runs": [run("tests", "failure")]},
+            "GET /repos/o/r/compare/master...abc": {"behind_by": 0},
             "PATCH /repos/o/r/issues/99": {"html_url": "https://github.com/o/r/issues/99"},
         }
     )
@@ -425,6 +446,8 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
 
     assert [t["number"] for t in result["threads"]] == [5]
     assert result["threads"][0]["agent"] == "codex"
+    assert result["threads"][0]["behind_by"] == 0
+    assert result["threads"][0]["freshness"] == "current"
     assert {f["kind"] for f in result["findings"]} == {"ci_failed", "no_codex_check"}
     assert result["tracking_issue"].endswith("/99")
     patch = next(call for call in fake.calls if call[0] == "PATCH")
