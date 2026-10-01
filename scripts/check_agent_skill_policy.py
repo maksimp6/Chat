@@ -82,6 +82,25 @@ def _load_effects_json(path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# AST helpers for allowlist mutation detection
+# ---------------------------------------------------------------------------
+
+
+def _rooted_at_allowlist(node: ast.expr) -> bool:
+    """Return True if node is ROLE_SKILL_ALLOWLIST or a subscript/attribute chain rooted there.
+
+    Used to detect mutations in all expression contexts (direct, subscript, chained).
+    """
+    if isinstance(node, ast.Name):
+        return node.id == "ROLE_SKILL_ALLOWLIST"
+    if isinstance(node, ast.Subscript):
+        return _rooted_at_allowlist(node.value)
+    if isinstance(node, ast.Attribute):
+        return _rooted_at_allowlist(node.value)
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Registry allowlist reading via safe AST analysis
 # ---------------------------------------------------------------------------
 
@@ -108,14 +127,23 @@ def _read_allowlist(root: Path) -> dict:
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "ROLE_SKILL_ALLOWLIST":
                     assignments.append(node)
-                elif (
-                    isinstance(target, ast.Subscript)
-                    and isinstance(target.value, ast.Name)
-                    and target.value.id == "ROLE_SKILL_ALLOWLIST"
+                elif _rooted_at_allowlist(target) and not (
+                    isinstance(target, ast.Name) and target.id == "ROLE_SKILL_ALLOWLIST"
                 ):
+                    # Subscript or attribute assignment rooted at allowlist
                     raise _PolicyError(
                         "REGISTRY_ERROR",
-                        "ROLE_SKILL_ALLOWLIST has a dynamic subscript assignment",
+                        "ROLE_SKILL_ALLOWLIST has a dynamic subscript/attribute assignment",
+                    )
+            # Also reject if RHS is a mutating call rooted at ROLE_SKILL_ALLOWLIST
+            # (e.g. result = ROLE_SKILL_ALLOWLIST.update(...) or .pop(...))
+            if isinstance(node.value, ast.Call):
+                call = node.value
+                if isinstance(call.func, ast.Attribute) and _rooted_at_allowlist(call.func.value):
+                    raise _PolicyError(
+                        "REGISTRY_ERROR",
+                        f"ROLE_SKILL_ALLOWLIST has a mutating call in assignment RHS:"
+                        f" .{call.func.attr}()",
                     )
         elif isinstance(node, ast.AugAssign):
             if isinstance(node.target, ast.Name) and node.target.id == "ROLE_SKILL_ALLOWLIST":
@@ -123,13 +151,23 @@ def _read_allowlist(root: Path) -> dict:
                     "REGISTRY_ERROR",
                     "ROLE_SKILL_ALLOWLIST has an augmented assignment",
                 )
+            if _rooted_at_allowlist(node.target):
+                raise _PolicyError(
+                    "REGISTRY_ERROR",
+                    "ROLE_SKILL_ALLOWLIST has an augmented assignment on a derived target",
+                )
+        elif isinstance(node, ast.Delete):
+            for target in node.targets:
+                if _rooted_at_allowlist(target):
+                    raise _PolicyError(
+                        "REGISTRY_ERROR",
+                        "ROLE_SKILL_ALLOWLIST has a delete statement",
+                    )
         elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             call = node.value
-            if (
-                isinstance(call.func, ast.Attribute)
-                and isinstance(call.func.value, ast.Name)
-                and call.func.value.id == "ROLE_SKILL_ALLOWLIST"
-            ):
+            # Reject any standalone method call rooted at ROLE_SKILL_ALLOWLIST,
+            # including chained subscript access: ROLE_SKILL_ALLOWLIST['key'].add(...)
+            if isinstance(call.func, ast.Attribute) and _rooted_at_allowlist(call.func.value):
                 raise _PolicyError(
                     "REGISTRY_ERROR",
                     f"ROLE_SKILL_ALLOWLIST has a dynamic method call: .{call.func.attr}()",
@@ -257,7 +295,13 @@ def _parse_profile_tools(profile_path: Path) -> list:
             for j in range(i + 1, len(fm_lines)):
                 item_stripped = fm_lines[j].strip()
                 if item_stripped.startswith("- "):
-                    tools.append(item_stripped[2:].strip().strip("\"'"))
+                    raw = item_stripped[2:].strip()
+                    # Strip inline YAML comment (# outside quoted strings).
+                    # Tool names are simple identifiers; # never appears in them.
+                    comment_start = raw.find("#")
+                    if comment_start >= 0:
+                        raw = raw[:comment_start].strip()
+                    tools.append(raw.strip("\"'"))
                 elif item_stripped == "-":
                     continue
                 elif not item_stripped:
@@ -280,7 +324,50 @@ def _parse_profile_tools(profile_path: Path) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Per-skill check for a constrained role
+# Unified skill filesystem validator (used for all roles)
+# ---------------------------------------------------------------------------
+
+
+def _validate_skill_path_and_fs(root: Path, skill: str, role: str) -> None:
+    """Validate skill name safety and SKILL.md integrity for any role.
+
+    Checks: no absolute/traversal path, skill dir exists and is not a symlink,
+    SKILL.md exists and is not a symlink.  Order matters: symlink checks come
+    before is_file/is_dir so we never follow a symlink before rejecting it.
+    """
+    skill_path_obj = Path(skill)
+    if skill_path_obj.is_absolute() or ".." in skill_path_obj.parts:
+        raise _PolicyError(
+            "UNSAFE_PATH",
+            f"role {role!r}: skill name {skill!r} contains unsafe path components",
+        )
+    skills_root = root / ".agents" / "skills"
+    skill_dir = skills_root / skill
+    if skill_dir.is_symlink():
+        raise _PolicyError(
+            "UNSAFE_PATH",
+            f"role {role!r}: skill {skill!r} directory is a symlink",
+        )
+    if not skill_dir.is_dir():
+        raise _PolicyError(
+            "MISSING_FILE",
+            f"role {role!r}: skill {skill!r} directory not found on filesystem",
+        )
+    skill_md = skill_dir / "SKILL.md"
+    if skill_md.is_symlink():
+        raise _PolicyError(
+            "UNSAFE_PATH",
+            f"role {role!r}: skill {skill!r} SKILL.md is a symlink",
+        )
+    if not skill_md.is_file():
+        raise _PolicyError(
+            "MISSING_FILE",
+            f"role {role!r}: skill {skill!r} has no SKILL.md on filesystem",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Per-skill check for a constrained role (effects subset + filesystem)
 # ---------------------------------------------------------------------------
 
 
@@ -291,29 +378,12 @@ def _check_skill(
     allowed_effects: list,
     skills_data: dict,
 ) -> None:
-    skill_path_obj = Path(skill)
-    if skill_path_obj.is_absolute() or ".." in skill_path_obj.parts:
-        raise _PolicyError(
-            "UNSAFE_PATH",
-            f"role {role!r}: skill name {skill!r} contains unsafe path components",
-        )
     if skill not in skills_data:
         raise _PolicyError(
             "MISSING_CLASSIFICATION",
             f"role {role!r}: skill {skill!r} has no entry in skill-effects.json",
         )
-    skills_root = root / ".agents" / "skills"
-    skill_dir = skills_root / skill
-    if skill_dir.is_symlink():
-        raise _PolicyError(
-            "UNSAFE_PATH",
-            f"role {role!r}: skill {skill!r} directory is a symlink",
-        )
-    if not (skill_dir / "SKILL.md").is_file():
-        raise _PolicyError(
-            "MISSING_FILE",
-            f"role {role!r}: skill {skill!r} has no SKILL.md on filesystem",
-        )
+    _validate_skill_path_and_fs(root, skill, role)
     required = set(skills_data[skill]["required_effects"])
     allowed = set(allowed_effects)
     if not required.issubset(allowed):
@@ -352,14 +422,30 @@ def _run_checks(root: Path) -> None:
     if not isinstance(skills_data, dict):
         raise _PolicyError("SCHEMA_ERROR", "skill-effects.json missing or invalid 'skills' map")
 
-    # Step 2c: Validate effect names in skill classifications.
+    # Step 2c: Validate skill classification entries (type + required fields + known effects).
     for skill_name, skill_info in skills_data.items():
+        if not isinstance(skill_info, dict):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"skill {skill_name!r} entry in skill-effects.json must be a JSON object",
+            )
         if "required_effects" not in skill_info:
             raise _PolicyError(
                 "SCHEMA_ERROR",
                 f"skill {skill_name!r} missing 'required_effects' in skill-effects.json",
             )
+        if not isinstance(skill_info["required_effects"], list):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"skill {skill_name!r} 'required_effects' must be a JSON array, "
+                f"got {type(skill_info['required_effects']).__name__!r}",
+            )
         for eff in skill_info["required_effects"]:
+            if not isinstance(eff, str):
+                raise _PolicyError(
+                    "SCHEMA_ERROR",
+                    f"skill {skill_name!r} 'required_effects' contains non-string value: {eff!r}",
+                )
             if eff not in _KNOWN_EFFECTS:
                 raise _PolicyError(
                     "SCHEMA_ERROR",
@@ -375,7 +461,13 @@ def _run_checks(root: Path) -> None:
                     f"required constrained role {role!r} missing from skill-effects.json roles map",
                 )
             continue
-        allowed_effects = roles_data[role].get("allowed_effects", [])
+        role_entry = roles_data[role]
+        if not isinstance(role_entry, dict):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"role {role!r} entry in skill-effects.json must be a JSON object",
+            )
+        allowed_effects = role_entry.get("allowed_effects", [])
         non_read = [e for e in allowed_effects if e != "read"]
         if non_read:
             raise _PolicyError(
@@ -386,17 +478,12 @@ def _run_checks(root: Path) -> None:
     # Step 4: Read registry allowlist via safe AST analysis (no import/execution).
     allowlist = _read_allowlist(root)
 
-    # Step 4b: Validate skill name safety and classification for every allowlisted role.
-    # Skill-name safety (UNSAFE_PATH) and classification existence (MISSING_CLASSIFICATION)
-    # apply to all roles, not only the three constrained ones.
+    # Step 4b: Validate skill path safety, classification, and filesystem integrity
+    # for EVERY referenced skill in ALL allowlisted roles (not only constrained ones).
+    # Effects-subset and profile checks happen later (Step 5, constrained roles only).
     for role in sorted(allowlist):
         for skill in sorted(allowlist[role]):
-            skill_path_obj = Path(skill)
-            if skill_path_obj.is_absolute() or ".." in skill_path_obj.parts:
-                raise _PolicyError(
-                    "UNSAFE_PATH",
-                    f"role {role!r}: skill name {skill!r} contains unsafe path components",
-                )
+            _validate_skill_path_and_fs(root, skill, role)
             if skill not in skills_data:
                 raise _PolicyError(
                     "MISSING_CLASSIFICATION",
@@ -440,6 +527,11 @@ def _run_checks(root: Path) -> None:
             )
 
         role_meta = roles_data[role]
+        if not isinstance(role_meta, dict):
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"role {role!r} entry in skill-effects.json must be a JSON object",
+            )
         allowed_effects: list = role_meta.get("allowed_effects", ["read"])
 
         # Profile must not be a symlink.
