@@ -115,8 +115,10 @@ is intentionally dispatched. A handoff is complete only when it reaches a materi
 terminal/status transition: merged, a `BLOCKED:` comment (or changes-requested review)
 with evidence, or a `DEFERRED:` comment with the next trigger. Ordinary
 progress/acknowledgement comments and reactions such as 👀 are not completion. The
-Observer starts the `maintainer_stall` clock from executable-dispatch evidence, not from
-a role-only or documentary mention. Evidence/status comments must describe trigger
+Observer starts the `maintainer_stall` clock only when the dispatch contains both
+explicit **Maintainer** intent and executable-backend evidence; implementation or other
+Claude-Lite work on a PR is not a maintainer handoff. A role-only or documentary
+mention also does not start the clock. Evidence/status comments must describe trigger
 names without reproducing an active literal mention unless execution is intended.
 
 - Claude merges its own pull requests once CI is green on the current head and
