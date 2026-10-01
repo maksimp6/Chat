@@ -110,8 +110,10 @@ The role name, provider identity, and executable backend trigger are separate fa
 `@claude` is reserved for the Claude Partner Agent and must not be used as shorthand
 for the repository maintainer backend.
 
-A maintainer handoff is executable only after the configured repository backend trigger
-is intentionally dispatched. A handoff is complete only when it reaches a material
+A maintainer handoff becomes executable evidence only after the configured repository
+backend trigger is posted by an author association allowed by that workflow **and** the
+backend visibly acknowledges the dispatch. Trigger text alone is intent, not proof that
+execution started. A handoff is complete only when it reaches a material
 terminal/status transition: merged, a `BLOCKED:` comment (or changes-requested review)
 with evidence, or a `DEFERRED:` comment with the next trigger. Ordinary
 progress/acknowledgement comments and reactions such as 👀 are not completion. The
