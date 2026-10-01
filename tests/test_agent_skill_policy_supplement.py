@@ -10,8 +10,13 @@ controlled temporary repository fixtures.  Fixture helpers imported from
 test_agent_skill_policy_consistency without editing that file.
 No mock validators or checker logic in tests.
 
-[RED today]  — all 9 cases; current implementation exits 0 for all violations.
-             Become GREEN after Groups A-E implementation fixes.
+[RED today]  — 9 cases; becomes GREEN after Groups A-E implementation fixes.
+             Cases 1,3-9: current implementation exits 0 for all violations.
+             Case 2: corrected fixture (sentinel appended); current implementation
+             raises SCHEMA_ERROR (nonzero) but writes the sentinel — sentinel-absent
+             assertion fails.  At head 61341e0 the fixture prepended the sentinel
+             before from __future__, producing a SyntaxError (invalid fixture, not
+             behavioral RED).  This head corrects that; all 9 are now behavioral RED.
 
 Accepted primary test blob 7cbabde0e9240a2fbfd093324f89741227aeda67 unchanged.
 """
@@ -151,7 +156,7 @@ def test_gate_before_registry_import(tmp_path):
     marker_line = f"open({str(sentinel)!r}, 'w').close()  # import-time sentinel\n"
     reg = root / "agent_skills" / "registry.py"
     original = reg.read_text()
-    reg.write_text(marker_line + original)
+    reg.write_text(original + "\n" + marker_line)
 
     # Control: prove that importing the fixture registry.py writes the sentinel.
     # Uses a separate control root so the main fixture sentinel is not pre-written.
@@ -161,7 +166,7 @@ def test_gate_before_registry_import(tmp_path):
     shutil.copytree(str(root / "agent_skills"), str(ctl_root / "agent_skills"))
     ctl_reg = ctl_root / "agent_skills" / "registry.py"
     ctl_marker = f"open({str(ctl_sentinel)!r}, 'w').close()  # ctl sentinel\n"
-    ctl_reg.write_text(ctl_marker + original)
+    ctl_reg.write_text(original + "\n" + ctl_marker)
     ctl = subprocess.run(
         [
             sys.executable,

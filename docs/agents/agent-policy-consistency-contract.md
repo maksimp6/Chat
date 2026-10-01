@@ -205,8 +205,18 @@ the targeted policy-checker token before the checker runs.
 | 9 | — | public | Referenced skill unclassified in unconstrained role | `MISSING_CLASSIFICATION` |
 
 Case 9 is presented for independent contract amendment acceptance before implementation
-(original contract: "For each referenced skill require a classification").  All 9 cases
-are behaviorally RED at the current implementation head; no authority is expanded.
+(original contract: "For each referenced skill require a classification").  No authority
+is expanded.
+
+Execution history: at head 61341e0, 8 cases were behaviorally RED (cases 1,3-9 — current
+implementation exits 0) plus Case 2 was an invalid fixture RED (sentinel prepended before
+`from __future__` caused SyntaxError in control subprocess, not a behavioral failure).
+At the corrected head (sentinel appended): all 9 are behaviorally RED.  Cases 1,3-9 remain
+exit-0 violations; Case 2 raises SCHEMA_ERROR nonzero but the sentinel is written (gate
+runs after registry import), so the sentinel-absent assertion fails — correct behavioral RED.
+Fresh CI on corrected head expected: 9 failed, all supplemental cases.
+
+Current status: SOLUTION_CHANGES_REQUIRED; supplemental contract amendment acceptance pending.
 
 ## Measurement
 
