@@ -43,7 +43,7 @@ def claim_comment(*, key, source_comment_id=100, run_id=111, head=HEAD):
     return {
         "id": 900,
         "body": (
-            '<!-- alice-maintainer-dispatch-claim:'
+            "<!-- alice-maintainer-dispatch-claim:"
             '{"key":"%s","source_comment_id":%d,"run_id":%d,"head_sha":"%s","retry_of":null}'
             " -->"
         )
@@ -249,7 +249,9 @@ class FakeOpener:
         self.calls = []
 
     def __call__(self, request, timeout):
-        self.calls.append((request.get_method(), request.full_url, request.data, dict(request.headers)))
+        self.calls.append(
+            (request.get_method(), request.full_url, request.data, dict(request.headers))
+        )
         if request.full_url.endswith("/comments?page=2"):
             return FakeResponse([{"id": 2}])
         if request.full_url.endswith("/comments"):
