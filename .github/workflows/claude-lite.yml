@@ -50,7 +50,25 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Guard keyed dispatch idempotency
+        id: dispatch_guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_REPO: ${{ github.repository }}
+          DISPATCH_ISSUE_NUMBER: ${{ github.event.issue.number || 0 }}
+          DISPATCH_COMMENT_ID: ${{ github.event.comment.id || 0 }}
+          DISPATCH_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association || github.event.issue.author_association || '' }}
+          DISPATCH_BODY: ${{ github.event.comment.body || github.event.issue.body || github.event.issue.title || '' }}
+        run: python scripts/claude_dispatch_guard.py
+
+      - name: Record skipped keyed dispatch
+        if: steps.dispatch_guard.outputs.should_run != 'true'
+        run: |
+          echo "Claude dispatch skipped: ${{ steps.dispatch_guard.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Dispatch key: ${{ steps.dispatch_guard.outputs.dispatch_key }}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run Claude Code
+        if: steps.dispatch_guard.outputs.should_run == 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1.0.235
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
