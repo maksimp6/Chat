@@ -63,9 +63,12 @@ jobs:
 
       - name: Record skipped keyed dispatch
         if: steps.dispatch_guard.outputs.should_run != 'true'
+        env:
+          SKIP_REASON: ${{ steps.dispatch_guard.outputs.reason }}
+          DISPATCH_KEY: ${{ steps.dispatch_guard.outputs.dispatch_key }}
         run: |
-          echo "Claude dispatch skipped: ${{ steps.dispatch_guard.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Dispatch key: ${{ steps.dispatch_guard.outputs.dispatch_key }}" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Claude dispatch skipped: %s\n' "$SKIP_REASON" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Dispatch key: %s\n' "$DISPATCH_KEY" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run Claude Code
         if: steps.dispatch_guard.outputs.should_run == 'true'
