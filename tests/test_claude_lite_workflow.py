@@ -122,9 +122,9 @@ def test_claude_lite_guards_keyed_dispatches_before_paid_action():
 def test_maintainer_dispatch_policy_requires_exact_head_idempotency_key():
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     maintainer = agents.split("## Maintainer", 1)[1].split("## Architecture rules", 1)[0]
-    governance = (
-        ROOT / "docs" / "agents" / "process-observation-and-governance.md"
-    ).read_text(encoding="utf-8")
+    governance = (ROOT / "docs" / "agents" / "process-observation-and-governance.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "agent-dispatch:maintainer:<40-char-head-sha>" in maintainer
     assert "only the earliest trusted comment" in maintainer
