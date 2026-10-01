@@ -103,3 +103,22 @@ def test_documentary_trigger_guidance_avoids_accidental_execution():
 
     assert "without reproducing the\n  literal mention trigger" in agents
     assert "Issue\nand PR comments are themselves workflow input." in governance
+
+
+def test_claude_lite_runs_idempotency_guard_before_paid_model_step():
+    workflow = _workflow()
+
+    guard = "python -m agent_office.maintainer_dispatch_guard"
+    action = "uses: anthropics/claude-code-action@"
+    assert guard in workflow
+    assert workflow.index(guard) < workflow.index(action)
+    assert "id: maintainer_guard" in workflow
+    assert "steps.maintainer_guard.outputs.run_model == 'true'" in workflow
+    assert "GITHUB_TOKEN: ${{ github.token }}" in workflow
+
+
+def test_duplicate_maintainer_path_records_evidence_without_running_model():
+    workflow = _workflow()
+
+    assert "steps.maintainer_guard.outputs.run_model == 'false'" in workflow
+    assert "Maintainer handoff deduplicated before model execution" in workflow
