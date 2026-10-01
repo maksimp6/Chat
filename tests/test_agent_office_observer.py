@@ -301,8 +301,11 @@ def test_ready_pr_without_reviews_and_quiet_drafts():
 def test_exact_behind_by_marks_green_ci_as_stale_immediately():
     thread = build_thread(
         pr_item(),
-        [],
-        pull(draft=True),
+        [
+            review("copilot-pull-request-reviewer[bot]", 5),
+            comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        ],
+        pull(),
         [run("tests", "success")],
         behind_by=3,
     )
