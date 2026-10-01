@@ -210,9 +210,7 @@ def test_write_outputs(tmp_path):
     )
 
     assert output.read_text(encoding="utf-8") == (
-        "should_run=false\n"
-        "reason=duplicate_of_comment_1\n"
-        f"dispatch_key=maintainer:{HEAD}\n"
+        f"should_run=false\nreason=duplicate_of_comment_1\ndispatch_key=maintainer:{HEAD}\n"
     )
 
 
