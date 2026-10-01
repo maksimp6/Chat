@@ -95,6 +95,9 @@ class Thread:
     events: list[Event] = field(default_factory=list)
     draft: bool = False
     mergeable_state: str = ""
+    base_ref: str = ""
+    head_sha: str = ""
+    behind_by: int | None = None
     checks: dict[str, str] = field(default_factory=dict)
     checks_started_at: datetime | None = None
     linked_prs: list[int] = field(default_factory=list)
@@ -271,6 +274,7 @@ def build_thread(
     timeline: list[dict[str, Any]],
     pull: dict[str, Any] | None = None,
     check_runs: list[dict[str, Any]] | None = None,
+    behind_by: int | None = None,
 ) -> Thread:
     """Assemble the thread of one issue or pull request from GitHub data."""
     is_pr = pull is not None or "pull_request" in item
@@ -279,7 +283,8 @@ def build_thread(
     created_at = parse_time(item.get("created_at")) or datetime.now(UTC)
 
     if is_pr:
-        head_ref = ((pull or {}).get("head") or {}).get("ref")
+        head = (pull or {}).get("head") or {}
+        head_ref = head.get("ref")
         owner_agent = classify_branch(head_ref) or classify_actor(author, body)
         merged = bool(
             (pull or {}).get("merged_at") or (item.get("pull_request") or {}).get("merged_at")
@@ -299,6 +304,9 @@ def build_thread(
         created_at=created_at,
         draft=bool((pull or {}).get("draft") or item.get("draft")),
         mergeable_state=(pull or {}).get("mergeable_state") or "",
+        base_ref=str(((pull or {}).get("base") or {}).get("ref") or ""),
+        head_sha=str(((pull or {}).get("head") or {}).get("sha") or ""),
+        behind_by=behind_by,
     )
     thread.events.append(
         Event(
@@ -372,6 +380,13 @@ def _record_dispatch(thread: Thread, text: str | None, at: datetime, actor: str)
 
 # --------------------------------------------------------------------------
 # Finding stuck work
+
+
+def freshness_state(thread: Thread) -> str:
+    """Summarise exact PR-head freshness relative to its current base ref."""
+    if thread.kind != "pr" or thread.behind_by is None:
+        return "unknown"
+    return "current" if thread.behind_by == 0 else f"behind {thread.behind_by}"
 
 
 def checks_state(thread: Thread) -> str:
@@ -476,6 +491,18 @@ def detect_findings(
                     "maintainer handoff без merge, blocker/defer статуса или ответа Claude",
                 )
             )
+        if thread.behind_by is not None and thread.behind_by > 0:
+            stale_ci = state == "passed"
+            message = (
+                f"ветка отстаёт от {thread.base_ref or 'base'} на {thread.behind_by} commit(s); "
+                + (
+                    "зелёный CI относится к устаревшей базе и не является merge-evidence"
+                    if stale_ci
+                    else "нужна синхронизация до финального merge preflight"
+                )
+            )
+            found.append(finding("medium", "branch_stale", message))
+
         if state == "failed":
             failed = sorted(
                 name for name, value in thread.checks.items() if value in FAILED_CONCLUSIONS
@@ -500,14 +527,23 @@ def detect_findings(
                 state == "passed"
                 and _has_copilot_review(thread)
                 and thread.mergeable_state in {"clean", "unstable", "has_hooks", ""}
+                and not (thread.behind_by is not None and thread.behind_by > 0)
                 and idle > limits.merge_wait
             ):
                 found.append(
                     finding("medium", "ready_to_merge", "зелёный и отревьюенный, ждёт мержа")
                 )
-            elif thread.mergeable_state == "behind" and idle > limits.merge_wait:
+            elif (
+                thread.behind_by is None
+                and thread.mergeable_state == "behind"
+                and idle > limits.merge_wait
+            ):
                 found.append(
-                    finding("low", "behind_base", "отстал от master, нужно обновить ветку")
+                    finding(
+                        "low",
+                        "behind_base",
+                        "GitHub сообщает behind, но точный behind_by не получен",
+                    )
                 )
 
         if idle > limits.stale:
@@ -618,13 +654,14 @@ def render_digest(
         kind = "PR" if thread.kind == "pr" else "Задача"
         draft = " · черновик" if thread.draft else ""
         ci = "" if thread.kind == "issue" else f" · CI: {checks_state(thread)}"
+        freshness = "" if thread.kind == "issue" else f" · freshness: {freshness_state(thread)}"
         links = (
             f" · PR {', '.join(f'#{n}' for n in thread.linked_prs)}" if thread.linked_prs else ""
         )
         owner = AGENT_LABELS.get(thread.owner_agent, thread.owner_agent)
         lines.append(
             f"<details><summary>{icon} {kind} #{thread.number} {_escape(thread.title)} · "
-            f"{owner}{draft}{ci}{links}</summary>"
+            f"{owner}{draft}{ci}{freshness}{links}</summary>"
         )
         lines.append("")
         lines.append(f"[Открыть на GitHub]({thread.url})")
@@ -730,16 +767,24 @@ def collect_threads(
         timeline = gh.paginate(gh.repo_path(f"/issues/{number}/timeline?per_page=100"), limit=500)
         pull = None
         runs: list[dict[str, Any]] = []
+        behind_by: int | None = None
         if "pull_request" in item:
             pull = gh.get(gh.repo_path(f"/pulls/{number}"))
             if item.get("state") == "open":
                 sha = pull["head"]["sha"]
+                base_ref = pull["base"]["ref"]
                 runs = gh.paginate(
                     gh.repo_path(f"/commits/{sha}/check-runs?per_page=100"),
                     key="check_runs",
                     limit=300,
                 )
-        return build_thread(item, timeline, pull, runs)
+                compare = gh.get(
+                    gh.repo_path(
+                        f"/compare/{urllib.parse.quote(base_ref, safe='')}...{urllib.parse.quote(sha, safe='')}"
+                    )
+                )
+                behind_by = int(compare["behind_by"])
+        return build_thread(item, timeline, pull, runs, behind_by=behind_by)
 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="observer") as pool:
         return list(pool.map(load, items))
@@ -804,6 +849,10 @@ def run(
                 "state": t.state,
                 "agent": t.owner_agent,
                 "title": t.title,
+                "base_ref": t.base_ref or None,
+                "head_sha": t.head_sha or None,
+                "behind_by": t.behind_by,
+                "freshness": freshness_state(t) if t.kind == "pr" else None,
                 "events": [{**asdict(event), "at": event.at.isoformat()} for event in t.events],
             }
             for t in threads
