@@ -132,8 +132,7 @@ def _read_allowlist(root: Path) -> dict:
             ):
                 raise _PolicyError(
                     "REGISTRY_ERROR",
-                    f"ROLE_SKILL_ALLOWLIST has a dynamic method call: "
-                    f".{call.func.attr}()",
+                    f"ROLE_SKILL_ALLOWLIST has a dynamic method call: .{call.func.attr}()",
                 )
 
     if not assignments:
@@ -241,7 +240,7 @@ def _parse_profile_tools(profile_path: Path) -> list:
         stripped = line.strip()
         if not stripped.startswith("tools:"):
             continue
-        val = stripped[len("tools:"):].strip()
+        val = stripped[len("tools:") :].strip()
 
         if val.startswith("["):
             if not val.endswith("]"):
