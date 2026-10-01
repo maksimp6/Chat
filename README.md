@@ -63,8 +63,8 @@ Treat advanced agent runtimes, branch environments, per-user provider credential
 
 For the current validated development path:
 
-- Python 3.12 for backend CI-compatible development.
-- Java 17 for Android builds.
+- Python 3.14 for backend CI-compatible development.
+- JDK 25 to run Gradle for Android builds; the app continues to target and use the Java 17 toolchain.
 - Android SDK with API 37 installed for the current Android compile toolchain.
 - Git.
 - Optional: PostgreSQL 17 for shared deployments. Omit ALICE_DATABASE_URL for the default SQLite/Termux mode.

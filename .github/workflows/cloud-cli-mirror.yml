@@ -3,7 +3,7 @@ name: Publish Cloud.ru CLI mirror
 on:
   push:
     branches:
-      - chore/codex-toolchain-alignment
+      - master
     paths:
       - scripts/cache_cloud_cli.sh
       - scripts/install_cloud_cli.sh

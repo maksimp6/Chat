@@ -1,6 +1,7 @@
 import hashlib
-import os
+import platform
 from pathlib import Path
+import shutil
 import subprocess
 import tarfile
 
@@ -21,12 +22,19 @@ def _archive(path: Path, payload: bytes = b"#!/bin/sh\nexit 0\n") -> str:
 def test_installer_uses_verified_local_cache_without_network(tmp_path: Path) -> None:
     cache = tmp_path / "cache"
     cache.mkdir()
-    archive = cache / "cloud-cli-linux-amd64.tar.gz"
+    arch = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }[platform.machine().lower()]
+    installer_sha256 = {
+        "amd64": "642d8b33afb113ffb36bd6e87fc1faf5add65fd01dae316cbd3f65c9d1c508ed",
+        "arm64": "e7b977bb41616acdc474671c76835f9cb529238fe6f39c0953a53854c19b63c3",
+    }[arch]
+    archive = cache / f"cloud-cli-linux-{arch}.tar.gz"
     digest = _archive(archive)
-    script = INSTALLER.read_text().replace(
-        "642d8b33afb113ffb36bd6e87fc1faf5add65fd01dae316cbd3f65c9d1c508ed",
-        digest,
-    )
+    script = INSTALLER.read_text().replace(installer_sha256, digest)
     installer = tmp_path / "install.sh"
     installer.write_text(script)
     installer.chmod(0o755)
@@ -34,15 +42,30 @@ def test_installer_uses_verified_local_cache_without_network(tmp_path: Path) -> 
     fake_bin.mkdir()
     (fake_bin / "curl").write_text("#!/bin/sh\nexit 99\n")
     (fake_bin / "curl").chmod(0o755)
+    for tool in (
+        "bash",
+        "chmod",
+        "gzip",
+        "install",
+        "mkdir",
+        "mktemp",
+        "rm",
+        "sha256sum",
+        "tar",
+        "uname",
+    ):
+        resolved_tool = shutil.which(tool)
+        assert resolved_tool is not None
+        (fake_bin / tool).symlink_to(resolved_tool)
     install_dir = tmp_path / "installed"
 
     result = subprocess.run(
         [str(installer)],
         env={
-            **os.environ,
             "CLOUD_CLI_CACHE_DIR": str(cache),
             "CLOUD_CLI_INSTALL_DIR": str(install_dir),
-            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            "PATH": str(fake_bin),
+            "TMPDIR": str(tmp_path),
         },
         text=True,
         capture_output=True,
