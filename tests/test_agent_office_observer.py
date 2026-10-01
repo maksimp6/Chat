@@ -256,7 +256,7 @@ def test_untrusted_trigger_text_never_becomes_executable_dispatch():
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
-    assert thread.dispatches == []
+    assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
     assert thread.trigger_eligible_dispatches == []
     assert thread.executable_dispatches == []
     assert thread.maintainer_dispatches == []
