@@ -72,3 +72,34 @@ def test_claude_lite_concurrency_is_job_scoped_after_trigger_guard():
     assert "    concurrency:\n" in job_section
     assert "      group: claude-lite-" in job_section
     assert "      cancel-in-progress: false" in job_section
+
+
+def test_maintainer_policy_separates_role_from_executable_backend_trigger():
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    maintainer = agents.split("## Maintainer", 1)[1].split("## Architecture rules", 1)[0]
+    governance = (ROOT / "docs" / "agents" / "process-observation-and-governance.md").read_text(
+        encoding="utf-8"
+    )
+    observer_profile = (ROOT / ".github" / "agents" / "operations-observer.agent.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "maintainer is a **role**" in maintainer
+    assert "executable-backend evidence" in maintainer
+    assert "explicit **Maintainer** intent" in maintainer
+    assert "backend visibly acknowledges the dispatch" in maintainer
+    assert "Do not hard-code a merge method" in maintainer
+    assert "role-only Claude mention" in governance
+    assert "author association allowed by the repository workflow" in governance
+    assert "acknowledgement from that backend" in governance
+    assert "workflow envelopes with\nno accepted inner trigger" in observer_profile
+
+
+def test_documentary_trigger_guidance_avoids_accidental_execution():
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    governance = (ROOT / "docs" / "agents" / "process-observation-and-governance.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "without reproducing the\n  literal mention trigger" in agents
+    assert "Issue\nand PR comments are themselves workflow input." in governance

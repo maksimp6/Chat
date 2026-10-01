@@ -102,6 +102,9 @@ class Thread:
     checks_started_at: datetime | None = None
     linked_prs: list[int] = field(default_factory=list)
     dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    trigger_eligible_dispatches: list[tuple[str, datetime, bool]] = field(default_factory=list)
+    executable_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    maintainer_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
 
     @property
     def last_activity(self) -> datetime:
@@ -170,10 +173,27 @@ def classify_branch(ref: str | None) -> str | None:
 
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
+_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(claude-lite|codex|copilot|alice)\b", re.I)
+_EXECUTABLE_AGENT = {
+    "claude-lite": "claude",
+    "codex": "codex",
+    "copilot": "copilot",
+    "alice": "alice",
+}
+_MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
+_EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+_CLAUDE_ACTION_RUN = re.compile(r"https://github\.com/[^)\s]+/actions/runs/\d+")
 
 
 def mentioned_agents(text: str | None) -> list[str]:
     return sorted({match.lower() for match in _MENTION.findall(text or "")})
+
+
+def executable_mentioned_agents(text: str | None) -> list[str]:
+    """Return repository mention tokens that can actually start a configured backend."""
+    return sorted(
+        {_EXECUTABLE_AGENT[match.lower()] for match in _EXECUTABLE_MENTION.findall(text or "")}
+    )
 
 
 # --------------------------------------------------------------------------
@@ -318,7 +338,13 @@ def build_thread(
         )
     )
     if not is_pr:
-        _record_dispatch(thread, body, created_at, author)
+        _record_dispatch(
+            thread,
+            body,
+            created_at,
+            author,
+            author_association=item.get("author_association"),
+        )
         for assignee in item.get("assignees") or []:
             if classify_login(_login(assignee)) == "copilot":
                 thread.dispatches.append(("copilot", created_at))
@@ -334,7 +360,26 @@ def build_thread(
             if "pull_request" in source and source.get("number") not in thread.linked_prs:
                 thread.linked_prs.append(source["number"])
         elif kind == "commented":
-            _record_dispatch(thread, raw.get("body"), event.at, event.actor)
+            if (
+                event.agent in AGENTS
+                and classify_login(event.actor) == event.agent
+                and _is_backend_acknowledgement(event.agent, raw.get("body"), kind)
+            ):
+                _acknowledge_backend_dispatch(thread, event.agent, event.at)
+            _record_dispatch(
+                thread,
+                raw.get("body"),
+                event.at,
+                event.actor,
+                author_association=raw.get("author_association"),
+            )
+        elif kind == "reviewed":
+            if (
+                event.agent in AGENTS
+                and classify_login(event.actor) == event.agent
+                and _is_backend_acknowledgement(event.agent, raw.get("body"), kind)
+            ):
+                _acknowledge_backend_dispatch(thread, event.agent, event.at)
         elif not is_pr and kind == "assigned":
             if classify_login(_login(raw.get("assignee"))) == "copilot":
                 thread.dispatches.append(("copilot", event.at))
@@ -365,17 +410,55 @@ def build_thread(
     return thread
 
 
-def _record_dispatch(thread: Thread, text: str | None, at: datetime, actor: str) -> None:
-    """A task is handed to an agent when someone other than that agent's bot mentions it.
-
-    The maintainer dispatches with the owner's token, so a signed Claude comment
-    that says "@claude" or "@codex" still counts; only an agent's own bot account
-    quoting its name does not.
-    """
+def _record_dispatch(
+    thread: Thread,
+    text: str | None,
+    at: datetime,
+    actor: str,
+    *,
+    author_association: str | None = None,
+) -> None:
+    """Record mention intent separately from trigger eligibility and execution evidence."""
     poster = classify_login(actor)
     for agent in mentioned_agents(text):
         if agent != poster:
             thread.dispatches.append((agent, at))
+
+    if (author_association or "").upper() not in _EXECUTABLE_AUTHOR_ASSOCIATIONS:
+        return
+
+    maintainer_intent = bool(thread.kind == "pr" and _MAINTAINER_INTENT.search(text or ""))
+    for agent in executable_mentioned_agents(text):
+        if agent != poster:
+            thread.trigger_eligible_dispatches.append((agent, at, maintainer_intent))
+
+
+def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
+    """Require provider-specific evidence that a trigger reached the execution backend."""
+    if kind == "reviewed":
+        return True
+    if agent == "claude":
+        return kind == "commented" and bool(_CLAUDE_ACTION_RUN.search(body or ""))
+    return kind == "commented"
+
+
+def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
+    """Promote the latest eligible mention only after that backend visibly acknowledges it."""
+    already_executed = set(thread.executable_dispatches)
+    candidates = [
+        candidate
+        for candidate in thread.trigger_eligible_dispatches
+        if candidate[0] == agent
+        and candidate[1] <= at
+        and (candidate[0], candidate[1]) not in already_executed
+    ]
+    if not candidates:
+        return
+
+    target, dispatched_at, maintainer_intent = max(candidates, key=lambda item: item[1])
+    thread.executable_dispatches.append((target, dispatched_at))
+    if target == "claude" and maintainer_intent:
+        thread.maintainer_dispatches.append((target, dispatched_at))
 
 
 # --------------------------------------------------------------------------
@@ -420,10 +503,6 @@ def _has_codex_check(thread: Thread) -> bool:
         event.kind in {"reviewed", "commented"} and classify_login(event.actor) == "codex"
         for event in thread.events
     )
-
-
-def _latest_dispatch(thread: Thread, agent: str) -> datetime | None:
-    return max((at for target, at in thread.dispatches if target == agent), default=None)
 
 
 _MAINTAINER_STATUS = re.compile(
@@ -473,7 +552,10 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
-        maintainer_since = _latest_dispatch(thread, "claude")
+        maintainer_since = max(
+            (at for target, at in thread.maintainer_dispatches if target == "claude"),
+            default=None,
+        )
         if (
             maintainer_since is not None
             and _observer_passes_since(
@@ -853,6 +935,23 @@ def run(
                 "head_sha": t.head_sha or None,
                 "behind_by": t.behind_by,
                 "freshness": freshness_state(t) if t.kind == "pr" else None,
+                "dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.dispatches
+                ],
+                "trigger_eligible_dispatches": [
+                    {
+                        "agent": agent,
+                        "at": at.isoformat(),
+                        "maintainer_intent": maintainer_intent,
+                    }
+                    for agent, at, maintainer_intent in t.trigger_eligible_dispatches
+                ],
+                "executable_dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.executable_dispatches
+                ],
+                "maintainer_dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.maintainer_dispatches
+                ],
                 "events": [{**asdict(event), "at": event.at.isoformat()} for event in t.events],
             }
             for t in threads
