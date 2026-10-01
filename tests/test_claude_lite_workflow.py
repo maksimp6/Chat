@@ -85,7 +85,7 @@ def test_maintainer_policy_separates_role_from_executable_backend_trigger():
     )
 
     assert "maintainer is a **role**" in maintainer
-    assert "executable-dispatch evidence" in maintainer
+    assert "executable-backend evidence" in maintainer
     assert "explicit **Maintainer** intent" in maintainer
     assert "Do not hard-code a merge method" in maintainer
     assert "role-only Claude mention" in governance
