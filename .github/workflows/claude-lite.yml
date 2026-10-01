@@ -58,9 +58,11 @@ jobs:
 
       - name: Record deduplicated Maintainer handoff
         if: steps.maintainer_guard.outputs.run_model == 'false'
+        env:
+          DEDUPE_REASON: ${{ steps.maintainer_guard.outputs.reason }}
         run: |
           echo "Maintainer handoff deduplicated before model execution" >> "$GITHUB_STEP_SUMMARY"
-          echo "Reason: ${{ steps.maintainer_guard.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reason: $DEDUPE_REASON" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run Claude Code
         if: steps.maintainer_guard.outputs.run_model == 'true'
