@@ -77,12 +77,12 @@ def test_claude_lite_concurrency_is_job_scoped_after_trigger_guard():
 def test_maintainer_policy_separates_role_from_executable_backend_trigger():
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     maintainer = agents.split("## Maintainer", 1)[1].split("## Architecture rules", 1)[0]
-    governance = (
-        ROOT / "docs" / "agents" / "process-observation-and-governance.md"
-    ).read_text(encoding="utf-8")
-    observer_profile = (
-        ROOT / ".github" / "agents" / "operations-observer.agent.md"
-    ).read_text(encoding="utf-8")
+    governance = (ROOT / "docs" / "agents" / "process-observation-and-governance.md").read_text(
+        encoding="utf-8"
+    )
+    observer_profile = (ROOT / ".github" / "agents" / "operations-observer.agent.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "maintainer is a **role**" in maintainer
     assert "executable-dispatch evidence" in maintainer
