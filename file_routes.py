@@ -21,7 +21,13 @@ def get_client():
 
 def _err_response(e):
     code = getattr(e, "status_code", None) or (404 if "Not found" in str(e) else 500)
-    return jsonify({"error": str(e)}), code
+    logger.debug(f"[FILES] API error: {e}", exc_info=True)
+    if code == 404:
+        return jsonify({"error": "Not found"}), code
+    elif code == 400:
+        return jsonify({"error": "Invalid request"}), code
+    else:
+        return jsonify({"error": "Service error"}), 500
 
 
 @file_bp.route("/api/files", methods=["GET"])
@@ -72,8 +78,8 @@ def upload_file():
         logger.error(f"[FILES] Yandex API error: {e}")
         return _err_response(e)
     except Exception as e:
-        logger.error(f"[FILES] Internal upload error: {e}", exc_info=True)
-        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+        logger.error(f"[FILES] Internal upload error", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @file_bp.route("/api/files/<file_id>", methods=["DELETE"])
@@ -210,25 +216,33 @@ LOCAL_REPO_DIR = os.getenv("ALICE_LOCAL_REPO_DIR", "/sdcard/repo")
 def list_local_files():
     try:
         subpath = request.args.get("path", "").strip("/")
-        root_dir = os.path.abspath(LOCAL_REPO_DIR)
-        target_dir = os.path.abspath(os.path.join(root_dir, subpath))
+        root_dir = os.path.realpath(LOCAL_REPO_DIR)
+        target_path = os.path.join(root_dir, subpath)
+        target_dir = os.path.realpath(target_path)
         try:
             inside_root = os.path.commonpath([root_dir, target_dir]) == root_dir
         except ValueError:
             inside_root = False
         if not inside_root:
-            return jsonify({"error": "Недопустимый путь"}), 400
-        if not os.path.exists(target_dir):
-            return jsonify({"error": f"Папка не найдена: {target_dir}"}), 404
+            logger.warning(f"[FILES] Path traversal attempt detected for path: {subpath}")
+            return jsonify({"error": "Path not allowed"}), 403
+        if not os.path.isdir(target_dir):
+            logger.debug(f"[FILES] Directory not found for requested path")
+            return jsonify({"error": "Directory not found"}), 404
         items = []
         for entry in os.scandir(target_dir):
-            items.append(
-                {
-                    "name": entry.name,
-                    "is_dir": entry.is_dir(),
-                    "size": entry.stat().st_size if entry.is_file() else 0,
-                }
-            )
-        return jsonify({"success": True, "path": target_dir, "items": items})
+            try:
+                items.append(
+                    {
+                        "name": entry.name,
+                        "is_dir": entry.is_dir(),
+                        "size": entry.stat().st_size if entry.is_file() else 0,
+                    }
+                )
+            except (OSError, IOError) as stat_err:
+                logger.debug(f"[FILES] Could not stat entry: {entry.name}")
+                continue
+        return jsonify({"success": True, "items": items})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"[FILES] Error listing local files", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
