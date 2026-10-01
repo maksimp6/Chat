@@ -145,20 +145,26 @@ class CoordinatorHandoff:
         object.__setattr__(self, "payload", _freeze(clean_payload))
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "audience": self.audience,
             "recipient_role": self.recipient_role,
-            "owner_role": self.owner_role,
-            "stage": self.stage,
-            "backend": self.backend,
             "task_state": self.task_state,
-            "reasoning_tier": self.reasoning_tier,
-            "evidence_fingerprint": self.evidence_fingerprint,
-            "repository": self.repository,
-            "work_item": self.work_item,
-            "head_sha": self.head_sha,
             "payload": _thaw(self.payload),
         }
+        if self.audience != "user":
+            result.update(
+                {
+                    "owner_role": self.owner_role,
+                    "stage": self.stage,
+                    "backend": self.backend,
+                    "reasoning_tier": self.reasoning_tier,
+                    "evidence_fingerprint": self.evidence_fingerprint,
+                    "repository": self.repository,
+                    "work_item": self.work_item,
+                    "head_sha": self.head_sha,
+                }
+            )
+        return result
 
 
 def assert_reasoning_allowed(
@@ -177,10 +183,9 @@ def assert_reasoning_allowed(
         raise CoordinatorPolicyError(f"reasoning tier {tier} exceeds task budget {budget}")
 
     fingerprint = packet.cache_key()
-    if (
-        tier == "strong"
-        and previous_strong_evidence_fingerprint is not None
-        and _clean(previous_strong_evidence_fingerprint) == fingerprint
+    if tier == "strong" and (
+        previous_strong_evidence_fingerprint is None
+        or _clean(previous_strong_evidence_fingerprint) == fingerprint
     ):
         raise NoNewEvidenceError("strong reasoning rejected because no new evidence is available")
     return fingerprint

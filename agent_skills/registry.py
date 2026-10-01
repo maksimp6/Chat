@@ -42,7 +42,6 @@ ROLE_SKILL_ALLOWLIST = {
         "github-pr-readiness",
         "github-ci-diagnosis",
         "alice-runtime-debugging",
-        "docs-sync",
     },
     "backend-engineer": {
         "issue-to-pr",
