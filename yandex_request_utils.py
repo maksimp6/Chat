@@ -20,13 +20,34 @@ _BINARY_KEYS = frozenset(
     }
 )
 
+_SECRET_KEYS = frozenset(
+    {
+        "api_key",
+        "api-key",
+        "authorization",
+        "token",
+        "secret",
+        "password",
+        "apikey",
+        "access_token",
+        "refresh_token",
+        "private_key",
+        "auth_code",
+        "credentials",
+    }
+)
+
 
 def sanitize_for_log(obj):
     if isinstance(obj, dict):
         result = {}
         for k, v in obj.items():
             key_lower = k.lower() if isinstance(k, str) else str(k).lower()
-            if key_lower in _BINARY_KEYS and isinstance(v, str) and len(v) > 1000:
+
+            # Mask secret/credential fields
+            if key_lower in _SECRET_KEYS:
+                result[k] = "<CREDENTIALS MASKED>"
+            elif key_lower in _BINARY_KEYS and isinstance(v, str) and len(v) > 1000:
                 result[k] = f"<AUDIO/BINARY MASKED: {len(v)} chars>"
             else:
                 result[k] = sanitize_for_log(v)
