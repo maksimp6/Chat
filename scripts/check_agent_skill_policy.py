@@ -161,9 +161,7 @@ def _read_allowlist(root: Path) -> dict:
     result: dict = {}
     for role_key, skill_val in raw.items():
         if not isinstance(role_key, str):
-            raise _PolicyError(
-                "REGISTRY_ERROR", f"role key is not a string: {role_key!r}"
-            )
+            raise _PolicyError("REGISTRY_ERROR", f"role key is not a string: {role_key!r}")
         if not isinstance(skill_val, (set, frozenset)):
             raise _PolicyError(
                 "REGISTRY_ERROR",
@@ -220,7 +218,7 @@ def _parse_profile_tools(profile_path: Path) -> list:
             break
         stripped = line.strip()
         if stripped.startswith("tools:"):
-            val = stripped[len("tools:"):].strip()
+            val = stripped[len("tools:") :].strip()
             if val.startswith("[") and val.endswith("]"):
                 return [t.strip() for t in val[1:-1].split(",") if t.strip()]
     return []
@@ -289,13 +287,9 @@ def _run_checks(root: Path) -> None:
     roles_data = effects_data.get("roles")
     skills_data = effects_data.get("skills")
     if not isinstance(roles_data, dict):
-        raise _PolicyError(
-            "SCHEMA_ERROR", "skill-effects.json missing or invalid 'roles' map"
-        )
+        raise _PolicyError("SCHEMA_ERROR", "skill-effects.json missing or invalid 'roles' map")
     if not isinstance(skills_data, dict):
-        raise _PolicyError(
-            "SCHEMA_ERROR", "skill-effects.json missing or invalid 'skills' map"
-        )
+        raise _PolicyError("SCHEMA_ERROR", "skill-effects.json missing or invalid 'skills' map")
 
     # Step 2c: Validate effect names in skill classifications.
     for skill_name, skill_info in skills_data.items():
@@ -361,9 +355,7 @@ def _run_checks(root: Path) -> None:
 
         # Profile file must exist.
         if not profile_path.is_file():
-            raise _PolicyError(
-                "MISSING_FILE", f"role {role!r} profile not found: {profile_rel!r}"
-            )
+            raise _PolicyError("MISSING_FILE", f"role {role!r} profile not found: {profile_rel!r}")
 
         # Profile must not list mutation tools.
         tools = _parse_profile_tools(profile_path)
@@ -396,9 +388,7 @@ def main() -> int:
         help="Repository root (default: inferred from script location).",
     )
     args = parser.parse_args()
-    root = (
-        args.root if args.root is not None else Path(__file__).resolve().parents[1]
-    ).resolve()
+    root = (args.root if args.root is not None else Path(__file__).resolve().parents[1]).resolve()
 
     try:
         _run_checks(root)
