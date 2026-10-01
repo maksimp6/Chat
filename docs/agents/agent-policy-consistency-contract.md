@@ -124,6 +124,28 @@ Cover:
 Include a docs-sync mutation fixture even if a fixture catalog assertion also
 agrees with its selection; test agreement cannot disable the policy gate.
 
+### Diagnostic tokens
+
+The checker must emit exactly one stable class token per failure in stdout or stderr.
+A bounded diagnostic identifies role/skill/path and the failure class token; it does
+not dump file bodies. Tests assert `returncode != 0` AND at least one expected token
+in combined stdout+stderr — a generic crash that exits nonzero does not satisfy them.
+
+| Token | Failure class |
+| --- | --- |
+| `POLICY_VIOLATION` | Skill requires effects exceeding the role's `allowed_effects`; or a read-only role profile lists edit/write tools. |
+| `MISSING_CLASSIFICATION` | A skill referenced in a role allowlist has no entry in `skill-effects.json`. |
+| `SCHEMA_ERROR` | Invalid/unsupported `version`; unknown effect name; duplicate JSON keys; `allowed_effects` grants edit/deploy/merge/permissions on a constrained read-only role; or other `skill-effects.json` invariant violation. |
+| `UNSAFE_PATH` | A role profile path or skill directory is a symlink, contains `..`, or otherwise escapes the repository root. |
+| `REGISTRY_ERROR` | `ROLE_SKILL_ALLOWLIST` has a dynamic mutation (`dict["k"] = v`) or a second assignment after the literal definition. |
+| `ONE_SIDED_OPTIONAL` | An optional role is present on exactly one of registry or profile, but absent from the other. |
+| `MISSING_FILE` | A required file is absent: `skill-effects.json`, a constrained role profile, or a referenced skill's `SKILL.md`. |
+| `MISSING_ROLE_METADATA` | A role with a registry entry or profile is absent from the `roles` map in `skill-effects.json`. |
+
+Tokens are stable identifiers; the implementer may surround them with context prose.
+The `NOT_PRESENT` token must appear in output when an optional role is absent from
+both surfaces and the check passes.
+
 ## Contract impact map
 
 Before contract acceptance, record one compact map for each changed rule:
