@@ -254,7 +254,7 @@ def test_unconstrained_role_skill_dir_symlink_rejected(tmp_path):
     assert docs_sync_dir.is_dir(), "docs-sync skill directory missing from fixture"
 
     # Create a valid safe-target directory inside the fixture root.
-    safe_target = skills_root / "safe-target"
+    safe_target = root / "safe-target"
     shutil.copytree(str(docs_sync_dir), str(safe_target))
     assert (safe_target / "SKILL.md").exists(), "safe-target SKILL.md not created"
 
