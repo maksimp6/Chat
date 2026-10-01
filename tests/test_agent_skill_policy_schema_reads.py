@@ -99,7 +99,9 @@ def _run_standalone(tmp: Path) -> subprocess.CompletedProcess:
 # be rejected fail-closed rather than silently accepted as unknown tokens.
 # ---------------------------------------------------------------------------
 
-_NESTED_LIST_PROFILE = "---\nname: Nested-list\ntools: [[read], [edit]]\n---\nUnsupported nested list.\n"
+_NESTED_LIST_PROFILE = (
+    "---\nname: Nested-list\ntools: [[read], [edit]]\n---\nUnsupported nested list.\n"
+)
 
 
 # ===========================================================================
