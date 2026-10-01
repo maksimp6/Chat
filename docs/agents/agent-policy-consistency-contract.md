@@ -181,6 +181,33 @@ Process Governor owns policy/templates and nonprivileged validation scope, never
 application production code, self-approval or self-merge. Preserve existing
 protected-master, single-vendor-review and owner-approval boundaries.
 
+## Supplemental tests
+
+Independent solution review (SOLUTION_CHANGES_REQUIRED) confirmed five failure groups
+not covered by the accepted 23-case primary file.  Supplemental cases live in
+`tests/test_agent_skill_policy_supplement.py`; primary blob
+`7cbabde0e9240a2fbfd093324f89741227aeda67` unchanged.
+
+"public" = `tests/validate_skills.py`; "standalone" = `scripts/check_agent_skill_policy.py --root`.
+Standalone is used where `SkillRegistry.validate_all()` name validation would mask
+the targeted policy-checker token before the checker runs.
+
+| Case | Group | Entrypoint | Targeted violation | Required token |
+| --- | --- | --- | --- | --- |
+| 1 | A2 | public | Missing helper silently skipped (`if helper.exists()`) | `MISSING_FILE` |
+| 2 | A1 | public | Registry module imported before gate; version=99 sentinel proof | `SCHEMA_ERROR` + sentinel absent |
+| 3 | B | standalone | `ROLE_SKILL_ALLOWLIST.update(...)` method-call mutation | `REGISTRY_ERROR` |
+| 4 | C | public | Profile `tools: ["read","edit"]` quoted-array representation | `POLICY_VIOLATION` |
+| 5 | C | public | Profile `tools:` YAML block sequence containing edit | `POLICY_VIOLATION` |
+| 6 | D1 | public | Skill classification `{}` — no `required_effects` key | `SCHEMA_ERROR` |
+| 7 | D2 | public | Optional role present on both surfaces, absent from `roles` map | `MISSING_ROLE_METADATA` |
+| 8 | E | standalone | Skill name `../../outside` traversal in literal allowlist | `UNSAFE_PATH` |
+| 9 | — | public | Referenced skill unclassified in unconstrained role | `MISSING_CLASSIFICATION` |
+
+Case 9 is presented for independent contract amendment acceptance before implementation
+(original contract: "For each referenced skill require a classification").  All 9 cases
+are behaviorally RED at the current implementation head; no authority is expanded.
+
 ## Measurement
 
 Baseline incident: two test-contract inconsistencies and one stale prose claim
