@@ -115,9 +115,10 @@ Process Governor is for repeated or structural failures, not ordinary bug triage
 ### Maintainer handoff state
 
 The hourly Observer separates a role/provider mention from an **executable dispatch**.
-For maintainer-stall timing it uses only the configured repository backend trigger that
-can actually start the Maintainer execution path. A role-only Claude mention is retained
-as timeline context but does not start the stall clock. Completion is deliberately
+For maintainer-stall timing it requires both the configured repository backend trigger
+and explicit Maintainer intent. A Claude-Lite implementation task can execute without
+becoming a maintainer handoff. A role-only Claude mention is retained as timeline
+context but does not start the stall clock. Completion is deliberately
 narrow: the PR merges, Claude posts an explicit `BLOCKED:` or `DEFERRED:` status, or
 Claude submits a changes-requested review. Other comments, commits, labels, skipped
 workflow envelopes, and reactions do not suppress the stall.
