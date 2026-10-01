@@ -218,9 +218,7 @@ def test_claude_lite_mention_is_executable_maintainer_dispatch():
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
-    assert thread.trigger_eligible_dispatches == [
-        ("claude", NOW - timedelta(hours=3), True)
-    ]
+    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), True)]
     assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
     assert thread.maintainer_dispatches == [("claude", NOW - timedelta(hours=3))]
     assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
@@ -236,9 +234,7 @@ def test_executable_claude_implementation_dispatch_is_not_maintainer_handoff():
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
-    assert thread.trigger_eligible_dispatches == [
-        ("claude", NOW - timedelta(hours=3), False)
-    ]
+    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), False)]
     assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
     assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
@@ -269,9 +265,7 @@ def test_trusted_trigger_needs_backend_acknowledgement_before_execution_evidence
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
-    assert thread.trigger_eligible_dispatches == [
-        ("claude", NOW - timedelta(hours=3), True)
-    ]
+    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), True)]
     assert thread.executable_dispatches == []
     assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
