@@ -54,10 +54,11 @@ these conditions is supported by repository evidence:
    maintainer passes.
 6. **Replacement churn** — more than two replacement pull requests are opened for the
    same unchanged objective.
-7. **Maintainer stall** — a PR receives a `@claude` maintainer handoff but has no
-   merge, `BLOCKED:` / changes-requested status, or `DEFERRED:` status by the
-   second scheduled hourly Observer pass. Reactions and ordinary progress comments are
-   acknowledgements, not completion.
+7. **Maintainer stall** — a PR receives an intentional executable dispatch to the
+   configured repository backend for the Maintainer role but has no merge, `BLOCKED:` /
+   changes-requested status, or `DEFERRED:` status by the second scheduled hourly
+   Observer pass. Role-only/provider mentions, skipped workflow envelopes, reactions,
+   and ordinary progress comments are acknowledgements, not execution/completion.
 
 These signals trigger investigation. They do not prove fault, incompetence, or that a
 specific role should be replaced.
@@ -113,10 +114,20 @@ Process Governor is for repeated or structural failures, not ordinary bug triage
 
 ### Maintainer handoff state
 
-The hourly Observer tracks `@claude` mentions on pull requests as maintainer
-dispatches. Completion is deliberately narrow: the PR merges, Claude posts an explicit
-`BLOCKED:` or `DEFERRED:` status, or Claude submits a changes-requested review.
-Other comments, commits, labels, and reactions do not suppress the stall.
+The hourly Observer separates a role/provider mention from an **executable dispatch**.
+For maintainer-stall timing it requires explicit Maintainer intent, a trigger from an
+author association allowed by the repository workflow, and a later visible
+acknowledgement from that backend. Trigger text alone is only dispatch intent. A
+Claude-Lite implementation task can execute without becoming a maintainer handoff. A
+role-only Claude mention is retained as timeline
+context but does not start the stall clock. Completion is deliberately
+narrow: the PR merges, Claude posts an explicit `BLOCKED:` or `DEFERRED:` status, or
+Claude submits a changes-requested review. Other comments, commits, labels, skipped
+workflow envelopes, and reactions do not suppress the stall.
+
+When publishing evidence about dispatch behavior, describe the backend/trigger by name
+without reproducing an active literal mention token unless execution is intended. Issue
+and PR comments are themselves workflow input.
 
 Passes are counted against the Observer's scheduled minute (:17), not raw elapsed
 hours. This makes a handoff just after :17 escalate on the next two scheduled

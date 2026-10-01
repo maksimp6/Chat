@@ -21,12 +21,17 @@ issue/PR, participating roles, trigger, round/attempt count, exact evidence, cur
 blocker, and recommended escalation target. Keep secrets and raw credentials out of
 the record.
 
-Treat a `@claude` PR handoff as incomplete until the PR merges or Claude posts a
-machine-recognizable material status: `BLOCKED:`, `DEFERRED:`, or a
-changes-requested review. Ordinary comments, commits, labels, and reactions are
-acknowledgements/progress only. Report `maintainer_stall` on the second scheduled
-hourly Observer pass without a material outcome, without triggering another paid-model
-ping.
+Treat only a **trusted, backend-acknowledged dispatch that explicitly targets the
+Maintainer role** as the start of the maintainer-stall clock. Trigger text from an
+unauthorized author or a trusted trigger with no backend acknowledgement is not
+execution evidence. A normal Claude-Lite implementation task, role-only Claude mention,
+or documentary reference is also not maintainer execution evidence. The handoff remains
+incomplete until the PR merges or Claude
+posts a machine-recognizable material status: `BLOCKED:`, `DEFERRED:`, or a
+changes-requested review. Ordinary comments, commits, labels, workflow envelopes with
+no accepted inner trigger, and reactions are acknowledgements/progress only. Report
+`maintainer_stall` on the second scheduled hourly Observer pass without a material
+outcome, without triggering another paid-model ping.
 
 Send ordinary technical blockers back to Team Lead or the relevant specialist. Send
 repeated cross-role/process failures to Process Governor. Send decisions that require

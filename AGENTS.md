@@ -74,8 +74,11 @@ stops converging.
   mention the partner agent. Use **Claude Sonnet 4.6** for the normal strong
   path. Use it for architecture-heavy, ambiguous or multi-domain work.
 - `@claude-lite` is our repository GitHub Actions worker
-  (`.github/workflows/claude-lite.yml`): `claude-haiku-4-5`, maximum 10
-  turns. Use it for cheap, bounded maintenance tasks.
+  (`.github/workflows/claude-lite.yml`). Its current execution profile is
+  `claude-sonnet-4-6` with a maximum of 45 turns. Use this backend only when
+  repository execution is intentional. In evidence/status prose that must not
+  execute a workflow, write **Claude-Lite backend** without reproducing the
+  literal mention trigger.
 - `@codex` is the OpenAI GitHub Partner Agent. Routine Codex sessions should
   use **GPT-5.4 nano**; `.codex/config.toml` also sets nano/low defaults for
   repository Codex tooling.
@@ -101,16 +104,24 @@ merges, after green CI; agents never push to `master`.
 
 ## Maintainer
 
-The maintainer is Claude, working from the Alice Pro project on claude.ai. The
-owner (@maksimp6) does not merge by hand.
+The maintainer is a **role**, currently executed for repository PR handoffs through
+our Claude-Lite GitHub Actions backend. The owner (@maksimp6) does not merge by hand.
+The role name, provider identity, and executable backend trigger are separate facts:
+`@claude` is reserved for the Claude Partner Agent and must not be used as shorthand
+for the repository maintainer backend.
 
-A maintainer handoff is complete only when it reaches a material terminal/status
-transition: merged, a `BLOCKED:` comment (or changes-requested review) with evidence,
-or a `DEFERRED:` comment with the next trigger. Ordinary progress/acknowledgement
-comments and reactions such as 👀 are not completion. If a `@claude` maintainer
-handoff has no material outcome by the second scheduled hourly Observer pass, the
-Observer emits `maintainer_stall` for Process Governor instead of repeatedly pinging a
-paid model.
+A maintainer handoff becomes executable evidence only after the configured repository
+backend trigger is posted by an author association allowed by that workflow **and** the
+backend visibly acknowledges the dispatch. Trigger text alone is intent, not proof that
+execution started. A handoff is complete only when it reaches a material
+terminal/status transition: merged, a `BLOCKED:` comment (or changes-requested review)
+with evidence, or a `DEFERRED:` comment with the next trigger. Ordinary
+progress/acknowledgement comments and reactions such as 👀 are not completion. The
+Observer starts the `maintainer_stall` clock only when the dispatch contains both
+explicit **Maintainer** intent and executable-backend evidence; implementation or other
+Claude-Lite work on a PR is not a maintainer handoff. A role-only or documentary
+mention also does not start the clock. Evidence/status comments must describe trigger
+names without reproducing an active literal mention unless execution is intended.
 
 - Claude merges its own pull requests once CI is green on the current head and
   no review thread is open.
@@ -148,8 +159,11 @@ paid model.
 - Use protected auto-merge while required checks or branch-protection gates are
   still pending. If GitHub reports the pull request as already `clean` and
   refuses to enable auto-merge, merge only through the protected GitHub merge
-  API with the exact current head SHA. Never force-update, rewrite, or bypass
-  protection on `master`.
+  API with the exact current head SHA. Do not hard-code a merge method such as
+  `--merge`; use a currently allowed repository method (or let the API infer it),
+  and treat the actual merge endpoint result as authoritative if repository
+  metadata disagrees. Never force-update, rewrite, or bypass protection on
+  `master`.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
