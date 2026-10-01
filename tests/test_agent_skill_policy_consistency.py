@@ -626,10 +626,8 @@ def test_deterministic_output_no_writes(tmp_path):
     assert r1.stderr == r2.stderr, "stderr must be identical across runs"
 
     assert before == after_r1, (
-        "checker must not add, modify, or delete files on first run; "
-        f"delta: {after_r1 ^ before}"
+        f"checker must not add, modify, or delete files on first run; delta: {after_r1 ^ before}"
     )
     assert after_r1 == after_r2, (
-        "checker must not add, modify, or delete files on second run; "
-        f"delta: {after_r2 ^ after_r1}"
+        f"checker must not add, modify, or delete files on second run; delta: {after_r2 ^ after_r1}"
     )
