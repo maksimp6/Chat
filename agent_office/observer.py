@@ -102,6 +102,7 @@ class Thread:
     checks_started_at: datetime | None = None
     linked_prs: list[int] = field(default_factory=list)
     dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    executable_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
 
     @property
     def last_activity(self) -> datetime:
@@ -170,10 +171,26 @@ def classify_branch(ref: str | None) -> str | None:
 
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
+_EXECUTABLE_MENTION = re.compile(
+    r"(?<![\w/])@(claude-lite|codex|copilot|alice)\b", re.I
+)
+_EXECUTABLE_AGENT = {
+    "claude-lite": "claude",
+    "codex": "codex",
+    "copilot": "copilot",
+    "alice": "alice",
+}
 
 
 def mentioned_agents(text: str | None) -> list[str]:
     return sorted({match.lower() for match in _MENTION.findall(text or "")})
+
+
+def executable_mentioned_agents(text: str | None) -> list[str]:
+    """Return repository mention tokens that can actually start a configured backend."""
+    return sorted(
+        {_EXECUTABLE_AGENT[match.lower()] for match in _EXECUTABLE_MENTION.findall(text or "")}
+    )
 
 
 # --------------------------------------------------------------------------
@@ -376,6 +393,9 @@ def _record_dispatch(thread: Thread, text: str | None, at: datetime, actor: str)
     for agent in mentioned_agents(text):
         if agent != poster:
             thread.dispatches.append((agent, at))
+    for agent in executable_mentioned_agents(text):
+        if agent != poster:
+            thread.executable_dispatches.append((agent, at))
 
 
 # --------------------------------------------------------------------------
@@ -422,8 +442,9 @@ def _has_codex_check(thread: Thread) -> bool:
     )
 
 
-def _latest_dispatch(thread: Thread, agent: str) -> datetime | None:
-    return max((at for target, at in thread.dispatches if target == agent), default=None)
+def _latest_dispatch(thread: Thread, agent: str, *, executable: bool = False) -> datetime | None:
+    dispatches = thread.executable_dispatches if executable else thread.dispatches
+    return max((at for target, at in dispatches if target == agent), default=None)
 
 
 _MAINTAINER_STATUS = re.compile(
@@ -473,7 +494,7 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
-        maintainer_since = _latest_dispatch(thread, "claude")
+        maintainer_since = _latest_dispatch(thread, "claude", executable=True)
         if (
             maintainer_since is not None
             and _observer_passes_since(
@@ -853,6 +874,13 @@ def run(
                 "head_sha": t.head_sha or None,
                 "behind_by": t.behind_by,
                 "freshness": freshness_state(t) if t.kind == "pr" else None,
+                "dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.dispatches
+                ],
+                "executable_dispatches": [
+                    {"agent": agent, "at": at.isoformat()}
+                    for agent, at in t.executable_dispatches
+                ],
                 "events": [{**asdict(event), "at": event.at.isoformat()} for event in t.events],
             }
             for t in threads
