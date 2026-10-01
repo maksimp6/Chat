@@ -103,6 +103,7 @@ class Thread:
     linked_prs: list[int] = field(default_factory=list)
     dispatches: list[tuple[str, datetime]] = field(default_factory=list)
     executable_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
+    maintainer_dispatches: list[tuple[str, datetime]] = field(default_factory=list)
 
     @property
     def last_activity(self) -> datetime:
@@ -178,6 +179,7 @@ _EXECUTABLE_AGENT = {
     "copilot": "copilot",
     "alice": "alice",
 }
+_MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
 
 
 def mentioned_agents(text: str | None) -> list[str]:
@@ -391,9 +393,17 @@ def _record_dispatch(thread: Thread, text: str | None, at: datetime, actor: str)
     for agent in mentioned_agents(text):
         if agent != poster:
             thread.dispatches.append((agent, at))
-    for agent in executable_mentioned_agents(text):
+    executable_agents = executable_mentioned_agents(text)
+    for agent in executable_agents:
         if agent != poster:
             thread.executable_dispatches.append((agent, at))
+    if (
+        thread.kind == "pr"
+        and "claude" in executable_agents
+        and poster != "claude"
+        and _MAINTAINER_INTENT.search(text or "")
+    ):
+        thread.maintainer_dispatches.append(("claude", at))
 
 
 # --------------------------------------------------------------------------
@@ -492,7 +502,10 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
-        maintainer_since = _latest_dispatch(thread, "claude", executable=True)
+        maintainer_since = max(
+            (at for target, at in thread.maintainer_dispatches if target == "claude"),
+            default=None,
+        )
         if (
             maintainer_since is not None
             and _observer_passes_since(
@@ -877,6 +890,9 @@ def run(
                 ],
                 "executable_dispatches": [
                     {"agent": agent, "at": at.isoformat()} for agent, at in t.executable_dispatches
+                ],
+                "maintainer_dispatches": [
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.maintainer_dispatches
                 ],
                 "events": [{**asdict(event), "at": event.at.isoformat()} for event in t.events],
             }
