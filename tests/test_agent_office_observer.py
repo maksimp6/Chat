@@ -54,12 +54,13 @@ def pull(ref="claude/feature", draft=False, mergeable_state="clean", merged_at=N
     }
 
 
-def comment(login, body, hours_ago):
+def comment(login, body, hours_ago, association="OWNER"):
     return {
         "event": "commented",
         "user": {"login": login},
         "body": body,
         "created_at": ts(hours_ago),
+        "author_association": association,
     }
 
 
@@ -181,7 +182,9 @@ def test_pr_maintainer_handoff_stalls_after_two_scheduled_observer_passes():
             "user": {"login": "maksimp6"},
             "body": "@claude-lite maintainer pass on exact head",
             "created_at": dispatch_at.isoformat(),
+            "author_association": "OWNER",
         },
+        comment("claude[bot]", "Claude Code is working…", 0.5),
     ]
     stalled = build_thread(pr_item(), base_timeline, pull(), [run("tests", "success")])
 
@@ -210,10 +213,14 @@ def test_claude_lite_mention_is_executable_maintainer_dispatch():
         review("copilot-pull-request-reviewer[bot]", 5),
         comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
         comment("maksimp6", "@claude-lite maintainer pass on exact head", 3),
+        comment("claude[bot]", "Claude Code is working…", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.trigger_eligible_dispatches == [
+        ("claude", NOW - timedelta(hours=3), True)
+    ]
     assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
     assert thread.maintainer_dispatches == [("claude", NOW - timedelta(hours=3))]
     assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
@@ -224,11 +231,48 @@ def test_executable_claude_implementation_dispatch_is_not_maintainer_handoff():
         review("copilot-pull-request-reviewer[bot]", 5),
         comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
         comment("maksimp6", "@claude-lite fix the failing test", 3),
+        comment("claude[bot]", "Claude Code is working…", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.trigger_eligible_dispatches == [
+        ("claude", NOW - timedelta(hours=3), False)
+    ]
     assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.maintainer_dispatches == []
+    assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
+
+
+def test_untrusted_trigger_text_never_becomes_executable_dispatch():
+    timeline = [
+        comment(
+            "outside-user",
+            "@claude-lite maintainer pass on exact head",
+            3,
+            association="NONE",
+        ),
+        comment("claude[bot]", "Unrelated Claude comment", 2.5),
+    ]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+
+    assert thread.dispatches == []
+    assert thread.trigger_eligible_dispatches == []
+    assert thread.executable_dispatches == []
+    assert thread.maintainer_dispatches == []
+    assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
+
+
+def test_trusted_trigger_needs_backend_acknowledgement_before_execution_evidence():
+    timeline = [
+        comment("maksimp6", "@claude-lite maintainer pass on exact head", 3),
+    ]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+
+    assert thread.trigger_eligible_dispatches == [
+        ("claude", NOW - timedelta(hours=3), True)
+    ]
+    assert thread.executable_dispatches == []
     assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
 
@@ -491,6 +535,7 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
     assert result["threads"][0]["behind_by"] == 0
     assert result["threads"][0]["freshness"] == "current"
     assert result["threads"][0]["dispatches"] == []
+    assert result["threads"][0]["trigger_eligible_dispatches"] == []
     assert result["threads"][0]["executable_dispatches"] == []
     assert result["threads"][0]["maintainer_dispatches"] == []
     assert {f["kind"] for f in result["findings"]} == {"ci_failed", "no_codex_check"}
