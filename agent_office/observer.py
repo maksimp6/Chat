@@ -450,11 +450,6 @@ def _has_codex_check(thread: Thread) -> bool:
     )
 
 
-def _latest_dispatch(thread: Thread, agent: str, *, executable: bool = False) -> datetime | None:
-    dispatches = thread.executable_dispatches if executable else thread.dispatches
-    return max((at for target, at in dispatches if target == agent), default=None)
-
-
 _MAINTAINER_STATUS = re.compile(
     r"^\s*(?:BLOCKED|DEFERRED|ЗАБЛОКИРОВАНО|ОТЛОЖЕНО)\s*:",
     re.IGNORECASE,
