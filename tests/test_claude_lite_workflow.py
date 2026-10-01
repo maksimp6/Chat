@@ -93,9 +93,9 @@ def test_maintainer_policy_separates_role_from_executable_backend_trigger():
 
 def test_documentary_trigger_guidance_avoids_accidental_execution():
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    governance = (
-        ROOT / "docs" / "agents" / "process-observation-and-governance.md"
-    ).read_text(encoding="utf-8")
+    governance = (ROOT / "docs" / "agents" / "process-observation-and-governance.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "without reproducing the\n  literal mention trigger" in agents
     assert "Issue\nand PR comments are themselves workflow input." in governance
