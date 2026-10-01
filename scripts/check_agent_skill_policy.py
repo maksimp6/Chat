@@ -281,7 +281,7 @@ def _strip_tools_comment(value: str) -> str:
         if quote is not None:
             if char == quote:
                 quote = None
-        elif char in {"\"", "'"}:
+        elif char in {'"', "'"}:
             quote = char
         elif char == "#":
             return value[:i].strip()
@@ -291,7 +291,7 @@ def _strip_tools_comment(value: str) -> str:
 def _parse_tool_scalar(value: str, profile_path: Path) -> str:
     """Accept one plain identifier, optionally enclosed in matching quotes."""
     value = value.strip()
-    if value.startswith(("\"", "'")):
+    if value.startswith(('"', "'")):
         if len(value) < 2 or value[-1] != value[0]:
             raise _PolicyError(
                 "SCHEMA_ERROR",
