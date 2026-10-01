@@ -121,10 +121,10 @@ def _evidence(**overrides):
 # Skills that modify repository state.  Work Coordinator is read/search only.
 _MUTATION_SKILLS = frozenset(
     {
-        "docs-sync",          # edits documentation files
-        "issue-to-pr",        # creates / pushes pull requests
+        "docs-sync",  # edits documentation files
+        "issue-to-pr",  # creates / pushes pull requests
         "release-readiness",  # manages release artifacts
-        "cloudru-change",     # makes cloud infrastructure changes
+        "cloudru-change",  # makes cloud infrastructure changes
     }
 )
 
