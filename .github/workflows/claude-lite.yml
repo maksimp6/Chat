@@ -50,7 +50,20 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Guard duplicate Maintainer handoffs
+        id: maintainer_guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -m agent_office.maintainer_dispatch_guard
+
+      - name: Record deduplicated Maintainer handoff
+        if: steps.maintainer_guard.outputs.run_model == 'false'
+        run: |
+          echo "Maintainer handoff deduplicated before model execution" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reason: ${{ steps.maintainer_guard.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run Claude Code
+        if: steps.maintainer_guard.outputs.run_model == 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1.0.235
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
