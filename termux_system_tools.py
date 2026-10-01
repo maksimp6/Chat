@@ -27,7 +27,9 @@ def _run_termux_cmd(cmd: list, timeout: int = 15) -> dict:
         stderr = proc.stderr.strip()
 
         if proc.returncode != 0:
-            return {"success": False, "error": stderr or f"Код возврата {proc.returncode}"}
+            safe_stderr = stderr[:200] if stderr else f"Command failed with exit code {proc.returncode}"
+            logger.debug(f"[TERMUX] {binary} returned {proc.returncode}: {stderr[:100]}")
+            return {"success": False, "error": safe_stderr}
 
         if not stdout:
             return {"success": True, "output": "(успешно / вывод пуст)"}
@@ -38,10 +40,11 @@ def _run_termux_cmd(cmd: list, timeout: int = 15) -> dict:
             return {"success": True, "output": stdout}
 
     except subprocess.TimeoutExpired:
+        logger.warning(f"[TERMUX] {binary} timed out after {timeout} seconds")
         return {"success": False, "error": f"Превышено время ожидания ({timeout} сек)"}
     except Exception as e:
-        logger.exception(f"Ошибка вызова {binary}: {e}")
-        return {"success": False, "error": str(e)}
+        logger.error(f"[TERMUX] Unexpected error calling {binary}", exc_info=True)
+        return {"success": False, "error": "System error"}
 
 
 # --- 1. Питание и Сеть ---
