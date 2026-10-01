@@ -122,3 +122,6 @@ def test_duplicate_maintainer_path_records_evidence_without_running_model():
 
     assert "steps.maintainer_guard.outputs.run_model == 'false'" in workflow
     assert "Maintainer handoff deduplicated before model execution" in workflow
+    assert "DEDUPE_REASON: ${{ steps.maintainer_guard.outputs.reason }}" in workflow
+    assert 'echo "Reason: $DEDUPE_REASON"' in workflow
+    assert 'echo "Reason: ${{ steps.maintainer_guard.outputs.reason }}"' not in workflow
