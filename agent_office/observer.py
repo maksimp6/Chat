@@ -435,9 +435,11 @@ def _record_dispatch(
 
 def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
     """Require provider-specific evidence that a trigger reached the execution backend."""
+    if kind == "reviewed":
+        return True
     if agent == "claude":
         return kind == "commented" and bool(_CLAUDE_ACTION_RUN.search(body or ""))
-    return kind in {"commented", "reviewed"}
+    return kind == "commented"
 
 
 def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
