@@ -166,10 +166,7 @@ def test_gate_before_registry_import(tmp_path):
         [
             sys.executable,
             "-c",
-            (
-                f"import sys; sys.path.insert(0, {str(ctl_root)!r}); "
-                "import agent_skills.registry"
-            ),
+            (f"import sys; sys.path.insert(0, {str(ctl_root)!r}); import agent_skills.registry"),
         ],
         capture_output=True,
         text=True,
@@ -213,8 +210,7 @@ def test_allowlist_update_method_rejected(tmp_path):
     _write_effects(root, _EFFECTS)
     reg = root / "agent_skills" / "registry.py"
     reg.write_text(
-        reg.read_text()
-        + "\nROLE_SKILL_ALLOWLIST.update({'operations-observer': {'docs-sync'}})\n"
+        reg.read_text() + "\nROLE_SKILL_ALLOWLIST.update({'operations-observer': {'docs-sync'}})\n"
     )
     result = _run_standalone(root)
     _assert_diagnostic(result, _TOKEN_REGISTRY_ERROR)
