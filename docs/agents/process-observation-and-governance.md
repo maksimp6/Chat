@@ -129,6 +129,13 @@ When publishing evidence about dispatch behavior, describe the backend/trigger b
 without reproducing an active literal mention token unless execution is intended. Issue
 and PR comments are themselves workflow input.
 
+Maintainer execution is idempotent per exact PR head. Coordinators attach
+`<!-- agent-dispatch:maintainer:<40-char-head-sha> -->`; only the earliest trusted
+comment with that key may reach the paid backend. Later duplicates are recorded as
+skipped before model invocation. A same-head retry uses an explicit retry suffix only
+after terminal failure evidence. Editing a comment after its workflow event has queued
+is not treated as cancellation, because the event payload may already be immutable.
+
 Passes are counted against the Observer's scheduled minute (:17), not raw elapsed
 hours. This makes a handoff just after :17 escalate on the next two scheduled
 boundaries (:17 of the next two hours), rather than accidentally waiting for a third
