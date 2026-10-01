@@ -201,6 +201,7 @@ def test_role_only_claude_mention_is_not_executable_maintainer_dispatch():
 
     assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
     assert thread.executable_dispatches == []
+    assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
 
 
@@ -214,7 +215,22 @@ def test_claude_lite_mention_is_executable_maintainer_dispatch():
 
     assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
     assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.maintainer_dispatches == [("claude", NOW - timedelta(hours=3))]
     assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
+
+
+def test_executable_claude_implementation_dispatch_is_not_maintainer_handoff():
+    timeline = [
+        review("copilot-pull-request-reviewer[bot]", 5),
+        comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
+        comment("maksimp6", "@claude-lite fix the failing test", 3),
+    ]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+
+    assert thread.dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.executable_dispatches == [("claude", NOW - timedelta(hours=3))]
+    assert thread.maintainer_dispatches == []
+    assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
 
 
 def test_only_material_maintainer_status_completes_handoff():
@@ -476,6 +492,7 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
     assert result["threads"][0]["freshness"] == "current"
     assert result["threads"][0]["dispatches"] == []
     assert result["threads"][0]["executable_dispatches"] == []
+    assert result["threads"][0]["maintainer_dispatches"] == []
     assert {f["kind"] for f in result["findings"]} == {"ci_failed", "no_codex_check"}
     assert result["tracking_issue"].endswith("/99")
     patch = next(call for call in fake.calls if call[0] == "PATCH")
