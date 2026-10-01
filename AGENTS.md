@@ -113,7 +113,18 @@ for the repository maintainer backend.
 A maintainer handoff becomes executable evidence only after the configured repository
 backend trigger is posted by an author association allowed by that workflow **and** the
 backend visibly acknowledges the dispatch. Trigger text alone is intent, not proof that
-execution started. A handoff is complete only when it reaches a material
+execution started.
+
+Every Maintainer PR dispatch must also carry a non-executable idempotency marker keyed
+to the exact head:
+
+`<!-- agent-dispatch:maintainer:<40-char-head-sha> -->`
+
+For the same PR/head, only the earliest trusted comment with that marker may invoke the
+paid backend. Parallel coordinators must reuse the existing handoff rather than emit a
+second marker. A deliberate same-head retry requires a distinct suffix such as
+`:retry-2` and must be justified by terminal failure evidence; ordinary progress or
+queue delay is not a retry reason. A handoff is complete only when it reaches a material
 terminal/status transition: merged, a `BLOCKED:` comment (or changes-requested review)
 with evidence, or a `DEFERRED:` comment with the next trigger. Ordinary
 progress/acknowledgement comments and reactions such as 👀 are not completion. The
