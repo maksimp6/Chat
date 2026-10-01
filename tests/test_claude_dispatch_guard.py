@@ -168,9 +168,9 @@ def test_fetch_pr_head_and_comment_pagination():
         endpoint = command[-1]
         if endpoint == "repos/o/r/pulls/7":
             return completed({"head": {"sha": HEAD}})
-        if "page=1" in endpoint:
+        if endpoint.endswith("page=1"):
             return completed([comment(n, "x") for n in range(1, 101)])
-        if "page=2" in endpoint:
+        if endpoint.endswith("page=2"):
             return completed([comment(101, "x")])
         raise AssertionError(endpoint)
 
