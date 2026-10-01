@@ -87,9 +87,11 @@ def test_maintainer_policy_separates_role_from_executable_backend_trigger():
     assert "maintainer is a **role**" in maintainer
     assert "executable-backend evidence" in maintainer
     assert "explicit **Maintainer** intent" in maintainer
+    assert "backend visibly acknowledges the dispatch" in maintainer
     assert "Do not hard-code a merge method" in maintainer
     assert "role-only Claude mention" in governance
-    assert "requires both the configured repository backend trigger" in governance
+    assert "author association allowed by the repository workflow" in governance
+    assert "acknowledgement from that backend" in governance
     assert "workflow envelopes with\nno accepted inner trigger" in observer_profile
 
 
