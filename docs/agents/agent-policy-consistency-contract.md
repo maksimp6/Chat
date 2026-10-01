@@ -3,7 +3,9 @@
 Tracking: #685. Related: #604, #607, #663. Baseline: master
 9991b057e8c54e32e06738c23ca2d128b672bdb7.
 
-Status: proposed contract; implementation and independent acceptance pending.
+Status: contract accepted (head 9eab78b, test blob 7cbabde); implementation
+published to branch contract/685-agent-policy-consistency; CI and independent
+solution review pending before maintainer merge.
 The policy checker verifies declared configuration, not natural-language intent or
 runtime tool authorization. It does not grant capabilities.
 
