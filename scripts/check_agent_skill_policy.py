@@ -123,6 +123,18 @@ def _read_allowlist(root: Path) -> dict:
                     "REGISTRY_ERROR",
                     "ROLE_SKILL_ALLOWLIST has an augmented assignment",
                 )
+        elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            call = node.value
+            if (
+                isinstance(call.func, ast.Attribute)
+                and isinstance(call.func.value, ast.Name)
+                and call.func.value.id == "ROLE_SKILL_ALLOWLIST"
+            ):
+                raise _PolicyError(
+                    "REGISTRY_ERROR",
+                    f"ROLE_SKILL_ALLOWLIST has a dynamic method call: "
+                    f".{call.func.attr}()",
+                )
 
     if not assignments:
         raise _PolicyError("REGISTRY_ERROR", "ROLE_SKILL_ALLOWLIST not found in registry.py")
@@ -208,19 +220,63 @@ def _check_profile_path_safe(root: Path, profile_rel: str, role: str) -> Path:
 
 
 def _parse_profile_tools(profile_path: Path) -> list:
-    """Return tool names from the YAML frontmatter 'tools:' line, or []."""
+    """Return tool names from YAML frontmatter 'tools:'.
+
+    Handles inline unquoted arrays ([read, search]), inline quoted arrays
+    (["read","edit"]), and YAML block sequences (- item lines).
+    Unknown/unsupported formats fail closed with SCHEMA_ERROR.
+    Returns [] only when no 'tools:' key is present in the frontmatter.
+    """
     text = profile_path.read_text(encoding="utf-8")
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return []
+    fm_lines: list = []
     for line in lines[1:]:
         if line.strip() == "---":
             break
+        fm_lines.append(line)
+
+    for i, line in enumerate(fm_lines):
         stripped = line.strip()
-        if stripped.startswith("tools:"):
-            val = stripped[len("tools:") :].strip()
-            if val.startswith("[") and val.endswith("]"):
-                return [t.strip() for t in val[1:-1].split(",") if t.strip()]
+        if not stripped.startswith("tools:"):
+            continue
+        val = stripped[len("tools:"):].strip()
+
+        if val.startswith("["):
+            if not val.endswith("]"):
+                raise _PolicyError(
+                    "SCHEMA_ERROR",
+                    f"profile {profile_path.name!r}: malformed tools inline array: {val!r}",
+                )
+            inner = val[1:-1]
+            return [t.strip().strip("\"'") for t in inner.split(",") if t.strip()]
+
+        if val == "":
+            # YAML block sequence: collect "- item" lines that follow
+            tools: list = []
+            for j in range(i + 1, len(fm_lines)):
+                item_stripped = fm_lines[j].strip()
+                if item_stripped.startswith("- "):
+                    tools.append(item_stripped[2:].strip().strip("\"'"))
+                elif item_stripped == "-":
+                    continue
+                elif not item_stripped:
+                    continue
+                else:
+                    break
+            if tools:
+                return tools
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"profile {profile_path.name!r}: 'tools:' block sequence is empty or unreadable",
+            )
+
+        raise _PolicyError(
+            "SCHEMA_ERROR",
+            f"profile {profile_path.name!r}: unsupported 'tools:' value format: {val!r}",
+        )
+
     return []
 
 
@@ -236,6 +292,12 @@ def _check_skill(
     allowed_effects: list,
     skills_data: dict,
 ) -> None:
+    skill_path_obj = Path(skill)
+    if skill_path_obj.is_absolute() or ".." in skill_path_obj.parts:
+        raise _PolicyError(
+            "UNSAFE_PATH",
+            f"role {role!r}: skill name {skill!r} contains unsafe path components",
+        )
     if skill not in skills_data:
         raise _PolicyError(
             "MISSING_CLASSIFICATION",
@@ -253,7 +315,7 @@ def _check_skill(
             "MISSING_FILE",
             f"role {role!r}: skill {skill!r} has no SKILL.md on filesystem",
         )
-    required = set(skills_data[skill].get("required_effects", []))
+    required = set(skills_data[skill]["required_effects"])
     allowed = set(allowed_effects)
     if not required.issubset(allowed):
         excess = sorted(required - allowed)
@@ -293,7 +355,12 @@ def _run_checks(root: Path) -> None:
 
     # Step 2c: Validate effect names in skill classifications.
     for skill_name, skill_info in skills_data.items():
-        for eff in skill_info.get("required_effects", []):
+        if "required_effects" not in skill_info:
+            raise _PolicyError(
+                "SCHEMA_ERROR",
+                f"skill {skill_name!r} missing 'required_effects' in skill-effects.json",
+            )
+        for eff in skill_info["required_effects"]:
             if eff not in _KNOWN_EFFECTS:
                 raise _PolicyError(
                     "SCHEMA_ERROR",
@@ -320,13 +387,32 @@ def _run_checks(root: Path) -> None:
     # Step 4: Read registry allowlist via safe AST analysis (no import/execution).
     allowlist = _read_allowlist(root)
 
-    # Step 5: Per-constrained-role validation.
-    for role, is_optional in _CONSTRAINED_ROLES.items():
-        role_meta = roles_data.get(role, {})
-        profile_rel: str = role_meta.get("profile", f".github/agents/{role}.agent.md")
-        allowed_effects: list = role_meta.get("allowed_effects", ["read"])
+    # Step 4b: Validate skill name safety and classification for every allowlisted role.
+    # Skill-name safety (UNSAFE_PATH) and classification existence (MISSING_CLASSIFICATION)
+    # apply to all roles, not only the three constrained ones.
+    for role in sorted(allowlist):
+        for skill in sorted(allowlist[role]):
+            skill_path_obj = Path(skill)
+            if skill_path_obj.is_absolute() or ".." in skill_path_obj.parts:
+                raise _PolicyError(
+                    "UNSAFE_PATH",
+                    f"role {role!r}: skill name {skill!r} contains unsafe path components",
+                )
+            if skill not in skills_data:
+                raise _PolicyError(
+                    "MISSING_CLASSIFICATION",
+                    f"role {role!r}: skill {skill!r} has no entry in skill-effects.json",
+                )
 
-        # Validate profile path metadata for safety before any filesystem access.
+    # Step 5: Per-constrained-role validation (profile + effects subset checks).
+    for role, is_optional in _CONSTRAINED_ROLES.items():
+        # Determine profile path: use declared metadata if present, else default.
+        if role in roles_data:
+            profile_rel: str = roles_data[role].get("profile", f".github/agents/{role}.agent.md")
+        else:
+            profile_rel = f".github/agents/{role}.agent.md"
+
+        # Validate profile path for safety before any filesystem access.
         profile_path = _check_profile_path_safe(root, profile_rel, role)
 
         has_registry = role in allowlist
@@ -346,6 +432,16 @@ def _run_checks(root: Path) -> None:
                     f"optional role {role!r} present on {present_surface!r} only; "
                     f"both surfaces or neither are required",
                 )
+
+        # Role is on both surfaces (or required). Metadata must exist.
+        if role not in roles_data:
+            raise _PolicyError(
+                "MISSING_ROLE_METADATA",
+                f"role {role!r} present on surfaces but absent from skill-effects.json roles map",
+            )
+
+        role_meta = roles_data[role]
+        allowed_effects: list = role_meta.get("allowed_effects", ["read"])
 
         # Profile must not be a symlink.
         if profile_path.is_symlink():
