@@ -44,13 +44,13 @@ _POLICY_HELPER = _REPO / "scripts" / "check_agent_skill_policy.py"
 # Documented in docs/agents/agent-policy-consistency-contract.md §Diagnostic tokens.
 # ---------------------------------------------------------------------------
 
-_TOKEN_POLICY_VIOLATION  = "POLICY_VIOLATION"
-_TOKEN_MISSING_CLASS     = "MISSING_CLASSIFICATION"
-_TOKEN_SCHEMA_ERROR      = "SCHEMA_ERROR"
-_TOKEN_UNSAFE_PATH       = "UNSAFE_PATH"
-_TOKEN_REGISTRY_ERROR    = "REGISTRY_ERROR"
-_TOKEN_ONE_SIDED         = "ONE_SIDED_OPTIONAL"
-_TOKEN_MISSING_FILE      = "MISSING_FILE"
+_TOKEN_POLICY_VIOLATION = "POLICY_VIOLATION"
+_TOKEN_MISSING_CLASS = "MISSING_CLASSIFICATION"
+_TOKEN_SCHEMA_ERROR = "SCHEMA_ERROR"
+_TOKEN_UNSAFE_PATH = "UNSAFE_PATH"
+_TOKEN_REGISTRY_ERROR = "REGISTRY_ERROR"
+_TOKEN_ONE_SIDED = "ONE_SIDED_OPTIONAL"
+_TOKEN_MISSING_FILE = "MISSING_FILE"
 _TOKEN_MISSING_ROLE_META = "MISSING_ROLE_METADATA"
 
 # ---------------------------------------------------------------------------
@@ -191,20 +191,20 @@ _EFFECTS: dict = {
         },
     },
     "skills": {
-        "docs-sync":               {"required_effects": ["read", "edit"]},
-        "security-review":         {"required_effects": ["read"]},
-        "github-pr-readiness":     {"required_effects": ["read"]},
-        "github-ci-diagnosis":     {"required_effects": ["read"]},
-        "issue-to-pr":             {"required_effects": ["read", "edit"]},
+        "docs-sync": {"required_effects": ["read", "edit"]},
+        "security-review": {"required_effects": ["read"]},
+        "github-pr-readiness": {"required_effects": ["read"]},
+        "github-ci-diagnosis": {"required_effects": ["read"]},
+        "issue-to-pr": {"required_effects": ["read", "edit"]},
         "alice-runtime-debugging": {"required_effects": ["read", "edit"]},
-        "cloudru-change":          {"required_effects": ["read", "edit", "deploy"]},
-        "release-readiness":       {"required_effects": ["read"]},
+        "cloudru-change": {"required_effects": ["read", "edit", "deploy"]},
+        "release-readiness": {"required_effects": ["read"]},
     },
 }
 
 _READONLY_PROFILE = "---\nname: Read-only\ntools: [read, search]\n---\nRead-only role.\n"
-_EXECUTE_PROFILE  = "---\nname: Read-execute\ntools: [read, search, execute]\n---\nRead-mostly.\n"
-_EDIT_PROFILE     = "---\nname: Edit-write\ntools: [read, write, edit]\n---\nEdit role.\n"
+_EXECUTE_PROFILE = "---\nname: Read-execute\ntools: [read, search, execute]\n---\nRead-mostly.\n"
+_EDIT_PROFILE = "---\nname: Edit-write\ntools: [read, write, edit]\n---\nEdit role.\n"
 
 
 def _write_observer_and_reviewer(tmp: Path, profile: str = _READONLY_PROFILE) -> None:
@@ -599,9 +599,7 @@ def test_deterministic_output_no_writes(tmp_path):
         return frozenset(
             (p, p.read_bytes())
             for p in path.rglob("*")
-            if p.is_file()
-            and "__pycache__" not in p.parts
-            and p.suffix != ".pyc"
+            if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"
         )
 
     before = _snapshot(root)
@@ -616,10 +614,7 @@ def test_deterministic_output_no_writes(tmp_path):
     new_after_r1 = {p for p, _ in after_r1} - {p for p, _ in before}
     assert not new_after_r1, f"checker must not write files after first run; new: {new_after_r1}"
 
-    modified_after_r2 = {
-        p for p, c in after_r2
-        if (p, c) not in before and (p, c) not in after_r1
-    }
+    modified_after_r2 = {p for p, c in after_r2 if (p, c) not in before and (p, c) not in after_r1}
     assert not modified_after_r2, (
         f"checker must not modify files between runs; changed: {modified_after_r2}"
     )
