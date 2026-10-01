@@ -139,6 +139,32 @@ def test_untrusted_maintainer_comment_is_rejected_before_model():
     assert decision.reason == "untrusted_author"
 
 
+def test_maintainer_dispatch_requires_exact_head_sha():
+    with pytest.raises(ValueError, match="pull request head SHA is required"):
+        evaluate_maintainer_dispatch(
+            event("@claude-lite Act as Maintainer for this exact head."),
+            {"head": {}},
+            [],
+            repo=REPO,
+            run_id=127,
+        )
+
+
+def test_replayed_source_comment_is_duplicate():
+    key = build_idempotency_key(REPO, 696, HEAD)
+    decision = evaluate_maintainer_dispatch(
+        event("@claude-lite Act as Maintainer for this exact head.", comment_id=200),
+        pr(),
+        [claim_comment(key=key, source_comment_id=200, run_id=123)],
+        repo=REPO,
+        run_id=124,
+    )
+
+    assert decision.run_model is False
+    assert decision.reason == "duplicate"
+    assert decision.prior_run_id == 123
+
+
 def test_explicit_retry_after_failed_attempt_is_allowed_once():
     key = build_idempotency_key(REPO, 696, HEAD)
     comments = [
@@ -251,6 +277,8 @@ class FakeOpener:
         self.calls.append(
             (request.get_method(), request.full_url, request.data, dict(request.headers))
         )
+        if request.full_url.endswith("/pulls/696"):
+            return FakeResponse({"head": {"sha": HEAD}})
         if request.full_url.endswith("/comments?page=2"):
             return FakeResponse([{"id": 2}])
         if request.full_url.endswith("/comments"):
@@ -269,6 +297,7 @@ def test_github_client_paginates_and_posts_with_token():
     opener = FakeOpener()
     gh = GitHub("secret", REPO, opener=opener)
 
+    assert gh.get(gh.repo_path("/pulls/696")) == {"head": {"sha": HEAD}}
     assert gh.paginate(gh.repo_path("/issues/696/comments")) == [{"id": 1}, {"id": 2}]
     assert gh.post(gh.repo_path("/issues/696/comments/new"), {"body": "x"}) == {"id": 3}
     assert opener.calls[0][3]["Authorization"] == "Bearer secret"
