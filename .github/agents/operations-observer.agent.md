@@ -21,8 +21,9 @@ issue/PR, participating roles, trigger, round/attempt count, exact evidence, cur
 blocker, and recommended escalation target. Keep secrets and raw credentials out of
 the record.
 
-Treat only an **executable repository backend dispatch** for the Maintainer role as the
-start of the maintainer-stall clock. A role-only Claude mention or documentary reference
+Treat only an **executable repository backend dispatch that explicitly targets the
+Maintainer role** as the start of the maintainer-stall clock. A normal Claude-Lite
+implementation task, role-only Claude mention, or documentary reference
 is not execution evidence. The handoff remains incomplete until the PR merges or Claude
 posts a machine-recognizable material status: `BLOCKED:`, `DEFERRED:`, or a
 changes-requested review. Ordinary comments, commits, labels, workflow envelopes with
