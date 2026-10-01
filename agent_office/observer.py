@@ -171,9 +171,7 @@ def classify_branch(ref: str | None) -> str | None:
 
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
-_EXECUTABLE_MENTION = re.compile(
-    r"(?<![\w/])@(claude-lite|codex|copilot|alice)\b", re.I
-)
+_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(claude-lite|codex|copilot|alice)\b", re.I)
 _EXECUTABLE_AGENT = {
     "claude-lite": "claude",
     "codex": "codex",
@@ -878,8 +876,7 @@ def run(
                     {"agent": agent, "at": at.isoformat()} for agent, at in t.dispatches
                 ],
                 "executable_dispatches": [
-                    {"agent": agent, "at": at.isoformat()}
-                    for agent, at in t.executable_dispatches
+                    {"agent": agent, "at": at.isoformat()} for agent, at in t.executable_dispatches
                 ],
                 "events": [{**asdict(event), "at": event.at.isoformat()} for event in t.events],
             }
