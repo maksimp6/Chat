@@ -208,30 +208,32 @@ def test_strong_reasoning_guard_fails_closed_without_prior_fingerprint():
     voluntarily supplying `previous_strong_evidence_fingerprint`; omitting it
     (passing None, the default) silently skips the unchanged-evidence check.
 
-    A compliant implementation must reject or require explicit first-call state
-    so that callers cannot bypass the guard by omitting the parameter.
+    A compliant implementation must treat omitted/None history as UNKNOWN, not as
+    an established first call.  A stateless helper cannot infer prior use from the
+    absence of a parameter; unknown history must fail closed on every observed call.
+
+    OPEN: genuine first-use authorization requires a separately agreed trusted-history
+    design (e.g. an explicit first-call sentinel derived from ExecutionTrace /
+    TaskPacket.usage, not a process-global counter or wildcard string).  That design
+    is not implemented here.
 
     Test contract:
-    - First call with no prior fingerprint may succeed (true first call).
-    - Second call on the same packet with no prior fingerprint must raise
-      NoNewEvidenceError, because the task-context fingerprint is unchanged.
+    - Both calls with omitted prior fingerprint must raise NoNewEvidenceError.
+    - Omitted/None history == unknown; unknown rejects even on the first observed call.
 
-    Expected RED: the second call currently succeeds.
+    Expected RED: both calls currently succeed (guard bypassed).
     """
     packet = _packet(budget="strong")
 
-    # First call — may succeed; establishes the fingerprint.
-    assert_reasoning_allowed(packet, requested_tier="strong")
-
-    # Second call on the SAME packet with prior fingerprint still omitted.
-    # Policy intent: must fail closed — no new evidence, no new reasoning.
-    # Current behavior: succeeds (guard bypassed) → RED.
-    with pytest.raises(NoNewEvidenceError, match="no new evidence"):
-        assert_reasoning_allowed(
-            packet,
-            requested_tier="strong",
-            # previous_strong_evidence_fingerprint intentionally omitted (None)
-        )
+    # Both calls with prior fingerprint omitted must be rejected.
+    # Unknown history is not an implicit free pass for the first observed call.
+    for _ in range(2):
+        with pytest.raises(NoNewEvidenceError, match="no new evidence"):
+            assert_reasoning_allowed(
+                packet,
+                requested_tier="strong",
+                # previous_strong_evidence_fingerprint intentionally omitted (None)
+            )
 
 
 def test_strong_reasoning_guard_treats_none_fingerprint_as_unknown_not_first_call():
