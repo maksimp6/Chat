@@ -241,7 +241,6 @@ def test_work_coordinator_docs_sync_legacy_catalog_cannot_disable_gate(tmp_path)
     _write_profile(root, "work-coordinator.agent.md", _READONLY_PROFILE)
     _write_observer_and_reviewer(root)
     effects = copy.deepcopy(_EFFECTS)
-    effects["_legacy_note"] = "work-coordinator may use docs-sync"
     _write_effects(root, effects)
 
     # Step 1: prove the real SkillRegistry.catalog returns docs-sync for work-coordinator.
@@ -575,11 +574,18 @@ def test_duplicate_json_keys_in_effects_fails(tmp_path):
     _write_observer_and_reviewer(root)
     dst = root / "docs" / "agents"
     dst.mkdir(parents=True, exist_ok=True)
-    (dst / "skill-effects.json").write_text(
-        '{"version": 1, "roles": {}, "skills": {'
-        '"security-review": {"required_effects": ["read"]}, '
-        '"security-review": {"required_effects": ["edit"]}}}'
+    # Build a complete valid JSON from _EFFECTS, then inject one duplicate skill key.
+    # json.dumps deduplicates; we inject manually so both values are independently valid.
+    base_json = json.dumps(_EFFECTS)
+    # base_json ends with }} (skills-close + root-close); insert duplicate before them.
+    assert base_json.endswith("}}"), "_EFFECTS JSON must end with }} (skills-close + root-close)"
+    duplicate_entry = ', "security-review": {"required_effects": ["read"]}'
+    injected_json = base_json[:-2] + duplicate_entry + "}}"
+    # Confirm the key appears exactly twice (original + injected); both values are ["read"].
+    assert injected_json.count('"security-review"') == 2, (
+        "expected exactly 2 occurrences of duplicate key in injected JSON"
     )
+    (dst / "skill-effects.json").write_text(injected_json)
     result = _run(root)
     _assert_diagnostic(result, _TOKEN_SCHEMA_ERROR)
 
@@ -608,13 +614,22 @@ def test_deterministic_output_no_writes(tmp_path):
     r2 = _run(root)
     after_r2 = _snapshot(root)
 
-    assert r1.returncode == r2.returncode, "exit code must be deterministic across runs"
+    assert r1.returncode == 0, (
+        f"valid fixture must exit 0 on first run; got {r1.returncode}.\n"
+        f"stdout={r1.stdout}\nstderr={r1.stderr}"
+    )
+    assert r2.returncode == 0, (
+        f"valid fixture must exit 0 on second run; got {r2.returncode}.\n"
+        f"stdout={r2.stdout}\nstderr={r2.stderr}"
+    )
     assert r1.stdout == r2.stdout, "stdout must be identical across runs"
+    assert r1.stderr == r2.stderr, "stderr must be identical across runs"
 
-    new_after_r1 = {p for p, _ in after_r1} - {p for p, _ in before}
-    assert not new_after_r1, f"checker must not write files after first run; new: {new_after_r1}"
-
-    modified_after_r2 = {p for p, c in after_r2 if (p, c) not in before and (p, c) not in after_r1}
-    assert not modified_after_r2, (
-        f"checker must not modify files between runs; changed: {modified_after_r2}"
+    assert before == after_r1, (
+        "checker must not add, modify, or delete files on first run; "
+        f"delta: {after_r1 ^ before}"
+    )
+    assert after_r1 == after_r2, (
+        "checker must not add, modify, or delete files on second run; "
+        f"delta: {after_r2 ^ after_r1}"
     )
