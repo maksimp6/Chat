@@ -103,3 +103,31 @@ def test_documentary_trigger_guidance_avoids_accidental_execution():
 
     assert "without reproducing the\n  literal mention trigger" in agents
     assert "Issue\nand PR comments are themselves workflow input." in governance
+
+
+def test_claude_lite_guards_keyed_dispatches_before_paid_action():
+    workflow = _workflow()
+    guard_pos = workflow.index("Guard keyed dispatch idempotency")
+    action_pos = workflow.index("Run Claude Code")
+
+    assert guard_pos < action_pos
+    assert "id: dispatch_guard" in workflow
+    assert "python scripts/claude_dispatch_guard.py" in workflow
+    assert "GH_TOKEN: ${{ github.token }}" in workflow
+    assert "DISPATCH_COMMENT_ID:" in workflow
+    assert "Record skipped keyed dispatch" in workflow
+    assert "if: steps.dispatch_guard.outputs.should_run == 'true'" in workflow
+
+
+def test_maintainer_dispatch_policy_requires_exact_head_idempotency_key():
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    maintainer = agents.split("## Maintainer", 1)[1].split("## Architecture rules", 1)[0]
+    governance = (
+        ROOT / "docs" / "agents" / "process-observation-and-governance.md"
+    ).read_text(encoding="utf-8")
+
+    assert "agent-dispatch:maintainer:<40-char-head-sha>" in maintainer
+    assert "only the earliest trusted comment" in maintainer
+    assert ":retry-2" in maintainer
+    assert "Maintainer execution is idempotent per exact PR head" in governance
+    assert "Editing a comment after its workflow event has queued" in governance
