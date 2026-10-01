@@ -158,8 +158,7 @@ def test_allowlist_pop_in_assign_rejected(tmp_path):
     _write_effects(root, _EFFECTS)
     reg = root / "agent_skills" / "registry.py"
     reg.write_text(
-        reg.read_text()
-        + "\nremoved = ROLE_SKILL_ALLOWLIST.pop('operations-observer')\n"
+        reg.read_text() + "\nremoved = ROLE_SKILL_ALLOWLIST.pop('operations-observer')\n"
     )
     result = _run_standalone(root)
     _assert_diagnostic(result, _TOKEN_REGISTRY_ERROR)
@@ -189,8 +188,7 @@ def test_allowlist_chained_subscript_add_rejected(tmp_path):
     _write_effects(root, _EFFECTS)
     reg = root / "agent_skills" / "registry.py"
     reg.write_text(
-        reg.read_text()
-        + "\nROLE_SKILL_ALLOWLIST['operations-observer'].add('docs-sync')\n"
+        reg.read_text() + "\nROLE_SKILL_ALLOWLIST['operations-observer'].add('docs-sync')\n"
     )
     result = _run_standalone(root)
     _assert_diagnostic(result, _TOKEN_REGISTRY_ERROR)
