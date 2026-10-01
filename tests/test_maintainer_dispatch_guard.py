@@ -182,7 +182,6 @@ def test_retry_without_failed_or_blocked_prior_attempt_is_suppressed():
     assert decision.reason == "retry_not_eligible"
 
 
-
 def test_machine_readable_comments_do_not_reproduce_executable_trigger():
     first = GuardDecision(
         True,
