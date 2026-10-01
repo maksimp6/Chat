@@ -284,7 +284,6 @@ def build_thread(
 
     if is_pr:
         head = (pull or {}).get("head") or {}
-        base = (pull or {}).get("base") or {}
         head_ref = head.get("ref")
         owner_agent = classify_branch(head_ref) or classify_actor(author, body)
         merged = bool(
@@ -496,7 +495,11 @@ def detect_findings(
             stale_ci = state == "passed"
             message = (
                 f"ветка отстаёт от {thread.base_ref or 'base'} на {thread.behind_by} commit(s); "
-                + ("зелёный CI относится к устаревшей базе и не является merge-evidence" if stale_ci else "нужна синхронизация до финального merge preflight")
+                + (
+                    "зелёный CI относится к устаревшей базе и не является merge-evidence"
+                    if stale_ci
+                    else "нужна синхронизация до финального merge preflight"
+                )
             )
             found.append(finding("medium", "branch_stale", message))
 
@@ -524,6 +527,7 @@ def detect_findings(
                 state == "passed"
                 and _has_copilot_review(thread)
                 and thread.mergeable_state in {"clean", "unstable", "has_hooks", ""}
+                and not (thread.behind_by is not None and thread.behind_by > 0)
                 and idle > limits.merge_wait
             ):
                 found.append(
