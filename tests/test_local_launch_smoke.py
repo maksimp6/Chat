@@ -106,6 +106,7 @@ def test_trace_persistence_checks_invocation_and_trace_correlation():
         _Response(
             200,
             {
+                "schema_version": 1,
                 "trace_id": "trace-1",
                 "context": {
                     "invocation_id": "inv-1",
@@ -181,3 +182,40 @@ def test_offline_mode_does_not_require_complete_provider_pair(monkeypatch):
 
     assert args.offline is True
     assert smoke._provider_inputs() == ("partial-secret", "")
+
+
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        (
+            {"trace_id": "trace-1", "context": {"invocation_id": "inv-1", "trace_id": "trace-1"}},
+            "ExecutionTrace is missing",
+        ),
+        (
+            {
+                "schema_version": 1,
+                "trace_id": "wrong",
+                "context": {"invocation_id": "inv-1", "trace_id": "trace-1"},
+            },
+            "trace id does not match",
+        ),
+        (
+            {
+                "schema_version": 1,
+                "trace_id": "trace-1",
+                "context": {"invocation_id": "inv-1", "trace_id": "wrong"},
+            },
+            "trace id does not match",
+        ),
+    ],
+)
+def test_trace_persistence_rejects_synthetic_and_one_sided_mismatches(payload, reason):
+    session = _Session(_Response(200, payload))
+
+    with pytest.raises(smoke.SmokeFailure, match=reason):
+        smoke._trace_persisted(
+            session,
+            "http://127.0.0.1:8765",
+            invocation_id="inv-1",
+            trace_id="trace-1",
+        )
