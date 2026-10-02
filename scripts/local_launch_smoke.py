@@ -87,9 +87,7 @@ def _json_response(response: requests.Response) -> Any:
     try:
         return response.json()
     except ValueError as exc:
-        raise SmokeFailure(
-            f"HTTP {response.status_code} returned non-JSON content"
-        ) from exc
+        raise SmokeFailure(f"HTTP {response.status_code} returned non-JSON content") from exc
 
 
 def _request_json(
@@ -115,8 +113,7 @@ def _request_json(
     if response.status_code not in expected:
         error_code = data.get("error") if isinstance(data, dict) else None
         raise SmokeFailure(
-            f"{method} {path} returned HTTP {response.status_code}"
-            f" error={error_code or 'unknown'}"
+            f"{method} {path} returned HTTP {response.status_code} error={error_code or 'unknown'}"
         )
     return response.status_code, data
 
@@ -148,9 +145,7 @@ def _wait_ready(
     deadline = time.monotonic() + STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise SmokeFailure(
-                f"Alice exited during startup with code {process.returncode}"
-            )
+            raise SmokeFailure(f"Alice exited during startup with code {process.returncode}")
         try:
             _health_ok(session, base_url)
             return
@@ -267,9 +262,7 @@ def _create_conversation(session: requests.Session, base_url: str) -> str:
         payload={"title": "Alice launch smoke", "model": "aliceai-llm"},
         expected=(200, 201),
     )
-    conversation_id = (
-        str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
-    )
+    conversation_id = str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
     if not conversation_id:
         raise SmokeFailure("conversation creation returned no id")
     return conversation_id
@@ -363,9 +356,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     provider_ready = bool(api_key and project_id)
     provider_partial = bool(api_key) != bool(project_id)
     if provider_partial and not args.offline:
-        raise SmokeFailure(
-            "launch-smoke provider inputs must include both API key and project id"
-        )
+        raise SmokeFailure("launch-smoke provider inputs must include both API key and project id")
 
     temp = tempfile.TemporaryDirectory(prefix="alice-launch-smoke-")
     work_dir = Path(temp.name)
