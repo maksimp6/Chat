@@ -54,7 +54,11 @@ def decide(req=None, snap=None, **overrides):
         "consumed_requests": set(),
     }
     options.update(overrides)
-    return admit_merge_request(request() if req is None else req, snapshot() if snap is None else snap, **options)
+    return admit_merge_request(
+        request() if req is None else req,
+        snapshot() if snap is None else snap,
+        **options,
+    )
 
 
 def codes(result):
