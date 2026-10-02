@@ -138,6 +138,7 @@ def test_trace_persistence_rejects_wrong_invocation():
         _Response(
             200,
             {
+                "schema_version": 1,
                 "trace_id": "trace-1",
                 "context": {
                     "invocation_id": "other-invocation",
