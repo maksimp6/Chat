@@ -60,8 +60,8 @@ the analogy does not require a separate human or agent for every checkpoint.
 | Electrical-work function | Repository checkpoint | Boundary |
 | --- | --- | --- |
 | Issuing the work permit | Issue owner or Team Lead defines a bounded task, deliverable, owner, and conditions in the canonical Issue/TaskPacket. | The issue is the source of scope, not authority to bypass repository approvals. |
-| Issuing permission to prepare the workplace and admit workers | Authorized coordinator verifies the branch, isolation, permissions, and prerequisites for this stage. | Do not invent a permanent role or require a separate issuer on every routine task. |
-| Admitting worker | Before execution, the dispatching owner checks the actual backend/tool profile and accepted contract against the intended task. | A role name, mention, or planned capability is insufficient evidence that the backend can execute. |
+| Issuing permission to prepare the workplace and admit workers | Authorized coordinator verifies permissions and stage prerequisites, including an isolated branch for file changes. | Do not invent a permanent role or require a separate issuer on every routine task. |
+| Admitting worker | Before execution, the dispatching owner checks the actual backend/tool profile and stage-specific evidence against the intended task. | Contract and contract-review use issue criteria; accepted-contract evidence is required from implementation onward. |
 | Responsible leader and work producer | Name one implementation owner; for complex or risky work, name a coordinating lead and explicit handoffs. | The lead is conditional; a reviewer cannot silently become the implementation owner. |
 | Observer and crew | Specialists work within their assigned scope; Operations Observer watches coordination signals under its own read-mostly policy. | The statutory electrical observer has a specific crew-safety purpose and is **not** Alice's Operations Observer. |
 
@@ -71,15 +71,18 @@ validation. Once those contracts land, record the same evidence there. This page
 defines how humans and agents use the evidence, without adding a second state
 machine or changing workflow permissions.
 
-1. **Issue the task.** Link the canonical issue and accepted contract; state the
-   current stage, one primary owner, expected artifact, scope, dependencies,
+1. **Issue the task.** Link the canonical issue and its acceptance criteria; state
+   the current stage, one primary owner, expected artifact, scope, dependencies,
    budget, approval boundary, and explicit pause conditions. A small routine
-   task needs a compact record, not a new sign-off ceremony.
-2. **Prepare and admit.** Check the current `master`/PR head and isolated branch,
-   role/backend and selected profile/skill versions, actual callable tools,
-   inputs, and required approval. Record only the evidence needed to reproduce
-   the decision. Missing branch, tool, contract acceptance, or required approval
-   blocks that stage until corrected.
+   task needs a compact record, not a new sign-off ceremony. Link accepted
+   contract provenance when the stage reaches implementation or later.
+2. **Prepare and admit.** For a write stage, check the current `master`/PR head
+   and isolated branch. For read-only observation or review, check the relevant
+   issue/PR and head when one exists. Check the role/backend, selected profile
+   and skill versions, actual callable tools, inputs, and required approval.
+   Record only evidence needed to reproduce the decision. Missing applicable
+   branch, tool, approval, or stage-specific contract evidence blocks that stage
+   until corrected.
 3. **Work within scope.** The assigned owner makes the smallest reviewable
    change. Pause and update the task/handoff when scope, branch head, backend
    capability, approval, or accepted contract changes. Recheck admission before
@@ -95,9 +98,10 @@ For example, #709 required a local-launch smoke fix. Its authorized implementati
 scope, PR head, and passing CI supported a protected merge. The live Yandex
 chat/trace and Cloud.ru outcome remain separate verification items; do not mark
 those outcomes complete merely because the PR merged. A backend dispatch that
-cannot run the required `gh` operations is paused and either given an approved
-capability path or reassigned with a fresh handoff, rather than repeatedly
-retrying the same blocked worker.
+cannot perform the required authorized GitHub operation through its available
+CLI, API, or connector is paused and either given an approved capability path or
+reassigned with a fresh handoff, rather than repeatedly retrying the same
+blocked worker.
 
 ## Supervision and process improvement
 
