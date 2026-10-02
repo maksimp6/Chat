@@ -2,11 +2,6 @@ name: Local launch smoke
 
 on:
   pull_request:
-    paths:
-      - "scripts/local_launch_smoke.py"
-      - "tests/test_local_launch_smoke.py"
-      - "docs/setup/launch-smoke.md"
-      - ".github/workflows/launch-smoke.yml"
   workflow_dispatch:
     inputs:
       live_provider:
@@ -59,9 +54,6 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.live_provider }}
     runs-on: ubuntu-latest
     environment: production
-    env:
-      ALICE_LAUNCH_SMOKE_YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
-      ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
     steps:
       - name: Checkout protected master
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -80,6 +72,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Run full protected-master launch smoke
+        env:
+          ALICE_LAUNCH_SMOKE_YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}
+          ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID: ${{ secrets.YANDEX_PROJECT_ID }}
         run: |
           set -euo pipefail
           python scripts/local_launch_smoke.py --require-master | tee launch-smoke.json
