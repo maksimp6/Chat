@@ -70,6 +70,11 @@ def test_install_retries_use_clean_context_and_preserve_state(tmp_path):
     assert (root / "state/auth-sentinel").read_text() == "not-a-real-secret"
     assert (root / "workspace/work.txt").read_text() == "keep"
     commands = log.read_text()
+    assert (root / ".dockerignore").read_text().splitlines()[:3] == [
+        "state/",
+        "workspace/",
+        "releases/",
+    ]
     assert "compose config --quiet" in commands
     assert "compose up -d --no-build" in commands
     assert "compose exec -T commander node" in commands

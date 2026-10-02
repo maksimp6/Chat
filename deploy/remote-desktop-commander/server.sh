@@ -18,7 +18,7 @@ case "$operation" in
     release="$(mktemp -d "$root/releases/$revision.XXXXXX")"
     tar -xzf "$archive" -C "$release"
     source_dir="$release/deploy/remote-desktop-commander"
-    for file in Dockerfile compose.yaml config.json entrypoint.sh; do
+    for file in Dockerfile compose.yaml config.json entrypoint.sh .dockerignore; do
       test -f "$source_dir/$file"
       cp "$source_dir/$file" "$root/$file"
     done
