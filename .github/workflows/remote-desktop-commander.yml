@@ -1,5 +1,9 @@
 name: Remote Desktop Commander deployment
 on:
+  pull_request:
+    paths:
+      - "deploy/remote-desktop-commander/**"
+      - ".github/workflows/remote-desktop-commander.yml"
   workflow_dispatch:
     inputs:
       operation:
@@ -13,6 +17,18 @@ concurrency:
   group: alice-remote-desktop-commander
   cancel-in-progress: false
 jobs:
+  validate-image:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate Compose and build the actual CLI image
+        run: |
+          docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
+          docker compose -f deploy/remote-desktop-commander/compose.yaml build
   deploy:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
