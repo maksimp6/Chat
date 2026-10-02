@@ -70,9 +70,7 @@ def test_admits_explicit_authorized_request_for_fresh_ready_head():
 
 
 def test_requires_real_capability_and_authorized_actor():
-    assert "capability_unavailable" in codes(
-        decide(capability_available=False)
-    )
+    assert "capability_unavailable" in codes(decide(capability_available=False))
     assert "actor_unauthorized" in codes(decide(actor_authorized=False))
 
 
@@ -94,9 +92,7 @@ def test_rejects_replay_and_does_not_consume_a_rejected_request():
 
 def test_rejects_request_bound_to_a_different_pr_or_head():
     assert "request_mismatch" in codes(decide(req=request(pr_number=124)))
-    assert "request_mismatch" in codes(
-        decide(req=request(expected_head_sha="older-head"))
-    )
+    assert "request_mismatch" in codes(decide(req=request(expected_head_sha="older-head")))
     assert "request_mismatch" in codes(decide(req=request(repo="other/repo")))
 
 
