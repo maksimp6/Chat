@@ -132,8 +132,8 @@ class Worker:
                 self.session = None
 
 
-def serve():
-    worker = Worker()
+def create_server(worker=None, address=("127.0.0.1", 8765)):
+    worker = worker or Worker()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args):
@@ -157,7 +157,12 @@ def serve():
             self.end_headers()
             self.wfile.write(payload)
 
-    server = HTTPServer(("127.0.0.1", 8765), Handler)
+    return HTTPServer(address, Handler)
+
+
+def serve():
+    worker = Worker()
+    server = create_server(worker)
     try:
         server.serve_forever()
     finally:
