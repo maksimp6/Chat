@@ -313,10 +313,14 @@ def _trace_persisted(
     )
     if not isinstance(payload, dict):
         raise SmokeFailure("persisted trace returned a non-object payload")
-    context = payload.get("context") or {}
-    if context.get("invocation_id") != invocation_id:
+    # The invocation endpoint can return an ID-only synthetic fallback when
+    # no trace was stored. A real ExecutionTrace carries a schema version.
+    if type(payload.get("schema_version")) is not int or payload["schema_version"] < 1:
+        raise SmokeFailure("persisted ExecutionTrace is missing")
+    context = payload.get("context")
+    if not isinstance(context, dict) or context.get("invocation_id") != invocation_id:
         raise SmokeFailure("persisted trace invocation correlation is missing")
-    if payload.get("trace_id") != trace_id and context.get("trace_id") != trace_id:
+    if payload.get("trace_id") != trace_id or context.get("trace_id") != trace_id:
         raise SmokeFailure("persisted trace id does not match the chat response")
 
 
