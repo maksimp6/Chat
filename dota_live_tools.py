@@ -238,9 +238,7 @@ class DotaLiveClient:
     def _validate_ttl(cache_ttl: float | None) -> float:
         value = DEFAULT_CACHE_TTL_SECONDS if cache_ttl is None else float(cache_ttl)
         if value < 0 or value > MAX_CACHE_TTL_SECONDS:
-            raise ValueError(
-                f"cache_ttl_seconds must be between 0 and {MAX_CACHE_TTL_SECONDS:g}"
-            )
+            raise ValueError(f"cache_ttl_seconds must be between 0 and {MAX_CACHE_TTL_SECONDS:g}")
         return value
 
     def _present(
@@ -393,8 +391,10 @@ def dota_live_snapshot(
 
     arguments = arguments or {}
     teams = arguments.get("teams")
-    if not isinstance(teams, list) or len(teams) != 2 or any(
-        not isinstance(team, str) or not team.strip() for team in teams
+    if (
+        not isinstance(teams, list)
+        or len(teams) != 2
+        or any(not isinstance(team, str) or not team.strip() for team in teams)
     ):
         return {
             "success": False,
@@ -460,17 +460,14 @@ DOTA_LIVE_TOOLS = {
                     "minItems": 2,
                     "maxItems": 2,
                     "items": {"type": "string", "minLength": 1, "maxLength": 100},
-                    "description": "Ровно две команды, например Aurora "
-                    "Gaming и Team Liquid.",
+                    "description": "Ровно две команды, например Aurora Gaming и Team Liquid.",
                 },
                 "timeout_seconds": {
                     "anyOf": [
                         {"type": "number", "minimum": 0.1, "maximum": 30},
                         {"type": "null"},
                     ],
-                    "description": (
-                        "HTTP timeout; null использует значение 10 секунд."
-                    ),
+                    "description": ("HTTP timeout; null использует значение 10 секунд."),
                 },
                 "cache_ttl_seconds": {
                     **_OPTIONAL_NULL_NUMBER,
@@ -479,8 +476,7 @@ DOTA_LIVE_TOOLS = {
                 "include_players": {
                     "anyOf": [{"type": "boolean"}, {"type": "null"}],
                     "description": (
-                        "Включить игроков и героев; по умолчанию "
-                        "false для компактного ответа."
+                        "Включить игроков и героев; по умолчанию false для компактного ответа."
                     ),
                 },
             },

@@ -54,9 +54,7 @@ class DotaLiveToolsTests(unittest.TestCase):
         snapshot = normalize_live_match(game())
         self.assertEqual(snapshot["status"], "live")
         self.assertTrue(snapshot["is_live"])
-        self.assertEqual(
-            snapshot["radiant"], {"name": "Team Liquid", "team_id": 1, "score": 10}
-        )
+        self.assertEqual(snapshot["radiant"], {"name": "Team Liquid", "team_id": 1, "score": 10})
         self.assertEqual(snapshot["dire"]["name"], "Aurora Gaming")
         self.assertEqual(snapshot["players"][0]["hero_id"], 2)
 
