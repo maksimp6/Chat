@@ -1,0 +1,80 @@
+name: Server browser worker
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Preflight existing SSH, install worker, or inspect a public page
+        type: choice
+        options: [preflight, install, navigate]
+        default: preflight
+      url:
+        description: Public page URL without credentials, query or fragment
+        type: string
+        default: https://cloud.ru/
+permissions:
+  contents: read
+concurrency:
+  group: alice-server-browser
+  cancel-in-progress: false
+jobs:
+  worker:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    env:
+      SSH_HOST: ${{ secrets.PREVIEW_SSH_HOST }}
+      SSH_USER: ${{ secrets.PREVIEW_SSH_USER }}
+      SSH_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
+      SSH_HOSTS: ${{ secrets.PREVIEW_SSH_KNOWN_HOSTS }}
+      SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
+      OPERATION: ${{ inputs.operation }}
+      PAGE_URL: ${{ inputs.url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare SSH and validate request
+        run: |
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$SSH_KEY" && test -n "$SSH_HOSTS"
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          [[ "$SSH_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9.:-]+$ ]]
+          install -d -m 700 "$RUNNER_TEMP/browser-ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/browser-ssh/key"
+          printf '%s\n' "$SSH_HOSTS" > "$RUNNER_TEMP/browser-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/browser-ssh/"*
+          ssh-keygen -y -f "$RUNNER_TEMP/browser-ssh/key" >/dev/null
+          python - <<'PY'
+          import json, os
+          from urllib.parse import urlsplit
+          from pathlib import Path
+          url = os.environ['PAGE_URL']
+          parsed = urlsplit(url)
+          if parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+              raise SystemExit('Expected credential-free HTTP(S) URL')
+          Path(os.environ['RUNNER_TEMP'], 'browser-request.json').write_text(json.dumps({'action': 'navigate', 'target': url, 'value': None}))
+          PY
+      - name: Execute bounded server operation
+        run: |
+          set -euo pipefail
+          ssh_args=(-p "$SSH_PORT" -i "$RUNNER_TEMP/browser-ssh/key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/browser-ssh/known_hosts" -o ConnectTimeout=10)
+          target="$SSH_USER@$SSH_HOST"
+          case "$OPERATION" in
+            preflight)
+              ssh "${ssh_args[@]}" "$target" 'bash -s -- preflight' < deploy/browser-worker/server.sh
+              ;;
+            install)
+              git archive --format=tar.gz HEAD browser deploy/browser-worker > "$RUNNER_TEMP/browser-worker.tar.gz"
+              ssh "${ssh_args[@]}" "$target" 'umask 077; mkdir -p "$HOME/alice-browser-worker"; cat > "$HOME/alice-browser-worker/source.tar.gz"' < "$RUNNER_TEMP/browser-worker.tar.gz"
+              ssh "${ssh_args[@]}" "$target" "bash -s -- install '$GITHUB_SHA'" < deploy/browser-worker/server.sh
+              ;;
+            navigate)
+              ssh "${ssh_args[@]}" "$target" 'docker exec -i alice-browser-worker python -m browser.server_worker request' < "$RUNNER_TEMP/browser-request.json"
+              ;;
+            *) exit 2 ;;
+          esac
+      - name: Remove temporary credentials
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/browser-ssh" "$RUNNER_TEMP/browser-request.json" "$RUNNER_TEMP/browser-worker.tar.gz"
