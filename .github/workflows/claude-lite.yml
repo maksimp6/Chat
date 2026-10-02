@@ -113,7 +113,9 @@ jobs:
         if: steps.routing.outputs.eligible == 'true'
         shell: bash
         run: |
-          npm install --prefix "$RUNNER_TEMP/claude-cli" --ignore-scripts --no-audit --no-fund --package-lock=false @anthropic-ai/claude-code@2.1.283
+          mkdir -p "$RUNNER_TEMP/claude-cli"
+          npm install --prefix "$RUNNER_TEMP/claude-cli" --ignore-scripts --no-audit --no-fund --package-lock-only @anthropic-ai/claude-code@2.1.283
+          npm ci --prefix "$RUNNER_TEMP/claude-cli" --ignore-scripts --no-audit --no-fund
           node "$RUNNER_TEMP/claude-cli/node_modules/@anthropic-ai/claude-code/install.cjs"
           echo "$RUNNER_TEMP/claude-cli/node_modules/.bin" >> "$GITHUB_PATH"
 
@@ -140,4 +142,5 @@ jobs:
         if: steps.prepare.outputs.ready == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/claude_session_ci.py finalize --metadata "$RUNNER_TEMP/claude-session/metadata.json" --artifact-id '${{ steps.checkpoint.outputs.artifact-id }}'
+          CHECKPOINT_ARTIFACT_ID: ${{ steps.checkpoint.outputs.artifact-id }}
+        run: python scripts/claude_session_ci.py finalize --metadata "$RUNNER_TEMP/claude-session/metadata.json" --artifact-id "$CHECKPOINT_ARTIFACT_ID"
