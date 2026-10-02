@@ -150,7 +150,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Profiler: {e}")
 
         try:
-            from dota_live_tools import DOTA_LIVE_TOOLS
+            from dota.live_tools import DOTA_LIVE_TOOLS
 
             for name, cfg in DOTA_LIVE_TOOLS.items():
                 self._register("dota", name, cfg)

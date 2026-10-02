@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from dota_live_tools import (
+from dota.live_tools import (
     DotaLiveClient,
     DotaLiveError,
     DotaLiveRateLimitError,
@@ -113,7 +113,7 @@ class DotaLiveToolsTests(unittest.TestCase):
 
     def test_responses_executor_runs_dota_tool_through_registry(self):
         fake_client = DotaLiveClient(fetcher=lambda _timeout: [game()], min_request_interval=0)
-        with patch("dota_live_tools._DEFAULT_CLIENT", fake_client):
+        with patch("dota.live_tools._DEFAULT_CLIENT", fake_client):
             result = UniversalToolExecutor(registry).execute(
                 UniversalToolCall(
                     tool_name="dota_live_snapshot",
