@@ -15,6 +15,17 @@ Use the smallest independent change that satisfies an issue or subtask.
 9. Merge only after required checks and review policy are satisfied.
 10. Never rewrite `master` directly and never commit secrets.
 
+Before dispatch or resuming an agent, apply the scoped work-admission checklist in
+`docs/agents/role-based-agent-office.md`. Record the canonical task and current
+stage/owner, expected output, role/backend and actual tool capability, required
+approval, and stop conditions in the existing task handoff. Record the branch/head
+for a write stage; use the relevant issue or PR head for read-only work. Contract
+and contract-review begin from the issue and acceptance criteria; require accepted
+contract evidence from implementation onward. Pause a stage when its applicable
+prerequisites are missing or change; recheck before resuming.
+This is a checkpoint on the existing TaskPacket and PR workflow, not a parallel
+authority or status system.
+
 ## Agent dispatch
 
 Alice Pro uses **roles first, model providers second**. The repository roles are
