@@ -17,27 +17,6 @@ concurrency:
   group: alice-remote-desktop-commander
   cancel-in-progress: false
 jobs:
-  refresh-lock:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Generate candidate dependency lock for review
-        working-directory: deploy/remote-desktop-commander
-        run: |
-          rm package-lock.json
-          npm install --package-lock-only --ignore-scripts --omit=dev --no-audit --no-fund
-          npm audit --omit=dev --json > npm-audit.json || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: rdc-candidate-lock
-          path: |
-            deploy/remote-desktop-commander/package-lock.json
-            deploy/remote-desktop-commander/npm-audit.json
-          retention-days: 1
   validate-image:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

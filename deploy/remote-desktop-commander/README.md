@@ -8,9 +8,9 @@ The image installs Node 22, Python, git, SSH client and system ripgrep. npm life
 scripts and Puppeteer's browser download are disabled; the package's documented
 `remote --help` is executed during the build to verify the installed CLI.
 The package and transitive npm dependencies are locked and installed with `npm ci`.
-The dependency graph is taken from the official v0.2.52 lockfile (its root version
-label is stale, but dependency declarations match that release); dev-only entries
-are omitted and the exact published CLI is added as the wrapper dependency.
+The lock is generated from npm for the exact CLI version. Security overrides pin
+sharp 0.35.4 and ExcelJS's UUID 11.1.1; the image build exercises PNG decoding and
+an XLSX write/read round trip to verify these dependency APIs remain usable.
 The base image and Debian packages still float. Record the deployed image ID. This is a files/terminal agent inside
 a container, not a full graphical desktop or automatic browser login.
 

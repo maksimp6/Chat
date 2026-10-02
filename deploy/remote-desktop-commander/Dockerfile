@@ -7,10 +7,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && mkdir -p /workspace /home/node/.desktop-commander-device /home/node/.claude-server-commander \
     && chown -R node:node /workspace /home/node
 
-COPY package.json package-lock.json /opt/desktop-commander/
+COPY package.json package-lock.json dependency-smoke.cjs /opt/desktop-commander/
 RUN cd /opt/desktop-commander \
     && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && node node_modules/@wonderwhy-er/desktop-commander/dist/index.js remote --help
+    && node node_modules/@wonderwhy-er/desktop-commander/dist/index.js remote --help \
+    && node dependency-smoke.cjs
 COPY config.json /opt/desktop-commander/config.example.json
 COPY entrypoint.sh /usr/local/bin/alice-desktop-commander
 USER node
