@@ -1,0 +1,28 @@
+name: alice-remote-desktop-commander
+services:
+  commander:
+    build:
+      context: .
+      args:
+        DC_VERSION: "0.2.52"
+    image: alice-remote-desktop-commander:0.2.52
+    init: true
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    volumes:
+      - ./state:/home/node
+      - ./workspace:/workspace
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    stop_grace_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: "5m"
+        max-file: "2"
