@@ -128,7 +128,19 @@ def test_workflow_master_only_and_no_pairing_logs():
     )
     job = workflow["jobs"]["deploy"]
     assert job["environment"] == "production"
-    assert job["if"] == "github.ref == 'refs/heads/master'"
+    gate = job["if"]
+    assert "github.ref == 'refs/heads/master'" in gate
+    assert "github.event_name == 'workflow_dispatch'" in gate
+    assert "github.event.issue.number == 409" in gate
+    assert "github.event.comment.author_association == 'OWNER'" in gate
+    assert "github.event.comment.user.login == github.repository_owner" in gate
+    assert (
+        json.dumps(["/rdc preflight", "/rdc install", "/rdc status"], separators=(",", ":")) in gate
+    )
+    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
+    assert "github.event.comment.body" not in "\n".join(
+        step.get("run", "") for step in job["steps"]
+    )
     assert workflow["permissions"] == {"contents": "read"}
     scripts = "\n".join(step.get("run", "") for step in job["steps"])
     assert "StrictHostKeyChecking=yes" in scripts
@@ -142,6 +154,7 @@ def test_image_uses_frozen_dependency_graph():
     package = json.loads((DEPLOY / "package.json").read_text())
     lock = json.loads((DEPLOY / "package-lock.json").read_text())
     assert package["dependencies"] == {"@wonderwhy-er/desktop-commander": "0.2.52"}
+    assert package["overrides"] == {"sharp": "0.35.4", "exceljs": {"uuid": "11.1.1"}}
     assert lock["packages"][""]["dependencies"] == package["dependencies"]
     assert lock["packages"]["node_modules/@wonderwhy-er/desktop-commander"]["version"] == "0.2.52"
     dockerfile = (DEPLOY / "Dockerfile").read_text()

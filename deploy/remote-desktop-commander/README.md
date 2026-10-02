@@ -36,7 +36,11 @@ ask it to read or return credentials. `state/` is owner-only on the host.
 ## Deployment
 
 After protected merge, run **Remote Desktop Commander deployment** on `master`:
-`preflight`, then `install`, then `status`. It uses the existing production
+`preflight`, then `install`, then `status`. The repository owner can also post an
+exact `/rdc preflight`, `/rdc install` or `/rdc status` comment on canonical issue
+#409. This route checks the OWNER association and repository-owner login, accepts
+only these three complete comments, and checks out the event's exact master SHA;
+PR code and other users' comments cannot reach the deployment job. It uses the existing production
 `PREVIEW_SSH_*` secrets with strict host-key checking. Installation changes only
 this service and its dedicated directories; it does not run preview/production
 scripts or restart Traefik. Repeating installation keeps state and workspace.
