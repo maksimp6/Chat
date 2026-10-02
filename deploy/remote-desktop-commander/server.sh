@@ -18,7 +18,7 @@ case "$operation" in
     release="$(mktemp -d "$root/releases/$revision.XXXXXX")"
     tar -xzf "$archive" -C "$release"
     source_dir="$release/deploy/remote-desktop-commander"
-    for file in Dockerfile compose.yaml config.json entrypoint.sh .dockerignore; do
+    for file in Dockerfile compose.yaml config.json entrypoint.sh .dockerignore package.json package-lock.json; do
       test -f "$source_dir/$file"
       cp "$source_dir/$file" "$root/$file"
     done
@@ -26,8 +26,7 @@ case "$operation" in
     docker compose config --quiet
     docker compose build
     # The root initialization process sees only this service's two volumes.
-    docker compose run --rm --no-deps --user 0 --entrypoint bash commander -c \
-      'chown 1000:1000 /home/node /workspace; chmod 700 /home/node'
+    docker compose run --rm --no-deps initialize
     docker compose up -d --no-build
     docker compose exec -T commander node -e 'process.stdout.write("Node runtime reachable\\n")'
     printf 'Remote Desktop Commander installed from %s; OAuth pairing still required\n' "$revision"

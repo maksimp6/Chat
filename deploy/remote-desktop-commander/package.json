@@ -1,0 +1,8 @@
+{
+  "name": "alice-remote-desktop-commander",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@wonderwhy-er/desktop-commander": "0.2.52"
+  }
+}

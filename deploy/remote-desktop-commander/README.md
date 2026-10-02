@@ -7,8 +7,11 @@ It is separate from the custom Chromium inspection worker in PR #719.
 The image installs Node 22, Python, git, SSH client and system ripgrep. npm lifecycle
 scripts and Puppeteer's browser download are disabled; the package's documented
 `remote --help` is executed during the build to verify the installed CLI.
-The package version is pinned; transitive npm dependencies and base image are not
-fully locked. Record the deployed image ID. This is a files/terminal agent inside
+The package and transitive npm dependencies are locked and installed with `npm ci`.
+The dependency graph is taken from the official v0.2.52 lockfile (its root version
+label is stale, but dependency declarations match that release); dev-only entries
+are omitted and the exact published CLI is added as the wrapper dependency.
+The base image and Debian packages still float. Record the deployed image ID. This is a files/terminal agent inside
 a container, not a full graphical desktop or automatic browser login.
 
 ## Docker layout
@@ -22,7 +25,10 @@ On the server: `$HOME/alice-preview/services/remote-desktop-commander/`.
 
 The service runs as uid/gid 1000, with a read-only root filesystem, dropped
 capabilities, no Docker socket, no host root or preview credentials mounted, and
-no published ports. It connects outbound to the official relay. The directory
+no published ports. A one-shot initializer has only CHOWN and FOWNER capabilities,
+no network, and the same two mounts; the running agent keeps all capabilities
+dropped. CI exercises both initialization and non-root writable volumes.
+It connects outbound to the official relay. The directory
 allowlist is a tool setting, not an OS sandbox; container mounts are the access
 boundary. The agent can run commands and access its own saved auth state: never
 ask it to read or return credentials. `state/` is owner-only on the host.

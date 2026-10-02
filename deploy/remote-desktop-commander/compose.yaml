@@ -3,8 +3,6 @@ services:
   commander:
     build:
       context: .
-      args:
-        DC_VERSION: "0.2.52"
     image: alice-remote-desktop-commander:0.2.52
     init: true
     restart: unless-stopped
@@ -26,3 +24,17 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
+  initialize:
+    profiles: [setup]
+    image: alice-remote-desktop-commander:0.2.52
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER]
+    security_opt: [no-new-privileges:true]
+    network_mode: none
+    volumes:
+      - ./state:/home/node
+      - ./workspace:/workspace
+    entrypoint: [bash, -euc]
+    command: ["chown 1000:1000 /home/node /workspace; chmod 700 /home/node /workspace"]

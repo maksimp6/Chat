@@ -29,6 +29,20 @@ jobs:
         run: |
           docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
           docker compose -f deploy/remote-desktop-commander/compose.yaml build
+      - name: Exercise volume initialization and non-root CLI startup
+        working-directory: deploy/remote-desktop-commander
+        run: |
+          set -euo pipefail
+          mkdir -m 700 state workspace
+          docker compose run --rm --no-deps initialize
+          docker compose run --rm --no-deps commander remote --help
+          docker compose run --rm --no-deps --entrypoint bash commander -euc '
+            test "$(id -u)" = 1000
+            test "$(stat -c %a /home/node)" = 700
+            test "$(stat -c %a /workspace)" = 700
+            touch /home/node/write-check /workspace/write-check
+            grep -qE "^CapEff:[[:space:]]+0+$" /proc/self/status
+          '
   deploy:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest

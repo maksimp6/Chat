@@ -76,6 +76,7 @@ def test_install_retries_use_clean_context_and_preserve_state(tmp_path):
         "releases/",
     ]
     assert "compose config --quiet" in commands
+    assert "compose run --rm --no-deps initialize" in commands
     assert "compose up -d --no-build" in commands
     assert "compose exec -T commander node" in commands
     assert "logs" not in commands
@@ -109,7 +110,13 @@ def test_compose_isolated_mounts_and_no_host_control():
     assert not service.get("privileged")
     assert not service.get("network_mode")
     assert service["restart"] == "unless-stopped"
-    assert service["build"]["args"]["DC_VERSION"] == "0.2.52"
+    initializer = config["services"]["initialize"]
+    assert initializer["profiles"] == ["setup"]
+    assert initializer["network_mode"] == "none"
+    assert initializer["cap_drop"] == ["ALL"]
+    assert initializer["cap_add"] == ["CHOWN", "FOWNER"]
+    assert initializer["volumes"] == service["volumes"]
+    assert "cap_add" not in service
     defaults = json.loads((DEPLOY / "config.json").read_text())
     assert defaults["allowedDirectories"] == ["/workspace"]
     assert defaults["telemetryEnabled"] is False
@@ -129,3 +136,14 @@ def test_workflow_master_only_and_no_pairing_logs():
     assert "device.json" not in scripts
     assert "${{ inputs." not in scripts
     assert "${{ secrets." not in scripts
+
+
+def test_image_uses_frozen_dependency_graph():
+    package = json.loads((DEPLOY / "package.json").read_text())
+    lock = json.loads((DEPLOY / "package-lock.json").read_text())
+    assert package["dependencies"] == {"@wonderwhy-er/desktop-commander": "0.2.52"}
+    assert lock["packages"][""]["dependencies"] == package["dependencies"]
+    assert lock["packages"]["node_modules/@wonderwhy-er/desktop-commander"]["version"] == "0.2.52"
+    dockerfile = (DEPLOY / "Dockerfile").read_text()
+    assert "npm ci --omit=dev --ignore-scripts" in dockerfile
+    assert "npm install" not in dockerfile
