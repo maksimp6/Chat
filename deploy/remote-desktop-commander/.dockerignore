@@ -1,6 +1,0 @@
-state/
-workspace/
-releases/
-.env
-.env.*
-*.log
