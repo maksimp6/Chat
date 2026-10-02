@@ -114,7 +114,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/claude-cli"
-          npm install --prefix "$RUNNER_TEMP/claude-cli" --ignore-scripts --no-audit --no-fund --package-lock-only @anthropic-ai/claude-code@2.1.283
+          cp .github/claude-cli/package.json .github/claude-cli/package-lock.json "$RUNNER_TEMP/claude-cli/"
           npm ci --prefix "$RUNNER_TEMP/claude-cli" --ignore-scripts --no-audit --no-fund
           node "$RUNNER_TEMP/claude-cli/node_modules/@anthropic-ai/claude-code/install.cjs"
           echo "$RUNNER_TEMP/claude-cli/node_modules/.bin" >> "$GITHUB_PATH"
