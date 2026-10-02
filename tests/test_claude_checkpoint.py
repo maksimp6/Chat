@@ -105,6 +105,36 @@ def test_extra_or_missing_scope_fields_are_rejected(checkpoint):
             checkpoint.seal_checkpoint(PRIVATE_CONTENT, SECRET, binding)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("repo_id", True),
+        ("repo_id", -1),
+        ("session_id", "../../private-state"),
+        ("native_session_id", "../../credentials.json"),
+        ("schema", True),
+        ("generation", 0),
+        ("generation", "1"),
+    ],
+)
+def test_scope_types_and_identities_cannot_be_coerced(checkpoint, field, value):
+    binding = dict(BINDING)
+    binding[field] = value
+    with pytest.raises(ValueError, match="^checkpoint_invalid$"):
+        checkpoint.seal_checkpoint(PRIVATE_CONTENT, SECRET, binding)
+
+
+def test_binding_dictionary_key_order_does_not_break_authentication(checkpoint):
+    ciphertext = checkpoint.seal_checkpoint(PRIVATE_CONTENT, SECRET, BINDING)
+    equivalent = dict(reversed(list(BINDING.items())))
+    assert checkpoint.open_checkpoint(ciphertext, SECRET, equivalent) == PRIVATE_CONTENT
+
+
+def test_plaintext_type_is_validated_before_encryption(checkpoint):
+    with pytest.raises(ValueError, match="^checkpoint_invalid$"):
+        checkpoint.seal_checkpoint(PRIVATE_CONTENT.decode(), SECRET, BINDING)
+
+
 def test_checkpoint_size_is_bounded_before_encryption_and_decryption(checkpoint):
     admitted = b"x" * (16 * 1024 * 1024)
     ciphertext = checkpoint.seal_checkpoint(admitted, SECRET, BINDING)

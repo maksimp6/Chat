@@ -10,7 +10,14 @@ import copy
 import pytest
 
 
-def _comment(comment_id, body="@claude-lite session Explain persistence", *, association="OWNER", user_type="User", login="owner"):
+def _comment(
+    comment_id,
+    body="@claude-lite session Explain persistence",
+    *,
+    association="OWNER",
+    user_type="User",
+    login="owner",
+):
     return {
         "id": comment_id,
         "body": body,
@@ -27,7 +34,11 @@ def select():
 
 
 def test_explicit_commands_are_ordered_and_use_stable_source_ids(select):
-    comments = [_comment(9, "@claude-lite session Third"), _comment(2, "@claude-lite session First"), _comment(5, "@claude-lite session Second")]
+    comments = [
+        _comment(9, "@claude-lite session Third"),
+        _comment(2, "@claude-lite session First"),
+        _comment(5, "@claude-lite session Second"),
+    ]
     assert select(comments, after_id=0) == [
         {"event_id": "issue-comment:2", "comment_id": 2, "message": "First", "author": "owner"},
         {"event_id": "issue-comment:5", "comment_id": 5, "message": "Second", "author": "owner"},
@@ -37,7 +48,12 @@ def test_explicit_commands_are_ordered_and_use_stable_source_ids(select):
 
 def test_cursor_excludes_already_acknowledged_comments(select):
     assert select([_comment(2), _comment(5), _comment(9)], after_id=5) == [
-        {"event_id": "issue-comment:9", "comment_id": 9, "message": "Explain persistence", "author": "owner"}
+        {
+            "event_id": "issue-comment:9",
+            "comment_id": 9,
+            "message": "Explain persistence",
+            "author": "owner",
+        }
     ]
 
 
@@ -48,7 +64,13 @@ def test_received_duplicate_is_delivered_exactly_once_not_dropped(select):
 
 def test_conflicting_same_source_id_fails_closed(select):
     with pytest.raises(ValueError, match="^comment_invalid$"):
-        select([_comment(4, "@claude-lite session One"), _comment(4, "@claude-lite session Different")], after_id=0)
+        select(
+            [
+                _comment(4, "@claude-lite session One"),
+                _comment(4, "@claude-lite session Different"),
+            ],
+            after_id=0,
+        )
 
 
 @pytest.mark.parametrize("association", ["OWNER", "MEMBER", "COLLABORATOR"])
@@ -56,7 +78,9 @@ def test_allowed_associations_are_only_candidates_for_write_permission_gate(sele
     assert len(select([_comment(1, association=association)], after_id=0)) == 1
 
 
-@pytest.mark.parametrize("association", ["NONE", "FIRST_TIMER", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR"])
+@pytest.mark.parametrize(
+    "association", ["NONE", "FIRST_TIMER", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR"]
+)
 def test_nonwriter_associations_never_become_commands(select, association):
     assert select([_comment(1, association=association)], after_id=0) == []
 
@@ -104,15 +128,28 @@ def test_parser_does_not_mutate_ingress_or_author_evidence(select):
 
 
 def test_routed_session_accepts_plain_followup_in_same_queue(select):
-    comments = [_comment(1, "@claude-lite session Start dialogue"), _comment(2, "Explain your previous answer")]
+    comments = [
+        _comment(1, "@claude-lite session Start dialogue"),
+        _comment(2, "Explain your previous answer"),
+    ]
     assert select(comments, after_id=1, routed=True) == [
-        {"event_id": "issue-comment:2", "comment_id": 2, "message": "Explain your previous answer", "author": "owner"}
+        {
+            "event_id": "issue-comment:2",
+            "comment_id": 2,
+            "message": "Explain your previous answer",
+            "author": "owner",
+        }
     ]
     assert select(comments, after_id=1, routed=False) == []
 
 
 def test_routed_session_still_strips_explicit_opt_in_prefix(select):
-    assert select([_comment(2, "@claude-lite session Next turn")], after_id=1, routed=True)[0]["message"] == "Next turn"
+    assert (
+        select([_comment(2, "@claude-lite session Next turn")], after_id=1, routed=True)[0][
+            "message"
+        ]
+        == "Next turn"
+    )
 
 
 def test_routing_hint_never_authorizes_outsiders_bots_or_checkpoint_metadata(select):
@@ -189,7 +226,14 @@ def test_malformed_newest_committed_anchor_is_not_replaced_with_old_snapshot(cho
         choose([_anchor("committed", 1, 1, 8), latest])
 
 
-@pytest.mark.parametrize(("field", "value"), [("repo_id", 999), ("issue_number", 716), ("session_id", "379eeb46-ef66-4fe3-b36d-aa10363e8552")])
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("repo_id", 999),
+        ("issue_number", 716),
+        ("session_id", "379eeb46-ef66-4fe3-b36d-aa10363e8552"),
+    ],
+)
 def test_anchors_cannot_mix_repository_issue_or_logical_session(choose, field, value):
     latest = _anchor("committed", 2, 2, 15)
     latest[field] = value

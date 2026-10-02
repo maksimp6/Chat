@@ -29,12 +29,16 @@ jobs:
       cancel-in-progress: false
     environment: production
     if: |
-      (github.event_name == 'issue_comment' &&
+      !contains(github.event.issue.labels.*.name, 'claude-session') &&
+      !contains(github.event.comment.body, '@claude-lite session') &&
+      !contains(github.event.issue.body, '@claude-lite session') &&
+      !contains(github.event.issue.title, '@claude-lite session') &&
+      ((github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@claude-lite') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'issues' &&
         (contains(github.event.issue.body, '@claude-lite') || contains(github.event.issue.title, '@claude-lite')) &&
-        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -50,7 +54,18 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Install dialogue routing dependencies
+        run: python -m pip install 'cryptography==50.0.1' 'requests==2.34.2'
+
+      - name: Recheck live dialogue routing before the legacy worker
+        id: routing
+        if: github.event_name == 'issue_comment'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/claude_session_ci.py check --metadata "$RUNNER_TEMP/claude-session/metadata.json"
+
       - name: Run Claude Code
+        if: steps.routing.outputs.eligible != 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1.0.235
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -61,3 +76,68 @@ jobs:
             --model claude-sonnet-4-6
             --max-turns 45
             --allowedTools "Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(pytest:*),Bash(python:*),Bash(bash scripts/format.sh:*)"
+
+  dialogue:
+    name: Resume private Claude dialogue
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.comment.user.type == 'User' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    concurrency:
+      group: claude-lite-session-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout trusted runner control code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install checkpoint transport dependencies
+        run: python -m pip install 'cryptography==50.0.1' 'requests==2.34.2'
+
+      - name: Check dialogue routing without a model call
+        id: routing
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/claude_session_ci.py check --metadata "$RUNNER_TEMP/claude-session/metadata.json"
+
+      - name: Install pinned native Claude CLI
+        if: steps.routing.outputs.eligible == 'true'
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/claude-cli" --ignore-scripts --no-audit --no-fund --package-lock=false @anthropic-ai/claude-code@2.1.283
+          node "$RUNNER_TEMP/claude-cli/node_modules/@anthropic-ai/claude-code/install.cjs"
+          echo "$RUNNER_TEMP/claude-cli/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Restore native session and process authorized dialogue
+        if: steps.routing.outputs.eligible == 'true'
+        id: prepare
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/claude_session_ci.py prepare --metadata "$RUNNER_TEMP/claude-session/metadata.json"
+
+      - name: Upload only authenticated ciphertext
+        if: steps.prepare.outputs.ready == 'true'
+        id: checkpoint
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.prepare.outputs.artifact_name }}
+          path: ${{ steps.prepare.outputs.checkpoint_path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit checkpoint before publishing dialogue answer
+        if: steps.prepare.outputs.ready == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/claude_session_ci.py finalize --metadata "$RUNNER_TEMP/claude-session/metadata.json" --artifact-id '${{ steps.checkpoint.outputs.artifact-id }}'

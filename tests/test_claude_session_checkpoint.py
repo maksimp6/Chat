@@ -23,15 +23,23 @@ def snapshot_harness(tmp_path, monkeypatch):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     config = tmp_path / "source-config"
-    source = PersistentClaudeRunner(state_dir=tmp_path / "source-state", workspace=workspace, claude_config_dir=config)
+    source = PersistentClaudeRunner(
+        state_dir=tmp_path / "source-state", workspace=workspace, claude_config_dir=config
+    )
     spy = NativeClaudeSpy()
     monkeypatch.setattr(subprocess, "run", spy)
-    session = source.open_session("Preserve the canonical goal", work_items=({"type": "issue", "id": "703"},))
+    session = source.open_session(
+        "Preserve the canonical goal", work_items=({"type": "issue", "id": "703"},)
+    )
     source.enqueue(session, "issue-comment:1", "Remember owner approval boundaries")
     source.run_pending(session)
 
     def destination():
-        return PersistentClaudeRunner(state_dir=tmp_path / "destination-state", workspace=workspace, claude_config_dir=tmp_path / "destination-config")
+        return PersistentClaudeRunner(
+            state_dir=tmp_path / "destination-state",
+            workspace=workspace,
+            claude_config_dir=tmp_path / "destination-config",
+        )
 
     return source, session, spy, destination, config, tmp_path
 
@@ -47,7 +55,9 @@ def test_portable_snapshot_restores_actual_history_queue_role_and_dedup(snapshot
     restored = destination()
     assert restored.restore_checkpoint(**record) == session
     assert restored.get_state(session)["role"] == "security-reviewer"
-    assert restored.get_state(session)["queue"] == [{"event_id": "issue-comment:2", "message": "Keep the newest undelivered comment"}]
+    assert restored.get_state(session)["queue"] == [
+        {"event_id": "issue-comment:2", "message": "Keep the newest undelivered comment"}
+    ]
     assert restored.enqueue(session, "issue-comment:1", "Duplicate already completed") is False
     restored.run_pending(session)
     assert len(spy.calls) == 2
@@ -59,7 +69,12 @@ def test_portable_snapshot_restores_actual_history_queue_role_and_dedup(snapshot
 def test_export_contains_only_selected_session_not_credentials_settings_or_hooks(snapshot_harness):
     source, session, _, _, config, _ = snapshot_harness
     foreign_marker = "foreign-private-file-must-not-be-exported"
-    for name in (".credentials.json", "settings.json", "hooks.sh", "projects/foreign/37ce5742-3563-4ff2-9d16-2bcdb0782d0f.jsonl"):
+    for name in (
+        ".credentials.json",
+        "settings.json",
+        "hooks.sh",
+        "projects/foreign/37ce5742-3563-4ff2-9d16-2bcdb0782d0f.jsonl",
+    ):
         path = config / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(foreign_marker, encoding="utf-8")
@@ -87,7 +102,9 @@ def test_export_requires_native_turn_boundary(snapshot_harness):
     source.run_pending(session)
 
 
-@pytest.mark.parametrize("mutation", ["role", "capabilities", "native_session_id", "project", "generation"])
+@pytest.mark.parametrize(
+    "mutation", ["role", "capabilities", "native_session_id", "project", "generation"]
+)
 def test_restore_rejects_unknown_authority_ids_or_snapshot_path(snapshot_harness, mutation):
     source, session, spy, destination, *_ = snapshot_harness
     record = copy.deepcopy(source.export_checkpoint(session))
@@ -136,7 +153,10 @@ def test_stale_local_snapshot_cannot_roll_back_completed_cursor(snapshot_harness
     source.run_pending(session)
     with pytest.raises(ValueError, match="stale|rollback|checkpoint"):
         source.restore_checkpoint(**older)
-    assert source.get_state(session)["completed_event_ids"] == ["issue-comment:1", "issue-comment:2"]
+    assert source.get_state(session)["completed_event_ids"] == [
+        "issue-comment:1",
+        "issue-comment:2",
+    ]
     assert len(spy.calls) == 2
 
 
