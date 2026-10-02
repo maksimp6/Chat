@@ -19,8 +19,9 @@ The script `scripts/local_launch_smoke.py` starts the documented
 6. Alice starts again against the same database;
 7. the runtime session survives the restart.
 
-Those checks are the deterministic **offline** half of the P0 baseline. They are
-useful on every relevant pull request, but they are deliberately reported as
+Those checks are the deterministic **offline** half of the P0 baseline. The
+workflow runs them on every pull request, including changes to application code,
+templates and runtime dependencies. They are deliberately reported as
 `PARTIAL`, not as proof that model chat works.
 
 The optional **full** mode additionally verifies the provider-dependent half:
@@ -74,7 +75,7 @@ python scripts/local_launch_smoke.py --offline --db-path /tmp/alice-launch-smoke
 
 `.github/workflows/launch-smoke.yml` has two jobs.
 
-The **Offline startup and restart smoke** runs on relevant pull requests and on
+The **Offline startup and restart smoke** runs on every pull request and on
 manual dispatch. It makes no provider/model call and therefore cannot consume
 Yandex inference quota.
 
@@ -87,8 +88,9 @@ the smoke-only environment variable names:
 - `YANDEX_PROJECT_ID` → `ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
 
 Those secret names are already used by `.github/workflows/alice.yml`; this
-workflow does not create a second credential source. It also references the
-existing `production` GitHub Environment so its approval boundary remains
+workflow does not create a second credential source. The secret mappings are
+scoped only to the live smoke step. It also references the existing
+`production` GitHub Environment so its approval boundary remains
 separate from ordinary PR CI. Adding or changing credentials remains an
 owner-controlled operation and is not performed by this change.
 
