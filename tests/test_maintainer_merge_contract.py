@@ -54,7 +54,7 @@ def decide(req=None, snap=None, **overrides):
         "consumed_requests": set(),
     }
     options.update(overrides)
-    return admit_merge_request(req or request(), snap or snapshot(), **options)
+    return admit_merge_request(request() if req is None else req, snapshot() if snap is None else snap, **options)
 
 
 def codes(result):
@@ -76,6 +76,7 @@ def test_requires_real_capability_and_authorized_actor():
 
 def test_rejects_documentary_intent_and_missing_request_identity():
     assert "invalid_intent" in codes(decide(req=request(action="documentation")))
+    assert "invalid_request" in codes(decide(req={}))
     assert "invalid_request" in codes(decide(req=request(request_key="")))
     assert "invalid_request" in codes(decide(req=request(expected_head_sha="")))
 
