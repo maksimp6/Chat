@@ -80,15 +80,17 @@ Yandex inference quota.
 
 The **Live Yandex chat and persisted trace smoke** is opt-in only. It runs only
 when a manual workflow dispatch sets `live_provider=true`, checks out
-protected `master`, and requires both of these protected environment secrets:
+protected `master`, and maps the repository's existing Actions secrets into
+the smoke-only environment variable names:
 
-- `ALICE_LAUNCH_SMOKE_YANDEX_API_KEY`
-- `ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
+- `YANDEX_API_KEY` → `ALICE_LAUNCH_SMOKE_YANDEX_API_KEY`
+- `YANDEX_PROJECT_ID` → `ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
 
-The workflow references the existing `production` GitHub Environment so its
-approval boundary remains separate from ordinary PR CI. Adding or changing
-those environment secrets is an owner-controlled operation and is not performed
-by this change.
+Those secret names are already used by `.github/workflows/alice.yml`; this
+workflow does not create a second credential source. It also references the
+existing `production` GitHub Environment so its approval boundary remains
+separate from ordinary PR CI. Adding or changing credentials remains an
+owner-controlled operation and is not performed by this change.
 
 The full job runs `--require-master`. If the checked-out HEAD is not exactly
 the fetched `origin/master`, the smoke fails before provider configuration or
