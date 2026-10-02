@@ -362,7 +362,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     api_key, project_id = _provider_inputs()
     provider_ready = bool(api_key and project_id)
     provider_partial = bool(api_key) != bool(project_id)
-    if provider_partial:
+    if provider_partial and not args.offline:
         raise SmokeFailure(
             "launch-smoke provider inputs must include both API key and project id"
         )
