@@ -65,10 +65,11 @@ the analogy does not require a separate human or agent for every checkpoint.
 | Responsible leader and work producer | Name one implementation owner; for complex or risky work, name a coordinating lead and explicit handoffs. | The lead is conditional; a reviewer cannot silently become the implementation owner. |
 | Observer and crew | Specialists work within their assigned scope; Operations Observer watches coordination signals under its own read-mostly policy. | The statutory electrical observer has a specific crew-safety purpose and is **not** Alice's Operations Observer. |
 
-Apply these checkpoints within the existing [task orchestration contract](../../.github/agent-handoffs/634-task-orchestration.md)
-and role/skill profiles. Issues #634/#637 own TaskPacket implementation; #685/#686
-own profile metadata validation. This page defines how humans and agents use that
-evidence, without adding a second state machine or changing workflow permissions.
+Apply these checkpoints in the canonical issue and its current task handoff.
+Issues #634/#637 own TaskPacket implementation; #685/#686 own profile metadata
+validation. Once those contracts land, record the same evidence there. This page
+defines how humans and agents use the evidence, without adding a second state
+machine or changing workflow permissions.
 
 1. **Issue the task.** Link the canonical issue and accepted contract; state the
    current stage, one primary owner, expected artifact, scope, dependencies,
