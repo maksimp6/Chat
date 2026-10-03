@@ -24,7 +24,9 @@ function harness(onLaunch = () => {}) {
     queueMicrotask(() => onLaunch(child, calls.length, signals));
     return child;
   }
-  return { calls, signals, spawn, probe: async () => true, sleep: async () => {} };
+  let closes = 0;
+  return { calls, signals, spawn, probe: async () => true, sleep: async () => {},
+    closeBrowser: async () => { closes++; }, get closes() { return closes; } };
 }
 
 test("browser keeps its sandbox, private control endpoint and durable profile", () => {
@@ -46,6 +48,7 @@ test("TERM stops both children and removes handlers", async () => {
   const h = harness((_child, number, signals) => { if (number === 2) signals.emit("SIGTERM"); });
   assert.equal(await supervise(["remote", "--disable-no-sleep"], h), 0);
   assert.equal(h.calls.length, 2);
+  assert.equal(h.closes, 1);
   assert.equal(h.calls[0].options.stdio, "ignore");
   assert(h.calls[1].args.includes("/opt/desktop-commander/pairing-handoff.cjs"));
   assert(h.calls.every(({ child }) => child.killedWith.includes("SIGTERM")));
@@ -56,6 +59,7 @@ test("browser startup failure does not start RDC or pairing", async () => {
   const h = harness((child) => child.emit("error", new Error("private detail")));
   assert.equal(await supervise(["remote"], h), 1);
   assert.equal(h.calls.length, 1);
+  assert.equal(h.closes, 0);
 });
 
 test("readiness timeout stops browser and never starts RDC", async () => {

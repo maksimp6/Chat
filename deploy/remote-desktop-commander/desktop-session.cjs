@@ -40,12 +40,32 @@ async function waitHealthy(probe = healthy, timeoutMs = 30000, sleep = delay) {
   return false;
 }
 
+async function closeBrowser() {
+  try {
+    const version = await (await fetch(VERSION_URL, { signal: AbortSignal.timeout(1000) })).json();
+    const endpoint = new URL(version.webSocketDebuggerUrl);
+    if (endpoint.protocol !== "ws:" || endpoint.hostname !== "127.0.0.1" || endpoint.port !== "9222") return;
+    await new Promise((resolve) => {
+      const socket = new WebSocket(endpoint);
+      const timer = setTimeout(() => { socket.close(); resolve(); }, 2000);
+      const finish = () => { clearTimeout(timer); resolve(); };
+      socket.addEventListener("open", () => socket.send(JSON.stringify({ id: 1, method: "Browser.close" })), { once: true });
+      socket.addEventListener("close", finish, { once: true });
+      socket.addEventListener("error", finish, { once: true });
+    });
+  } catch {
+    // Process termination below remains the bounded fallback.
+  }
+}
+
 async function supervise(argv, options = {}) {
   const launch = options.spawn || spawn;
   const probe = options.probe || healthy;
   const signals = options.signals || process;
   const sleep = options.sleep || delay;
+  const close = options.closeBrowser || closeBrowser;
   const children = [];
+  let ready = false;
   let stopping = false;
   let exitCode = 1;
   let finish;
@@ -68,7 +88,6 @@ async function supervise(argv, options = {}) {
   };
   try {
     start("chromium", browserArgs, "ignore");
-    let ready = false;
     // Whole startup is bounded, including failed/slow health requests.
     const deadline = Date.now() + (options.startupTimeoutMs ?? 30000);
     while (!stopping && Date.now() < deadline) {
@@ -94,6 +113,9 @@ async function supervise(argv, options = {}) {
   } catch {
     return 1;
   } finally {
+    // Browser.close flushes the profile and removes SingletonLock, unlike a
+    // signal-only exit that can strand a lock naming the old container host.
+    if (ready) await close();
     for (const child of children) child.kill("SIGTERM");
     // Wait for a clean profile flush, then bound shutdown even if a child hangs.
     await Promise.race([
