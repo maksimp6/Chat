@@ -5,8 +5,8 @@ RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
     && apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
       bash ca-certificates git openssh-client ripgrep python3 chromium fonts-liberation \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /workspace /home/node/.desktop-commander-device /home/node/.claude-server-commander \
-    && chown -R node:node /workspace /home/node
+    && mkdir -p /workspace /rdc-state /home/node/.desktop-commander-device /home/node/.claude-server-commander \
+    && chown -R node:node /workspace /rdc-state /home/node
 
 COPY package.json package-lock.json dependency-smoke.cjs /opt/desktop-commander/
 RUN cd /opt/desktop-commander \
@@ -17,6 +17,7 @@ COPY config.json /opt/desktop-commander/config.example.json
 COPY entrypoint.sh /usr/local/bin/alice-desktop-commander
 COPY pairing-handoff.cjs /opt/desktop-commander/pairing-handoff.cjs
 COPY desktop-session.cjs browser-smoke.cjs /opt/desktop-commander/
+COPY state-store.py /opt/desktop-commander/state-store.py
 USER node
 WORKDIR /workspace
 ENTRYPOINT ["bash", "/usr/local/bin/alice-desktop-commander"]
