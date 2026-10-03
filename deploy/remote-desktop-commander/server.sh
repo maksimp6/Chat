@@ -24,11 +24,25 @@ case "$operation" in
     done
     cd "$root"
     docker compose config --quiet
+    rollback_tag="alice-remote-desktop-commander:rollback-$revision"
+    had_previous=0
+    if docker image inspect alice-remote-desktop-commander:0.2.52 >/dev/null 2>&1; then
+      docker tag alice-remote-desktop-commander:0.2.52 "$rollback_tag"
+      had_previous=1
+    fi
+    restore() {
+      docker compose down --remove-orphans >/dev/null 2>&1 || true
+      if [[ "$had_previous" == 1 ]]; then
+        docker tag "$rollback_tag" alice-remote-desktop-commander:0.2.52
+        docker compose up -d --no-build
+      fi
+    }
+    trap restore ERR
     docker compose build
-    # The root initialization process sees only this service's two volumes.
     docker compose run --rm --no-deps initialize
     docker compose up -d --no-build
     docker compose exec -T commander node -e 'process.stdout.write("Node runtime reachable\\n")'
+    trap - ERR
     printf 'Remote Desktop Commander installed from %s; OAuth pairing still required\n' "$revision"
     ;;
   status)
