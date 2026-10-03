@@ -179,6 +179,7 @@ function deleteConv(id) {
   localStorage.removeItem("messages_" + id);
 
   if (currentConvId === id) {
+    if (window.AlicePets) window.AlicePets.reset();
     currentConvId = conversations.length ? conversations[0].id : null;
     localStorage.setItem("current_conv_id", currentConvId);
     if (currentConvId) {

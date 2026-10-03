@@ -30,6 +30,7 @@
   var selected = "plush";
   var root, button, sprite, label, pending, unsubscribe;
   var motion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  var compact = window.matchMedia ? window.matchMedia("(max-height: 480px)") : null;
   var state = "idle",
     frame = 0,
     active = false,
@@ -58,6 +59,7 @@
   function schedule() {
     cancelFrame();
     if (!active || !root || root.hidden || document.hidden || context.revoke.isRevoked()) return;
+    if (compact && compact.matches) return;
     if (motion && motion.matches && !animations[state].once) return;
     try {
       pending = core.scheduler.defer(
@@ -72,6 +74,7 @@
   function advance() {
     pending = null;
     if (!active || document.hidden || context.revoke.isRevoked()) return;
+    if (compact && compact.matches) return;
     var animation = animations[state];
     if (motion && motion.matches) {
       setState(baseline());
@@ -184,6 +187,8 @@
     window.removeEventListener("pagehide", stop);
     window.removeEventListener("pageshow", start);
     if (motion && motion.removeEventListener) motion.removeEventListener("change", refreshMotion);
+    if (compact && compact.removeEventListener)
+      compact.removeEventListener("change", refreshMotion);
     if (unsubscribe) unsubscribe();
     root = null;
     sprite = null;
@@ -210,6 +215,7 @@
     window.addEventListener("pagehide", stop);
     window.addEventListener("pageshow", start);
     if (motion && motion.addEventListener) motion.addEventListener("change", refreshMotion);
+    if (compact && compact.addEventListener) compact.addEventListener("change", refreshMotion);
     unsubscribe = core.status.subscribe(function () {
       if (context.revoke.isRevoked()) stop();
     });

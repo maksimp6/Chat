@@ -11,6 +11,12 @@ function setup(options = {}) {
   const browser = new BrowserShim(html);
   const callbacks = new Set();
   const mediaListeners = new Set();
+  const compactListeners = new Set();
+  const compact = {
+    matches: Boolean(options.compact),
+    addEventListener: (_, fn) => compactListeners.add(fn),
+    removeEventListener: (_, fn) => compactListeners.delete(fn),
+  };
   const media = {
     matches: false,
     addEventListener: (_, fn) => mediaListeners.add(fn),
@@ -43,7 +49,7 @@ function setup(options = {}) {
     ["static/core_api.js", "static/pets.js", ...(options.chat ? ["static/chat.js"] : [])],
     {
       AbortSignal: fakeAbort,
-      matchMedia: () => media,
+      matchMedia: (query) => (query === "(max-height: 480px)" ? compact : media),
       performance: { now: () => 100 },
       currentConvId: "c1",
       currentModel: "test",
@@ -65,6 +71,8 @@ function setup(options = {}) {
     callbacks,
     media,
     mediaListeners,
+    compact,
+    compactListeners,
     tick,
     pet: loaded.window.AlicePets,
   };
@@ -119,6 +127,15 @@ async function main() {
     t.document.hidden = false;
     t.document.dispatchEvent(new t.window.Event("visibilitychange"));
     assert.equal(t.callbacks.size, 1);
+    t.compact.matches = true;
+    t.compactListeners.forEach((fn) => fn());
+    assert.equal(t.callbacks.size, 0, "CSS-hidden companion stops scheduling");
+    const hiddenRequest = t.pet.begin("running");
+    assert.equal(t.callbacks.size, 0, "activity cannot restart hidden animation");
+    t.compact.matches = false;
+    t.compactListeners.forEach((fn) => fn());
+    assert.equal(t.callbacks.size, 1, "tall viewport resumes one animation job");
+    hiddenRequest();
     t.media.matches = true;
     t.mediaListeners.forEach((fn) => fn());
     assert.equal(t.callbacks.size, 0, "reduced-motion idle has no animation work");
@@ -138,6 +155,30 @@ async function main() {
     assert.equal(t.callbacks.size, 0);
     t.pet.destroy();
     assert.equal(t.mediaListeners.size, 0);
+    assert.equal(t.compactListeners.size, 0);
+  }
+  {
+    const t = setup({ compact: true });
+    assert.equal(t.callbacks.size, 0, "short viewport never schedules initial idle");
+    t.pet.destroy();
+  }
+  {
+    const t = setup({ chat: true });
+    vm.runInContext(fs.readFileSync("static/sidebar.js", "utf8"), t.context);
+    vm.runInContext(
+      'conversations = [{id: "c1"}]; renderApprovalCard({name: "demo", arguments: {}}, "hello");',
+      t.context,
+    );
+    assert.equal(t.root.dataset.state, "waiting");
+    vm.runInContext('deleteConv("c1")', t.context);
+    assert.equal(
+      t.root.dataset.state,
+      "idle",
+      "deleting the last conversation clears unreachable approval",
+    );
+    assert.equal(t.document.querySelector(".approval-card"), null);
+    assert.equal(vm.runInContext("currentConvId", t.context), null);
+    t.pet.destroy();
   }
   {
     const t = setup({ saved: "none" });
