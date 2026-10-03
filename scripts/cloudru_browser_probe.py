@@ -44,6 +44,16 @@ def registry_response_shape(payload):
         "nextPageToken",
         "next_page_token",
         "pagination",
+        "registryList",
+        "registry_list",
+        "content",
+        "response",
+        "code",
+        "message",
+        "error",
+        "errors",
+        "details",
+        "status",
     )
 
     def shape(value, depth=0):
@@ -65,7 +75,7 @@ def registry_response_shape(payload):
     return shape(payload)
 
 
-def find_probe(apps, name):
+def probe_record(apps, name):
     found = [item for item in apps.list(require_total=True) if item.get("name") == name]
     if len(found) > 1:
         raise CloudProviderError("Ambiguous probe", code="invalid_response")
@@ -76,63 +86,175 @@ def find_probe(apps, name):
         identifier = str(UUID(item["id"]))
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise CloudProviderError("Invalid probe identity", code="invalid_response") from exc
-    return identifier
+    return {**item, "id": identifier}
+
+
+def find_probe(apps, name):
+    item = probe_record(apps, name)
+    return item["id"] if item is not None else None
+
+
+def registry_inventory(registry):
+    """Current official protobuf contract: registries + nextPageToken, no total."""
+    records = []
+    token = None
+    seen_tokens = set()
+    seen_ids = set()
+    for _ in range(100):
+        params = {"projectId": registry.project_id, "pageSize": 100}
+        if token:
+            params["pageToken"] = token
+        payload = registry.client.request(
+            "artifact_registry", "GET", "/v1/registries", params=params
+        )
+        print(
+            json.dumps(
+                {"stage": "registry_response_shape", "shape": registry_response_shape(payload)}
+            ),
+            flush=True,
+        )
+        if set(payload) - {"registries", "nextPageToken"}:
+            raise CloudProviderError("Unknown registry list schema", code="invalid_response")
+        # ProtoJSON omits default repeated fields and accepts null as unset.
+        items = payload.get("registries")
+        if items is None:
+            items = []
+        if not isinstance(items, list):
+            raise CloudProviderError("Invalid registry list", code="invalid_response")
+        for item in items:
+            identifier = registry_identifier(item)
+            if identifier in seen_ids:
+                raise CloudProviderError("Duplicate registry", code="invalid_response")
+            seen_ids.add(identifier)
+            records.append(item)
+        token = payload.get("nextPageToken")
+        if token in (None, ""):
+            return records
+        if not isinstance(token, str) or len(token) > 4096 or token in seen_tokens:
+            raise CloudProviderError("Invalid registry pagination", code="invalid_response")
+        seen_tokens.add(token)
+    raise CloudProviderError("Registry pagination exceeded bound", code="invalid_response")
+
+
+def registry_identifier(item):
+    try:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"]:
+            raise ValueError("Missing registry name")
+        return str(UUID(item["id"]))
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise CloudProviderError("Invalid registry identity", code="invalid_response") from exc
+
+
+def wait_registry_ready(registry, identifier):
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            item = registry.client.request(
+                "artifact_registry",
+                "GET",
+                f"/v1/registries/{identifier}",
+                params={"projectId": registry.project_id},
+            )
+        except CloudProviderError as exc:
+            if exc.http_status != 404:
+                raise
+            time.sleep(1)
+            continue
+        kind = item.get("registryType", "DOCKER")
+        if (
+            registry_identifier(item) != identifier
+            or item["name"] != REGISTRY
+            or item.get("isPublic", False) is not False
+            or not (kind == "DOCKER" or type(kind) is int and kind == 0)
+        ):
+            raise CloudProviderError(
+                "Probe registry must be the expected private Docker registry",
+                code="validation_error",
+            )
+        status = item.get("status", "CREATING")
+        if status == "ACTIVE" or type(status) is int and status == 1:
+            return
+        if status != "CREATING" and not (type(status) is int and status == 0):
+            raise CloudProviderError("Registry creation failed", code="registry_create_failed")
+        time.sleep(1)
+    raise CloudProviderError(
+        "Registry readiness exceeded 30 seconds", code="registry_create_timeout"
+    )
+
+
+def wait_registry_operation(registry, operation):
+    operation_id = operation.get("id")
+    if (
+        not isinstance(operation_id, str)
+        or not 1 <= len(operation_id) <= 256
+        or operation_id in {".", ".."}
+        or any(ord(char) < 33 or ord(char) > 126 for char in operation_id)
+    ):
+        raise CloudProviderError(
+            "Registry operation identity unavailable", code="registry_creation_unconfirmed"
+        )
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        error = operation.get("error")
+        if error is not None and (
+            not isinstance(error, dict)
+            or type(error.get("code", 0)) is not int
+            or error.get("code", 0) != 0
+        ):
+            raise CloudProviderError("Registry operation failed", code="registry_create_failed")
+        done = operation.get("done", False)
+        if type(done) is not bool:
+            raise CloudProviderError("Invalid operation status", code="invalid_response")
+        if done:
+            try:
+                return str(UUID(operation["resourceId"]))
+            except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                raise CloudProviderError(
+                    "Registry resource identity unavailable", code="invalid_response"
+                ) from exc
+        time.sleep(1)
+        try:
+            operation = registry.client.request(
+                "artifact_registry", "GET", f"/v1/operations/{quote(operation_id, safe='')}"
+            )
+        except CloudProviderError as exc:
+            if exc.http_status != 404:
+                raise
+            continue
+        if operation.get("id") != operation_id:
+            raise CloudProviderError("Registry operation identity changed", code="invalid_response")
+    raise CloudProviderError(
+        "Registry operation exceeded 30 seconds", code="registry_create_timeout"
+    )
 
 
 def prepare_registry(registry):
-    # Do not interpret an unfamiliar response as permission to create a resource.
-    # Official Cloud.ru MCP client uses project-scoped routes for both operations:
-    # github.com/cloud-ru/mcp-servers/blob/master/mcp-artifact-registry/server.py
-    path = f"/v1/projects/{quote(registry.project_id, safe='')}/registries"
+    # Contract extracted from the checksum-verified official Terraform provider v2.1.3.
     print('{"stage":"registry_inventory"}', flush=True)
-    payload = registry.client.request("artifact_registry", "GET", path, params={"pageSize": 100})
-    print(
-        json.dumps({"stage": "registry_response_shape", "shape": registry_response_shape(payload)}),
-        flush=True,
-    )
-    counters = [payload[k] for k in ("totalCount", "total") if k in payload]
-    total = counters[0] if len(counters) == 1 else None
-    if isinstance(total, str) and re.fullmatch(r"0|[1-9][0-9]{0,18}", total):
-        total = int(total)
-    if counters and (len(counters) != 1 or type(total) is not int or not 0 <= total < 1 << 63):
-        raise CloudProviderError("Invalid registry total", code="invalid_response")
-    collections = [payload[k] for k in ("registries", "items", "data") if k in payload]
-    # ProtoJSON may omit an empty repeated field; require an explicit zero count.
-    if not collections and total == 0:
-        collections = [[]]
-    if (
-        len(collections) != 1
-        or not isinstance(collections[0], list)
-        or not all(isinstance(x, dict) for x in collections[0])
-        or payload.get("nextPageToken")
-        or payload.get("next_page_token")
-    ):
-        raise CloudProviderError("Registry inventory incomplete", code="invalid_response")
-    items = collections[0]
-    if total is not None and total != len(items):
-        raise CloudProviderError("Registry inventory incomplete", code="invalid_response")
-    matches = [item for item in items if item.get("name") == REGISTRY]
+    items = with_budget(registry_inventory, registry, code="registry_inventory_timeout")
+    matches = [item for item in items if item["name"] == REGISTRY]
+    if len(matches) > 1:
+        raise CloudProviderError("Ambiguous probe registry", code="invalid_response")
     if matches:
-        if (
-            len(matches) != 1
-            or matches[0].get("isPublic") is not False
-            or matches[0].get("registryType") != "DOCKER"
-        ):
-            raise CloudProviderError(
-                "Probe registry must be private Docker", code="validation_error"
-            )
-        return
-    print('{"stage":"registry_create"}', flush=True)
-    registry.client.request(
-        "artifact_registry",
-        "POST",
-        path,
-        json_body={
-            "name": REGISTRY,
-            "isPublic": False,
-            "registryType": "DOCKER",
-        },
-    )
+        identifier = registry_identifier(matches[0])
+    else:
+        print('{"stage":"registry_create"}', flush=True)
+        operation = registry.client.request(
+            "artifact_registry",
+            "POST",
+            "/v1/registries",
+            json_body={
+                "projectId": registry.project_id,
+                "name": REGISTRY,
+                "isPublic": False,
+                "registryType": "DOCKER",
+            },
+        )
+        identifier = with_budget(
+            wait_registry_operation, registry, operation, code="registry_create_timeout"
+        )
+    with_budget(wait_registry_ready, registry, identifier, code="registry_create_timeout")
+    print(json.dumps({"stage": "registry_ready", "registry_id": identifier}), flush=True)
 
 
 def build_image(root, sha):
@@ -185,7 +307,7 @@ def stop_probe(apps, name, identifier, image):
     identifier = identifier or wait_for_probe(apps, name)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        current = apps.get(name)
+        current = probe_record(apps, name)
         if current is None:
             time.sleep(1)
             continue
@@ -210,9 +332,10 @@ def stop_probe(apps, name, identifier, image):
 def verify_probe(apps, name, identifier, image, *, http_get=requests.get, sleep=time.sleep):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        app = apps.get(name)
+        app = probe_record(apps, name)
         if app is None:
-            raise CloudProviderError("Probe disappeared", code="not_found")
+            sleep(1)
+            continue
         if app.get("id") != identifier:
             raise CloudProviderError("Probe identity changed", code="invalid_response")
         template = app.get("template") or {}

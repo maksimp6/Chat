@@ -24,8 +24,7 @@ def owned():
 
 def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
     verify = Mock()
     monkeypatch.setattr(probe, "verify_probe", verify)
     result = probe.run_probe(apps, SHA, IMAGE)
@@ -36,12 +35,12 @@ def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch)
     assert (spec.min_instances, spec.max_instances) == (0, 1)
     verify.assert_called_once_with(apps, NAME, ID, IMAGE)
     apps.stop.assert_called_once_with(NAME)
+    apps.get.assert_not_called()
 
 
 def test_wall_clock_timeout_still_stops_the_probe(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
 
     def expire(*_args):
         probe.signal.raise_signal(probe.signal.SIGALRM)
@@ -56,8 +55,7 @@ def test_wall_clock_timeout_still_stops_the_probe(monkeypatch):
 
 def test_probe_stops_on_runtime_failure(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
     monkeypatch.setattr(
         probe,
         "verify_probe",
@@ -80,8 +78,7 @@ def test_probe_never_takes_over_existing_resource():
 
 def test_ambiguous_create_timeout_stops_only_verified_owned_probe():
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
     apps.create.side_effect = CloudProviderError("timeout", code="provider_http_error")
     with pytest.raises(CloudProviderError, match="timeout"):
         probe.run_probe(apps, SHA, IMAGE)
@@ -102,8 +99,7 @@ def clock(monkeypatch):
 
 def test_async_create_waits_for_inventory_before_verification(monkeypatch, clock):
     apps = Mock()
-    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}], [owned()]]
     verify = Mock()
     monkeypatch.setattr(probe, "verify_probe", verify)
     assert probe.run_probe(apps, SHA, IMAGE)["status"] == "BROWSER_PROBE_PASSED"
@@ -116,8 +112,7 @@ def test_async_create_waits_for_inventory_before_verification(monkeypatch, clock
 def test_ambiguous_create_waits_for_delayed_inventory_and_detail(clock):
     apps = Mock()
     apps.create.side_effect = CloudProviderError("ambiguous", code="provider_http_error")
-    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}]]
-    apps.get.side_effect = [None, None, owned()]
+    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}], [], [], [owned()]]
     with pytest.raises(CloudProviderError, match="ambiguous"):
         probe.run_probe(apps, SHA, IMAGE)
     assert clock[0] == 4
@@ -127,8 +122,7 @@ def test_ambiguous_create_waits_for_delayed_inventory_and_detail(clock):
 
 def test_discovery_timeout_still_waits_and_stops_late_resource(monkeypatch, clock):
     apps = Mock()
-    apps.list.side_effect = [[]] * 33 + [[{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[]] * 33 + [[{"name": NAME, "id": ID}], [owned()]]
     verify = Mock()
     monkeypatch.setattr(probe, "verify_probe", verify)
     with pytest.raises(CloudProviderError) as failure:
@@ -158,13 +152,16 @@ def test_missing_resource_is_unconfirmed_cleanup_not_success(create_error, clock
 
 def test_cleanup_wall_clock_budget_reports_unconfirmed_resource(monkeypatch, capsys):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
     monkeypatch.setattr(probe, "verify_probe", Mock())
 
-    def stalled_get(_name):
+    def stalled_list(**_kwargs):
+        if apps.list.call_count == 1:
+            return []
+        if apps.list.call_count == 2:
+            return [{"name": NAME, "id": ID}]
         probe.signal.raise_signal(probe.signal.SIGALRM)
 
-    apps.get.side_effect = stalled_get
+    apps.list.side_effect = stalled_list
     with pytest.raises(CloudProviderError) as failure:
         probe.run_probe(apps, SHA, IMAGE)
     assert failure.value.code == "cleanup_failed"
@@ -175,8 +172,11 @@ def test_cleanup_wall_clock_budget_reports_unconfirmed_resource(monkeypatch, cap
 
 def test_cleanup_refuses_resource_with_unexpected_image(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = {**owned(), "template": {"containers": [{"image": "other"}]}}
+    apps.list.side_effect = [
+        [],
+        [{"name": NAME, "id": ID}],
+        [{**owned(), "template": {"containers": [{"image": "other"}]}}],
+    ]
     monkeypatch.setattr(probe, "verify_probe", Mock())
     with pytest.raises(CloudProviderError) as failure:
         probe.run_probe(apps, SHA, IMAGE)
@@ -186,7 +186,12 @@ def test_cleanup_refuses_resource_with_unexpected_image(monkeypatch):
 
 @pytest.mark.parametrize(
     "payload",
-    [{}, {"data": [], "total": 4}, {"items": [], "nextPageToken": "next"}, {"data": "invalid"}],
+    [
+        {"registries": "bad"},
+        {"data": [], "total": 4},
+        {"items": [], "nextPageToken": "next"},
+        {"code": 7, "message": "denied"},
+    ],
 )
 def test_unknown_or_partial_registry_inventory_never_creates(payload):
     registry = Mock(project_id="project")
@@ -220,42 +225,210 @@ def test_registry_diagnostic_distinguishes_counter_types(value, kind):
     assert result["fields"]["total"]["type"] == kind
 
 
-@pytest.mark.parametrize("payload", [{"registries": [], "totalCount": "0"}, {"totalCount": 0}])
-def test_registry_uses_official_project_scoped_list_and_create_routes(payload):
+OP_ID = "8d786cac-04bb-4f43-bef3-383eab421ab5"
+OTHER_ID = "4576b5bf-2cbc-463c-831b-3d74757cc360"
+
+
+def registry_record(**changes):
+    return {"id": ID, "name": probe.REGISTRY, "status": "ACTIVE", **changes}
+
+
+@pytest.mark.parametrize("payload", [{}, {"registries": None}, {"registries": []}])
+def test_empty_protojson_inventory_waits_for_created_registry_before_push(payload, clock):
     registry = Mock(project_id=ID)
-    registry.client.request.return_value = payload
+    registry.client.request.side_effect = [
+        payload,
+        {"id": OP_ID},
+        {"id": OP_ID, "done": True, "resourceId": ID},
+        registry_record(status="CREATING"),
+        registry_record(),
+    ]
     probe.prepare_registry(registry)
     calls = registry.client.request.call_args_list
-    assert calls[0].args == ("artifact_registry", "GET", f"/v1/projects/{ID}/registries")
-    assert calls[0].kwargs == {"params": {"pageSize": 100}}
-    assert calls[1].args == ("artifact_registry", "POST", f"/v1/projects/{ID}/registries")
+    assert calls[0].args == ("artifact_registry", "GET", "/v1/registries")
+    assert calls[0].kwargs == {"params": {"projectId": ID, "pageSize": 100}}
+    assert calls[1].args == ("artifact_registry", "POST", "/v1/registries")
     assert calls[1].kwargs == {
-        "json_body": {"name": probe.REGISTRY, "isPublic": False, "registryType": "DOCKER"}
+        "json_body": {
+            "projectId": ID,
+            "name": probe.REGISTRY,
+            "isPublic": False,
+            "registryType": "DOCKER",
+        }
     }
+    assert calls[2].args == ("artifact_registry", "GET", f"/v1/operations/{OP_ID}")
+    assert calls[2].kwargs == {}
+    assert calls[-1].args == ("artifact_registry", "GET", f"/v1/registries/{ID}")
+    assert calls[-1].kwargs == {"params": {"projectId": ID}}
+    assert clock[0] == 2
 
 
-@pytest.mark.parametrize("total", [True, -1, "-1", "01", "secret", 1.0, 1 << 63, 2])
-def test_registry_total_count_must_prove_complete_inventory(total):
+@pytest.mark.parametrize(
+    "metadata",
+    [{}, {"registryType": "DOCKER", "isPublic": False}, {"registryType": 0, "isPublic": False}],
+)
+def test_private_docker_protojson_defaults_are_checked_on_existing_registry(metadata):
     registry = Mock(project_id=ID)
-    registry.client.request.return_value = {"registries": [], "totalCount": total}
+    registry.client.request.side_effect = [
+        {"registries": [registry_record(**metadata)]},
+        registry_record(**metadata),
+    ]
+    probe.prepare_registry(registry)
+    assert all(call.args[1] == "GET" for call in registry.client.request.call_args_list)
+
+
+def test_paginated_inventory_reuses_registry_from_second_page():
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [
+        {
+            "registries": [registry_record(id=OTHER_ID, name="other-registry")],
+            "nextPageToken": "next",
+        },
+        {"registries": [registry_record()]},
+        registry_record(),
+    ]
+    probe.prepare_registry(registry)
+    calls = registry.client.request.call_args_list
+    assert calls[1].kwargs["params"]["pageToken"] == "next"
+    assert all(call.args[1] == "GET" for call in calls)
+
+
+@pytest.mark.parametrize(
+    "second",
+    [
+        {"registries": [registry_record()], "nextPageToken": "same"},
+        {"registries": [registry_record(id=OTHER_ID)]},
+        {"registries": "bad"},
+    ],
+)
+def test_incomplete_or_duplicate_registry_pages_never_create(second):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [
+        {
+            "registries": [registry_record(id=OTHER_ID, name="other-registry")],
+            "nextPageToken": "same",
+        },
+        second,
+    ]
     with pytest.raises(CloudProviderError):
         probe.prepare_registry(registry)
-    assert registry.client.request.call_count == 1
+    assert all(call.args[1] == "GET" for call in registry.client.request.call_args_list)
 
 
-def test_existing_private_registry_is_reused_without_creation():
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"isPublic": True},
+        {"registryType": "NPM"},
+        {"registryType": False},
+        {"name": "other-registry"},
+        {"id": OTHER_ID},
+        {"status": "ERROR"},
+    ],
+)
+def test_registry_detail_must_match_expected_private_ready_resource(changes):
     registry = Mock(project_id=ID)
-    registry.client.request.return_value = {
-        "registries": [{"name": probe.REGISTRY, "isPublic": False, "registryType": "DOCKER"}],
-        "totalCount": "1",
-    }
+    registry.client.request.side_effect = [
+        {"registries": [registry_record()]},
+        registry_record(**changes),
+    ]
+    with pytest.raises(CloudProviderError):
+        probe.prepare_registry(registry)
+    assert all(call.args[1] == "GET" for call in registry.client.request.call_args_list)
+
+
+def test_failed_create_operation_stops_before_registry_login(clock, capsys):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [
+        {},
+        {"id": OP_ID},
+        {"id": OP_ID, "done": True, "error": {"code": 7, "message": "secret-canary"}},
+    ]
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value.code == "registry_create_failed"
+    assert "secret-canary" not in capsys.readouterr().out
+    assert registry.client.request.call_count == 3
+
+
+def test_registry_create_timeout_never_posts_twice(clock):
+    registry = Mock(project_id=ID)
+    operation = {"id": OP_ID}
+    registry.client.request.side_effect = [{}, operation] + [operation] * 30
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value.code == "registry_create_timeout"
+    assert sum(call.args[1] == "POST" for call in registry.client.request.call_args_list) == 1
+    assert clock[0] == 30
+
+
+def test_registry_operation_identity_change_is_rejected(clock):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [
+        {},
+        {"id": OP_ID},
+        {"id": OTHER_ID, "done": True, "resourceId": ID},
+    ]
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value.code == "invalid_response"
+
+
+def test_registry_operation_propagation_404_is_polled_without_recreating(clock):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [
+        {},
+        {"id": OP_ID},
+        CloudProviderError("not visible", http_status=404),
+        {"id": OP_ID, "done": True, "resourceId": ID},
+        registry_record(),
+    ]
     probe.prepare_registry(registry)
+    assert sum(call.args[1] == "POST" for call in registry.client.request.call_args_list) == 1
+    assert clock[0] == 2
+
+
+def test_provider_opaque_operation_id_is_preserved_and_path_quoted(clock):
+    registry = Mock(project_id=ID)
+    operation_id = "registry-create/opaque?request=1"
+    registry.client.request.side_effect = [
+        {},
+        {"id": operation_id},
+        {"id": operation_id, "done": True, "resourceId": ID},
+        registry_record(),
+    ]
+    probe.prepare_registry(registry)
+    operation_get = registry.client.request.call_args_list[2]
+    assert operation_get.args == (
+        "artifact_registry",
+        "GET",
+        "/v1/operations/registry-create%2Fopaque%3Frequest%3D1",
+    )
+
+
+@pytest.mark.parametrize("operation_id", [".", ".."])
+def test_dot_segment_operation_ids_cannot_redirect_authenticated_request(operation_id):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [{}, {"id": operation_id}]
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value.code == "registry_creation_unconfirmed"
+    assert registry.client.request.call_count == 2
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 500])
+def test_registry_provider_errors_are_not_retried_or_used_for_creation(status):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = CloudProviderError("failed", http_status=status)
+    with pytest.raises(CloudProviderError):
+        probe.prepare_registry(registry)
     assert registry.client.request.call_count == 1
 
 
 def test_readiness_requires_expected_image_and_exact_static_response():
     apps = Mock()
     apps.get.return_value = {
+        "name": NAME,
         "id": ID,
         "status": "RUNNING",
         "template": {"containers": [{"image": IMAGE}]},
@@ -267,11 +440,13 @@ def test_readiness_requires_expected_image_and_exact_static_response():
         "browser_ready": True,
         "smoke_passed": True,
     }
+    apps.list.return_value = [apps.get.return_value]
     get = Mock(return_value=response)
     probe.verify_probe(apps, NAME, ID, IMAGE, http_get=get)
     get.assert_called_once_with(
         "https://" + NAME + ".containers.cloud.ru/healthz", timeout=3, allow_redirects=False
     )
+    apps.get.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -286,10 +461,12 @@ def test_readiness_requires_expected_image_and_exact_static_response():
 def test_readiness_rejects_untrusted_origin(uri):
     apps = Mock()
     apps.get.return_value = {
+        "name": NAME,
         "id": ID,
         "template": {"containers": [{"image": IMAGE}]},
         "configuration": {"ingress": {"publicUri": uri}},
     }
+    apps.list.return_value = [apps.get.return_value]
     get = Mock()
     with pytest.raises(CloudProviderError):
         probe.verify_probe(apps, NAME, ID, IMAGE, http_get=get)
