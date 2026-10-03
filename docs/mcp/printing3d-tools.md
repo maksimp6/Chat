@@ -20,11 +20,28 @@ Owner определяется:
 
 | Tool | Режим | Approval | Назначение |
 |---|---|---|---|
+| `printing3d.quote` | read-only, low risk | нет | Расчёт себестоимости и цены заказа |
+| `printing3d.order.create` | write, medium risk | да | Сохранить согласованный заказ |
 | `printing3d.finance.assess` | read-only, low risk | нет | AI-first оценка покупки/кредита |
 | `printing3d.finance.status` | read-only, low risk | нет | Сохранённый finance plan и фактическая окупаемость |
 | `printing3d.finance.plan.set` | write, medium risk | да | Сохранить принятые условия финансирования |
 | `printing3d.treasury.summary` | read-only, low risk | нет | Фактический P&L 3D-направления |
 | `printing3d.orders.list` | read-only, low risk | нет | Owner-scoped очередь заказов |
+
+## `printing3d.quote` и `printing3d.order.create`
+
+Калькулятор заказа использует тот же `calculate_quote`, что и HTTP
+`/api/3d/quote`.
+
+- `material_grams`, `material_cost_per_kg` и `print_hours` обязательны по смыслу:
+  если хотя бы одно неизвестно (`null`), инструмент возвращает
+  `status=needs_input` и `missing_fields`, а не цену, посчитанную от нуля.
+- Остальные параметры (мощность, электричество, амортизация, упаковка, брак,
+  комиссия, маржа) имеют значения по умолчанию сервиса; использованные
+  умолчания перечислены в `assumed_defaults`, чтобы Alice могла их назвать.
+- `printing3d.order.create` сохраняет заказ только через approval, со статусом
+  `lead`, `quote` (по умолчанию) или `accepted` и `source=alice`. Цена
+  пересчитывается на сервере из `quote`; неполный `quote` отклоняется.
 
 ## `printing3d.finance.assess`
 
