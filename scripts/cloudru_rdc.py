@@ -556,6 +556,26 @@ def health_summary(value):
     return value
 
 
+def readiness_error_form(exc):
+    """Classify one exact bounded message without emitting provider text."""
+    current = exc
+    for _ in range(4):
+        response = current.response if isinstance(current, requests.RequestException) else None
+        if response is not None and len(response.content) <= 65536:
+            try:
+                payload = response.json()
+            except (ValueError, RecursionError):
+                return "other"
+            message = payload.get("message") if isinstance(payload, dict) else None
+            if isinstance(message, str) and message.lower() == "must be running":
+                return "must_be_running"
+            return "other"
+        current = current.__cause__
+        if current is None:
+            break
+    return "other"
+
+
 def wait_ready(
     apps,
     *,
@@ -589,7 +609,7 @@ def wait_ready(
                     details.get("error") == "provider_http_error"
                     and exc.http_status == 499
                     and details.get("provider_status_code") == 1
-                    and details.get("provider_error_terms") == ["must", "running"]
+                    and readiness_error_form(exc) == "must_be_running"
                 )
                 if exc.http_status not in (404, 502, 503, 504) and not starting:
                     raise

@@ -1288,6 +1288,9 @@ def test_readiness_retries_exact_provider_starting_race(monkeypatch):
         (1, 400, "must be running"),
         (1, 499, "container"),
         (1, 499, "must be running authorization"),
+        (1, 499, "permission denied; must be running"),
+        (1, 499, "must be running; untrusted-extra"),
+        (1, 499, "must be running "),
     ],
 )
 def test_readiness_unknown_or_auth_errors_fail_immediately(monkeypatch, code, status, message):
