@@ -70,8 +70,9 @@ def test_install_retries_use_clean_context_and_preserve_state(tmp_path):
     assert (root / "state/auth-sentinel").read_text() == "not-a-real-secret"
     assert (root / "workspace/work.txt").read_text() == "keep"
     commands = log.read_text()
-    assert (root / ".dockerignore").read_text().splitlines()[:3] == [
+    assert (root / ".dockerignore").read_text().splitlines()[:4] == [
         "state/",
+        "pairing/",
         "workspace/",
         "releases/",
     ]
@@ -101,7 +102,13 @@ def test_invalid_revision_and_operation_do_not_invoke_docker(tmp_path):
 def test_compose_isolated_mounts_and_no_host_control():
     config = yaml.safe_load((DEPLOY / "compose.yaml").read_text())
     service = config["services"]["commander"]
-    assert service["volumes"] == ["./state:/home/node", "./workspace:/workspace"]
+    assert service["volumes"] == [
+        "./state:/home/node",
+        "./workspace:/workspace",
+        "./pairing:/pairing",
+    ]
+    assert service["group_add"] == ["10001"]
+    assert service["environment"]["ALICE_RDC_PAIRING_FILE"] == "/pairing/handoff.json"
     assert service["user"] == "1000:1000"
     assert service["read_only"] is True
     assert service["cap_drop"] == ["ALL"]

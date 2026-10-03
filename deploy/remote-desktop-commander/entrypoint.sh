@@ -27,4 +27,4 @@ with open(tmp, "w", encoding="utf-8") as handle:
     handle.write("\n")
 os.replace(tmp, target)
 PY
-exec node /opt/desktop-commander/node_modules/@wonderwhy-er/desktop-commander/dist/index.js "$@"
+exec node --require /opt/desktop-commander/pairing-handoff.cjs /opt/desktop-commander/node_modules/@wonderwhy-er/desktop-commander/dist/index.js "$@"

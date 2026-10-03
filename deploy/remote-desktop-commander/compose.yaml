@@ -7,14 +7,18 @@ services:
     init: true
     restart: unless-stopped
     user: "1000:1000"
+    group_add: ["10001"]
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m
+    environment:
+      ALICE_RDC_PAIRING_FILE: /pairing/handoff.json
     volumes:
       - ./state:/home/node
       - ./workspace:/workspace
+      - ./pairing:/pairing
     mem_limit: 1g
     cpus: 1.0
     pids_limit: 128
@@ -36,5 +40,6 @@ services:
     volumes:
       - ./state:/home/node
       - ./workspace:/workspace
+      - ./pairing:/pairing
     entrypoint: [bash, -euc]
-    command: ["chown 1000:1000 /home/node /workspace; chmod 700 /home/node /workspace"]
+    command: ["chown 1000:1000 /home/node /workspace; chmod 700 /home/node /workspace; chown 1000:10001 /pairing; chmod 2750 /pairing"]

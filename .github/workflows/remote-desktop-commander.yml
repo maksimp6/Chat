@@ -30,6 +30,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Validate Compose and build the actual CLI image
         run: |
+          node --test deploy/remote-desktop-commander/pairing-handoff.test.cjs
           docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
           docker compose -f deploy/remote-desktop-commander/compose.yaml build
       - name: Exercise volume initialization and non-root CLI startup
