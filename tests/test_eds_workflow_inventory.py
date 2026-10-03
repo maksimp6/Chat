@@ -54,6 +54,19 @@ def test_one_deadline_for_all_pages():
         )
 
 
+def test_missing_applications_does_not_report_complete_inventory():
+    with pytest.raises(ValueError):
+        module.inventory(lambda *_: {})
+    pages = iter([{"applications": [application(i) for i in range(50)]}, {}])
+    with pytest.raises(ValueError):
+        module.inventory(lambda *_: next(pages))
+    assert module.inventory(lambda *_: {"total": 0}) == {
+        "complete": True,
+        "count": 0,
+        "applications": [],
+    }
+
+
 def test_secret_echoes_and_cli_errors_are_not_published(monkeypatch, capsys):
     secret = "secret-sentinel"
     monkeypatch.setenv("EDS_API_KEY", secret)

@@ -38,8 +38,10 @@ def inventory(query, *, clock=time.monotonic, secrets=()):
         page = query(offset, remaining)
         if not isinstance(page, dict):
             raise ValueError("invalid page")
-        applications = page.get("applications", [])
         total = page.get("total")
+        applications = page.get("applications")
+        if "applications" not in page and type(total) is int and total == 0:
+            applications = []
         if not isinstance(applications, list) or len(applications) > PAGE_SIZE:
             raise ValueError("invalid applications")
         if total is not None:
