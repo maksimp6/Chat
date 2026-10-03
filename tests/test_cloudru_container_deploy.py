@@ -265,12 +265,38 @@ def test_strict_inventory_accepts_integer_and_decimal_string_totals(total):
     assert apps.list(require_total=True) == items
 
 
-@pytest.mark.parametrize("total", [False, None, "", "-1", "1.5", "NaN", " 0", "00", "9" * 21])
+@pytest.mark.parametrize(
+    "total",
+    [
+        False,
+        None,
+        "",
+        "-1",
+        "1.5",
+        "NaN",
+        " 0",
+        "00",
+        "9" * 21,
+        "9" * 20,
+        1 << 63,
+        str(1 << 63),
+        (1 << 64) - 1,
+    ],
+)
 def test_strict_inventory_rejects_invalid_total_representations(total):
     apps = CloudRuContainerAppsClient(
         project_id="p1", client=RecordingClient([{"data": [], "total": total}])
     )
     with pytest.raises(CloudProviderError, match="Invalid inventory total"):
+        apps.list(require_total=True)
+
+
+@pytest.mark.parametrize("total", [(1 << 63) - 1, str((1 << 63) - 1)])
+def test_inventory_accepts_int64_max_but_still_requires_all_records(total):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([{"data": [], "total": total}])
+    )
+    with pytest.raises(CloudProviderError, match="Incomplete container inventory"):
         apps.list(require_total=True)
 
 

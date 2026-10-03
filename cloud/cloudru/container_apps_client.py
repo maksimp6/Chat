@@ -231,11 +231,12 @@ class CloudRuContainerAppsClient:
             if "total" in payload:
                 total = payload["total"]
                 # ProtoJSON serializes 64-bit integer counters as decimal strings.
-                if isinstance(total, str) and re.fullmatch(r"0|[1-9][0-9]{0,19}", total):
+                if isinstance(total, str) and re.fullmatch(r"0|[1-9][0-9]{0,18}", total):
                     total = int(total)
                 if (
                     type(total) is not int
                     or total < 0
+                    or total > (1 << 63) - 1
                     or (expected_total is not None and total != expected_total)
                 ):
                     raise CloudProviderError("Invalid inventory total", code="invalid_response")
