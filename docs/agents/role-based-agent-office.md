@@ -141,3 +141,12 @@ Execution Trace, while the full skill prompt is not copied into the trace.
 
 Role prompts reference reusable skills instead of restating their procedures. Global
 safety, authorization and approval policy always overrides a skill.
+
+## Compliance evidence roles
+
+Issue #729 adds six manually selected compliance profiles: RKN Law, Data Mapping,
+Policy Diff, Privacy E2E, Incident Drill and Compliance Gate. See
+[the compliance agent contract](../../agents/compliance/README.md) for matching
+GitHub/Codex profiles, GPT-5.5/low settings, evidence reports and deterministic
+handoff validation. These specialist profiles do not grant deployment or legal
+approval and are not new application runtime roles.
