@@ -64,6 +64,13 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/claude_session_ci.py check --metadata "$RUNNER_TEMP/claude-session/metadata.json"
 
+      - name: Install verified EDS CLI
+        if: steps.routing.outputs.eligible != 'true'
+        run: |
+          timeout 30s python scripts/install_eds.py --bin-dir "$RUNNER_TEMP/eds-bin"
+          echo "$RUNNER_TEMP/eds-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/eds-bin/eds" version
+
       - name: Run Claude Code
         if: steps.routing.outputs.eligible != 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1.0.235
