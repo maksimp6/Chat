@@ -240,7 +240,7 @@ def cmd_status(_: argparse.Namespace) -> dict:
 def cmd_inventory(_: argparse.Namespace) -> dict:
     """Check project-level access without assuming a container already exists."""
     cfg = _settings()
-    items = CloudRuContainerAppsClient().list(order_by="name")
+    items = CloudRuContainerAppsClient().list(order_by="name", require_total=True)
     names = [item.get("name") for item in items]
     if any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(
         names

@@ -372,12 +372,35 @@ def test_inventory_cli_never_publishes_partial_success(monkeypatch, capsys, last
     assert "configured_container_exists" not in output
 
 
+@pytest.mark.parametrize(
+    "pages",
+    [
+        [{"data": []}],
+        [{"data": [{"name": "other"}]}],
+        [{"data": [{"name": "alice-pro"}]}],
+        [{"data": [], "nextPageToken": "next"}, {"data": []}],
+    ],
+)
+def test_inventory_cli_requires_total_before_claiming_completeness(monkeypatch, capsys, pages):
+    script = _deploy_script()
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient(pages))
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    monkeypatch.setattr(script, "_load_cloudru_credentials", lambda: None)
+    assert script.main(["inventory"]) == 1
+    output = capsys.readouterr().out
+    assert "Missing inventory total" in output
+    assert "INVENTORY_COMPLETE" not in output
+    assert "configured_container_exists" not in output
+
+
 @pytest.mark.parametrize("items", [[{}], [{"name": []}], [{"name": "one"}, {"name": "one"}]])
 def test_inventory_rejects_unknown_or_repeated_names(monkeypatch, items):
     import argparse
 
     script = _deploy_script()
-    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient([{"data": items}]))
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([{"data": items, "total": len(items)}])
+    )
     monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
     with pytest.raises(CloudProviderError, match="Invalid container inventory"):
         script.cmd_inventory(argparse.Namespace())

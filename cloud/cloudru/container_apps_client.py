@@ -198,6 +198,7 @@ class CloudRuContainerAppsClient:
         page_size: int = 100,
         filter_expr: str | None = None,
         order_by: str | None = None,
+        require_total: bool = False,
     ) -> list[dict[str, Any]]:
         """Return all Container Services using the documented v2 pagination contract."""
         if page_size < 1:
@@ -239,6 +240,8 @@ class CloudRuContainerAppsClient:
 
             next_token = payload.get("nextPageToken")
             if next_token is None or next_token == "":
+                if require_total and expected_total is None:
+                    raise CloudProviderError("Missing inventory total", code="invalid_response")
                 if expected_total is not None and len(items) != expected_total:
                     raise CloudProviderError(
                         "Incomplete container inventory", code="invalid_response"
