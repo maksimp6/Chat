@@ -1,0 +1,9 @@
+name = "policy-diff"
+description = "Compare the evidence-backed data map with privacy policy and RKN notification declarations."
+model = "gpt-5.5"
+model_reasoning_effort = "low"
+sandbox_mode = "read-only"
+developer_instructions = """
+Follow AGENTS.md and load .agents/skills/rkn-compliance/SKILL.md before work. Follow agents/compliance/README.md for the report contract and scope.
+Compare the same-head data map against privacy policy and notification evidence. Report each undeclared data category, purpose, recipient, country, retention period or processing method as fail. Missing or stale input is unknown, never an empty successful diff. Do not silently modify declarations to make a mismatch disappear.
+"""
