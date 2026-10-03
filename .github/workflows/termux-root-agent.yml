@@ -1,0 +1,81 @@
+name: Alice Root Termux APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/termux_root_agent/**"
+      - ".github/workflows/termux-root-agent.yml"
+  push:
+    branches:
+      - "feat/termux-root-agent"
+    paths:
+      - "tools/termux_root_agent/**"
+      - ".github/workflows/termux-root-agent.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build rooted Termux APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Alice Pro overlay
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout official Termux source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: termux/termux-app
+          ref: master
+          path: termux-src
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Apply Alice Root Agent overlay
+        shell: bash
+        run: |
+          python tools/termux_root_agent/patch_termux.py             "$GITHUB_WORKSPACE/termux-src"             "$GITHUB_WORKSPACE/tools/termux_root_agent"
+          grep -q "AliceRootAgentService"             termux-src/app/src/main/java/com/termux/app/TermuxApplication.java
+          grep -q "AliceRootAgentService"             termux-src/app/src/main/AndroidManifest.xml
+
+      - name: Build universal APK
+        working-directory: termux-src
+        env:
+          TERMUX_PACKAGE_VARIANT: apt-android-7
+          TERMUX_SPLIT_APKS_FOR_DEBUG_BUILDS: "0"
+          TERMUX_APP_VERSION_NAME: 0.118.0-alice.1
+          TERMUX_APK_VERSION_TAG: alice-root-agent
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          APK="$(find termux-src/app/build/outputs/apk/debug -maxdepth 1 -name '*universal.apk' -print -quit)"
+          test -n "$APK"
+          cp "$APK" out/AliceRootTermux-universal.apk
+          sha256sum out/AliceRootTermux-universal.apk > out/AliceRootTermux-universal.apk.sha256
+          ls -lh out/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: AliceRootTermux
+          path: |
+            out/AliceRootTermux-universal.apk
+            out/AliceRootTermux-universal.apk.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
