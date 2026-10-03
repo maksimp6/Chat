@@ -187,6 +187,7 @@ def wait_registry_operation(registry, operation):
     if (
         not isinstance(operation_id, str)
         or not 1 <= len(operation_id) <= 256
+        or operation_id in {".", ".."}
         or any(ord(char) < 33 or ord(char) > 126 for char in operation_id)
     ):
         raise CloudProviderError(

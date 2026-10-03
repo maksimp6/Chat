@@ -406,6 +406,16 @@ def test_provider_opaque_operation_id_is_preserved_and_path_quoted(clock):
     )
 
 
+@pytest.mark.parametrize("operation_id", [".", ".."])
+def test_dot_segment_operation_ids_cannot_redirect_authenticated_request(operation_id):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = [{}, {"id": operation_id}]
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value.code == "registry_creation_unconfirmed"
+    assert registry.client.request.call_count == 2
+
+
 @pytest.mark.parametrize("status", [401, 403, 404, 500])
 def test_registry_provider_errors_are_not_retried_or_used_for_creation(status):
     registry = Mock(project_id=ID)
