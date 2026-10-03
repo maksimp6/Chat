@@ -14,6 +14,7 @@ from uuid import uuid4
 from flask import Blueprint, jsonify, request
 
 from db import get_conn
+from local_agents.results import wait_for_job_result
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
 
@@ -169,7 +170,13 @@ def enqueue_local_tool_job(
                 agent_id,
                 tool_name,
                 _json(dict(arguments)),
-                _json(dict(metadata or {})),
+                _json(
+                    {
+                        key: value
+                        for key, value in (metadata or {}).items()
+                        if key != "execution_trace"
+                    }
+                ),
                 trace_id,
                 invocation_id,
                 _now(),
@@ -179,6 +186,11 @@ def enqueue_local_tool_job(
         return job_id
     finally:
         conn.close()
+
+
+def wait_for_local_tool_job(job_id: str, *, timeout_seconds: float = 30.0) -> dict[str, Any] | None:
+    """Internal result path for UniversalToolExecutor; never a public read route."""
+    return wait_for_job_result(get_conn, job_id, timeout_seconds=timeout_seconds)
 
 
 def _recover_expired_jobs(conn, agent_id: str) -> None:
@@ -438,4 +450,9 @@ def local_agent_health():
     return jsonify({"agents": agents})
 
 
-__all__ = ["enqueue_local_tool_job", "init_local_agent_tables", "local_agent_bp"]
+__all__ = [
+    "enqueue_local_tool_job",
+    "wait_for_local_tool_job",
+    "init_local_agent_tables",
+    "local_agent_bp",
+]
