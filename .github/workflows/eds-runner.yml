@@ -1,0 +1,43 @@
+name: EDS runner check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Verify EDS installation and credentials
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 2
+    steps:
+      - name: Checkout trusted runner code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install verified EDS CLI
+        run: |
+          timeout 30s python scripts/install_eds.py --bin-dir "$RUNNER_TEMP/eds-bin"
+          echo "$RUNNER_TEMP/eds-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/eds-bin/eds" version
+
+      - name: Check Repo access without publishing API output
+        env:
+          EDS_API_KEY: ${{ secrets.EDS_API_KEY }}
+          EDS_PROJECT_ID: ${{ secrets.EDS_PROJECT_ID }}
+          EDS_REPO_API_URL: https://devtools.api.cloud.ru/repo/api/v1
+        run: |
+          if [[ -z "$EDS_API_KEY" || -z "$EDS_PROJECT_ID" ]]; then
+            echo 'Missing EDS_API_KEY or EDS_PROJECT_ID in production secrets.'
+            exit 1
+          fi
+          if timeout 30s eds repo list --limit 1 --offset 0 --json >/dev/null 2>&1; then
+            echo 'EDS Repo access verified.'
+          else
+            echo 'EDS Repo access failed or exceeded 30 seconds; check credentials and network.'
+            exit 1
+          fi
