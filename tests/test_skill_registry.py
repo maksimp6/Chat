@@ -142,6 +142,7 @@ def test_registry_role_catalog_and_empty_root_policy(tmp_path):
     assert [item["name"] for item in registry.catalog(role="Operations Observer")] == [
         "security-review"
     ]
+    assert [item["name"] for item in registry.catalog(role="Work Coordinator")] == []
     assert [item["name"] for item in registry.catalog(role="Process Governor")] == [
         "docs-sync",
         "security-review",

@@ -25,10 +25,12 @@ IMPLEMENTATION_ROLES = frozenset(
 )
 
 REVIEW_ONLY_BACKENDS = frozenset({"copilot"})
+COORDINATION_ONLY_ROLES = frozenset({"work-coordinator"})
 
 _ALL_ROLES = frozenset(
     {
         "team-lead",
+        "work-coordinator",
         "backend-engineer",
         "frontend-engineer",
         "android-engineer",
@@ -147,13 +149,20 @@ def resolve_task_plan(
                 f"{role!r} is an implementation role and cannot perform solution review;"
                 " use a non-implementation supervisory role"
             )
+        if role in COORDINATION_ONLY_ROLES:
+            raise AgentDispatchError(
+                f"{role!r} is coordination-only and cannot perform solution review"
+            )
 
     can_merge = stage == "maintain" and role == "release-manager"
     can_implement = stage == "implementation" and role in IMPLEMENTATION_ROLES
     can_write_contract_tests = stage == "contract" and role == "test-engineer"
     can_review_contract = stage == "contract-review" and role == "team-lead"
     can_review_solution = (
-        stage == "solution-review" and role is not None and role not in IMPLEMENTATION_ROLES
+        stage == "solution-review"
+        and role is not None
+        and role not in IMPLEMENTATION_ROLES
+        and role not in COORDINATION_ONLY_ROLES
     )
 
     return AgentTaskPlan(
