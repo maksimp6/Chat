@@ -70,7 +70,7 @@ fi
 
 _codex_github_token="${CODEX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 if [[ -n "$_codex_github_token" ]]; then
-  printf '%s\n' "$_codex_github_token" | gh auth login --hostname github.com --git-protocol https --with-token >/dev/null
+  printf '%s\n' "$_codex_github_token" | GH_TOKEN= GITHUB_TOKEN= gh auth login --hostname github.com --git-protocol https --with-token >/dev/null
   gh auth setup-git --hostname github.com >/dev/null
   if [[ -f "$HOME/.config/gh/hosts.yml" ]]; then
     chmod 600 "$HOME/.config/gh/hosts.yml"

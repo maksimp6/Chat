@@ -56,7 +56,7 @@ gh --version
 # Codex removes their environment variables before the interactive agent phase.
 # shellcheck disable=SC1091
 source scripts/codex_agent_credentials.sh
-if test -n "${CODEX_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"; then
+if test -n "${CODEX_GITHUB_TOKEN:+configured}${GITHUB_TOKEN:+configured}"; then
   gh auth status >/dev/null
 fi
 if ! command -v cloud >/dev/null 2>&1; then
