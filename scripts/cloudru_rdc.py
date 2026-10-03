@@ -1098,7 +1098,7 @@ def diagnostic_terms(value):
 
 
 def revision_diagnostics(apps, record, *, clock=time.monotonic):
-    """Bounded provider revision metadata only; never application logs or raw reasons."""
+    """Bounded provider revisions and system events; no application logs or raw reasons."""
     deadline = clock() + 60
     previous_timeout = apps.client.timeout
     name = names(apps.project_id)[0]
