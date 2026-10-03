@@ -1774,3 +1774,95 @@ body {
   background: var(--m-card, #fff);
   color: var(--m-text, #222);
 }
+
+/* === APP SURFACES === */
+.alice-pro-app .app-surfaces-card {
+  width: min(1100px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+}
+
+.alice-pro-app .app-surfaces-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alice-pro-app .app-surfaces-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.alice-pro-app .app-surfaces-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 420px;
+}
+
+.alice-pro-app .app-surfaces-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.alice-pro-app .app-surface-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+}
+
+.alice-pro-app .app-surface-row span,
+.alice-pro-app .app-surface-view-meta,
+.alice-pro-app .app-surface-state {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.alice-pro-app .app-surfaces-viewer {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alice-pro-app .app-surface-view-title {
+  font-weight: 700;
+}
+
+.alice-pro-app .app-surface-frame {
+  width: 100%;
+  max-height: 65dvh;
+  object-fit: contain;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: #111;
+  cursor: crosshair;
+}
+
+.alice-pro-app .app-surface-refresh {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text-main);
+}
+
+.alice-pro-app .app-surface-error {
+  color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .alice-pro-app .app-surfaces-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .alice-pro-app .app-surfaces-list {
+    max-height: 160px;
+  }
+}
