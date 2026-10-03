@@ -160,6 +160,41 @@ def test_copilot_assignment_and_alice_label_are_dispatches():
 # --- findings ---------------------------------------------------------------
 
 
+def test_approved_red_contract_is_expected_not_ci_incident():
+    item = pr_item(hours_ago=1)
+    item["labels"] = [{"name": "tdd:red-contract-approved"}]
+    thread = build_thread(
+        item,
+        [],
+        pull(draft=True),
+        [run("Contract tests", "failure")],
+    )
+
+    findings = detect_findings(thread, NOW)
+
+    assert "ci_failed" not in kinds(findings)
+    assert "expected_red_contract" in kinds(findings)
+    expected = next(finding for finding in findings if finding.kind == "expected_red_contract")
+    assert expected.severity == "low"
+    assert "Contract tests" in expected.message
+
+
+def test_unapproved_red_contract_remains_ci_failure():
+    item = pr_item(hours_ago=1)
+    item["labels"] = [{"name": "tdd:red-contract"}]
+    thread = build_thread(
+        item,
+        [],
+        pull(draft=True),
+        [run("Contract tests", "failure")],
+    )
+
+    findings = detect_findings(thread, NOW)
+
+    assert "ci_failed" in kinds(findings)
+    assert "expected_red_contract" not in kinds(findings)
+
+
 def test_red_ci_and_merge_conflict_are_high():
     thread = build_thread(
         pr_item(),
