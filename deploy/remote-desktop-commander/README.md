@@ -174,6 +174,11 @@ input `storage_tenant_id` or existing variable `CLOUDRU_STORAGE_TENANT_ID`.
 The tenant ID is not a credential and cannot be replaced by the project ID.
 Ownership checks compare any returned managed-mount tenant ID with this exact
 configured tenant before operating on the service.
+Cloud.ru may add a global volume `readOnly` attribute. Ownership accepts it only
+when omitted or explicitly disabled (`false` as a boolean, or the exact strings
+`false`, `False`, `FALSE`); empty, null, numeric, enabled and unknown values are
+rejected. The mount must also remain writable. This preserves the documented
+[volume access rules](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes).
 Existing production IAM signs S3 operations only in the reviewed runner.
 The application receives a managed `/rdc-state` bucket mount; IAM, S3 and SSH
 keys are not passed to RDC. The dedicated bucket name is

@@ -850,3 +850,32 @@ def test_volume_attribute_diagnostics_allowlist_keys_without_values(capsys):
         "secretAccessKey",
     ]
     assert diagnostic["volume_read_only_form"] == "false_string"
+
+
+@pytest.mark.parametrize("value", [False, "false", "False", "FALSE"])
+def test_explicit_global_writable_volume_preserves_ownership(value):
+    item = record()
+    item["template"]["volumes"][0]["volumeAttributes"]["readOnly"] = value
+    assert rdc.owned_record(apps_with(item), tenant=TENANT)["id"] == IDENTIFIER
+
+
+@pytest.mark.parametrize(
+    "value", [None, "", 0, 0.0, "0", True, "true", "True", "TRUE", 1, "1", "unknown"]
+)
+def test_global_readonly_ambiguous_or_enabled_is_not_owned(value):
+    item = record()
+    item["template"]["volumes"][0]["volumeAttributes"]["readOnly"] = value
+    apps = apps_with(item)
+    with pytest.raises(CloudProviderError) as error:
+        rdc.owned_record(apps, tenant=TENANT)
+    assert error.value.code == "rdc_ownership_unconfirmed"
+    apps.stop.assert_not_called()
+    apps.start.assert_not_called()
+
+
+def test_global_writable_does_not_override_readonly_mount():
+    item = record()
+    item["template"]["volumes"][0]["volumeAttributes"]["readOnly"] = "False"
+    item["template"]["containers"][0]["volumeMounts"][0]["readOnly"] = True
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
