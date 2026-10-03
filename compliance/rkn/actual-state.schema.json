@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Alice Pro RKN actual state",
+  "type": "object",
+  "required": ["version", "controls", "external_services", "evidence"],
+  "properties": {
+    "version": {"const": 1},
+    "controls": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "evidence"],
+        "properties": {
+          "status": {"enum": ["pass", "fail", "unknown"]},
+          "value": {},
+          "evidence": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "external_services": {"type": "array", "items": {"type": "string"}},
+    "evidence": {"type": "array", "items": {"type": "string"}}
+  }
+}

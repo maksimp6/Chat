@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "required_controls": [
+    "password_storage",
+    "backup_restore",
+    "log_redaction",
+    "log_retention",
+    "tls_public_endpoint"
+  ],
+  "allowed_external_services": [
+    "cloud.ru",
+    "yandex"
+  ],
+  "human_approval_required": [
+    "approve_privacy_policy",
+    "submit_rkn_notification",
+    "change_rkn_notification"
+  ]
+}
