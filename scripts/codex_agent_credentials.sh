@@ -28,8 +28,15 @@ chmod 700 "$HOME/.ssh" "$HOME/.gnupg" "$HOME/.config" "$HOME/.config/gh"
 _codex_gpg_private_key="${CODEX_GPG_PRIVATE_KEY:-${GPG_PRIVATE_KEY:-}}"
 if [[ -n "$_codex_gpg_private_key" ]]; then
   _codex_gpg_file="$(mktemp)"
-  _codex_normalize_secret_file "$_codex_gpg_file" "$_codex_gpg_private_key"
-  _codex_gpg_status="$(gpg --batch --status-fd 1 --import "$_codex_gpg_file" 2>/dev/null)"
+  if ! _codex_normalize_secret_file "$_codex_gpg_file" "$_codex_gpg_private_key"; then
+    rm -f "$_codex_gpg_file"
+    return 1
+  fi
+  if ! _codex_gpg_status="$(gpg --batch --status-fd 1 --import "$_codex_gpg_file" 2>/dev/null)"; then
+    rm -f "$_codex_gpg_file"
+    echo "Codex GPG private key import failed" >&2
+    return 1
+  fi
   rm -f "$_codex_gpg_file"
   _codex_gpg_fingerprint="$(awk '$2 == "IMPORT_OK" { print $4; exit }' <<<"$_codex_gpg_status")"
   if [[ -z "$_codex_gpg_fingerprint" ]]; then
@@ -41,8 +48,17 @@ fi
 
 _codex_ssh_private_key="${CODEX_SSH_PRIVATE_KEY:-${SSH_PRIVATE_KEY:-${PREVIEW_SSH_PRIVATE_KEY:-}}}"
 if [[ -n "$_codex_ssh_private_key" ]]; then
-  _codex_normalize_secret_file "$HOME/.ssh/id_ed25519" "$_codex_ssh_private_key"
-  ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+  _codex_ssh_file="$(mktemp "$HOME/.ssh/.id_ed25519.XXXXXX")"
+  if ! _codex_normalize_secret_file "$_codex_ssh_file" "$_codex_ssh_private_key" \
+      || ! ssh-keygen -y -f "$_codex_ssh_file" >/dev/null 2>&1; then
+    rm -f "$_codex_ssh_file"
+    echo "Codex SSH private key validation failed" >&2
+    return 1
+  fi
+  if ! mv -f "$_codex_ssh_file" "$HOME/.ssh/id_ed25519"; then
+    rm -f "$_codex_ssh_file"
+    return 1
+  fi
 fi
 
 _codex_ssh_known_hosts="${CODEX_SSH_KNOWN_HOSTS:-${SSH_KNOWN_HOSTS:-${PREVIEW_SSH_KNOWN_HOSTS:-}}}"
@@ -78,7 +94,7 @@ if [[ -n "$_codex_github_token" ]]; then
 fi
 
 unset _codex_gpg_private_key _codex_gpg_file _codex_gpg_status _codex_gpg_fingerprint
-unset _codex_ssh_private_key _codex_ssh_known_hosts _codex_github_token
+unset _codex_ssh_private_key _codex_ssh_file _codex_ssh_known_hosts _codex_github_token
 unset _codex_server_known_hosts _codex_server_number _codex_server_host_variable
 unset _codex_server_key_variable _codex_server_host _codex_server_key
 unset CODEX_SECRET_DESTINATION CODEX_SECRET_VALUE

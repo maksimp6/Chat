@@ -279,3 +279,43 @@ def test_bootstrap_callers_do_not_trace_github_credentials(
     )
     assert "synthetic-caller-secret-token" not in result.stdout + result.stderr
     assert "configured" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("program", "key_variable"),
+    [("gpg", "CODEX_GPG_PRIVATE_KEY"), ("ssh-keygen", "CODEX_SSH_PRIVATE_KEY")],
+)
+def test_invalid_private_key_preserves_identity_and_removes_plaintext_tempfiles(
+    tmp_path: Path, program: str, key_variable: str
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    executable = bin_dir / program
+    executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    executable.chmod(0o700)
+    home = tmp_path / "home"
+    ssh_dir = home / ".ssh"
+    ssh_dir.mkdir(parents=True)
+    identity = ssh_dir / "id_ed25519"
+    identity.write_text("previous-working-identity\n", encoding="utf-8")
+    identity.chmod(0o600)
+    temporary = tmp_path / "temporary"
+    temporary.mkdir()
+    result = subprocess.run(
+        ["bash", "-c", f"set -euxo pipefail; source {CREDENTIAL_HELPER}"],
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "HOME": str(home),
+            "TMPDIR": str(temporary),
+            key_variable: "synthetic-invalid-private-key",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert identity.read_text(encoding="utf-8") == "previous-working-identity\n"
+    assert stat.S_IMODE(identity.stat().st_mode) == 0o600
+    assert list(temporary.iterdir()) == []
+    assert list(ssh_dir.iterdir()) == [identity]
+    assert "synthetic-invalid-private-key" not in result.stdout + result.stderr
