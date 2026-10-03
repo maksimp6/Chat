@@ -5,7 +5,8 @@ const { EventEmitter } = require("node:events");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, processGroupGone, containerWritersGone } = require("./desktop-session.cjs");
+const { createHash } = require("node:crypto");
+const { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit } = require("./desktop-session.cjs");
 
 function harness(onLaunch = () => {}) {
   const signals = new EventEmitter();
@@ -174,6 +175,7 @@ function cloudHarness(options = {}) {
   h.authSignature = () => null;
   h.processGroupGone = () => !options.lingeringExecutor;
   h.containerWritersGone = () => !options.escapedExecutor;
+  h.authorizeControl = () => true;
   h.stateHelper = async (command) => {
     commands.push(command);
     if (command === "status") return { ...summary };
@@ -204,7 +206,7 @@ test("persistent cloud session reports only durable summary and suppresses raw R
     assert.equal(response.headers.get("cache-control"), "no-store");
     assert.deepEqual(await response.json(), {
       mode: "cloud-rdc", browser_ready: true, rdc_running: true, state_ready: true,
-      paired: false, device_id: null, checkpoint_generation: 0,
+      paired: false, device_id: null, checkpoint_generation: 0, quiesced: false,
     });
     assert.deepEqual(h.calls[1].options.stdio, ["ignore", "ignore", "ignore", "ipc"]);
     assert(h.calls.every(({ options }) => options.detached === true));
@@ -251,6 +253,7 @@ test("checkpoint closes both children before snapshot, keeps server quiesced and
     assert.equal(state.browser_ready, false);
     assert.equal(state.rdc_running, false);
     assert.equal(state.checkpoint_generation, 1);
+    assert.equal(state.quiesced, true);
     assert.equal(h.calls.length, 2);
     assert.equal(commands.filter((value) => value === "checkpoint").length, 1);
   } finally {
@@ -370,6 +373,157 @@ test("checkpoint drains pending auth helpers before scanning container writers",
   assert(commands.includes("save-auth"));
   h.signals.emit("SIGTERM");
   assert.equal(await running, 0);
+});
+
+function permitFixture() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "rdc-control-"));
+  const file = path.join(directory, "control-permit.json");
+  const projectId = "94ae3a86-671f-40ae-9323-e81d3626135e";
+  const nonce = "ab".repeat(32);
+  const issued = Math.floor(Date.now() / 1000) - 1;
+  const permit = {
+    schema: 1, action: "checkpoint", project_id: projectId, container_name: "rdc-94ae3a86671f",
+    issued_at: issued, expires_at: issued + 300, sha256: createHash("sha256").update(nonce, "ascii").digest("hex"),
+  };
+  const canonical = (value) => JSON.stringify(Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))) + "\n";
+  const write = (changes = {}) => fs.writeFileSync(file, canonical({ ...permit, ...changes }), { mode: 0o600 });
+  const request = (value = nonce) => ({ rawHeaders: ["X-Alice-Rdc-Control", value], headers: { "x-alice-rdc-control": value } });
+  write();
+  return { directory, file, projectId, nonce, permit, canonical, write, request,
+    authorize: (value) => controlPermit(value, { file, projectId }),
+    remove: () => fs.rmSync(directory, { recursive: true, force: true }) };
+}
+
+test("control permit requires a unique nonce header and canonical bounded project checkpoint grant", () => {
+  const p = permitFixture();
+  try {
+    assert.equal(p.authorize(p.request()), true);
+    assert.equal(p.authorize({ rawHeaders: [], headers: {} }), false);
+    const duplicate = p.request();
+    duplicate.rawHeaders.push("x-alice-rdc-control", p.nonce);
+    assert.equal(p.authorize(duplicate), false);
+    for (const nonce of [p.nonce.toUpperCase(), p.nonce + "00", "cd".repeat(32), [p.nonce]]) {
+      assert.equal(p.authorize(p.request(nonce)), false);
+    }
+    for (const changes of [
+      { schema: true }, { action: "stop" }, { project_id: "11111111-1111-1111-1111-111111111111" },
+      { container_name: "rdc-other" }, { issued_at: Math.floor(Date.now() / 1000) + 1 },
+      { expires_at: Math.floor(Date.now() / 1000) }, { expires_at: p.permit.issued_at + 301 },
+      { issued_at: 1.5 }, { sha256: "00".repeat(32) }, { extra: "synthetic-private-value" },
+    ]) {
+      p.write(changes);
+      assert.equal(p.authorize(p.request()), false);
+    }
+    p.write();
+    const canonical = fs.readFileSync(p.file, "utf8");
+    for (const raw of [canonical.trim(), canonical + "\n", canonical.replace('"action":"checkpoint",', '"action":"checkpoint","action":"checkpoint",'), " ".repeat(4097)]) {
+      fs.writeFileSync(p.file, raw);
+      assert.equal(p.authorize(p.request()), false);
+    }
+    assert.equal(controlPermit(p.request(), { file: p.file, projectId: p.projectId.toUpperCase() }), false);
+  } finally { p.remove(); }
+});
+
+test("control permit rejects symlinks, hardlinks, non-files and missing grants", () => {
+  const p = permitFixture();
+  try {
+    const original = path.join(p.directory, "original.json");
+    fs.renameSync(p.file, original);
+    fs.symlinkSync(original, p.file);
+    assert.equal(p.authorize(p.request()), false);
+    fs.rmSync(p.file);
+    fs.linkSync(original, p.file);
+    assert.equal(p.authorize(p.request()), false);
+    fs.rmSync(p.file);
+    fs.mkdirSync(p.file);
+    assert.equal(p.authorize(p.request()), false);
+    fs.rmSync(p.file, { recursive: true });
+    assert.equal(p.authorize(p.request()), false);
+  } finally { p.remove(); }
+});
+
+test("HTTP checkpoint validates each fresh permit before cached completion or shutdown", { timeout: 5000 }, async () => {
+  const p = permitFixture();
+  const { h, commands, rdcStarted } = cloudHarness();
+  h.authorizeControl = p.authorize;
+  let port;
+  const running = superviseCloudRdc(["remote"], { ...h, port: 0, onListening: (value) => { port = value; } });
+  await rdcStarted;
+  const endpoint = `http://127.0.0.1:${port}`;
+  const post = (nonce) => fetch(endpoint + "/checkpoint", {
+    method: "POST", headers: nonce ? { "X-Alice-Rdc-Control": nonce } : {},
+  });
+  try {
+    for (const nonce of [undefined, "cd".repeat(32)]) {
+      const response = await post(nonce);
+      assert.equal(response.status, 403);
+      assert.deepEqual(await response.json(), { status: "control_denied" });
+    }
+    assert(h.calls.every(({ child }) => child.killedWith.length === 0));
+    assert.deepEqual(commands, ["status"]);
+    const live = await (await fetch(endpoint + "/healthz")).json();
+    assert.equal(live.quiesced, false);
+    const completed = await post(p.nonce);
+    assert.deepEqual(await completed.json(), { status: "CHECKPOINT_COMPLETE", generation: 1 });
+    p.write({ expires_at: Math.floor(Date.now() / 1000) });
+    assert.equal((await post(p.nonce)).status, 403);
+    const newNonce = "cd".repeat(32);
+    p.write({ sha256: createHash("sha256").update(newNonce, "ascii").digest("hex") });
+    assert.equal((await post(p.nonce)).status, 403);
+    const cached = await post(newNonce);
+    assert.equal(cached.status, 200);
+    assert.deepEqual(await cached.json(), { status: "CHECKPOINT_COMPLETE", generation: 1 });
+    assert.equal(commands.filter((command) => command === "checkpoint").length, 1);
+    const health = await fetch(endpoint + "/healthz");
+    assert.equal(health.status, 503);
+    assert.deepEqual(await health.json(), {
+      mode: "cloud-rdc", browser_ready: false, rdc_running: false, quiesced: true,
+      state_ready: true, paired: false, device_id: null, checkpoint_generation: 1,
+    });
+  } finally {
+    h.signals.emit("SIGTERM");
+    assert.equal(await running, 0);
+    p.remove();
+  }
+});
+
+test("checkpoint helpers get operation budgets capped by the complete phase deadline", async () => {
+  assert.equal(CHECKPOINT_TIMEOUT_MS, 240000);
+  assert.equal(helperTimeout("checkpoint", 300000, 0), 120000);
+  assert.equal(helperTimeout("status", 300000, 0), 60000);
+  assert.equal(helperTimeout("checkpoint", 1000, 250), 750);
+  assert.throws(() => helperTimeout("checkpoint", 1000, 1000));
+  const calls = [];
+  await stateHelper("checkpoint", {}, async (...args) => { calls.push(args); return { stdout: "{}" }; });
+  await stateHelper("status", { timeoutMs: 750 }, async (...args) => { calls.push(args); return { stdout: "{}" }; });
+  assert.equal(calls[0][2].timeout, 120000);
+  assert.equal(calls[1][2].timeout, 750);
+  assert.equal(calls[0][2].killSignal, "SIGKILL");
+});
+
+test("expired full checkpoint phase returns failure without claiming a late helper snapshot", { timeout: 5000 }, async () => {
+  const { h, commands, rdcStarted } = cloudHarness();
+  const helper = h.stateHelper;
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  h.stateHelper = async (command, options) => {
+    if (command === "checkpoint") {
+      assert(options.timeoutMs > 0 && options.timeoutMs <= 50);
+      await pending;
+    }
+    return helper(command);
+  };
+  let port;
+  const running = superviseCloudRdc(["remote"], {
+    ...h, port: 0, checkpointTimeoutMs: 50, onListening: (value) => { port = value; },
+  });
+  await rdcStarted;
+  const response = await fetch(`http://127.0.0.1:${port}/checkpoint`, { method: "POST" });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { status: "checkpoint_failed" });
+  release();
+  assert.equal(await running, 1);
+  assert.equal(commands.filter((command) => command === "status").length, 1);
 });
 
 test("pairing redirect accepts only current bounded official HTTPS handoff", { timeout: 5000 }, async () => {

@@ -901,3 +901,222 @@ def test_exclusive_copy_preserves_a_destination_created_during_install(
     assert source.read_bytes() == b"new contents"
     assert outside.read_bytes() == b"existing contents"
     assert (store.workspace / "work").is_symlink()
+
+
+@pytest.mark.parametrize("failed_file", [2, 5])
+def test_restore_rolls_back_all_roots_and_can_retry_after_disk_full(
+    store, monkeypatch, failed_file
+):
+    auth_file(store, "durable-session")
+    configuration = store.home / ".claude-server-commander/config.json"
+    configuration.parent.mkdir()
+    configuration.write_text('{"fileReadLineLimit":200}')
+    profile = store.home / ".config/chromium/Default/Cookies"
+    profile.parent.mkdir(parents=True)
+    profile.write_bytes(b"closed profile")
+    (store.workspace / "project").mkdir()
+    (store.workspace / "project/work").write_bytes(b"workspace contents")
+    executable = store.workspace / "run.sh"
+    executable.write_text("#!/bin/sh\nexit 0\n")
+    executable.chmod(0o751)
+    store.checkpoint()
+    durable = {path.name: path.read_bytes() for path in store.state.iterdir()}
+    clear_local(store)
+    store.auth.parent.mkdir(mode=0o750)
+    browser_root = store.home / ".config/chromium"
+    browser_root.mkdir(parents=True)
+    browser_root.chmod(0o751)
+    unrelated = store.home / ".config/unrelated"
+    unrelated.write_text("retain unrelated home content")
+    retained_dirs = (store.auth.parent, browser_root, browser_root.parent, store.workspace)
+    initial = {
+        path: (path.stat().st_ino, stat.S_IMODE(path.stat().st_mode)) for path in retained_dirs
+    }
+    original = storage.os.fdopen
+    copied_files = 0
+
+    class DiskFullWriter:
+        def __init__(self, handle):
+            self.handle = handle
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.handle.__exit__(*args)
+
+        def write(self, block):
+            self.handle.write(block[:3])
+            self.handle.flush()
+            raise OSError(errno.ENOSPC, "synthetic later-file disk full")
+
+    def fail_later_file(fd, mode):
+        nonlocal copied_files
+        handle = original(fd, mode)
+        name = os.readlink(f"/proc/self/fd/{fd}")
+        if (
+            mode == "wb"
+            and ".rdc-restore-" not in name
+            and any(name.startswith(str(root) + "/") for root in (store.home, store.workspace))
+        ):
+            copied_files += 1
+            if copied_files == failed_file:
+                return DiskFullWriter(handle)
+        return handle
+
+    with monkeypatch.context() as patch:
+        patch.setattr(storage.os, "fdopen", fail_later_file)
+        with pytest.raises(OSError) as failure:
+            store.restore()
+    assert failure.value.errno == errno.ENOSPC
+    assert copied_files == failed_file
+    assert not list(store.auth.parent.iterdir())
+    assert not list(browser_root.iterdir())
+    assert not configuration.parent.exists()
+    assert not list(store.workspace.iterdir())
+    assert unrelated.read_text() == "retain unrelated home content"
+    assert not list(store.home.glob(".rdc-restore-*"))
+    assert {
+        path: (path.stat().st_ino, stat.S_IMODE(path.stat().st_mode)) for path in retained_dirs
+    } == initial
+    assert {path.name: path.read_bytes() for path in store.state.iterdir()} == durable
+    assert store.restore() == {"status": "STATE_RESTORED", "generation": 1}
+    assert json.loads(store.auth.read_bytes())["session"]["access_token"] == "durable-session"
+    assert profile.read_bytes() == b"closed profile"
+    assert (store.workspace / "project/work").read_bytes() == b"workspace contents"
+    assert stat.S_IMODE(executable.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.auth.stat().st_mode) == 0o600
+    assert unrelated.read_text() == "retain unrelated home content"
+
+
+@pytest.mark.parametrize("change", ["missing", "replacement", "parent-link", "unrelated-child"])
+def test_rollback_never_deletes_a_replacement_or_unrelated_entry(store, tmp_path, change):
+    created = store.workspace / "created"
+    owned = created / "owned"
+    unrelated = tmp_path / "unrelated"
+    unrelated.write_text("retain unrelated content")
+    with pytest.raises(OSError):
+        with storage.RestoreAttempt((store.workspace,)) as attempt:
+            parent = attempt.directory(created)
+            try:
+                fd = os.open("owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent)
+                with os.fdopen(fd, "wb") as handle:
+                    attempt.file(owned, handle.fileno())
+                    handle.write(b"attempt contents")
+            finally:
+                os.close(parent)
+            if change == "missing":
+                owned.unlink()
+            elif change == "replacement":
+                os.replace(unrelated, owned)
+            elif change == "parent-link":
+                created.rename(tmp_path / "moved-owned-directory")
+                created.symlink_to(tmp_path, target_is_directory=True)
+            else:
+                (created / "unrelated").write_text("retain another writer's file")
+            raise OSError(errno.ENOSPC, "synthetic failure")
+    if change == "missing":
+        assert not created.exists()
+    elif change == "replacement":
+        assert owned.read_text() == "retain unrelated content"
+    elif change == "parent-link":
+        assert created.is_symlink()
+        assert unrelated.read_text() == "retain unrelated content"
+        assert (tmp_path / "moved-owned-directory/owned").read_bytes() == b"attempt contents"
+    else:
+        assert not owned.exists()
+        assert (created / "unrelated").read_text() == "retain another writer's file"
+
+
+def test_rollback_reports_cleanup_permission_failure(store, monkeypatch):
+    owned = store.workspace / "blocked"
+    original = storage.os.unlink
+
+    def denied(name, *args, **kwargs):
+        if name == "blocked":
+            raise PermissionError(errno.EACCES, "synthetic cleanup permission failure")
+        return original(name, *args, **kwargs)
+
+    with pytest.raises(storage.StateError, match="STATE_ROLLBACK_FAILED"):
+        with storage.RestoreAttempt((store.workspace,)) as attempt:
+            fd = os.open(owned, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                attempt.file(owned, handle.fileno())
+                handle.write(b"attempt contents")
+            monkeypatch.setattr(storage.os, "unlink", denied)
+            raise OSError(errno.ENOSPC, "synthetic failure")
+    assert owned.read_bytes() == b"attempt contents"
+    assert not attempt.roots
+
+
+def test_rollback_restores_preexisting_directory_even_when_moved(store, tmp_path):
+    existing = store.workspace / "existing"
+    existing.mkdir(mode=0o751)
+    existing.chmod(0o751)
+    original_inode = existing.stat().st_ino
+    moved = tmp_path / "moved-preexisting"
+    with pytest.raises(OSError):
+        with storage.RestoreAttempt((store.workspace,)) as attempt:
+            fd = attempt.directory(existing)
+            os.close(fd)
+            existing.rename(moved)
+            existing.mkdir(mode=0o750)
+            existing.chmod(0o750)
+            raise OSError(errno.ENOSPC, "synthetic failure")
+    assert moved.stat().st_ino == original_inode
+    assert stat.S_IMODE(moved.stat().st_mode) == 0o751
+    assert stat.S_IMODE(existing.stat().st_mode) == 0o750
+
+
+def test_directory_creation_failure_rolls_back_and_closes_attempt(store, monkeypatch):
+    def denied(fd, mode):
+        raise PermissionError(errno.EACCES, "synthetic private-mode failure")
+
+    monkeypatch.setattr(storage.os, "fchmod", denied)
+    with pytest.raises(PermissionError):
+        with storage.RestoreAttempt((store.workspace,)) as attempt:
+            attempt.directory(store.workspace / "created")
+    assert not list(store.workspace.iterdir())
+    assert not attempt.roots
+
+
+def test_rollback_reports_preexisting_mode_restore_failure(store, monkeypatch):
+    store.workspace.chmod(0o751)
+    original = storage.os.fchmod
+
+    def denied(fd, mode):
+        if mode == 0o751:
+            raise PermissionError(errno.EACCES, "synthetic mode restore failure")
+        return original(fd, mode)
+
+    monkeypatch.setattr(storage.os, "fchmod", denied)
+    with pytest.raises(storage.StateError, match="STATE_ROLLBACK_FAILED"):
+        with storage.RestoreAttempt((store.workspace,)) as attempt:
+            fd = attempt.directory(store.workspace)
+            os.close(fd)
+            raise OSError(errno.ENOSPC, "synthetic failure")
+    assert not attempt.roots
+
+
+def test_restore_attempt_rejects_missing_roots_and_escape_paths(store, tmp_path):
+    with pytest.raises(FileNotFoundError):
+        storage.RestoreAttempt((store.workspace, tmp_path / "missing"))
+    for path in (tmp_path / "outside", store.workspace / "../outside"):
+        with pytest.raises(storage.StateError, match="INVALID_PATHS"):
+            with storage.RestoreAttempt((store.workspace,)) as attempt:
+                attempt.locate(path)
+
+
+def test_standalone_install_commits_private_contents(store, tmp_path):
+    staging = tmp_path / "private-staging"
+    nested = staging / "project"
+    nested.mkdir(parents=True, mode=0o700)
+    executable = nested / "run.sh"
+    executable.write_text("#!/bin/sh\nexit 0\n")
+    executable.chmod(0o700)
+    store._install(staging, store.workspace)
+    restored = store.workspace / "project/run.sh"
+    assert restored.read_text() == "#!/bin/sh\nexit 0\n"
+    assert stat.S_IMODE(restored.stat().st_mode) == 0o700
+    assert not executable.exists()

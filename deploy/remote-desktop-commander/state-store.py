@@ -8,6 +8,7 @@ unsupported. An abrupt loss can lose changes since the last closed checkpoint.
 """
 
 import argparse
+import errno
 import gzip
 import hashlib
 import json
@@ -244,6 +245,124 @@ def _inspect_tar(compressed, destination, seen, total):
             tail_size += len(block)
             if tail_size > 1024 * 1024 or any(block):
                 fail("UNSAFE_ARCHIVE")
+
+
+class RestoreAttempt:
+    """Rollback only this attempt's local entries, through pinned root FDs."""
+
+    def __init__(self, roots):
+        self.roots = {}
+        self.created = []
+        self.modes = []
+        try:
+            for root in roots:
+                self.roots[Path(root).absolute()] = directory_fd(root)
+        except BaseException:
+            self.close()
+            raise
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, error_type, error, traceback):
+        try:
+            if error_type:
+                self.rollback()
+        finally:
+            self.close()
+
+    def close(self):
+        for fd, _ in self.modes:
+            os.close(fd)
+        self.modes.clear()
+        for fd in self.roots.values():
+            os.close(fd)
+        self.roots.clear()
+
+    def locate(self, path):
+        path = Path(path).absolute()
+        for root, root_fd in self.roots.items():
+            if path == root or root in path.parents:
+                parts = path.relative_to(root).parts
+                if any(part in {".", ".."} for part in parts):
+                    fail("INVALID_PATHS")
+                fd = os.dup(root_fd)
+                try:
+                    for part in parts[:-1]:
+                        child = os.open(
+                            part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
+                        )
+                        os.close(fd)
+                        fd = child
+                    return fd, parts[-1] if parts else "."
+                except BaseException:
+                    os.close(fd)
+                    raise
+        fail("INVALID_PATHS")
+
+    @staticmethod
+    def identity(value):
+        return value.st_dev, value.st_ino, stat.S_IFMT(value.st_mode)
+
+    def directory(self, path):
+        parent, name = self.locate(path)
+        try:
+            created = False
+            try:
+                os.mkdir(name, 0o700, dir_fd=parent)
+                created = True
+            except FileExistsError:
+                pass
+            fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+            try:
+                value = os.fstat(fd)
+                if created:
+                    self.created.append((Path(path), self.identity(value), True))
+                else:
+                    # Keep preexisting directories pinned so their permissions
+                    # can be restored even if another writer moves/replaces them.
+                    self.modes.append((os.dup(fd), stat.S_IMODE(value.st_mode)))
+                os.fchmod(fd, 0o700)
+                return fd
+            except BaseException:
+                os.close(fd)
+                raise
+        finally:
+            os.close(parent)
+
+    def file(self, path, fd):
+        self.created.append((Path(path), self.identity(os.fstat(fd)), False))
+
+    def rollback(self):
+        failed = False
+        for path, identity, is_directory in reversed(self.created):
+            parent = None
+            try:
+                parent, name = self.locate(path)
+                current = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                if self.identity(current) != identity:
+                    continue
+                if is_directory:
+                    os.rmdir(name, dir_fd=parent)
+                else:
+                    os.unlink(name, dir_fd=parent)
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                # Changed parents or unrelated entries inside a created dir
+                # belong to another writer and must never be followed/deleted.
+                if error.errno not in {errno.ELOOP, errno.ENOTDIR, errno.ENOTEMPTY}:
+                    failed = True
+            finally:
+                if parent is not None:
+                    os.close(parent)
+        for fd, mode in reversed(self.modes):
+            try:
+                os.fchmod(fd, mode)
+            except OSError:
+                failed = True
+        if failed:
+            fail("STATE_ROLLBACK_FAILED")
 
 
 class StateStore:
@@ -488,43 +607,44 @@ class StateStore:
             if restored.exists():
                 # All paths were validated before touching live state. Local
                 # POSIX files can be installed normally; no Object Storage rename.
-                for relative, destination in [
-                    ("home/" + tree, self.home / tree) for tree in HOME_TREES
-                ] + [("workspace", self.workspace)]:
-                    source = restored / relative
-                    if source.exists():
-                        if relative == "home/.config/chromium":
-                            self.home.joinpath(".config").mkdir(mode=0o700, exist_ok=True)
-                            self.home.joinpath(".config").chmod(0o700)
-                        self._install(source, destination)
+                with RestoreAttempt((self.home, self.workspace)) as attempt:
+                    for relative, destination in [
+                        ("home/" + tree, self.home / tree) for tree in HOME_TREES
+                    ] + [("workspace", self.workspace)]:
+                        source = restored / relative
+                        if source.exists():
+                            if relative == "home/.config/chromium":
+                                fd = attempt.directory(self.home / ".config")
+                                os.close(fd)
+                            self._install(source, destination, attempt)
         return {
             "status": "STATE_RESTORED",
             "generation": snapshot["metadata"]["generation"] if snapshot else 0,
         }
 
     @staticmethod
-    def _install(source, target):
-        target.mkdir(parents=True, exist_ok=True, mode=0o700)
-        fd = directory_fd(target)
+    def _install(source, target, attempt=None):
+        if attempt is None:
+            with RestoreAttempt((target.parent,)) as local_attempt:
+                StateStore._install(source, target, local_attempt)
+            return
+        fd = attempt.directory(target)
         try:
-            os.fchmod(fd, 0o700)
             for child in source.iterdir():
                 destination = target / child.name
                 if stat.S_ISDIR(child.lstat().st_mode):
-                    StateStore._install(child, destination)
+                    StateStore._install(child, destination, attempt)
                 else:
                     if os.path.lexists(destination):
                         fail("LOCAL_STATE_NOT_EMPTY")
-                    StateStore._copy_file(child, fd)
+                    StateStore._copy_file(child, fd, destination, attempt)
         finally:
             os.close(fd)
 
     @staticmethod
-    def _copy_file(child, target_fd):
+    def _copy_file(child, target_fd, destination, attempt):
         """Private exclusive copies work across separate local filesystems."""
         source_parent = directory_fd(child.parent)
-        created = False
-        complete = False
         try:
             source_fd = os.open(
                 child.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source_parent
@@ -543,8 +663,8 @@ class StateStore:
                     0o600,
                     dir_fd=target_fd,
                 )
-                created = True
                 with os.fdopen(output_fd, "wb") as output:
+                    attempt.file(destination, output_fd)
                     copied = 0
                     while block := source.read(65536):
                         copied += len(block)
@@ -559,10 +679,7 @@ class StateStore:
                         fail("STATE_CHANGED")
                     os.fchmod(output.fileno(), 0o700 if before.st_mode & 0o100 else 0o600)
             os.unlink(child.name, dir_fd=source_parent)
-            complete = True
         finally:
-            if created and not complete:
-                os.unlink(child.name, dir_fd=target_fd)
             os.close(source_parent)
 
     def checkpoint(self):

@@ -1,12 +1,16 @@
 "use strict";
 
 const { spawn, execFile } = require("node:child_process");
-const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync } = require("node:fs");
+const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync, openSync, closeSync, fstatSync, readSync, constants } = require("node:fs");
 const { setTimeout: delay } = require("node:timers/promises");
 const { createServer } = require("node:http");
 const { promisify } = require("node:util");
+const { createHash, timingSafeEqual } = require("node:crypto");
+const { join } = require("node:path");
 
 const execute = promisify(execFile);
+const HELPER_TIMEOUT_MS = Object.freeze({ status: 60000, "save-auth": 60000, checkpoint: 120000, restore: 120000 });
+const CHECKPOINT_TIMEOUT_MS = 240000;
 
 const PROFILE = "/home/node/.config/chromium";
 const VERSION_URL = "http://127.0.0.1:9222/json/version";
@@ -62,11 +66,66 @@ async function closeBrowser() {
   }
 }
 
-async function stateHelper(command) {
-  const { stdout } = await execute("python3", ["/opt/desktop-commander/state-store.py", command], {
-    timeout: 60000, maxBuffer: 8192,
+function helperTimeout(command, deadline, now = Date.now()) {
+  const budget = HELPER_TIMEOUT_MS[command];
+  if (!budget) throw new Error("State operation unavailable");
+  const remaining = deadline === undefined ? budget : deadline - now;
+  if (!Number.isFinite(remaining) || remaining <= 0) throw new Error("State operation timed out");
+  return Math.min(budget, remaining);
+}
+
+async function stateHelper(command, options = {}, executeImpl = execute) {
+  const timeout = options.timeoutMs ?? helperTimeout(command);
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > helperTimeout(command)) throw new Error("State operation timed out");
+  const { stdout } = await executeImpl("python3", ["/opt/desktop-commander/state-store.py", command], {
+    timeout, killSignal: "SIGKILL", maxBuffer: 8192,
   });
   return JSON.parse(stdout);
+}
+
+async function beforeDeadline(pending, deadline) {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error("Checkpoint timed out");
+  let timer;
+  try {
+    return await Promise.race([pending, new Promise((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("Checkpoint timed out")), remaining);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+function controlPermit(request, options = {}) {
+  let fd;
+  try {
+    const headerCount = request.rawHeaders.filter((_value, index) => index % 2 === 0 &&
+      request.rawHeaders[index].toLowerCase() === "x-alice-rdc-control").length;
+    const nonce = request.headers["x-alice-rdc-control"];
+    if (headerCount !== 1 || typeof nonce !== "string" || !/^[0-9a-f]{64}$/.test(nonce)) return false;
+    const project = options.projectId ?? process.env.ALICE_RDC_PROJECT_ID;
+    if (typeof project !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(project)) return false;
+    const file = options.file ?? join(process.env.ALICE_RDC_STATE_PATH || "/rdc-state", "control-permit.json");
+    fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const before = fstatSync(fd);
+    if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > 4096) return false;
+    const buffer = Buffer.alloc(4097);
+    const count = readSync(fd, buffer, 0, buffer.length, 0);
+    const after = fstatSync(fd);
+    if (count !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) return false;
+    const raw = buffer.subarray(0, count);
+    const value = JSON.parse(raw.toString("utf8"));
+    if (!value || Array.isArray(value) || Object.keys(value).sort().join(",") !==
+        "action,container_name,expires_at,issued_at,project_id,schema,sha256") return false;
+    const canonical = JSON.stringify(Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))) + "\n";
+    const now = options.now ?? Math.floor(Date.now() / 1000);
+    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== "checkpoint" ||
+        value.project_id !== project || value.container_name !== "rdc-" + project.replaceAll("-", "").slice(0, 12) ||
+        !Number.isSafeInteger(value.issued_at) || !Number.isSafeInteger(value.expires_at) ||
+        value.issued_at < 0 || value.issued_at > now || value.expires_at <= now ||
+        value.expires_at <= value.issued_at || value.expires_at - value.issued_at > 300 ||
+        typeof value.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.sha256)) return false;
+    return timingSafeEqual(createHash("sha256").update(nonce, "ascii").digest(), Buffer.from(value.sha256, "hex"));
+  } catch { return false; }
+  finally { if (fd !== undefined) closeSync(fd); }
 }
 
 function stateSummary(value) {
@@ -189,6 +248,7 @@ async function superviseCloudRdc(argv, options = {}) {
   const signature = options.authSignature || authSignature;
   const groupGone = options.processGroupGone || processGroupGone;
   const writersGone = options.containerWritersGone || (() => containerWritersGone(process.getuid(), process.pid));
+  const authorize = options.authorizeControl || controlPermit;
   const authFile = "/home/node/.desktop-commander-device/device.json";
   const handoffFile = options.pairingFile || process.env.ALICE_RDC_PAIRING_FILE;
   const children = [];
@@ -202,6 +262,7 @@ async function superviseCloudRdc(argv, options = {}) {
   let server;
   let poll;
   let checkpointPromise;
+  let checkpointComplete = false;
   let helperQueue = Promise.resolve();
   let finish;
   const ended = new Promise((resolve) => { finish = resolve; });
@@ -212,10 +273,10 @@ async function superviseCloudRdc(argv, options = {}) {
     finish();
   };
   const onSignal = () => stop(0);
-  const runHelper = (command) => {
-    const pending = helperQueue.then(() => helper(command));
+  const runHelper = (command, deadline) => {
+    const pending = helperQueue.then(() => helper(command, { timeoutMs: helperTimeout(command, deadline) }));
     helperQueue = pending.catch(() => {});
-    return pending;
+    return deadline === undefined ? pending : beforeDeadline(pending, deadline);
   };
   const persistAuth = () => {
     if (stopping || quiescing || !summary) return;
@@ -232,7 +293,7 @@ async function superviseCloudRdc(argv, options = {}) {
     child.once("exit", () => { if (!quiescing) stop(1); });
     return child;
   };
-  const waitExit = async (child) => {
+  const waitExit = async (child, deadline) => {
     if (child.exitCode === null && child.signalCode === null) {
       let timer;
       await new Promise((resolve, reject) => {
@@ -240,7 +301,7 @@ async function superviseCloudRdc(argv, options = {}) {
         timer = setTimeout(() => {
           child.off("exit", completed);
           reject(new Error("Shutdown incomplete"));
-        }, options.shutdownTimeoutMs ?? 5000);
+        }, Math.min(options.shutdownTimeoutMs ?? 5000, deadline - Date.now()));
         child.once("exit", completed);
       });
     }
@@ -249,6 +310,7 @@ async function superviseCloudRdc(argv, options = {}) {
   const checkpoint = () => {
     if (checkpointPromise) return checkpointPromise;
     checkpointPromise = (async () => {
+      const phaseDeadline = Date.now() + (options.checkpointTimeoutMs ?? CHECKPOINT_TIMEOUT_MS);
       quiescing = true;
       browserReady = false;
       rdcRunning = false;
@@ -256,29 +318,30 @@ async function superviseCloudRdc(argv, options = {}) {
       const [browser, rdc] = children;
       if (!browser || !rdc) throw new Error("Session unavailable");
       rdc.kill("SIGTERM");
-      await waitExit(rdc);
-      await close();
-      await waitExit(browser);
+      await beforeDeadline(waitExit(rdc, phaseDeadline), phaseDeadline);
+      await beforeDeadline(close(), phaseDeadline);
+      await beforeDeadline(waitExit(browser, phaseDeadline), phaseDeadline);
       // RDC suppresses transport-close errors, so its exit code alone does not
       // prove that an executor grandchild has stopped modifying the workspace.
-      const deadline = Date.now() + (options.shutdownTimeoutMs ?? 5000);
+      const deadline = Math.min(phaseDeadline, Date.now() + (options.shutdownTimeoutMs ?? 5000));
       for (const child of children) {
         while (!groupGone(child.pid)) {
           if (Date.now() >= deadline) throw new Error("Shutdown incomplete");
-          await sleep(25);
+          await beforeDeadline(sleep(25), phaseDeadline);
         }
         closedGroups.add(child.pid);
       }
       // Drain helpers already scheduled by auth notifications before checking
       // all container UID writers, including executors that escaped with setsid.
       let drained;
-      do { drained = helperQueue; await drained; } while (drained !== helperQueue);
+      do { drained = helperQueue; await beforeDeadline(drained, phaseDeadline); } while (drained !== helperQueue);
       if ((stopping && exitCode !== 0) || !writersGone()) throw new Error("Shutdown incomplete");
-      const result = await runHelper("checkpoint");
+      const result = await runHelper("checkpoint", phaseDeadline);
       if (!result || result.status !== "CHECKPOINT_COMPLETE" ||
           !Number.isSafeInteger(result.generation) || result.generation < 1) throw new Error("Checkpoint unavailable");
-      summary = stateSummary(await runHelper("status"));
+      summary = stateSummary(await runHelper("status", phaseDeadline));
       if (summary.checkpoint_generation !== result.generation) throw new Error("Checkpoint unavailable");
+      checkpointComplete = true;
       return { status: "CHECKPOINT_COMPLETE", generation: result.generation };
     })();
     return checkpointPromise;
@@ -298,13 +361,18 @@ async function superviseCloudRdc(argv, options = {}) {
         const ok = browserReady && rdcRunning && summary.state_ready && !stopping && !quiescing;
         response.writeHead(ok ? 200 : 503).end(JSON.stringify({
           mode: "cloud-rdc", browser_ready: browserReady && !stopping && !quiescing,
-          rdc_running: rdcRunning && !stopping && !quiescing, ...summary,
+          rdc_running: rdcRunning && !stopping && !quiescing, quiesced: checkpointComplete, ...summary,
         }));
       } else if (request.method === "GET" && request.url === "/rdc/pair") {
         const href = !stopping && !quiescing && !summary.paired && pairingHandoff(handoffFile);
         if (href) response.writeHead(303, { Location: href }).end();
         else response.writeHead(404).end('{"status":"pairing_unavailable"}');
       } else if (request.method === "POST" && request.url === "/checkpoint") {
+        if (!authorize(request)) {
+          request.resume();
+          response.writeHead(403).end('{"status":"control_denied"}');
+          return;
+        }
         if (request.headers["transfer-encoding"] || Number(request.headers["content-length"] || 0) !== 0) {
           request.resume();
           response.writeHead(400).end('{"status":"invalid_request"}');
@@ -507,7 +575,7 @@ async function main() {
   if (process.exitCode) console.error("RDC/browser session stopped; check container startup and sandbox support.");
 }
 
-module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone };
+module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit };
 if (require.main === module) main().catch(() => {
   console.error("RDC/browser startup failed.");
   process.exitCode = 1;

@@ -167,10 +167,13 @@ Hot instances remain active between HTTP requests and incur continuous compute
 charges; see [scaling](https://cloud.ru/docs/container-apps-evolution/ug/topics/container__scaling).
 It never takes over the separate compatibility-probe record or the Alice app.
 
-Run `preflight`, then `install` from protected `master`. Both require the
+Run `preflight`, then `install` from protected `master`. All lifecycle actions
+require the
 **Object Storage tenant ID from the same project**, supplied as the workflow
 input `storage_tenant_id` or existing variable `CLOUDRU_STORAGE_TENANT_ID`.
 The tenant ID is not a credential and cannot be replaced by the project ID.
+Ownership checks compare any returned managed-mount tenant ID with this exact
+configured tenant before operating on the service.
 Existing production IAM signs S3 operations only in the reviewed runner.
 The application receives a managed `/rdc-state` bucket mount; IAM, S3 and SSH
 keys are not passed to RDC. The dedicated bucket name is
@@ -192,8 +195,10 @@ Snapshots are limited to 128 MiB compressed, 256 MiB of regular file contents
 and 20,000 archive entries. Restore stages validated content in a private directory
 under the local home, keeping expanded files out of Compose's 256 MiB `/tmp`.
 Exclusive bounded copies install files across separate local home/workspace
-filesystems; an incomplete copy is removed and startup fails. The archive and
-content can temporarily occupy up to 640 MiB during copying, plus authorization
+filesystems. If any copy fails, restore rolls back entries created by that attempt,
+preserves preexisting entries, and blocks startup; a later attempt can retry.
+The archive and content can temporarily occupy up to 640 MiB during copying,
+plus authorization
 data and filesystem/entry overhead. This is a data bound, not a guarantee of total
 disk usage; insufficient local space blocks startup. The Object Storage mount
 still receives only closed regular files and never rename or fsync operations.
@@ -204,7 +209,10 @@ of reverting to stale credentials. A persistence failure stops the runtime.
 The `restart` operation first quiesces RDC and Chromium, verifies their process
 groups have finished, saves closed state, requests provider stop, and confirms
 `suspended` before starting another revision. `stop` performs the same checkpoint
-and confirmed suspension. Neither operation deletes the bucket, images or state.
+and confirmed suspension. A completed checkpoint retains a verified quiesced
+status and cached generation,
+so an ambiguous provider stop can be retried without starting another writer.
+Neither operation deletes the bucket, images or state.
 `start` resumes only an exactly owned, confirmed suspended service and checks
 restored runtime health and the authorization gate; it never creates another app.
 Do not create rolling revisions or a second writer manually. Abrupt provider loss
@@ -219,11 +227,21 @@ HTTPS hosts and expires within ten minutes. This trusted audience includes users
 with project/organization access, not only the owner; see the official
 [invocation guide](https://cloud.ru/docs/container-apps-evolution/ug/topics/guides__container-invoke).
 Raw RDC output is discarded because upstream errors can include token arguments.
-Pairing URLs/codes, credentials and browser data never reach Actions logs or
-artifacts. The workflow uses IAM `:testCall` only for `/healthz` and `/checkpoint`,
-and verifies anonymous ingress cannot retrieve health data. CDP remains loopback.
+The reported protected `/rdc/pair` application link can appear in Actions logs.
+The secret upstream verification URL/code, credentials and browser data never
+reach Actions logs or artifacts. The workflow uses IAM `:testCall` only for
+`/healthz` and `/checkpoint`,
+and verifies anonymous ingress cannot retrieve health data. Checkpoint additionally
+requires a fresh, short-lived permit written by the production runner to the private
+state bucket. The HTTP request carries a random nonce; the bucket holds only its
+hash, bound to the operation, project and container. A project/organization user
+with only native-ingress access cannot authorize checkpoint; private bucket writers
+and authorized RDC tools remain trusted. The nonce is excluded from logs, health
+and snapshots. CDP remains loopback.
 
-`status` reports safe readiness and a device UUID. `RDC_RUNNING` means the local
+`status` reports safe readiness and a device UUID. `RDC_QUIESCED` confirms a
+completed checkpoint awaiting provider suspension; retry `stop` to complete it.
+`RDC_RUNNING` means the local
 session has been saved; complete connectivity still requires the same device to
 appear **Online** in the connected RDC plugin and an explicit-device tool call
 to succeed. Repeat this check after the controlled `restart` before reporting

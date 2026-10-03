@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import secrets
+import signal
 import subprocess
 import sys
 import time
@@ -40,8 +43,12 @@ HEALTH_KEYS = {
     "paired",
     "device_id",
     "checkpoint_generation",
+    "quiesced",
 }
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")
+CONTROL_HEADER = "X-Alice-Rdc-Control"
+CONTROL_FILE = "control-permit.json"
+CHECKPOINT_BUDGET = 300
 
 
 def fail(code):
@@ -56,6 +63,12 @@ def project_uuid(value):
     if value != identifier:
         fail("validation_error")
     return identifier
+
+
+def configured_tenant(value):
+    if not value:
+        fail("storage_tenant_not_configured")
+    return project_uuid(value)
 
 
 def names(project):
@@ -128,7 +141,8 @@ def named_record(apps):
     return records[0] if records else None
 
 
-def owned_record(apps, *, identifier=None, image=None):
+def owned_record(apps, *, tenant, identifier=None, image=None):
+    tenant = configured_tenant(tenant)
     record = named_record(apps)
     if record is None:
         return None
@@ -157,7 +171,7 @@ def owned_record(apps, *, identifier=None, image=None):
             and attributes.get("region", "ru-central-1") == "ru-central-1"
         )
         if "tenantId" in attributes:
-            project_uuid(attributes["tenantId"])
+            volume_ok = volume_ok and project_uuid(attributes["tenantId"]) == tenant
         mount_ok = (
             len(mounts) == 1
             and mounts[0].get("name") == VOLUME
@@ -240,20 +254,47 @@ def verify_anonymous_gate(record, *, http_get=requests.get):
     fail("rdc_ingress_unconfirmed")
 
 
-def test_call(apps, path, method="GET"):
+def json_object(body):
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                fail("invalid_response")
+            result[key] = value
+        return result
+
+    try:
+        result = json.loads(body, object_pairs_hook=unique)
+    except (ValueError, RecursionError):
+        fail("invalid_response")
+    if not isinstance(result, dict):
+        fail("invalid_response")
+    return result
+
+
+def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
     if (path, method) not in {("/healthz", "GET"), ("/checkpoint", "POST")}:
         fail("validation_error")
+    if path == "/checkpoint":
+        if not isinstance(nonce, str) or not re.fullmatch("[0-9a-f]{64}", nonce):
+            fail("validation_error")
+    elif nonce is not None:
+        fail("validation_error")
     name = names(apps.project_id)[0]
+    body = {"name": name, "projectId": apps.project_id, "method": method, "path": path}
+    if nonce is not None:
+        body["headers"] = {CONTROL_HEADER: nonce}
     previous_timeout = apps.client.timeout
     try:
-        # Closed-state checkpoint can take a minute; only this request gets that budget.
-        if path == "/checkpoint":
-            apps.client.timeout = max(previous_timeout, 180)
+        if timeout is not None:
+            if timeout <= 0:
+                fail("rdc_checkpoint_unconfirmed")
+            apps.client.timeout = timeout
         payload = apps.client.request(
             "container_apps",
             "POST",
             f"/v2/containers/{name}:testCall",
-            json_body={"name": name, "projectId": apps.project_id, "method": method, "path": path},
+            json_body=body,
         )
     finally:
         apps.client.timeout = previous_timeout
@@ -267,16 +308,30 @@ def test_call(apps, path, method="GET"):
         or payload.get("isBase64Encoded", False) is not False
     ):
         fail("invalid_response")
-    if status in (404, 502, 503, 504):
+    if status in (404, 502, 504) or (status == 503 and path != "/healthz"):
         return None
+    if status == 403 and path == "/checkpoint":
+        if json_object(body) != {"status": "control_denied"}:
+            fail("invalid_response")
+        fail("rdc_control_unconfirmed")
+    if status == 503 and path == "/healthz":
+        # The proxy may answer before Node is listening. Only a claimed runtime
+        # health object can prove a completed, closed checkpoint.
+        try:
+            candidate = json.loads(body)
+        except (ValueError, RecursionError):
+            return None
+        if not isinstance(candidate, dict) or candidate.get("mode") != "cloud-rdc":
+            return None
+        summary = health_summary(json_object(body))
+        return summary if summary["quiesced"] else None
     if status != 200:
         fail("rdc_runtime_failed")
-    try:
-        result = json.loads(body)
-    except (ValueError, RecursionError):
-        fail("invalid_response")
-    if not isinstance(result, dict):
-        fail("invalid_response")
+    result = json_object(body)
+    if path == "/healthz":
+        health_summary(result)
+        if result["quiesced"]:
+            fail("invalid_response")
     return result
 
 
@@ -285,7 +340,7 @@ def health_summary(value):
         fail("invalid_response")
     if any(
         type(value.get(key)) is not bool
-        for key in ("browser_ready", "rdc_running", "state_ready", "paired")
+        for key in ("browser_ready", "rdc_running", "state_ready", "paired", "quiesced")
     ):
         fail("invalid_response")
     generation = value.get("checkpoint_generation")
@@ -296,13 +351,26 @@ def health_summary(value):
         project_uuid(identifier)
     if value["paired"] and identifier is None:
         fail("invalid_response")
+    if value["quiesced"] and (
+        not value["state_ready"] or value["browser_ready"] or value["rdc_running"] or generation < 1
+    ):
+        fail("invalid_response")
     return value
 
 
-def wait_ready(apps, *, identifier=None, image=None, timeout=300, sleep=time.sleep):
+def wait_ready(
+    apps,
+    *,
+    tenant,
+    identifier=None,
+    image=None,
+    timeout=300,
+    sleep=time.sleep,
+    allow_quiesced=False,
+):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        record = owned_record(apps, identifier=identifier, image=image)
+        record = owned_record(apps, tenant=tenant, identifier=identifier, image=image)
         if record is not None:
             if str(record.get("status", "")).lower() in {
                 "rejected",
@@ -318,18 +386,20 @@ def wait_ready(apps, *, identifier=None, image=None, timeout=300, sleep=time.sle
                 result = None
             if result is not None:
                 summary = health_summary(result)
-                if summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]:
+                if (allow_quiesced and summary["quiesced"]) or (
+                    summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]
+                ):
                     return record, summary
         sleep(2)
     fail("rdc_readiness_timeout")
 
 
-def stop_owned(apps, *, identifier=None, image=None, timeout=300, sleep=time.sleep):
+def stop_owned(apps, *, tenant, identifier=None, image=None, timeout=300, sleep=time.sleep):
     # Discovery is bounded even after a possibly committed create; never retry creation.
     deadline = time.monotonic() + timeout
     record = None
     while time.monotonic() < deadline:
-        record = owned_record(apps, identifier=identifier, image=image)
+        record = owned_record(apps, tenant=tenant, identifier=identifier, image=image)
         if record is not None:
             break
         sleep(2)
@@ -339,7 +409,7 @@ def stop_owned(apps, *, identifier=None, image=None, timeout=300, sleep=time.sle
     if str(record.get("status", "")).lower() != "suspended":
         apps.stop(record["name"])
     while time.monotonic() < deadline:
-        current = owned_record(apps, identifier=identifier, image=image)
+        current = owned_record(apps, tenant=tenant, identifier=identifier, image=image)
         if current and str(current.get("status", "")).lower() == "suspended":
             return current
         sleep(2)
@@ -347,10 +417,11 @@ def stop_owned(apps, *, identifier=None, image=None, timeout=300, sleep=time.sle
 
 
 def storage_client(project, tenant, env=os.environ):
-    project_uuid(tenant)
-    credentials = cloudru_s3_credentials(
-        env.get("CLOUDRU_IAM_KEY_ID", ""), env.get("CLOUDRU_IAM_KEY_SECRET", ""), tenant
-    )
+    tenant = configured_tenant(tenant)
+    key_id = env.get("CLOUDRU_IAM_KEY_ID", "")
+    if ":" in key_id and (not key_id.startswith(tenant + ":") or key_id.count(":") != 1):
+        fail("validation_error")
+    credentials = cloudru_s3_credentials(key_id, env.get("CLOUDRU_IAM_KEY_SECRET", ""), tenant)
     if credentials is None:
         fail("auth_not_configured")
     return CloudRuObjectStorage(names(project)[1]), credentials
@@ -400,6 +471,11 @@ def bucket_inventory(store, credentials, project):
     return True
 
 
+def require_owned_bucket(store, credentials, project):
+    if not bucket_inventory(store, credentials, project):
+        fail("rdc_bucket_ownership_unconfirmed")
+
+
 def prepare_bucket(store, credentials, project):
     if bucket_inventory(store, credentials, project):
         return
@@ -415,10 +491,11 @@ def prepare_bucket(store, credentials, project):
         fail("rdc_bucket_ownership_unconfirmed")
 
 
-def preflight(apps, store, credentials):
+def preflight(apps, store, credentials, *, tenant):
+    configured_tenant(tenant)
     record = named_record(apps)
     if record is not None:
-        owned_record(apps)
+        owned_record(apps, tenant=tenant)
     exists = bucket_inventory(store, credentials, apps.project_id)
     return {
         "status": "PREFLIGHT_PASSED",
@@ -428,6 +505,13 @@ def preflight(apps, store, credentials):
 
 
 def deployment_summary(record, health):
+    if health["quiesced"]:
+        return {
+            "status": "RDC_QUIESCED",
+            "container_name": record["name"],
+            "container_id": record["id"],
+            **health,
+        }
     return {
         "status": "RDC_RUNNING" if health["paired"] else "PAIRING_REQUIRED",
         "container_name": record["name"],
@@ -437,7 +521,8 @@ def deployment_summary(record, health):
     }
 
 
-def install(apps, store, credentials, image, *, http_get=requests.get):
+def install(apps, store, credentials, image, *, tenant, http_get=requests.get):
+    configured_tenant(tenant)
     if named_record(apps) is not None:
         fail("already_exists")
     prepare_bucket(store, credentials, apps.project_id)
@@ -454,14 +539,14 @@ def install(apps, store, credentials, image, *, http_get=requests.get):
         resource = operation.get("resourceId")
         if resource is not None:
             identifier = project_uuid(resource)
-        record, health = wait_ready(apps, identifier=identifier, image=image)
+        record, health = wait_ready(apps, tenant=tenant, identifier=identifier, image=image)
         verify_anonymous_gate(record, http_get=http_get)
         return deployment_summary(record, health)
     except Exception as exc:
         print(json.dumps({"stage": "rdc_install", **safe_error(exc)}), flush=True)
         if attempted:
             try:
-                stopped = stop_owned(apps, identifier=identifier, image=image)
+                stopped = stop_owned(apps, tenant=tenant, identifier=identifier, image=image)
                 print(
                     json.dumps({"status": "RDC_ROLLBACK_SUSPENDED", "container_id": stopped["id"]}),
                     flush=True,
@@ -472,29 +557,228 @@ def install(apps, store, credentials, image, *, http_get=requests.get):
         raise
 
 
-def checkpoint(apps):
-    record, before = wait_ready(apps)
-    result = test_call(apps, "/checkpoint", "POST")
-    if (
-        not isinstance(result, dict)
-        or set(result) != {"status", "generation"}
-        or result.get("status") != "CHECKPOINT_COMPLETE"
-        or type(result.get("generation")) is not int
-        or not before["checkpoint_generation"] < result["generation"] < 2**53
+def remaining(deadline, clock):
+    value = deadline - clock()
+    if value <= 0:
+        fail("rdc_checkpoint_unconfirmed")
+    return value
+
+
+class CheckpointBudget:
+    """One wall-clock bound includes IAM, inventory, S3, and runtime calls."""
+
+    def __init__(self, apps, store, timeout, clock):
+        self.apps = apps
+        self.store = store
+        self.timeout = timeout
+        self.clock = clock
+
+    def __enter__(self):
+        self.previous_client = self.apps.client.timeout
+        self.previous_store = self.store._timeout
+        self.previous_handler = signal.getsignal(signal.SIGALRM)
+        self.started = self.clock()
+        signal.signal(signal.SIGALRM, self.expired)
+        self.previous_timer = signal.setitimer(signal.ITIMER_REAL, self.timeout)
+        return self.started + self.timeout
+
+    @staticmethod
+    def expired(*_args):
+        fail("rdc_checkpoint_unconfirmed")
+
+    def __exit__(self, *_args):
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, self.previous_handler)
+        if self.previous_timer[0]:
+            signal.setitimer(
+                signal.ITIMER_REAL,
+                max(0.000001, self.previous_timer[0] - (self.clock() - self.started)),
+                self.previous_timer[1],
+            )
+        self.apps.client.timeout = self.previous_client
+        self.store._timeout = self.previous_store
+        return False
+
+
+def cap_timeouts(apps, store, deadline, clock):
+    budget = remaining(deadline, clock)
+    apps.client.timeout = min(apps.client.timeout, budget)
+    store._timeout = min(store._timeout, budget)
+
+
+def issue_control_permit(apps, store, credentials, deadline, *, clock, sleep):
+    nonce = secrets.token_hex(32)
+    issued = int(time.time())
+    permit = {
+        "schema": 1,
+        "action": "checkpoint",
+        "project_id": project_uuid(apps.project_id),
+        "container_name": names(apps.project_id)[0],
+        "issued_at": issued,
+        "expires_at": issued + 300,
+        "sha256": hashlib.sha256(nonce.encode("ascii")).hexdigest(),
+    }
+    content = (json.dumps(permit, sort_keys=True, separators=(",", ":")) + "\n").encode("ascii")
+    cap_timeouts(apps, store, deadline, clock)
+    store.upload(CONTROL_FILE, content, credentials=credentials)
+    visibility_deadline = min(deadline, clock() + 10)
+    while clock() < visibility_deadline:
+        cap_timeouts(apps, store, deadline, clock)
+        try:
+            actual = store.download(CONTROL_FILE, credentials=credentials)
+        except StorageObjectNotFound:
+            actual = None
+        if isinstance(actual, bytes) and len(actual) <= 4096 and actual == content:
+            return nonce
+        sleep(min(1, remaining(visibility_deadline, clock)))
+    fail("rdc_control_unconfirmed")
+
+
+def transient_runtime_error(exc):
+    return isinstance(exc, requests.RequestException) or (
+        isinstance(exc, CloudProviderError)
+        and (
+            exc.http_status in (404, 502, 503, 504)
+            or (exc.code == "provider_http_error" and exc.http_status is None)
+        )
+    )
+
+
+def checkpoint_identity(before, after):
+    if (before["device_id"] is not None and before["device_id"] != after["device_id"]) or (
+        before["paired"] and not after["paired"]
     ):
         fail("rdc_checkpoint_unconfirmed")
-    return record, before, result["generation"]
 
 
-def restart(apps, *, http_get=requests.get):
-    record, before, generation = checkpoint(apps)
+def checkpoint(
+    apps,
+    store,
+    credentials,
+    *,
+    tenant,
+    timeout=CHECKPOINT_BUDGET,
+    clock=time.monotonic,
+    sleep=time.sleep,
+):
+    configured_tenant(tenant)
+    if not 0 < timeout <= CHECKPOINT_BUDGET:
+        fail("validation_error")
+    with CheckpointBudget(apps, store, timeout, clock) as deadline:
+        cap_timeouts(apps, store, deadline, clock)
+        require_owned_bucket(store, credentials, apps.project_id)
+        record = None
+        before = None
+        while clock() < deadline:
+            cap_timeouts(apps, store, deadline, clock)
+            current = owned_record(
+                apps,
+                tenant=tenant,
+                identifier=record["id"] if record else None,
+                image=record["template"]["containers"][0]["image"] if record else None,
+            )
+            if current is None:
+                fail("rdc_ownership_unconfirmed")
+            record = current
+            if str(record.get("status", "")).lower() in {
+                "rejected",
+                "deleted",
+                "suspended",
+                "suspended_product",
+            }:
+                fail("rdc_runtime_failed")
+            try:
+                value = test_call(apps, "/healthz", timeout=min(20, remaining(deadline, clock)))
+            except Exception as exc:
+                if not transient_runtime_error(exc):
+                    raise
+                value = None
+            if value is not None:
+                summary = health_summary(value)
+                if summary["quiesced"] or all(
+                    summary[key] for key in ("browser_ready", "rdc_running", "state_ready")
+                ):
+                    before = summary
+                    break
+            sleep(min(2, remaining(deadline, clock)))
+        if before is None:
+            fail("rdc_checkpoint_unconfirmed")
+        nonce = issue_control_permit(apps, store, credentials, deadline, clock=clock, sleep=sleep)
+        control_deadline = min(deadline, clock() + 10)
+        receipt = None
+        current_health = before
+        while clock() < deadline:
+            cap_timeouts(apps, store, deadline, clock)
+            current = owned_record(
+                apps,
+                tenant=tenant,
+                identifier=record["id"],
+                image=record["template"]["containers"][0]["image"],
+            )
+            if current is None:
+                fail("rdc_ownership_unconfirmed")
+            checkpoint_identity(before, current_health)
+            if receipt is None:
+                try:
+                    result = test_call(
+                        apps,
+                        "/checkpoint",
+                        "POST",
+                        nonce=nonce,
+                        timeout=remaining(deadline, clock),
+                    )
+                except Exception as exc:
+                    if (
+                        isinstance(exc, CloudProviderError)
+                        and exc.code == "rdc_control_unconfirmed"
+                    ):
+                        if clock() >= control_deadline:
+                            raise
+                        sleep(min(1, remaining(control_deadline, clock)))
+                        continue
+                    if not transient_runtime_error(exc):
+                        raise
+                    result = None
+                if result is not None:
+                    generation = result.get("generation")
+                    if (
+                        set(result) != {"status", "generation"}
+                        or result.get("status") != "CHECKPOINT_COMPLETE"
+                        or type(generation) is not int
+                        or not 1 <= generation < 2**53
+                        or (before["quiesced"] and generation != before["checkpoint_generation"])
+                        or (
+                            not before["quiesced"] and generation <= before["checkpoint_generation"]
+                        )
+                    ):
+                        fail("rdc_checkpoint_unconfirmed")
+                    receipt = generation
+            try:
+                value = test_call(apps, "/healthz", timeout=min(20, remaining(deadline, clock)))
+            except Exception as exc:
+                if not transient_runtime_error(exc):
+                    raise
+                value = None
+            if value is not None:
+                current_health = health_summary(value)
+                checkpoint_identity(before, current_health)
+                if receipt is not None and current_health["quiesced"]:
+                    if current_health["checkpoint_generation"] != receipt:
+                        fail("rdc_checkpoint_unconfirmed")
+                    return current, current_health, receipt
+            sleep(min(2, remaining(deadline, clock)))
+        fail("rdc_checkpoint_unconfirmed")
+
+
+def restart(apps, store, credentials, *, tenant, http_get=requests.get):
+    record, before, generation = checkpoint(apps, store, credentials, tenant=tenant)
     identifier = record["id"]
     image = record["template"]["containers"][0]["image"]
-    stop_owned(apps, identifier=identifier, image=image)
+    stop_owned(apps, tenant=tenant, identifier=identifier, image=image)
     # A confirmed suspension fences the old revision before creating another writer.
     try:
         apps.start(record["name"])
-        after, health = wait_ready(apps, identifier=identifier, image=image)
+        after, health = wait_ready(apps, tenant=tenant, identifier=identifier, image=image)
         if (
             health["checkpoint_generation"] < generation
             or health["device_id"] != before["device_id"]
@@ -505,25 +789,76 @@ def restart(apps, *, http_get=requests.get):
         return {**deployment_summary(after, health), "restart_verified": True}
     except Exception as exc:
         print(json.dumps({"stage": "rdc_restart", **safe_error(exc)}), flush=True)
-        stop_owned(apps, identifier=identifier, image=image)
+        stop_owned(apps, tenant=tenant, identifier=identifier, image=image)
         raise
 
 
-def resume(apps, *, http_get=requests.get):
-    record = owned_record(apps)
+def resume(apps, store, credentials, *, tenant, http_get=requests.get):
+    configured_tenant(tenant)
+    require_owned_bucket(store, credentials, apps.project_id)
+    record = owned_record(apps, tenant=tenant)
     if record is None or str(record.get("status", "")).lower() != "suspended":
         fail("rdc_not_suspended")
     identifier = record["id"]
     image = record["template"]["containers"][0]["image"]
     try:
         apps.start(record["name"])
-        after, health = wait_ready(apps, identifier=identifier, image=image)
+        after, health = wait_ready(apps, tenant=tenant, identifier=identifier, image=image)
         verify_anonymous_gate(after, http_get=http_get)
         return deployment_summary(after, health)
     except Exception as exc:
         print(json.dumps({"stage": "rdc_start", **safe_error(exc)}), flush=True)
-        stop_owned(apps, identifier=identifier, image=image)
+        stop_owned(apps, tenant=tenant, identifier=identifier, image=image)
         raise
+
+
+def status(apps, *, tenant, http_get=requests.get):
+    configured_tenant(tenant)
+    record = owned_record(apps, tenant=tenant)
+    if record is None:
+        return {"status": "RDC_ABSENT"}
+    if str(record.get("status", "")).lower() == "suspended":
+        return {
+            "status": "RDC_SUSPENDED",
+            "container_name": record["name"],
+            "container_id": record["id"],
+        }
+    record, health = wait_ready(
+        apps,
+        tenant=tenant,
+        identifier=record["id"],
+        image=record["template"]["containers"][0]["image"],
+        allow_quiesced=True,
+    )
+    verify_anonymous_gate(record, http_get=http_get)
+    return deployment_summary(record, health)
+
+
+def suspend(apps, store, credentials, *, tenant):
+    configured_tenant(tenant)
+    require_owned_bucket(store, credentials, apps.project_id)
+    record = owned_record(apps, tenant=tenant)
+    if record is None:
+        fail("rdc_ownership_unconfirmed")
+    if str(record.get("status", "")).lower() == "suspended":
+        return {
+            "status": "RDC_SUSPENDED",
+            "container_name": record["name"],
+            "container_id": record["id"],
+        }
+    record, _, generation = checkpoint(apps, store, credentials, tenant=tenant)
+    stopped = stop_owned(
+        apps,
+        tenant=tenant,
+        identifier=record["id"],
+        image=record["template"]["containers"][0]["image"],
+    )
+    return {
+        "status": "RDC_SUSPENDED",
+        "container_name": stopped["name"],
+        "container_id": stopped["id"],
+        "checkpoint_generation": generation,
+    }
 
 
 RDC_ERROR_CODES = {
@@ -539,6 +874,7 @@ RDC_ERROR_CODES = {
     "storage_tenant_not_configured",
     "rdc_storage_unavailable",
     "rdc_not_suspended",
+    "rdc_control_unconfirmed",
 }
 
 
@@ -573,45 +909,26 @@ def main():
     ):
         fail("auth_not_configured")
     project = project_uuid(os.environ["CLOUDRU_PROJECT_ID"])
+    tenant = configured_tenant(args.tenant_id)
+    store, credentials = storage_client(project, tenant)
     apps = CloudRuContainerAppsClient(project_id=project)
     if args.action in ("preflight", "install"):
-        if not args.tenant_id:
-            fail("storage_tenant_not_configured")
-        store, credentials = storage_client(project, args.tenant_id)
-        result = preflight(apps, store, credentials)
+        result = preflight(apps, store, credentials, tenant=tenant)
         if args.action == "install":
             if result["container_exists"]:
                 fail("already_exists")
             image = build_image(root, args.sha)
             creation_body(project, image)
             print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
-            result = install(apps, store, credentials, image)
+            result = install(apps, store, credentials, image, tenant=tenant)
     elif args.action == "status":
-        record = owned_record(apps)
-        if record is None:
-            result = {"status": "RDC_ABSENT"}
-        elif str(record.get("status", "")).lower() == "suspended":
-            result = {
-                "status": "RDC_SUSPENDED",
-                "container_name": record["name"],
-                "container_id": record["id"],
-            }
-        else:
-            record, health = wait_ready(apps, identifier=record["id"])
-            verify_anonymous_gate(record)
-            result = deployment_summary(record, health)
+        result = status(apps, tenant=tenant)
     elif args.action == "restart":
-        result = restart(apps)
+        result = restart(apps, store, credentials, tenant=tenant)
     elif args.action == "start":
-        result = resume(apps)
+        result = resume(apps, store, credentials, tenant=tenant)
     else:
-        record, _, generation = checkpoint(apps)
-        stopped = stop_owned(apps, identifier=record["id"])
-        result = {
-            "status": "RDC_SUSPENDED",
-            "container_id": stopped["id"],
-            "checkpoint_generation": generation,
-        }
+        result = suspend(apps, store, credentials, tenant=tenant)
     print(json.dumps(result), flush=True)
 
 

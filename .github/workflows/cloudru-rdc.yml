@@ -8,7 +8,7 @@ on:
         options: [preflight, install, status, start, restart, stop]
         default: preflight
       storage_tenant_id:
-        description: Object Storage tenant ID (not a secret); required for preflight/install
+        description: Object Storage tenant ID (not a secret); required for all actions unless configured
         type: string
         required: false
 permissions:
