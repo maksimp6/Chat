@@ -48,6 +48,14 @@ jobs:
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Check source formatting
         run: bash scripts/format.sh check
+      - name: Playwright MCP integration tests
+        env:
+          CHROME_EXECUTABLE_PATH: /usr/bin/google-chrome
+          BROWSER_OAUTH_MCP_TEST: "1"
+        run: |
+          npm ci --prefix deploy/chrome-worker
+          npm test --prefix deploy/chrome-worker
+          npm run test:browser --prefix deploy/chrome-worker
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \

@@ -9,7 +9,7 @@ mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
 # A resumed cached container must remain maintainable even with no GitHub
 # connectivity. Refresh the installed copies from the checkout when present.
-for name in codex_setup.sh codex_maintenance.sh codex_cloudru_env.sh; do
+for name in codex_setup.sh codex_maintenance.sh codex_cloudru_env.sh codex_agent_credentials.sh; do
   if test -f "scripts/$name"; then
     install -m 700 "scripts/$name" "$INSTALL_DIR/$name"
   fi
@@ -51,8 +51,13 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 gh --version
-if test -n "${GITHUB_TOKEN:-}"; then
-  GH_TOKEN="$GITHUB_TOKEN" gh auth status >/dev/null
+# Refresh setup-only GitHub/GPG/SSH credentials when a cached container resumes.
+# shellcheck disable=SC1091
+if test -f scripts/codex_agent_credentials.sh; then
+  source scripts/codex_agent_credentials.sh
+fi
+if test -n "${CODEX_GITHUB_TOKEN:+configured}${GITHUB_TOKEN:+configured}"; then
+  gh auth status >/dev/null
 fi
 if ! command -v cloud >/dev/null 2>&1; then
   bash scripts/install_cloud_cli.sh
