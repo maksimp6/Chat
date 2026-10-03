@@ -458,7 +458,7 @@ def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
     elif nonce is not None:
         fail("validation_error")
     name = names(apps.project_id)[0]
-    body = {"name": name, "projectId": apps.project_id, "method": method, "path": path}
+    body = {"name": name, "projectId": apps.project_id, "method": method.lower(), "path": path}
     if nonce is not None:
         body["headers"] = {CONTROL_HEADER: nonce}
     previous_timeout = apps.client.timeout
@@ -492,7 +492,7 @@ def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
                 "container_apps",
                 "POST",
                 f"/v2/containers/{name}/testCall",
-                params={"projectId": apps.project_id, "method": "GET", "path": "/healthz"},
+                params={"projectId": apps.project_id, "method": "get", "path": "/healthz"},
             )
     finally:
         apps.client.timeout = previous_timeout
@@ -1012,6 +1012,99 @@ def resume(apps, store, credentials, *, tenant, http_get=requests.get):
         raise
 
 
+def revision_diagnostics(apps, record, *, clock=time.monotonic):
+    """Bounded provider revision metadata only; never application logs or raw reasons."""
+    deadline = clock() + 60
+    previous_timeout = apps.client.timeout
+    name = names(apps.project_id)[0]
+
+    def read(path, params):
+        budget = deadline - clock()
+        if budget <= 0:
+            fail("rdc_readiness_timeout")
+        apps.client.timeout = min(previous_timeout, budget)
+        payload = apps.client.request("container_apps", "GET", path, params=params)
+        if clock() >= deadline:
+            fail("rdc_readiness_timeout")
+        return payload
+
+    try:
+        payload = read(
+            f"/v2/containers/{name}/revisions", {"projectId": apps.project_id, "pageSize": "3"}
+        )
+        data = payload.get("data")
+        if (
+            not isinstance(data, list)
+            or len(data) > 3
+            or any(not isinstance(item, dict) for item in data)
+        ):
+            fail("invalid_response")
+        for item in data:
+            identifier = project_uuid(item.get("id"))
+            detail = read(
+                f"/v2/containers/{name}/revisions/{identifier}", {"projectId": apps.project_id}
+            )
+            if (
+                detail.get("id") != identifier
+                or detail.get("projectId") != apps.project_id
+                or detail.get("serverlessId") != record["id"]
+            ):
+                fail("invalid_response")
+            state = detail.get("status")
+            state = state.lower() if isinstance(state, str) else "other"
+            if state not in {
+                "running",
+                "pending",
+                "creating",
+                "starting",
+                "stopping",
+                "stopped",
+                "failed",
+                "error",
+                "ready",
+                "rejected",
+                "deleted",
+                "suspended",
+            }:
+                state = "other"
+            reason = detail.get("statusReason")
+            if not isinstance(reason, str) or len(reason) > 8192:
+                reason = ""
+            reason = reason.lower()
+            patterns = {
+                "image_pull": ("imagepullbackoff", "errimagepull", "image pull", "pull image"),
+                "process_exit": ("crashloopbackoff", "process exited", "container terminated"),
+                "volume_mount": ("failedmount", "mountvolume", "volume mount", "state_not_mounted"),
+                "memory": ("oomkilled", "out of memory"),
+                "scheduling": ("failedscheduling", "insufficient"),
+                "permission": ("permission denied", "access denied", "unauthorized", "forbidden"),
+                "state_restore": (
+                    "state_corrupt",
+                    "state_write_failed",
+                    "ownership_mismatch",
+                    "local_state_not_empty",
+                    "state_rollback_failed",
+                ),
+                "health_probe": ("unhealthy", "health probe", "readiness probe", "liveness probe"),
+            }
+            categories = sorted(
+                key for key, tokens in patterns.items() if any(token in reason for token in tokens)
+            )
+            print(
+                json.dumps(
+                    {
+                        "stage": "rdc_revision_diagnostic",
+                        "revision_id": identifier,
+                        "resource_state": state,
+                        "reason_categories": categories or ["other"],
+                    }
+                ),
+                flush=True,
+            )
+    finally:
+        apps.client.timeout = previous_timeout
+
+
 def status(apps, *, tenant, http_get=requests.get):
     configured_tenant(tenant)
     record = owned_record(apps, tenant=tenant)
@@ -1046,7 +1139,12 @@ def status(apps, *, tenant, http_get=requests.get):
         ),
         flush=True,
     )
-    if str(record.get("status", "")).lower() == "suspended":
+    if resource_state in {"error", "failed"}:
+        try:
+            revision_diagnostics(apps, record)
+        except CloudProviderError as exc:
+            print(json.dumps({"stage": "rdc_revision_inspection", **safe_error(exc)}), flush=True)
+    if resource_state == "suspended":
         return {
             "status": "RDC_SUSPENDED",
             "container_name": record["name"],

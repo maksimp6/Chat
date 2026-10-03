@@ -237,7 +237,7 @@ def test_iam_call_is_fixed_path_bounded_and_restores_checkpoint_timeout():
     assert kwargs["json_body"] == {
         "name": rdc.names(PROJECT)[0],
         "projectId": PROJECT,
-        "method": "GET",
+        "method": "get",
         "path": "/healthz",
     }
     with pytest.raises(CloudProviderError):
@@ -416,7 +416,7 @@ def test_checkpoint_success_requires_new_monotonic_generation():
     apps = apps_with()
     apps.client.request.side_effect = lambda *a, **kw: response(
         health()
-        if kw["json_body"]["method"] == "GET"
+        if kw["json_body"]["method"] == "get"
         else {"status": "CHECKPOINT_COMPLETE", "generation": 1}
     )
     with pytest.raises(CloudProviderError) as error:
@@ -593,7 +593,7 @@ def test_checkpoint_lost_response_after_durable_commit_recovers_same_snapshot():
     posts = [
         call.kwargs["json_body"]
         for call in apps.client.request.call_args_list
-        if call.kwargs["json_body"]["method"] == "POST"
+        if call.kwargs["json_body"]["method"] == "post"
     ]
     assert generation == 2 and durable == closed_health()
     assert len(posts) == 2 and posts[0]["headers"] == posts[1]["headers"]
@@ -708,8 +708,8 @@ def test_control_visibility_retry_uses_same_permit_and_nonce():
 def test_control_denial_visibility_budget_is_ten_seconds_and_restores_timeouts():
     apps, store, clock = apps_with(), private_store(), Clock()
     apps.client.request.side_effect = lambda *a, **kw: response(
-        health() if kw["json_body"]["method"] == "GET" else {"status": "control_denied"},
-        200 if kw["json_body"]["method"] == "GET" else 403,
+        health() if kw["json_body"]["method"] == "get" else {"status": "control_denied"},
+        200 if kw["json_body"]["method"] == "get" else 403,
     )
     with pytest.raises(CloudProviderError) as error:
         rdc.checkpoint(apps, store, object(), tenant=TENANT, clock=clock, sleep=clock.sleep)
@@ -728,7 +728,7 @@ def test_checkpoint_recovery_has_one_overall_deadline():
         if first:
             first = False
             return response(health())
-        if kwargs["json_body"]["method"] == "POST":
+        if kwargs["json_body"]["method"] == "post":
             clock.sleep(3)
             raise CloudProviderError("synthetic timeout", code="provider_http_error")
         return {"statusCode": 503, "body": "proxy"}
@@ -915,7 +915,7 @@ def test_health_compatibility_fallback_is_fixed_and_shares_timeout(monkeypatch, 
         f"/v2/containers/{rdc.names(PROJECT)[0]}/testCall",
     )
     assert calls[1].kwargs == {
-        "params": {"projectId": PROJECT, "method": "GET", "path": "/healthz"}
+        "params": {"projectId": PROJECT, "method": "get", "path": "/healthz"}
     }
     assert apps.client.timeout == 20
     diagnostic = json.loads(capsys.readouterr().out)
@@ -1028,3 +1028,107 @@ def test_http400_authorization_or_unknown_grpc_never_fallback(grpc_code):
         rdc.test_call(apps, "/healthz")
     assert apps.client.request.call_count == 1
     assert apps.client.timeout == 20
+
+
+def revision_detail(**overrides):
+    return {
+        "id": DEVICE,
+        "projectId": PROJECT,
+        "serverlessId": IDENTIFIER,
+        "status": "error",
+        "statusReason": "ErrImagePull opaque-private-value",
+        **overrides,
+    }
+
+
+def test_revision_diagnostics_bind_context_and_hide_provider_reason(capsys):
+    apps = apps_with()
+    apps.client.request.side_effect = [{"data": [{"id": DEVICE}]}, revision_detail()]
+    rdc.revision_diagnostics(apps, record())
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic == {
+        "stage": "rdc_revision_diagnostic",
+        "revision_id": DEVICE,
+        "resource_state": "error",
+        "reason_categories": ["image_pull"],
+    }
+    assert apps.client.timeout == 20
+    assert apps.client.request.call_args_list[0].kwargs == {
+        "params": {"projectId": PROJECT, "pageSize": "3"}
+    }
+    assert apps.client.request.call_args_list[1].args == (
+        "container_apps",
+        "GET",
+        f"/v2/containers/{rdc.names(PROJECT)[0]}/revisions/{DEVICE}",
+    )
+
+
+@pytest.mark.parametrize(
+    "field,value", [("id", IDENTIFIER), ("projectId", DEVICE), ("serverlessId", DEVICE)]
+)
+def test_revision_diagnostics_reject_cross_context_details(field, value, capsys):
+    apps = apps_with()
+    apps.client.request.side_effect = [
+        {"data": [{"id": DEVICE}]},
+        revision_detail(**{field: value}),
+    ]
+    with pytest.raises(CloudProviderError):
+        rdc.revision_diagnostics(apps, record())
+    assert capsys.readouterr().out == ""
+    assert apps.client.timeout == 20
+
+
+def test_revision_diagnostics_limit_requests_and_total_timeout(capsys):
+    apps = apps_with()
+    clock = Clock()
+    timeouts = []
+
+    def read(*_args, **_kwargs):
+        timeouts.append(apps.client.timeout)
+        if len(timeouts) == 1:
+            clock.sleep(50)
+            return {"data": [{"id": DEVICE}]}
+        return revision_detail(status="private-state", statusReason="private reason")
+
+    apps.client.request.side_effect = read
+    rdc.revision_diagnostics(apps, record(), clock=clock)
+    assert timeouts == [20, 10]
+    assert apps.client.timeout == 20
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["resource_state"] == "other"
+    assert diagnostic["reason_categories"] == ["other"]
+
+
+def test_revision_diagnostics_stop_when_deadline_expires():
+    apps = apps_with()
+    clock = Clock()
+
+    def read(*_args, **_kwargs):
+        clock.sleep(60)
+        return {"data": [{"id": DEVICE}]}
+
+    apps.client.request.side_effect = read
+    with pytest.raises(CloudProviderError):
+        rdc.revision_diagnostics(apps, record(), clock=clock)
+    assert apps.client.request.call_count == 1
+    assert apps.client.timeout == 20
+
+
+def test_revision_diagnostics_reject_excessive_inventory():
+    apps = apps_with()
+    apps.client.request.return_value = {"data": [{"id": DEVICE}] * 4}
+    with pytest.raises(CloudProviderError):
+        rdc.revision_diagnostics(apps, record())
+    assert apps.client.request.call_count == 1
+    assert apps.client.timeout == 20
+
+
+def test_method_normalization_preserves_checkpoint_nonce_and_internal_allowlist():
+    apps = apps_with()
+    apps.client.request.return_value = response({"checkpoint_generation": 2})
+    assert rdc.test_call(apps, "/checkpoint", "POST", nonce=NONCE) == {"checkpoint_generation": 2}
+    body = apps.client.request.call_args.kwargs["json_body"]
+    assert body["method"] == "post"
+    assert body["headers"] == {rdc.CONTROL_HEADER: NONCE}
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps, "/healthz", "get")

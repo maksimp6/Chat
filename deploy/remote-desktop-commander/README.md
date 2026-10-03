@@ -180,6 +180,11 @@ If the colon `testCall` API returns transport HTTP 400 with verified gRPC code 3
 runner tries the documented slash route within the same request timeout. This
 compatibility path is read-only: checkpoint always requires the colon route
 and its nonce header. Reading health does not prove checkpoint support.
+The API method field uses lowercase `get`/`post`; the internal operation allowlist
+remains `GET /healthz` and `POST /checkpoint`. For an errored service, status reads
+at most three revision details within 60 seconds, verifies their resource context,
+and reports only fixed failure categories. It never fetches application logs or
+prints provider reasons, templates or configuration.
 Cloud.ru may add a global volume `readOnly` attribute. Ownership accepts it only
 when omitted or explicitly disabled (`false` as a boolean, or the exact strings
 `false`, `False`, `FALSE`); empty, null, numeric, enabled and unknown values are
