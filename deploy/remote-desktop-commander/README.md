@@ -71,3 +71,21 @@ device has been observed; Cloud.ru connectivity has not been verified.
 Stop with `docker compose stop` to retain state. Device revocation is performed
 in the official dashboard when requested. No automatic logout, deletion, or
 revocation is part of deployment.
+# Protected server pairing redirect
+
+The Commander startup preload observes the official `/device/start` response
+without changing RDC's PKCE or polling. Only `verification_uri_complete` and a
+maximum ten-minute expiry are written to `pairing/handoff.json`. This separate
+directory is mounted read-only into production Alice; RDC's credential directory
+is **not** mounted into Alice. The handoff is removed after authorization or a
+terminal provider error and cleared on process startup.
+
+After both deployments use this revision, visit `/<short-token>/rdc` while the
+server is waiting for authorization. Alice returns a 303 redirect to the exact
+server-generated verification URL. Complete the provider's account confirmation
+there. An expired or absent handoff returns 503; unauthenticated access is denied.
+No new OAuth callback or startup token flag is introduced.
+
+Deployment order: deploy production Alice with this revision, then install RDC
+with this revision using the existing protected deployment workflows. This code
+does not authorize the device automatically: the account owner must confirm it.

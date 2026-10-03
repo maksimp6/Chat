@@ -14,6 +14,7 @@ RUN cd /opt/desktop-commander \
     && node dependency-smoke.cjs
 COPY config.json /opt/desktop-commander/config.example.json
 COPY entrypoint.sh /usr/local/bin/alice-desktop-commander
+COPY pairing-handoff.cjs /opt/desktop-commander/pairing-handoff.cjs
 USER node
 WORKDIR /workspace
 ENTRYPOINT ["bash", "/usr/local/bin/alice-desktop-commander"]

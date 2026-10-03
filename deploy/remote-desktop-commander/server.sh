@@ -13,12 +13,12 @@ case "$operation" in
     [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || exit 2
     archive="${ALICE_RDC_ARCHIVE:-$HOME/alice-preview/incoming/remote-desktop-commander.tar.gz}"
     test -f "$archive"
-    install -d -m 700 "$root" "$root/state" "$root/workspace" "$root/releases"
+    install -d -m 700 "$root" "$root/state" "$root/workspace" "$root/pairing" "$root/releases"
     # Each attempt gets a clean immutable context; auth/workspace are never removed.
     release="$(mktemp -d "$root/releases/$revision.XXXXXX")"
     tar -xzf "$archive" -C "$release"
     source_dir="$release/deploy/remote-desktop-commander"
-    for file in Dockerfile compose.yaml config.json entrypoint.sh .dockerignore package.json package-lock.json dependency-smoke.cjs; do
+    for file in Dockerfile compose.yaml config.json entrypoint.sh pairing-handoff.cjs .dockerignore package.json package-lock.json dependency-smoke.cjs; do
       test -f "$source_dir/$file"
       cp "$source_dir/$file" "$root/$file"
     done
