@@ -109,11 +109,14 @@ def test_worker_contract_has_no_raw_cdp_shell_or_arbitrary_eval():
         assert route in source
 
 
-def test_worker_image_does_not_expand_system_tls_trust():
+def test_worker_image_installs_reviewed_russian_ca_bundle():
     dockerfile = (BROWSER_WORKER / "Dockerfile").read_text(encoding="utf-8")
-    assert "COPY certificates" not in dockerfile
-    assert "update-ca-certificates" not in dockerfile
-    assert "NODE_EXTRA_CA_CERTS" not in dockerfile
+    sums = (BROWSER_WORKER / "certificates" / "SHA256SUMS").read_text(encoding="utf-8")
+
+    assert "COPY certificates/*.crt /usr/local/share/ca-certificates/" in dockerfile
+    assert "update-ca-certificates" in dockerfile
+    assert "russian-trusted-root-ca.crt" in sums
+    assert "russian-trusted-sub-ca.crt" in sums
 
 
 def test_worker_documents_persistent_sleep_wake_and_mcp_contract():
@@ -122,3 +125,11 @@ def test_worker_documents_persistent_sleep_wake_and_mcp_contract():
     assert "POST /browser/v1/sleep" in readme
     assert "POST /browser/v1/wake" in readme
     assert "/browser/v1/mcp" in readme
+
+
+def test_gateway_supports_streamable_http_session_methods(gateway_spec):
+    route = gateway_spec["paths"]["/browser/v1/mcp"]
+    for method in ("get", "delete"):
+        assert route[method]["security"] == route["post"]["security"]
+        assert route[method]["x-cloud-backend"] == route["post"]["x-cloud-backend"]
+        assert route[method]["x-cloud-limit-count"]["count"] > 0

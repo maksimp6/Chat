@@ -1,7 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
-import { lookup } from "node:dns/promises";
-import { BlockList, isIP } from "node:net";
+import { createPlaywrightMcp } from "./mcp.mjs";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TEXT_CHARS = 32 * 1024;
@@ -51,35 +50,10 @@ function safeUrl(value, allowedHosts) {
   if (!new Set(["http:", "https:"]).has(target.protocol)) {
     throw Object.assign(new Error("unsupported_url_scheme"), { status: 400 });
   }
-  if (target.username || target.password || !allowedHosts.has(target.hostname.toLowerCase())) {
+  if (allowedHosts.size && !allowedHosts.has(target.hostname.toLowerCase())) {
     throw Object.assign(new Error("host_not_allowed"), { status: 403 });
   }
   return target.href;
-}
-
-const privateNetworks = new BlockList();
-for (const [address, prefix] of [
-  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
-  ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24],
-  ["192.0.2.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15],
-  ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 3],
-]) privateNetworks.addSubnet(address, prefix, "ipv4");
-
-// Pin public IPv4 answers for this browser lifetime. No later DNS lookup can
-// rebind an approved hostname to a private address; IPv6 is intentionally closed.
-export async function resolverRules(hosts, resolve = lookup) {
-  const rules = [];
-  for (const host of hosts) {
-    if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(host) || isIP(host)) {
-      throw new Error("invalid_allowed_host");
-    }
-    const answers = await resolve(host, { all: true, family: 4 });
-    if (!answers.length || answers.some(({ address }) => isIP(address) !== 4 || privateNetworks.check(address, "ipv4"))) {
-      throw new Error("non_public_allowed_host");
-    }
-    rules.push(`MAP ${host} ${answers[0].address}`);
-  }
-  return [...rules, "MAP * ~NOTFOUND"].join(", ");
 }
 
 export function createWorker(options = {}) {
@@ -98,27 +72,18 @@ export function createWorker(options = {}) {
 
   async function wake() {
     if (context) return;
-    if (!allowedHosts.size) throw Object.assign(new Error("allowed_hosts_required"), { status: 503 });
-    const rules = await resolverRules(allowedHosts, options.resolve);
     const chromium = options.chromium ?? (await import("playwright-core")).chromium;
     context = await chromium.launchPersistentContext(profileDir, {
       executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
       headless: process.env.CHROME_HEADLESS !== "0",
-      chromiumSandbox: true,
-      serviceWorkers: "block",
-      args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check",
-        "--no-proxy-server", "--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-        `--host-resolver-rules=${rules}`],
+      chromiumSandbox: false,
+      args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
     });
-    await context.route("**/*", async (route) => {
-      try {
-        safeUrl(route.request().url(), allowedHosts);
-        await route.continue();
-      } catch {
-        await route.abort("blockedbyclient");
-      }
+    context.on?.("close", () => {
+      context = undefined;
+      page = undefined;
+      state = "sleeping";
     });
-    await context.routeWebSocket("**/*", (socket) => socket.close());
     page = context.pages()[0] ?? (await context.newPage());
     generation += 1;
     state = "awake";
@@ -178,25 +143,18 @@ export function createWorker(options = {}) {
     ["POST /browser/v1/screenshot", ["screenshot", true]],
   ]);
 
-  const tools = ["browser_status", "wake", "sleep", "navigate", "click", "type", "extract", "screenshot"].map(
-    (name) => ({ name, description: `Controlled Chrome operation: ${name}`, inputSchema: { type: "object" } }),
-  );
+  const mcp = createPlaywrightMcp(async () => {
+    await wake();
+    return context;
+  }, `${profileDir}/mcp-output`);
 
   async function handler(request, response) {
     const pathname = new URL(request.url, "http://worker.invalid").pathname;
     if (!authorized(request, token)) return json(response, 401, { error: "unauthorized" });
     try {
-      if (request.method === "POST" && pathname === "/browser/v1/mcp") {
-        const message = await body(request);
-        if (message.method === "initialize") {
-          return json(response, 200, { jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "alice-chrome-worker", version: "0.1.0" } } });
-        }
-        if (message.method === "tools/list") return json(response, 200, { jsonrpc: "2.0", id: message.id, result: { tools } });
-        if (message.method === "tools/call") {
-          const result = await callTool(message.params?.name, message.params?.arguments);
-          return json(response, 200, { jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result } });
-        }
-        return json(response, 200, { jsonrpc: "2.0", id: message.id ?? null, error: { code: -32601, message: "Method not found" } });
+      if (pathname === "/browser/v1/mcp") {
+        const message = request.method === "POST" ? await body(request) : undefined;
+        return await mcp.handle(request, response, message);
       }
       const operation = routeTools.get(`${request.method} ${pathname}`);
       if (!operation) return json(response, 404, { error: "not_found" });
@@ -207,7 +165,7 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, close: sleep };
+  return { handler, callTool, async close() { await mcp.close(); await sleep(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

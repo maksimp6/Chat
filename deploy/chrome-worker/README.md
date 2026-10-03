@@ -1,47 +1,65 @@
-# Persistent Chrome Worker
+# Chrome + Playwright MCP
 
-This image runs official Google Chrome Stable through `playwright-core`. Its
-persistent user-data directory is `/state/profile`; production must mount the
-existing private state volume there. `POST /browser/v1/sleep` closes Chrome so
-the profile is flushed before the container scales down. Any authorized
-`POST /browser/v1/wake` starts Chrome again with that same directory.
+The worker runs official Google Chrome Stable with the persistent profile at
+`/state/profile`. Mount the private state volume there. Chrome's sandbox is
+explicitly disabled (`chromiumSandbox: false`). The Dockerfile retains the
+original Russian CA installation and certificate files.
 
-Every route, including status, requires `Authorization: Bearer` with the value
-from `BROWSER_API_TOKEN`. Set `BROWSER_ALLOWED_HOSTS` to a comma-separated exact
-hostname allowlist. The worker must remain private; API Gateway is the supported
-ingress. `/browser/v1/mcp` provides the same bounded operations as MCP tools over
-JSON-RPC, without exposing CDP, cookies, arbitrary JavaScript, or shell access.
+## MCP connection
 
-The image uses the distribution TLS trust store without installing additional
-Russian roots. The archived certificate files are not copied into the image.
-TLS validation remains enabled.
+`/browser/v1/mcp` runs the official `@playwright/mcp` server over MCP Streamable
+HTTP, using the MCP SDK transport. It supports POST (initialize, notifications and
+tool calls), GET (event stream), and DELETE (end session). Every request requires
+`Authorization: Bearer` with `BROWSER_API_TOKEN`, including requests carrying an
+`Mcp-Session-Id`. The Gateway must forward this session header, the MCP protocol
+version header and Accept header, and return `Mcp-Session-Id` to the client.
 
-An empty `BROWSER_ALLOWED_HOSTS` prevents wake. Only exact DNS hostnames are
-accepted (no wildcards or IP literals). At wake, public IPv4 answers are checked
-and pinned in Chrome's resolver for the browser lifetime; private/reserved answers
-are rejected and all other DNS names fail closed. IPv6-only sites are unsupported.
-Context request interception applies the allowlist to page navigation, redirects,
-popups and subresources. Service workers and WebSockets are blocked. All required
-asset/login hosts must be explicitly listed. Sleep/wake refreshes DNS pins.
-Deploy with an egress firewall denying private, loopback, link-local and metadata
-networks as defense in depth; browser flags are not a replacement for network
-isolation. The persistent profile must not contain unreviewed extensions.
+The advertised tools are Playwright MCP's standard tools, including
+`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, and
+`browser_take_screenshot`. This replaces the earlier hand-written JSON-RPC
+adapter. A tool call starts Chrome on demand. MCP clients share the worker's
+browser context and profile; they are not isolated browser users. MCP sessions
+are process-local, so keep a single worker replica or use sticky routing.
 
-Live acceptance remains required before merge/cutover: build the pinned image,
-start sandboxed Chrome in Cloud.ru, verify authenticated Gateway navigation,
-extract and screenshot, reject anonymous/direct worker access, persist a synthetic
-cookie across sleep plus container recreation using the same state volume, and
-verify Alice ExecutionTrace correlation and extension restoration. Fake-browser
-unit tests do not establish those deployment outcomes. See issue #751 and PR #752.
+The existing REST operations remain available, including
+`POST /browser/v1/sleep` and `POST /browser/v1/wake`. Sleep closes Chrome and
+flushes its profile. The next MCP browser operation wakes it again. The optional
+`BROWSER_ALLOWED_HOSTS` setting belongs to the legacy REST navigate operation;
+it does not restrict the official MCP tools.
+
+Use the Gateway's actual deployed URL with path `/browser/v1/mcp` in your client.
+For a locally running worker, the Codex configuration is:
+
+```toml
+[mcp_servers.playwright]
+url = "http://127.0.0.1:8080/browser/v1/mcp"
+bearer_token_env_var = "BROWSER_API_TOKEN"
+```
+
+Set the token through the client's environment/secret store. In a remote setup,
+replace the local URL with the deployed Gateway endpoint. No live Gateway URL
+or credentials are embedded in this repository.
+
+## Run and check
 
 ```bash
 npm ci --prefix deploy/chrome-worker
+npm start --prefix deploy/chrome-worker
+```
+
+Set `BROWSER_API_TOKEN`, `CHROME_PROFILE_DIR`, and, when necessary,
+`CHROME_EXECUTABLE_PATH` before starting. The image defaults to
+`/usr/bin/google-chrome-stable`; local checks may point to another installed
+Chrome executable.
+
+```bash
 npm test --prefix deploy/chrome-worker
 CHROME_EXECUTABLE_PATH=/usr/bin/google-chrome npm run test:browser --prefix deploy/chrome-worker
 ```
 
-Chrome runs with `chromiumSandbox: true`. The runtime must permit Chrome's
-namespace sandbox. A container that rejects namespace creation with
-`Operation not permitted` is not an accepted runtime; do not work around that
-failure with `--no-sandbox`. The browser regression suite uses synthetic pages
-and cookies and requires no external site or account.
+The integration test connects the official MCP SDK client, initializes a session,
+lists Playwright tools, navigates a synthetic page, snapshots, types, clicks and
+screenshots, and checks authentication and session termination. It needs no
+external site or account. MCP-generated artifacts stay in the private
+`/state/profile/mcp-output` directory by default; no profile/artifact HTTP routes
+are exposed.

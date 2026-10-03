@@ -308,6 +308,54 @@
           "time_window": 60,
           "rejected_code": 429
         }
+      },
+      "get": {
+        "operationId": "browserMcpStream",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 10,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      },
+      "delete": {
+        "operationId": "browserMcpDisconnect",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 10,
+          "time_window": 60,
+          "rejected_code": 429
+        }
       }
     }
   },

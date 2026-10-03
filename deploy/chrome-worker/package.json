@@ -9,6 +9,8 @@
     "test:browser": "node --test browser.test.mjs"
   },
   "dependencies": {
-    "playwright-core": "1.63.0"
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@playwright/mcp": "0.0.83",
+    "playwright-core": "1.64.0-alpha-1790635538000"
   }
 }

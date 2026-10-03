@@ -12,12 +12,15 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends "google-chrome-stable=${CHROME_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-# Use the distribution TLS trust store. No additional roots are installed.
+# These public TLS roots are published by the Russian Ministry of Digital
+# Development. Keeping reviewed copies in the image makes the build reproducible.
+COPY certificates/*.crt /usr/local/share/ca-certificates/
+RUN update-ca-certificates
 
 WORKDIR /opt/chrome-worker
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.mjs ./
+COPY server.mjs mcp.mjs ./
 
 RUN mkdir -p /state/profile && chown -R node:node /state /opt/chrome-worker
 USER node

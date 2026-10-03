@@ -14,8 +14,8 @@ Alice   -> authenticated client -> Cloud.ru API Gateway -> Playwright API -> Chr
 ```
 
 The Gateway is the supported public boundary. The worker must not expose CDP,
-Chrome profile files, cookies, credentials, arbitrary JavaScript evaluation or
-unrestricted shell execution.
+Chrome profile files, cookies or credentials as separate HTTP endpoints. The
+MCP endpoint uses the standard official Playwright MCP tool set.
 
 ## Stable operations
 
@@ -64,7 +64,14 @@ should keep a small versioned namespace:
 - `POST /browser/v1/type`
 - `POST /browser/v1/extract`
 - `POST /browser/v1/screenshot`
-- `POST /browser/v1/mcp` (MCP JSON-RPC adapter for the same operations)
+- `POST /browser/v1/mcp` (official Playwright MCP Streamable HTTP)
+- `GET /browser/v1/mcp` (MCP event stream)
+- `DELETE /browser/v1/mcp` (MCP session termination)
+
+The MCP tool names are the official `browser_*` names, such as
+`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, and
+`browser_take_screenshot`. The short names above describe the retained REST
+operations. See `deploy/chrome-worker/README.md` for client configuration.
 
 Do not add a catch-all browser proxy. Every externally callable browser operation
 must be explicitly declared in the Gateway contract and covered by authorization,
@@ -72,7 +79,7 @@ input bounds, rate limits and tests.
 
 ## First acceptance flow
 
-1. External MCP/plugin client calls `browser_status` through API Gateway.
+1. External MCP/plugin client initializes a session and lists tools through API Gateway.
 2. It navigates Chrome to a synthetic test page.
 3. It clicks/types into non-secret controls.
 4. It extracts bounded page content.
