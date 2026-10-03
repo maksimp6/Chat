@@ -467,12 +467,33 @@ def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
             if timeout <= 0:
                 fail("rdc_checkpoint_unconfirmed")
             apps.client.timeout = timeout
-        payload = apps.client.request(
-            "container_apps",
-            "POST",
-            f"/v2/containers/{name}:testCall",
-            json_body=body,
-        )
+        deadline = time.monotonic() + apps.client.timeout
+        try:
+            payload = apps.client.request(
+                "container_apps", "POST", f"/v2/containers/{name}:testCall", json_body=body
+            )
+        except CloudProviderError as exc:
+            if (
+                path != "/healthz"
+                or method != "GET"
+                or exc.code != "provider_http_error"
+                or exc.http_status != 400
+            ):
+                raise
+            diagnostic = safe_error(exc)
+            if diagnostic.get("provider_status_code") != 3:
+                raise
+            print(json.dumps({"stage": "rdc_health_compatibility", **diagnostic}), flush=True)
+            remaining_timeout = deadline - time.monotonic()
+            if remaining_timeout <= 0:
+                raise
+            apps.client.timeout = remaining_timeout
+            payload = apps.client.request(
+                "container_apps",
+                "POST",
+                f"/v2/containers/{name}/testCall",
+                params={"projectId": apps.project_id, "method": "GET", "path": "/healthz"},
+            )
     finally:
         apps.client.timeout = previous_timeout
     status = payload.get("statusCode")
@@ -996,6 +1017,35 @@ def status(apps, *, tenant, http_get=requests.get):
     record = owned_record(apps, tenant=tenant)
     if record is None:
         return {"status": "RDC_ABSENT"}
+    resource_state = str(record.get("status", "")).lower()
+    known_states = {
+        "running",
+        "suspended",
+        "pending",
+        "created",
+        "creating",
+        "deploying",
+        "starting",
+        "stopping",
+        "stopped",
+        "failed",
+        "error",
+        "ready",
+        "rejected",
+        "deleted",
+        "suspended_product",
+    }
+    print(
+        json.dumps(
+            {
+                "stage": "rdc_owned_service",
+                "container_name": names(apps.project_id)[0],
+                "container_id": str(UUID(record["id"])),
+                "resource_state": resource_state if resource_state in known_states else "other",
+            }
+        ),
+        flush=True,
+    )
     if str(record.get("status", "")).lower() == "suspended":
         return {
             "status": "RDC_SUSPENDED",
@@ -1062,6 +1112,91 @@ def safe_error(exc):
     code = getattr(exc, "code", None)
     if isinstance(code, str) and code in RDC_ERROR_CODES:
         result["error"] = code
+    current = exc
+    fields_allowed = {
+        "method",
+        "path",
+        "headers",
+        "queryStringParams",
+        "body",
+        "isBase64Encoded",
+        "name",
+        "projectId",
+    }
+    words_allowed = {
+        "method",
+        "unsupported",
+        "must",
+        "get",
+        "post",
+        "only",
+        "disabled",
+        "enabled",
+        "auth",
+        "authorization",
+        "authentication",
+        "not",
+        "cannot",
+        "call",
+        "container",
+        "suspended",
+        "started",
+        "running",
+        "headers",
+        "header",
+        "body",
+        "path",
+        "request",
+        "json",
+        "invalid",
+        "empty",
+        "missing",
+        "test",
+        "allowed",
+        "access",
+        "public",
+        "private",
+        "protocol",
+        "http",
+        "https",
+        "deployment",
+        "ready",
+        "id",
+        "project",
+        "service",
+    }
+    for _ in range(4):
+        response = current.response if isinstance(current, requests.RequestException) else None
+        if response is not None and len(response.content) <= 65536:
+            try:
+                payload = response.json()
+            except (ValueError, RecursionError):
+                payload = None
+            if isinstance(payload, dict):
+                message = payload.get("message")
+                if isinstance(message, str):
+                    words = sorted(set(re.findall(r"[a-z]+", message.lower())) & words_allowed)
+                    if words:
+                        result["provider_error_terms"] = words
+                fields = set(result.get("provider_validation_fields", []))
+                details = payload.get("details")
+                for detail in details[:16] if isinstance(details, list) else []:
+                    if (
+                        not isinstance(detail, dict)
+                        or detail.get("@type") != "type.googleapis.com/google.rpc.BadRequest"
+                    ):
+                        continue
+                    violations = detail.get("fieldViolations")
+                    for violation in violations[:32] if isinstance(violations, list) else []:
+                        field = violation.get("field") if isinstance(violation, dict) else None
+                        if isinstance(field, str) and field in fields_allowed:
+                            fields.add(field)
+                if fields:
+                    result["provider_validation_fields"] = sorted(fields)
+            break
+        current = current.__cause__
+        if current is None:
+            break
     if exc.__class__.__module__ == "storage":
         result["error"] = "rdc_storage_unavailable"
     return result
