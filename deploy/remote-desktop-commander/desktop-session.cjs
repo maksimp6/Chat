@@ -1,9 +1,12 @@
 "use strict";
 
-const { spawn } = require("node:child_process");
-const { mkdirSync, chmodSync } = require("node:fs");
+const { spawn, execFile } = require("node:child_process");
+const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync } = require("node:fs");
 const { setTimeout: delay } = require("node:timers/promises");
 const { createServer } = require("node:http");
+const { promisify } = require("node:util");
+
+const execute = promisify(execFile);
 
 const PROFILE = "/home/node/.config/chromium";
 const VERSION_URL = "http://127.0.0.1:9222/json/version";
@@ -57,6 +60,325 @@ async function closeBrowser() {
   } catch {
     // Process termination below remains the bounded fallback.
   }
+}
+
+async function stateHelper(command) {
+  const { stdout } = await execute("python3", ["/opt/desktop-commander/state-store.py", command], {
+    timeout: 60000, maxBuffer: 8192,
+  });
+  return JSON.parse(stdout);
+}
+
+function stateSummary(value) {
+  if (!value || value.state_ready !== true || typeof value.paired !== "boolean" ||
+      !Number.isSafeInteger(value.checkpoint_generation) || value.checkpoint_generation < 0 ||
+      !(value.device_id === null || (typeof value.device_id === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.device_id))) ||
+      (value.paired && value.device_id === null)) throw new Error("State unavailable");
+  return {
+    state_ready: true, paired: value.paired, device_id: value.device_id,
+    checkpoint_generation: value.checkpoint_generation,
+  };
+}
+
+function pairingHandoff(file, now = Date.now() / 1000) {
+  try {
+    const info = lstatSync(file);
+    if (!info.isFile() || info.size > 4096) return null;
+    const value = JSON.parse(readFileSync(file, "utf8"));
+    if (!value || Object.keys(value).sort().join(",") !== "expires_at,verification_uri_complete" ||
+        !Number.isFinite(value.expires_at) || value.expires_at <= now || value.expires_at > now + 600 ||
+        typeof value.verification_uri_complete !== "string" || value.verification_uri_complete.length > 2048 ||
+        /[\s\x00-\x1f\x7f]/.test(value.verification_uri_complete)) return null;
+    const url = new URL(value.verification_uri_complete);
+    if (url.protocol !== "https:" || !["mcp.desktopcommander.app", "auth.desktopcommander.app"].includes(url.hostname) ||
+        url.username || url.password || url.hash || (url.port && url.port !== "443")) return null;
+    return url.href;
+  } catch { return null; }
+}
+
+function authSignature(file) {
+  try {
+    const info = lstatSync(file);
+    if (!info.isFile()) throw new Error("Invalid auth file");
+    return `${info.ino}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function processGroupGone(pid, inspect = {}) {
+  if (!Number.isInteger(pid) || pid < 1) throw new Error("Process ownership unavailable");
+  const kill = inspect.kill || process.kill;
+  try { kill(-pid, 0); }
+  catch (error) {
+    if (error.code === "ESRCH") return true;
+    throw error;
+  }
+  const entries = inspect.entries || (() => readdirSync("/proc"));
+  const read = inspect.read || ((entry) => readFileSync(`/proc/${entry}/stat`, "utf8"));
+  const scan = () => {
+    const members = [];
+    for (const entry of entries()) {
+      if (!/^[1-9][0-9]*$/.test(entry)) continue;
+      let raw;
+      try { raw = read(entry); }
+      catch (error) { if (error.code === "ENOENT") continue; throw error; }
+      const boundary = raw.lastIndexOf(") ");
+      const fields = raw.slice(boundary + 2).trim().split(/\s+/);
+      if (boundary < 0 || fields.length < 20 || !/^[0-9]+$/.test(fields[2])) throw new Error("Process state unavailable");
+      if (Number(fields[2]) !== pid) continue;
+      if (!["Z", "X"].includes(fields[0])) return { closed: false };
+      members.push(`${entry}:${fields[19]}:${fields[0]}`);
+    }
+    return { closed: members.length > 0, signature: members.sort().join(",") };
+  };
+  // Dead zombies cannot write and can remain until the container's init reaps
+  // them. Require two matching scans; a live or changing group stays blocked.
+  const first = scan();
+  const second = scan();
+  return first.closed && second.closed && first.signature === second.signature;
+}
+
+function containerWritersGone(uid, supervisorPid, inspect = {}) {
+  if (uid !== 1000 || !Number.isInteger(supervisorPid) || supervisorPid < 1) {
+    throw new Error("Process ownership unavailable");
+  }
+  const entries = inspect.entries || (() => readdirSync("/proc"));
+  const read = inspect.read || ((entry, file) => readFileSync(`/proc/${entry}/${file}`, "utf8"));
+  const scan = () => {
+    const members = [];
+    const processes = entries().filter((entry) => /^[1-9][0-9]*$/.test(entry));
+    if (processes.length > 4096) throw new Error("Process state unavailable");
+    for (const entry of processes) {
+      let status;
+      let raw;
+      try { status = read(entry, "status"); raw = read(entry, "stat"); }
+      catch (error) { if (error.code === "ENOENT") continue; throw error; }
+      if (status.length > 8192 || raw.length > 4096) throw new Error("Process state unavailable");
+      const identities = status.split("\n").filter((line) => line.startsWith("Uid:"));
+      const match = identities.length === 1 && /^Uid:\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)$/.exec(identities[0]);
+      if (!match || match.slice(1).some((value) => Number(value) > 4294967295)) throw new Error("Process ownership unavailable");
+      const owners = match.slice(1).map(Number);
+      if (!owners.includes(uid)) continue;
+      if (!owners.every((owner) => owner === uid)) throw new Error("Process ownership unavailable");
+      const boundary = raw.lastIndexOf(") ");
+      const fields = raw.slice(boundary + 2).trim().split(/\s+/);
+      if (boundary < 0 || !raw.startsWith(`${entry} (`) || fields.length < 20 ||
+          !/^[A-Za-z]$/.test(fields[0]) || !/^[0-9]+$/.test(fields[19])) throw new Error("Process state unavailable");
+      if (Number(entry) !== supervisorPid && !["Z", "X"].includes(fields[0])) return { closed: false };
+      members.push(`${entry}:${fields[19]}:${fields[0]}`);
+    }
+    return { closed: members.some((member) => member.startsWith(`${supervisorPid}:`)), signature: members.sort().join(",") };
+  };
+  // A terminal can daemonize with setsid and leave both original groups. Only
+  // the known supervisor may remain alive as UID 1000 before a fresh snapshot.
+  const first = scan();
+  const second = scan();
+  return first.closed && second.closed && first.signature === second.signature;
+}
+
+async function superviseCloudRdc(argv, options = {}) {
+  const launch = options.spawn || spawn;
+  const probe = options.probe || healthy;
+  const signals = options.signals || process;
+  const sleep = options.sleep || delay;
+  const close = options.closeBrowser || closeBrowser;
+  const helper = options.stateHelper || stateHelper;
+  const signature = options.authSignature || authSignature;
+  const groupGone = options.processGroupGone || processGroupGone;
+  const writersGone = options.containerWritersGone || (() => containerWritersGone(process.getuid(), process.pid));
+  const authFile = "/home/node/.desktop-commander-device/device.json";
+  const handoffFile = options.pairingFile || process.env.ALICE_RDC_PAIRING_FILE;
+  const children = [];
+  const closedGroups = new Set();
+  let summary;
+  let browserReady = false;
+  let rdcRunning = false;
+  let stopping = false;
+  let quiescing = false;
+  let exitCode = 1;
+  let server;
+  let poll;
+  let checkpointPromise;
+  let helperQueue = Promise.resolve();
+  let finish;
+  const ended = new Promise((resolve) => { finish = resolve; });
+  const stop = (code) => {
+    if (stopping) return;
+    stopping = true;
+    exitCode = code;
+    finish();
+  };
+  const onSignal = () => stop(0);
+  const runHelper = (command) => {
+    const pending = helperQueue.then(() => helper(command));
+    helperQueue = pending.catch(() => {});
+    return pending;
+  };
+  const persistAuth = () => {
+    if (stopping || quiescing || !summary) return;
+    summary.state_ready = false;
+    // Commands share one queue: token rotation cannot race a closed snapshot.
+    void runHelper("save-auth").then(() => runHelper("status")).then((value) => {
+      summary = stateSummary(value);
+    }).catch(() => stop(1));
+  };
+  const start = (command, args, stdio) => {
+    const child = launch(command, args, { stdio, detached: true });
+    children.push(child);
+    child.once("error", () => stop(1));
+    child.once("exit", () => { if (!quiescing) stop(1); });
+    return child;
+  };
+  const waitExit = async (child) => {
+    if (child.exitCode === null && child.signalCode === null) {
+      let timer;
+      await new Promise((resolve, reject) => {
+        const completed = () => { clearTimeout(timer); resolve(); };
+        timer = setTimeout(() => {
+          child.off("exit", completed);
+          reject(new Error("Shutdown incomplete"));
+        }, options.shutdownTimeoutMs ?? 5000);
+        child.once("exit", completed);
+      });
+    }
+    if (child.exitCode !== 0 || child.signalCode !== null) throw new Error("Shutdown incomplete");
+  };
+  const checkpoint = () => {
+    if (checkpointPromise) return checkpointPromise;
+    checkpointPromise = (async () => {
+      quiescing = true;
+      browserReady = false;
+      rdcRunning = false;
+      clearInterval(poll);
+      const [browser, rdc] = children;
+      if (!browser || !rdc) throw new Error("Session unavailable");
+      rdc.kill("SIGTERM");
+      await waitExit(rdc);
+      await close();
+      await waitExit(browser);
+      // RDC suppresses transport-close errors, so its exit code alone does not
+      // prove that an executor grandchild has stopped modifying the workspace.
+      const deadline = Date.now() + (options.shutdownTimeoutMs ?? 5000);
+      for (const child of children) {
+        while (!groupGone(child.pid)) {
+          if (Date.now() >= deadline) throw new Error("Shutdown incomplete");
+          await sleep(25);
+        }
+        closedGroups.add(child.pid);
+      }
+      // Drain helpers already scheduled by auth notifications before checking
+      // all container UID writers, including executors that escaped with setsid.
+      let drained;
+      do { drained = helperQueue; await drained; } while (drained !== helperQueue);
+      if ((stopping && exitCode !== 0) || !writersGone()) throw new Error("Shutdown incomplete");
+      const result = await runHelper("checkpoint");
+      if (!result || result.status !== "CHECKPOINT_COMPLETE" ||
+          !Number.isSafeInteger(result.generation) || result.generation < 1) throw new Error("Checkpoint unavailable");
+      summary = stateSummary(await runHelper("status"));
+      if (summary.checkpoint_generation !== result.generation) throw new Error("Checkpoint unavailable");
+      return { status: "CHECKPOINT_COMPLETE", generation: result.generation };
+    })();
+    return checkpointPromise;
+  };
+  signals.on("SIGTERM", onSignal);
+  signals.on("SIGINT", onSignal);
+  try {
+    session: {
+    summary = stateSummary(await runHelper("status"));
+    const port = options.port ?? Number(process.env.PORT || 8080);
+    if (!Number.isInteger(port) || port < 0 || port > 65535 || (port === 0 && options.port !== 0)) break session;
+    server = createServer(async (request, response) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("Referrer-Policy", "no-referrer");
+      response.setHeader("Content-Type", "application/json");
+      if (request.method === "GET" && request.url === "/healthz") {
+        const ok = browserReady && rdcRunning && summary.state_ready && !stopping && !quiescing;
+        response.writeHead(ok ? 200 : 503).end(JSON.stringify({
+          mode: "cloud-rdc", browser_ready: browserReady && !stopping && !quiescing,
+          rdc_running: rdcRunning && !stopping && !quiescing, ...summary,
+        }));
+      } else if (request.method === "GET" && request.url === "/rdc/pair") {
+        const href = !stopping && !quiescing && !summary.paired && pairingHandoff(handoffFile);
+        if (href) response.writeHead(303, { Location: href }).end();
+        else response.writeHead(404).end('{"status":"pairing_unavailable"}');
+      } else if (request.method === "POST" && request.url === "/checkpoint") {
+        if (request.headers["transfer-encoding"] || Number(request.headers["content-length"] || 0) !== 0) {
+          request.resume();
+          response.writeHead(400).end('{"status":"invalid_request"}');
+          return;
+        }
+        try {
+          const result = await checkpoint();
+          response.writeHead(200).end(JSON.stringify(result));
+        } catch {
+          response.writeHead(503).end('{"status":"checkpoint_failed"}');
+          setImmediate(() => stop(1));
+        }
+      } else response.writeHead(404).end('{"status":"not_found"}');
+    });
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "0.0.0.0", resolve);
+    });
+    server.on("error", () => stop(1));
+    if (options.onListening) options.onListening(server.address().port);
+    if (await probe()) break session;
+    start("chromium", browserArgs, "ignore");
+    const deadline = Date.now() + (options.startupTimeoutMs ?? 30000);
+    while (!stopping && Date.now() < deadline) {
+      if (await probe()) { browserReady = !stopping; break; }
+      await Promise.race([sleep(100), ended]);
+    }
+    if (!browserReady || stopping || quiescing) break session;
+    let lastSignature = signature(authFile);
+    const rdc = start(process.execPath, [
+      "--require", "/opt/desktop-commander/pairing-handoff.cjs",
+      "/opt/desktop-commander/node_modules/@wonderwhy-er/desktop-commander/dist/index.js", ...argv,
+    ], ["ignore", "ignore", "ignore", "ipc"]);
+    rdcRunning = !stopping;
+    rdc.on("message", (message) => {
+      if (!message || Object.keys(message).length !== 1) return;
+      if (message.type === "rdc-auth-write-failed") stop(1);
+      if (message.type === "rdc-auth-committed") {
+        try { lastSignature = signature(authFile); persistAuth(); } catch { stop(1); }
+      }
+    });
+    poll = setInterval(() => {
+      if (stopping || quiescing) return;
+      try {
+        const current = signature(authFile);
+        if (current !== lastSignature) { lastSignature = current; persistAuth(); }
+      } catch { stop(1); }
+    }, options.authPollMs ?? 500);
+    await ended;
+    }
+  } catch { exitCode = 1; }
+  finally {
+    clearInterval(poll);
+    // SIGTERM is best effort. A forced/failed child exit never becomes a new
+    // durable browser snapshot; the previous complete generation stays intact.
+    if (exitCode === 0 && children.length === 2) {
+      try { await checkpoint(); } catch { exitCode = 1; }
+    }
+    quiescing = true;
+    for (const child of children) {
+      if (Number.isInteger(child.pid) && !closedGroups.has(child.pid)) {
+        try { process.kill(-child.pid, "SIGKILL"); } catch { /* Already closed. */ }
+      }
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    }
+    await helperQueue;
+    if (server) {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+    signals.off("SIGTERM", onSignal);
+    signals.off("SIGINT", onSignal);
+  }
+  return exitCode;
 }
 
 async function supervise(argv, options = {}) {
@@ -179,12 +501,13 @@ async function main() {
   mkdirSync(PROFILE, { recursive: true, mode: 0o700 });
   chmodSync(PROFILE, 0o700);
   const mode = process.env.ALICE_RDC_MODE;
-  if (mode && mode !== "cloud-probe") throw new Error("Invalid mode");
-  process.exitCode = await supervise(mode === "cloud-probe" ? ["--cloud-probe"] : process.argv.slice(2));
+  if (mode && !["cloud-probe", "cloud-rdc"].includes(mode)) throw new Error("Invalid mode");
+  process.exitCode = mode === "cloud-rdc" ? await superviseCloudRdc(process.argv.slice(2)) :
+    await supervise(mode === "cloud-probe" ? ["--cloud-probe"] : process.argv.slice(2));
   if (process.exitCode) console.error("RDC/browser session stopped; check container startup and sandbox support.");
 }
 
-module.exports = { browserArgs, healthy, waitHealthy, supervise };
+module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone };
 if (require.main === module) main().catch(() => {
   console.error("RDC/browser startup failed.");
   process.exitCode = 1;

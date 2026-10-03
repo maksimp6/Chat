@@ -1,6 +1,7 @@
 // Observe only the public verification handoff; PKCE and tokens stay in RDC.
 const fs = require('node:fs');
 const path = require('node:path');
+const promises = require('node:fs/promises');
 
 const target = process.env.ALICE_RDC_PAIRING_FILE;
 const trusted = new Set(['mcp.desktopcommander.app', 'auth.desktopcommander.app']);
@@ -15,6 +16,34 @@ function trustedUrl(value) {
 }
 function clear() {
   if (target) fs.rmSync(target, { force: true });
+}
+function observeAuthWrites(api, notify, authFile = '/home/node/.desktop-commander-device/device.json') {
+  const authDirectory = path.dirname(authFile);
+  const relevant = (value) => typeof value === 'string' &&
+    (value === authFile || value.startsWith(authFile + '.') || value === authDirectory);
+  for (const method of ['mkdir', 'writeFile', 'rename', 'rm']) {
+    const original = api[method];
+    api[method] = async function (...args) {
+      const observed = relevant(args[0]) || (method === 'rename' && relevant(args[1]));
+      try {
+        const result = await original.apply(this, args);
+        if ((method === 'rename' && args[1] === authFile) || (method === 'rm' && args[0] === authFile)) {
+          notify({ type: 'rdc-auth-committed' });
+        }
+        return result;
+      } catch (error) {
+        if (observed) notify({ type: 'rdc-auth-write-failed' });
+        throw error;
+      }
+    };
+  }
+}
+// The pinned RDC writes through fs/promises and suppresses persistence errors.
+// IPC carries fixed event names only; the parent journals the committed file.
+if (process.env.ALICE_RDC_MODE === 'cloud-rdc' && typeof process.send === 'function') {
+  observeAuthWrites(promises, (message) => {
+    if (process.connected) process.send(message, () => {});
+  });
 }
 if (target) {
   clear();
@@ -46,3 +75,4 @@ if (target) {
     return response;
   };
 }
+module.exports = { trustedUrl, observeAuthWrites };
