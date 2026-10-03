@@ -27,3 +27,7 @@ app_logs.jsonl
 # pytest-cov data
 .coverage
 coverage.xml
+
+# Desktop packaging
+build/
+dist/
