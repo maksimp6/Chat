@@ -1,0 +1,51 @@
+name: Preservation policy
+
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+
+jobs:
+  preservation-policy:
+    runs-on: ubuntu-latest
+    steps:
+      # Uses trusted base workflow only. Never check out or execute PR code.
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const blockers = [];
+            const isRevert = text => /^\s*revert\b/im.test(text || "") || /\bthis reverts commit\s+[0-9a-f]{7,40}\b/i.test(text || "");
+            let conclusion = "failure";
+            let summary;
+            try {
+              const current = (await github.rest.pulls.get({owner, repo, pull_number: pr.number})).data;
+              if (current.head.sha !== pr.head.sha) throw new Error("Head changed; fresh validation required.");
+              if (isRevert(current.title) || isRevert(current.body)) blockers.push("Explicit revert pull request.");
+              const files = await github.paginate(github.rest.pulls.listFiles, {owner, repo, pull_number: pr.number, per_page: 100});
+              if (files.length !== current.changed_files || files.length >= 3000) throw new Error("File listing incomplete or at API limit.");
+              for (const file of files) if (file.status === "removed") blockers.push("Deleted file: " + file.filename);
+              const commits = await github.paginate(github.rest.pulls.listCommits, {owner, repo, pull_number: pr.number, per_page: 100});
+              if (commits.length !== current.commits || commits.length >= 250) throw new Error("Commit listing incomplete or at API limit.");
+              for (const commit of commits) if (isRevert(commit.commit.message)) blockers.push("Explicit revert commit: " + commit.sha);
+              const final = (await github.rest.pulls.get({owner, repo, pull_number: pr.number})).data;
+              if (final.head.sha !== pr.head.sha || final.base.sha !== current.base.sha) throw new Error("Head or base changed; fresh validation required.");
+              conclusion = blockers.length ? "failure" : "success";
+              summary = blockers.length ? blockers.join("\n") : "No deleted files or explicitly marked reverts found. Semantic rollbacks and external deletion require separate controls.";
+            } catch (error) {
+              summary = "Preservation validation failed closed: " + error.message;
+            }
+            await github.rest.checks.create({
+              owner, repo, name: "preservation-policy", head_sha: pr.head.sha,
+              status: "completed", conclusion,
+              output: {title: "Deletion and revert prohibition", summary: summary.slice(0,60000)}
+            });
+            if (conclusion !== "success") core.setFailed(summary);
+            
