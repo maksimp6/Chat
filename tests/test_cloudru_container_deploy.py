@@ -300,6 +300,106 @@ def test_list_rejects_invalid_pagination_payload():
         apps.list()
 
 
+@pytest.mark.parametrize(
+    "last_page",
+    [{}, {"data": [], "total": 2}, {"data": [], "total": False}, {"data": [], "total": -1}],
+)
+def test_inventory_rejects_missing_or_incomplete_final_page(last_page):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient(
+            [
+                {"data": [{"name": "one"}], "nextPageToken": "next", "total": 2},
+                last_page,
+            ]
+        ),
+    )
+    with pytest.raises(CloudProviderError):
+        apps.list()
+
+
+@pytest.mark.parametrize("present", [False, True])
+def test_inventory_cli_lists_project_without_fetching_assumed_container(
+    monkeypatch, capsys, present
+):
+    import json
+
+    script = _deploy_script()
+    pages = [{"data": [], "total": 0}]
+    if present:
+        pages = [
+            {
+                "data": [{"name": "other", "secret": "private-test-value"}],
+                "nextPageToken": "next",
+                "total": 2,
+            },
+            {"data": [_app()], "total": 2},
+        ]
+    client = RecordingClient(pages)
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    monkeypatch.setattr(script, "_load_cloudru_credentials", lambda: None)
+    monkeypatch.setenv("CLOUDRU_CONTAINER_NAME", "alice-pro")
+
+    assert script.main(["inventory"]) == 0
+    output = capsys.readouterr().out
+    assert json.loads(output) == {
+        "status": "INVENTORY_COMPLETE",
+        "container_count": 2 if present else 0,
+        "configured_container_exists": present,
+    }
+    assert "private-test-value" not in output
+    assert all(call[1:3] == ("GET", "/v2/containers") for call in client.calls)
+
+
+@pytest.mark.parametrize("last_page", [CloudProviderError("Request failed", http_status=499), {}])
+def test_inventory_cli_never_publishes_partial_success(monkeypatch, capsys, last_page):
+    script = _deploy_script()
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=RecordingClient(
+            [
+                {"data": [{"name": "alice-pro"}], "nextPageToken": "next"},
+                last_page,
+            ]
+        ),
+    )
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    monkeypatch.setattr(script, "_load_cloudru_credentials", lambda: None)
+    assert script.main(["inventory"]) == 1
+    output = capsys.readouterr().out
+    assert "INVENTORY_COMPLETE" not in output
+    assert "configured_container_exists" not in output
+
+
+@pytest.mark.parametrize("items", [[{}], [{"name": []}], [{"name": "one"}, {"name": "one"}]])
+def test_inventory_rejects_unknown_or_repeated_names(monkeypatch, items):
+    import argparse
+
+    script = _deploy_script()
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient([{"data": items}]))
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    with pytest.raises(CloudProviderError, match="Invalid container inventory"):
+        script.cmd_inventory(argparse.Namespace())
+
+
+def test_inventory_workflow_is_bounded_and_has_only_control_plane_credentials():
+    from pathlib import Path
+    import yaml
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-deploy.yml").read_text()
+    )
+    steps = workflow["jobs"]["cloudru"]["steps"]
+    inventory = next(step for step in steps if step["name"] == "Inventory")
+    assert inventory["if"] == "inputs.action == 'inventory'"
+    assert inventory["run"] == "timeout 30s python scripts/cloudru_deploy.py inventory"
+    assert set(inventory["env"]) == {"CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET"}
+    assert steps.index(
+        next(step for step in steps if step["name"] == "Require a commit on master")
+    ) < steps.index(inventory)
+
+
 @pytest.mark.parametrize("next_page_token", [0, False, [], {}])
 def test_list_rejects_falsey_non_string_pagination_tokens(next_page_token):
     apps = CloudRuContainerAppsClient(
@@ -761,6 +861,7 @@ def test_successful_deploy_passes_app_configuration_only(monkeypatch):
         ("deploy", "ALICE_GITHUB_CLIENT_SECRET", False, False),
         ("preflight", None, True, False),
         ("status", "ALICE_DATABASE_URL", False, True),
+        ("inventory", "ALICE_DATABASE_URL", False, True),
     ],
 )
 def test_workflow_preflight_reports_configuration_without_secret_values(

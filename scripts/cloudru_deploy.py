@@ -4,6 +4,7 @@
 Usage:
   python scripts/cloudru_deploy.py deploy --tag <git-sha> [--env NAME ...]
   python scripts/cloudru_deploy.py status
+  python scripts/cloudru_deploy.py inventory
   python scripts/cloudru_deploy.py delete --yes
   python scripts/cloudru_deploy.py estimate
 
@@ -236,6 +237,23 @@ def cmd_status(_: argparse.Namespace) -> dict:
     return CloudRuContainerAppsClient().status(cfg["name"])
 
 
+def cmd_inventory(_: argparse.Namespace) -> dict:
+    """Check project-level access without assuming a container already exists."""
+    cfg = _settings()
+    items = CloudRuContainerAppsClient().list(order_by="name")
+    names = [item.get("name") for item in items]
+    if any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(
+        names
+    ):
+        raise CloudProviderError("Invalid container inventory", code="invalid_response")
+    # Do not publish provider metadata, environment values or even resource names.
+    return {
+        "status": "INVENTORY_COMPLETE",
+        "container_count": len(items),
+        "configured_container_exists": cfg["name"] in names,
+    }
+
+
 def cmd_delete(args: argparse.Namespace) -> dict:
     if not args.yes:
         raise CloudProviderError(
@@ -274,6 +292,9 @@ def main(argv: list[str] | None = None) -> int:
     deploy.set_defaults(func=cmd_deploy)
 
     sub.add_parser("status", help="show service status").set_defaults(func=cmd_status)
+    sub.add_parser("inventory", help="check project-level container access").set_defaults(
+        func=cmd_inventory
+    )
 
     delete = sub.add_parser("delete", help="delete the container service")
     delete.add_argument("--yes", action="store_true")

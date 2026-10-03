@@ -17,6 +17,7 @@ on:
           - preflight
           - deploy
           - status
+          - inventory
           - estimate
 
 concurrency:
@@ -127,3 +128,9 @@ jobs:
       - name: Estimate
         if: inputs.action == 'estimate'
         run: python scripts/cloudru_deploy.py estimate
+      - name: Inventory
+        if: inputs.action == 'inventory'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+        run: timeout 30s python scripts/cloudru_deploy.py inventory
