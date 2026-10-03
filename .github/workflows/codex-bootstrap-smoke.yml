@@ -6,7 +6,9 @@ on:
     paths:
       - "scripts/codex_setup.sh"
       - "scripts/codex_maintenance.sh"
+      - "scripts/codex_agent_credentials.sh"
       - "scripts/install_cloud_cli.sh"
+      - "tests/test_codex_cloudru_env.py"
       - ".github/workflows/codex-bootstrap-smoke.yml"
   workflow_dispatch:
 
