@@ -45,14 +45,15 @@ async function fixture() {
       body: payload === undefined ? undefined : JSON.stringify(payload),
     });
   }
-  return { fake, worker, request, close: () => new Promise((resolve) => server.close(resolve)) };
+  const workerProfile = (await worker.callTool("browser_status")).profile;
+  return { fake, worker, workerProfile, request, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
 test("worker rejects anonymous calls and wakes and sleeps a persistent profile", async (t) => {
   const app = await fixture();
   t.after(app.close);
   assert.equal((await app.request("/browser/v1/status", undefined, "wrong")).status, 401);
-  assert.deepEqual(await (await app.request("/browser/v1/status")).json(), { state: "sleeping", generation: 0, url: null, title: null });
+  assert.deepEqual(await (await app.request("/browser/v1/status")).json(), { state: "sleeping", generation: 0, url: null, title: null, profile: app.workerProfile });
   assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
   assert.equal(app.fake.profile.directory, "/state/profile");
   assert.equal((await app.request("/browser/v1/sleep", {})).status, 200);

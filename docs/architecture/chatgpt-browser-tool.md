@@ -9,7 +9,7 @@ exposed to ChatGPT through an MCP/plugin adapter and to Alice Pro.
 ## Request path
 
 ```
-ChatGPT -> MCP/plugin adapter -> Cloud.ru API Gateway -> Playwright API -> Chrome Worker
+ChatGPT -> OAuth-authenticated MCP client -> Cloud.ru API Gateway -> Playwright MCP -> Chrome Worker
 Alice   -> authenticated client -> Cloud.ru API Gateway -> Playwright API -> Chrome Worker
 ```
 
@@ -34,12 +34,20 @@ carry an ExecutionTrace correlation ID. Neither identifier is authorization.
 
 ## Authentication boundary
 
-Browser operations use dedicated machine/service authentication at API Gateway.
+The Gateway exposes the dedicated HTTPS origin under `maxxxpavlov.online` and
+routes only the declared paths through the native Container Apps backend.
+Direct container ingress retains provider authentication.
+The Gateway must preserve application Authorization, MCP session/protocol headers,
+OAuth query parameters and cookies. The worker validates OAuth access tokens
+for ChatGPT's MCP calls and a machine bearer token for operations clients.
 They do not inherit Alice's browser cookie merely because Alice and the browser
 worker share a project. ChatGPT and Alice are distinct clients.
 
-The adapter stores/uses Gateway credentials; credentials are never returned by a
-browser operation. Gateway logs, worker logs, Actions output and ExecutionTrace
+OAuth discovery, dynamic client registration and GitHub sign-in are routed on
+the same public origin. Authorization requires PKCE S256 and the configured
+GitHub owner account. OAuth access cannot call the lifecycle REST routes.
+Credentials are never returned by a browser operation. Gateway logs, worker logs,
+Actions output and ExecutionTrace
 must redact Authorization, Cookie, Set-Cookie, Google account data and extension
 secrets.
 

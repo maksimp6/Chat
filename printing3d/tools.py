@@ -7,7 +7,25 @@ from typing import Any, Mapping, Optional
 from treasury_identity import get_current_owner_id
 
 from .finance import assess_financing, get_payback_status, set_financing_plan
-from .service import ORDER_STATUSES, get_financial_summary, list_orders
+from .service import (
+    ORDER_STATUSES,
+    calculate_quote,
+    create_order,
+    get_financial_summary,
+    list_orders,
+)
+
+QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")
+QUOTE_OPTIONAL_FIELDS = (
+    "printer_power_watts",
+    "electricity_cost_per_kwh",
+    "depreciation_per_hour",
+    "packaging_cost",
+    "failure_rate_percent",
+    "platform_fee_percent",
+    "target_margin_percent",
+)
+ORDER_CREATE_STATUSES = ("lead", "quote", "accepted")
 
 
 def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
@@ -63,6 +81,81 @@ def finance_assess(
     return assess_financing(_trusted_owner(cfg), dict(arguments))
 
 
+def _quote_input(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    fields = QUOTE_REQUIRED_FIELDS + QUOTE_OPTIONAL_FIELDS + ("currency",)
+    return {key: arguments[key] for key in fields if arguments.get(key) is not None}
+
+
+def quote(
+    arguments: Mapping[str, Any],
+    cfg: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Calculate an order quote without persisting it."""
+    data = _quote_input(arguments)
+    # A missing cost driver would silently price the order at zero.
+    missing = [key for key in QUOTE_REQUIRED_FIELDS if key not in data]
+    if missing:
+        return {"status": "needs_input", "missing_fields": missing}
+    return {
+        "status": "ok",
+        "quote": calculate_quote(data),
+        "assumed_defaults": [key for key in QUOTE_OPTIONAL_FIELDS if key not in data],
+    }
+
+
+def order_create(
+    arguments: Mapping[str, Any],
+    cfg: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Persist an accepted order after approval at the universal tool boundary."""
+    status = str(arguments.get("status") or "quote").strip()
+    if status not in ORDER_CREATE_STATUSES:
+        raise ValueError(f"status must be one of {', '.join(ORDER_CREATE_STATUSES)}")
+    data: dict[str, Any] = {
+        key: arguments[key]
+        for key in ("title", "customer_name", "quoted_price", "currency", "notes")
+        if arguments.get(key) is not None
+    }
+    data["status"] = status
+    data["source"] = "alice"
+    raw_quote = arguments.get("quote")
+    if raw_quote is not None:
+        quote_input = _quote_input(raw_quote)
+        missing = [key for key in QUOTE_REQUIRED_FIELDS if key not in quote_input]
+        if missing:
+            raise ValueError(f"quote is missing: {', '.join(missing)}")
+        order_currency = data.get("currency")
+        quote_currency = quote_input.get("currency")
+        if order_currency and quote_currency and order_currency != quote_currency:
+            raise ValueError("order currency and quote currency differ")
+        currency = order_currency or quote_currency
+        if currency:
+            data["currency"] = quote_input["currency"] = currency
+        data["quote"] = quote_input
+    return {"order": create_order(_trusted_owner(cfg), data)}
+
+
+def _nullable_number(minimum: float = 0) -> dict[str, Any]:
+    return {"anyOf": [{"type": "number", "minimum": minimum}, {"type": "null"}]}
+
+
+_QUOTE_PROPERTIES: dict[str, Any] = {
+    "material_grams": _nullable_number(),
+    "material_cost_per_kg": _nullable_number(),
+    "print_hours": _nullable_number(),
+    "printer_power_watts": _nullable_number(),
+    "electricity_cost_per_kwh": _nullable_number(),
+    "depreciation_per_hour": _nullable_number(),
+    "packaging_cost": _nullable_number(),
+    "failure_rate_percent": {
+        "anyOf": [{"type": "number", "minimum": 0, "exclusiveMaximum": 100}, {"type": "null"}]
+    },
+    "platform_fee_percent": _nullable_number(),
+    "target_margin_percent": _nullable_number(),
+    "currency": {"anyOf": [{"type": "string", "minLength": 1, "maxLength": 8}, {"type": "null"}]},
+}
+
+
 def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {
         "type": "object",
@@ -73,6 +166,59 @@ def _tool_schema(properties: dict[str, Any], required: list[str]) -> dict[str, A
 
 
 PRINTING3D_TOOLS = {
+    "printing3d.quote": {
+        "title": "3D Printing Order Quote",
+        "description": (
+            "Рассчитать себестоимость и рекомендуемую цену заказа 3D-печати: материал, "
+            "электричество, амортизация, упаковка, резерв на брак, комиссия площадки и "
+            "целевая маржа. Ничего не сохраняет. Вес модели, цену материала за кг и время "
+            "печати бери из диалога, слайсера или поиска; неизвестные значения передавай "
+            "как null — инструмент вернёт missing_fields. Остальные параметры имеют "
+            "консервативные значения по умолчанию и перечисляются в assumed_defaults."
+        ),
+        "parameters": _tool_schema(_QUOTE_PROPERTIES, []),
+        "capabilities": ["3d", "orders", "read"],
+        "risk_level": "low",
+        "read_only": True,
+        "requires_approval": False,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": quote,
+    },
+    "printing3d.order.create": {
+        "title": "3D Printing Order Create",
+        "description": (
+            "Сохранить заказ 3D-печати после явного согласия пользователя. Передай исходные "
+            "данные расчёта в quote — цена будет пересчитана на сервере; quoted_price "
+            "указывай, только если пользователь согласовал другую цену."
+        ),
+        "parameters": _tool_schema(
+            {
+                "title": {"type": "string", "minLength": 1, "maxLength": 200},
+                "customer_name": {
+                    "anyOf": [{"type": "string", "maxLength": 200}, {"type": "null"}]
+                },
+                "status": {
+                    "anyOf": [
+                        {"type": "string", "enum": list(ORDER_CREATE_STATUSES)},
+                        {"type": "null"},
+                    ]
+                },
+                "quote": {"anyOf": [_tool_schema(_QUOTE_PROPERTIES, []), {"type": "null"}]},
+                "quoted_price": _nullable_number(),
+                "currency": _QUOTE_PROPERTIES["currency"],
+                "notes": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}]},
+            },
+            ["title"],
+        ),
+        "capabilities": ["3d", "orders", "write"],
+        "risk_level": "medium",
+        "read_only": False,
+        "requires_approval": True,
+        "supported_transports": ["responses_api", "local_agent", "mcp"],
+        "executor": {"type": "local"},
+        "func": order_create,
+    },
     "printing3d.finance.assess": {
         "title": "3D Printing Finance Assess",
         "description": (

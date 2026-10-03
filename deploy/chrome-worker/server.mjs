@@ -1,6 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
+import { dirname, join, relative } from "node:path";
 import { createPlaywrightMcp } from "./mcp.mjs";
+import { createOAuth } from "./oauth.mjs";
+import { createChromeStateStore } from "./state.mjs";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TEXT_CHARS = 32 * 1024;
@@ -65,48 +68,85 @@ export function createWorker(options = {}) {
       .filter(Boolean),
   );
   const profileDir = options.profileDir ?? process.env.CHROME_PROFILE_DIR ?? "/state/profile";
+  const authDir = options.authDir ?? process.env.BROWSER_OAUTH_STATE_DIR
+    ?? dirname(process.env.BROWSER_OAUTH_STATE_FILE ?? "/tmp/chrome-auth/oauth.json");
+  const oauthStateFile = options.oauth?.stateFile ?? process.env.BROWSER_OAUTH_STATE_FILE
+    ?? join(authDir, "oauth.json");
+  const authRelative = relative(authDir, oauthStateFile);
+  if ((options.stateDir ?? process.env.CHROME_STATE_DIR) && (authRelative.startsWith("..") || !authRelative)) {
+    throw new Error("oauth_state_outside_checkpoint_directory");
+  }
+  const stateStore = options.stateStore ?? createChromeStateStore({
+    profileDir,
+    stateDir: options.stateDir ?? process.env.CHROME_STATE_DIR,
+    authDir,
+  });
+  let oauth;
+  const ready = (async () => {
+    await stateStore.restore();
+    oauth = createOAuth({
+      ...options.oauth,
+      stateFile: oauthStateFile,
+      onPersist: () => stateStore.checkpointAuth(),
+    });
+  })();
+  // Keep lifecycle operations serialized when multiple MCP clients wake at once.
+  let lifecycle = Promise.resolve();
+  const transition = (operation) => {
+    const next = lifecycle.then(operation);
+    lifecycle = next.catch(() => {});
+    return next;
+  };
   let context;
   let page;
   let state = "sleeping";
   let generation = 0;
 
   async function wake() {
-    if (context) return;
-    const chromium = options.chromium ?? (await import("playwright-core")).chromium;
-    context = await chromium.launchPersistentContext(profileDir, {
-      executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
-      headless: process.env.CHROME_HEADLESS !== "0",
-      chromiumSandbox: false,
-      args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
+    await ready;
+    return transition(async () => {
+      if (context) return;
+      const chromium = options.chromium ?? (await import("playwright-core")).chromium;
+      context = await chromium.launchPersistentContext(profileDir, {
+        executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
+        headless: process.env.CHROME_HEADLESS !== "0",
+        chromiumSandbox: false,
+        args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
+      });
+      context.on?.("close", () => {
+        context = undefined;
+        page = undefined;
+        state = "sleeping";
+      });
+      page = context.pages()[0] ?? (await context.newPage());
+      generation += 1;
+      state = "awake";
     });
-    context.on?.("close", () => {
-      context = undefined;
-      page = undefined;
-      state = "sleeping";
-    });
-    page = context.pages()[0] ?? (await context.newPage());
-    generation += 1;
-    state = "awake";
   }
 
   async function sleep() {
-    if (context) await context.close();
-    context = undefined;
-    page = undefined;
-    state = "sleeping";
+    await ready;
+    return transition(async () => {
+      if (context) await context.close();
+      context = undefined;
+      page = undefined;
+      state = "sleeping";
+      await stateStore.checkpoint();
+    });
   }
 
   async function callTool(name, args = {}) {
+    await ready;
     if (name === "browser_status") {
-      return { state, generation, url: page?.url() ?? null, title: page ? await page.title() : null };
+      return { state, generation, url: page?.url() ?? null, title: page ? await page.title() : null, profile: stateStore.status() };
     }
     if (name === "wake") {
       await wake();
-      return { state, generation };
+      return { state, generation, profile: stateStore.status() };
     }
     if (name === "sleep") {
       await sleep();
-      return { state, generation };
+      return { state, generation, profile: stateStore.status() };
     }
     if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
     if (name === "navigate") {
@@ -149,9 +189,24 @@ export function createWorker(options = {}) {
   }, `${profileDir}/mcp-output`);
 
   async function handler(request, response) {
-    const pathname = new URL(request.url, "http://worker.invalid").pathname;
-    if (!authorized(request, token)) return json(response, 401, { error: "unauthorized" });
+    const url = new URL(request.url, "http://worker.invalid");
+    const pathname = url.pathname;
     try {
+      await ready;
+      if (request.method === "GET" && pathname === "/healthz") {
+        return json(response, 200, {
+          status: "ok",
+          deployment_sha: process.env.BROWSER_DEPLOYMENT_SHA ?? null,
+          state_ready: true,
+          oauth_ready: oauth.enabled,
+        });
+      }
+      if (await oauth.handle(request, response, url)) return;
+      const mcpAccess = pathname === "/browser/v1/mcp" && oauth.authorize(request);
+      if (!authorized(request, token) && !mcpAccess) {
+        if (pathname === "/browser/v1/mcp" && oauth.enabled) response.setHeader("www-authenticate", oauth.challenge());
+        return json(response, 401, { error: "unauthorized" });
+      }
       if (pathname === "/browser/v1/mcp") {
         const message = request.method === "POST" ? await body(request) : undefined;
         return await mcp.handle(request, response, message);
@@ -165,10 +220,26 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, async close() { await mcp.close(); await sleep(); } };
+  return { handler, callTool, ready, async close() { await mcp.close(); await sleep(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const worker = createWorker();
-  createServer(worker.handler).listen(Number(process.env.PORT ?? 8080), "0.0.0.0");
+  await worker.ready;
+  const server = createServer(worker.handler).listen(Number(process.env.PORT ?? 8080), "0.0.0.0");
+  let stopping = false;
+  async function stop() {
+    if (stopping) return;
+    stopping = true;
+    server.close();
+    try {
+      await worker.close();
+      process.exit(0);
+    } catch {
+      process.stderr.write("chrome_checkpoint_failed\n");
+      process.exit(1);
+    }
+  }
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
 }

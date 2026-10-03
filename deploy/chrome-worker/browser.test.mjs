@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,7 @@ import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createWorker } from "./server.mjs";
+import { chromium } from "playwright-core";
 
 async function fixture(t) {
   const profileDir = await mkdtemp(join(tmpdir(), "playwright-mcp-test-"));
@@ -60,4 +61,39 @@ test("official Playwright MCP initializes, lists tools, and executes a browser f
   await app.transport.terminateSession();
   const expired = await fetch(app.endpoint, { headers: { Authorization: "Bearer synthetic-test-token", "mcp-session-id": "nonexistent", Accept: "text/event-stream" } });
   assert.equal(expired.status, 404);
+});
+
+
+test("Chrome cookies and localStorage survive a cold worker/profile restore", async (t) => {
+  const base = await mkdtemp(join(tmpdir(), "chrome-cold-restore-"));
+  const stateDir = join(base, "volume");
+  const profileDir = join(base, "profile");
+  const authDir = join(base, "auth");
+  await mkdir(stateDir);
+  let context;
+  const options = {
+    token: "synthetic-test-token", profileDir, stateDir, authDir,
+    chromium: { async launchPersistentContext(directory, launchOptions) {
+      context = await chromium.launchPersistentContext(directory, launchOptions);
+      return context;
+    } },
+  };
+  let worker = createWorker(options);
+  t.after(async () => { await worker.close(); await rm(base, { recursive: true, force: true }); });
+  await worker.callTool("wake");
+  await context.route("https://fixture.example/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>Persistent fixture</title>" }));
+  await worker.callTool("navigate", { url: "https://fixture.example/" });
+  await context.addCookies([{ name: "synthetic-cookie", value: "retained", domain: "fixture.example", path: "/", expires: Math.floor(Date.now() / 1000) + 3600 }]);
+  await context.pages()[0].evaluate(() => localStorage.setItem("synthetic-marker", "retained"));
+  await worker.close();
+  await rm(profileDir, { recursive: true, force: true });
+  await rm(authDir, { recursive: true, force: true });
+  worker = createWorker(options);
+  const restored = await worker.callTool("browser_status");
+  assert.equal(restored.profile.restored, true);
+  await worker.callTool("wake");
+  assert.equal((await context.cookies()).find((cookie) => cookie.name === "synthetic-cookie")?.value, "retained");
+  await context.route("https://fixture.example/**", (route) => route.fulfill({ contentType: "text/html", body: "<title>Restored fixture</title>" }));
+  await worker.callTool("navigate", { url: "https://fixture.example/" });
+  assert.equal(await context.pages()[0].evaluate(() => localStorage.getItem("synthetic-marker")), "retained");
 });
