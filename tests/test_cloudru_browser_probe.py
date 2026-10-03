@@ -1,7 +1,9 @@
 from pathlib import Path
+import json
 from unittest.mock import Mock
 
 import pytest
+import requests
 import yaml
 
 from cloud.base import CloudProviderError
@@ -182,6 +184,180 @@ def test_cleanup_refuses_resource_with_unexpected_image(monkeypatch):
         probe.run_probe(apps, SHA, IMAGE)
     assert failure.value.code == "cleanup_failed"
     apps.stop.assert_not_called()
+
+
+def test_primary_create_and_cleanup_failures_are_both_visible(clock, capsys):
+    apps = Mock()
+    apps.list.return_value = []
+    apps.create.side_effect = CloudProviderError(
+        "secret-canary", code="authorization_failed", http_status=403
+    )
+    with pytest.raises(CloudProviderError) as failure:
+        probe.run_probe(apps, SHA, IMAGE)
+    assert failure.value.code == "cleanup_failed"
+    output = capsys.readouterr().out
+    events = [json.loads(line) for line in output.splitlines()]
+    assert {
+        "stage": "container_create",
+        "error": "authorization_failed",
+        "http_status": 403,
+    } in events
+    assert any(
+        event.get("stage") == "container_cleanup" and event.get("error") == "probe_identity_timeout"
+        for event in events
+    )
+    assert "secret-canary" not in output
+    apps.create.assert_called_once()
+    apps.stop.assert_not_called()
+
+
+def test_discovery_failure_is_distinct_from_create_failure(monkeypatch, clock, capsys):
+    apps = Mock()
+    apps.list.return_value = []
+    with pytest.raises(CloudProviderError):
+        probe.run_probe(apps, SHA, IMAGE)
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert {
+        "stage": "container_discovery",
+        "error": "probe_identity_timeout",
+        "http_status": None,
+    } in events
+
+
+@pytest.mark.parametrize("code,status", [("secret-canary", True), ([], "403"), (None, 999)])
+def test_diagnostics_drop_unknown_codes_and_invalid_statuses(code, status):
+    error = CloudProviderError("secret-canary", code=code, http_status=status)
+    assert probe.probe_error_details(error) == {
+        "error": "probe_internal_error",
+        "http_status": None,
+    }
+
+
+def provider_failure(payload):
+    response = requests.Response()
+    response.status_code = 400
+    response._content = json.dumps(payload).encode()
+    error = CloudProviderError("secret-canary", code="provider_http_error", http_status=400)
+    object.__setattr__(error, "__cause__", requests.HTTPError("secret-canary", response=response))
+    return error
+
+
+def test_provider_diagnostics_only_emit_known_status_and_validation_fields():
+    error = provider_failure(
+        {
+            "code": 3,
+            "message": "secret-canary",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                        {
+                            "field": "template.containers[0].resources.cpu",
+                            "description": "secret-canary",
+                        },
+                        {"field": "secret-canary", "description": "secret-canary"},
+                    ],
+                }
+            ],
+        }
+    )
+    assert probe.probe_error_details(error) == {
+        "error": "provider_http_error",
+        "http_status": 400,
+        "provider_status_code": 3,
+        "provider_validation_fields": ["template.containers[0].resources.cpu"],
+    }
+    assert "secret-canary" not in json.dumps(probe.probe_error_details(error))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        {"code": True, "details": "secret-canary"},
+        {"code": 99},
+        {"code": 3, "message": "x" * 65536},
+    ],
+)
+def test_provider_diagnostics_ignore_invalid_and_oversized_payloads(payload):
+    assert probe.probe_error_details(provider_failure(payload)) == {
+        "error": "provider_http_error",
+        "http_status": 400,
+    }
+
+
+def test_provider_diagnostics_ignore_malformed_json_and_bound_cause_chain():
+    error = provider_failure({"code": 3})
+    error.__cause__.response._content = b"secret-canary"
+    assert "provider_status_code" not in probe.probe_error_details(error)
+    object.__setattr__(error, "__cause__", error)
+    assert "provider_status_code" not in probe.probe_error_details(error)
+
+
+def test_provider_diagnostics_do_not_mask_failure_with_deep_json():
+    error = provider_failure({"code": 3})
+    error.__cause__.response._content = b"[" * 10000 + b"0" + b"]" * 10000
+    assert probe.probe_error_details(error) == {
+        "error": "provider_http_error",
+        "http_status": 400,
+    }
+
+
+def test_terminal_reporting_keeps_primary_error_safe_after_successful_cleanup(monkeypatch, capsys):
+    apps = Mock()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
+    apps.create.side_effect = CloudProviderError(
+        "message-secret-canary", code="code-secret-canary", http_status="status-secret-canary"
+    )
+    monkeypatch.setattr(probe, "main", lambda: probe.run_probe(apps, SHA, IMAGE))
+    assert probe.cli() == 1
+    output = capsys.readouterr().out
+    assert "secret-canary" not in output
+    events = [json.loads(line) for line in output.splitlines()]
+    assert events[-1] == {"error": "probe_internal_error", "http_status": None}
+    assert {
+        "stage": "container_create",
+        "error": "probe_internal_error",
+        "http_status": None,
+    } in events
+    apps.stop.assert_called_once_with(NAME)
+
+
+@pytest.fixture
+def main_environment(monkeypatch):
+    monkeypatch.setattr(probe.sys, "argv", ["probe", "--sha", SHA])
+    monkeypatch.setattr(probe.subprocess, "check_output", Mock(side_effect=[SHA + "\n", ""]))
+    for name in ("CLOUDRU_PROJECT_ID", "CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET"):
+        monkeypatch.setenv(name, "synthetic-test-value")
+    apps = Mock()
+    monkeypatch.setattr(probe, "CloudRuContainerAppsClient", apps)
+    return apps
+
+
+@pytest.mark.parametrize(
+    "image", ["secret-canary", IMAGE.replace("@sha256:", ":"), IMAGE[:-1], IMAGE.upper(), None, {}]
+)
+def test_main_rejects_invalid_image_before_apps_construction(
+    monkeypatch, main_environment, capsys, image
+):
+    monkeypatch.setattr(probe, "build_image", Mock(return_value=image))
+    with pytest.raises(CloudProviderError) as failure:
+        probe.main()
+    assert failure.value.code == "invalid_response"
+    main_environment.assert_not_called()
+    assert "image_ready" not in capsys.readouterr().out
+
+
+def test_main_logs_and_deploys_valid_digest(monkeypatch, main_environment, capsys):
+    build = Mock(return_value=IMAGE)
+    run = Mock(return_value={"status": "BROWSER_PROBE_PASSED"})
+    monkeypatch.setattr(probe, "build_image", build)
+    monkeypatch.setattr(probe, "run_probe", run)
+    probe.main()
+    run.assert_called_once_with(main_environment.return_value, SHA, IMAGE)
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert {"stage": "image_ready", "image": IMAGE} in events
 
 
 @pytest.mark.parametrize(

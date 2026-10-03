@@ -27,6 +27,91 @@ from scripts.cloudru_deploy import _export_commit  # noqa: E402
 REGISTRY = "alice-rdc-probe"
 REPOSITORY = "chromium-probe"
 DESCRIPTION = "Alice RDC browser compatibility probe; no OAuth or user data"
+PROBE_ERROR_CODES = frozenset(
+    {
+        "authorization_failed",
+        "auth_failed",
+        "auth_not_configured",
+        "provider_http_error",
+        "invalid_response",
+        "validation_error",
+        "unsupported_capability",
+        "probe_identity_timeout",
+        "browser_probe_timeout",
+        "browser_probe_failed",
+        "cleanup_failed",
+        "already_exists",
+        "registry_create_failed",
+        "registry_create_timeout",
+        "registry_creation_unconfirmed",
+        "registry_inventory_timeout",
+        "docker_error",
+    }
+)
+VALIDATION_FIELDS = frozenset(
+    {
+        "name",
+        "projectId",
+        "description",
+        "configuration.ingress.publiclyAccessible",
+        "configuration.privileged",
+        "configuration.autoDeployments.enabled",
+        "template.timeout",
+        "template.idleTimeout",
+        "template.protocol",
+        "template.scaling.minInstanceCount",
+        "template.scaling.maxInstanceCount",
+        "template.containers[0].name",
+        "template.containers[0].image",
+        "template.containers[0].containerPort",
+        "template.containers[0].resources.cpu",
+        "template.containers[0].resources.memory",
+    }
+)
+
+
+def probe_error_details(exc):
+    """Fixed error identifiers only; never messages, URLs or provider values."""
+    code = getattr(exc, "code", None)
+    status = getattr(exc, "http_status", None)
+    result = {
+        "error": code
+        if isinstance(code, str) and code in PROBE_ERROR_CODES
+        else "probe_internal_error",
+        "http_status": status if type(status) is int and 100 <= status <= 599 else None,
+    }
+    current = exc
+    for _ in range(4):
+        response = current.response if isinstance(current, requests.RequestException) else None
+        if response is not None and len(response.content) <= 65536:
+            try:
+                payload = response.json()
+            except (ValueError, RecursionError):
+                payload = None
+            if isinstance(payload, dict):
+                provider_code = payload.get("code")
+                if type(provider_code) is int and 0 <= provider_code <= 16:
+                    result["provider_status_code"] = provider_code
+                fields = set()
+                details = payload.get("details")
+                for detail in details[:16] if isinstance(details, list) else []:
+                    if (
+                        not isinstance(detail, dict)
+                        or detail.get("@type") != "type.googleapis.com/google.rpc.BadRequest"
+                    ):
+                        continue
+                    violations = detail.get("fieldViolations")
+                    for violation in violations[:32] if isinstance(violations, list) else []:
+                        field = violation.get("field") if isinstance(violation, dict) else None
+                        if isinstance(field, str) and field in VALIDATION_FIELDS:
+                            fields.add(field)
+                if fields:
+                    result["provider_validation_fields"] = sorted(fields)
+            break
+        current = current.__cause__
+        if current is None:
+            break
+    return result
 
 
 def registry_response_shape(payload):
@@ -381,6 +466,7 @@ def run_probe(apps, sha, image):
         )
     identifier = None
     attempted = False
+    phase = "container_create"
     try:
         print('{"stage":"container_create"}', flush=True)
         attempted = True
@@ -396,7 +482,10 @@ def run_probe(apps, sha, image):
                 env={"ALICE_RDC_MODE": "cloud-probe", "PORT": "8080"},
             )
         )
+        phase = "container_discovery"
+        print(json.dumps({"stage": phase}), flush=True)
         identifier = with_budget(wait_for_probe, apps, name, code="probe_identity_timeout")
+        phase = "browser_verify"
         print('{"stage":"browser_verify"}', flush=True)
         verify_with_budget(apps, name, identifier, image)
         return {
@@ -405,13 +494,23 @@ def run_probe(apps, sha, image):
             "image": image,
             "container_id": identifier,
         }
+    except Exception as exc:
+        print(json.dumps({"stage": phase, **probe_error_details(exc)}), flush=True)
+        raise
     finally:
         if attempted:
             try:
                 with_budget(stop_probe, apps, name, identifier, image, code="cleanup_failed")
             except Exception as exc:
                 print(
-                    json.dumps({"probe_cleanup_unconfirmed": True, "container_name": name}),
+                    json.dumps(
+                        {
+                            "stage": "container_cleanup",
+                            "probe_cleanup_unconfirmed": True,
+                            "container_name": name,
+                            **probe_error_details(exc),
+                        }
+                    ),
                     flush=True,
                 )
                 raise CloudProviderError(
@@ -436,16 +535,26 @@ def main():
         if not os.environ.get(name):
             raise CloudProviderError("Missing probe credentials", code="auth_not_configured")
     image = build_image(root, args.sha)
+    if not isinstance(image, str) or not re.fullmatch(
+        re.escape(REGISTRY + ".cr.cloud.ru/" + REPOSITORY) + r"@sha256:[0-9a-f]{64}", image
+    ):
+        raise CloudProviderError("Invalid probe image digest", code="invalid_response")
+    print(json.dumps({"stage": "image_ready", "image": image}), flush=True)
     print(json.dumps(run_probe(CloudRuContainerAppsClient(), args.sha, image)), flush=True)
 
 
-if __name__ == "__main__":
+def cli():
     try:
         main()
     except CloudProviderError as exc:
         # Do not dump provider responses, build output, credentials or environment.
-        print(json.dumps({"error": exc.code, "http_status": exc.http_status}), flush=True)
-        sys.exit(1)
+        print(json.dumps(probe_error_details(exc)), flush=True)
+        return 1
     except Exception:
         print('{"error":"probe_internal_error"}', flush=True)
-        sys.exit(1)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(cli())
