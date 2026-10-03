@@ -1,5 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
+import { lookup } from "node:dns/promises";
+import { BlockList, isIP } from "node:net";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TEXT_CHARS = 32 * 1024;
@@ -49,10 +51,35 @@ function safeUrl(value, allowedHosts) {
   if (!new Set(["http:", "https:"]).has(target.protocol)) {
     throw Object.assign(new Error("unsupported_url_scheme"), { status: 400 });
   }
-  if (allowedHosts.size && !allowedHosts.has(target.hostname.toLowerCase())) {
+  if (target.username || target.password || !allowedHosts.has(target.hostname.toLowerCase())) {
     throw Object.assign(new Error("host_not_allowed"), { status: 403 });
   }
   return target.href;
+}
+
+const privateNetworks = new BlockList();
+for (const [address, prefix] of [
+  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
+  ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24],
+  ["192.0.2.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15],
+  ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 3],
+]) privateNetworks.addSubnet(address, prefix, "ipv4");
+
+// Pin public IPv4 answers for this browser lifetime. No later DNS lookup can
+// rebind an approved hostname to a private address; IPv6 is intentionally closed.
+export async function resolverRules(hosts, resolve = lookup) {
+  const rules = [];
+  for (const host of hosts) {
+    if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(host) || isIP(host)) {
+      throw new Error("invalid_allowed_host");
+    }
+    const answers = await resolve(host, { all: true, family: 4 });
+    if (!answers.length || answers.some(({ address }) => isIP(address) !== 4 || privateNetworks.check(address, "ipv4"))) {
+      throw new Error("non_public_allowed_host");
+    }
+    rules.push(`MAP ${host} ${answers[0].address}`);
+  }
+  return [...rules, "MAP * ~NOTFOUND"].join(", ");
 }
 
 export function createWorker(options = {}) {
@@ -71,12 +98,27 @@ export function createWorker(options = {}) {
 
   async function wake() {
     if (context) return;
+    if (!allowedHosts.size) throw Object.assign(new Error("allowed_hosts_required"), { status: 503 });
+    const rules = await resolverRules(allowedHosts, options.resolve);
     const chromium = options.chromium ?? (await import("playwright-core")).chromium;
     context = await chromium.launchPersistentContext(profileDir, {
       executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
       headless: process.env.CHROME_HEADLESS !== "0",
-      args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
+      chromiumSandbox: true,
+      serviceWorkers: "block",
+      args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check",
+        "--no-proxy-server", "--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        `--host-resolver-rules=${rules}`],
     });
+    await context.route("**/*", async (route) => {
+      try {
+        safeUrl(route.request().url(), allowedHosts);
+        await route.continue();
+      } catch {
+        await route.abort("blockedbyclient");
+      }
+    });
+    await context.routeWebSocket("**/*", (socket) => socket.close());
     page = context.pages()[0] ?? (await context.newPage());
     generation += 1;
     state = "awake";

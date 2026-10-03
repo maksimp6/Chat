@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test server.test.mjs"
+    "test": "node --test server.test.mjs",
+    "test:browser": "node --test browser.test.mjs"
   },
   "dependencies": {
     "playwright-core": "1.63.0"

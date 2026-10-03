@@ -109,16 +109,11 @@ def test_worker_contract_has_no_raw_cdp_shell_or_arbitrary_eval():
         assert route in source
 
 
-def test_worker_image_installs_reviewed_russian_ca_bundle():
+def test_worker_image_does_not_expand_system_tls_trust():
     dockerfile = (BROWSER_WORKER / "Dockerfile").read_text(encoding="utf-8")
-    sums = (BROWSER_WORKER / "certificates" / "SHA256SUMS").read_text(
-        encoding="utf-8"
-    )
-
-    assert "COPY certificates/*.crt /usr/local/share/ca-certificates/" in dockerfile
-    assert "update-ca-certificates" in dockerfile
-    assert "russian-trusted-root-ca.crt" in sums
-    assert "russian-trusted-sub-ca.crt" in sums
+    assert "COPY certificates" not in dockerfile
+    assert "update-ca-certificates" not in dockerfile
+    assert "NODE_EXTRA_CA_CERTS" not in dockerfile
 
 
 def test_worker_documents_persistent_sleep_wake_and_mcp_contract():
