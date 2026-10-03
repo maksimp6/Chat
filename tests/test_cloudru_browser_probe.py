@@ -34,7 +34,8 @@ def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch)
     spec = apps.create.call_args.args[0]
     assert spec.name == NAME
     assert spec.image == IMAGE
-    assert spec.env == {"ALICE_RDC_MODE": "cloud-probe", "PORT": "8080"}
+    assert spec.env == {"ALICE_RDC_MODE": "cloud-probe"}
+    assert spec.container_body()["containerPort"] == 8080
     assert (spec.min_instances, spec.max_instances) == (0, 1)
     verify.assert_called_once_with(apps, NAME, ID, IMAGE)
     apps.stop.assert_called_once_with(NAME)
@@ -602,14 +603,15 @@ def test_registry_provider_errors_are_not_retried_or_used_for_creation(status):
     assert registry.client.request.call_count == 1
 
 
-def test_readiness_requires_expected_image_and_exact_static_response():
+@pytest.mark.parametrize("suffix", [".containers.cloud.ru", ".containerapps.ru"])
+def test_readiness_requires_expected_image_and_exact_static_response(suffix):
     apps = Mock()
     apps.get.return_value = {
         "name": NAME,
         "id": ID,
         "status": "RUNNING",
         "template": {"containers": [{"image": IMAGE}]},
-        "configuration": {"ingress": {"publicUri": NAME + ".containers.cloud.ru"}},
+        "configuration": {"ingress": {"publicUri": NAME + suffix}},
     }
     response = Mock(status_code=200)
     response.json.return_value = {
@@ -621,7 +623,7 @@ def test_readiness_requires_expected_image_and_exact_static_response():
     get = Mock(return_value=response)
     probe.verify_probe(apps, NAME, ID, IMAGE, http_get=get)
     get.assert_called_once_with(
-        "https://" + NAME + ".containers.cloud.ru/healthz", timeout=3, allow_redirects=False
+        "https://" + NAME + suffix + "/healthz", timeout=3, allow_redirects=False
     )
     apps.get.assert_not_called()
 
@@ -633,6 +635,8 @@ def test_readiness_requires_expected_image_and_exact_static_response():
         "https://evil.example",
         "https://user@probe.containers.cloud.ru",
         "https://probe.containers.cloud.ru:444",
+        "https://probe.containerapps.ru.evil.example",
+        "https://evilcontainerapps.ru",
     ],
 )
 def test_readiness_rejects_untrusted_origin(uri):

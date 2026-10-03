@@ -438,7 +438,7 @@ def verify_probe(apps, name, identifier, image, *, http_get=requests.get, sleep=
                 or url.username
                 or url.password
                 or url.port not in (None, 443)
-                or not url.hostname.endswith(".containers.cloud.ru")
+                or not url.hostname.endswith((".containers.cloud.ru", ".containerapps.ru"))
             ):
                 raise CloudProviderError("Unexpected probe origin", code="invalid_response")
             try:
@@ -481,7 +481,8 @@ def run_probe(apps, sha, image):
                 max_instances=1,
                 public=True,
                 description=DESCRIPTION,
-                env={"ALICE_RDC_MODE": "cloud-probe", "PORT": "8080"},
+                # Container Apps injects PORT from containerPort and forbids overrides.
+                env={"ALICE_RDC_MODE": "cloud-probe"},
             )
         )
         phase = "container_discovery"
