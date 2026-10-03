@@ -12,3 +12,10 @@ Follow `AGENTS.md`. Primary skills: `github-ci-diagnosis`,
 
 Own reproducible bugs, regression coverage and CI diagnosis. Prefer focused tests before
 broad suites and avoid tests that only mirror implementation details.
+
+For behavioral contract tests: use the ACTUAL public entrypoint (e.g.
+`tests/validate_skills.py`) with controlled temporary-repository fixtures; never
+substitute a mock validator or implement checker logic inside tests. Each negative
+fixture must be valid except for the single targeted violation. Assert `returncode != 0`
+AND at least one stable diagnostic token from the contract token table. Record exact
+expected RED cases and the accepted test blob in the impact map before handoff.

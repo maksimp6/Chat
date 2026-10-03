@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "roles": {
+    "work-coordinator": {
+      "profile": ".github/agents/work-coordinator.agent.md",
+      "allowed_effects": ["read"],
+      "optional": true
+    },
+    "operations-observer": {
+      "profile": ".github/agents/operations-observer.agent.md",
+      "allowed_effects": ["read"],
+      "optional": false
+    },
+    "security-reviewer": {
+      "profile": ".github/agents/security-reviewer.agent.md",
+      "allowed_effects": ["read"],
+      "optional": false
+    }
+  },
+  "skills": {
+    "docs-sync": {
+      "required_effects": ["read", "edit"],
+      "note": "Procedure step 4: update authoritative documents"
+    },
+    "issue-to-pr": {
+      "required_effects": ["read", "edit"],
+      "note": "Procedure steps 3-7: branch, implement, tests, PR"
+    },
+    "alice-runtime-debugging": {
+      "required_effects": ["read", "edit"],
+      "note": "Procedure step 6: add focused regression test"
+    },
+    "cloudru-change": {
+      "required_effects": ["read", "edit", "deploy"],
+      "note": "Procedure step 6: apply smallest cloud change; Approval boundaries: production deploys"
+    },
+    "github-ci-diagnosis": {
+      "required_effects": ["read"],
+      "note": "Procedure: read logs, diagnose, propose fix; mutation via separate workflow"
+    },
+    "github-pr-readiness": {
+      "required_effects": ["read"],
+      "note": "Approval boundaries: the skill is read-only"
+    },
+    "security-review": {
+      "required_effects": ["read"],
+      "note": "Approval boundaries: the review is read-only"
+    },
+    "release-readiness": {
+      "required_effects": ["read"],
+      "note": "Approval boundaries: release preparation is read-only"
+    }
+  }
+}
