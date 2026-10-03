@@ -120,12 +120,16 @@ by the [Container Apps client](https://github.com/Nick1994209/cloudru-containera
 The manual **Cloud.ru browser compatibility probe** workflow runs only from
 protected `master` using the existing production IAM pair. It exports that exact
 commit, builds the RDC image, pushes it to the dedicated private `alice-rdc-probe`
-registry, and creates a separate `rdc-browser-probe-<sha>` Container App pinned by
+registry, and creates a separate `rdc-<12-hex-sha>` Container App pinned by
 digest. This creates billable registry/image storage and brief container usage.
 The probe uses scale 0–1 and requests a stop in cleanup; it does not delete the
 image or container. A failed stop is a failure, and a stop request alone is not
 confirmation that the provider has completed it. Inspect status after the run.
 An existing same-name container is never taken over automatically.
+
+Probe names are 16 characters. The live API rejected the earlier 30-character
+`rdc-browser-probe-<sha>` name with HTTP 400 and a `name` validation violation;
+the compact prefix preserves the same 12-character source identity.
 
 `ALICE_RDC_MODE=cloud-probe` starts only sandboxed Chromium and the synthetic
 rendering check. It never starts RDC, pairing or an authenticated browser session.

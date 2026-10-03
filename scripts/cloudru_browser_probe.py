@@ -458,7 +458,9 @@ def verify_probe(apps, name, identifier, image, *, http_get=requests.get, sleep=
 
 
 def run_probe(apps, sha, image):
-    name = "rdc-browser-probe-" + sha[:12]
+    # The live API rejects the previous 30-character name. Keep the same SHA
+    # identity in a compact 16-character service/container name.
+    name = "rdc-" + sha[:12]
     # Never take over or stop an existing resource, including an interrupted run.
     if find_probe(apps, name) is not None:
         raise CloudProviderError(
