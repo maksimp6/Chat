@@ -47,7 +47,8 @@ case "$operation" in
     ;;
   status)
     cd "$root"
-    docker compose ps --status running --services
+    services="$(docker compose ps --status running --services)"
+    grep -qx 'commander' <<<"$services"
     # Never print device.json, raw logs, pairing codes, or access tokens in Actions.
     ;;
   *) echo 'Unsupported operation' >&2; exit 2 ;;
