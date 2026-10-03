@@ -29,6 +29,42 @@ REPOSITORY = "chromium-probe"
 DESCRIPTION = "Alice RDC browser compatibility probe; no OAuth or user data"
 
 
+def registry_response_shape(payload):
+    """Only fixed field names, JSON types and counts; never echo provider values."""
+    fields = (
+        "registries",
+        "items",
+        "data",
+        "result",
+        "results",
+        "total",
+        "count",
+        "totalCount",
+        "total_count",
+        "nextPageToken",
+        "next_page_token",
+        "pagination",
+    )
+
+    def shape(value, depth=0):
+        if isinstance(value, dict):
+            result = {"type": "object", "field_count": len(value)}
+            if depth < 2:
+                result["fields"] = {k: shape(value[k], depth + 1) for k in fields if k in value}
+            return result
+        if isinstance(value, list):
+            return {"type": "array", "length": len(value)}
+        if type(value) is int:
+            return {"type": "integer", "zero": value == 0}
+        if isinstance(value, str):
+            return {"type": "string", "empty": value == "", "zero": value == "0"}
+        if value is None:
+            return {"type": "null"}
+        return {"type": "boolean" if isinstance(value, bool) else "unknown"}
+
+    return shape(payload)
+
+
 def find_probe(apps, name):
     found = [item for item in apps.list(require_total=True) if item.get("name") == name]
     if len(found) > 1:
@@ -48,6 +84,10 @@ def prepare_registry(registry):
     print('{"stage":"registry_inventory"}', flush=True)
     payload = registry.client.request(
         "artifact_registry", "GET", "/v1/registries", params={"projectId": registry.project_id}
+    )
+    print(
+        json.dumps({"stage": "registry_response_shape", "shape": registry_response_shape(payload)}),
+        flush=True,
     )
     collections = [payload[k] for k in ("registries", "items", "data") if k in payload]
     if (
