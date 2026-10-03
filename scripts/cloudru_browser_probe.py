@@ -44,6 +44,16 @@ def registry_response_shape(payload):
         "nextPageToken",
         "next_page_token",
         "pagination",
+        "registryList",
+        "registry_list",
+        "content",
+        "response",
+        "code",
+        "message",
+        "error",
+        "errors",
+        "details",
+        "status",
     )
 
     def shape(value, depth=0):
@@ -85,7 +95,44 @@ def prepare_registry(registry):
     # github.com/cloud-ru/mcp-servers/blob/master/mcp-artifact-registry/server.py
     path = f"/v1/projects/{quote(registry.project_id, safe='')}/registries"
     print('{"stage":"registry_inventory"}', flush=True)
-    payload = registry.client.request("artifact_registry", "GET", path, params={"pageSize": 100})
+    try:
+        payload = registry.client.request(
+            "artifact_registry", "GET", path, params={"pageSize": 100}
+        )
+    except CloudProviderError as exc:
+        if exc.http_status == 404:
+            # The official client's project route is unavailable in the live service.
+            # Inspect the previously HTTP-successful route without accepting its
+            # inventory or using it for any resource mutation.
+            print('{"stage":"registry_legacy_route_diagnostic"}', flush=True)
+            try:
+                legacy = registry.client.request(
+                    "artifact_registry",
+                    "GET",
+                    "/v1/registries",
+                    params={"projectId": registry.project_id, "pageSize": 100},
+                )
+                print(
+                    json.dumps(
+                        {
+                            "stage": "registry_legacy_response_shape",
+                            "shape": registry_response_shape(legacy),
+                        }
+                    ),
+                    flush=True,
+                )
+            except CloudProviderError as diagnostic_error:
+                print(
+                    json.dumps(
+                        {
+                            "stage": "registry_legacy_route_error",
+                            "error": diagnostic_error.code,
+                            "http_status": diagnostic_error.http_status,
+                        }
+                    ),
+                    flush=True,
+                )
+        raise
     print(
         json.dumps({"stage": "registry_response_shape", "shape": registry_response_shape(payload)}),
         flush=True,

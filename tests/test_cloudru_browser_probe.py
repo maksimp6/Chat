@@ -253,6 +253,51 @@ def test_existing_private_registry_is_reused_without_creation():
     assert registry.client.request.call_count == 1
 
 
+def test_project_route_404_gets_read_only_legacy_diagnostic_and_preserves_failure(capsys):
+    registry = Mock(project_id=ID)
+    original = CloudProviderError("unavailable", code="provider_http_error", http_status=404)
+    registry.client.request.side_effect = [
+        original,
+        {"data": {"registries": [], "totalCount": "0"}, "message": "secret-canary"},
+    ]
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value is original
+    calls = registry.client.request.call_args_list
+    assert len(calls) == 2
+    assert all(call.args[1] == "GET" for call in calls)
+    assert calls[1].args == ("artifact_registry", "GET", "/v1/registries")
+    assert calls[1].kwargs["params"] == {"projectId": ID, "pageSize": 100}
+    output = capsys.readouterr().out
+    assert "secret-canary" not in output
+    assert "registry_legacy_response_shape" in output
+
+
+@pytest.mark.parametrize("status", [401, 403, 500])
+def test_registry_diagnostic_does_not_retry_auth_or_provider_errors(status):
+    registry = Mock(project_id=ID)
+    registry.client.request.side_effect = CloudProviderError("failed", http_status=status)
+    with pytest.raises(CloudProviderError):
+        probe.prepare_registry(registry)
+    assert registry.client.request.call_count == 1
+
+
+def test_legacy_diagnostic_failure_never_replaces_original_or_creates(capsys):
+    registry = Mock(project_id=ID)
+    original = CloudProviderError("missing", http_status=404)
+    registry.client.request.side_effect = [
+        original,
+        CloudProviderError("secret-canary", http_status=403),
+    ]
+    with pytest.raises(CloudProviderError) as failure:
+        probe.prepare_registry(registry)
+    assert failure.value is original
+    output = capsys.readouterr().out
+    assert "secret-canary" not in output
+    assert '"http_status": 403' in output
+    assert all(call.args[1] == "GET" for call in registry.client.request.call_args_list)
+
+
 def test_readiness_requires_expected_image_and_exact_static_response():
     apps = Mock()
     apps.get.return_value = {
