@@ -61,10 +61,10 @@ def test_install_retries_use_clean_context_and_preserve_state(tmp_path):
     assert run(env, "install", revision).returncode == 0
     (root / "state/auth-sentinel").write_text("not-a-real-secret")
     (root / "workspace/work.txt").write_text("keep")
-    first = list((root / "releases").iterdir())
+    first = list((root / "releases").glob(f"{revision}.*"))
     (first[0] / "stale.txt").write_text("old file")
     assert run(env, "install", revision).returncode == 0
-    releases = list((root / "releases").iterdir())
+    releases = list((root / "releases").glob(f"{revision}.*"))
     assert len(releases) == 2
     assert sum((item / "stale.txt").exists() for item in releases) == 1
     assert (root / "state/auth-sentinel").read_text() == "not-a-real-secret"
@@ -80,6 +80,7 @@ def test_install_retries_use_clean_context_and_preserve_state(tmp_path):
     assert "compose run --rm --no-deps initialize" in commands
     assert "compose up -d --no-build" in commands
     assert "compose exec -T commander node" in commands
+    assert "desktop-session.cjs --wait-ready" in commands
     assert "logs" not in commands
     assert "/var/run/docker.sock" not in commands
 
@@ -112,7 +113,15 @@ def test_compose_isolated_mounts_and_no_host_control():
     assert service["user"] == "1000:1000"
     assert service["read_only"] is True
     assert service["cap_drop"] == ["ALL"]
-    assert service["security_opt"] == ["no-new-privileges:true"]
+    assert service["security_opt"] == ["no-new-privileges:true", "seccomp=./chromium-seccomp.json"]
+    assert service["shm_size"] == "256m"
+    assert service["healthcheck"]["test"][-1] == "--healthcheck"
+    profile = json.loads((DEPLOY / "chromium-seccomp.json").read_text())
+    assert profile["defaultAction"] == "SCMP_ACT_ERRNO"
+    assert any(rule["names"] == ["chroot"] and not rule["includes"] for rule in profile["syscalls"])
+    assert any(
+        rule["names"] == ["clone3"] and rule["errnoRet"] == 38 for rule in profile["syscalls"]
+    )
     assert not service.get("ports")
     assert not service.get("privileged")
     assert not service.get("network_mode")
@@ -167,3 +176,24 @@ def test_image_uses_frozen_dependency_graph():
     dockerfile = (DEPLOY / "Dockerfile").read_text()
     assert "npm ci --omit=dev --ignore-scripts" in dockerfile
     assert "npm install" not in dockerfile
+    assert "chromium fonts-liberation" in dockerfile
+
+
+def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
+    home, log, env = harness(tmp_path)
+    archive(home)
+    root = home / "alice-preview/services/remote-desktop-commander"
+    root.mkdir(parents=True)
+    (root / "compose.yaml").write_text("previous compose\n")
+    docker = Path(env["PATH"].split(os.pathsep)[0]) / "docker"
+    docker.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$DOCKER_TEST_LOG"\n'
+        'case "$*" in *--wait-ready*) exit 23;; esac\nexit 0\n'
+    )
+    result = run(env, "install", "b" * 40)
+    assert result.returncode == 23
+    assert (root / "compose.yaml").read_text() == "previous compose\n"
+    commands = log.read_text()
+    assert "compose down --remove-orphans" in commands
+    assert "tag alice-remote-desktop-commander:rollback-" in commands
+    assert commands.count("compose up -d --no-build") == 2

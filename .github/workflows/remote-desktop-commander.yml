@@ -31,6 +31,7 @@ jobs:
       - name: Validate Compose and build the actual CLI image
         run: |
           node --test deploy/remote-desktop-commander/pairing-handoff.test.cjs
+          node --test deploy/remote-desktop-commander/desktop-session.test.cjs
           docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
           docker compose -f deploy/remote-desktop-commander/compose.yaml build
       - name: Exercise volume initialization and non-root CLI startup
@@ -40,6 +41,12 @@ jobs:
           mkdir -m 700 state workspace
           docker compose run --rm --no-deps initialize
           docker compose run --rm --no-deps commander remote --help
+          timeout 40s docker compose run --rm --no-deps commander --browser-smoke-test
+          docker compose run --rm --no-deps --entrypoint bash commander -euc '
+            test -d /home/node/.config/chromium/Default
+            test "$(stat -c %a /home/node/.config/chromium)" = 700
+          '
+          timeout 40s docker compose run --rm --no-deps commander --browser-smoke-test
           docker compose run --rm --no-deps --entrypoint bash commander -euc '
             test "$(id -u)" = 1000
             test "$(stat -c %a /home/node)" = 700
@@ -97,7 +104,7 @@ jobs:
           target="$SSH_USER@$SSH_HOST"
           case "$OPERATION" in
             preflight|status)
-              ssh "${ssh_args[@]}" "$target" "bash -s -- '$OPERATION'" < deploy/remote-desktop-commander/server.sh
+              timeout 30s ssh "${ssh_args[@]}" "$target" "bash -s -- '$OPERATION'" < deploy/remote-desktop-commander/server.sh
               ;;
             install)
               git archive --format=tar.gz HEAD deploy/remote-desktop-commander > "$RUNNER_TEMP/commander.tar.gz"
