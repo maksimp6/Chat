@@ -62,6 +62,15 @@ def test_claude_direct_implementation_profile_has_bounded_write_and_validation_t
     assert "Bash(gh api repos/*/branches:*)" not in workflow
 
 
+def test_claude_lite_can_read_public_web_sources():
+    workflow = _workflow()
+    allowed = next(line for line in workflow.splitlines() if "--allowedTools" in line)
+
+    assert "WebFetch" in allowed
+    assert "WebSearch" in allowed
+    assert "Bash(curl" not in allowed
+
+
 def test_claude_lite_concurrency_is_job_scoped_after_trigger_guard():
     workflow = _workflow()
 
