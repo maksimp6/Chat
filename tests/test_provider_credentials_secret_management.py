@@ -116,6 +116,25 @@ def test_resolve_fetches_the_pinned_version_only(isolated_db):
     assert client.calls == [("secret-1", "v2")]
 
 
+def test_secret_ref_reads_timezone_timestamp_without_microseconds(isolated_db):
+    set_secret_management_ref(
+        isolated_db,
+        "alice_short_token",
+        "secret-1",
+        "v1",
+    )
+    isolated_db.execute(
+        "UPDATE secret_management_refs SET updated_at = ? WHERE purpose = ?",
+        ("2026-09-29 13:45:45+00:00", "alice_short_token"),
+    )
+    isolated_db.commit()
+
+    ref = get_secret_management_ref(isolated_db, "alice_short_token")
+
+    assert ref is not None
+    assert ref.updated_at.isoformat() == "2026-09-29T13:45:45+00:00"
+
+
 def test_resolve_after_rollback_uses_restored_version(isolated_db):
     set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
     set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2")
