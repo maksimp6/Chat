@@ -10,7 +10,11 @@ const ACCESS_TTL = 15 * 60;
 const REFRESH_TTL = 30 * 24 * 60 * 60;
 const random = () => randomBytes(32).toString("base64url");
 const digest = (value) => createHash("sha256").update(value).digest("base64url");
-const equal = (left, right) => timingSafeEqual(createHash("sha256").update(String(left)).digest(), createHash("sha256").update(String(right)).digest());
+function equal(left, right) {
+  const supplied = Buffer.from(String(left));
+  const expected = Buffer.from(String(right));
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
 const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 
 function json(response, status, payload, extra = {}) {

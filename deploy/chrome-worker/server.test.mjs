@@ -52,7 +52,9 @@ async function fixture() {
 test("worker rejects anonymous calls and wakes and sleeps a persistent profile", async (t) => {
   const app = await fixture();
   t.after(app.close);
-  assert.equal((await app.request("/browser/v1/status", undefined, "wrong")).status, 401);
+  for (const invalidToken of ["", "wrong", "test-tokem"]) {
+    assert.equal((await app.request("/browser/v1/status", undefined, invalidToken)).status, 401);
+  }
   assert.deepEqual(await (await app.request("/browser/v1/status")).json(), { state: "sleeping", generation: 0, url: null, title: null, profile: app.workerProfile });
   assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
   assert.equal(app.fake.profile.directory, "/state/profile");

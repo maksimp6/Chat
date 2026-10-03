@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { dirname, join, relative } from "node:path";
 import { createPlaywrightMcp } from "./mcp.mjs";
@@ -22,9 +22,9 @@ function authorized(request, token) {
   if (!token) return false;
   const supplied = request.headers.authorization;
   if (typeof supplied !== "string" || !supplied.startsWith("Bearer ")) return false;
-  const expectedHash = createHash("sha256").update(token).digest();
-  const suppliedHash = createHash("sha256").update(supplied.slice(7)).digest();
-  return timingSafeEqual(expectedHash, suppliedHash);
+  const expected = Buffer.from(token);
+  const actual = Buffer.from(supplied.slice(7));
+  return actual.length === expected.length && timingSafeEqual(expected, actual);
 }
 
 async function body(request) {

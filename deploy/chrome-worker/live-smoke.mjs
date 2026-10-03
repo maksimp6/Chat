@@ -53,9 +53,11 @@ export async function runLiveSmoke(options = {}) {
   const phase = options.phase ?? process.argv[2];
   const endpoint = new URL(options.endpoint ?? `${process.env.BROWSER_PUBLIC_URL ?? ""}/browser/v1/mcp`);
   const token = options.token ?? process.env.BROWSER_API_TOKEN ?? "";
-  const marker = (options.marker ?? process.env.BROWSER_SMOKE_MARKER ?? "").replaceAll("-", "").toLowerCase();
+  const marker = options.marker ?? process.env.BROWSER_SMOKE_MARKER ?? "";
   requireCheck(["seed", "verify"].includes(phase), "invalid_smoke_phase");
-  requireCheck(/^[a-f0-9]{32}$/.test(marker), "invalid_smoke_marker");
+  if (typeof marker !== "string" || !/^[a-f0-9]{32}$/.test(marker)) {
+    throw Object.assign(new Error("invalid_smoke_marker"), { smokeCode: "invalid_smoke_marker" });
+  }
   requireCheck(Boolean(token), "smoke_token_missing");
   requireCheck(endpoint.pathname === "/browser/v1/mcp", "invalid_smoke_endpoint");
   requireCheck(endpoint.protocol === "https:" && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash, "invalid_smoke_endpoint");
@@ -83,7 +85,6 @@ export async function runLiveSmoke(options = {}) {
     return result;
   }
   const evaluate = async (source) => evaluationResult(await call("browser_evaluate", { function: source }));
-  const key = `alice_mcp_smoke_${marker}`;
   try {
     await client.connect(transport, { timeout: 30_000 });
     requireCheck(Boolean(transport.sessionId), "mcp_session_missing");
@@ -92,18 +93,23 @@ export async function runLiveSmoke(options = {}) {
     if (options.checkOAuth !== false && phase === "seed") await oauthDiscovery(endpoint.origin, fetchHttp);
     await call("browser_tabs", { action: "new" });
     tabOpened = true;
-    await call("browser_navigate", { url: "https://example.com" });
+    // Carry test data in a URL fragment, never in executable JavaScript source.
+    // The fragment is not sent to example.com's HTTP server.
+    await call("browser_navigate", { url: `https://example.com/#${marker}` });
     if (phase === "seed") {
       const seeded = await evaluate(`() => {
         if (location.origin !== "https://example.com") return { origin: location.origin };
+        const marker = location.hash.slice(1);
+        if (!/^[a-f0-9]{32}$/.test(marker)) throw new Error("invalid_smoke_fragment");
+        const key = "alice_mcp_smoke_" + marker;
         document.title = "Chrome deployment acceptance";
         document.body.innerHTML = '<h1>Browser acceptance</h1><input aria-label="Acceptance input"><button>Save acceptance</button><output></output>';
         document.querySelector('button').onclick = () => { document.querySelector('output').textContent = document.querySelector('input').value; };
-        document.cookie = ${JSON.stringify(`${key}=${marker}; Path=/; Max-Age=3600; Secure; SameSite=Lax`)};
-        localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(marker)});
-        return { origin: location.origin, storage: localStorage.getItem(${JSON.stringify(key)}) };
+        document.cookie = key + "=" + marker + "; Path=/; Max-Age=3600; Secure; SameSite=Lax";
+        localStorage.setItem(key, marker);
+        return { origin: location.origin, marker, storage: localStorage.getItem(key) };
       }`);
-      requireCheck(seeded.origin === "https://example.com" && seeded.storage === marker, "smoke_seed_failed");
+      requireCheck(seeded.origin === "https://example.com" && seeded.marker === marker && seeded.storage === marker, "smoke_seed_failed");
       const snapshot = await call("browser_snapshot");
       const text = snapshot.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
       const input = text.match(/textbox "Acceptance input" \[ref=([\w-]+)\]/)?.[1];
@@ -116,11 +122,25 @@ export async function runLiveSmoke(options = {}) {
       const screenshot = await call("browser_take_screenshot", { type: "png" });
       requireCheck(screenshot.content.some((item) => item.type === "image"), "smoke_screenshot_missing");
     }
-    const persisted = await evaluate(`() => ({ origin: location.origin, storage: localStorage.getItem(${JSON.stringify(key)}), cookie: document.cookie.split('; ').find(value => value.startsWith(${JSON.stringify(`${key}=`)}))?.slice(${key.length + 1}) ?? null })`);
-    requireCheck(persisted.origin === "https://example.com" && persisted.storage === marker && persisted.cookie === marker, phase === "seed" ? "smoke_seed_marker_missing" : "smoke_persistent_profile_marker_mismatch");
+    const persisted = await evaluate(`() => {
+      if (location.origin !== "https://example.com") return { origin: location.origin };
+      const marker = location.hash.slice(1);
+      if (!/^[a-f0-9]{32}$/.test(marker)) throw new Error("invalid_smoke_fragment");
+      const key = "alice_mcp_smoke_" + marker;
+      return { origin: location.origin, marker, storage: localStorage.getItem(key), cookie: document.cookie.split('; ').find(value => value.startsWith(key + "="))?.slice(key.length + 1) ?? null };
+    }`);
+    requireCheck(persisted.origin === "https://example.com" && persisted.marker === marker && persisted.storage === marker && persisted.cookie === marker, phase === "seed" ? "smoke_seed_marker_missing" : "smoke_persistent_profile_marker_mismatch");
     if (phase === "verify") {
-      const cleaned = await evaluate(`() => { localStorage.removeItem(${JSON.stringify(key)}); document.cookie = ${JSON.stringify(`${key}=; Path=/; Max-Age=0; Secure; SameSite=Lax`)}; return { storage: localStorage.getItem(${JSON.stringify(key)}), cookie: document.cookie.split('; ').some(value => value.startsWith(${JSON.stringify(`${key}=`)})) }; }`);
-      requireCheck(cleaned.storage === null && cleaned.cookie === false, "smoke_marker_cleanup_failed");
+      const cleaned = await evaluate(`() => {
+        if (location.origin !== "https://example.com") return { origin: location.origin };
+        const marker = location.hash.slice(1);
+        if (!/^[a-f0-9]{32}$/.test(marker)) throw new Error("invalid_smoke_fragment");
+        const key = "alice_mcp_smoke_" + marker;
+        localStorage.removeItem(key);
+        document.cookie = key + "=; Path=/; Max-Age=0; Secure; SameSite=Lax";
+        return { marker, storage: localStorage.getItem(key), cookie: document.cookie.split('; ').some(value => value.startsWith(key + "=")) };
+      }`);
+      requireCheck(cleaned.marker === marker && cleaned.storage === null && cleaned.cookie === false, "smoke_marker_cleanup_failed");
     }
     requireCheck(Object.values(seen).every(Boolean), "mcp_gateway_headers_missing");
     await call("browser_tabs", { action: "close" });

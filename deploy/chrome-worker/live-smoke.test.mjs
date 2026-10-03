@@ -12,6 +12,14 @@ test("smoke evidence parses only the executed JSON result, never echoed source",
   assert.throws(() => evaluationResult({ content: [{ type: "text", text: '### Ran Playwright code\nconst marker="expected";' }] }), /evaluation_result_missing/);
 });
 
+test("smoke rejects unmodified non-hex markers before sending any requests", async () => {
+  let calls = 0;
+  for (const marker of ['0123456789abcdef0123456789abcde"', "01234567-89ab-cdef-0123-456789abcdef", "ABCDEF0123456789ABCDEF0123456789", 123]) {
+    await assert.rejects(runLiveSmoke({ phase: "seed", endpoint: "https://gateway.example.test/browser/v1/mcp", token: "synthetic-token", marker, fetch: async () => { calls += 1; throw new Error("unexpected_request"); } }), /invalid_smoke_marker/);
+  }
+  assert.equal(calls, 0);
+});
+
 test("live SDK seed and verify survive a cold profile restore and reject wrong/replayed markers", { skip: process.env.BROWSER_LIVE_SMOKE_TEST !== "1" }, async (t) => {
   const { chromium } = await import("playwright-core");
   const { createWorker } = await import("./server.mjs");

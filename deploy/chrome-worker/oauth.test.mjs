@@ -143,6 +143,7 @@ test("registered redirect, S256, resource and browser cookie prevent login/code 
   for (const values of [{ redirect_uri: "https://attacker.test/callback" }, { code_challenge_method: "plain" }, { resource: "https://other.test/mcp" }]) assert.equal((await app.start(client, values)).response.status, 400);
   const started = await app.start(client);
   assert.equal((await app.form("/browser/oauth/authorize", { transaction: started.transaction })).status, 400);
+  assert.equal((await app.form("/browser/oauth/authorize", { transaction: started.transaction }, "browser_oauth_transaction=short")).status, 400);
   const login = await app.form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie);
   assert.equal(login.status, 302);
   const callbackPath = `/browser/oauth/github/callback?state=${started.transaction}&code=synthetic-code`;
@@ -158,7 +159,7 @@ test("registered redirect, S256, resource and browser cookie prevent login/code 
 
 test("only the immutable configured GitHub owner can obtain a code", async (t) => {
   const app = await fixture(t);
-  app.setOwner("99999");
+  app.setOwner("9");
   const flow = await app.code();
   assert.equal(flow.location.searchParams.get("code"), null);
   assert.equal(flow.location.searchParams.get("error"), "access_denied");
