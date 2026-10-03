@@ -12,7 +12,7 @@ from scripts import cloudru_browser_probe as probe
 SHA = "a" * 40
 IMAGE = "alice-rdc-probe.cr.cloud.ru/chromium-probe@sha256:" + "b" * 64
 ID = "6d94852d-98e4-4a98-8101-d103b9834d45"
-NAME = "rdc-browser-probe-" + SHA[:12]
+NAME = "rdc-" + SHA[:12]
 
 
 def owned():
@@ -32,6 +32,7 @@ def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch)
     result = probe.run_probe(apps, SHA, IMAGE)
     assert result["status"] == "BROWSER_PROBE_PASSED"
     spec = apps.create.call_args.args[0]
+    assert spec.name == NAME
     assert spec.image == IMAGE
     assert spec.env == {"ALICE_RDC_MODE": "cloud-probe", "PORT": "8080"}
     assert (spec.min_instances, spec.max_instances) == (0, 1)
