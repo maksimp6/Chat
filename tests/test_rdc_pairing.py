@@ -3,7 +3,7 @@ import json
 import pytest
 from flask import Flask
 
-from rdc_pairing import install_rdc_pairing, verification_url
+from rdc_connection.pairing import install_rdc_pairing, verification_url
 from short_token_auth import install_short_token_auth
 
 

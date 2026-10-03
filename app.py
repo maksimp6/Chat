@@ -39,7 +39,7 @@ from government import government_bp, init_government_tables, ensure_government_
 from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
-from rdc_pairing import install_rdc_pairing
+from rdc_connection.pairing import install_rdc_pairing
 from identity.github_oauth import (
     current_github_login,
     github_auth_bp,
