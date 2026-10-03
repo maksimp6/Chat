@@ -179,6 +179,92 @@ def test_printing3d_tools_are_registered_read_only():
     assert orders_tool["requires_approval"] is False
 
 
+def test_quote_tool_is_read_only_and_order_create_requires_approval():
+    from tool_registry import ToolRegistry
+
+    registry = ToolRegistry()
+    quote_tool = registry.get_tool_meta("printing3d.quote")
+    create_tool = registry.get_tool_meta("printing3d.order.create")
+
+    assert quote_tool["read_only"] is True
+    assert quote_tool["requires_approval"] is False
+    assert create_tool["read_only"] is False
+    assert create_tool["requires_approval"] is True
+
+
+def test_quote_tool_reports_missing_cost_drivers_instead_of_zero_price():
+    from printing3d.tools import quote
+
+    result = quote({"material_grams": 120, "material_cost_per_kg": None, "print_hours": None})
+
+    assert result == {
+        "status": "needs_input",
+        "missing_fields": ["material_cost_per_kg", "print_hours"],
+    }
+
+
+def test_quote_tool_matches_service_and_lists_assumed_defaults():
+    from printing3d import calculate_quote
+    from printing3d.tools import quote
+
+    args = {
+        "material_grams": 120,
+        "material_cost_per_kg": 1800,
+        "print_hours": 5,
+        "electricity_cost_per_kwh": 7,
+        "target_margin_percent": None,
+    }
+    result = quote(args)
+
+    assert result["status"] == "ok"
+    assert result["quote"] == calculate_quote(
+        {
+            "material_grams": 120,
+            "material_cost_per_kg": 1800,
+            "print_hours": 5,
+            "electricity_cost_per_kwh": 7,
+        }
+    )
+    assert result["quote"]["recommended_price"] > 0
+    assert "electricity_cost_per_kwh" not in result["assumed_defaults"]
+    assert "target_margin_percent" in result["assumed_defaults"]
+
+
+def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
+    from printing3d import list_orders
+    from printing3d.tools import order_create, quote
+
+    class Call:
+        user_id = "trusted-owner"
+
+    quote_args = {"material_grams": 80, "material_cost_per_kg": 2000, "print_hours": 3}
+    expected = quote(quote_args)["quote"]["recommended_price"]
+
+    result = order_create(
+        {"title": "Cable clip x10", "customer_name": "Ivan", "quote": quote_args},
+        {"_universal_context": {"call": Call()}},
+    )
+
+    order = result["order"]
+    assert order["owner_id"] == "trusted-owner"
+    assert order["status"] == "quote"
+    assert order["source"] == "alice"
+    assert order["quoted_price"] == pytest.approx(expected)
+    assert list_orders("other-owner") == []
+
+
+def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
+    from printing3d.tools import order_create
+
+    with pytest.raises(ValueError, match="status"):
+        order_create({"title": "X", "status": "paid"}, {})
+    with pytest.raises(ValueError, match="print_hours"):
+        order_create(
+            {"title": "X", "quote": {"material_grams": 10, "material_cost_per_kg": 1000}},
+            {},
+        )
+
+
 def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     from printing3d import create_order, settle_order
     from printing3d.tools import treasury_summary
