@@ -18,37 +18,51 @@ case "$operation" in
     release="$(mktemp -d "$root/releases/$revision.XXXXXX")"
     tar -xzf "$archive" -C "$release"
     source_dir="$release/deploy/remote-desktop-commander"
-    for file in Dockerfile compose.yaml config.json entrypoint.sh pairing-handoff.cjs .dockerignore package.json package-lock.json dependency-smoke.cjs; do
+    previous="$(mktemp -d "$root/releases/previous.XXXXXX")"
+    trap 'rm -rf -- "$previous"' EXIT
+    files=(Dockerfile compose.yaml config.json entrypoint.sh pairing-handoff.cjs .dockerignore package.json package-lock.json dependency-smoke.cjs desktop-session.cjs browser-smoke.cjs chromium-seccomp.json chromium-seccomp.LICENSE)
+    for file in "${files[@]}"; do
+      if [[ -f "$root/$file" ]]; then cp "$root/$file" "$previous/$file"; fi
       test -f "$source_dir/$file"
       cp "$source_dir/$file" "$root/$file"
     done
     cd "$root"
-    docker compose config --quiet
     rollback_tag="alice-remote-desktop-commander:rollback-$revision"
     had_previous=0
+    started_replacement=0
     if docker image inspect alice-remote-desktop-commander:0.2.52 >/dev/null 2>&1; then
       docker tag alice-remote-desktop-commander:0.2.52 "$rollback_tag"
       had_previous=1
     fi
     restore() {
-      docker compose down --remove-orphans >/dev/null 2>&1 || true
+      if [[ "$started_replacement" == 1 ]]; then
+        docker compose down --remove-orphans >/dev/null 2>&1 || true
+      fi
+      for file in "${files[@]}"; do
+        if [[ -f "$previous/$file" ]]; then cp "$previous/$file" "$root/$file"; fi
+      done
       if [[ "$had_previous" == 1 ]]; then
         docker tag "$rollback_tag" alice-remote-desktop-commander:0.2.52
-        docker compose up -d --no-build
+        if [[ "$started_replacement" == 1 ]]; then docker compose up -d --no-build; fi
       fi
     }
     trap restore ERR
+    docker compose config --quiet
     docker compose build
     docker compose run --rm --no-deps initialize
+    started_replacement=1
     docker compose up -d --no-build
     docker compose exec -T commander node -e 'process.stdout.write("Node runtime reachable\\n")'
+    timeout 30s docker compose exec -T commander node /opt/desktop-commander/desktop-session.cjs --wait-ready
     trap - ERR
-    printf 'Remote Desktop Commander installed from %s; OAuth pairing still required\n' "$revision"
+    printf 'Remote Desktop Commander and Chromium ready from %s; OAuth pairing still required\n' "$revision"
     ;;
   status)
     cd "$root"
     services="$(docker compose ps --status running --services)"
     grep -qx 'commander' <<<"$services"
+    timeout 30s docker compose exec -T commander node /opt/desktop-commander/desktop-session.cjs --healthcheck
+    printf 'RDC container and Chromium available\n'
     # Never print device.json, raw logs, pairing codes, or access tokens in Actions.
     ;;
   *) echo 'Unsupported operation' >&2; exit 2 ;;

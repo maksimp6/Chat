@@ -10,18 +10,25 @@ services:
     group_add: ["10001"]
     read_only: true
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    security_opt: [no-new-privileges:true, "seccomp=./chromium-seccomp.json"]
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=128m
+      - /tmp:rw,noexec,nosuid,size=256m
+    shm_size: 256m
     environment:
       ALICE_RDC_PAIRING_FILE: /pairing/handoff.json
     volumes:
       - ./state:/home/node
       - ./workspace:/workspace
       - ./pairing:/pairing
-    mem_limit: 1g
+    mem_limit: 2g
     cpus: 1.0
-    pids_limit: 128
+    pids_limit: 256
+    healthcheck:
+      test: [CMD, node, /opt/desktop-commander/desktop-session.cjs, --healthcheck]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 2
     stop_grace_period: 30s
     logging:
       driver: local

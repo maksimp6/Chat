@@ -27,4 +27,10 @@ with open(tmp, "w", encoding="utf-8") as handle:
     handle.write("\n")
 os.replace(tmp, target)
 PY
-exec node --require /opt/desktop-commander/pairing-handoff.cjs /opt/desktop-commander/node_modules/@wonderwhy-er/desktop-commander/dist/index.js "$@"
+# Help/version commands must not start a browser or begin OAuth pairing.
+case " $* " in
+  *" --help "*|*" --version "*)
+    exec node --require /opt/desktop-commander/pairing-handoff.cjs /opt/desktop-commander/node_modules/@wonderwhy-er/desktop-commander/dist/index.js "$@"
+    ;;
+esac
+exec node /opt/desktop-commander/desktop-session.cjs "$@"

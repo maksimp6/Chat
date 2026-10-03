@@ -1,8 +1,9 @@
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      bash ca-certificates git openssh-client ripgrep python3 \
+RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
+    && apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+      bash ca-certificates git openssh-client ripgrep python3 chromium fonts-liberation \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /workspace /home/node/.desktop-commander-device /home/node/.claude-server-commander \
     && chown -R node:node /workspace /home/node
@@ -15,6 +16,7 @@ RUN cd /opt/desktop-commander \
 COPY config.json /opt/desktop-commander/config.example.json
 COPY entrypoint.sh /usr/local/bin/alice-desktop-commander
 COPY pairing-handoff.cjs /opt/desktop-commander/pairing-handoff.cjs
+COPY desktop-session.cjs browser-smoke.cjs /opt/desktop-commander/
 USER node
 WORKDIR /workspace
 ENTRYPOINT ["bash", "/usr/local/bin/alice-desktop-commander"]

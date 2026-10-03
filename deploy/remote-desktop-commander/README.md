@@ -4,15 +4,35 @@ This directory is the standalone Docker configuration for the official
 `@wonderwhy-er/desktop-commander` Remote Device, version **0.2.52**.
 It is separate from the custom Chromium inspection worker in PR #719.
 
-The image installs Node 22, Python, git, SSH client and system ripgrep. npm lifecycle
+The image installs Node 22, Python, git, SSH client, system ripgrep and Chromium. npm lifecycle
 scripts and Puppeteer's browser download are disabled; the package's documented
 `remote --help` is executed during the build to verify the installed CLI.
 The package and transitive npm dependencies are locked and installed with `npm ci`.
 The lock is generated from npm for the exact CLI version. Security overrides pin
 sharp 0.35.4 and ExcelJS's UUID 11.1.1; the image build exercises PNG decoding and
 an XLSX write/read round trip to verify these dependency APIs remain usable.
-The base image and Debian packages still float. Record the deployed image ID. This is a files/terminal agent inside
-a container, not a full graphical desktop or automatic browser login.
+The base image and Debian packages still float. Record the deployed image ID.
+RDC and headless Chromium run together in this one container. The persistent
+browser profile lives in `state/.config/chromium`; it is private session data,
+not a CI artifact. The browser's control endpoint listens only on
+`127.0.0.1:9222` inside the container; no host port is published. This does not
+add a graphical desktop, automatic site login, or register an Alice browser adapter.
+
+Chromium starts before RDC, with a 30-second readiness budget. Startup fails
+if Chromium cannot run with its namespace sandbox; no `--no-sandbox` fallback
+is used. A browser/RDC exit stops the other process so Compose can restart the
+whole session. Normal shutdown allows five seconds to flush the browser profile.
+`remote --help` does not start either a browser session or OAuth pairing.
+
+The vendored `chromium-seccomp.json` derives from Microsoft Playwright v1.62.0
+`utils/docker/seccomp_profile.json` (Git blob `fddc05fb520affb145404e6f6f647ca96af8087d`),
+under the adjacent Apache-2.0 license. It is a Docker syscall profile, not a
+Playwright dependency. It permits user-namespace creation. Local additions allow
+`chroot` without granting a host capability, and return ENOSYS for `clone3` so
+glibc uses `clone`. All Linux capabilities remain dropped; Docker's default-deny
+syscall policy is preserved. Hosts must support unprivileged user namespaces.
+The container has its own 256 MiB shared-memory allocation, a 2 GiB memory ceiling
+and a 256-process limit; host IPC and privileged mode are not used.
 
 ## Docker layout
 
@@ -44,7 +64,11 @@ PR code and other users' comments cannot reach the deployment job. It uses the e
 `PREVIEW_SSH_*` secrets with strict host-key checking. Installation changes only
 this service and its dedicated directories; it does not run preview/production
 scripts or restart Traefik. Repeating installation keeps state and workspace.
-The install check proves Node can run, not that the device is paired or online.
+CI builds the real image and renders a synthetic page twice with the same profile
+volume, without starting RDC's OAuth flow. Installation checks browser readiness
+on the actual host before reporting success and restores the previous image and
+Compose configuration if that check fails. This proves Node and Chromium can run,
+not that the device is paired or online.
 No production secrets are available to PR code.
 
 ## Pairing — separate from installation
