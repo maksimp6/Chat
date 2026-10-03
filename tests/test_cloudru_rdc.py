@@ -829,3 +829,24 @@ def test_entrypoint_diagnostic_distinguishes_omitted_from_null(present, capsys):
     diagnostic = json.loads(capsys.readouterr().out)
     assert diagnostic["volume_entrypoint_form"] == ("null" if present else "omitted")
     assert ("volume" in diagnostic["fields"]) is present
+
+
+def test_volume_attribute_diagnostics_allowlist_keys_without_values(capsys):
+    item = record()
+    secret = "unknown-private-volume-value"
+    attributes = item["template"]["volumes"][0]["volumeAttributes"]
+    attributes.update(readOnly="false", accessKeyId=secret, secretAccessKey=secret)
+    attributes[secret] = secret
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    output = capsys.readouterr().out
+    assert secret not in output
+    diagnostic = json.loads(output)
+    assert diagnostic["fields"] == ["volume"]
+    assert diagnostic["known_volume_attributes"] == [
+        "accessKeyId",
+        "bucketName",
+        "readOnly",
+        "secretAccessKey",
+    ]
+    assert diagnostic["volume_read_only_form"] == "false_string"

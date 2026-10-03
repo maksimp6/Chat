@@ -299,6 +299,48 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
                         "volume_region_match": attributes.get("region", "ru-central-1")
                         == "ru-central-1",
                         "volume_tenant_match": attributes.get("tenantId", tenant) == tenant,
+                        "known_volume_attributes": sorted(
+                            set(attributes)
+                            & {
+                                "readOnly",
+                                "read_only",
+                                "bucketId",
+                                "bucket_id",
+                                "projectId",
+                                "project_id",
+                                "logGroupId",
+                                "logGroupName",
+                                "unlimited",
+                                "isPublic",
+                                "accessKeyId",
+                                "secretAccessKey",
+                                "accessKey",
+                                "secretKey",
+                                "forcePathStyle",
+                                "mountOptions",
+                                "protocol",
+                                "mounter",
+                                "storageType",
+                                "capacity",
+                                "type",
+                                "cache",
+                                "endpoint",
+                                "region",
+                                "tenantId",
+                                "bucketName",
+                                "entrypoint",
+                            }
+                        ),
+                        "volume_read_only_form": safe_form(
+                            attributes.get("readOnly"),
+                            (
+                                ("omitted_or_null", None),
+                                ("false_string", "false"),
+                                ("false_boolean", False),
+                                ("true_string", "true"),
+                                ("true_boolean", True),
+                            ),
+                        ),
                         "volume_attributes_extra": bool(
                             set(attributes) - {"bucketName", "entrypoint", "tenantId", "region"}
                         ),
