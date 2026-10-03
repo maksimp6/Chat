@@ -123,7 +123,10 @@ def test_deploy_loader_accepts_legacy_environment_names(
     assert os.environ["CLOUDRU_IAM_KEY_SECRET"] == "legacy-secret"
 
 
-def test_agent_credentials_are_materialized_without_tracing_secrets(tmp_path: Path) -> None:
+@pytest.mark.parametrize("token_variable", ["CODEX_GITHUB_TOKEN", "GITHUB_TOKEN"])
+def test_agent_credentials_are_materialized_without_tracing_secrets(
+    tmp_path: Path, token_variable: str
+) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "gpg").write_text(
@@ -137,6 +140,7 @@ def test_agent_credentials_are_materialized_without_tracing_secrets(tmp_path: Pa
     (bin_dir / "gh").write_text(
         "#!/bin/sh\n"
         "if test \"$1 $2\" = 'auth login'; then\n"
+        '  test -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" || exit 1\n'
         "  token=$(cat)\n"
         '  mkdir -p "$HOME/.config/gh"\n'
         '  printf \'oauth_token: %s\\n\' "$token" > "$HOME/.config/gh/hosts.yml"\n'
@@ -161,6 +165,7 @@ def test_agent_credentials_are_materialized_without_tracing_secrets(tmp_path: Pa
         "CLOUD_RU_SERVER_2",
         "CLOUD_RU_SERVER_2_pub",
         "CODEX_GITHUB_TOKEN",
+        "GH_TOKEN",
         "GITHUB_TOKEN",
     ):
         env.pop(name, None)
@@ -174,7 +179,7 @@ def test_agent_credentials_are_materialized_without_tracing_secrets(tmp_path: Pa
             "CLOUD_RU_SERVER_1_pub": "ssh-ed25519 russian-host-key",
             "CLOUD_RU_SERVER_2": "us.example.test",
             "CLOUD_RU_SERVER_2_pub": "ssh-ed25519 american-host-key",
-            "CODEX_GITHUB_TOKEN": "github-secret-token",
+            token_variable: "github-secret-token",
         }
     )
     result = subprocess.run(
@@ -210,3 +215,67 @@ def test_agent_credentials_are_materialized_without_tracing_secrets(tmp_path: Pa
     output = result.stdout + result.stderr
     for secret in ("gpg-secret-material", "ssh-secret-material", "github-secret-token"):
         assert secret not in output
+
+
+@pytest.mark.parametrize("script", ["codex_setup.sh", "codex_maintenance.sh"])
+@pytest.mark.parametrize("token_variable", ["CODEX_GITHUB_TOKEN", "GITHUB_TOKEN"])
+def test_bootstrap_callers_do_not_trace_github_credentials(
+    tmp_path: Path, script: str, token_variable: str
+) -> None:
+    import sys
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    mocks = {
+        "python": (
+            '#!/bin/sh\nif test "$1" = --version; then echo "Python 3.14.0"; '
+            'elif test "$1 $2" = "-m pip"; then exit 0; '
+            f'else exec "{sys.executable}" "$@"; fi\n'
+        ),
+        "node": '#!/bin/sh\necho "v22.22.2"\n',
+        "java": "#!/bin/sh\necho 'openjdk version \"25\"' >&2\n",
+        "npm": "#!/bin/sh\nexit 0\n",
+        "cloud": "#!/bin/sh\nexit 0\n",
+        "gh": (
+            "#!/bin/sh\n"
+            'if test "$1 $2" = "auth login"; then\n'
+            '  test -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" || exit 1\n'
+            '  mkdir -p "$HOME/.config/gh"\n'
+            '  cat > "$HOME/.config/gh/hosts.yml"\n'
+            'elif test "$1 $2" = "auth status"; then\n'
+            '  test -s "$HOME/.config/gh/hosts.yml" || exit 1\n'
+            "fi\n"
+        ),
+    }
+    for name, content in mocks.items():
+        executable = bin_dir / name
+        executable.write_text(content, encoding="utf-8")
+        executable.chmod(0o700)
+    env = os.environ.copy()
+    for name in tuple(env):
+        if name.startswith(("CODEX_", "CLOUDRU_", "CLOUD_RU_", "PREVIEW_SSH_")) or name in (
+            "GH_TOKEN",
+            "GITHUB_TOKEN",
+            "GPG_PRIVATE_KEY",
+            "SSH_PRIVATE_KEY",
+            "SSH_KNOWN_HOSTS",
+        ):
+            env.pop(name, None)
+    env.update(
+        {
+            "HOME": str(tmp_path / "home"),
+            "XDG_STATE_HOME": str(tmp_path / "state"),
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            token_variable: "synthetic-caller-secret-token",
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(CREDENTIAL_HELPER.parent / script)],
+        cwd=CREDENTIAL_HELPER.parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "synthetic-caller-secret-token" not in result.stdout + result.stderr
+    assert "configured" in result.stderr
