@@ -185,7 +185,22 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             and volumes[0].get("name") == VOLUME
             and volumes[0].get("type") == "s3"
             and attributes.get("bucketName") == names(project)[1]
-            and not (set(attributes) - {"bucketName", "entrypoint", "tenantId", "region"})
+            and not (
+                set(attributes) - {"bucketName", "entrypoint", "tenantId", "region", "readOnly"}
+            )
+            and (
+                "readOnly" not in attributes
+                or safe_form(
+                    attributes["readOnly"],
+                    (
+                        ("false_boolean", False),
+                        ("false_string", "false"),
+                        ("false_title", "False"),
+                        ("false_upper", "FALSE"),
+                    ),
+                )
+                != "other"
+            )
             and attributes.get("entrypoint", "https://s3.cloud.ru") == "https://s3.cloud.ru"
             and attributes.get("region", "ru-central-1") == "ru-central-1"
         )
@@ -336,13 +351,23 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
                             (
                                 ("omitted_or_null", None),
                                 ("false_string", "false"),
+                                ("false_title", "False"),
+                                ("false_upper", "FALSE"),
+                                ("empty_string", ""),
+                                ("zero_string", "0"),
+                                ("one_string", "1"),
+                                ("zero_number", 0),
+                                ("zero_float", 0.0),
+                                ("true_title", "True"),
+                                ("true_upper", "TRUE"),
                                 ("false_boolean", False),
                                 ("true_string", "true"),
                                 ("true_boolean", True),
                             ),
                         ),
                         "volume_attributes_extra": bool(
-                            set(attributes) - {"bucketName", "entrypoint", "tenantId", "region"}
+                            set(attributes)
+                            - {"bucketName", "entrypoint", "tenantId", "region", "readOnly"}
                         ),
                         "volume_type_form": safe_form(
                             volumes[0].get("type") if len(volumes) == 1 else None,
