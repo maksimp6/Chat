@@ -40,6 +40,12 @@ PROBE_ERROR_CODES = frozenset(
         "browser_probe_timeout",
         "browser_probe_failed",
         "cleanup_failed",
+        "already_exists",
+        "registry_create_failed",
+        "registry_create_timeout",
+        "registry_creation_unconfirmed",
+        "registry_inventory_timeout",
+        "docker_error",
     }
 )
 VALIDATION_FIELDS = frozenset(
@@ -529,7 +535,7 @@ def main():
         if not os.environ.get(name):
             raise CloudProviderError("Missing probe credentials", code="auth_not_configured")
     image = build_image(root, args.sha)
-    if not re.fullmatch(
+    if not isinstance(image, str) or not re.fullmatch(
         re.escape(REGISTRY + ".cr.cloud.ru/" + REPOSITORY) + r"@sha256:[0-9a-f]{64}", image
     ):
         raise CloudProviderError("Invalid probe image digest", code="invalid_response")
@@ -537,13 +543,18 @@ def main():
     print(json.dumps(run_probe(CloudRuContainerAppsClient(), args.sha, image)), flush=True)
 
 
-if __name__ == "__main__":
+def cli():
     try:
         main()
     except CloudProviderError as exc:
         # Do not dump provider responses, build output, credentials or environment.
-        print(json.dumps({"error": exc.code, "http_status": exc.http_status}), flush=True)
-        sys.exit(1)
+        print(json.dumps(probe_error_details(exc)), flush=True)
+        return 1
     except Exception:
         print('{"error":"probe_internal_error"}', flush=True)
-        sys.exit(1)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

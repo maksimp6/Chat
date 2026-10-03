@@ -304,6 +304,62 @@ def test_provider_diagnostics_do_not_mask_failure_with_deep_json():
     }
 
 
+def test_terminal_reporting_keeps_primary_error_safe_after_successful_cleanup(monkeypatch, capsys):
+    apps = Mock()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
+    apps.create.side_effect = CloudProviderError(
+        "message-secret-canary", code="code-secret-canary", http_status="status-secret-canary"
+    )
+    monkeypatch.setattr(probe, "main", lambda: probe.run_probe(apps, SHA, IMAGE))
+    assert probe.cli() == 1
+    output = capsys.readouterr().out
+    assert "secret-canary" not in output
+    events = [json.loads(line) for line in output.splitlines()]
+    assert events[-1] == {"error": "probe_internal_error", "http_status": None}
+    assert {
+        "stage": "container_create",
+        "error": "probe_internal_error",
+        "http_status": None,
+    } in events
+    apps.stop.assert_called_once_with(NAME)
+
+
+@pytest.fixture
+def main_environment(monkeypatch):
+    monkeypatch.setattr(probe.sys, "argv", ["probe", "--sha", SHA])
+    monkeypatch.setattr(probe.subprocess, "check_output", Mock(side_effect=[SHA + "\n", ""]))
+    for name in ("CLOUDRU_PROJECT_ID", "CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET"):
+        monkeypatch.setenv(name, "synthetic-test-value")
+    apps = Mock()
+    monkeypatch.setattr(probe, "CloudRuContainerAppsClient", apps)
+    return apps
+
+
+@pytest.mark.parametrize(
+    "image", ["secret-canary", IMAGE.replace("@sha256:", ":"), IMAGE[:-1], IMAGE.upper(), None, {}]
+)
+def test_main_rejects_invalid_image_before_apps_construction(
+    monkeypatch, main_environment, capsys, image
+):
+    monkeypatch.setattr(probe, "build_image", Mock(return_value=image))
+    with pytest.raises(CloudProviderError) as failure:
+        probe.main()
+    assert failure.value.code == "invalid_response"
+    main_environment.assert_not_called()
+    assert "image_ready" not in capsys.readouterr().out
+
+
+def test_main_logs_and_deploys_valid_digest(monkeypatch, main_environment, capsys):
+    build = Mock(return_value=IMAGE)
+    run = Mock(return_value={"status": "BROWSER_PROBE_PASSED"})
+    monkeypatch.setattr(probe, "build_image", build)
+    monkeypatch.setattr(probe, "run_probe", run)
+    probe.main()
+    run.assert_called_once_with(main_environment.return_value, SHA, IMAGE)
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert {"stage": "image_ready", "image": IMAGE} in events
+
+
 @pytest.mark.parametrize(
     "payload",
     [
