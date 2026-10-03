@@ -576,10 +576,22 @@ def wait_ready(
                 "suspended_product",
             }:
                 fail("rdc_runtime_failed")
+            if str(record.get("status", "")).lower() != "running":
+                sleep(min(2, max(0, deadline - time.monotonic())))
+                continue
+            if time.monotonic() >= deadline:
+                break
             try:
                 result = test_call(apps, "/healthz")
             except CloudProviderError as exc:
-                if exc.http_status not in (404, 502, 503, 504):
+                details = safe_error(exc)
+                starting = (
+                    details.get("error") == "provider_http_error"
+                    and exc.http_status == 499
+                    and details.get("provider_status_code") == 1
+                    and details.get("provider_error_terms") == ["must", "running"]
+                )
+                if exc.http_status not in (404, 502, 503, 504) and not starting:
                     raise
                 result = None
             if result is not None:
@@ -588,7 +600,7 @@ def wait_ready(
                     summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]
                 ):
                     return record, summary
-        sleep(2)
+        sleep(min(2, max(0, deadline - time.monotonic())))
     fail("rdc_readiness_timeout")
 
 
