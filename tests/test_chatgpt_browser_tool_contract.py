@@ -10,11 +10,14 @@ BROWSER_WORKER = ROOT / "deploy" / "chrome-worker"
 
 BROWSER_ROUTES = {
     "/browser/v1/status": "get",
+    "/browser/v1/wake": "post",
+    "/browser/v1/sleep": "post",
     "/browser/v1/navigate": "post",
     "/browser/v1/click": "post",
     "/browser/v1/type": "post",
     "/browser/v1/extract": "post",
     "/browser/v1/screenshot": "post",
+    "/browser/v1/mcp": "post",
 }
 
 
@@ -104,3 +107,23 @@ def test_worker_contract_has_no_raw_cdp_shell_or_arbitrary_eval():
 
     for route in BROWSER_ROUTES:
         assert route in source
+
+
+def test_worker_image_installs_reviewed_russian_ca_bundle():
+    dockerfile = (BROWSER_WORKER / "Dockerfile").read_text(encoding="utf-8")
+    sums = (BROWSER_WORKER / "certificates" / "SHA256SUMS").read_text(
+        encoding="utf-8"
+    )
+
+    assert "COPY certificates/*.crt /usr/local/share/ca-certificates/" in dockerfile
+    assert "update-ca-certificates" in dockerfile
+    assert "russian-trusted-root-ca.crt" in sums
+    assert "russian-trusted-sub-ca.crt" in sums
+
+
+def test_worker_documents_persistent_sleep_wake_and_mcp_contract():
+    readme = (BROWSER_WORKER / "README.md").read_text(encoding="utf-8")
+    assert "/state/profile" in readme
+    assert "POST /browser/v1/sleep" in readme
+    assert "POST /browser/v1/wake" in readme
+    assert "/browser/v1/mcp" in readme

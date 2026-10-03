@@ -20,6 +20,8 @@ unrestricted shell execution.
 ## Stable operations
 
 - `browser_status`: readiness, session identifier and safe page metadata.
+- `wake` / `sleep`: start Chrome on the persistent profile or close it cleanly
+  before Container Apps scales the worker to zero.
 - `navigate`: navigate the active page to an allowed HTTP(S) URL.
 - `click`: click a locator in the active page.
 - `type`: enter text into a locator. Secret values must be supplied through a
@@ -55,11 +57,14 @@ The concrete API may evolve before production, but the first implementation
 should keep a small versioned namespace:
 
 - `GET /browser/v1/status`
+- `POST /browser/v1/wake`
+- `POST /browser/v1/sleep`
 - `POST /browser/v1/navigate`
 - `POST /browser/v1/click`
 - `POST /browser/v1/type`
 - `POST /browser/v1/extract`
 - `POST /browser/v1/screenshot`
+- `POST /browser/v1/mcp` (MCP JSON-RPC adapter for the same operations)
 
 Do not add a catch-all browser proxy. Every externally callable browser operation
 must be explicitly declared in the Gateway contract and covered by authorization,

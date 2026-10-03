@@ -75,6 +75,240 @@
           }
         }
       }
+    },
+    "/browser/v1/status": {
+      "get": {
+        "operationId": "browserStatus",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/wake": {
+      "post": {
+        "operationId": "browserWake",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/sleep": {
+      "post": {
+        "operationId": "browserSleep",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/navigate": {
+      "post": {
+        "operationId": "browserNavigate",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/click": {
+      "post": {
+        "operationId": "browserClick",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/type": {
+      "post": {
+        "operationId": "browserType",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/extract": {
+      "post": {
+        "operationId": "browserExtract",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 30,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/screenshot": {
+      "post": {
+        "operationId": "browserScreenshot",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 10,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
+    },
+    "/browser/v1/mcp": {
+      "post": {
+        "operationId": "browserMcp",
+        "security": [
+          {
+            "BrowserMachineAuth": []
+          }
+        ],
+        "x-cloud-backend": {
+          "$ref": "#/components/x-cloud-backends/ChromeWorker"
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded browser-worker response"
+          },
+          "401": {
+            "description": "Machine authorization required"
+          }
+        },
+        "x-cloud-limit-count": {
+          "count": 10,
+          "time_window": 60,
+          "rejected_code": 429
+        }
+      }
     }
   },
   "components": {
@@ -95,6 +329,31 @@
           "send": 30,
           "read": 300
         }
+      },
+      "ChromeWorker": {
+        "name": "Chrome_Worker",
+        "description": "Private persistent Chrome Worker Container App; ID resolved by operator",
+        "type": "serverless_container",
+        "scheme": "http",
+        "nodes": [
+          {
+            "container_id": "REPLACE_CHROME_WORKER_CONTAINER_APP_UUID",
+            "weight": 1
+          }
+        ],
+        "timeout": {
+          "connect": 10,
+          "send": 30,
+          "read": 120
+        }
+      }
+    },
+    "securitySchemes": {
+      "BrowserMachineAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Dedicated browser-worker bearer credential; never use an Alice session cookie."
       }
     }
   }
