@@ -617,6 +617,26 @@ def test_control_permit_readback_must_match_before_protected_post():
     assert apps.client.timeout == 20 and store._timeout == 30
 
 
+def test_permit_readback_request_obeys_visibility_deadline_and_rejects_late_success():
+    apps, store, clock = apps_with(), private_store(), Clock()
+    apps.client.request.return_value = response(health())
+    download = store.download.side_effect
+
+    def slow_download(name, **kwargs):
+        if name == rdc.CONTROL_FILE:
+            assert store._timeout <= 10 - clock()
+            clock.sleep(store._timeout)
+        return download(name, **kwargs)
+
+    store.download.side_effect = slow_download
+    with pytest.raises(CloudProviderError) as error:
+        rdc.checkpoint(apps, store, object(), tenant=TENANT, clock=clock, sleep=clock.sleep)
+    assert error.value.code == "rdc_control_unconfirmed" and clock() == 10
+    assert apps.client.request.call_count == 1
+    apps.stop.assert_not_called()
+    assert apps.client.timeout == 20 and store._timeout == 30
+
+
 def test_control_visibility_retry_uses_same_permit_and_nonce():
     apps, store, clock = apps_with(), private_store(), Clock()
     apps.client.request.side_effect = [

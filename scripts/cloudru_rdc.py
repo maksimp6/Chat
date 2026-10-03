@@ -623,14 +623,16 @@ def issue_control_permit(apps, store, credentials, deadline, *, clock, sleep):
     store.upload(CONTROL_FILE, content, credentials=credentials)
     visibility_deadline = min(deadline, clock() + 10)
     while clock() < visibility_deadline:
-        cap_timeouts(apps, store, deadline, clock)
+        cap_timeouts(apps, store, visibility_deadline, clock)
         try:
             actual = store.download(CONTROL_FILE, credentials=credentials)
         except StorageObjectNotFound:
             actual = None
+        if clock() >= visibility_deadline:
+            break
         if isinstance(actual, bytes) and len(actual) <= 4096 and actual == content:
             return nonce
-        sleep(min(1, remaining(visibility_deadline, clock)))
+        sleep(min(1, visibility_deadline - clock()))
     fail("rdc_control_unconfirmed")
 
 
