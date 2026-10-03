@@ -230,6 +230,9 @@ class CloudRuContainerAppsClient:
             items.extend(data)
             if "total" in payload:
                 total = payload["total"]
+                # ProtoJSON serializes 64-bit integer counters as decimal strings.
+                if isinstance(total, str) and re.fullmatch(r"0|[1-9][0-9]{0,19}", total):
+                    total = int(total)
                 if (
                     type(total) is not int
                     or total < 0
