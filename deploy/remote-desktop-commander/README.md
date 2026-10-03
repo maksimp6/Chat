@@ -185,6 +185,11 @@ remains `GET /healthz` and `POST /checkpoint`. For an errored service, status re
 at most three revision details within 60 seconds, verifies their resource context,
 and reports only fixed failure categories. It never fetches application logs or
 prints provider reasons, templates or configuration.
+The same diagnostic budget permits one provider `systemLogs` request. At most
+100 returned events are processed, each bound to the owned container UUID;
+truncation is reported explicitly. Only fixed reason codes, terms and counts are
+printed. This never calls the separate application `/logs` endpoint and does not
+authorize any lifecycle operation.
 Cloud.ru may add a global volume `readOnly` attribute. Ownership accepts it only
 when omitted or explicitly disabled (`false` as a boolean, or the exact strings
 `false`, `False`, `FALSE`); empty, null, numeric, enabled and unknown values are

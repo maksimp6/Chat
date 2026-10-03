@@ -1012,6 +1012,91 @@ def resume(apps, store, credentials, *, tenant, http_get=requests.get):
         raise
 
 
+DIAGNOSTIC_TERMS = {
+    "container",
+    "image",
+    "pull",
+    "error",
+    "failed",
+    "permission",
+    "denied",
+    "cannot",
+    "mount",
+    "volume",
+    "bucket",
+    "s3",
+    "state",
+    "read",
+    "write",
+    "readonly",
+    "only",
+    "not",
+    "found",
+    "missing",
+    "invalid",
+    "empty",
+    "mismatch",
+    "unavailable",
+    "timeout",
+    "memory",
+    "cpu",
+    "scheduling",
+    "insufficient",
+    "replica",
+    "revision",
+    "ready",
+    "running",
+    "probe",
+    "liveness",
+    "readiness",
+    "port",
+    "connection",
+    "refused",
+    "registry",
+    "unauthorized",
+    "forbidden",
+    "secret",
+    "credential",
+    "credentials",
+    "token",
+    "authentication",
+    "account",
+    "certificate",
+    "x509",
+    "tls",
+    "ssl",
+    "namespace",
+    "sandbox",
+    "operation",
+    "permitted",
+    "user",
+    "uid",
+    "gid",
+    "root",
+    "node",
+    "exit",
+    "exited",
+    "termination",
+    "terminated",
+    "backoff",
+    "config",
+    "configuration",
+    "storage",
+    "quota",
+    "exceeded",
+    "access",
+    "argument",
+    "arguments",
+}
+
+
+def diagnostic_terms(value):
+    if not isinstance(value, str) or len(value) > 8192:
+        return []
+    value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    return sorted(set(re.findall(r"[a-z0-9]+", value.lower())) & DIAGNOSTIC_TERMS)
+
+
 def revision_diagnostics(apps, record, *, clock=time.monotonic):
     """Bounded provider revision metadata only; never application logs or raw reasons."""
     deadline = clock() + 60
@@ -1068,8 +1153,18 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
             }:
                 state = "other"
             reason = detail.get("statusReason")
-            if not isinstance(reason, str) or len(reason) > 8192:
-                reason = ""
+            if "statusReason" not in detail:
+                reason_form = "missing"
+            elif reason is None:
+                reason_form = "null"
+            elif not isinstance(reason, str):
+                fail("invalid_response")
+            elif len(reason) > 8192:
+                reason_form = "oversize"
+            else:
+                reason_form = "text" if reason else "empty"
+            reason = reason if reason_form == "text" else ""
+            terms = diagnostic_terms(reason)
             reason = reason.lower()
             patterns = {
                 "image_pull": ("imagepullbackoff", "errimagepull", "image pull", "pull image"),
@@ -1097,10 +1192,84 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
                         "revision_id": identifier,
                         "resource_state": state,
                         "reason_categories": categories or ["other"],
+                        "reason_form": reason_form,
+                        "reason_terms": terms,
                     }
                 ),
                 flush=True,
             )
+        payload = read(
+            f"/v2/containers/{name}/systemLogs",
+            {"projectId": apps.project_id, "serverlessId": record["id"]},
+        )
+        data = payload.get("data")
+        if not isinstance(data, list):
+            fail("invalid_response")
+        events = data[:100]
+        if any(
+            not isinstance(event, dict) or event.get("serverlessId") != record["id"]
+            for event in events
+        ):
+            fail("invalid_response")
+        known_reasons = {
+            "FailedMount",
+            "Failed",
+            "BackOff",
+            "ImagePullBackOff",
+            "ErrImagePull",
+            "CrashLoopBackOff",
+            "CreateContainerConfigError",
+            "RunContainerError",
+            "FailedScheduling",
+            "FailedCreate",
+            "SandboxChanged",
+            "FailedKillPod",
+            "FailedCreatePodSandBox",
+            "Unhealthy",
+            "OOMKilled",
+            "Evicted",
+            "ProgressDeadlineExceeded",
+            "ContainerCreating",
+            "Ready",
+            "Pulling",
+            "Pulled",
+            "Created",
+            "Started",
+            "Killing",
+            "Scheduled",
+            "SuccessfulCreate",
+            "SuccessfulDelete",
+            "ScalingReplicaSet",
+            "FailedAttachVolume",
+            "FailedMapVolume",
+            "FailedBinding",
+            "FailedProvisioning",
+            "ProvisioningFailed",
+            "VolumeMountError",
+            "ImagePullError",
+            "ContainerCreationFailed",
+            "RevisionFailed",
+            "DeploymentError",
+        }
+        reasons = set()
+        terms = set()
+        for event in events:
+            reason = event.get("reason")
+            reasons.add(reason if isinstance(reason, str) and reason in known_reasons else "other")
+            terms.update(diagnostic_terms(reason))
+            terms.update(diagnostic_terms(event.get("message")))
+        print(
+            json.dumps(
+                {
+                    "stage": "rdc_system_event_diagnostic",
+                    "events_examined": len(events),
+                    "response_truncated": len(data) > 100,
+                    "known_reasons": sorted(reasons),
+                    "event_terms": sorted(terms),
+                }
+            ),
+            flush=True,
+        )
     finally:
         apps.client.timeout = previous_timeout
 
