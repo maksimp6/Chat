@@ -91,6 +91,7 @@ jobs:
           run_node tests/test_frontend_smoke.js env NODE_V8_COVERAGE=coverage-js
           run_node tests/test_browser_self_test_runner.js env NODE_V8_COVERAGE=coverage-js
           run_node tests/test_frontend_runtime_safety.js env
+          run_node tests/test_pets.js env
           run_node tests/test_system_status.js env
           run_node tests/test_ui_action_contract.js env
           run_node tests/test_real_header_actions.js env

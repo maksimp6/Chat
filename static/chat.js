@@ -5,6 +5,7 @@ function renderApprovalCard(toolCall, origMsg) {
   const card = document.createElement("div");
   card.className = "msg bot approval-card";
 
+  const approvalConversationId = currentConvId;
   const paramsStr = JSON.stringify(toolCall.arguments, null, 2);
   const heading = document.createElement("div");
   heading.className = "approval-card-title";
@@ -45,7 +46,10 @@ function renderApprovalCard(toolCall, origMsg) {
   chatbox.appendChild(card);
   chatbox.scrollTop = chatbox.scrollHeight;
 
+  const finishWaiting = window.AlicePets ? window.AlicePets.begin("waiting") : function () {};
   approveBtn.addEventListener("click", function () {
+    finishWaiting();
+    const finishPet = window.AlicePets ? window.AlicePets.begin("running") : function () {};
     card.classList.add("is-executing");
     card.replaceChildren(document.createTextNode("Выполняется..."));
     var approvalPayload = {
@@ -70,6 +74,11 @@ function renderApprovalCard(toolCall, origMsg) {
       .then((result) => {
         const data = result.data || {};
         card.remove();
+        if (currentConvId !== approvalConversationId) {
+          finishPet();
+          return;
+        }
+        finishPet(result.ok && (data.reply || data.requires_approval) ? "success" : "failed");
         if (data.requires_approval) {
           renderApprovalCard(data.tool_call, origMsg);
         } else if (data.reply) {
@@ -102,12 +111,15 @@ function renderApprovalCard(toolCall, origMsg) {
         }
       })
       .catch(() => {
+        finishPet("failed");
         card.remove();
+        if (currentConvId !== approvalConversationId) return;
         addMessage("Сетевая ошибка при выполнении действия", "bot", false, 0);
       });
   });
 
   rejectBtn.addEventListener("click", function () {
+    finishWaiting();
     card.remove();
     addMessage(`⛔ Действие "${toolCall.name}" отклонено пользователем.`, "bot", true, 0);
   });
@@ -450,6 +462,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
 }
 
 function loadHistory(convId) {
+  if (window.AlicePets) window.AlicePets.reset();
   const chatbox = document.getElementById("chatbox");
   if (!chatbox) return;
   chatbox.replaceChildren();
@@ -514,7 +527,9 @@ document.addEventListener("DOMContentLoaded", function () {
     addMessage(text, "user", false, 0);
     const params =
       typeof window.getResponsesParams === "function" ? window.getResponsesParams() : {};
+    const requestConversationId = currentConvId;
     const t0 = performance.now();
+    const finishPet = window.AlicePets ? window.AlicePets.begin("running") : function () {};
 
     window.AliceDispatcher.request("/api/chat", {
       method: "POST",
@@ -532,7 +547,12 @@ document.addEventListener("DOMContentLoaded", function () {
       })
       .then((result) => {
         const data = result.data || {};
+        if (currentConvId !== requestConversationId) {
+          finishPet();
+          return;
+        }
         const clientTotalMs = Math.round(performance.now() - t0);
+        finishPet(result.ok && (data.reply || data.requires_approval) ? "success" : "failed");
         if (data.title && Array.isArray(conversations)) {
           var conversation = conversations.find(function (item) {
             return item.id === currentConvId;
@@ -543,7 +563,9 @@ document.addEventListener("DOMContentLoaded", function () {
             if (typeof renderSidebar === "function") renderSidebar();
           }
         }
-        if (data.reply) {
+        if (data.requires_approval) {
+          renderApprovalCard(data.tool_call, text);
+        } else if (data.reply) {
           addMessage(
             data.reply,
             "bot",
@@ -582,6 +604,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       })
       .catch((e) => {
+        finishPet("failed");
+        if (currentConvId !== requestConversationId) return;
         addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "bot", false, 0);
       });
   }

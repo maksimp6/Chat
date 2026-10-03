@@ -206,6 +206,7 @@ function handleHistoryNavigation(event) {
   if (convId && convId !== currentConvId) {
     selectConv(convId, false);
   } else if (!convId && currentConvId) {
+    if (window.AlicePets) window.AlicePets.reset();
     currentConvId = null;
     localStorage.removeItem("current_conv_id");
     var chatbox = document.getElementById("chatbox");

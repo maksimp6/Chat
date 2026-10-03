@@ -1,0 +1,42 @@
+.alice-pro-app .alice-pet {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 65px;
+  padding: 0 14px;
+  color: var(--text-secondary);
+}
+.alice-pro-app .alice-pet[hidden] {
+  display: none;
+}
+.alice-pro-app .alice-pet-button {
+  flex: 0 0 60px;
+  width: 60px;
+  height: 65px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.alice-pro-app .alice-pet-button:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+.alice-pro-app .alice-pet-sprite {
+  display: block;
+  width: 60px;
+  height: 65px;
+  background-size: 480px 715px;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.alice-pro-app .alice-pet-label {
+  font-size: 12px;
+}
+@media (max-height: 480px) {
+  .alice-pro-app .alice-pet {
+    display: none;
+  }
+}
