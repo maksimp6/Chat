@@ -118,11 +118,19 @@ def order_create(
     }
     data["status"] = status
     data["source"] = "alice"
-    quote_input = _quote_input(arguments.get("quote") or {})
-    if quote_input:
+    raw_quote = arguments.get("quote")
+    if raw_quote is not None:
+        quote_input = _quote_input(raw_quote)
         missing = [key for key in QUOTE_REQUIRED_FIELDS if key not in quote_input]
         if missing:
             raise ValueError(f"quote is missing: {', '.join(missing)}")
+        order_currency = data.get("currency")
+        quote_currency = quote_input.get("currency")
+        if order_currency and quote_currency and order_currency != quote_currency:
+            raise ValueError("order currency and quote currency differ")
+        currency = order_currency or quote_currency
+        if currency:
+            data["currency"] = quote_input["currency"] = currency
         data["quote"] = quote_input
     return {"order": create_order(_trusted_owner(cfg), data)}
 

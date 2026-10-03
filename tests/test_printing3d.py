@@ -265,6 +265,39 @@ def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
         )
 
 
+@pytest.mark.parametrize(
+    "empty_quote",
+    [{}, {"material_grams": None, "material_cost_per_kg": None, "print_hours": None}],
+)
+def test_order_create_tool_rejects_empty_or_all_null_quote(printing_db, empty_quote):
+    from printing3d.tools import order_create
+
+    with pytest.raises(ValueError, match="quote is missing"):
+        order_create({"title": "X", "status": "accepted", "quote": empty_quote}, {})
+
+
+def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db):
+    from printing3d.tools import order_create
+
+    class Call:
+        user_id = "trusted-owner"
+
+    cfg = {"_universal_context": {"call": Call()}}
+    quote_args = {"material_grams": 80, "material_cost_per_kg": 20, "print_hours": 3}
+
+    order = order_create({"title": "EUR order", "currency": "EUR", "quote": quote_args}, cfg)[
+        "order"
+    ]
+    assert order["currency"] == "EUR"
+    assert order["quote"]["currency"] == "EUR"
+
+    with pytest.raises(ValueError, match="currency"):
+        order_create(
+            {"title": "X", "currency": "EUR", "quote": {**quote_args, "currency": "RUB"}},
+            {},
+        )
+
+
 def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     from printing3d import create_order, settle_order
     from printing3d.tools import treasury_summary
