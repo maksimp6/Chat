@@ -473,11 +473,31 @@
       })
       .join("");
 
+    var pets = window.AlicePets;
+    var petOptions = '<option value="none">Без питомца</option>';
+    if (pets) {
+      petOptions += pets.catalog
+        .map(function (pet) {
+          return (
+            '<option value="' +
+            UI.escapeHtml(pet.id) +
+            '">' +
+            UI.escapeHtml(pet.name + " — " + pet.description) +
+            "</option>"
+          );
+        })
+        .join("");
+    }
     var tabTheme = [
       '<div id="tab-theme" class="llm-tab-content" style="display:none;">',
       UI.section("Цветовая схема"),
       UI.lbl("Схема интерфейса"),
       UI.sel("set-theme", themeOptions),
+      pets
+        ? UI.section("Питомцы") +
+          '<label for="set-pet">Питомец рядом с чатом</label>' +
+          UI.sel("set-pet", petOptions)
+        : "",
       '<div style="margin-top:10px;color:var(--m-muted,#666);font-size:12px;line-height:1.5;">',
       "Выбор сохраняется локально на устройстве и не передаётся модели. Переключатель в шапке циклически меняет схемы.",
       "</div>",
@@ -524,6 +544,14 @@
         if (target) target.style.display = "block";
       });
     });
+
+    var petSelect = document.getElementById("set-pet");
+    if (petSelect && pets) {
+      petSelect.value = pets.getSelected();
+      petSelect.addEventListener("change", function () {
+        pets.select(this.value);
+      });
+    }
 
     var themeSelect = document.getElementById("set-theme");
     if (themeSelect) {

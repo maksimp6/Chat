@@ -9,6 +9,7 @@
     <title>Alice Pro</title>
     {% set static_root = (preview_base_path ~ "/static") if preview_base_path else "/static" %}
     <link rel="stylesheet" href="{{ static_root }}/style.css?v={{ static_version }}" />
+    <link rel="stylesheet" href="{{ static_root }}/pets.css?v={{ static_version }}" />
     <link
       rel="icon"
       type="image/svg+xml"
@@ -43,6 +44,7 @@
       defer
       data-critical-script="core"
     ></script>
+    <script src="{{ static_root }}/pets.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/system_status.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/file_manager.js?v={{ static_version }}" defer></script>
     <script src="{{ static_root }}/treasury.js?v={{ static_version }}" defer></script>
@@ -309,6 +311,17 @@
           {% else %}
           <div class="empty-state">Начните диалог или выберите модель</div>
           {% endif %}
+        </div>
+        <div id="alice-pet" class="alice-pet" data-static-root="{{ static_root }}" hidden>
+          <span class="alice-pet-label"></span>
+          <button
+            type="button"
+            class="alice-btn alice-pet-button"
+            aria-label="Поприветствовать Плюша"
+            title="Поприветствовать Плюша"
+          >
+            <span class="alice-pet-sprite" aria-hidden="true"></span>
+          </button>
         </div>
         <div id="voice-ui">
           <canvas id="waveform"></canvas>

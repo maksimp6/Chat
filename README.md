@@ -19,6 +19,16 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
 - **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
 
+## Питомцы
+
+![Плюш — анимированный плюшевый дракон](docs/assets/pets/plush.gif)
+
+**Плюш** — мягкий, немного неуклюжий дракон из недорогого плюша. Он живёт рядом со строкой ввода: думает во время запроса, ждёт подтверждения инструмента, радуется готовому ответу и реагирует на ошибки. Нажмите на него, чтобы поздороваться.
+
+Выбор: **Настройки → Оформление → Питомцы → Плюш / Без питомца**. Настройка сохраняется на устройстве и не передаётся модели. Анимация учитывает системное уменьшение движения и приостанавливается в скрытой вкладке.
+
+Плюш — первый питомец в каталоге. Изображения хранятся в репозитории; подключение к ChatGPT для работы питомца не требуется. Подробнее: [модуль питомцев](docs/frontend/pets.md).
+
 ## Architecture
 
 ```mermaid
@@ -121,6 +131,7 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 ## Documentation map
 
 - [Documentation index](docs/README.md)
+- [Питомцы](docs/frontend/pets.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Integration coordination](docs/architecture/integration-coordination.md)
 - [Current scope](docs/integration/current-scope.md)
