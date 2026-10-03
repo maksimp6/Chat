@@ -881,11 +881,20 @@ def test_global_writable_does_not_override_readonly_mount():
         rdc.owned_record(apps_with(item), tenant=TENANT)
 
 
+def transport_error(grpc_code=3):
+    response_value = requests.Response()
+    response_value.status_code = 400
+    response_value._content = json.dumps({"code": grpc_code}).encode()
+    error = CloudProviderError("private", code="provider_http_error", http_status=400)
+    try:
+        raise error from requests.HTTPError(response=response_value)
+    except CloudProviderError as caught:
+        return caught
+
+
 def test_health_compatibility_fallback_is_fixed_and_shares_timeout(monkeypatch, capsys):
     apps = apps_with()
-    original = CloudProviderError(
-        "private provider message", code="provider_http_error", http_status=400
-    )
+    original = transport_error()
     timeouts = []
 
     def call(*_args, **_kwargs):
@@ -914,6 +923,7 @@ def test_health_compatibility_fallback_is_fixed_and_shares_timeout(monkeypatch, 
         "stage": "rdc_health_compatibility",
         "error": "provider_http_error",
         "http_status": 400,
+        "provider_status_code": 3,
     }
 
 
@@ -952,7 +962,7 @@ def test_runtime_400_never_uses_transport_fallback():
 
 def test_health_fallback_does_not_extend_expired_timeout(monkeypatch):
     apps = apps_with()
-    original = CloudProviderError("private", code="provider_http_error", http_status=400)
+    original = transport_error()
     apps.client.request.side_effect = original
     ticks = iter([10, 31])
     monkeypatch.setattr(rdc.time, "monotonic", lambda: next(ticks))
@@ -1008,3 +1018,13 @@ def test_status_reports_only_verified_service_and_known_resource_state(capsys):
         "container_id": IDENTIFIER,
         "resource_state": "other",
     }
+
+
+@pytest.mark.parametrize("grpc_code", [7, 16, None, "3", True, 2, 99])
+def test_http400_authorization_or_unknown_grpc_never_fallback(grpc_code):
+    apps = apps_with()
+    apps.client.request.side_effect = transport_error(grpc_code)
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps, "/healthz")
+    assert apps.client.request.call_count == 1
+    assert apps.client.timeout == 20

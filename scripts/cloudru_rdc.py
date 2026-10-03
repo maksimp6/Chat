@@ -480,7 +480,10 @@ def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
                 or exc.http_status != 400
             ):
                 raise
-            print(json.dumps({"stage": "rdc_health_compatibility", **safe_error(exc)}), flush=True)
+            diagnostic = safe_error(exc)
+            if diagnostic.get("provider_status_code") != 3:
+                raise
+            print(json.dumps({"stage": "rdc_health_compatibility", **diagnostic}), flush=True)
             remaining_timeout = deadline - time.monotonic()
             if remaining_timeout <= 0:
                 raise

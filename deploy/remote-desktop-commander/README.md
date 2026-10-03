@@ -176,7 +176,7 @@ Ownership checks compare any returned managed-mount tenant ID with this exact
 configured tenant before operating on the service.
 `status` reports the verified service name/UUID and a fixed provider state before
 checking runtime health; this identity diagnostic does not claim RDC is ready.
-If the colon `testCall` API returns transport HTTP 400 for `GET /healthz`, the
+If the colon `testCall` API returns transport HTTP 400 with verified gRPC code 3 for `GET /healthz`, the
 runner tries the documented slash route within the same request timeout. This
 compatibility path is read-only: checkpoint always requires the colon route
 and its nonce header. Reading health does not prove checkpoint support.
