@@ -102,17 +102,60 @@ def build_image(root, sha):
         ).pinned
 
 
-def verify_with_budget(*args):
+def with_budget(operation, *args, code):
     def expired(_signum, _frame):
-        raise CloudProviderError("Probe exceeded 30 seconds", code="browser_probe_timeout")
+        raise CloudProviderError("Probe phase exceeded 30 seconds", code=code)
 
     previous = signal.signal(signal.SIGALRM, expired)
     signal.setitimer(signal.ITIMER_REAL, 30)
     try:
-        return verify_probe(*args)
+        return operation(*args)
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)
+
+
+def verify_with_budget(*args):
+    return with_budget(verify_probe, *args, code="browser_probe_timeout")
+
+
+def wait_for_probe(apps, name):
+    """Creation is asynchronous: an empty inventory is not a terminal result."""
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        identifier = find_probe(apps, name)
+        if identifier is not None:
+            return identifier
+        time.sleep(1)
+    raise CloudProviderError("Probe identity still unavailable", code="probe_identity_timeout")
+
+
+def stop_probe(apps, name, identifier, image):
+    # Recovery gets its own budget, including after an ambiguous create error.
+    # Never interpret expiry as proof that the asynchronous create did not commit.
+    identifier = identifier or wait_for_probe(apps, name)
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        current = apps.get(name)
+        if current is None:
+            time.sleep(1)
+            continue
+        containers = (current.get("template") or {}).get("containers") or []
+        if (
+            current.get("name") != name
+            or current.get("id") != identifier
+            or current.get("description") != DESCRIPTION
+            or not containers
+            or containers[0].get("image") != image
+        ):
+            raise CloudProviderError("Cannot prove probe ownership", code="cleanup_failed")
+        apps.stop(name)
+        print(
+            json.dumps({"probe_stop_requested": True, "container_id": identifier}),
+            flush=True,
+        )
+        return
+    raise CloudProviderError("Probe detail still unavailable", code="cleanup_failed")
 
 
 def verify_probe(apps, name, identifier, image, *, http_get=requests.get, sleep=time.sleep):
@@ -181,9 +224,7 @@ def run_probe(apps, sha, image):
                 env={"ALICE_RDC_MODE": "cloud-probe", "PORT": "8080"},
             )
         )
-        identifier = find_probe(apps, name)
-        if identifier is None:
-            raise CloudProviderError("Probe identity unavailable", code="invalid_response")
+        identifier = with_budget(wait_for_probe, apps, name, code="probe_identity_timeout")
         print('{"stage":"browser_verify"}', flush=True)
         verify_with_budget(apps, name, identifier, image)
         return {
@@ -194,23 +235,16 @@ def run_probe(apps, sha, image):
         }
     finally:
         if attempted:
-            identifier = identifier or find_probe(apps, name)
-            if identifier is not None:
-                current = apps.get(name) or {}
-                containers = (current.get("template") or {}).get("containers") or []
-                if (
-                    current.get("name") != name
-                    or current.get("id") != identifier
-                    or current.get("description") != DESCRIPTION
-                    or not containers
-                    or containers[0].get("image") != image
-                ):
-                    raise CloudProviderError("Cannot prove probe ownership", code="cleanup_failed")
-                apps.stop(name)
+            try:
+                with_budget(stop_probe, apps, name, identifier, image, code="cleanup_failed")
+            except Exception as exc:
                 print(
-                    json.dumps({"probe_stop_requested": True, "container_id": identifier}),
+                    json.dumps({"probe_cleanup_unconfirmed": True, "container_name": name}),
                     flush=True,
                 )
+                raise CloudProviderError(
+                    "Probe may still appear or run; inspect before retry", code="cleanup_failed"
+                ) from exc
 
 
 def main():

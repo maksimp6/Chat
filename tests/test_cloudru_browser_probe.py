@@ -88,6 +88,91 @@ def test_ambiguous_create_timeout_stops_only_verified_owned_probe():
     apps.stop.assert_called_once_with(NAME)
 
 
+@pytest.fixture
+def clock(monkeypatch):
+    now = [0.0]
+
+    def sleep(seconds):
+        now[0] += seconds
+
+    monkeypatch.setattr(probe.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(probe.time, "sleep", sleep)
+    return now
+
+
+def test_async_create_waits_for_inventory_before_verification(monkeypatch, clock):
+    apps = Mock()
+    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}]]
+    apps.get.return_value = owned()
+    verify = Mock()
+    monkeypatch.setattr(probe, "verify_probe", verify)
+    assert probe.run_probe(apps, SHA, IMAGE)["status"] == "BROWSER_PROBE_PASSED"
+    assert clock[0] == 2
+    apps.create.assert_called_once()
+    verify.assert_called_once_with(apps, NAME, ID, IMAGE)
+    apps.stop.assert_called_once_with(NAME)
+
+
+def test_ambiguous_create_waits_for_delayed_inventory_and_detail(clock):
+    apps = Mock()
+    apps.create.side_effect = CloudProviderError("ambiguous", code="provider_http_error")
+    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}]]
+    apps.get.side_effect = [None, None, owned()]
+    with pytest.raises(CloudProviderError, match="ambiguous"):
+        probe.run_probe(apps, SHA, IMAGE)
+    assert clock[0] == 4
+    apps.create.assert_called_once()
+    apps.stop.assert_called_once_with(NAME)
+
+
+def test_discovery_timeout_still_waits_and_stops_late_resource(monkeypatch, clock):
+    apps = Mock()
+    apps.list.side_effect = [[]] * 33 + [[{"name": NAME, "id": ID}]]
+    apps.get.return_value = owned()
+    verify = Mock()
+    monkeypatch.setattr(probe, "verify_probe", verify)
+    with pytest.raises(CloudProviderError) as failure:
+        probe.run_probe(apps, SHA, IMAGE)
+    assert failure.value.code == "probe_identity_timeout"
+    assert clock[0] == 32
+    verify.assert_not_called()
+    apps.stop.assert_called_once_with(NAME)
+
+
+@pytest.mark.parametrize("create_error", [False, True])
+def test_missing_resource_is_unconfirmed_cleanup_not_success(create_error, clock, capsys):
+    apps = Mock()
+    apps.list.return_value = []
+    if create_error:
+        apps.create.side_effect = CloudProviderError("ambiguous", code="provider_http_error")
+    with pytest.raises(CloudProviderError) as failure:
+        probe.run_probe(apps, SHA, IMAGE)
+    assert failure.value.code == "cleanup_failed"
+    assert clock[0] == (30 if create_error else 60)
+    output = capsys.readouterr().out
+    assert '"probe_cleanup_unconfirmed": true' in output
+    assert NAME in output
+    assert "BROWSER_PROBE_PASSED" not in output
+    apps.stop.assert_not_called()
+
+
+def test_cleanup_wall_clock_budget_reports_unconfirmed_resource(monkeypatch, capsys):
+    apps = Mock()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
+    monkeypatch.setattr(probe, "verify_probe", Mock())
+
+    def stalled_get(_name):
+        probe.signal.raise_signal(probe.signal.SIGALRM)
+
+    apps.get.side_effect = stalled_get
+    with pytest.raises(CloudProviderError) as failure:
+        probe.run_probe(apps, SHA, IMAGE)
+    assert failure.value.code == "cleanup_failed"
+    assert probe.signal.getitimer(probe.signal.ITIMER_REAL) == (0, 0)
+    assert '"probe_cleanup_unconfirmed": true' in capsys.readouterr().out
+    apps.stop.assert_not_called()
+
+
 def test_cleanup_refuses_resource_with_unexpected_image(monkeypatch):
     apps = Mock()
     apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
