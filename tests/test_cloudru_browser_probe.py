@@ -196,6 +196,63 @@ def test_unknown_or_partial_registry_inventory_never_creates(payload):
     assert registry.client.request.call_count == 1
 
 
+def test_registry_diagnostic_exposes_structure_without_provider_values(capsys):
+    secret = "provider-secret-canary"
+    registry = Mock(project_id="project")
+    registry.client.request.return_value = {
+        "data": {"items": [{"name": secret}], "total": "1", secret: secret},
+        "nextPageToken": secret,
+        secret: secret,
+    }
+    with pytest.raises(CloudProviderError):
+        probe.prepare_registry(registry)
+    output = capsys.readouterr().out
+    assert secret not in output
+    assert '"stage": "registry_response_shape"' in output
+    assert '"items": {"type": "array", "length": 1}' in output
+    assert '"total": {"type": "string", "empty": false, "zero": false}' in output
+    assert registry.client.request.call_count == 1
+
+
+@pytest.mark.parametrize("value,kind", [(0, "integer"), (False, "boolean"), (None, "null")])
+def test_registry_diagnostic_distinguishes_counter_types(value, kind):
+    result = probe.registry_response_shape({"total": value})
+    assert result["fields"]["total"]["type"] == kind
+
+
+@pytest.mark.parametrize("payload", [{"registries": [], "totalCount": "0"}, {"totalCount": 0}])
+def test_registry_uses_official_project_scoped_list_and_create_routes(payload):
+    registry = Mock(project_id=ID)
+    registry.client.request.return_value = payload
+    probe.prepare_registry(registry)
+    calls = registry.client.request.call_args_list
+    assert calls[0].args == ("artifact_registry", "GET", f"/v1/projects/{ID}/registries")
+    assert calls[0].kwargs == {"params": {"pageSize": 100}}
+    assert calls[1].args == ("artifact_registry", "POST", f"/v1/projects/{ID}/registries")
+    assert calls[1].kwargs == {
+        "json_body": {"name": probe.REGISTRY, "isPublic": False, "registryType": "DOCKER"}
+    }
+
+
+@pytest.mark.parametrize("total", [True, -1, "-1", "01", "secret", 1.0, 1 << 63, 2])
+def test_registry_total_count_must_prove_complete_inventory(total):
+    registry = Mock(project_id=ID)
+    registry.client.request.return_value = {"registries": [], "totalCount": total}
+    with pytest.raises(CloudProviderError):
+        probe.prepare_registry(registry)
+    assert registry.client.request.call_count == 1
+
+
+def test_existing_private_registry_is_reused_without_creation():
+    registry = Mock(project_id=ID)
+    registry.client.request.return_value = {
+        "registries": [{"name": probe.REGISTRY, "isPublic": False, "registryType": "DOCKER"}],
+        "totalCount": "1",
+    }
+    probe.prepare_registry(registry)
+    assert registry.client.request.call_count == 1
+
+
 def test_readiness_requires_expected_image_and_exact_static_response():
     apps = Mock()
     apps.get.return_value = {

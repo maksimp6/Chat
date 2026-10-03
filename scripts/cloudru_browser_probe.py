@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 import requests
@@ -27,6 +27,42 @@ from scripts.cloudru_deploy import _export_commit  # noqa: E402
 REGISTRY = "alice-rdc-probe"
 REPOSITORY = "chromium-probe"
 DESCRIPTION = "Alice RDC browser compatibility probe; no OAuth or user data"
+
+
+def registry_response_shape(payload):
+    """Only fixed field names, JSON types and counts; never echo provider values."""
+    fields = (
+        "registries",
+        "items",
+        "data",
+        "result",
+        "results",
+        "total",
+        "count",
+        "totalCount",
+        "total_count",
+        "nextPageToken",
+        "next_page_token",
+        "pagination",
+    )
+
+    def shape(value, depth=0):
+        if isinstance(value, dict):
+            result = {"type": "object", "field_count": len(value)}
+            if depth < 2:
+                result["fields"] = {k: shape(value[k], depth + 1) for k in fields if k in value}
+            return result
+        if isinstance(value, list):
+            return {"type": "array", "length": len(value)}
+        if type(value) is int:
+            return {"type": "integer", "zero": value == 0}
+        if isinstance(value, str):
+            return {"type": "string", "empty": value == "", "zero": value == "0"}
+        if value is None:
+            return {"type": "null"}
+        return {"type": "boolean" if isinstance(value, bool) else "unknown"}
+
+    return shape(payload)
 
 
 def find_probe(apps, name):
@@ -45,11 +81,25 @@ def find_probe(apps, name):
 
 def prepare_registry(registry):
     # Do not interpret an unfamiliar response as permission to create a resource.
+    # Official Cloud.ru MCP client uses project-scoped routes for both operations:
+    # github.com/cloud-ru/mcp-servers/blob/master/mcp-artifact-registry/server.py
+    path = f"/v1/projects/{quote(registry.project_id, safe='')}/registries"
     print('{"stage":"registry_inventory"}', flush=True)
-    payload = registry.client.request(
-        "artifact_registry", "GET", "/v1/registries", params={"projectId": registry.project_id}
+    payload = registry.client.request("artifact_registry", "GET", path, params={"pageSize": 100})
+    print(
+        json.dumps({"stage": "registry_response_shape", "shape": registry_response_shape(payload)}),
+        flush=True,
     )
+    counters = [payload[k] for k in ("totalCount", "total") if k in payload]
+    total = counters[0] if len(counters) == 1 else None
+    if isinstance(total, str) and re.fullmatch(r"0|[1-9][0-9]{0,18}", total):
+        total = int(total)
+    if counters and (len(counters) != 1 or type(total) is not int or not 0 <= total < 1 << 63):
+        raise CloudProviderError("Invalid registry total", code="invalid_response")
     collections = [payload[k] for k in ("registries", "items", "data") if k in payload]
+    # ProtoJSON may omit an empty repeated field; require an explicit zero count.
+    if not collections and total == 0:
+        collections = [[]]
     if (
         len(collections) != 1
         or not isinstance(collections[0], list)
@@ -59,7 +109,7 @@ def prepare_registry(registry):
     ):
         raise CloudProviderError("Registry inventory incomplete", code="invalid_response")
     items = collections[0]
-    if "total" in payload and str(payload["total"]) != str(len(items)):
+    if total is not None and total != len(items):
         raise CloudProviderError("Registry inventory incomplete", code="invalid_response")
     matches = [item for item in items if item.get("name") == REGISTRY]
     if matches:
@@ -76,9 +126,8 @@ def prepare_registry(registry):
     registry.client.request(
         "artifact_registry",
         "POST",
-        "/v1/registries",
+        path,
         json_body={
-            "projectId": registry.project_id,
             "name": REGISTRY,
             "isPublic": False,
             "registryType": "DOCKER",
