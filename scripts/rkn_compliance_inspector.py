@@ -69,16 +69,15 @@ def inspect(root: Path = ROOT) -> dict:
         # No password hashing implementation is currently evidenced by the
         # dependency manifests. Authentication may be delegated, so this is
         # unknown rather than fail.
-        password_known = any(name in requirements for name in ("argon2", "bcrypt", "passlib"))
+        password_hashers = ("argon2", "bcrypt", "passlib")
+        password_known = any(hasher in requirements for hasher in password_hashers)
 
         return {
             "version": 1,
             "controls": {
                 "password_storage": _control(
                     "pass" if password_known else "unknown",
-                    ["requirements.txt: password hashing dependency"]
-                    if password_known
-                    else [],
+                    ["requirements.txt: password hashing dependency"] if password_known else [],
                 ),
                 "backup_restore": _control(
                     "pass" if len(backup_evidence) == 2 else "unknown",
@@ -95,9 +94,7 @@ def inspect(root: Path = ROOT) -> dict:
                 "tls_public_endpoint": _control("unknown", []),
             },
             "external_services": sorted(set(external)),
-            "evidence": sorted(
-                set(backup_evidence + redaction_evidence + retention_evidence)
-            ),
+            "evidence": sorted(set(backup_evidence + redaction_evidence + retention_evidence)),
         }
     finally:
         ROOT = old_root

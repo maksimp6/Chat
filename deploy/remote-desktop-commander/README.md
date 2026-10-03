@@ -97,6 +97,174 @@ in the official dashboard when requested. No automatic logout, deletion, or
 revocation is part of deployment.
 # Protected server pairing redirect
 
+## Cloud.ru compatibility probe
+
+The registry API contract is taken from the checksum-verified official
+[Terraform provider v2.1.3](https://github.com/cloud-ru/evo-terraform/releases/tag/v2.1.3)
+(`linux_amd64` SHA256 `41b14bbf195131364d58d3f5d33face1d7f151d6b4ca6175bf6b0f6b83ede5a7`).
+Its embedded protobuf descriptors use `/v1/registries` with `projectId`,
+`registries`/`nextPageToken` pagination, and an asynchronous creation operation.
+The probe accepts omitted or null empty collections and omitted private/Docker
+defaults according to [ProtoJSON](https://protobuf.dev/programming-guides/json/),
+rejects unknown response envelopes, and waits for the specific operation and
+registry to become ready before image push. Registry reads and creation readiness
+have separate 30-second budgets. The project-scoped route in the older public MCP
+example returned HTTP 404 against the live service.
+
+Probe health and cleanup ownership use the complete project container inventory,
+matching the resource UUID, name, description and digest. This uses the list route
+already verified in the live project; incomplete ownership data stops cleanup with
+an explicit error. The stop operation remains the name-based v2 action documented
+by the [Container Apps client](https://github.com/Nick1994209/cloudru-containerapps-mcp/blob/1c5fab2028f13991c52338fee6c1ae9ad719073f/internal/application/cloudru/containerapps.go).
+
+The manual **Cloud.ru browser compatibility probe** workflow runs only from
+protected `master` using the existing production IAM pair. It exports that exact
+commit, builds the RDC image, pushes it to the dedicated private `alice-rdc-probe`
+registry, and creates a separate `rdc-<12-hex-sha>` Container App pinned by
+digest. This creates billable registry/image storage and brief container usage.
+The probe uses scale 0–1 and requests a stop in cleanup; it does not delete the
+image or container. A failed stop is a failure, and a stop request alone is not
+confirmation that the provider has completed it. Inspect status after the run.
+An existing same-name container is never taken over automatically.
+
+Probe names are 16 characters and preserve the 12-character source identity.
+Container Apps sets `PORT` from `containerPort` and forbids overriding that
+environment variable. The probe keeps `containerPort: 8080` and sends only
+`ALICE_RDC_MODE` in its environment; the server already reads the platform port.
+See the official [runtime contract](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__runtime).
+Health verification accepts HTTPS application hosts under the current
+`*.containerapps.ru` domain and the older `*.containers.cloud.ru` domain, with no
+redirects or IAM headers. The current domain is documented in the official
+[deployment guide](https://cloud.ru/docs/tutorials-evolution/list/topics/container-apps__deploy-frontend-app).
+
+`ALICE_RDC_MODE=cloud-probe` starts only sandboxed Chromium and the synthetic
+rendering check. It never starts RDC, pairing or an authenticated browser session.
+The only HTTP route is `GET /healthz` on `0.0.0.0:$PORT` (default 8080); it returns
+503 until rendering succeeds and then static readiness booleans. CDP stays on
+loopback. Browser startup and live verification have separate 30-second budgets;
+building/pushing the image is not part of those budgets.
+
+This probe does not establish persistent-session support. Container Apps permanent
+volumes use Object Storage and disallow socket/symlink operations needed by a live
+Chromium profile. The probe uses disposable container storage. The existing
+Compose deployment continues to use its local persistent volume and private CDP.
+The Cloud.ru probe on reviewed commit `fdd3de4` passed sandboxed Chromium and
+synthetic rendering ([live run](https://github.com/maksimp6/Chat/actions/runs/37114179318)).
+It created `rdc-fdd3de412cb7`, UUID `94ae3a86-671f-40ae-9323-e81d3626135e`,
+and requested stop; a subsequent inventory confirmed one retained container.
+This evidence covers disposable browser execution, not persistent authentication.
+There is no privileged or `--no-sandbox` fallback.
+
+References: [volumes](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes)
+and [unsupported volume operations](https://cloud.ru/docs/container-apps-evolution/ug/topics/troubleshooting__bucket-size-exceeded).
+
+## Permanent Cloud.ru RDC
+
+The **Cloud.ru persistent Remote Desktop Commander** workflow operates one
+dedicated service: `rdc-<first 12 project UUID hex digits>`. It uses 1 vCPU,
+4 GiB, scale **1–1**, a private digest-pinned image, and disabled auto-deployment.
+Hot instances remain active between HTTP requests and incur continuous compute
+charges; see [scaling](https://cloud.ru/docs/container-apps-evolution/ug/topics/container__scaling).
+It never takes over the separate compatibility-probe record or the Alice app.
+
+Run `preflight`, then `install` from protected `master`. All lifecycle actions
+require the
+**Object Storage tenant ID from the same project**, supplied as the workflow
+input `storage_tenant_id` or existing variable `CLOUDRU_STORAGE_TENANT_ID`.
+The tenant ID is not a credential and cannot be replaced by the project ID.
+Ownership checks compare any returned managed-mount tenant ID with this exact
+configured tenant before operating on the service.
+`status` reports the verified service name/UUID and a fixed provider state before
+checking runtime health; this identity diagnostic does not claim RDC is ready.
+If the colon `testCall` API returns transport HTTP 400 with verified gRPC code 3 for `GET /healthz`, the
+runner tries the documented slash route within the same request timeout. This
+compatibility path is read-only: checkpoint always requires the colon route
+and its nonce header. Reading health does not prove checkpoint support.
+The API method field uses lowercase `get`/`post`; the internal operation allowlist
+remains `GET /healthz` and `POST /checkpoint`. For an errored service, status reads
+at most three revision details within 60 seconds, verifies their resource context,
+and reports only fixed failure categories. It never fetches application logs or
+prints provider reasons, templates or configuration.
+Cloud.ru may add a global volume `readOnly` attribute. Ownership accepts it only
+when omitted or explicitly disabled (`false` as a boolean, or the exact strings
+`false`, `False`, `FALSE`); empty, null, numeric, enabled and unknown values are
+rejected. The mount must also remain writable. This preserves the documented
+[volume access rules](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes).
+Existing production IAM signs S3 operations only in the reviewed runner.
+The application receives a managed `/rdc-state` bucket mount; IAM, S3 and SSH
+keys are not passed to RDC. The dedicated bucket name is
+`alice-rdc-state-<first 12 project UUID hex digits>`. Creation uses the documented
+[S3 API](https://cloud.ru/docs/s3e/ug/topics/api__createbucket); private ACL and an
+exact project/service ownership marker are verified before use. An existing
+unmarked or non-private bucket is rejected.
+
+Live Chromium, RDC configuration and `/workspace` stay on local POSIX storage.
+Only closed regular snapshot files are written to Object Storage. Two slots,
+generation numbers and checksums retain the previous complete checkpoint during
+an incomplete write. Restore validates the whole archive, refuses path traversal,
+links/devices and oversized data, and installs private local files before starting
+Chromium or RDC. Workspace owner executable bits are retained; group/world access
+and setuid bits are removed. Browser cache and `Singleton*` runtime files are
+excluded. Workspace links are unsupported by this snapshot format.
+
+Snapshots are limited to 128 MiB compressed, 256 MiB of regular file contents
+and 20,000 archive entries. Restore stages validated content in a private directory
+under the local home, keeping expanded files out of Compose's 256 MiB `/tmp`.
+Exclusive bounded copies install files across separate local home/workspace
+filesystems. If any copy fails, restore rolls back entries created by that attempt,
+preserves preexisting entries, and blocks startup; a later attempt can retry.
+The archive and content can temporarily occupy up to 640 MiB during copying,
+plus authorization
+data and filesystem/entry overhead. This is a data bound, not a guarantee of total
+disk usage; insufficient local space blocks startup. The Object Storage mount
+still receives only closed regular files and never rename or fsync operations.
+
+Committed `device.json` updates, including rotated refresh tokens, are journaled
+separately. Invalid or possibly newer corrupt authorization fails closed instead
+of reverting to stale credentials. A persistence failure stops the runtime.
+The `restart` operation first quiesces RDC and Chromium, verifies their process
+groups have finished, saves closed state, requests provider stop, and confirms
+`suspended` before starting another revision. `stop` performs the same checkpoint
+and confirmed suspension. A completed checkpoint retains a verified quiesced
+status and cached generation,
+so an ambiguous provider stop can be retried without starting another writer.
+Neither operation deletes the bucket, images or state.
+`start` resumes only an exactly owned, confirmed suspended service and checks
+restored runtime health and the authorization gate; it never creates another app.
+Do not create rolling revisions or a second writer manually. Abrupt provider loss
+can lose browser/workspace changes since the last completed checkpoint; SIGTERM
+storage upload is best effort, because the provider does not publish a guaranteed
+grace period.
+
+Pairing is available at the reported `/rdc/pair` link behind Cloud.ru's native
+project/organization-role authorization. Log in to Cloud.ru, then approve the
+exact device in the official RDC account. The redirect accepts only the official
+HTTPS hosts and expires within ten minutes. This trusted audience includes users
+with project/organization access, not only the owner; see the official
+[invocation guide](https://cloud.ru/docs/container-apps-evolution/ug/topics/guides__container-invoke).
+Raw RDC output is discarded because upstream errors can include token arguments.
+The reported protected `/rdc/pair` application link can appear in Actions logs.
+The secret upstream verification URL/code, credentials and browser data never
+reach Actions logs or artifacts. The workflow uses IAM `:testCall` only for
+`/healthz` and `/checkpoint`,
+and verifies anonymous ingress cannot retrieve health data. Checkpoint additionally
+requires a fresh, short-lived permit written by the production runner to the private
+state bucket. The HTTP request carries a random nonce; the bucket holds only its
+hash, bound to the operation, project and container. A project/organization user
+with only native-ingress access cannot authorize checkpoint; private bucket writers
+and authorized RDC tools remain trusted. The nonce is excluded from logs, health
+and snapshots. CDP remains loopback.
+
+`status` reports safe readiness and a device UUID. `RDC_QUIESCED` confirms a
+completed checkpoint awaiting provider suspension; retry `stop` to complete it.
+`RDC_RUNNING` means the local
+session has been saved; complete connectivity still requires the same device to
+appear **Online** in the connected RDC plugin and an explicit-device tool call
+to succeed. Repeat this check after the controlled `restart` before reporting
+durable connectivity. Account confirmation cannot be performed automatically.
+
+## Existing server redirect
+
 The Commander startup preload observes the official `/device/start` response
 without changing RDC's PKCE or polling. Only `verification_uri_complete` and a
 maximum ten-minute expiry are written to `pairing/handoff.json`. This separate

@@ -1,0 +1,48 @@
+name: Cloud.ru persistent Remote Desktop Commander
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: One persistent RDC service; install starts device pairing
+        type: choice
+        options: [preflight, install, status, start, restart, stop]
+        default: preflight
+      storage_tenant_id:
+        description: Object Storage tenant ID (not a secret); required for all actions unless configured
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: alice-cloudru-persistent-rdc
+  cancel-in-progress: false
+jobs:
+  rdc:
+    if: github.ref == 'refs/heads/master'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Require reviewed master commit
+        run: |
+          git fetch --no-tags origin master
+          git merge-base --is-ancestor HEAD FETCH_HEAD
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version-file: .python-version
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Operate exactly owned RDC service
+        env:
+          ACTION: ${{ inputs.action }}
+          SOURCE_SHA: ${{ github.sha }}
+          CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
+          CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+        run: python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
