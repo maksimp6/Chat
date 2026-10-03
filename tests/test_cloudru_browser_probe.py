@@ -34,7 +34,8 @@ def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch)
     spec = apps.create.call_args.args[0]
     assert spec.name == NAME
     assert spec.image == IMAGE
-    assert spec.env == {"ALICE_RDC_MODE": "cloud-probe", "PORT": "8080"}
+    assert spec.env == {"ALICE_RDC_MODE": "cloud-probe"}
+    assert spec.container_body()["containerPort"] == 8080
     assert (spec.min_instances, spec.max_instances) == (0, 1)
     verify.assert_called_once_with(apps, NAME, ID, IMAGE)
     apps.stop.assert_called_once_with(NAME)
@@ -361,174 +362,6 @@ def test_main_logs_and_deploys_valid_digest(monkeypatch, main_environment, capsy
     assert {"stage": "image_ready", "image": IMAGE} in events
 
 
-def test_main_name_preflight_never_builds_or_runs_probe(monkeypatch, main_environment, capsys):
-    monkeypatch.setattr(probe.sys, "argv", ["probe", "--sha", SHA, "--action", "name_preflight"])
-    build = Mock()
-    run = Mock()
-    preflight = Mock(return_value={"status": "NAME_PREFLIGHT_COMPLETE"})
-    monkeypatch.setattr(probe, "build_image", build)
-    monkeypatch.setattr(probe, "run_probe", run)
-    monkeypatch.setattr(probe, "name_preflight", preflight)
-    probe.main()
-    preflight.assert_called_once_with(main_environment.return_value, SHA, "")
-    build.assert_not_called()
-    run.assert_not_called()
-    assert json.loads(capsys.readouterr().out) == {"status": "NAME_PREFLIGHT_COMPLETE"}
-
-
-@pytest.mark.parametrize(
-    "action,name",
-    [("probe", NAME), ("name_preflight", "secret-canary"), ("name_preflight", "rdc-" + "a" * 13)],
-)
-def test_main_rejects_unscoped_name_input_before_client_construction(
-    monkeypatch, main_environment, action, name
-):
-    monkeypatch.setattr(
-        probe.sys, "argv", ["probe", "--sha", SHA, "--action", action, "--check-name", name]
-    )
-    with pytest.raises(CloudProviderError) as failure:
-        probe.main()
-    assert failure.value.code == "validation_error"
-    main_environment.assert_not_called()
-
-
-def test_name_preflight_includes_previous_rejected_probe_once(capsys):
-    apps = Mock(project_id=ID)
-    apps.list.return_value = []
-    apps.client.request.return_value = {"isExist": False}
-    previous = "rdc-" + "b" * 12
-    probe.name_preflight(apps, SHA, previous)
-    assert apps.client.request.call_args_list[0].kwargs["json_body"]["name"] == previous
-    assert apps.client.request.call_count == 6
-    apps.create.assert_not_called()
-    apps.stop.assert_not_called()
-
-
-@pytest.mark.parametrize("payload", [{"isExist": False}, {"isExist": True}, {}])
-def test_name_preflight_only_calls_documented_availability_endpoint(payload, capsys):
-    apps = Mock(project_id=ID)
-    apps.list.return_value = []
-    apps.client.request.return_value = payload
-    assert probe.name_preflight(apps, SHA) == {"status": "NAME_PREFLIGHT_COMPLETE"}
-    assert apps.client.request.call_count == 5
-    for call in apps.client.request.call_args_list:
-        assert call.args == ("container_apps", "POST", "/v2/containers:check_name")
-        assert call.kwargs["json_body"]["projectId"] == ID
-        assert set(call.kwargs["json_body"]) == {"projectId", "name"}
-    apps.create.assert_not_called()
-    apps.stop.assert_not_called()
-    apps.get.assert_not_called()
-    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    assert all(event["name_exists"] == payload.get("isExist", False) for event in events[1:])
-
-
-@pytest.mark.parametrize(
-    "payload", [{"isExist": "false"}, {"isExist": None}, {"error": "secret-canary"}]
-)
-def test_name_preflight_fails_closed_on_unknown_response(payload):
-    apps = Mock(project_id=ID)
-    apps.list.return_value = []
-    apps.client.request.return_value = payload
-    with pytest.raises(CloudProviderError) as failure:
-        probe.name_preflight(apps, SHA)
-    assert failure.value.code == "invalid_response"
-    assert apps.client.request.call_count == 1
-    apps.create.assert_not_called()
-
-
-def test_name_preflight_does_not_retry_authorization_failure():
-    apps = Mock(project_id=ID)
-    apps.list.return_value = []
-    apps.client.request.side_effect = CloudProviderError(
-        "secret-canary", code="authorization_failed", http_status=403
-    )
-    with pytest.raises(CloudProviderError):
-        probe.name_preflight(apps, SHA)
-    assert apps.client.request.call_count == 1
-    apps.create.assert_not_called()
-
-
-def test_name_violation_hints_never_echo_provider_description(capsys):
-    error = provider_failure(
-        {
-            "code": 3,
-            "details": [
-                {
-                    "@type": "type.googleapis.com/google.rpc.BadRequest",
-                    "fieldViolations": [
-                        {
-                            "field": "name",
-                            "description": "length must be between 3 and 20 characters; secret-canary; pattern ^secret-regex$",
-                        }
-                    ],
-                }
-            ],
-        }
-    )
-    apps = Mock(project_id=ID)
-    apps.list.return_value = []
-    apps.client.request.side_effect = error
-    probe.name_preflight(apps, SHA)
-    output = capsys.readouterr().out
-    assert "secret-canary" not in output
-    assert "secret-regex" not in output
-    assert probe.probe_error_details(error)["provider_name_rule_hint"] == {
-        "categories": ["format", "length"],
-        "min_length": 3,
-        "max_length": 20,
-    }
-    apps.create.assert_not_called()
-    apps.stop.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "code,status,field",
-    [(3.0, 400, "name"), (3, 200, "name"), (4, 400, "name"), (3, 400, "projectId")],
-)
-def test_name_hints_require_exact_error_contract(code, status, field):
-    error = provider_failure(
-        {
-            "code": code,
-            "details": [
-                {
-                    "@type": "type.googleapis.com/google.rpc.BadRequest",
-                    "fieldViolations": [
-                        {
-                            "field": field,
-                            "description": "length at most 20 characters; secret-canary",
-                        }
-                    ],
-                }
-            ],
-        }
-    )
-    object.__setattr__(error, "http_status", status)
-    result = probe.probe_error_details(error)
-    assert "provider_name_rule_hint" not in result
-    assert "secret-canary" not in json.dumps(result)
-
-
-@pytest.mark.parametrize(
-    "description",
-    [
-        "at most 20 characters; at most 30 characters",
-        "between 30 and 20 characters",
-        "at most 99 characters",
-        "at most 123456 characters",
-        "pattern {3,20}; secret-canary123456",
-    ],
-)
-def test_name_hints_drop_conflicting_or_non_length_numbers(description):
-    hint = probe.name_rule_hint(description)
-    assert "min_length" not in hint
-    assert "max_length" not in hint
-
-
-@pytest.mark.parametrize("description", [None, 20, "secret-canary" * 100])
-def test_name_hints_ignore_invalid_or_oversized_description(description):
-    assert probe.name_rule_hint(description) is None
-
-
 @pytest.mark.parametrize(
     "payload",
     [
@@ -770,14 +603,15 @@ def test_registry_provider_errors_are_not_retried_or_used_for_creation(status):
     assert registry.client.request.call_count == 1
 
 
-def test_readiness_requires_expected_image_and_exact_static_response():
+@pytest.mark.parametrize("suffix", [".containers.cloud.ru", ".containerapps.ru"])
+def test_readiness_requires_expected_image_and_exact_static_response(suffix):
     apps = Mock()
     apps.get.return_value = {
         "name": NAME,
         "id": ID,
         "status": "RUNNING",
         "template": {"containers": [{"image": IMAGE}]},
-        "configuration": {"ingress": {"publicUri": NAME + ".containers.cloud.ru"}},
+        "configuration": {"ingress": {"publicUri": NAME + suffix}},
     }
     response = Mock(status_code=200)
     response.json.return_value = {
@@ -789,7 +623,7 @@ def test_readiness_requires_expected_image_and_exact_static_response():
     get = Mock(return_value=response)
     probe.verify_probe(apps, NAME, ID, IMAGE, http_get=get)
     get.assert_called_once_with(
-        "https://" + NAME + ".containers.cloud.ru/healthz", timeout=3, allow_redirects=False
+        "https://" + NAME + suffix + "/healthz", timeout=3, allow_redirects=False
     )
     apps.get.assert_not_called()
 
@@ -801,6 +635,8 @@ def test_readiness_requires_expected_image_and_exact_static_response():
         "https://evil.example",
         "https://user@probe.containers.cloud.ru",
         "https://probe.containers.cloud.ru:444",
+        "https://probe.containerapps.ru.evil.example",
+        "https://evilcontainerapps.ru",
     ],
 )
 def test_readiness_rejects_untrusted_origin(uri):
@@ -832,6 +668,4 @@ def test_production_workflow_is_master_only_and_scopes_credentials():
         "CLOUDRU_PROJECT_ID",
         "CLOUDRU_IAM_KEY_ID",
         "CLOUDRU_IAM_KEY_SECRET",
-        "PROBE_ACTION",
-        "CHECK_NAME",
     }

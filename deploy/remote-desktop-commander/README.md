@@ -127,18 +127,15 @@ image or container. A failed stop is a failure, and a stop request alone is not
 confirmation that the provider has completed it. Inspect status after the run.
 An existing same-name container is never taken over automatically.
 
-Probe names are 16 characters. The live API rejected the earlier 30-character
-`rdc-browser-probe-<sha>` name with HTTP 400 and a `name` validation violation;
-the compact prefix preserves the same 12-character source identity.
-
-The workflow's `name_preflight` action checks the complete inventory and a fixed
-set of candidate names through `POST /v2/containers:check_name`. It builds no
-image and creates or stops no resource. Availability is reported separately from
-validation; it is not proof that a complete create request will be accepted.
-Name-validation hints contain only fixed categories and explicit character-count
-bounds; provider descriptions and regular expressions are never printed.
-The endpoint and full inventory schema are documented in the current official
-[OpenAPI](https://cloud.ru/docs/api/specs/container-apps-evolution/ug/_specs/openapi.yaml).
+Probe names are 16 characters and preserve the 12-character source identity.
+Container Apps sets `PORT` from `containerPort` and forbids overriding that
+environment variable. The probe keeps `containerPort: 8080` and sends only
+`ALICE_RDC_MODE` in its environment; the server already reads the platform port.
+See the official [runtime contract](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__runtime).
+Health verification accepts HTTPS application hosts under the current
+`*.containerapps.ru` domain and the older `*.containers.cloud.ru` domain, with no
+redirects or IAM headers. The current domain is documented in the official
+[deployment guide](https://cloud.ru/docs/tutorials-evolution/list/topics/container-apps__deploy-frontend-app).
 
 `ALICE_RDC_MODE=cloud-probe` starts only sandboxed Chromium and the synthetic
 rendering check. It never starts RDC, pairing or an authenticated browser session.
