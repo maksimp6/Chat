@@ -556,6 +556,26 @@ def health_summary(value):
     return value
 
 
+def readiness_error_form(exc):
+    """Classify one exact bounded message without emitting provider text."""
+    current = exc
+    for _ in range(4):
+        response = current.response if isinstance(current, requests.RequestException) else None
+        if response is not None and len(response.content) <= 65536:
+            try:
+                payload = response.json()
+            except (ValueError, RecursionError):
+                return "other"
+            message = payload.get("message") if isinstance(payload, dict) else None
+            if isinstance(message, str) and message.lower() == "must be running":
+                return "must_be_running"
+            return "other"
+        current = current.__cause__
+        if current is None:
+            break
+    return "other"
+
+
 def wait_ready(
     apps,
     *,
@@ -576,10 +596,22 @@ def wait_ready(
                 "suspended_product",
             }:
                 fail("rdc_runtime_failed")
+            if str(record.get("status", "")).lower() != "running":
+                sleep(min(2, max(0, deadline - time.monotonic())))
+                continue
+            if time.monotonic() >= deadline:
+                break
             try:
                 result = test_call(apps, "/healthz")
             except CloudProviderError as exc:
-                if exc.http_status not in (404, 502, 503, 504):
+                details = safe_error(exc)
+                starting = (
+                    details.get("error") == "provider_http_error"
+                    and exc.http_status == 499
+                    and details.get("provider_status_code") == 1
+                    and readiness_error_form(exc) == "must_be_running"
+                )
+                if exc.http_status not in (404, 502, 503, 504) and not starting:
                     raise
                 result = None
             if result is not None:
@@ -588,7 +620,7 @@ def wait_ready(
                     summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]
                 ):
                     return record, summary
-        sleep(2)
+        sleep(min(2, max(0, deadline - time.monotonic())))
     fail("rdc_readiness_timeout")
 
 

@@ -881,11 +881,11 @@ def test_global_writable_does_not_override_readonly_mount():
         rdc.owned_record(apps_with(item), tenant=TENANT)
 
 
-def transport_error(grpc_code=3):
+def transport_error(grpc_code=3, *, status=400, message=""):
     response_value = requests.Response()
-    response_value.status_code = 400
-    response_value._content = json.dumps({"code": grpc_code}).encode()
-    error = CloudProviderError("private", code="provider_http_error", http_status=400)
+    response_value.status_code = status
+    response_value._content = json.dumps({"code": grpc_code, "message": message}).encode()
+    error = CloudProviderError("private", code="provider_http_error", http_status=status)
     try:
         raise error from requests.HTTPError(response=response_value)
     except CloudProviderError as caught:
@@ -1002,15 +1002,25 @@ def test_safe_provider_testcall_diagnostics_exclude_raw_values():
     assert secret not in json.dumps(diagnostic)
 
 
-def test_status_reports_only_verified_service_and_known_resource_state(capsys):
+def test_status_reports_only_verified_service_and_known_resource_state(capsys, monkeypatch):
     item = record()
     item["status"] = "untrusted-private-state"
     apps = apps_with(item)
     apps.client.request.side_effect = CloudProviderError(
         "private", code="provider_http_error", http_status=403
     )
-    with pytest.raises(CloudProviderError):
+    clock = Clock()
+    monkeypatch.setattr(rdc.time, "monotonic", clock)
+    original = rdc.wait_ready
+    monkeypatch.setattr(
+        rdc,
+        "wait_ready",
+        lambda *args, **kwargs: original(*args, **kwargs, timeout=3, sleep=clock.sleep),
+    )
+    with pytest.raises(CloudProviderError) as caught:
         rdc.status(apps, tenant=TENANT)
+    assert caught.value.code == "rdc_readiness_timeout" and clock.value == 3
+    apps.client.request.assert_not_called()
     diagnostic = json.loads(capsys.readouterr().out)
     assert diagnostic == {
         "stage": "rdc_owned_service",
@@ -1232,3 +1242,78 @@ def test_revision_reason_shape_is_fixed_and_values_hidden(form, value, capsys):
     diagnostic = json.loads(capsys.readouterr().out.splitlines()[0])
     assert diagnostic["reason_form"] == form
     assert diagnostic["reason_terms"] == []
+
+
+def test_readiness_waits_for_owned_running_inventory(monkeypatch):
+    apps, clock = apps_with(), Clock()
+    starting = record()
+    starting["status"] = "starting"
+    apps.list.side_effect = [[starting], [record()]]
+    apps.client.request.return_value = response(health())
+    monkeypatch.setattr(rdc.time, "monotonic", clock)
+    _, result = rdc.wait_ready(
+        apps, tenant=TENANT, identifier=IDENTIFIER, image=IMAGE, sleep=clock.sleep
+    )
+    assert result == health() and clock.value == 2
+    assert apps.list.call_count == 2
+    apps.client.request.assert_called_once()
+    apps.start.assert_not_called()
+    apps.stop.assert_not_called()
+
+
+def test_readiness_retries_exact_provider_starting_race(monkeypatch):
+    apps, clock = apps_with(), Clock()
+    apps.client.request.side_effect = [
+        transport_error(1, status=499, message="must be running"),
+        response(health()),
+    ]
+    monkeypatch.setattr(rdc.time, "monotonic", clock)
+    _, result = rdc.wait_ready(
+        apps, tenant=TENANT, identifier=IDENTIFIER, image=IMAGE, sleep=clock.sleep
+    )
+    assert result == health() and clock.value == 2
+    assert apps.list.call_count == apps.client.request.call_count == 2
+    apps.start.assert_not_called()
+    apps.stop.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "code,status,message",
+    [
+        (7, 499, "must be running"),
+        (16, 499, "must be running"),
+        (None, 499, "must be running"),
+        ("1", 499, "must be running"),
+        (True, 499, "must be running"),
+        (1, 400, "must be running"),
+        (1, 499, "container"),
+        (1, 499, "must be running authorization"),
+        (1, 499, "permission denied; must be running"),
+        (1, 499, "must be running; untrusted-extra"),
+        (1, 499, "must be running "),
+    ],
+)
+def test_readiness_unknown_or_auth_errors_fail_immediately(monkeypatch, code, status, message):
+    apps, clock = apps_with(), Clock()
+    error = transport_error(code, status=status, message=message)
+    apps.client.request.side_effect = error
+    monkeypatch.setattr(rdc.time, "monotonic", clock)
+    with pytest.raises(CloudProviderError) as caught:
+        rdc.wait_ready(apps, tenant=TENANT, sleep=clock.sleep)
+    assert caught.value is error and clock.value == 0
+    apps.client.request.assert_called_once()
+    apps.start.assert_not_called()
+    apps.stop.assert_not_called()
+
+
+def test_readiness_starting_deadline_never_calls_health(monkeypatch):
+    item = record()
+    item["status"] = "starting"
+    apps, clock = apps_with(item), Clock()
+    monkeypatch.setattr(rdc.time, "monotonic", clock)
+    with pytest.raises(CloudProviderError) as caught:
+        rdc.wait_ready(apps, tenant=TENANT, timeout=3, sleep=clock.sleep)
+    assert caught.value.code == "rdc_readiness_timeout" and clock.value == 3
+    apps.client.request.assert_not_called()
+    apps.start.assert_not_called()
+    apps.stop.assert_not_called()
