@@ -132,6 +132,49 @@ def test_ownership_blocks_unrelated_or_weakened_config(change):
     apps.stop.assert_not_called()
 
 
+@pytest.mark.parametrize("cpu,memory", [("1000m", "4Gi"), (1, 4294967296)])
+def test_ownership_diagnostics_identify_encodings_without_accepting_them(cpu, memory, capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"].update(cpu=cpu, memory=memory)
+    apps = apps_with(item)
+    with pytest.raises(CloudProviderError) as error:
+        rdc.owned_record(apps, tenant=TENANT)
+    assert error.value.code == "rdc_ownership_unconfirmed"
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["fields"] == ["cpu", "memory"]
+    assert diagnostic["cpu_form"] in {"thousand_millicores", "one_number"}
+    assert diagnostic["memory_form"] in {"4_gib", "bytes_number"}
+    apps.stop.assert_not_called()
+    apps.start.assert_not_called()
+
+
+def test_ownership_diagnostics_never_print_unknown_provider_values(capsys):
+    item = record()
+    secret = "arbitrary-private-provider-value"
+    container = item["template"]["containers"][0]
+    container["resources"].update(cpu=secret, memory=secret)
+    container["resources"][secret] = secret
+    container["env"].append({"name": secret, "value": secret})
+    item["template"]["volumes"][0]["volumeAttributes"].update(
+        entrypoint=secret, tenantId=secret, region=secret
+    )
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    output = capsys.readouterr().out
+    assert secret not in output
+    diagnostic = json.loads(output)
+    assert diagnostic["cpu_form"] == diagnostic["memory_form"] == "other"
+    assert diagnostic["volume_entrypoint_form"] == "other"
+    assert diagnostic["known_resource_keys"] == ["cpu", "memory"]
+    assert diagnostic["known_platform_envs"] == []
+    assert diagnostic["volume_tenant_match"] is False
+
+
+def test_valid_ownership_emits_no_diagnostic(capsys):
+    assert rdc.owned_record(apps_with(), tenant=TENANT)["id"] == IDENTIFIER
+    assert capsys.readouterr().out == ""
+
+
 def test_proto_defaults_and_expanded_managed_volume_do_not_break_ownership():
     item = record()
     item["template"]["containers"][0]["volumeMounts"][0].pop("readOnly")
@@ -751,3 +794,38 @@ def test_stop_retry_of_confirmed_suspended_app_never_calls_runtime_or_mutates():
     apps.start.assert_not_called()
     store.upload.assert_not_called()
     assert store.download.call_args.args[0] == "owner.json"
+
+
+def test_gpu_default_diagnostic_does_not_accept_extra_resources(capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"]["gpu"] = {"count": 0, "sku": ""}
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["fields"] == ["resource_keys"]
+    assert diagnostic["known_resource_keys"] == ["cpu", "gpu", "memory"]
+    assert diagnostic["gpu_form"] == "zero_count_empty_sku"
+
+
+@pytest.mark.parametrize("gpu", [{"count": False}, {"count": 0.0, "sku": ""}])
+def test_gpu_diagnostic_requires_nested_integer_zero(gpu, capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"]["gpu"] = gpu
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["fields"] == ["resource_keys"]
+    assert diagnostic["gpu_form"] == "other"
+
+
+@pytest.mark.parametrize("present", [False, True])
+def test_entrypoint_diagnostic_distinguishes_omitted_from_null(present, capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"]["cpu"] = "1000m"
+    if present:
+        item["template"]["volumes"][0]["volumeAttributes"]["entrypoint"] = None
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["volume_entrypoint_form"] == ("null" if present else "omitted")
+    assert ("volume" in diagnostic["fields"]) is present

@@ -141,6 +141,25 @@ def named_record(apps):
     return records[0] if records else None
 
 
+def same_form(value, expected):
+    """Compare known encodings including nested JSON scalar types."""
+    if type(value) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return set(value) == set(expected) and all(
+            same_form(value[key], item) for key, item in expected.items()
+        )
+    return value == expected
+
+
+def safe_form(value, choices):
+    """Report only fixed known encodings, never an unknown provider value."""
+    for label, expected in choices:
+        if same_form(value, expected):
+            return label
+    return "other"
+
+
 def owned_record(apps, *, tenant, identifier=None, image=None):
     tenant = configured_tenant(tenant)
     record = named_record(apps)
@@ -179,28 +198,119 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             and mounts[0].get("readOnly", False) is False
             and mounts[0].get("subPath", "") == ""
         )
-        valid = (
-            record.get("projectId") == project
-            and record.get("description") == DESCRIPTION
-            and (identifier is None or identifier == actual_id)
-            and (image is None or image == container["image"])
-            and ingress.get("publiclyAccessible") is True
-            and ingress.get("accessSettings", {}).get("enableAuth") is True
-            and configuration.get("autoDeployments", {}).get("enabled", False) is False
-            and configuration.get("privileged", False) is False
-            and len(containers) == 1
-            and len(variables) == len(environment)
-            and environment == runtime_env(project)
-            and container.get("name") == names(project)[0]
-            and type(container.get("containerPort")) is int
-            and container["containerPort"] == 8080
-            and container.get("resources") == {"cpu": "1", "memory": "4096Mi"}
-            and type(scaling.get("minInstanceCount")) is int
-            and type(scaling.get("maxInstanceCount")) is int
-            and scaling["minInstanceCount"] == scaling["maxInstanceCount"] == 1
-            and volume_ok
-            and mount_ok
-        )
+        resources = container.get("resources")
+        resource_map = resources if isinstance(resources, dict) else {}
+        expected_env = runtime_env(project)
+        checks = {
+            "project": record.get("projectId") == project,
+            "description": record.get("description") == DESCRIPTION,
+            "identifier": identifier is None or identifier == actual_id,
+            "image": image is None or image == container["image"],
+            "public_ingress": ingress.get("publiclyAccessible") is True,
+            "native_auth": ingress.get("accessSettings", {}).get("enableAuth") is True,
+            "auto_deploy": configuration.get("autoDeployments", {}).get("enabled", False) is False,
+            "privileged": configuration.get("privileged", False) is False,
+            "container_count": len(containers) == 1,
+            "env_duplicates": len(variables) == len(environment),
+            "env_names": set(environment) == set(expected_env),
+            "env_values": all(environment.get(key) == value for key, value in expected_env.items()),
+            "container_name": container.get("name") == names(project)[0],
+            "port": type(container.get("containerPort")) is int
+            and container["containerPort"] == 8080,
+            "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
+            "cpu": resource_map.get("cpu") == "1",
+            "memory": resource_map.get("memory") == "4096Mi",
+            "scaling_types": type(scaling.get("minInstanceCount")) is int
+            and type(scaling.get("maxInstanceCount")) is int,
+            "scaling_min": scaling.get("minInstanceCount") == 1,
+            "scaling_max": scaling.get("maxInstanceCount") == 1,
+            "volume": volume_ok,
+            "mount": mount_ok,
+        }
+        valid = all(checks.values())
+        if not valid:
+            print(
+                json.dumps(
+                    {
+                        "stage": "rdc_ownership_mismatch",
+                        "fields": sorted(key for key, passed in checks.items() if not passed),
+                        "cpu_form": safe_form(
+                            resource_map.get("cpu"),
+                            (
+                                ("one_string", "1"),
+                                ("one_number", 1),
+                                ("one_float", 1.0),
+                                ("one_decimal_string", "1.0"),
+                                ("thousand_millicores", "1000m"),
+                            ),
+                        ),
+                        "memory_form": safe_form(
+                            resource_map.get("memory"),
+                            (
+                                ("4096_mib", "4096Mi"),
+                                ("4_gib", "4Gi"),
+                                ("bytes_number", 4294967296),
+                                ("bytes_string", "4294967296"),
+                            ),
+                        ),
+                        "gpu_form": safe_form(
+                            resource_map.get("gpu"),
+                            (
+                                ("omitted_or_null", None),
+                                ("empty", {}),
+                                ("zero_count", {"count": 0}),
+                                ("zero_count_empty_sku", {"count": 0, "sku": ""}),
+                            ),
+                        ),
+                        "known_resource_keys": sorted(
+                            set(resource_map)
+                            & {
+                                "cpu",
+                                "memory",
+                                "gpu",
+                                "ephemeralStorage",
+                                "ephemeral-storage",
+                                "ephemeral_storage",
+                            }
+                        ),
+                        "known_platform_envs": sorted(
+                            set(environment)
+                            & {
+                                "PORT",
+                                "HOME",
+                                "HOSTNAME",
+                                "PATH",
+                                "NODE_ENV",
+                                "PUPPETEER_SKIP_DOWNLOAD",
+                            }
+                        ),
+                        "volume_bucket_match": attributes.get("bucketName") == names(project)[1],
+                        "volume_entrypoint_form": "omitted"
+                        if "entrypoint" not in attributes
+                        else safe_form(
+                            attributes.get("entrypoint"),
+                            (
+                                ("null", None),
+                                ("https_s3", "https://s3.cloud.ru"),
+                                ("https_s3_slash", "https://s3.cloud.ru/"),
+                                ("bare_s3", "s3.cloud.ru"),
+                            ),
+                        ),
+                        "volume_region_match": attributes.get("region", "ru-central-1")
+                        == "ru-central-1",
+                        "volume_tenant_match": attributes.get("tenantId", tenant) == tenant,
+                        "volume_attributes_extra": bool(
+                            set(attributes) - {"bucketName", "entrypoint", "tenantId", "region"}
+                        ),
+                        "volume_type_form": safe_form(
+                            volumes[0].get("type") if len(volumes) == 1 else None,
+                            (("lower_s3", "s3"), ("upper_s3", "S3")),
+                        ),
+                    }
+                ),
+                flush=True,
+            )
+
     except (ValueError, KeyError, TypeError, AttributeError, IndexError):
         fail("invalid_response")
     if not valid:
