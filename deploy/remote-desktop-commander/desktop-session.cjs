@@ -3,6 +3,7 @@
 const { spawn } = require("node:child_process");
 const { mkdirSync, chmodSync } = require("node:fs");
 const { setTimeout: delay } = require("node:timers/promises");
+const { createServer } = require("node:http");
 
 const PROFILE = "/home/node/.config/chromium";
 const VERSION_URL = "http://127.0.0.1:9222/json/version";
@@ -68,6 +69,9 @@ async function supervise(argv, options = {}) {
   let ready = false;
   let stopping = false;
   let exitCode = 1;
+  let smokePassed = false;
+  let server;
+  const cloudProbe = argv.length === 1 && argv[0] === "--cloud-probe";
   let finish;
   const ended = new Promise((resolve) => { finish = resolve; });
   const stop = (code) => {
@@ -87,6 +91,28 @@ async function supervise(argv, options = {}) {
     return child;
   };
   try {
+    if (cloudProbe) {
+      const port = options.port ?? Number(process.env.PORT || 8080);
+      if (!Number.isInteger(port) || port < 0 || port > 65535 || (port === 0 && options.port !== 0)) return 1;
+      server = createServer((request, response) => {
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Content-Type", "application/json");
+        if (request.method !== "GET" || request.url !== "/healthz") {
+          response.writeHead(404).end('{"status":"not_found"}');
+          return;
+        }
+        const ok = ready && smokePassed && !stopping;
+        response.writeHead(ok ? 200 : 503).end(JSON.stringify({
+          mode: "cloud-probe", browser_ready: ok, smoke_passed: ok,
+        }));
+      });
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, "0.0.0.0", resolve);
+      });
+      server.on("error", () => stop(1));
+      if (options.onListening) options.onListening(server.address().port);
+    }
     // Never reuse or close a browser started by another process in this container.
     if (await probe()) return 1;
     start("chromium", browserArgs, "ignore");
@@ -97,12 +123,15 @@ async function supervise(argv, options = {}) {
       await Promise.race([sleep(100), ended]);
     }
     if (!ready || stopping) return exitCode;
-    if (argv[0] === "--browser-smoke-test") {
+    if (argv[0] === "--browser-smoke-test" || cloudProbe) {
       // This script only exercises a synthetic page; it never starts RDC pairing.
       const smoke = launch(process.execPath, ["/opt/desktop-commander/browser-smoke.cjs"], { stdio: "inherit" });
       children.push(smoke);
       smoke.once("error", () => stop(1));
-      smoke.once("exit", (code) => stop(code === 0 ? 0 : 1));
+      smoke.once("exit", (code) => {
+        if (cloudProbe && code === 0) smokePassed = true;
+        else stop(code === 0 ? 0 : 1);
+      });
     } else {
       start(process.execPath, [
         "--require", "/opt/desktop-commander/pairing-handoff.cjs",
@@ -115,6 +144,10 @@ async function supervise(argv, options = {}) {
   } catch {
     return 1;
   } finally {
+    if (server) {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
     // Browser.close flushes the profile and removes SingletonLock, unlike a
     // signal-only exit that can strand a lock naming the old container host.
     if (ready) await close();
@@ -145,7 +178,9 @@ async function main() {
   process.umask(0o077);
   mkdirSync(PROFILE, { recursive: true, mode: 0o700 });
   chmodSync(PROFILE, 0o700);
-  process.exitCode = await supervise(process.argv.slice(2));
+  const mode = process.env.ALICE_RDC_MODE;
+  if (mode && mode !== "cloud-probe") throw new Error("Invalid mode");
+  process.exitCode = await supervise(mode === "cloud-probe" ? ["--cloud-probe"] : process.argv.slice(2));
   if (process.exitCode) console.error("RDC/browser session stopped; check container startup and sandbox support.");
 }
 
