@@ -1,6 +1,10 @@
 package com.alicepro.mobile
 
 import android.app.AlertDialog
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
@@ -40,6 +44,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         AppLogger.initialize(this)
         AppLogger.info("MainActivity", "Activity created")
+
+        // Create notification channel for RootAgentService (API 26+).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val ch = NotificationChannel(
+                RootAgentService.CHANNEL_ID,
+                "Root Agent",
+                NotificationManager.IMPORTANCE_LOW,
+            )
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(ch)
+        }
 
         // Keep the WebView in the platform-managed content area so it does not
         // draw underneath the status or navigation bars.
@@ -152,6 +166,45 @@ class MainActivity : AppCompatActivity() {
                 else -> AppLogger.LogLevel.INFO
             }
             AppLogger.log(mappedLevel, "Web:$tag", message)
+        }
+
+        @JavascriptInterface
+        fun startRootAgent() {
+            // Trusted app-side confirmation – token never passes through JS
+            runOnUiThread {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Enable Root Control")
+                    .setMessage(
+                        "Allow Alice to control this device at root level?\n\n" +
+                        "This grants the local AI agent full device access via a " +
+                        "loopback-only, authenticated API. You can stop it at any " +
+                        "time from the notification.",
+                    )
+                    .setPositiveButton("Enable") { _, _ ->
+                        AppLogger.info("RootAgent", "Root agent confirmed by user")
+                        val intent = Intent(this@MainActivity, RootAgentService::class.java)
+                            .setAction(RootAgentService.ACTION_START)
+                        startForegroundService(intent)
+                    }
+                    .setNegativeButton("Cancel") { _, _ ->
+                        AppLogger.info("RootAgent", "Root agent start declined by user")
+                    }
+                    .show()
+            }
+        }
+
+        @JavascriptInterface
+        fun stopRootAgent() {
+            AppLogger.info("RootAgent", "Root agent stop requested from web UI")
+            val intent = Intent(this@MainActivity, RootAgentService::class.java)
+                .setAction(RootAgentService.ACTION_STOP)
+            startService(intent)
+        }
+
+        @JavascriptInterface
+        fun getRootAgentPort(): Int {
+            val prefs = getSharedPreferences("alice_pro", MODE_PRIVATE)
+            return prefs.getInt("root_agent_port", -1)
         }
     }
 
