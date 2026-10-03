@@ -1,6 +1,18 @@
 name: Cloud.ru browser compatibility probe
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: Run browser probe or check name availability without creating resources
+        type: choice
+        default: probe
+        options:
+          - probe
+          - name_preflight
+      check_name:
+        description: Previous rdc probe name to inspect (name_preflight only)
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -33,4 +45,6 @@ jobs:
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
           SOURCE_SHA: ${{ github.sha }}
-        run: python scripts/cloudru_browser_probe.py --sha "$SOURCE_SHA"
+          PROBE_ACTION: ${{ inputs.action || 'probe' }}
+          CHECK_NAME: ${{ inputs.check_name || '' }}
+        run: python scripts/cloudru_browser_probe.py --sha "$SOURCE_SHA" --action "$PROBE_ACTION" --check-name "$CHECK_NAME"

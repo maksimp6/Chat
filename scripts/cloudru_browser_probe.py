@@ -46,6 +46,7 @@ PROBE_ERROR_CODES = frozenset(
         "registry_creation_unconfirmed",
         "registry_inventory_timeout",
         "docker_error",
+        "name_preflight_timeout",
     }
 )
 VALIDATION_FIELDS = frozenset(
@@ -68,6 +69,64 @@ VALIDATION_FIELDS = frozenset(
         "template.containers[0].resources.memory",
     }
 )
+
+
+def name_rule_hint(description):
+    """Finite hints only; no provider text, regexes or arbitrary numeric values."""
+    if not isinstance(description, str) or len(description) > 1024:
+        return None
+    text = description.casefold()
+    phrases = {
+        "length": ("length", "too long", "too short", "длина", "длиннее", "короче"),
+        "format": ("pattern", "regex", "format", "lowercase", "alphanumeric", "символ", "формат"),
+        "uniqueness": (
+            "already exists",
+            "unique",
+            "duplicate",
+            "reserved",
+            "taken",
+            "уникаль",
+            "существует",
+            "занято",
+        ),
+        "missing": (
+            "required",
+            "missing",
+            "must not be empty",
+            "обязательно",
+            "не указан",
+            "не задан",
+            "пуст",
+        ),
+        "scope": ("project", "tenant", "account", "organization", "проект", "организац"),
+    }
+    categories = sorted(
+        key for key, values in phrases.items() if any(value in text for value in values)
+    )
+    result = {"categories": categories or ["unspecified"]}
+    number = r"(0|[1-9][0-9]?)"
+    bounds = {"min_length": set(), "max_length": set()}
+    for pattern in (
+        rf"\bbetween {number} and {number} characters\b",
+        rf"\bот {number} до {number} символов\b",
+    ):
+        for minimum, maximum in re.findall(pattern, text):
+            bounds["min_length"].add(int(minimum))
+            bounds["max_length"].add(int(maximum))
+    for key, patterns in {
+        "min_length": (rf"\bat least {number} characters\b", rf"\bне менее {number} символов\b"),
+        "max_length": (rf"\bat most {number} characters\b", rf"\bне более {number} символов\b"),
+    }.items():
+        for pattern in patterns:
+            bounds[key].update(int(value) for value in re.findall(pattern, text))
+    if all(
+        len(values) <= 1 and all(0 <= value <= 63 for value in values) for values in bounds.values()
+    ):
+        minimum = next(iter(bounds["min_length"]), 0)
+        maximum = next(iter(bounds["max_length"]), 63)
+        if minimum <= maximum:
+            result.update({key: next(iter(values)) for key, values in bounds.items() if values})
+    return result
 
 
 def probe_error_details(exc):
@@ -105,6 +164,15 @@ def probe_error_details(exc):
                         field = violation.get("field") if isinstance(violation, dict) else None
                         if isinstance(field, str) and field in VALIDATION_FIELDS:
                             fields.add(field)
+                            if (
+                                field == "name"
+                                and result["http_status"] == 400
+                                and type(provider_code) is int
+                                and provider_code == 3
+                            ):
+                                hint = name_rule_hint(violation.get("description"))
+                                if hint is not None:
+                                    result["provider_name_rule_hint"] = hint
                 if fields:
                     result["provider_validation_fields"] = sorted(fields)
             break
@@ -177,6 +245,47 @@ def probe_record(apps, name):
 def find_probe(apps, name):
     item = probe_record(apps, name)
     return item["id"] if item is not None else None
+
+
+def name_preflight(apps, sha, requested_name=""):
+    """Documented availability-only calls; never creates or stops resources."""
+    letters = sha[:12].translate(str.maketrans("0123456789abcdef", "abcdefghijklmnop"))
+    names = (
+        requested_name,
+        "rdc-" + sha[:12],
+        "rdc-" + letters,
+        "rdc" + sha[:12],
+        "rdc" + letters,
+        "alice-rdc-probe",
+    )
+    names = list(dict.fromkeys(name for name in names if name))
+    items = apps.list(require_total=True)
+    print(
+        json.dumps({"stage": "container_name_inventory", "container_count": len(items)}), flush=True
+    )
+    for name in names:
+        try:
+            payload = apps.client.request(
+                "container_apps",
+                "POST",
+                "/v2/containers:check_name",
+                json_body={"name": name, "projectId": apps.project_id},
+            )
+            # ProtoJSON can omit a default false bool; unknown envelopes fail closed.
+            if set(payload) - {"isExist"} or type(payload.get("isExist", False)) is not bool:
+                raise CloudProviderError(
+                    "Invalid name availability response", code="invalid_response"
+                )
+            result = {"name_exists": payload.get("isExist", False)}
+        except CloudProviderError as exc:
+            if exc.http_status != 400:
+                raise
+            result = probe_error_details(exc)
+        print(
+            json.dumps({"stage": "container_name_preflight", "container_name": name, **result}),
+            flush=True,
+        )
+    return {"status": "NAME_PREFLIGHT_COMPLETE"}
 
 
 def registry_inventory(registry):
@@ -523,10 +632,17 @@ def run_probe(apps, sha, image):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sha", required=True)
+    parser.add_argument("--action", choices=("probe", "name_preflight"), default="probe")
+    parser.add_argument("--check-name", default="")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     if not re.fullmatch(r"[0-9a-f]{40}", args.sha):
         raise CloudProviderError("Invalid source SHA", code="validation_error")
+    if args.check_name and (
+        args.action != "name_preflight"
+        or not re.fullmatch(r"rdc-(?:browser-probe-)?[0-9a-f]{12}", args.check_name)
+    ):
+        raise CloudProviderError("Invalid probe name preflight target", code="validation_error")
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     dirty = subprocess.check_output(
         ["git", "status", "--porcelain", "--untracked-files=all"], cwd=root, text=True
@@ -536,6 +652,16 @@ def main():
     for name in ("CLOUDRU_PROJECT_ID", "CLOUDRU_IAM_KEY_ID", "CLOUDRU_IAM_KEY_SECRET"):
         if not os.environ.get(name):
             raise CloudProviderError("Missing probe credentials", code="auth_not_configured")
+    if args.action == "name_preflight":
+        result = with_budget(
+            name_preflight,
+            CloudRuContainerAppsClient(),
+            args.sha,
+            args.check_name,
+            code="name_preflight_timeout",
+        )
+        print(json.dumps(result), flush=True)
+        return
     image = build_image(root, args.sha)
     if not isinstance(image, str) or not re.fullmatch(
         re.escape(REGISTRY + ".cr.cloud.ru/" + REPOSITORY) + r"@sha256:[0-9a-f]{64}", image

@@ -131,6 +131,15 @@ Probe names are 16 characters. The live API rejected the earlier 30-character
 `rdc-browser-probe-<sha>` name with HTTP 400 and a `name` validation violation;
 the compact prefix preserves the same 12-character source identity.
 
+The workflow's `name_preflight` action checks the complete inventory and a fixed
+set of candidate names through `POST /v2/containers:check_name`. It builds no
+image and creates or stops no resource. Availability is reported separately from
+validation; it is not proof that a complete create request will be accepted.
+Name-validation hints contain only fixed categories and explicit character-count
+bounds; provider descriptions and regular expressions are never printed.
+The endpoint and full inventory schema are documented in the current official
+[OpenAPI](https://cloud.ru/docs/api/specs/container-apps-evolution/ug/_specs/openapi.yaml).
+
 `ALICE_RDC_MODE=cloud-probe` starts only sandboxed Chromium and the synthetic
 rendering check. It never starts RDC, pairing or an authenticated browser session.
 The only HTTP route is `GET /healthz` on `0.0.0.0:$PORT` (default 8080); it returns
