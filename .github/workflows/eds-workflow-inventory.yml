@@ -1,0 +1,29 @@
+name: EDS Workflow Studio inventory
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Install verified EDS CLI
+        run: |
+          timeout 30s python scripts/install_eds.py --bin-dir "$RUNNER_TEMP/eds-bin"
+          echo "$RUNNER_TEMP/eds-bin" >> "$GITHUB_PATH"
+      - name: Inventory Workflow Studio without raw API output
+        env:
+          EDS_API_KEY: ${{ secrets.EDS_API_KEY }}
+          EDS_PROJECT_ID: ${{ secrets.EDS_PROJECT_ID || vars.CLOUDRU_PROJECT_ID }}
+          EDS_WF_API_URL: https://pipeline.cloud.ru/public-api/v1
+        run: timeout 30s python scripts/eds_workflow_inventory.py
