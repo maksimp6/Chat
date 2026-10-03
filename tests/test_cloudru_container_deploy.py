@@ -252,6 +252,54 @@ def test_list_uses_v2_pagination_contract():
     )
 
 
+@pytest.mark.parametrize("total", [0, "0", 2, "2"])
+def test_strict_inventory_accepts_integer_and_decimal_string_totals(total):
+    items = [{"name": "one"}, {"name": "two"}] if int(total) else []
+    pages = [{"data": items, "total": total}]
+    if items:
+        pages = [
+            {"data": items[:1], "total": total, "nextPageToken": "next"},
+            {"data": items[1:], "total": int(total)},
+        ]
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient(pages))
+    assert apps.list(require_total=True) == items
+
+
+@pytest.mark.parametrize(
+    "total",
+    [
+        False,
+        None,
+        "",
+        "-1",
+        "1.5",
+        "NaN",
+        " 0",
+        "00",
+        "9" * 21,
+        "9" * 20,
+        1 << 63,
+        str(1 << 63),
+        (1 << 64) - 1,
+    ],
+)
+def test_strict_inventory_rejects_invalid_total_representations(total):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([{"data": [], "total": total}])
+    )
+    with pytest.raises(CloudProviderError, match="Invalid inventory total"):
+        apps.list(require_total=True)
+
+
+@pytest.mark.parametrize("total", [(1 << 63) - 1, str((1 << 63) - 1)])
+def test_inventory_accepts_int64_max_but_still_requires_all_records(total):
+    apps = CloudRuContainerAppsClient(
+        project_id="p1", client=RecordingClient([{"data": [], "total": total}])
+    )
+    with pytest.raises(CloudProviderError, match="Incomplete container inventory"):
+        apps.list(require_total=True)
+
+
 def test_list_rejects_non_positive_page_size():
     apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient())
     with pytest.raises(CloudProviderError, match="page_size"):
