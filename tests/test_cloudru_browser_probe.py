@@ -295,6 +295,15 @@ def test_provider_diagnostics_ignore_malformed_json_and_bound_cause_chain():
     assert "provider_status_code" not in probe.probe_error_details(error)
 
 
+def test_provider_diagnostics_do_not_mask_failure_with_deep_json():
+    error = provider_failure({"code": 3})
+    error.__cause__.response._content = b"[" * 10000 + b"0" + b"]" * 10000
+    assert probe.probe_error_details(error) == {
+        "error": "provider_http_error",
+        "http_status": 400,
+    }
+
+
 @pytest.mark.parametrize(
     "payload",
     [

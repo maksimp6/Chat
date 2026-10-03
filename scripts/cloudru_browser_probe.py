@@ -80,7 +80,7 @@ def probe_error_details(exc):
         if response is not None and len(response.content) <= 65536:
             try:
                 payload = response.json()
-            except ValueError:
+            except (ValueError, RecursionError):
                 payload = None
             if isinstance(payload, dict):
                 provider_code = payload.get("code")
