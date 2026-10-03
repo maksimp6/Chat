@@ -12,7 +12,7 @@ def workflow(name):
     return yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
 
 
-def test_eds_credentials_are_scoped_to_authorized_task_execution():
+def test_general_task_execution_installs_cli_without_production_credentials():
     jobs = workflow("claude-lite.yml")["jobs"]
     job = jobs["claude"]
     assert job["environment"] == "production"
@@ -25,14 +25,8 @@ def test_eds_credentials_are_scoped_to_authorized_task_execution():
     assert install["if"] == execute["if"]
     assert "timeout 30s python scripts/install_eds.py" in install["run"]
     assert '"$GITHUB_PATH"' in install["run"]
-    assert execute["env"] == {
-        "EDS_API_KEY": "${{ secrets.EDS_API_KEY }}",
-        "EDS_PROJECT_ID": "${{ secrets.EDS_PROJECT_ID || vars.CLOUDRU_PROJECT_ID }}",
-    }
-    for step in steps:
-        if step is not execute:
-            assert "EDS_API_KEY" not in str(step)
-    assert "EDS_API_KEY" not in str(jobs["dialogue"])
+    assert "EDS_API_KEY" not in str(jobs)
+    assert "EDS_PROJECT_ID" not in str(jobs)
 
 
 def test_eds_auth_check_is_manual_trusted_and_does_not_publish_api_output():
@@ -43,6 +37,8 @@ def test_eds_auth_check_is_manual_trusted_and_does_not_publish_api_output():
     job = config["jobs"]["check"]
     assert job["if"] == "github.ref == 'refs/heads/master'"
     assert job["environment"] == "production"
+    assert "env" not in job
+    assert "env" not in config
     steps = job["steps"]
     assert steps[0]["with"]["persist-credentials"] is False
     assert all("EDS_API_KEY" not in str(step) for step in steps[:-1])

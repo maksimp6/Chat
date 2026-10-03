@@ -17,12 +17,13 @@ actual values through the owner's authorized secret source or direct entry into
 GitHub's secret form. Do not put them in issues, commits, logs, or chat. Cloud.ru
 IAM Key ID/Key Secret and model-provider keys are different credentials.
 
-The secrets are injected only into the task-execution action. They are not
-required for unrelated code tasks, installed into a config file, or restored
-from session checkpoints. The tool-free persistent dialogue job receives no EDS
-credentials and retains its existing restrictions. The existing Python tool
-permission lets a task invoke EDS through a subprocess with captured output;
-this change does not grant unrestricted shell commands or deployment approval.
+The secrets are injected only into the fixed read-only check in
+`eds-runner.yml`. Neither the general Claude-Lite task action nor the tool-free
+persistent dialogue receives EDS credentials. A production DevServices key can
+authorize destructive operations, so it must not be exposed to model-controlled
+Python or shell subprocesses. Keys are not installed into a config file or
+restored from session checkpoints. General tasks can inspect the CLI and prepare
+commands; authenticated operations need a separately approved, scoped workflow.
 
 After merge and secret entry, run **EDS runner check** on `master` from GitHub
 Actions. It independently installs the verified binary and performs one read-only
