@@ -198,6 +198,7 @@ class CloudRuContainerAppsClient:
         page_size: int = 100,
         filter_expr: str | None = None,
         order_by: str | None = None,
+        require_total: bool = False,
     ) -> list[dict[str, Any]]:
         """Return all Container Services using the documented v2 pagination contract."""
         if page_size < 1:
@@ -206,6 +207,7 @@ class CloudRuContainerAppsClient:
         items: list[dict[str, Any]] = []
         page_token: str | None = None
         seen_tokens: set[str] = set()
+        expected_total: int | None = None
         while True:
             params: dict[str, Any] = {
                 "projectId": self._project(),
@@ -219,24 +221,37 @@ class CloudRuContainerAppsClient:
                 params["orderBy"] = order_by
 
             payload = self.client.request(SERVICE, "GET", "/v2/containers", params=params)
-            data = payload.get("data", [])
+            data = payload.get("data")
             if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid list payload",
                     code="invalid_response",
                 )
             items.extend(data)
+            if "total" in payload:
+                total = payload["total"]
+                if (
+                    type(total) is not int
+                    or total < 0
+                    or (expected_total is not None and total != expected_total)
+                ):
+                    raise CloudProviderError("Invalid inventory total", code="invalid_response")
+                expected_total = total
 
             next_token = payload.get("nextPageToken")
-            if next_token is None:
+            if next_token is None or next_token == "":
+                if require_total and expected_total is None:
+                    raise CloudProviderError("Missing inventory total", code="invalid_response")
+                if expected_total is not None and len(items) != expected_total:
+                    raise CloudProviderError(
+                        "Incomplete container inventory", code="invalid_response"
+                    )
                 return items
             if not isinstance(next_token, str):
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid pagination token",
                     code="invalid_response",
                 )
-            if next_token == "":
-                return items
             if next_token in seen_tokens:
                 raise CloudProviderError(
                     "Cloud.ru Container Apps returned invalid pagination token",
