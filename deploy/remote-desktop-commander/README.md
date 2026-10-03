@@ -97,6 +97,37 @@ in the official dashboard when requested. No automatic logout, deletion, or
 revocation is part of deployment.
 # Protected server pairing redirect
 
+## Cloud.ru compatibility probe
+
+The manual **Cloud.ru browser compatibility probe** workflow runs only from
+protected `master` using the existing production IAM pair. It exports that exact
+commit, builds the RDC image, pushes it to the dedicated private `alice-rdc-probe`
+registry, and creates a separate `rdc-browser-probe-<sha>` Container App pinned by
+digest. This creates billable registry/image storage and brief container usage.
+The probe uses scale 0–1 and requests a stop in cleanup; it does not delete the
+image or container. A failed stop is a failure, and a stop request alone is not
+confirmation that the provider has completed it. Inspect status after the run.
+An existing same-name container is never taken over automatically.
+
+`ALICE_RDC_MODE=cloud-probe` starts only sandboxed Chromium and the synthetic
+rendering check. It never starts RDC, pairing or an authenticated browser session.
+The only HTTP route is `GET /healthz` on `0.0.0.0:$PORT` (default 8080); it returns
+503 until rendering succeeds and then static readiness booleans. CDP stays on
+loopback. Browser startup and live verification have separate 30-second budgets;
+building/pushing the image is not part of those budgets.
+
+This probe does not establish persistent-session support. Container Apps permanent
+volumes use Object Storage and disallow socket/symlink operations needed by a live
+Chromium profile. The probe uses disposable container storage. The existing
+Compose deployment continues to use its local persistent volume and private CDP.
+Full RDC deployment still needs a verified storage strategy and sandbox support;
+there is no privileged or `--no-sandbox` fallback.
+
+References: [volumes](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes)
+and [unsupported volume operations](https://cloud.ru/docs/container-apps-evolution/ug/topics/troubleshooting__bucket-size-exceeded).
+
+## Existing server redirect
+
 The Commander startup preload observes the official `/device/start` response
 without changing RDC's PKCE or polling. Only `verification_uri_complete` and a
 maximum ten-minute expiry are written to `pairing/handoff.json`. This separate

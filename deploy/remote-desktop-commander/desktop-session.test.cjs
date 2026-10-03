@@ -93,3 +93,48 @@ test("smoke starts the synthetic test instead of the authenticated RDC client", 
   assert.deepEqual(h.calls[1].args, ["/opt/desktop-commander/browser-smoke.cjs"]);
   assert(h.calls.every(({ args }) => !args.includes("remote")));
 });
+
+test("cloud probe serves readiness only after synthetic rendering, never starts RDC", { timeout: 5000 }, async () => {
+  let port;
+  let release;
+  const rendered = new Promise((resolve) => { release = resolve; });
+  const h = harness((child, number) => {
+    if (number === 2) release(child);
+  });
+  const running = supervise(["--cloud-probe"], {
+    ...h, port: 0, onListening: (value) => { port = value; },
+  });
+  const smoke = await rendered;
+  try {
+    let response = await fetch(`http://127.0.0.1:${port}/healthz`);
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).browser_ready, false);
+    smoke.exitCode = 0;
+    smoke.emit("exit", 0);
+    response = await fetch(`http://127.0.0.1:${port}/healthz`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      mode: "cloud-probe", browser_ready: true, smoke_passed: true,
+    });
+    for (const path of ["/json/version", "/rdc", "/healthz?secret=x"]) {
+      assert.equal((await fetch(`http://127.0.0.1:${port}${path}`)).status, 404);
+    }
+    assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`, { method: "POST" })).status, 404);
+    assert.deepEqual(h.calls[1].args, ["/opt/desktop-commander/browser-smoke.cjs"]);
+    assert(h.calls.every(({ args }) => !args.includes("remote")));
+  } finally {
+    h.signals.emit("SIGTERM");
+    assert.equal(await running, 0);
+  }
+});
+
+test("cloud probe rejects invalid port and stops on failed smoke", async () => {
+  const badPort = harness();
+  assert.equal(await supervise(["--cloud-probe"], { ...badPort, port: -1 }), 1);
+  assert.equal(badPort.calls.length, 0);
+  const failed = harness((child, number) => {
+    if (number === 2) { child.exitCode = 1; child.emit("exit", 1); }
+  });
+  assert.equal(await supervise(["--cloud-probe"], { ...failed, port: 0 }), 1);
+  assert(failed.calls[0].child.killedWith.includes("SIGTERM"));
+});

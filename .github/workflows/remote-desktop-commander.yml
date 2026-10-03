@@ -54,6 +54,26 @@ jobs:
             touch /home/node/write-check /workspace/write-check
             grep -qE "^CapEff:[[:space:]]+0+$" /proc/self/status
           '
+      - name: Verify HTTP probe without RDC authentication
+        working-directory: deploy/remote-desktop-commander
+        run: |
+          set -euo pipefail
+          trap 'docker rm -f rdc-cloud-probe >/dev/null 2>&1 || true' EXIT
+          docker compose run -d --name rdc-cloud-probe --no-deps -e ALICE_RDC_MODE=cloud-probe commander
+          timeout 30s docker exec rdc-cloud-probe node -e '
+            const {setTimeout: delay} = require("node:timers/promises");
+            (async () => {
+              for (let attempt = 0; attempt < 60; attempt++) {
+                try {
+                  const response = await fetch("http://127.0.0.1:8080/healthz", {signal: AbortSignal.timeout(1000)});
+                  const result = await response.json();
+                  if (response.ok && result.mode === "cloud-probe" && result.smoke_passed === true) return;
+                } catch {}
+                await delay(250);
+              }
+              process.exitCode = 1;
+            })();
+          '
   deploy:
     if: >-
       github.ref == 'refs/heads/master' &&
