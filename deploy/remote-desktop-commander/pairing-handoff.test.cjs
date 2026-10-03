@@ -26,6 +26,17 @@ test('handoff contains only verification URL and expiry, never provider secrets'
     assert.equal(handoff.verification_uri_complete, payload.verification_uri_complete);
     assert.ok(handoff.expires_at <= Date.now() / 1000 + 600);
     assert.equal(fs.statSync(target).mode & 0o777, 0o640);
+    const validStart = { ...payload };
+    payload = { verification_uri_complete: 'https://evil.example/', expires_in: 60 };
+    await fetch(start);
+    assert.equal(fs.existsSync(target), false);
+    payload = validStart;
+    await fetch(start);
+    payload = { error_description: 'Denied' };
+    await fetch('https://mcp.desktopcommander.app/device/poll');
+    assert.equal(fs.existsSync(target), false);
+    payload = validStart;
+    await fetch(start);
     payload = { error: 'authorization_pending' };
     await fetch('https://mcp.desktopcommander.app/device/poll');
     assert.ok(fs.existsSync(target));

@@ -24,6 +24,7 @@ if (target) {
     const raw = args[0] instanceof Request ? args[0].url : String(args[0]);
     const endpoint = new URL(raw);
     if (trustedUrl(raw) && ['/device/start', '/device/poll'].includes(endpoint.pathname)) {
+      if (endpoint.pathname === '/device/start') clear();
       const data = await response.clone().json().catch(() => null);
       if (endpoint.pathname === '/device/start' && response.ok && data &&
           typeof data.verification_uri_complete === 'string' &&
@@ -38,7 +39,7 @@ if (target) {
         fs.chmodSync(temporary, 0o640);
         fs.renameSync(temporary, target);
       } else if (endpoint.pathname === '/device/poll' && response.status < 500 && data &&
-                 (data.access_token || (data.error && !['authorization_pending', 'slow_down'].includes(data.error)))) {
+                 (data.access_token || !['authorization_pending', 'slow_down'].includes(data.error))) {
         clear();
       }
     }
