@@ -5,12 +5,12 @@ release with `scripts/install_eds.py`. The installer verifies the pinned SHA-256
 before execution. Installation has a 30-second limit and the verified binary is
 added to the job's PATH. Each new hosted task run installs it again.
 
-In GitHub Settings → Environments → production, add these environment secrets:
+In GitHub Settings → Environments → production, add the DevServices key (and a project override only if needed):
 
 | Secret | Value |
 | --- | --- |
 | `EDS_API_KEY` | DevServices product API key (`X-API-KEY`) |
-| `EDS_PROJECT_ID` | The corresponding Cloud.ru project UUID |
+| `EDS_PROJECT_ID` | Optional project UUID override; otherwise the existing `CLOUDRU_PROJECT_ID` environment variable is used |
 
 The owner authorized adding these keys in the runner setup request. Obtain the
 actual values through the owner's authorized secret source or direct entry into

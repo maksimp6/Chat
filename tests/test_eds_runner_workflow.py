@@ -27,7 +27,7 @@ def test_eds_credentials_are_scoped_to_authorized_task_execution():
     assert '"$GITHUB_PATH"' in install["run"]
     assert execute["env"] == {
         "EDS_API_KEY": "${{ secrets.EDS_API_KEY }}",
-        "EDS_PROJECT_ID": "${{ secrets.EDS_PROJECT_ID }}",
+        "EDS_PROJECT_ID": "${{ secrets.EDS_PROJECT_ID || vars.CLOUDRU_PROJECT_ID }}",
     }
     for step in steps:
         if step is not execute:
@@ -48,7 +48,9 @@ def test_eds_auth_check_is_manual_trusted_and_does_not_publish_api_output():
     assert all("EDS_API_KEY" not in str(step) for step in steps[:-1])
     check = steps[-1]
     assert check["env"]["EDS_API_KEY"] == "${{ secrets.EDS_API_KEY }}"
-    assert check["env"]["EDS_PROJECT_ID"] == "${{ secrets.EDS_PROJECT_ID }}"
+    assert (
+        check["env"]["EDS_PROJECT_ID"] == "${{ secrets.EDS_PROJECT_ID || vars.CLOUDRU_PROJECT_ID }}"
+    )
     assert '-z "$EDS_API_KEY"' in check["run"]
     assert "timeout 30s eds repo list --limit 1 --offset 0 --json >/dev/null 2>&1" in check["run"]
     assert "eds config" not in check["run"]
