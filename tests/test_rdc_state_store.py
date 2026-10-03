@@ -1,3 +1,4 @@
+import errno
 import gzip
 import hashlib
 import importlib.util
@@ -11,6 +12,7 @@ import socket
 import stat
 import sys
 import tarfile
+import tempfile
 from types import SimpleNamespace
 
 import pytest
@@ -724,3 +726,178 @@ def test_archive_file_directory_contradiction_rejected_before_restore(store, rev
     put_slot(store, "snapshot", 0, 1, archive_bytes(members[::-1] if reverse else members))
     with pytest.raises(storage.StateError, match="STATE_CORRUPT"):
         store.status()
+
+
+def test_restore_across_real_filesystems_stages_under_home(store, monkeypatch):
+    second_filesystem = Path("/dev/shm")
+    if not second_filesystem.is_dir() or not os.access(second_filesystem, os.W_OK):
+        pytest.skip("a second writable local filesystem is unavailable")
+    if second_filesystem.stat().st_dev == store.workspace.stat().st_dev:
+        pytest.skip("test paths do not reside on different filesystems")
+    auth_file(store, "durable-session")
+    profile = store.home / ".config/chromium/Default"
+    profile.mkdir(parents=True)
+    (profile / "Cookies").write_bytes(b"closed-profile")
+    script = store.workspace / "run.sh"
+    script.write_text("#!/bin/sh\nexit 0\n")
+    script.chmod(0o751)
+    store.checkpoint()
+    durable = {path.name: path.read_bytes() for path in store.state.iterdir()}
+    with tempfile.TemporaryDirectory(prefix="rdc-recovery-test-", dir=second_filesystem) as mounted:
+        home = Path(mounted, "home")
+        home.mkdir()
+        workspace = store.workspace.parent / "restored-workspace"
+        workspace.mkdir()
+        restored = storage.StateStore(store.state, PROJECT, home, workspace)
+        original = storage.tempfile.TemporaryDirectory
+        staging_paths = []
+
+        def private_home_staging(*args, **kwargs):
+            assert kwargs["dir"] == home
+            directory = original(*args, **kwargs)
+            path = Path(directory.name)
+            assert path.parent == home
+            assert stat.S_IMODE(path.stat().st_mode) == 0o700
+            staging_paths.append(path)
+            return directory
+
+        monkeypatch.setattr(storage.tempfile, "TemporaryDirectory", private_home_staging)
+        assert restored.restore() == {"status": "STATE_RESTORED", "generation": 1}
+        assert (
+            json.loads(restored.auth.read_bytes())["session"]["access_token"] == "durable-session"
+        )
+        assert (home / ".config/chromium/Default/Cookies").read_bytes() == b"closed-profile"
+        assert (workspace / "run.sh").read_text() == "#!/bin/sh\nexit 0\n"
+        assert stat.S_IMODE((workspace / "run.sh").stat().st_mode) == 0o700
+        assert stat.S_IMODE(restored.auth.stat().st_mode) == 0o600
+        assert home.stat().st_dev != workspace.stat().st_dev
+        assert staging_paths and all(not path.exists() for path in staging_paths)
+        assert {path.name: path.read_bytes() for path in store.state.iterdir()} == durable
+
+
+def test_failed_copy_removes_only_its_partial_destination(store, tmp_path, monkeypatch):
+    staging = tmp_path / "private-staging"
+    staging.mkdir(mode=0o700)
+    source = staging / "work"
+    content = b"closed workspace contents"
+    source.write_bytes(content)
+    original = storage.os.fdopen
+
+    class DiskFullWriter:
+        def __init__(self, handle):
+            self.handle = handle
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.handle.__exit__(*args)
+
+        def write(self, block):
+            self.handle.write(block[:3])
+            self.handle.flush()
+            raise OSError(errno.ENOSPC, "synthetic local disk full")
+
+    def disk_full(fd, mode):
+        handle = original(fd, mode)
+        return DiskFullWriter(handle) if mode == "wb" else handle
+
+    monkeypatch.setattr(storage.os, "fdopen", disk_full)
+    with pytest.raises(OSError) as failure:
+        store._install(staging, store.workspace)
+    assert failure.value.errno == errno.ENOSPC
+    assert source.read_bytes() == content
+    assert not list(store.workspace.iterdir())
+
+
+@pytest.mark.parametrize("change", ["grow", "shrink", "mtime"])
+def test_copy_detects_changed_staging_without_publishing_file(store, tmp_path, monkeypatch, change):
+    staging = tmp_path / "private-staging"
+    staging.mkdir(mode=0o700)
+    source = staging / "work"
+    source.write_bytes(b"original")
+    original = storage.os.fdopen
+
+    class ChangedReader:
+        def __init__(self, handle):
+            self.handle = handle
+            self.changed = False
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.handle.__exit__(*args)
+
+        def fileno(self):
+            return self.handle.fileno()
+
+        def read(self, size):
+            if not self.changed:
+                self.changed = True
+                if change == "grow":
+                    source.write_bytes(b"unexpected larger file")
+                elif change == "shrink":
+                    source.write_bytes(b"")
+                else:
+                    value = source.stat()
+                    os.utime(source, ns=(value.st_atime_ns, value.st_mtime_ns + 1))
+            return self.handle.read(size)
+
+    def changed(fd, mode):
+        handle = original(fd, mode)
+        return ChangedReader(handle) if mode == "rb" else handle
+
+    monkeypatch.setattr(storage.os, "fdopen", changed)
+    with pytest.raises(storage.StateError, match="STATE_CHANGED"):
+        store._install(staging, store.workspace)
+    assert source.exists()
+    assert not list(store.workspace.iterdir())
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hardlink", "fifo", "oversize"])
+def test_copy_refuses_unsafe_or_oversized_staging(store, tmp_path, monkeypatch, kind):
+    staging = tmp_path / "private-staging"
+    staging.mkdir(mode=0o700)
+    outside = tmp_path / "retain"
+    outside.write_bytes(b"private outside contents")
+    source = staging / "work"
+    if kind == "symlink":
+        source.symlink_to(outside)
+    elif kind == "hardlink":
+        os.link(outside, source)
+    elif kind == "fifo":
+        os.mkfifo(source)
+    else:
+        source.write_bytes(b"more than four bytes")
+        monkeypatch.setattr(storage, "MAX_CONTENT", 4)
+    with pytest.raises((storage.StateError, OSError)):
+        store._install(staging, store.workspace)
+    assert outside.read_bytes() == b"private outside contents"
+    assert not list(store.workspace.iterdir())
+
+
+def test_exclusive_copy_preserves_a_destination_created_during_install(
+    store, tmp_path, monkeypatch
+):
+    staging = tmp_path / "private-staging"
+    staging.mkdir(mode=0o700)
+    source = staging / "work"
+    source.write_bytes(b"new contents")
+    outside = tmp_path / "retain"
+    outside.write_bytes(b"existing contents")
+    original = storage.os.open
+
+    def raced_destination(path, flags, *args, **kwargs):
+        if path == "work" and flags & os.O_CREAT:
+            os.symlink(outside, path, dir_fd=kwargs["dir_fd"])
+        return original(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(storage.os, "open", raced_destination)
+    with pytest.raises(FileExistsError):
+        store._install(staging, store.workspace)
+    assert source.read_bytes() == b"new contents"
+    assert outside.read_bytes() == b"existing contents"
+    assert (store.workspace / "work").is_symlink()

@@ -20,8 +20,8 @@ import tempfile
 import uuid
 
 
-MAX_ARCHIVE = 256 * 1024 * 1024
-MAX_CONTENT = 512 * 1024 * 1024
+MAX_ARCHIVE = 128 * 1024 * 1024
+MAX_CONTENT = 256 * 1024 * 1024
 MAX_FILES = 20000
 MAX_AUTH = 65536
 MAX_METADATA = 4096
@@ -467,7 +467,9 @@ class StateStore:
                             fail("LOCAL_STATE_NOT_EMPTY")
                     finally:
                         os.close(fd)
-        with tempfile.TemporaryDirectory() as staging:
+        # Expanded state belongs on local home storage, not Compose's bounded
+        # /tmp tmpfs and never on the Object Storage mount.
+        with tempfile.TemporaryDirectory(prefix=".rdc-restore-", dir=self.home) as staging:
             if snapshot:
                 archive_path = Path(staging, "snapshot.tar.gz")
                 archive_path.write_bytes(snapshot["raw"])
@@ -504,18 +506,64 @@ class StateStore:
     def _install(source, target):
         target.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd = directory_fd(target)
-        os.close(fd)
-        target.chmod(0o700)
-        for child in source.iterdir():
-            destination = target / child.name
-            if child.is_dir():
-                StateStore._install(child, destination)
-            else:
-                if os.path.lexists(destination):
-                    fail("LOCAL_STATE_NOT_EMPTY")
-                # Both trees are private local POSIX storage. Moving avoids
-                # doubling restored content within the container's disk budget.
-                os.rename(child, destination)
+        try:
+            os.fchmod(fd, 0o700)
+            for child in source.iterdir():
+                destination = target / child.name
+                if stat.S_ISDIR(child.lstat().st_mode):
+                    StateStore._install(child, destination)
+                else:
+                    if os.path.lexists(destination):
+                        fail("LOCAL_STATE_NOT_EMPTY")
+                    StateStore._copy_file(child, fd)
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _copy_file(child, target_fd):
+        """Private exclusive copies work across separate local filesystems."""
+        source_parent = directory_fd(child.parent)
+        created = False
+        complete = False
+        try:
+            source_fd = os.open(
+                child.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source_parent
+            )
+            with os.fdopen(source_fd, "rb") as source:
+                before = os.fstat(source.fileno())
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or before.st_nlink != 1
+                    or before.st_size > MAX_CONTENT
+                ):
+                    fail("INVALID_STATE")
+                output_fd = os.open(
+                    child.name,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o600,
+                    dir_fd=target_fd,
+                )
+                created = True
+                with os.fdopen(output_fd, "wb") as output:
+                    copied = 0
+                    while block := source.read(65536):
+                        copied += len(block)
+                        if copied > before.st_size:
+                            fail("STATE_CHANGED")
+                        output.write(block)
+                    after = os.fstat(source.fileno())
+                    if copied != before.st_size or (
+                        before.st_size,
+                        before.st_mtime_ns,
+                    ) != (after.st_size, after.st_mtime_ns):
+                        fail("STATE_CHANGED")
+                    os.fchmod(output.fileno(), 0o700 if before.st_mode & 0o100 else 0o600)
+            os.unlink(child.name, dir_fd=source_parent)
+            complete = True
+        finally:
+            if created and not complete:
+                os.unlink(child.name, dir_fd=target_fd)
+            os.close(source_parent)
 
     def checkpoint(self):
         """Caller has quiesced both processes; never call on open databases."""

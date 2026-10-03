@@ -188,6 +188,16 @@ Chromium or RDC. Workspace owner executable bits are retained; group/world acces
 and setuid bits are removed. Browser cache and `Singleton*` runtime files are
 excluded. Workspace links are unsupported by this snapshot format.
 
+Snapshots are limited to 128 MiB compressed, 256 MiB of regular file contents
+and 20,000 archive entries. Restore stages validated content in a private directory
+under the local home, keeping expanded files out of Compose's 256 MiB `/tmp`.
+Exclusive bounded copies install files across separate local home/workspace
+filesystems; an incomplete copy is removed and startup fails. The archive and
+content can temporarily occupy up to 640 MiB during copying, plus authorization
+data and filesystem/entry overhead. This is a data bound, not a guarantee of total
+disk usage; insufficient local space blocks startup. The Object Storage mount
+still receives only closed regular files and never rename or fsync operations.
+
 Committed `device.json` updates, including rotated refresh tokens, are journaled
 separately. Invalid or possibly newer corrupt authorization fails closed instead
 of reverting to stale credentials. A persistence failure stops the runtime.
