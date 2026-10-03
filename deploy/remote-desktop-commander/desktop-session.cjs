@@ -87,11 +87,13 @@ async function supervise(argv, options = {}) {
     return child;
   };
   try {
+    // Never reuse or close a browser started by another process in this container.
+    if (await probe()) return 1;
     start("chromium", browserArgs, "ignore");
     // Whole startup is bounded, including failed/slow health requests.
     const deadline = Date.now() + (options.startupTimeoutMs ?? 30000);
     while (!stopping && Date.now() < deadline) {
-      if (await probe()) { ready = true; break; }
+      if (await probe()) { ready = !stopping; break; }
       await Promise.race([sleep(100), ended]);
     }
     if (!ready || stopping) return exitCode;

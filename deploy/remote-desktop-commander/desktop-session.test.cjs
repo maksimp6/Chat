@@ -25,7 +25,8 @@ function harness(onLaunch = () => {}) {
     return child;
   }
   let closes = 0;
-  return { calls, signals, spawn, probe: async () => true, sleep: async () => {},
+  let probes = 0;
+  return { calls, signals, spawn, probe: async () => ++probes > 1, sleep: async () => {},
     closeBrowser: async () => { closes++; }, get closes() { return closes; } };
 }
 
@@ -67,6 +68,13 @@ test("readiness timeout stops browser and never starts RDC", async () => {
   assert.equal(await supervise(["remote"], { ...h, startupTimeoutMs: 0 }), 1);
   assert.equal(h.calls.length, 1);
   assert(h.calls[0].child.killedWith.includes("SIGTERM"));
+});
+
+test("an existing browser is not taken over or closed", async () => {
+  const h = harness();
+  assert.equal(await supervise(["remote"], { ...h, probe: async () => true }), 1);
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.closes, 0);
 });
 
 test("unexpected child completion tears down the session as failure", async () => {
