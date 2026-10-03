@@ -879,3 +879,132 @@ def test_global_writable_does_not_override_readonly_mount():
     item["template"]["containers"][0]["volumeMounts"][0]["readOnly"] = True
     with pytest.raises(CloudProviderError):
         rdc.owned_record(apps_with(item), tenant=TENANT)
+
+
+def test_health_compatibility_fallback_is_fixed_and_shares_timeout(monkeypatch, capsys):
+    apps = apps_with()
+    original = CloudProviderError(
+        "private provider message", code="provider_http_error", http_status=400
+    )
+    timeouts = []
+
+    def call(*_args, **_kwargs):
+        timeouts.append(apps.client.timeout)
+        if len(timeouts) == 1:
+            raise original
+        return response(health())
+
+    apps.client.request.side_effect = call
+    ticks = iter([10, 13])
+    monkeypatch.setattr(rdc.time, "monotonic", lambda: next(ticks))
+    assert rdc.test_call(apps, "/healthz") == health()
+    calls = apps.client.request.call_args_list
+    assert timeouts == [20, 17]
+    assert calls[1].args == (
+        "container_apps",
+        "POST",
+        f"/v2/containers/{rdc.names(PROJECT)[0]}/testCall",
+    )
+    assert calls[1].kwargs == {
+        "params": {"projectId": PROJECT, "method": "GET", "path": "/healthz"}
+    }
+    assert apps.client.timeout == 20
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic == {
+        "stage": "rdc_health_compatibility",
+        "error": "provider_http_error",
+        "http_status": 400,
+    }
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 500])
+def test_health_auth_and_other_transport_errors_never_fallback(status):
+    apps = apps_with()
+    apps.client.request.side_effect = CloudProviderError(
+        "private", code="provider_http_error", http_status=status
+    )
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps, "/healthz")
+    assert apps.client.request.call_count == 1
+    assert apps.client.timeout == 20
+
+
+def test_checkpoint_transport_400_never_uses_headerless_fallback():
+    apps = apps_with()
+    apps.client.request.side_effect = CloudProviderError(
+        "private", code="provider_http_error", http_status=400
+    )
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps, "/checkpoint", "POST", nonce=NONCE)
+    assert apps.client.request.call_count == 1
+    assert apps.client.request.call_args.kwargs["json_body"]["headers"] == {
+        rdc.CONTROL_HEADER: NONCE
+    }
+
+
+def test_runtime_400_never_uses_transport_fallback():
+    apps = apps_with()
+    apps.client.request.return_value = response({"error": "private"}, status=400)
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps, "/healthz")
+    assert apps.client.request.call_count == 1
+
+
+def test_health_fallback_does_not_extend_expired_timeout(monkeypatch):
+    apps = apps_with()
+    original = CloudProviderError("private", code="provider_http_error", http_status=400)
+    apps.client.request.side_effect = original
+    ticks = iter([10, 31])
+    monkeypatch.setattr(rdc.time, "monotonic", lambda: next(ticks))
+    with pytest.raises(CloudProviderError) as error:
+        rdc.test_call(apps, "/healthz")
+    assert error.value is original
+    assert apps.client.request.call_count == 1
+    assert apps.client.timeout == 20
+
+
+def test_safe_provider_testcall_diagnostics_exclude_raw_values():
+    secret = "opaque-private-value-XYZ987"
+    response_value = requests.Response()
+    response_value._content = json.dumps(
+        {
+            "code": 3,
+            "message": "unsupported method " + secret,
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.BadRequest",
+                    "fieldViolations": [
+                        {"field": "method", "description": secret},
+                        {"field": secret},
+                    ],
+                }
+            ],
+        }
+    ).encode()
+    request_error = requests.HTTPError(response=response_value)
+    error = CloudProviderError(secret, code="provider_http_error", http_status=400)
+    try:
+        raise error from request_error
+    except CloudProviderError as caught:
+        diagnostic = rdc.safe_error(caught)
+    assert diagnostic["provider_validation_fields"] == ["method"]
+    assert diagnostic["provider_error_terms"] == ["method", "private", "unsupported"]
+    assert secret not in json.dumps(diagnostic)
+
+
+def test_status_reports_only_verified_service_and_known_resource_state(capsys):
+    item = record()
+    item["status"] = "untrusted-private-state"
+    apps = apps_with(item)
+    apps.client.request.side_effect = CloudProviderError(
+        "private", code="provider_http_error", http_status=403
+    )
+    with pytest.raises(CloudProviderError):
+        rdc.status(apps, tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic == {
+        "stage": "rdc_owned_service",
+        "container_name": rdc.names(PROJECT)[0],
+        "container_id": IDENTIFIER,
+        "resource_state": "other",
+    }
