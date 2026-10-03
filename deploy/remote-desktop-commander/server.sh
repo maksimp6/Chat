@@ -19,6 +19,7 @@ case "$operation" in
     tar -xzf "$archive" -C "$release"
     source_dir="$release/deploy/remote-desktop-commander"
     previous="$(mktemp -d "$root/releases/previous.XXXXXX")"
+    trap 'rm -rf -- "$previous"' EXIT
     files=(Dockerfile compose.yaml config.json entrypoint.sh pairing-handoff.cjs .dockerignore package.json package-lock.json dependency-smoke.cjs desktop-session.cjs browser-smoke.cjs chromium-seccomp.json chromium-seccomp.LICENSE)
     for file in "${files[@]}"; do
       if [[ -f "$root/$file" ]]; then cp "$root/$file" "$previous/$file"; fi

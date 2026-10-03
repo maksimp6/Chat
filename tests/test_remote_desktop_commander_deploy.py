@@ -66,6 +66,7 @@ def test_install_retries_use_clean_context_and_preserve_state(tmp_path):
     assert run(env, "install", revision).returncode == 0
     releases = list((root / "releases").glob(f"{revision}.*"))
     assert len(releases) == 2
+    assert not list((root / "releases").glob("previous.*"))
     assert sum((item / "stale.txt").exists() for item in releases) == 1
     assert (root / "state/auth-sentinel").read_text() == "not-a-real-secret"
     assert (root / "workspace/work.txt").read_text() == "keep"
@@ -193,6 +194,7 @@ def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
     result = run(env, "install", "b" * 40)
     assert result.returncode == 23
     assert (root / "compose.yaml").read_text() == "previous compose\n"
+    assert not list((root / "releases").glob("previous.*"))
     commands = log.read_text()
     assert "compose down --remove-orphans" in commands
     assert "tag alice-remote-desktop-commander:rollback-" in commands
