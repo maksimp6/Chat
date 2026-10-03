@@ -242,11 +242,21 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
                                 ("bytes_string", "4294967296"),
                             ),
                         ),
+                        "gpu_form": safe_form(
+                            resource_map.get("gpu"),
+                            (
+                                ("omitted_or_null", None),
+                                ("empty", {}),
+                                ("zero_count", {"count": 0}),
+                                ("zero_count_empty_sku", {"count": 0, "sku": ""}),
+                            ),
+                        ),
                         "known_resource_keys": sorted(
                             set(resource_map)
                             & {
                                 "cpu",
                                 "memory",
+                                "gpu",
                                 "ephemeralStorage",
                                 "ephemeral-storage",
                                 "ephemeral_storage",

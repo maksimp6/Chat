@@ -794,3 +794,14 @@ def test_stop_retry_of_confirmed_suspended_app_never_calls_runtime_or_mutates():
     apps.start.assert_not_called()
     store.upload.assert_not_called()
     assert store.download.call_args.args[0] == "owner.json"
+
+
+def test_gpu_default_diagnostic_does_not_accept_extra_resources(capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"]["gpu"] = {"count": 0, "sku": ""}
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["fields"] == ["resource_keys"]
+    assert diagnostic["known_resource_keys"] == ["cpu", "gpu", "memory"]
+    assert diagnostic["gpu_form"] == "zero_count_empty_sku"
