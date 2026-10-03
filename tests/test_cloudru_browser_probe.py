@@ -24,8 +24,7 @@ def owned():
 
 def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
     verify = Mock()
     monkeypatch.setattr(probe, "verify_probe", verify)
     result = probe.run_probe(apps, SHA, IMAGE)
@@ -36,12 +35,12 @@ def test_probe_passes_only_after_health_and_stops_verified_identity(monkeypatch)
     assert (spec.min_instances, spec.max_instances) == (0, 1)
     verify.assert_called_once_with(apps, NAME, ID, IMAGE)
     apps.stop.assert_called_once_with(NAME)
+    apps.get.assert_not_called()
 
 
 def test_wall_clock_timeout_still_stops_the_probe(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
 
     def expire(*_args):
         probe.signal.raise_signal(probe.signal.SIGALRM)
@@ -56,8 +55,7 @@ def test_wall_clock_timeout_still_stops_the_probe(monkeypatch):
 
 def test_probe_stops_on_runtime_failure(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
     monkeypatch.setattr(
         probe,
         "verify_probe",
@@ -80,8 +78,7 @@ def test_probe_never_takes_over_existing_resource():
 
 def test_ambiguous_create_timeout_stops_only_verified_owned_probe():
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [{"name": NAME, "id": ID}], [owned()]]
     apps.create.side_effect = CloudProviderError("timeout", code="provider_http_error")
     with pytest.raises(CloudProviderError, match="timeout"):
         probe.run_probe(apps, SHA, IMAGE)
@@ -102,8 +99,7 @@ def clock(monkeypatch):
 
 def test_async_create_waits_for_inventory_before_verification(monkeypatch, clock):
     apps = Mock()
-    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}], [owned()]]
     verify = Mock()
     monkeypatch.setattr(probe, "verify_probe", verify)
     assert probe.run_probe(apps, SHA, IMAGE)["status"] == "BROWSER_PROBE_PASSED"
@@ -116,8 +112,7 @@ def test_async_create_waits_for_inventory_before_verification(monkeypatch, clock
 def test_ambiguous_create_waits_for_delayed_inventory_and_detail(clock):
     apps = Mock()
     apps.create.side_effect = CloudProviderError("ambiguous", code="provider_http_error")
-    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}]]
-    apps.get.side_effect = [None, None, owned()]
+    apps.list.side_effect = [[], [], [], [{"name": NAME, "id": ID}], [], [], [owned()]]
     with pytest.raises(CloudProviderError, match="ambiguous"):
         probe.run_probe(apps, SHA, IMAGE)
     assert clock[0] == 4
@@ -127,8 +122,7 @@ def test_ambiguous_create_waits_for_delayed_inventory_and_detail(clock):
 
 def test_discovery_timeout_still_waits_and_stops_late_resource(monkeypatch, clock):
     apps = Mock()
-    apps.list.side_effect = [[]] * 33 + [[{"name": NAME, "id": ID}]]
-    apps.get.return_value = owned()
+    apps.list.side_effect = [[]] * 33 + [[{"name": NAME, "id": ID}], [owned()]]
     verify = Mock()
     monkeypatch.setattr(probe, "verify_probe", verify)
     with pytest.raises(CloudProviderError) as failure:
@@ -158,13 +152,16 @@ def test_missing_resource_is_unconfirmed_cleanup_not_success(create_error, clock
 
 def test_cleanup_wall_clock_budget_reports_unconfirmed_resource(monkeypatch, capsys):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
     monkeypatch.setattr(probe, "verify_probe", Mock())
 
-    def stalled_get(_name):
+    def stalled_list(**_kwargs):
+        if apps.list.call_count == 1:
+            return []
+        if apps.list.call_count == 2:
+            return [{"name": NAME, "id": ID}]
         probe.signal.raise_signal(probe.signal.SIGALRM)
 
-    apps.get.side_effect = stalled_get
+    apps.list.side_effect = stalled_list
     with pytest.raises(CloudProviderError) as failure:
         probe.run_probe(apps, SHA, IMAGE)
     assert failure.value.code == "cleanup_failed"
@@ -175,8 +172,11 @@ def test_cleanup_wall_clock_budget_reports_unconfirmed_resource(monkeypatch, cap
 
 def test_cleanup_refuses_resource_with_unexpected_image(monkeypatch):
     apps = Mock()
-    apps.list.side_effect = [[], [{"name": NAME, "id": ID}]]
-    apps.get.return_value = {**owned(), "template": {"containers": [{"image": "other"}]}}
+    apps.list.side_effect = [
+        [],
+        [{"name": NAME, "id": ID}],
+        [{**owned(), "template": {"containers": [{"image": "other"}]}}],
+    ]
     monkeypatch.setattr(probe, "verify_probe", Mock())
     with pytest.raises(CloudProviderError) as failure:
         probe.run_probe(apps, SHA, IMAGE)
@@ -388,6 +388,24 @@ def test_registry_operation_propagation_404_is_polled_without_recreating(clock):
     assert clock[0] == 2
 
 
+def test_provider_opaque_operation_id_is_preserved_and_path_quoted(clock):
+    registry = Mock(project_id=ID)
+    operation_id = "registry-create/opaque?request=1"
+    registry.client.request.side_effect = [
+        {},
+        {"id": operation_id},
+        {"id": operation_id, "done": True, "resourceId": ID},
+        registry_record(),
+    ]
+    probe.prepare_registry(registry)
+    operation_get = registry.client.request.call_args_list[2]
+    assert operation_get.args == (
+        "artifact_registry",
+        "GET",
+        "/v1/operations/registry-create%2Fopaque%3Frequest%3D1",
+    )
+
+
 @pytest.mark.parametrize("status", [401, 403, 404, 500])
 def test_registry_provider_errors_are_not_retried_or_used_for_creation(status):
     registry = Mock(project_id=ID)
@@ -400,6 +418,7 @@ def test_registry_provider_errors_are_not_retried_or_used_for_creation(status):
 def test_readiness_requires_expected_image_and_exact_static_response():
     apps = Mock()
     apps.get.return_value = {
+        "name": NAME,
         "id": ID,
         "status": "RUNNING",
         "template": {"containers": [{"image": IMAGE}]},
@@ -411,11 +430,13 @@ def test_readiness_requires_expected_image_and_exact_static_response():
         "browser_ready": True,
         "smoke_passed": True,
     }
+    apps.list.return_value = [apps.get.return_value]
     get = Mock(return_value=response)
     probe.verify_probe(apps, NAME, ID, IMAGE, http_get=get)
     get.assert_called_once_with(
         "https://" + NAME + ".containers.cloud.ru/healthz", timeout=3, allow_redirects=False
     )
+    apps.get.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -430,10 +451,12 @@ def test_readiness_requires_expected_image_and_exact_static_response():
 def test_readiness_rejects_untrusted_origin(uri):
     apps = Mock()
     apps.get.return_value = {
+        "name": NAME,
         "id": ID,
         "template": {"containers": [{"image": IMAGE}]},
         "configuration": {"ingress": {"publicUri": uri}},
     }
+    apps.list.return_value = [apps.get.return_value]
     get = Mock()
     with pytest.raises(CloudProviderError):
         probe.verify_probe(apps, NAME, ID, IMAGE, http_get=get)

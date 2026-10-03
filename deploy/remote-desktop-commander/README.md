@@ -111,6 +111,12 @@ registry to become ready before image push. Registry reads and creation readines
 have separate 30-second budgets. The project-scoped route in the older public MCP
 example returned HTTP 404 against the live service.
 
+Probe health and cleanup ownership use the complete project container inventory,
+matching the resource UUID, name, description and digest. This uses the list route
+already verified in the live project; incomplete ownership data stops cleanup with
+an explicit error. The stop operation remains the name-based v2 action documented
+by the [Container Apps client](https://github.com/Nick1994209/cloudru-containerapps-mcp/blob/1c5fab2028f13991c52338fee6c1ae9ad719073f/internal/application/cloudru/containerapps.go).
+
 The manual **Cloud.ru browser compatibility probe** workflow runs only from
 protected `master` using the existing production IAM pair. It exports that exact
 commit, builds the RDC image, pushes it to the dedicated private `alice-rdc-probe`

@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 import requests
@@ -75,7 +75,7 @@ def registry_response_shape(payload):
     return shape(payload)
 
 
-def find_probe(apps, name):
+def probe_record(apps, name):
     found = [item for item in apps.list(require_total=True) if item.get("name") == name]
     if len(found) > 1:
         raise CloudProviderError("Ambiguous probe", code="invalid_response")
@@ -86,7 +86,12 @@ def find_probe(apps, name):
         identifier = str(UUID(item["id"]))
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise CloudProviderError("Invalid probe identity", code="invalid_response") from exc
-    return identifier
+    return {**item, "id": identifier}
+
+
+def find_probe(apps, name):
+    item = probe_record(apps, name)
+    return item["id"] if item is not None else None
 
 
 def registry_inventory(registry):
@@ -178,12 +183,15 @@ def wait_registry_ready(registry, identifier):
 
 
 def wait_registry_operation(registry, operation):
-    try:
-        operation_id = str(UUID(operation["id"]))
-    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+    operation_id = operation.get("id")
+    if (
+        not isinstance(operation_id, str)
+        or not 1 <= len(operation_id) <= 256
+        or any(ord(char) < 33 or ord(char) > 126 for char in operation_id)
+    ):
         raise CloudProviderError(
             "Registry operation identity unavailable", code="registry_creation_unconfirmed"
-        ) from exc
+        )
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         error = operation.get("error")
@@ -206,7 +214,7 @@ def wait_registry_operation(registry, operation):
         time.sleep(1)
         try:
             operation = registry.client.request(
-                "artifact_registry", "GET", f"/v1/operations/{operation_id}"
+                "artifact_registry", "GET", f"/v1/operations/{quote(operation_id, safe='')}"
             )
         except CloudProviderError as exc:
             if exc.http_status != 404:
@@ -298,7 +306,7 @@ def stop_probe(apps, name, identifier, image):
     identifier = identifier or wait_for_probe(apps, name)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        current = apps.get(name)
+        current = probe_record(apps, name)
         if current is None:
             time.sleep(1)
             continue
@@ -323,9 +331,10 @@ def stop_probe(apps, name, identifier, image):
 def verify_probe(apps, name, identifier, image, *, http_get=requests.get, sleep=time.sleep):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        app = apps.get(name)
+        app = probe_record(apps, name)
         if app is None:
-            raise CloudProviderError("Probe disappeared", code="not_found")
+            sleep(1)
+            continue
         if app.get("id") != identifier:
             raise CloudProviderError("Probe identity changed", code="invalid_response")
         template = app.get("template") or {}
