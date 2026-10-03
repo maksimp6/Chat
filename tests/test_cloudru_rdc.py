@@ -1043,14 +1043,17 @@ def revision_detail(**overrides):
 
 def test_revision_diagnostics_bind_context_and_hide_provider_reason(capsys):
     apps = apps_with()
-    apps.client.request.side_effect = [{"data": [{"id": DEVICE}]}, revision_detail()]
+    apps.client.request.side_effect = [{"data": [{"id": DEVICE}]}, revision_detail(), {"data": []}]
     rdc.revision_diagnostics(apps, record())
-    diagnostic = json.loads(capsys.readouterr().out)
+    diagnostic, system = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert system["stage"] == "rdc_system_event_diagnostic" and system["events_examined"] == 0
     assert diagnostic == {
         "stage": "rdc_revision_diagnostic",
         "revision_id": DEVICE,
         "resource_state": "error",
         "reason_categories": ["image_pull"],
+        "reason_form": "text",
+        "reason_terms": ["image", "pull"],
     }
     assert apps.client.timeout == 20
     assert apps.client.request.call_args_list[0].kwargs == {
@@ -1088,15 +1091,18 @@ def test_revision_diagnostics_limit_requests_and_total_timeout(capsys):
         if len(timeouts) == 1:
             clock.sleep(50)
             return {"data": [{"id": DEVICE}]}
-        return revision_detail(status="private-state", statusReason="private reason")
+        if len(timeouts) == 2:
+            return revision_detail(status="private-state", statusReason="private reason")
+        return {"data": []}
 
     apps.client.request.side_effect = read
     rdc.revision_diagnostics(apps, record(), clock=clock)
-    assert timeouts == [20, 10]
+    assert timeouts == [20, 10, 10]
     assert apps.client.timeout == 20
-    diagnostic = json.loads(capsys.readouterr().out)
+    diagnostic, system = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert diagnostic["resource_state"] == "other"
     assert diagnostic["reason_categories"] == ["other"]
+    assert system["events_examined"] == 0
 
 
 def test_revision_diagnostics_stop_when_deadline_expires():
@@ -1132,3 +1138,97 @@ def test_method_normalization_preserves_checkpoint_nonce_and_internal_allowlist(
     assert body["headers"] == {rdc.CONTROL_HEADER: NONCE}
     with pytest.raises(CloudProviderError):
         rdc.test_call(apps, "/healthz", "get")
+
+
+def test_system_event_diagnostics_bind_context_and_hide_unknown_values(capsys):
+    apps = apps_with()
+    secret = "opaque-private-value-XYZ987"
+    events = [
+        {
+            "serverlessId": IDENTIFIER,
+            "reason": "FailedMount",
+            "message": "volume permission denied " + secret,
+        },
+        {"serverlessId": IDENTIFIER, "reason": secret, "message": secret},
+    ]
+    apps.client.request.side_effect = [{"data": []}, {"data": events}]
+    rdc.revision_diagnostics(apps, record())
+    output = capsys.readouterr().out
+    assert secret not in output
+    diagnostic = json.loads(output)
+    assert diagnostic["known_reasons"] == ["FailedMount", "other"]
+    assert diagnostic["event_terms"] == ["denied", "failed", "mount", "permission", "volume"]
+    assert apps.client.request.call_args.args == (
+        "container_apps",
+        "GET",
+        f"/v2/containers/{rdc.names(PROJECT)[0]}/systemLogs",
+    )
+    assert apps.client.request.call_args.kwargs == {
+        "params": {"projectId": PROJECT, "serverlessId": IDENTIFIER}
+    }
+    assert apps.client.timeout == 20
+
+
+@pytest.mark.parametrize("owner", [None, DEVICE])
+def test_system_events_reject_missing_or_foreign_resource_context(owner, capsys):
+    apps = apps_with()
+    apps.client.request.side_effect = [
+        {"data": []},
+        {"data": [{"serverlessId": owner, "reason": "FailedMount"}]},
+    ]
+    with pytest.raises(CloudProviderError):
+        rdc.revision_diagnostics(apps, record())
+    assert capsys.readouterr().out == ""
+    assert apps.client.timeout == 20
+
+
+def test_system_events_cap_processing_and_report_truncation(capsys):
+    apps = apps_with()
+    event = {"serverlessId": IDENTIFIER, "reason": "Started", "message": "container started"}
+    apps.client.request.side_effect = [{"data": []}, {"data": [event] * 101}]
+    rdc.revision_diagnostics(apps, record())
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["events_examined"] == 100
+    assert diagnostic["response_truncated"] is True
+    assert diagnostic["known_reasons"] == ["Started"]
+    assert apps.client.request.call_count == 2
+
+
+def test_system_events_share_revision_diagnostic_deadline(capsys):
+    apps = apps_with()
+    clock = Clock()
+    timeouts = []
+
+    def read(*_args, **_kwargs):
+        timeouts.append(apps.client.timeout)
+        clock.sleep(50 if len(timeouts) == 1 else 10)
+        return {"data": []}
+
+    apps.client.request.side_effect = read
+    with pytest.raises(CloudProviderError):
+        rdc.revision_diagnostics(apps, record(), clock=clock)
+    assert timeouts == [20, 10]
+    assert capsys.readouterr().out == ""
+    assert apps.client.timeout == 20
+
+
+@pytest.mark.parametrize(
+    "form,value",
+    [
+        ("missing", "missing"),
+        ("null", None),
+        ("empty", ""),
+        ("text", "opaque-private-value"),
+        ("oversize", "x" * 8193),
+    ],
+)
+def test_revision_reason_shape_is_fixed_and_values_hidden(form, value, capsys):
+    apps = apps_with()
+    detail = revision_detail(statusReason=value)
+    if form == "missing":
+        detail.pop("statusReason")
+    apps.client.request.side_effect = [{"data": [{"id": DEVICE}]}, detail, {"data": []}]
+    rdc.revision_diagnostics(apps, record())
+    diagnostic = json.loads(capsys.readouterr().out.splitlines()[0])
+    assert diagnostic["reason_form"] == form
+    assert diagnostic["reason_terms"] == []
