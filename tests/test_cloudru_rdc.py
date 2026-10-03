@@ -805,3 +805,27 @@ def test_gpu_default_diagnostic_does_not_accept_extra_resources(capsys):
     assert diagnostic["fields"] == ["resource_keys"]
     assert diagnostic["known_resource_keys"] == ["cpu", "gpu", "memory"]
     assert diagnostic["gpu_form"] == "zero_count_empty_sku"
+
+
+@pytest.mark.parametrize("gpu", [{"count": False}, {"count": 0.0, "sku": ""}])
+def test_gpu_diagnostic_requires_nested_integer_zero(gpu, capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"]["gpu"] = gpu
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["fields"] == ["resource_keys"]
+    assert diagnostic["gpu_form"] == "other"
+
+
+@pytest.mark.parametrize("present", [False, True])
+def test_entrypoint_diagnostic_distinguishes_omitted_from_null(present, capsys):
+    item = record()
+    item["template"]["containers"][0]["resources"]["cpu"] = "1000m"
+    if present:
+        item["template"]["volumes"][0]["volumeAttributes"]["entrypoint"] = None
+    with pytest.raises(CloudProviderError):
+        rdc.owned_record(apps_with(item), tenant=TENANT)
+    diagnostic = json.loads(capsys.readouterr().out)
+    assert diagnostic["volume_entrypoint_form"] == ("null" if present else "omitted")
+    assert ("volume" in diagnostic["fields"]) is present

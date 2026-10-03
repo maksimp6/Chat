@@ -141,10 +141,21 @@ def named_record(apps):
     return records[0] if records else None
 
 
+def same_form(value, expected):
+    """Compare known encodings including nested JSON scalar types."""
+    if type(value) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return set(value) == set(expected) and all(
+            same_form(value[key], item) for key, item in expected.items()
+        )
+    return value == expected
+
+
 def safe_form(value, choices):
     """Report only fixed known encodings, never an unknown provider value."""
     for label, expected in choices:
-        if type(value) is type(expected) and value == expected:
+        if same_form(value, expected):
             return label
     return "other"
 
@@ -274,10 +285,12 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
                             }
                         ),
                         "volume_bucket_match": attributes.get("bucketName") == names(project)[1],
-                        "volume_entrypoint_form": safe_form(
+                        "volume_entrypoint_form": "omitted"
+                        if "entrypoint" not in attributes
+                        else safe_form(
                             attributes.get("entrypoint"),
                             (
-                                ("omitted", None),
+                                ("null", None),
                                 ("https_s3", "https://s3.cloud.ru"),
                                 ("https_s3_slash", "https://s3.cloud.ru/"),
                                 ("bare_s3", "s3.cloud.ru"),
