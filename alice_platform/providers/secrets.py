@@ -1,12 +1,9 @@
 """Secrets provider - fetch secrets from Cloud.ru Secret Management."""
 
 from typing import Any, Dict
-import logging
 
 from cloud.cloudru.secret_management import CloudRuSecretManagementClient
 from cloud.base import CloudProviderError
-
-logger = logging.getLogger(__name__)
 
 
 def _parse_secret_path(path: str) -> tuple[str, str]:
@@ -59,9 +56,7 @@ def get_secret(path: str) -> str:
         if version_id == "latest":
             versions = client.list_versions(secret_id)
             if not versions:
-                raise CloudProviderError(
-                    f"No versions found for secret {secret_id}", code="not_found"
-                )
+                raise CloudProviderError("No versions found for secret", code="not_found")
             # Get the first active version
             for v in versions:
                 status = v.get("status") or v.get("state")
@@ -71,14 +66,12 @@ def get_secret(path: str) -> str:
             else:
                 version_id = versions[0].get("id") or versions[0].get("version_id")
 
-        logger.info(f"Fetching secret {secret_id} (version {version_id})")
         value = client.get_secret_value(secret_id, version_id)
         return value
     except CloudProviderError:
         raise
     except Exception as e:
-        logger.error(f"Failed to fetch secret {path}: {e}")
-        raise CloudProviderError(f"Failed to fetch secret {path}: {e}", code="provider_error")
+        raise CloudProviderError("Failed to fetch secret", code="provider_error")
 
 
 def resolve_all_secrets(secrets_config: Dict[str, Any]) -> Dict[str, str]:
@@ -104,19 +97,9 @@ def resolve_all_secrets(secrets_config: Dict[str, Any]) -> Dict[str, str]:
             if isinstance(value, str):
                 # Check if this is a secret reference (starts with alice/)
                 if value.startswith("alice/"):
-                    try:
-                        resolved[full_key] = get_secret(value)
-                        logger.info(f"Resolved secret: {full_key}")
-                    except Exception as e:
-                        logger.error(f"Failed to resolve {full_key}: {e}")
-                        raise
+                    resolved[full_key] = get_secret(value)
             elif isinstance(value, dict):
                 resolve_dict(value, full_key)
 
-    try:
-        resolve_dict(secrets_config)
-        logger.info(f"Resolved {len(resolved)} secrets")
-        return resolved
-    except Exception as e:
-        logger.error(f"Failed to resolve all secrets: {e}")
-        raise
+    resolve_dict(secrets_config)
+    return resolved
