@@ -33,3 +33,18 @@ services:
     resources:
       cpu: "0.5"
       memory: 512Mi
+
+  dota-commentator:
+    type: dota-commentator
+    depends_on:
+      - oauth
+    scale: 1
+    resources:
+      cpu: "2"
+      memory: 4096Mi
+      gpu: "1"
+      gpu_memory: 8192Mi
+    repository: dota-live-commentator
+    billing:
+      rate: 0.50
+      currency: USD

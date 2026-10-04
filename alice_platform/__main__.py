@@ -8,6 +8,7 @@ from pathlib import Path
 from alice_platform.config import load_config, ConfigError
 from alice_platform.planner import plan_actions
 from alice_platform.health import generate_health_plan
+from alice_platform.reconciler import reconcile
 
 
 def cmd_validate(args):
@@ -86,6 +87,35 @@ def cmd_health(args):
         return 1
 
 
+def cmd_reconcile(args):
+    """Apply planned actions to reconcile reality to desired state."""
+    config_dir = Path(args.config_dir) if args.config_dir else Path("config/alice")
+
+    try:
+        config = load_config(config_dir)
+
+        # For now, use empty observed state (dry-run)
+        observed = {"containers": []}
+
+        actions = plan_actions(args.lane, config, observed)
+
+        if not actions:
+            print(f"✓ {args.lane}: no changes needed")
+            return 0
+
+        print(f"Applying plan for {args.lane}:")
+        reconcile(args.lane, actions, config)
+        print(f"✓ Reconciliation complete (dry-run mode)")
+
+        return 0
+    except ConfigError as e:
+        print(f"✗ Config error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"✗ Error: {e}", file=sys.stderr)
+        return 1
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Alice Platform config management")
@@ -107,6 +137,12 @@ def main():
     health_parser.add_argument("lane", help="Lane name (test, production, etc)")
     health_parser.add_argument("--config-dir", help="Config directory (default: config/alice)")
     health_parser.set_defaults(func=cmd_health)
+
+    # Reconcile command
+    reconcile_parser = subparsers.add_parser("reconcile", help="Apply planned actions")
+    reconcile_parser.add_argument("lane", help="Lane name (test, production, etc)")
+    reconcile_parser.add_argument("--config-dir", help="Config directory (default: config/alice)")
+    reconcile_parser.set_defaults(func=cmd_reconcile)
 
     args = parser.parse_args()
 

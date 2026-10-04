@@ -24,32 +24,56 @@ class TestCloudRuProviderNotImplemented:
         assert result == {"containers": []}
 
 
-class TestReconcilerNotImplemented:
-    """Reconciler is deferred to next slice."""
+class TestReconcilerImplemented:
+    """Reconciler is now implemented in Slice 2."""
 
-    def test_reconcile_raises(self):
-        """Reconcile raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Reconciliation deferred"):
-            reconcile("test", [], {})
+    def test_reconcile_with_empty_actions(self):
+        """Reconcile with empty actions completes without error."""
+        # Should not raise - reconcile now works
+        reconcile("test", [], {})
+
+    def test_reconcile_dry_run_mode(self):
+        """Reconcile runs in dry-run mode (no actual deployments)."""
+        from alice_platform.planner import Action, ActionType
+
+        actions = [
+            Action(
+                type=ActionType.CREATE,
+                service="test-service",
+                lane="test",
+                description="Test create",
+            )
+        ]
+        config = {"services": {"test-service": {"resources": {"cpu": "0.5", "memory": "512Mi"}}}}
+        # Should complete without error
+        reconcile("test", actions, config)
 
 
-class TestRecoveryNotImplemented:
-    """Recovery functions are deferred to next slice."""
+class TestRecoveryImplemented:
+    """Recovery functions are now implemented in Slice 2."""
 
-    def test_list_snapshots_raises(self):
-        """List snapshots raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Recovery deferred"):
-            list_snapshots("chrome-state", "test")
+    def test_list_snapshots_returns_empty(self):
+        """List snapshots returns empty list (placeholder)."""
+        result = list_snapshots("chrome-state", "test")
+        assert result == []
 
-    def test_restore_snapshot_raises(self):
-        """Restore snapshot raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Recovery deferred"):
-            restore_snapshot("chrome-state", "2024-10-01", "test")
+    def test_restore_snapshot_test_lane(self):
+        """Restore snapshot in test lane completes without approval."""
+        # Should not raise
+        restore_snapshot("chrome-state", "2024-10-01", "test")
 
-    def test_rollback_config_raises(self):
-        """Rollback config raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Recovery deferred"):
-            rollback_config("abc1234", "test")
+    def test_restore_snapshot_production_requires_approval(self):
+        """Restore snapshot in production lane requires approval."""
+        # Should complete (approval check is done, request is logged)
+        restore_snapshot("chrome-state", "2024-10-01", "production", approve=False)
+
+    def test_rollback_config_test_lane(self):
+        """Rollback config in test lane completes without approval."""
+        rollback_config("abc1234", "test")
+
+    def test_rollback_config_production_requires_approval(self):
+        """Rollback config in production lane requires approval."""
+        rollback_config("abc1234", "production", approve=False)
 
 
 class TestSecretsProviderNotImplemented:

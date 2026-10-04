@@ -2,6 +2,9 @@
 
 from typing import List, Optional, Any, Dict
 from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -24,10 +27,12 @@ def list_snapshots(storage: str, lane: str) -> List[Snapshot]:
     Returns:
         List of available snapshots
 
-    Raises:
-        NotImplementedError: Not implemented in this slice
+    Note:
+        Real implementation will query Cloud.ru snapshot API.
     """
-    raise NotImplementedError("Recovery deferred to next slice")
+    logger.info(f"[DRY-RUN] Would list snapshots for {storage} in {lane}")
+    # Placeholder - will return real snapshots from Cloud.ru API
+    return []
 
 
 def restore_snapshot(
@@ -42,10 +47,17 @@ def restore_snapshot(
         lane: Lane name
         approve: Skip confirmation (for CI)
 
-    Raises:
-        NotImplementedError: Not implemented in this slice
+    Note:
+        Real implementation will call Cloud.ru restore API.
+        Requires approval in production.
     """
-    raise NotImplementedError("Recovery deferred to next slice")
+    if lane == "production" and not approve:
+        logger.warning(
+            f"Production recovery requires explicit approval: {storage} from {snapshot_timestamp}"
+        )
+        return
+
+    logger.info(f"[DRY-RUN] Would restore {storage} from snapshot {snapshot_timestamp} in {lane}")
 
 
 def rollback_config(commit: str, lane: str, approve: bool = False) -> None:
@@ -57,7 +69,15 @@ def rollback_config(commit: str, lane: str, approve: bool = False) -> None:
         lane: Lane name
         approve: Skip confirmation
 
-    Raises:
-        NotImplementedError: Not implemented in this slice
+    Note:
+        Real implementation will:
+        1. Checkout config from git commit
+        2. Generate new plan
+        3. Apply changes to reconcile to previous state
+        4. Require approval in production
     """
-    raise NotImplementedError("Recovery deferred to next slice")
+    if lane == "production" and not approve:
+        logger.warning(f"Production rollback requires approval: to {commit}")
+        return
+
+    logger.info(f"[DRY-RUN] Would rollback {lane} config to {commit}")
