@@ -9,7 +9,7 @@ const MAX_JWKS_BYTES = 16 * 1024;
  * against the published key set. Fails closed on any error.
  */
 export function createIdpAuth(options = {}) {
-  const { issuer, resource, ownerIds = [] } = options;
+  const { issuer, resource, ownerIds = [], requiredScopes = BROWSER_SCOPES } = options;
   const owners = new Set(ownerIds.map(String).filter((id) => /^\d+$/.test(id)));
   if (!issuer || !resource || !owners.size) return { enabled: false, authorize: async () => false };
   const issuerUrl = new URL(issuer);
@@ -76,7 +76,7 @@ export function createIdpAuth(options = {}) {
   return {
     enabled: true,
     authorize,
-    resourceMetadata: () => ({ resource, authorization_servers: [base], scopes_supported: BROWSER_SCOPES, bearer_methods_supported: ["header"] }),
-    challenge: () => `Bearer resource_metadata="${new URL(resource).origin}/.well-known/oauth-protected-resource/browser/v1/mcp", scope="${BROWSER_SCOPES.join(" ")}"`,
+    resourceMetadata: () => ({ resource, authorization_servers: [base], scopes_supported: requiredScopes, bearer_methods_supported: ["header"] }),
+    challenge: () => `Bearer resource_metadata="${new URL(resource).origin}/.well-known/oauth-protected-resource/browser/v1/mcp", scope="${requiredScopes.join(" ")}"`,
   };
 }
