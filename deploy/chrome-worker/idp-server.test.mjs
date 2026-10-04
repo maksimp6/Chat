@@ -53,7 +53,7 @@ test("protected-resource metadata points at the central IdP", async (t) => {
   for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/browser/v1/mcp"]) {
     const metadata = await (await app.call(path)).json();
     assert.deepEqual(metadata.authorization_servers, [ISSUER]);
-    assert.deepEqual(metadata.scopes_supported, ["browser.read", "browser.control"]);
+    assert.deepEqual(metadata.scopes_supported, ["browser.control"]);
   }
 });
 
