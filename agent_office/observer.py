@@ -475,7 +475,9 @@ def freshness_state(thread: Thread) -> str:
 
 def implementation_checks(thread: Thread) -> dict[str, str]:
     """Checks that validate implementation, excluding merge-admission snapshots."""
-    return {name: value for name, value in thread.checks.items() if name not in ADMISSION_CHECK_NAMES}
+    return {
+        name: value for name, value in thread.checks.items() if name not in ADMISSION_CHECK_NAMES
+    }
 
 
 def checks_state(thread: Thread) -> str:
