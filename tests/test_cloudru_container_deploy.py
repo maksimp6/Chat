@@ -1106,3 +1106,36 @@ def test_cloudru_workflow_test_and_production_database_secrets_are_distinct():
     assert "secrets.ALICE_TEST_DATABASE_URL" in text
     assert "secrets.ALICE_DATABASE_URL" in text
     assert "inputs.target == 'production'" in text
+
+
+def test_healthz_reports_database_readiness(monkeypatch):
+    import app as app_module
+
+    class Conn:
+        def execute(self, sql):
+            assert sql == "SELECT 1"
+            return self
+        def fetchone(self):
+            return (1,)
+        def close(self):
+            pass
+
+    monkeypatch.setattr("db.get_conn", lambda: Conn())
+    client = app_module.app.test_client()
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok", "database": "ok"}
+
+
+def test_healthz_fails_closed_when_database_is_unavailable(monkeypatch):
+    import app as app_module
+
+    def broken():
+        raise RuntimeError("database secret must not leak")
+
+    monkeypatch.setattr("db.get_conn", broken)
+    client = app_module.app.test_client()
+    response = client.get("/healthz")
+    assert response.status_code == 503
+    assert response.get_json() == {"status": "error", "database": "unavailable"}
+    assert b"database secret" not in response.data
