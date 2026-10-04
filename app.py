@@ -142,7 +142,7 @@ def _set_web_cache_headers(response):
     return response
 
 
-# OWASP ASVS V14.4. The CSP is report-only until inline styles are removed
+# OWASP ASVS 5.0.0 V3.4. The CSP is report-only until inline styles are removed
 # from the template; see docs/security/asvs-l2.md.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
