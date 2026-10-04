@@ -1774,3 +1774,32 @@ body {
   background: var(--m-card, #fff);
   color: var(--m-text, #222);
 }
+
+.alice-pro-app .execution-surface {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary, inherit);
+}
+.alice-pro-app .execution-surface-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.alice-pro-app .execution-surface-stages li {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+}
+.alice-pro-app .execution-surface-stages li[data-status="done"],
+.alice-pro-app .execution-surface-stages li[data-status="active"] {
+  opacity: 1;
+}
+.alice-pro-app .execution-surface-blocker,
+.alice-pro-app .execution-surface[data-state="error"] .execution-surface-summary,
+.alice-pro-app .execution-surface[data-state="timeout"] .execution-surface-summary {
+  color: var(--danger);
+}

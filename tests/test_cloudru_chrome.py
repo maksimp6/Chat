@@ -795,3 +795,24 @@ def test_provider_lifecycle_calls_retry_abandoned_requests():
     with pytest.raises(CloudProviderError):
         chrome.provider(bad, "chrome-x", sleep=clock.sleep, clock=clock.now)
     assert bad.call_count == 1
+
+
+def test_idp_issuer_is_forwarded_only_as_a_trusted_https_origin():
+    assert "BROWSER_IDP_ISSUER" not in environment()
+    values = environment(BROWSER_IDP_ISSUER="https://idp-test.containerapps.ru/")
+    assert values["BROWSER_IDP_ISSUER"] == "https://idp-test.containerapps.ru"
+    assert environment(BROWSER_IDP_ISSUER="https://oauth.maxxxpavlov.online")[
+        "BROWSER_IDP_ISSUER"
+    ] == ("https://oauth.maxxxpavlov.online")
+    for bad in (
+        "http://idp-test.containerapps.ru",
+        "https://evil.example",
+        "https://oauth.maxxxpavlov.online/path",
+        "https://user:x@idp-test.containerapps.ru",
+        "https://idp-test.containerapps.ru:8443",
+    ):
+        with pytest.raises(CloudProviderError):
+            environment(BROWSER_IDP_ISSUER=bad)
+    with_issuer = record(env=environment(BROWSER_IDP_ISSUER=ORIGIN))
+    apps = SimpleNamespace(project_id=PROJECT, list=Mock(return_value=[with_issuer]))
+    assert chrome.owned_record(apps)["id"] == IDENTIFIER

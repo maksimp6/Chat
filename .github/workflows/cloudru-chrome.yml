@@ -13,6 +13,10 @@ on:
         type: choice
         options: [production, test]
         default: production
+      idp_issuer:
+        description: Central IdP issuer origin to trust; empty uses the repository variable for the lane
+        type: string
+        required: false
       storage_tenant_id:
         description: Object Storage tenant ID (not a secret); required for preflight/deploy unless configured
         type: string
@@ -63,6 +67,7 @@ jobs:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
           CHROME_LANE: ${{ inputs.lane }}
+          BROWSER_IDP_ISSUER: ${{ inputs.idp_issuer || (inputs.lane == 'test' && vars.BROWSER_IDP_ISSUER_TEST) || (inputs.lane != 'test' && vars.BROWSER_IDP_ISSUER) || '' }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}

@@ -27,3 +27,5 @@ app_logs.jsonl
 # pytest-cov data
 .coverage
 coverage.xml
+
+agent_shell.sqlite3
