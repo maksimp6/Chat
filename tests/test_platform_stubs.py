@@ -1,7 +1,8 @@
 """Tests verify that future-work stubs raise NotImplementedError."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 from alice_platform.reconciler import reconcile
 from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
 from alice_platform.providers.cloudru import CloudProviderUnavailable, get_observed_state
