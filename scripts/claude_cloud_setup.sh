@@ -24,11 +24,21 @@ command -v eds >/dev/null 2>&1 || python3 scripts/install_eds.py --bin-dir "$BIN
 # GitHub CLI for issues/PRs/Actions when the environment provides GH_TOKEN.
 if ! command -v gh >/dev/null 2>&1; then
   GH_VERSION=2.80.0
-  case "$(uname -m)" in x86_64|amd64) A=amd64 ;; aarch64|arm64) A=arm64 ;; *) A= ;; esac
+  # SHA-256 values from the official gh_${GH_VERSION}_checksums.txt release asset.
+  case "$(uname -m)" in
+    x86_64|amd64) A=amd64 SUM=e0afffbf36548194aed8a1bdaf474314857a808b1b1cfa38743e2f4ed6a35b0b ;;
+    aarch64|arm64) A=arm64 SUM=785a746a7b42baaf42f7d792c9ca1732451a28b78112a1a3b38884156cdeb8a2 ;;
+    *) A= ;;
+  esac
   if [ -n "$A" ]; then
     T="$CACHE/gh_${GH_VERSION}_linux_${A}.tar.gz"
-    [ -s "$T" ] || curl -fsSL --retry 3 -o "$T" \
-      "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${A}.tar.gz"
+    # A cached or fresh archive is used only after its checksum matches.
+    if ! printf '%s  %s\n' "$SUM" "$T" | sha256sum --check --status 2>/dev/null; then
+      rm -f "$T"
+      curl -fsSL --retry 3 -o "$T" \
+        "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${A}.tar.gz"
+      printf '%s  %s\n' "$SUM" "$T" | sha256sum --check --status
+    fi
     tar -xzf "$T" -C "$CACHE"
     install -m 755 "$CACHE/gh_${GH_VERSION}_linux_${A}/bin/gh" "$BIN/gh"
   fi
