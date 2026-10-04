@@ -96,6 +96,10 @@ export function createIdp(options = {}) {
   if (!autoApprove && !options.githubClientSecret) missing.push("IDP_GITHUB_CLIENT_SECRET");
   if (!allowedIds.size) missing.push("IDP_ALLOWED_GITHUB_IDS");
   if (!allowedResources.size) missing.push("IDP_ALLOWED_RESOURCES");
+  // Production holds GitHub credentials; auto-approve must never be reachable there.
+  if (autoApprove && (options.githubClientId || options.githubClientSecret)) {
+    missing.push("IDP_AUTO_APPROVE_conflicts_with_IDP_GITHUB_credentials");
+  }
   const ready = missing.length === 0;
   const issuer = ready ? parseOrigin(options.publicUrl) : "";
   const keys = ready ? createKeys(options.secret) : null;

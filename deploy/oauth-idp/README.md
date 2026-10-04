@@ -70,3 +70,5 @@ against a real HTTP server with a fake GitHub and an injected clock.
 ## Test lane: auto-approve
 
 `IDP_AUTO_APPROVE=1` skips GitHub: the consent button issues the code directly, signing the owner id from `IDP_ALLOWED_GITHUB_IDS` (the first entry). GitHub credentials are then optional. The browser binding, redirect and resource allowlists and PKCE still apply, and `/healthz` reports `auto_approve: true`. Use it only for the test lane, whose worker has a fresh profile with no logins; never in production.
+
+Production uses GitHub only. The IdP refuses to start (`/healthz` 503, `missing` names the conflict) if `IDP_AUTO_APPROVE=1` is set together with `IDP_GITHUB_CLIENT_ID` or `IDP_GITHUB_CLIENT_SECRET`, so a production configuration cannot be switched to auto-approve by mistake.

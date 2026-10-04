@@ -496,3 +496,12 @@ test("IDP_AUTO_APPROVE is opt-in and exactly '1'", () => {
   assert.equal(configFromEnv({ IDP_AUTO_APPROVE: "true" }).autoApprove, false);
   assert.equal(configFromEnv({ IDP_AUTO_APPROVE: "1" }).autoApprove, true);
 });
+
+test("auto-approve refuses to run next to GitHub credentials (production configuration)", async (t) => {
+  const app = await fixture(t, { autoApprove: true });
+  assert.equal(app.idp.ready, false);
+  assert.deepEqual(app.idp.missing, ["IDP_AUTO_APPROVE_conflicts_with_IDP_GITHUB_credentials"]);
+  const health = await app.request("/healthz");
+  assert.equal(health.status, 503);
+  assert.equal((await app.request("/register", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 503);
+});
