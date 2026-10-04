@@ -1,0 +1,117 @@
+# OWASP ASVS 4.0.3, level 2: the requirements that apply to Alice Pro.
+# status: met | partial | gap | n/a. Every "met" names evidence: a test file
+# (optionally ::test_name) that proves it. tests/test_asvs_checklist.py
+# checks the evidence exists and that the number of gaps never grows.
+version: "4.0.3"
+level: 2
+requirements:
+  - id: V2.1.1
+    title: Password length and complexity
+    status: n/a
+    note: No passwords; sign-in is GitHub OAuth or the deployment short token.
+  - id: V2.2.1
+    title: Anti-automation on authentication
+    status: gap
+    note: No rate limit on short-token or OAuth callback endpoints.
+  - id: V2.10.4
+    title: Service secrets kept out of source and config files
+    status: met
+    evidence: tests/test_cloudru_secret_management.py
+  - id: V3.4.1
+    title: Session cookies use the Secure attribute
+    status: partial
+    note: alice_user_token and the short-token refresh set Secure only on HTTPS requests.
+  - id: V3.4.2
+    title: Session cookies use HttpOnly
+    status: met
+    evidence: tests/test_short_token_auth.py::test_session_cookie_is_secure_httponly_and_samesite
+  - id: V3.4.3
+    title: Session cookies use SameSite
+    status: met
+    evidence: tests/test_short_token_auth.py::test_session_cookie_is_secure_httponly_and_samesite
+  - id: V3.5.2
+    title: OAuth uses PKCE with S256
+    status: met
+    evidence: deploy/chrome-worker/oauth.test.mjs
+  - id: V3.5.3
+    title: OAuth state is bound to the browser and single use
+    status: met
+    evidence: tests/test_github_oauth.py
+  - id: V4.1.1
+    title: Access control enforced on a trusted server
+    status: partial
+    note: Conversation ownership checks exist; no consolidated evidence test yet.
+  - id: V4.2.2
+    title: Cross-site request forgery protection
+    status: partial
+    note: Relies on SameSite=Lax cookies; no CSRF token on state-changing JSON routes.
+  - id: V5.1.3
+    title: Input validated at trust boundaries
+    status: partial
+    note: Tool arguments are schema-validated; HTTP routes validate ad hoc.
+  - id: V5.3.3
+    title: Output encoding prevents XSS
+    status: partial
+    note: The UI uses textContent; parseMarkdown escapes but has no dedicated XSS test.
+  - id: V6.2.1
+    title: Cryptographic modules fail securely
+    status: met
+    evidence: tests/test_provider_credential_runtime.py
+  - id: V7.1.1
+    title: Credentials and session tokens are not logged
+    status: met
+    evidence: tests/test_trace_security.py
+  - id: V7.4.1
+    title: Generic error messages without internal details
+    status: partial
+    evidence: tests/test_api_problem_details.py
+    note: Ratchet tracks 75 responses that still echo exceptions.
+  - id: V8.1.1
+    title: Sensitive responses are not cached
+    status: met
+    evidence: tests/test_http_cache_headers.py::test_api_responses_are_not_cached
+  - id: V10.3.2
+    title: Dependencies are scanned for known vulnerabilities
+    status: partial
+    note: Trivy runs in CI; Dependabot reports open vulnerabilities on master.
+  - id: V12.3.1
+    title: File paths from users cannot escape the allowed root
+    status: partial
+    note: filesystem tool enforces BASE_DIR; see docs/security/path-traversal.md.
+  - id: V13.1.3
+    title: API URLs do not expose sensitive information
+    status: partial
+    note: The short token is accepted in the URL path once and then moved to a cookie.
+  - id: V13.2.1
+    title: State-changing actions require explicit approval where risky
+    status: met
+    evidence: tests/test_browser_action_approval.py
+  - id: V14.4.1
+    title: Responses declare a safe Content-Type
+    status: partial
+    note: JSON and problem+json are typed; HTML sets charset via the template.
+  - id: V14.4.3
+    title: Content Security Policy
+    status: partial
+    evidence: tests/test_security_headers.py
+    note: Report-only until the inline style in templates/index.html is removed.
+  - id: V14.4.4
+    title: X-Content-Type-Options nosniff
+    status: met
+    evidence: tests/test_security_headers.py
+  - id: V14.4.5
+    title: Strict-Transport-Security
+    status: n/a
+    note: TLS terminates at the Cloud.ru API Gateway, which owns HSTS.
+  - id: V14.4.6
+    title: Referrer-Policy
+    status: met
+    evidence: tests/test_security_headers.py
+  - id: V14.4.7
+    title: Framing restricted (frame-ancestors / X-Frame-Options)
+    status: met
+    evidence: tests/test_security_headers.py
+  - id: V14.5.3
+    title: CORS allows only trusted origins
+    status: gap
+    note: mcp_server/transport.py answers Access-Control-Allow-Origin "*".

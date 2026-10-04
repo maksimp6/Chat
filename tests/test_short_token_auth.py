@@ -96,3 +96,11 @@ def test_auth_can_be_disabled_for_local_development(monkeypatch):
     client = _client(monkeypatch, token=None, require=False, preview=True)
     response = client.get("/")
     assert response.status_code == 200
+
+
+def test_session_cookie_is_secure_httponly_and_samesite(monkeypatch):
+    client = _client(monkeypatch, token="unit-test-token", require=True)
+    cookie = client.get("/unit-test-token").headers["Set-Cookie"]
+    attributes = {part.strip().split("=")[0].lower() for part in cookie.split(";")}
+    assert {"httponly", "secure", "samesite"} <= attributes
+    assert "SameSite=Lax" in cookie

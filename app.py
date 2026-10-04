@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, Response, request, jsonify, render_template
 import os
 import logging
 import json
@@ -140,6 +140,31 @@ def _set_web_cache_headers(response):
         # API responses may contain user-specific state, traces, settings, or credentials.
         response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# OWASP ASVS V14.4. The CSP is report-only until inline styles are removed
+# from the template; see docs/security/asvs-l2.md.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
+    "media-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; "
+    "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=(self)",
+    "Content-Security-Policy-Report-Only": CONTENT_SECURITY_POLICY,
+}
+
+
+def _set_security_headers(response: Response) -> Response:
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
+
+app.after_request(_set_security_headers)
 
 
 init_db()
