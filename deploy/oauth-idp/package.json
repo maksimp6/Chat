@@ -1,0 +1,10 @@
+{
+  "name": "alice-oauth-idp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test crypto.test.mjs jwt.test.mjs idp.test.mjs"
+  }
+}

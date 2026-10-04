@@ -54,6 +54,8 @@ jobs:
           npm ci --prefix deploy/chrome-worker
           npm test --prefix deploy/chrome-worker
           npm run test:browser --prefix deploy/chrome-worker
+      - name: Identity provider tests
+        run: npm test --prefix deploy/oauth-idp
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \
