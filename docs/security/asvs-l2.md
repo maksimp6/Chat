@@ -1,32 +1,38 @@
-# OWASP ASVS level 2
+# OWASP ASVS 5.0.0 level 2 baseline
 
-Alice Pro tracks the [OWASP ASVS 4.0.3](https://owasp.org/www-project-application-security-verification-standard/)
-level 2 requirements that apply to it in `asvs-l2.yaml`. Each entry has a
-status and either evidence (a test that proves it) or a note explaining what
-is missing.
+Alice Pro tracks a **selected applicable subset** of OWASP ASVS 5.0.0 Level 1/2 requirements in `asvs-l2.yaml`.
 
-Current state: 27 requirements; 12 met, 11 partial, 2 gaps, 2 not applicable.
+This file is not a claim of full ASVS certification. It is a deterministic project security baseline tied to current repository evidence.
 
-## Open gaps
+Requirement IDs are always version-qualified, for example `v5.0.0-3.4.4`, because OWASP explicitly warns that identifiers change across major ASVS releases.
+
+## Migration from 4.0.3
+
+The previous draft used ASVS 4.0.3 identifiers. It has been rebuilt against the official OWASP 4.0.3 → 5.0.0 mapping and the ASVS 5.0.0 requirement list rather than mechanically renumbered.
+
+A major-version migration may split, merge, remove or substantially rewrite requirements. Therefore evidence/status was re-evaluated against the **5.0.0 requirement text**, not inherited just because an old number had a mapping.
+
+Current tracked subset: **26 requirements: 9 met, 15 partial, 2 gaps**.
+
+## Current gaps
 
 | Requirement | Gap |
 |---|---|
-| V2.2.1 Anti-automation | No rate limit on the short-token and OAuth callback endpoints. |
-| V14.5.3 CORS | `mcp_server/transport.py` answers `Access-Control-Allow-Origin: *`. |
+| v5.0.0-2.4.1 | No unified anti-automation/rate-limit control for all costly or abuse-sensitive functions. |
+| v5.0.0-3.4.2 | `mcp_server/transport.py` still allows wildcard CORS. |
 
-## Partial, next in line
+## Important partials
 
-- **V14.4.3 CSP.** The policy is sent as `Content-Security-Policy-Report-Only`.
-  Enforce it after the inline `style` attribute in `templates/index.html` moves
-  to `static/style.css`.
-- **V3.4.1 Secure cookies.** `alice_user_token` and the short-token refresh set
-  `Secure` only on HTTPS requests; set it unconditionally outside local dev.
-- **V7.4.1 Generic errors.** `tests/test_api_problem_details.py` tracks the
-  responses that still echo exceptions; convert them to `problem()`.
+- **v5.0.0-13.3.1 Secret management.** Cloud.ru Secret Management exists, but #755 still owns migration of remaining credential consumers.
+- **v5.0.0-3.4.3 CSP.** CSP is still report-only until remaining inline-style debt is removed.
+- **v5.0.0-3.4.1 HSTS.** Enforcement belongs to the Cloud.ru ingress/API Gateway; end-to-end evidence is still required.
+- **v5.0.0-16.5.1 Generic errors.** The RFC 9457 migration ratchet still tracks legacy exception-derived responses.
+- **v5.0.0-15.1.1 / v5.0.0-15.2.1 Dependencies.** Scanner evidence exists, but remediation-time policy and open findings prevent a `met` status.
 
 ## Rules
 
-- `tests/test_asvs_checklist.py` fails if a `met` entry lacks existing evidence,
-  if a non-met entry has no note, or if the number of gaps grows.
-- Closing a gap: fix it, add the evidence test, set `met`, and lower
-  `GAP_BASELINE` in the same pull request.
+- `tests/test_asvs_checklist.py` verifies ASVS version 5.0.0, version-qualified IDs, unique IDs, evidence existence, and the gap ratchet.
+- A `met` entry must name deterministic repository evidence.
+- A `partial`, `gap`, or `n/a` entry must explain why it is not `met`.
+- Closing a gap requires the implementation fix, deterministic evidence and lowering `GAP_BASELINE` in the same change.
+- A future ASVS major-version bump requires an explicit migration using the official OWASP mapping/current requirement source. Do not silently rewrite IDs.

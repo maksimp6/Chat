@@ -13,8 +13,24 @@ STATUSES = {"met", "partial", "gap", "n/a"}
 GAP_BASELINE = 2
 
 
+def _document():
+    return yaml.safe_load(CHECKLIST.read_text(encoding="utf-8"))
+
+
 def _requirements():
-    return yaml.safe_load(CHECKLIST.read_text(encoding="utf-8"))["requirements"]
+    return _document()["requirements"]
+
+
+def test_checklist_is_pinned_to_asvs_5_0_0_with_versioned_ids():
+    document = _document()
+    assert document["version"] == "5.0.0"
+    assert document["level"] == 2
+    assert document["source"] == "OWASP/ASVS v5.0.0"
+    assert "4.0.3 -> 5.0.0" in document["mapping_source"]
+
+    ids = [item["id"] for item in document["requirements"]]
+    assert ids
+    assert all(item_id.startswith("v5.0.0-") for item_id in ids)
 
 
 def test_checklist_entries_are_well_formed():
