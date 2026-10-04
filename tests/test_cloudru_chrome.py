@@ -784,3 +784,14 @@ def test_only_test_lane_replaces_a_worker_whose_checkpoint_failed(monkeypatch, l
         with pytest.raises(CloudProviderError):
             chrome.deploy(apps, Mock(), {}, IMAGE, environment())
         apps.restore.assert_not_called()
+
+
+def test_provider_lifecycle_calls_retry_abandoned_requests():
+    clock = _Clock()
+    stop = Mock(side_effect=[CloudProviderError("x", http_status=499), {"ok": True}])
+    assert chrome.provider(stop, "chrome-x", sleep=clock.sleep, clock=clock.now) == {"ok": True}
+    assert stop.call_count == 2
+    bad = Mock(side_effect=CloudProviderError("x", http_status=409))
+    with pytest.raises(CloudProviderError):
+        chrome.provider(bad, "chrome-x", sleep=clock.sleep, clock=clock.now)
+    assert bad.call_count == 1

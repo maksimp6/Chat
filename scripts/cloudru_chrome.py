@@ -226,7 +226,7 @@ def creation_body(project, image, environment):
 def owned_record(apps, *, identifier=None):
     matches = [
         item
-        for item in apps.list(require_total=True)
+        for item in provider(apps.list, require_total=True)
         if item.get("name") == names(apps.project_id)[0]
     ]
     if not matches:
@@ -422,6 +422,19 @@ def build_image(root, sha):
 RETRY_STATUSES = frozenset({499, 502, 503, 504})
 
 
+def provider(operation, *args, timeout=240, sleep=time.sleep, clock=time.monotonic, **kwargs):
+    # Lifecycle and inventory calls are idempotent; the provider proxy abandons
+    # them (HTTP 499) while a slow operation is still in progress.
+    deadline = clock() + timeout
+    while True:
+        try:
+            return operation(*args, **kwargs)
+        except CloudProviderError as exc:
+            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+                raise
+            sleep(5)
+
+
 def request_worker(
     apps, record, token, path, *, method="GET", timeout=240, sleep=time.sleep, clock=time.monotonic
 ):
@@ -571,7 +584,7 @@ def stop_owned(apps, record, *, timeout=300, sleep=time.sleep, clock=time.monoto
     if current is None:
         fail("chrome_ownership_unconfirmed")
     if str(current.get("status", "")).lower() != "suspended":
-        apps.stop(current["name"])
+        provider(apps.stop, current["name"])
     deadline = clock() + timeout
     while clock() < deadline:
         current = owned_record(apps, identifier=record["id"])
@@ -646,8 +659,8 @@ def deploy(apps, store, credentials, image, environment):
         body = creation_body(apps.project_id, image, environment)
         attempted = True
         if previous:
-            apps.restore(previous["name"], body)
-            apps.start(previous["name"])
+            provider(apps.restore, previous["name"], body)
+            provider(apps.start, previous["name"])
         else:
             operation = apps.client.request(
                 "container_apps", "POST", "/v2/containers", json_body=body
@@ -670,8 +683,10 @@ def deploy(apps, store, credentials, image, environment):
             # The origin is assigned on creation; bind OAuth to it on the same
             # container instead of creating another one.
             environment = {**environment, "BROWSER_PUBLIC_URL": application_origin(record)}
-            apps.restore(record["name"], creation_body(apps.project_id, image, environment))
-            apps.start(record["name"])
+            provider(
+                apps.restore, record["name"], creation_body(apps.project_id, image, environment)
+            )
+            provider(apps.start, record["name"])
             record = wait_ready(apps, identifier=record["id"], image=image)
             verify_restored(apps, record, generation)
         return summary(record)
@@ -684,9 +699,9 @@ def deploy(apps, store, credentials, image, environment):
                 if current is not None:
                     stop_owned(apps, current)
                 if previous:
-                    apps.restore(previous["name"], previous)
+                    provider(apps.restore, previous["name"], previous)
                     if str(previous.get("status", "")).lower() == "running":
-                        apps.start(previous["name"])
+                        provider(apps.start, previous["name"])
                         wait_ready(
                             apps,
                             identifier=previous["id"],
@@ -792,7 +807,7 @@ def main(argv=None):
                 generation = checkpoint(apps, record)
             stop_owned(apps, record)
             if args.action == "restart":
-                apps.start(record["name"])
+                provider(apps.start, record["name"])
                 record = wait_ready(apps, identifier=record["id"])
                 if generation is not None:
                     verify_restored(apps, record, generation)
