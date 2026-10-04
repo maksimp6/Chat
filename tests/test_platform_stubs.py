@@ -1,6 +1,7 @@
 """Tests verify that future-work stubs raise NotImplementedError."""
 
 import pytest
+from unittest.mock import patch
 from alice_platform.reconciler import reconcile
 from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
 from alice_platform.providers.cloudru import CloudProviderUnavailable, get_observed_state
@@ -30,8 +31,8 @@ class TestReconcilerImplemented:
         # Should not raise - reconcile now works
         reconcile("test", [], {})
 
-    def test_reconcile_dry_run_mode(self):
-        """Reconcile runs in dry-run mode (no actual deployments)."""
+    def test_reconcile_routes_create_through_provider_boundary(self):
+        """Reconciler routing is testable without pretending the provider is available."""
         from alice_platform.planner import Action, ActionType
 
         actions = [
@@ -43,8 +44,9 @@ class TestReconcilerImplemented:
             )
         ]
         config = {"services": {"test-service": {"resources": {"cpu": "0.5", "memory": "512Mi"}}}}
-        # Should complete without error
-        reconcile("test", actions, config)
+        with patch("alice_platform.reconciler.create_container") as create:
+            reconcile("test", actions, config)
+        create.assert_called_once()
 
 
 class TestRecoveryImplemented:
