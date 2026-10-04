@@ -6,23 +6,26 @@
 set -euo pipefail
 
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
-BIN="$HOME/.local/bin"
+BIN="${CLAUDE_SETUP_BIN:-$HOME/.local/bin}"
+STEPS="${CLAUDE_SETUP_STEPS:-deps tools docker report}"
 mkdir -p "$CACHE/pip" "$CACHE/npm" "$BIN"
 export PATH="$BIN:$PATH" PIP_CACHE_DIR="$CACHE/pip" npm_config_cache="$CACHE/npm"
+has_step() { [[ " $STEPS " == *" $1 "* ]]; }
 
-# Python and Node dependencies; package caches make repeat setups fast.
-python3 -m pip install --disable-pip-version-check -q \
-  -r requirements.txt -r requirements-dev.txt
-npm install --ignore-scripts --no-audit --no-fund --package-lock=false --prefer-offline
-npm ci --prefix deploy/chrome-worker --no-audit --no-fund --prefer-offline
+if has_step deps; then
+  # Package caches make repeat setups fast.
+  python3 -m pip install --disable-pip-version-check -q \
+    -r requirements.txt -r requirements-dev.txt
+  npm install --ignore-scripts --no-audit --no-fund --package-lock=false --prefer-offline
+  npm ci --prefix deploy/chrome-worker --no-audit --no-fund --prefer-offline
+fi
 
-# Pinned, checksum-verified Cloud.ru CLI (cached under ~/.cache/alice-pro).
-bash scripts/install_cloud_cli.sh
-# Pinned, checksum-verified EDS CLI.
-command -v eds >/dev/null 2>&1 || python3 scripts/install_eds.py --bin-dir "$BIN"
+if has_step tools; then
+  # Always run the pinned, checksum-verified installers: a stale binary already
+  # on PATH must never stand in for the verified version.
+  bash scripts/install_cloud_cli.sh
+  python3 scripts/install_eds.py --bin-dir "$BIN"
 
-# GitHub CLI for issues/PRs/Actions when the environment provides GH_TOKEN.
-if ! command -v gh >/dev/null 2>&1; then
   GH_VERSION=2.80.0
   # SHA-256 values from the official gh_${GH_VERSION}_checksums.txt release asset.
   case "$(uname -m)" in
@@ -44,16 +47,28 @@ if ! command -v gh >/dev/null 2>&1; then
   fi
 fi
 
-# Docker: start the daemon when present so image builds can reuse layers.
-if command -v docker >/dev/null 2>&1 && ! docker info >/dev/null 2>&1; then
-  (dockerd >/tmp/dockerd.log 2>&1 &) || true
+if has_step docker; then
+  # Start the daemon so image builds can reuse layers, and wait until it answers.
+  if command -v docker >/dev/null 2>&1; then
+    if ! docker info >/dev/null 2>&1; then
+      (dockerd >/tmp/dockerd.log 2>&1 &) || true
+      for _ in $(seq 1 "${CLAUDE_SETUP_DOCKER_WAIT:-30}"); do
+        docker info >/dev/null 2>&1 && break
+        sleep 1
+      done
+    fi
+    if docker info >/dev/null 2>&1; then echo "docker: ready"; else echo "docker: unavailable (see /tmp/dockerd.log)"; fi
+  else
+    echo "docker: not installed"
+  fi
 fi
 
-# Report tool versions without printing any credential.
-command -v cloud >/dev/null && echo "cloud: installed"
-eds version 2>/dev/null | head -1 || true
-gh --version 2>/dev/null | head -1 || true
-docker --version 2>/dev/null || true
-for name in CLOUDRU_PROJECT_ID CLOUDRU_IAM_KEY_ID CLOUDRU_IAM_KEY_SECRET EDS_API_KEY GH_TOKEN; do
-  if [ -n "${!name:-}" ]; then echo "$name: set"; else echo "$name: missing"; fi
-done
+if has_step report; then
+  # Tool and variable report; never prints a credential value.
+  command -v cloud >/dev/null 2>&1 && echo "cloud: installed" || echo "cloud: missing"
+  eds version 2>/dev/null | head -1 || echo "eds: missing"
+  gh --version 2>/dev/null | head -1 || echo "gh: missing"
+  for name in CLOUDRU_PROJECT_ID CLOUDRU_IAM_KEY_ID CLOUDRU_IAM_KEY_SECRET EDS_PROJECT_ID EDS_API_KEY GH_TOKEN; do
+    if [ -n "${!name:-}" ]; then echo "$name: set"; else echo "$name: missing"; fi
+  done
+fi
