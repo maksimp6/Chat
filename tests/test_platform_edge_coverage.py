@@ -63,7 +63,6 @@ def test_platform_cli_does_not_expose_unobserved_plan_or_reconcile(command):
     assert exc.value.code == 2
 
 
-
 def test_module_main_exit_path():
     old = sys.argv[:]
     try:
