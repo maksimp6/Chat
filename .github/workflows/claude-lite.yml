@@ -34,10 +34,10 @@ jobs:
       !contains(github.event.issue.body, '@claude-lite session') &&
       !contains(github.event.issue.title, '@claude-lite session') &&
       ((github.event_name == 'issue_comment' &&
-        contains(github.event.comment.body, '@claude-lite') &&
+        startsWith(github.event.comment.body, '@claude-lite') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'issues' &&
-        (contains(github.event.issue.body, '@claude-lite') || contains(github.event.issue.title, '@claude-lite')) &&
+        (startsWith(github.event.issue.body, '@claude-lite') || startsWith(github.event.issue.title, '@claude-lite')) &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)))
     runs-on: ubuntu-latest
     timeout-minutes: 60
