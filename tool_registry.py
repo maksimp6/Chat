@@ -75,7 +75,7 @@ class ToolRegistry:
 
     def _load_all(self):
         try:
-            from git_mcp_tools import GIT_TOOLS
+            from tool_providers.git import GIT_TOOLS
 
             mcp_read_tools = {"git_status", "git_log", "git_diff", "git_branches"}
             mcp_write_tools = {
@@ -126,7 +126,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки System: {e}")
 
         try:
-            from filesystem_mcp_tools import FILESYSTEM_TOOLS
+            from tool_providers.filesystem import FILESYSTEM_TOOLS
 
             for name, cfg in FILESYSTEM_TOOLS.items():
                 self._register("filesystem", name, cfg)
@@ -134,7 +134,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Filesystem: {e}")
 
         try:
-            from wikipedia_mcp_tools import WIKIPEDIA_TOOLS
+            from tool_providers.wikipedia import WIKIPEDIA_TOOLS
 
             for name, cfg in WIKIPEDIA_TOOLS.items():
                 self._register("wikipedia", name, cfg)
@@ -142,7 +142,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Wikipedia: {e}")
 
         try:
-            from profiler_tools import PROFILER_TOOLS
+            from tool_providers.profiler import PROFILER_TOOLS
 
             for name, cfg in PROFILER_TOOLS.items():
                 self._register("profiler", name, cfg)
@@ -150,7 +150,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Profiler: {e}")
 
         try:
-            from theme_tools import THEME_TOOLS
+            from tool_providers.theme import THEME_TOOLS
 
             for name, cfg in THEME_TOOLS.items():
                 self._register("theme", name, cfg)

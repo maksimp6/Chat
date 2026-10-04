@@ -33,8 +33,6 @@ LEGACY_ROOT_PYTHON = {
     "environment_routes.py",
     "file_manager.py",
     "file_routes.py",
-    "filesystem_mcp_tools.py",
-    "git_mcp_tools.py",
     "government.py",
     "key_manager.py",
     "knowledge_economics.py",
@@ -55,7 +53,6 @@ LEGACY_ROOT_PYTHON = {
     "plugin_manager.py",
     "plugin_routes.py",
     "pricing_registry.py",
-    "profiler_tools.py",
     "project_tree.py",
     "provider_credentials.py",
     "provider_credentials_routes.py",
@@ -76,7 +73,6 @@ LEGACY_ROOT_PYTHON = {
     "ssh_runtime.py",
     "ssh_runtime_settings.py",
     "storage.py",
-    "theme_tools.py",
     "tool_registry.py",
     "trace_manager.py",
     "trace_security.py",
@@ -86,7 +82,6 @@ LEGACY_ROOT_PYTHON = {
     "universal_tool_platform.py",
     "user_identity.py",
     "voice_routes.py",
-    "wikipedia_mcp_tools.py",
     "yandex_api_key_provider.py",
     "yandex_api_logger.py",
     "yandex_client.py",
@@ -160,12 +155,26 @@ def test_claude_instructions_import_repository_rules():
     assert any(line.split()[:1] == ["CLAUDE.md"] for line in codeowners.splitlines())
 
 
-def test_termux_tool_providers_live_in_package_not_repository_root():
-    legacy_names = {"termux_mcp_tools.py", "termux_system_tools.py"}
-    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
-    assert not still_in_root, f"Termux tool modules still in root: {still_in_root}"
+def test_tool_providers_live_in_package_not_repository_root():
+    moved = {
+        "termux_mcp_tools.py": "termux.py",
+        "termux_system_tools.py": "termux_system.py",
+        "filesystem_mcp_tools.py": "filesystem.py",
+        "git_mcp_tools.py": "git.py",
+        "wikipedia_mcp_tools.py": "wikipedia.py",
+        "profiler_tools.py": "profiler.py",
+        "theme_tools.py": "theme.py",
+    }
+    still_in_root = sorted(name for name in moved if (ROOT / name).exists())
+    assert not still_in_root, f"Tool provider modules still in root: {still_in_root}"
 
     package = ROOT / "tool_providers"
     assert (package / "__init__.py").is_file()
-    assert (package / "termux.py").is_file()
-    assert (package / "termux_system.py").is_file()
+    for module in moved.values():
+        assert (package / module).is_file(), module
+
+
+def test_filesystem_tools_stay_rooted_at_repository_root():
+    from tool_providers import filesystem
+
+    assert filesystem.BASE_DIR == str(ROOT.resolve())

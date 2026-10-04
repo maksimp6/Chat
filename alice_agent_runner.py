@@ -1,7 +1,7 @@
 """Run Alice headlessly on a GitHub issue against her own checkout.
 
 Alice only gets her filesystem tools, which are sandboxed to this repository
-(filesystem_mcp_tools.BASE_DIR). She never commits, pushes or runs commands:
+(tool_providers.filesystem.BASE_DIR). She never commits, pushes or runs commands:
 the calling workflow reviews the diff and opens the pull request.
 """
 
