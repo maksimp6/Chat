@@ -20,8 +20,9 @@ def test_ci_does_not_rerun_frontend_tests_only_for_logging() -> None:
 def test_full_python_suites_report_slowest_tests() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "pytest --durations=30 --cov=." in workflow
+    assert "pytest -n auto --dist=loadfile --durations=30 --cov=." in workflow
     assert "pytest --durations=30 -q" in workflow
+    assert "Parallel Python application tests:" in workflow
 
 
 def test_focused_python_suites_are_not_duplicated_before_full_suite() -> None:
