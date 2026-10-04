@@ -8,8 +8,4 @@ lanes:
       - oauth
       - chrome
       - agent-shell
-      - dota-commentator
     owner_id: "293531601"
-    billing:
-      enabled: true
-      stripe_key: alice/prod/stripe-key
