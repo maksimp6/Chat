@@ -52,6 +52,7 @@ AGENT_LABELS = {
 
 FAILED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 PASSED_CONCLUSIONS = {"success", "neutral", "skipped"}
+ADMISSION_CHECK_NAMES = {"Merge readiness snapshot"}
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 SEVERITY_ICONS = {"high": "🔴", "medium": "🟡", "low": "⚪"}
 
@@ -472,11 +473,19 @@ def freshness_state(thread: Thread) -> str:
     return "current" if thread.behind_by == 0 else f"behind {thread.behind_by}"
 
 
+def implementation_checks(thread: Thread) -> dict[str, str]:
+    """Checks that validate implementation, excluding merge-admission snapshots."""
+    return {
+        name: value for name, value in thread.checks.items() if name not in ADMISSION_CHECK_NAMES
+    }
+
+
 def checks_state(thread: Thread) -> str:
-    """Summarise head-commit checks as "failed", "pending", "passed" or "none"."""
-    if not thread.checks:
+    """Summarise implementation checks as "failed", "pending", "passed" or "none"."""
+    checks = implementation_checks(thread)
+    if not checks:
         return "none"
-    values = set(thread.checks.values())
+    values = set(checks.values())
     if values & FAILED_CONCLUSIONS:
         return "failed"
     if values <= PASSED_CONCLUSIONS:
@@ -587,7 +596,9 @@ def detect_findings(
 
         if state == "failed":
             failed = sorted(
-                name for name, value in thread.checks.items() if value in FAILED_CONCLUSIONS
+                name
+                for name, value in implementation_checks(thread).items()
+                if value in FAILED_CONCLUSIONS
             )
             found.append(finding("high", "ci_failed", "CI красный: " + ", ".join(failed)))
         elif (
@@ -596,6 +607,15 @@ def detect_findings(
             and now - thread.checks_started_at > limits.checks_pending
         ):
             found.append(finding("low", "checks_stuck", "проверки идут дольше обычного"))
+        readiness = thread.checks.get("Merge readiness snapshot")
+        if readiness in FAILED_CONCLUSIONS:
+            found.append(
+                finding(
+                    "medium",
+                    "readiness_blocked",
+                    "merge readiness не пройден; см. freshness/check/review причины",
+                )
+            )
         if thread.mergeable_state == "dirty":
             found.append(finding("high", "merge_conflict", "конфликт с master"))
 
