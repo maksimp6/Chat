@@ -7,8 +7,12 @@ services:
     depends_on: []
     scale: 1
     resources:
-      cpu: 0.5
-      memory: 512
+      cpu: "0.1"
+      memory: 256Mi
+    repository: oauth-idp
+    scopes:
+      - browser.read
+      - browser.control
 
   chrome:
     type: chrome
@@ -16,8 +20,10 @@ services:
       - oauth
     scale: 0
     resources:
-      cpu: 0.1
-      memory: 256
+      cpu: "0.5"
+      memory: 1024Mi
+    repository: chrome-worker
+    owner_id: "293531601"
 
   agent-shell:
     type: agent-shell
@@ -25,5 +31,5 @@ services:
       - oauth
     scale: 1
     resources:
-      cpu: 0.5
-      memory: 512
+      cpu: "0.5"
+      memory: 512Mi
