@@ -49,8 +49,9 @@ allowlist: rename an entry, then delete it from the list.
 ## Python
 
 - Modules and packages use `snake_case`. Implementation lives in packages
-  (#430). The repository root holds only entrypoints and project metadata, so
-  a new root module needs a justified entry in the allowlist.
+  (#430). The repository root holds only entrypoints and project metadata;
+  `tests/test_repository_root_layout.py` rejects new root modules and lists
+  the legacy ones still waiting to move.
 - Classes use `PascalCase`, functions and variables `snake_case`, constants
   `UPPER_SNAKE_CASE`.
 - Name a module after the capability it owns (`trace_manager`), never after a
