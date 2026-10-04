@@ -40,3 +40,9 @@ def test_trace_summary_module_loads_before_chat():
     assert template.index("trace_summary.js") < template.index("chat.js")
     source = read("static/chat.js")
     assert "window.AliceTraceSummary.build(traceObj)" in source
+
+
+def test_execution_surface_module_loads_before_chat():
+    template = read("templates/index.html")
+    assert template.index("execution_surface.js") < template.index("chat.js")
+    assert "window.AliceExecutionSurface.project(traceObj)" in read("static/chat.js")
