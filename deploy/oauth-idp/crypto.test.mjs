@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
-import { cookieMac, createKeys, fromB64u, open, safeEqual, seal } from "./crypto.mjs";
+import { cookieMac, createKeys, fromB64u, hashPassphrase, open, safeEqual, seal } from "./crypto.mjs";
 
 const SECRET = "test-secret-with-at-least-32-characters!!";
 const NOW = 1_800_000_000;
@@ -71,4 +72,18 @@ test("base64url decoding is strict and comparison is length-safe", () => {
   assert.equal(safeEqual("abc", "abc"), true);
   assert.equal(safeEqual("abc", "abd"), false);
   assert.equal(safeEqual("abc", "abcd"), false);
+});
+
+test("passphrases are hashed with a slow salted function", () => {
+  const phrase = "correct horse battery staple";
+  const hash = hashPassphrase(phrase, "salt-a");
+  assert.equal(hash, hashPassphrase(phrase, "salt-a"));
+  assert.notEqual(hash, hashPassphrase(phrase, "salt-b"));
+  assert.notEqual(hash, hashPassphrase(phrase + " ", "salt-a"));
+  assert.notEqual(hash, createHash("sha256").update(phrase).digest("base64url"));
+  assert.ok(hashPassphrase(phrase, "salt-a").length >= 43);
+  // A deliberately slow derivation: a plain digest takes microseconds.
+  const started = process.hrtime.bigint();
+  hashPassphrase(phrase, "salt-c");
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 >= 5);
 });
