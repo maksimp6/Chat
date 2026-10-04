@@ -76,8 +76,6 @@ LEGACY_ROOT_PYTHON = {
     "ssh_runtime.py",
     "ssh_runtime_settings.py",
     "storage.py",
-    "termux_mcp_tools.py",
-    "termux_system_tools.py",
     "theme_tools.py",
     "tool_registry.py",
     "trace_manager.py",
@@ -160,3 +158,14 @@ def test_claude_instructions_import_repository_rules():
 
     codeowners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
     assert any(line.split()[:1] == ["CLAUDE.md"] for line in codeowners.splitlines())
+
+
+def test_termux_tool_providers_live_in_package_not_repository_root():
+    legacy_names = {"termux_mcp_tools.py", "termux_system_tools.py"}
+    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
+    assert not still_in_root, f"Termux tool modules still in root: {still_in_root}"
+
+    package = ROOT / "tool_providers"
+    assert (package / "__init__.py").is_file()
+    assert (package / "termux.py").is_file()
+    assert (package / "termux_system.py").is_file()

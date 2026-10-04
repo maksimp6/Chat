@@ -18,9 +18,9 @@
 
 1. Последовательно импортирует реестры из модулей:
    - `git_mcp_tools.TOOL_REGISTRY`
-   - `termux_system_tools.SYSTEM_TOOLS`
+   - `tool_providers.termux_system.SYSTEM_TOOLS`
    - `filesystem_mcp_tools.FILESYSTEM_TOOLS`
-   - `termux_mcp_tools.TERMUX_TOOLS`
+   - `tool_providers.termux.TERMUX_TOOLS`
 2. Ищет в каждом реестре инструмент с именем `func_name`.
 3. Возвращает метаданные инструмента или `None`, если не найден.
 

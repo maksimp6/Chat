@@ -110,7 +110,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Git: {e}")
 
         try:
-            from termux_mcp_tools import TERMUX_TOOLS
+            from tool_providers.termux import TERMUX_TOOLS
 
             for name, cfg in TERMUX_TOOLS.items():
                 self._register("termux", name, cfg)
@@ -118,7 +118,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Termux: {e}")
 
         try:
-            from termux_system_tools import SYSTEM_TOOLS
+            from tool_providers.termux_system import SYSTEM_TOOLS
 
             for name, cfg in SYSTEM_TOOLS.items():
                 self._register("system", name, cfg)
