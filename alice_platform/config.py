@@ -163,7 +163,7 @@ def validate_schema(data: Dict[str, Any]) -> None:
 
 def validate_no_http_in_production(domains: Dict[str, Any], lanes: Dict[str, Any]) -> None:
     """Exported function for testing."""
-    _validate_http_in_production(domains, lanes)
+    validate_http_in_production(domains, lanes)
 
 
 def validate_service_references(

@@ -1,5 +1,7 @@
 """Tests for Alice Platform health checks (derived from config)."""
 
+from urllib.parse import urlsplit
+
 import pytest
 from alice_platform.health import (
     generate_health_plan,
@@ -27,9 +29,8 @@ class TestHealthPlanGeneration:
         assert len(health_plan) >= 2
 
         # Check that domains are in the plan
-        domains_checked = [check.endpoint for check in health_plan]
-        assert any("oauth.example.com" in domain for domain in domains_checked)
-        assert any("chrome.example.com" in domain for domain in domains_checked)
+        hosts_checked = {urlsplit(check.endpoint).hostname for check in health_plan}
+        assert hosts_checked == {"oauth.example.com", "chrome.example.com"}
 
     def test_health_check_includes_sign_in_method(self):
         """Health check includes expected sign_in method."""
