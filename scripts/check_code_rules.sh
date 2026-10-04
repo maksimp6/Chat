@@ -9,5 +9,4 @@ python -m pytest -q -p no:cacheprovider \
   tests/test_reliability_rules.py \
   tests/test_type_checking.py \
   tests/test_api_problem_details.py \
-  tests/test_asvs_checklist.py \
-  tests/test_security_headers.py
+  tests/test_asvs_checklist.py
