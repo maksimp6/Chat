@@ -22,7 +22,26 @@ SCENARIOS = ("cold", "warm", "python", "worker-js", "dependencies")
 def docker_runner(argv, *, cold=False, **kwargs):
     if argv[:2] == ["docker", "build"]:
         argv = [*argv[:2], "--progress=plain", *(["--no-cache"] if cold else []), *argv[2:]]
-    return subprocess.run(argv, **kwargs)
+    operation = argv[1]
+    print(
+        json.dumps({"stage": "chrome_docker_command_started", "operation": operation}), flush=True
+    )
+    started = time.perf_counter()
+    kwargs.setdefault("timeout", 180)
+    try:
+        return subprocess.run(argv, **kwargs)
+    except subprocess.TimeoutExpired:
+        print(
+            json.dumps(
+                {
+                    "stage": "chrome_docker_timeout",
+                    "operation": operation,
+                    "seconds": time.perf_counter() - started,
+                }
+            ),
+            flush=True,
+        )
+        chrome.fail("docker_error")
 
 
 def mutate_context(exported, scenario):

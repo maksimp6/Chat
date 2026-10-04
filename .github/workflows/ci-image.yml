@@ -11,6 +11,14 @@ on:
       - scripts/ci_environment_hash.py
   pull_request:
     branches: [master]
+    # Optional measurement builder only; required workflows retain full triggers.
+    paths:
+      - .github/workflows/ci-image.yml
+      - deploy/ci/Dockerfile
+      - requirements.txt
+      - requirements-dev.txt
+      - package.json
+      - scripts/ci_environment_hash.py
   workflow_dispatch:
 
 permissions:

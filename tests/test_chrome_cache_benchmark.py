@@ -95,3 +95,20 @@ def test_dispatch_main_selects_cold_runner(monkeypatch):
     probe.main(["--sha", "a" * 40, "--scenario", "cold"])
     assert registry.call_args.kwargs["runner"].keywords == {"cold": True}
     assert benchmark.call_args.args[2] == "cold"
+
+
+def test_docker_probe_timeout_emits_only_operation_and_time(monkeypatch, capsys):
+    runner = Mock(side_effect=subprocess.TimeoutExpired(["docker", "login", "secret-id"], 180))
+    monkeypatch.setattr(probe.subprocess, "run", runner)
+    with pytest.raises(CloudProviderError) as error:
+        probe.docker_runner(
+            ["docker", "login", "registry", "--password-stdin"], input="secret-password"
+        )
+    assert error.value.code == "docker_error"
+    assert runner.call_args.kwargs["timeout"] == 180
+    output = capsys.readouterr().out
+    records = [json.loads(line) for line in output.splitlines()]
+    assert records[0] == {"stage": "chrome_docker_command_started", "operation": "login"}
+    assert records[1]["stage"] == "chrome_docker_timeout"
+    assert records[1]["operation"] == "login" and records[1]["seconds"] >= 0
+    assert "secret" not in output
