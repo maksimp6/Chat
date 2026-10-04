@@ -25,12 +25,5 @@ services:
     repository: chrome-worker
     owner_id: "293531601"
 
-  agent-shell:
-    type: agent-shell
-    depends_on:
-      - oauth
-    scale: 1
-    resources:
-      cpu: "0.5"
-      memory: 512Mi
+
 
