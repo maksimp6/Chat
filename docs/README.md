@@ -14,8 +14,17 @@
 - [Правила надёжного кода](development/reliability.md) — идемпотентность операций и правила Power of Ten для Python/JS; «храповик» `tests/test_reliability_rules.py`
 - [Правила именования](development/naming.md) — тексты UI, код фронтенда, файлы, Python-модули, ветки и PR; проверка `tests/test_naming_conventions.py`
 - [Облачное окружение Claude Code для Cloud.ru](development/claude-cloud-ops-environment.md) — настройка, setup script, переменные и инструменты (Cloud.ru CLI, EDS, gh, Docker)
+- [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
+- [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
 - [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
+- [Alice Platform](platform/architecture.md) — deployment system с config-driven reconciliation
+  - [Архитектура](platform/architecture.md) — сервисы, lanes, валидация
+  - [Домены](platform/domains.md) — конфигурация маршрутизации
+  - [Хранилище](platform/storage.md) — persistent storage и backup
+  - [Секреты](platform/secrets.md) — управление credentials
+  - [Восстановление](platform/recovery.md) — аварийные процедуры
+  - [Деплой](platform/deployment.md) — процесс и gates утверждения
 - [API](api/overview.md) — описание доступных API-интерфейсов
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
 - [3D Printing Business](printing3d.md) — shipped-контур заказов, P&L, финансирования и AI-first оценки

@@ -1,0 +1,72 @@
+name: Cloud.ru Alice OAuth IdP
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deploy or inspect the central OAuth identity provider on its Container Apps origin
+        type: choice
+        options: [preflight, deploy, status, stop]
+        default: preflight
+      lane:
+        description: production (reviewed master only, GitHub sign-in) or test (any branch, separate container, passphrase sign-in)
+        type: choice
+        options: [production, test]
+        default: production
+      public_url:
+        description: Issuer origin on the owner's domain (https://oauth.example); empty uses the container's own origin
+        type: string
+        required: false
+
+permissions:
+  contents: read
+concurrency:
+  group: alice-cloudru-idp-${{ inputs.lane }}
+  cancel-in-progress: false
+
+jobs:
+  idp:
+    if: github.ref == 'refs/heads/master' || inputs.lane == 'test'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Require reviewed master commit
+        if: inputs.lane != 'test'
+        run: |
+          git fetch --no-tags origin master
+          git merge-base --is-ancestor HEAD FETCH_HEAD
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version-file: .python-version
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: inputs.action == 'deploy'
+        with:
+          node-version: "22.22.2"
+      - name: Test the identity provider before building it
+        if: inputs.action == 'deploy'
+        run: npm test --prefix deploy/oauth-idp
+      - name: Operate identity provider
+        env:
+          ACTION: ${{ inputs.action }}
+          SOURCE_SHA: ${{ github.sha }}
+          IDP_LANE: ${{ inputs.lane }}
+          IDP_PUBLIC_URL: ${{ inputs.public_url || (inputs.lane == 'production' && vars.IDP_PUBLIC_URL) || '' }}
+          CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          # The lanes never share signing keys.
+          IDP_SECRET: ${{ inputs.lane == 'production' && secrets.IDP_SECRET || secrets.IDP_TEST_SECRET }}
+          # Each lane receives only its own sign-in credentials.
+          IDP_GITHUB_CLIENT_ID: ${{ inputs.lane == 'production' && secrets.IDP_GITHUB_CLIENT_ID || '' }}
+          IDP_GITHUB_CLIENT_SECRET: ${{ inputs.lane == 'production' && secrets.IDP_GITHUB_CLIENT_SECRET || '' }}
+          IDP_OWNER_PASSPHRASE: ${{ inputs.lane == 'test' && secrets.IDP_TEST_PASSPHRASE || '' }}
+          ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
+        run: python scripts/cloudru_idp.py "$ACTION" --sha "$SOURCE_SHA"
