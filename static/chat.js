@@ -417,6 +417,10 @@ function addMessage(
       }
     }
     if (traceObj && typeof traceObj === "object" && Object.keys(traceObj).length > 0) {
+      if (window.AliceExecutionSurface) {
+        const surface = window.AliceExecutionSurface.project(traceObj);
+        if (surface) metaWrap.appendChild(window.AliceExecutionSurface.render(surface));
+      }
       if (window.AliceTraceSummary && typeof window.AliceTraceSummary.build === "function") {
         const technical = window.AliceTraceSummary.build(traceObj);
         if (technical && technical.items && technical.items.length > 0) {
