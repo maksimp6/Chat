@@ -30,8 +30,7 @@ class TestHealthPlanGeneration:
 
         # Check that domains are in the plan
         hosts_checked = {urlsplit(check.endpoint).hostname for check in health_plan}
-        assert "oauth.example.com" in hosts_checked
-        assert "chrome.example.com" in hosts_checked
+        assert hosts_checked == {"oauth.example.com", "chrome.example.com"}
 
     def test_health_check_includes_sign_in_method(self):
         """Health check includes expected sign_in method."""
