@@ -17,3 +17,7 @@ chrome.maxxxpavlov.online:
 agent-shell.maxxxpavlov.online:
   service: agent-shell
   protocol: https
+
+dota-commentator.maxxxpavlov.online:
+  service: dota-commentator
+  protocol: https

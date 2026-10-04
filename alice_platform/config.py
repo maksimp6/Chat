@@ -139,6 +139,7 @@ def _validate_schema(data: Dict[str, Any]) -> None:
             "owner_id",
             "secret_ref",
             "repository",
+            "billing",
         }
         for key in service_config.keys():
             if key not in allowed_service_fields and not key.startswith("_"):
