@@ -11,6 +11,7 @@ import {
   createPublicKey,
   hkdfSync,
   randomBytes,
+  scryptSync,
   timingSafeEqual,
 } from "node:crypto";
 
@@ -23,6 +24,10 @@ const BASE64URL = /^[A-Za-z0-9_-]*$/;
 export const b64u = (value) => Buffer.from(value).toString("base64url");
 export const randomToken = (bytes = 32) => b64u(randomBytes(bytes));
 export const sha256b64u = (value) => b64u(createHash("sha256").update(value).digest());
+
+// Slow, salted hash for the owner passphrase (never a plain digest of a password).
+export const hashPassphrase = (passphrase, salt) =>
+  b64u(scryptSync(String(passphrase), Buffer.from(String(salt)), 32, { N: 16384, r: 8, p: 1 }));
 
 export function fromB64u(value) {
   if (typeof value !== "string" || !BASE64URL.test(value)) throw new Error("invalid_encoding");
