@@ -13,6 +13,13 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = '^(tests|node_modules|android|scripts|deploy|plugins|r)/'
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = ["--strict-config", "--strict-markers"]
