@@ -1139,3 +1139,76 @@ def test_healthz_fails_closed_when_database_is_unavailable(monkeypatch):
     assert response.status_code == 503
     assert response.get_json() == {"status": "error", "database": "unavailable"}
     assert b"database secret" not in response.data
+
+
+def test_verify_persistence_restarts_only_alice_test(monkeypatch):
+    import argparse
+    import json
+    import scripts.cloudru_deploy as deploy
+
+    rows = {}
+
+    class Cursor:
+        def __init__(self, row=None):
+            self.row = row
+        def fetchone(self):
+            return self.row
+
+    class Conn:
+        def execute(self, sql, params=()):
+            if sql.startswith("INSERT INTO conv_settings"):
+                rows[params[0]] = params[1]
+                return Cursor()
+            if sql.startswith("SELECT settings_json"):
+                value = rows.get(params[0])
+                return Cursor(None if value is None else {"settings_json": value})
+            if sql.startswith("DELETE FROM conv_settings"):
+                rows.pop(params[0], None)
+                return Cursor()
+            raise AssertionError(sql)
+        def commit(self):
+            pass
+        def close(self):
+            pass
+
+    events = []
+
+    class Apps:
+        def status(self, name):
+            assert name == "alice-test"
+            return {"status": "RUNNING"}
+        def get(self, name):
+            return {"template": {"containers": [{"image": "registry/alice@sha256:abc"}]}}
+        def stop(self, name):
+            events.append(("stop", name))
+        def start(self, name):
+            events.append(("start", name))
+        def wait_until_ready(self, name, image=None):
+            events.append(("ready", name, image))
+            return {"public_uri": "https://alice-test.example", "image": image}
+        def health_check(self, uri):
+            events.append(("health", uri))
+            return {"http_status": 200}
+
+    monkeypatch.setenv("CLOUDRU_CONTAINER_NAME", "alice-test")
+    monkeypatch.setenv("CLOUDRU_TEST_CONTAINER_NAME", "alice-test")
+    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://test/db")
+    monkeypatch.setattr(deploy, "CloudRuContainerAppsClient", Apps)
+    monkeypatch.setattr("db.init_db", lambda: None)
+    monkeypatch.setattr("db.get_conn", Conn)
+
+    result = deploy.cmd_verify_persistence(argparse.Namespace())
+    assert result["status"] == "PERSISTENCE_VERIFIED"
+    assert events[:2] == [("stop", "alice-test"), ("start", "alice-test")]
+    assert rows == {}
+
+
+def test_verify_persistence_refuses_production_container(monkeypatch):
+    import argparse
+    import scripts.cloudru_deploy as deploy
+
+    monkeypatch.setenv("CLOUDRU_CONTAINER_NAME", "alice-prod")
+    monkeypatch.setenv("CLOUDRU_TEST_CONTAINER_NAME", "alice-test")
+    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://prod/db")
+    with pytest.raises(CloudProviderError, match="restricted to alice-test"):
+        deploy.cmd_verify_persistence(argparse.Namespace())
