@@ -27,8 +27,8 @@ def test_memory_controls_are_server_rendered():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     elements = parse_index()
     assert elements["memory-btn"][0] == "button"
-    assert "modal" in elements["memoryModal"][1].get("class", "").split()
-    assert "memory-modal" in elements["memoryModal"][1].get("class", "").split()
+    assert "modal" in elements["memory-modal"][1].get("class", "").split()
+    assert "memory-modal" in elements["memory-modal"][1].get("class", "").split()
     assert 'class="modal-content memory-modal-content"' in html
     assert 'src="{{ static_root }}/memory_panel.js?v={{ static_version }}"' in html
     assert "memory_btn.js" not in html
@@ -36,7 +36,7 @@ def test_memory_controls_are_server_rendered():
 
 def test_memory_modal_has_no_inline_presentation_styles():
     html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    modal = html.split('id="memoryModal"', 1)[1].split("</div></div>", 1)[0]
+    modal = html.split('id="memory-modal"', 1)[1].split("</div></div>", 1)[0]
     assert not re.search(r'\sstyle="', modal)
 
 
@@ -59,8 +59,8 @@ def test_memory_button_has_real_binding_path():
     panel = (ROOT / "static" / "memory_panel.js").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
     assert 'data-action="modal.open"' in html
-    assert 'data-modal="memoryModal"' in html
-    assert 'id="memoryModal"' in html
+    assert 'data-modal="memory-modal"' in html
+    assert 'id="memory-modal"' in html
     assert 'data-action="modal.close"' in html
     assert "header.memory.open" not in header
     assert "alice:modal:before-open" in panel

@@ -1,4 +1,4 @@
-/* Bridges trace metadata in chat messages to the full Execution Trace viewer. */
+/* Links trace metadata in chat messages to the full trace viewer. */
 (function () {
   "use strict";
 

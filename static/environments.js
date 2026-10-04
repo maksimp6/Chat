@@ -161,7 +161,7 @@
   window.AliceEnvironments = { open, load };
 
   document.addEventListener("DOMContentLoaded", () => {
-    const header = document.getElementById("header-actions-2");
+    const header = document.getElementById("header-actions-secondary");
     if (!header || document.getElementById("environments-btn")) return;
     const button = document.createElement("button");
     button.id = "environments-btn";

@@ -125,15 +125,15 @@ def test_model_modal_complete_dom_shape():
 
 
 def test_memory_modal_complete_dom_shape():
-    modal = find(parse_html(), "memoryModal")
+    modal = find(parse_html(), "memory-modal")
     expected = (
         "div",
         (
-            ("aria-labelledby", "memoryModalTitle"),
+            ("aria-labelledby", "memory-modal-title"),
             ("aria-modal", "true"),
             ("class", "modal memory-modal"),
             ("hidden", None),
-            ("id", "memoryModal"),
+            ("id", "memory-modal"),
             ("role", "dialog"),
         ),
         (),
@@ -149,8 +149,8 @@ def test_memory_modal_complete_dom_shape():
                             ("aria-label", "Закрыть"),
                             ("class", "memory-modal-close alice-btn"),
                             ("data-action", "modal.close"),
-                            ("data-modal", "memoryModal"),
-                            ("id", "memoryCloseBtn"),
+                            ("data-modal", "memory-modal"),
+                            ("id", "memory-close-btn"),
                             ("type", "button"),
                         ),
                         ("×",),
@@ -158,7 +158,7 @@ def test_memory_modal_complete_dom_shape():
                     ),
                     (
                         "h2",
-                        (("class", "memory-modal-title"), ("id", "memoryModalTitle")),
+                        (("class", "memory-modal-title"), ("id", "memory-modal-title")),
                         ("Управление памятью",),
                         (),
                     ),
@@ -171,7 +171,14 @@ def test_memory_modal_complete_dom_shape():
                                 "label",
                                 (("class", "memory-config-option"),),
                                 ("Включить память",),
-                                (("input", (("id", "memEnabled"), ("type", "checkbox")), (), ()),),
+                                (
+                                    (
+                                        "input",
+                                        (("id", "memory-enabled"), ("type", "checkbox")),
+                                        (),
+                                        (),
+                                    ),
+                                ),
                             ),
                             (
                                 "label",
@@ -182,7 +189,7 @@ def test_memory_modal_complete_dom_shape():
                                         "input",
                                         (
                                             ("class", "memory-limit"),
-                                            ("id", "memLimit"),
+                                            ("id", "memory-limit"),
                                             ("max", "50"),
                                             ("min", "1"),
                                             ("type", "number"),
@@ -203,7 +210,7 @@ def test_memory_modal_complete_dom_shape():
                                 "button",
                                 (
                                     ("class", "memory-clear-btn alice-btn"),
-                                    ("id", "memoryClearBtn"),
+                                    ("id", "memory-clear-btn"),
                                     ("type", "button"),
                                 ),
                                 ("Очистить всю память",),
@@ -215,9 +222,9 @@ def test_memory_modal_complete_dom_shape():
                         "h3",
                         (("class", "memory-facts-title"),),
                         ("Факты (", ")"),
-                        (("span", (("id", "memCount"),), ("0",), ()),),
+                        (("span", (("id", "memory-count"),), ("0",), ()),),
                     ),
-                    ("div", (("class", "memory-facts-list"), ("id", "memoryFactsList")), (), ()),
+                    ("div", (("class", "memory-facts-list"), ("id", "memory-facts-list")), (), ()),
                 ),
             ),
         ),

@@ -114,12 +114,12 @@ const memoryRuntime = memoryShim.load(
   },
 );
 const memoryButton = memoryRuntime.document.getElementById("memory-btn");
-const memoryModal = memoryRuntime.document.getElementById("memoryModal");
-const memoryClose = memoryRuntime.document.getElementById("memoryCloseBtn");
+const memoryModal = memoryRuntime.document.getElementById("memory-modal");
+const memoryClose = memoryRuntime.document.getElementById("memory-close-btn");
 if (!memoryButton || !memoryModal || !memoryClose) {
   throw new Error("real memory modal controls must exist in index.html");
 }
-if (memoryButton.dataset.action !== "modal.open" || memoryButton.dataset.modal !== "memoryModal") {
+if (memoryButton.dataset.action !== "modal.open" || memoryButton.dataset.modal !== "memory-modal") {
   throw new Error("memory button must use generic modal.open dispatcher contract");
 }
 if (!memoryModal.hidden) throw new Error("real memory modal must start hidden");

@@ -7,7 +7,7 @@ def test_header_actions_stay_on_one_horizontal_line():
     css = Path("static/style.css").read_text(encoding="utf-8")
     assert 'class="header-row header-row-primary"' in html
     assert 'class="header-row header-row-secondary"' in html
-    assert 'id="header-actions-2"' in html
+    assert 'id="header-actions-secondary"' in html
     assert ".alice-pro-app #header {" in css
     assert "flex-direction: row;" in css
     assert "flex-wrap: nowrap;" in css
@@ -21,8 +21,8 @@ def test_dynamic_header_actions_target_secondary_row():
     html = Path("templates/index.html").read_text(encoding="utf-8")
     assert 'id="memory-btn"' in html
     assert 'data-action="modal.open"' in html
-    assert 'data-modal="memoryModal"' in html
-    assert 'getElementById("header-actions-2")' in diagnostics
+    assert 'data-modal="memory-modal"' in html
+    assert 'getElementById("header-actions-secondary")' in diagnostics
     assert "window.__aliceHeaderActionsBound === true" in header
     assert "header.memory.open" not in header
     assert "window.openMemoryModal" in memory
@@ -40,6 +40,6 @@ def test_memory_action_uses_document_delegation_for_dynamic_modal_lifecycle():
     assert "window.__aliceMemoryPanelBound === true" in source
     assert "document.addEventListener(" in source
     assert '"click"' in source
-    assert 'event.target.closest("#memoryClearBtn")' in source
+    assert 'event.target.closest("#memory-clear-btn")' in source
     assert "event.preventDefault();" in source
     assert "window.openMemoryModal();" not in source

@@ -18,5 +18,5 @@ def test_chat_has_direct_trace_viewer_action():
 
 
 def test_trace_viewer_auto_preserves_direct_chat_action():
-    source = (ROOT / "static" / "trace_viewer_auto.js").read_text(encoding="utf-8")
+    source = (ROOT / "static" / "trace_viewer_links.js").read_text(encoding="utf-8")
     assert 'details.dataset.traceViewerDirect === "1"' in source

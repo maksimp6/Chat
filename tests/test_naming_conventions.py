@@ -105,19 +105,9 @@ ROOT_MODULE_ALLOWLIST = {
     "yc_logging",
 }
 
-STATIC_FILE_ALLOWLIST = {"trace_viewer_auto.js", "trace_viewer_timing_fix.js"}
+STATIC_FILE_ALLOWLIST: set[str] = set()
 
-TEMPLATE_ID_ALLOWLIST = {
-    "header-actions-2",
-    "memoryModal",
-    "memoryCloseBtn",
-    "memoryModalTitle",
-    "memEnabled",
-    "memLimit",
-    "memoryClearBtn",
-    "memCount",
-    "memoryFactsList",
-}
+TEMPLATE_ID_ALLOWLIST: set[str] = set()
 
 UI_TEXT_ALLOWLIST: set[str] = set()
 

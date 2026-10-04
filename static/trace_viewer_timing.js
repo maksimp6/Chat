@@ -1,4 +1,4 @@
-/* Safe Execution Trace timing patch. */
+/* Trace viewer timing: derives step intervals from responses, requests and events. */
 (function () {
   "use strict";
   function finite(v) {

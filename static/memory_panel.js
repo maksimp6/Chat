@@ -6,14 +6,14 @@
   }
 
   window.openMemoryModal = function () {
-    var modal = byId("memoryModal");
+    var modal = byId("memory-modal");
     if (!modal) return;
     window.AliceCoreAPI.ui.modal.open(modal);
     window.loadMemoryData();
   };
 
   window.closeMemoryModal = function () {
-    var modal = byId("memoryModal");
+    var modal = byId("memory-modal");
     if (modal) window.AliceCoreAPI.ui.modal.close(modal);
   };
 
@@ -22,10 +22,10 @@
       var response = await window.AliceDispatcher.request("/api/memory/manage");
       if (!response.ok) throw new Error("HTTP " + response.status);
       var data = await response.json();
-      var enabled = byId("memEnabled");
-      var limit = byId("memLimit");
-      var count = byId("memCount");
-      var list = byId("memoryFactsList");
+      var enabled = byId("memory-enabled");
+      var limit = byId("memory-limit");
+      var count = byId("memory-count");
+      var list = byId("memory-facts-list");
       var facts = Array.isArray(data.facts) ? data.facts : [];
 
       if (enabled) enabled.checked = Boolean(data.config && data.config.enabled);
@@ -58,8 +58,8 @@
   };
 
   window.updateMemoryConfig = async function () {
-    var enabled = byId("memEnabled");
-    var limit = byId("memLimit");
+    var enabled = byId("memory-enabled");
+    var limit = byId("memory-limit");
     try {
       var response = await window.AliceDispatcher.request("/api/memory/config", {
         method: "PUT",
@@ -99,10 +99,10 @@
       "click",
       function (event) {
         var target =
-          event.target && event.target.closest ? event.target.closest("#memoryClearBtn") : null;
+          event.target && event.target.closest ? event.target.closest("#memory-clear-btn") : null;
         if (!target) return;
 
-        if (target.id === "memoryClearBtn") {
+        if (target.id === "memory-clear-btn") {
           event.preventDefault();
           window.clearMemory(null);
         }
@@ -112,13 +112,13 @@
 
     document.addEventListener("alice:modal:before-open", function (event) {
       var detail = event && event.detail;
-      if (!detail || detail.modalId !== "memoryModal") return;
+      if (!detail || detail.modalId !== "memory-modal") return;
       window.loadMemoryData();
     });
 
     var configBindings = [
-      ["memEnabled", "change", window.updateMemoryConfig],
-      ["memLimit", "change", window.updateMemoryConfig],
+      ["memory-enabled", "change", window.updateMemoryConfig],
+      ["memory-limit", "change", window.updateMemoryConfig],
     ];
 
     configBindings.forEach(function (binding) {

@@ -6,7 +6,7 @@ def read(path):
 
 
 def test_trace_viewer_lifecycle_is_idempotent_and_css_owned():
-    source = read("static/trace_viewer_auto.js")
+    source = read("static/trace_viewer_links.js")
     assert "var observer = null;" in source
     assert "if (observer) return;" in source
     assert "style.cssText" not in source

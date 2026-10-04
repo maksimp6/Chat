@@ -16,7 +16,7 @@
   function installDiagnosticsButton() {
     if (!bridge()) return;
     var header = document.getElementById("header");
-    var actionRow = document.getElementById("header-actions-2") || header;
+    var actionRow = document.getElementById("header-actions-secondary") || header;
     if (!header || document.getElementById("android-diagnostics-btn")) return;
 
     var button = document.createElement("button");

@@ -118,27 +118,27 @@ function click(element) {
         "static/dispatcher.js",
         "static/memory_panel.js",
       ],
-      '<button id="memory-btn" data-action="modal.open" data-modal="memoryModal"></button><div id="memoryModal" class="modal" hidden><button id="memoryCloseBtn" data-action="modal.close" data-modal="memoryModal"></button><button id="memoryClearBtn"></button><input id="memEnabled"><input id="memLimit"><span id="memCount"></span><div id="memoryFactsList"></div>',
+      '<button id="memory-btn" data-action="modal.open" data-modal="memory-modal"></button><div id="memory-modal" class="modal" hidden><button id="memory-close-btn" data-action="modal.close" data-modal="memory-modal"></button><button id="memory-clear-btn"></button><input id="memory-enabled"><input id="memory-limit"><span id="memory-count"></span><div id="memory-facts-list"></div>',
       { fetch },
     );
 
     click(document.getElementById("memory-btn"));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    assert.equal(document.getElementById("memoryModal").hidden, false);
-    assert.equal(document.getElementById("memoryModal").classList.contains("visible"), true);
-    assert.equal(document.getElementById("memEnabled").checked, true);
-    assert.equal(document.getElementById("memLimit").value, 7);
-    assert.equal(document.getElementById("memCount").textContent, "1");
-    assert.match(document.getElementById("memoryFactsList").textContent, /\[work\] Test fact/);
+    assert.equal(document.getElementById("memory-modal").hidden, false);
+    assert.equal(document.getElementById("memory-modal").classList.contains("visible"), true);
+    assert.equal(document.getElementById("memory-enabled").checked, true);
+    assert.equal(document.getElementById("memory-limit").value, 7);
+    assert.equal(document.getElementById("memory-count").textContent, "1");
+    assert.match(document.getElementById("memory-facts-list").textContent, /\[work\] Test fact/);
     assert.deepEqual(
       requests.map((item) => item.url),
       ["/api/memory/manage"],
     );
 
-    click(document.getElementById("memoryCloseBtn"));
-    assert.equal(document.getElementById("memoryModal").hidden, true);
-    assert.equal(document.getElementById("memoryModal").classList.contains("visible"), false);
+    click(document.getElementById("memory-close-btn"));
+    assert.equal(document.getElementById("memory-modal").hidden, true);
+    assert.equal(document.getElementById("memory-modal").classList.contains("visible"), false);
   }
 
   console.log("frontend smoke tests passed");
