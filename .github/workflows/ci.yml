@@ -138,7 +138,10 @@ jobs:
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
       - name: Run Python application tests with coverage
-        run: pytest --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+        run: |
+          started=$SECONDS
+          pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+          echo "- Parallel Python application tests: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Generate validation report
         if: always()
         run: |
