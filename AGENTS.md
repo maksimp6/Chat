@@ -8,7 +8,7 @@ Use the smallest independent change that satisfies an issue or subtask.
 2. Create a branch named for the issue/change.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
-5. Before publishing any non-RED implementation commit, work from a real checkout/worktree and run `bash scripts/pre_push.sh` (use `bash scripts/pre_push.sh full` before final handoff). The gate formats first and must finish with a clean worktree; if the execution backend cannot provide a shell checkout, do not use repository file APIs as a substitute for a validated development environment.
+5. Before publishing any non-RED implementation commit, work from a real checkout/worktree and run the fast `bash scripts/pre_push.sh` formatting gate. Run focused tests separately when the change requires them; full suites remain CI/final-handoff evidence rather than part of every pre-push. The formatting gate must finish with a clean worktree; if the execution backend cannot provide a shell checkout, do not use repository file APIs as a substitute for this gate.
 6. Run the relevant backend/Android checks in CI.
 7. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
 8. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
