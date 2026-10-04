@@ -16,6 +16,8 @@ from alice_platform.config import (
     validate_no_plaintext_secrets,
     validate_schema,
     validate_service_references,
+    validate_lane_invariants,
+    _is_secret_pattern,
 )
 from alice_platform.health import generate_health_plan
 from alice_platform.planner import Action, ActionType, plan_actions
@@ -103,6 +105,10 @@ def test_module_main_exit_path():
 
 
 def test_config_exported_helpers_and_invalid_shapes(tmp_path):
+    assert _is_secret_pattern(123) is False
+    assert _is_secret_pattern("plain-short-value") is False
+    validate_lane_invariants({"ignored": "not-a-dict"})
+
     validate_no_plaintext_secrets({"x": 1, "items": [{"nested": "ok"}]})
     with pytest.raises(ConfigError, match="Invalid secret ref"):
         validate_no_plaintext_secrets({"secret": {"ref": "wrong/ref"}})
@@ -135,6 +141,8 @@ def test_config_exported_helpers_and_invalid_shapes(tmp_path):
 
 
 def test_health_and_planner_edge_branches():
+    assert generate_health_plan("missing", {"lanes": {}}) == []
+
     config = {
         "domains": {
             "bad": "not-a-dict",
