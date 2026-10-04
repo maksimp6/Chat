@@ -55,12 +55,12 @@ def test_cli_error_and_empty_paths(tmp_path, capsys):
         assert cmd_health(_args(lane="test", config_dir="config/alice")) == 1
 
 
-def test_platform_cli_does_not_expose_unobserved_plan_or_reconcile():
-    for command in ("plan", "reconcile"):
-        with patch("sys.argv", ["alice_platform", command, "test"]):
-            with pytest.raises(SystemExit) as exc:
-                main()
-            assert exc.value.code == 2
+@pytest.mark.parametrize("command", ["plan", "reconcile"])
+def test_platform_cli_does_not_expose_unobserved_plan_or_reconcile(command):
+    with patch("sys.argv", ["alice_platform", command, "test"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == 2
 
 
 
