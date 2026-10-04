@@ -88,6 +88,7 @@ export function createWorker(options = {}) {
     issuer: process.env.BROWSER_IDP_ISSUER,
     resource: publicUrl ? `${new URL(publicUrl).origin}/browser/v1/mcp` : undefined,
     ownerIds: (process.env.BROWSER_GITHUB_ALLOWED_ID ?? process.env.ALICE_GITHUB_ALLOWED_IDS ?? "").split(","),
+    requiredScopes: ["browser.control"],
     ...options.idp,
   });
   let oauth;
@@ -217,7 +218,9 @@ export function createWorker(options = {}) {
       }
       if (await oauth.handle(request, response, url)) return;
       const isMcp = pathname === "/browser/v1/mcp";
-      const mcpAccess = isMcp && (oauth.authorize(request) || (idp.enabled && Boolean(await idp.authorize(request))));
+      const idpGrant = isMcp && idp.enabled ? await idp.authorize(request) : false;
+      const idpControlAccess = Boolean(idpGrant && idpGrant.scopes.includes("browser.control"));
+      const mcpAccess = isMcp && (oauth.authorize(request) || idpControlAccess);
       if (!authorized(request, token) && !mcpAccess) {
         if (isMcp && idp.enabled) response.setHeader("www-authenticate", idp.challenge());
         else if (isMcp && oauth.enabled) response.setHeader("www-authenticate", oauth.challenge());

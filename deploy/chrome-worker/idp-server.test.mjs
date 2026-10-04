@@ -36,6 +36,7 @@ test("MCP endpoint accepts IdP tokens and challenges everything else", async (t)
   assert.match(anonymous.headers.get("www-authenticate"), /resource_metadata=/);
   assert.equal((await app.call("/browser/v1/mcp", token({ sub: "999" }))).status, 401);
   assert.equal((await app.call("/browser/v1/mcp", token({ scope: "mcp" }))).status, 401);
+  assert.equal((await app.call("/browser/v1/mcp", token({ scope: "browser.read" }))).status, 401);
 });
 
 test("IdP tokens do not open the REST control surface; the static token still does", async (t) => {
@@ -52,7 +53,7 @@ test("protected-resource metadata points at the central IdP", async (t) => {
   for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/browser/v1/mcp"]) {
     const metadata = await (await app.call(path)).json();
     assert.deepEqual(metadata.authorization_servers, [ISSUER]);
-    assert.deepEqual(metadata.scopes_supported, ["browser.read", "browser.control"]);
+    assert.deepEqual(metadata.scopes_supported, ["browser.control"]);
   }
 });
 
