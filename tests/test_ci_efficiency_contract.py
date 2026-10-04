@@ -20,9 +20,30 @@ def test_ci_does_not_rerun_frontend_tests_only_for_logging() -> None:
 def test_full_python_suites_report_slowest_tests() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "pytest -n auto --dist=loadfile --durations=30 --cov=." in workflow
-    assert "pytest --durations=30 -q" in workflow
-    assert "Parallel Python application tests:" in workflow
+    application_step = workflow.split(
+        "- name: Run Python application tests with coverage", 1
+    )[1].split("- name: Generate validation report", 1)[0]
+    postgres_step = workflow.split(
+        "- name: Run full application suite on PostgreSQL", 1
+    )[1].split("- name: Verify backup and restore", 1)[0]
+
+    for argument in (
+        "pytest",
+        "--durations=30",
+        "--cov=.",
+        "--cov-config=.coveragerc",
+        "--cov-branch",
+        "--cov-report=xml:coverage.xml",
+        "--cov-report=json:coverage.json",
+    ):
+        assert argument in application_step
+    assert "-n auto" in application_step
+    assert "--dist=loadfile" in application_step
+    assert "Parallel Python application tests:" in application_step
+
+    assert "pytest" in postgres_step
+    assert "--durations=30" in postgres_step
+    assert "-q" in postgres_step
 
 
 def test_focused_python_suites_are_not_duplicated_before_full_suite() -> None:
