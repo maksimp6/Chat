@@ -85,3 +85,15 @@ def test_package_mounts_keep_cached_downloads_out_of_image_and_exclude_source():
     assert "COPY . " not in dockerfile
     assert "chrome" not in dockerfile.lower()
     assert "android" not in dockerfile.lower()
+
+
+def test_ab_toolchain_versions_match_image_versions():
+    benchmark = workflow("ci-image.yml")["jobs"]["benchmark"]
+    python_step = next(
+        s for s in benchmark["steps"] if "actions/setup-python@" in s.get("uses", "")
+    )
+    node_step = next(s for s in benchmark["steps"] if "actions/setup-node@" in s.get("uses", ""))
+    dockerfile = (ROOT / "deploy/ci/Dockerfile").read_text()
+    assert f"FROM python:{python_step['with']['python-version']}-slim" in dockerfile
+    assert f"ARG NODE_VERSION={node_step['with']['node-version']}" in dockerfile
+    assert "nodejs=${NODE_VERSION}-1nodesource1" in dockerfile

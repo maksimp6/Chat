@@ -160,7 +160,7 @@ jobs:
       METHOD: ${{ matrix.method }}
     steps:
       - name: Record runner arrival
-        run: echo "runner_arrived=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "runner_arrived=$(date +%s.%N)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Checkout identical test source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -170,7 +170,7 @@ jobs:
         if: matrix.method == 'setup'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: '3.14'
+          python-version: '3.14.7'
           cache: pip
           cache-dependency-path: |
             requirements.txt
@@ -206,7 +206,7 @@ jobs:
             --workdir /workspace "$CI_IMAGE" sleep infinity
           docker exec alice-ci-benchmark bash -c 'git config --global --add safe.directory /workspace; python --version; node --version; python -m pip check'
       - name: Record time to useful test
-        run: echo "tests_started=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "tests_started=$(date +%s.%N)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Run identical full SQLite suite with coverage
         run: |
           command=(python -m pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q)
@@ -215,7 +215,7 @@ jobs:
           else
             "${command[@]}"
           fi
-          echo "tests_finished=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
+          echo "tests_finished=$(date +%s.%N)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Stop CI container
         if: always() && matrix.method == 'image'
         run: docker rm --force alice-ci-benchmark

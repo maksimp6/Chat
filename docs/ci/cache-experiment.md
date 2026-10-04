@@ -4,7 +4,7 @@ Baseline head `2d7d870`: SQLite + coverage 24.01s, PostgreSQL 36.44s,
 required feedback wall-clock 89s, required workflow runner-time 6.40 minutes.
 The experiment does not close #757 or replace any required check.
 
-The CI image contains Python 3.14, Node 22 and shared Python/npm dependencies.
+The CI image and A/B setup arm pin Python 3.14.7, Node 22.22.2 and shared Python/npm dependencies.
 It contains no application source, Chrome or Android SDK. The content tag hashes
 only Dockerfile, requirements.txt, requirements-dev.txt and package.json.
 Existing tags are retained; updates to moving upstream dependencies require an
