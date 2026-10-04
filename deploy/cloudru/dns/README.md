@@ -1,6 +1,9 @@
 # Cloud DNS для API Gateway
 
-Cloud DNS API endpoint: `https://console.cloud.ru/api/clouddns`; запросы требуют
+Наши зоны находятся в Evolution DNS: `https://dns.api.cloud.ru`.
+`https://console.cloud.ru/api/clouddns` — отдельный классический Cloud DNS.
+У Evolution API Gateway нет публичного API управления (только консоль), поэтому
+Chrome MCP работает на адресе контейнера без Gateway. Запросы требуют
 Evolution IAM bearer token. Токен берётся штатным IAM service-account flow и
 истекает через час. Для Cloud DNS получи Service Instance ID `parentId` в разделе
 зон. Не подставляй Cloud project UUID вместо DNS service instance UUID.

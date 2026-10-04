@@ -29,6 +29,8 @@ ALLOWED_REGISTRY_DOMAINS = frozenset({DEFAULT_REGISTRY_DOMAIN})
 _NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _TAG_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
 _DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
+# Fixed tag holding the inline BuildKit layer cache for the next CI build.
+CACHE_TAG = "buildcache"
 
 Runner = Callable[..., subprocess.CompletedProcess]
 
@@ -205,16 +207,25 @@ class CloudRuRegistryClient:
     ) -> ImageRef:
         host = self.docker_login(registry_name, env=env)
         ref = ImageRef(host, repository, tag)
+        # CI runners start empty, so layers are reused through an inline BuildKit
+        # cache kept in the same private registry under a fixed tag.
+        cache = ImageRef(host, repository, CACHE_TAG).tagged
         for argv in (
             [
                 "docker",
                 "build",
                 "--platform",
                 platform,
+                "--cache-from",
+                cache,
+                "--build-arg",
+                "BUILDKIT_INLINE_CACHE=1",
                 "-f",
                 dockerfile,
                 "-t",
                 ref.tagged,
+                "-t",
+                cache,
                 context_dir,
             ],
             ["docker", "push", ref.tagged],
@@ -234,4 +245,7 @@ class CloudRuRegistryClient:
                         code="docker_error",
                     )
                 ref = ImageRef(host, repository, tag, match.group(0))
+        # The cache only speeds up the next build; failing to refresh it must not
+        # fail a deploy whose pinned image is already pushed.
+        self._run(["docker", "push", cache], text=True, capture_output=True, check=False, env=env)
         return ref

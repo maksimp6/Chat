@@ -199,6 +199,7 @@ export function createWorker(options = {}) {
           deployment_sha: process.env.BROWSER_DEPLOYMENT_SHA ?? null,
           state_ready: true,
           oauth_ready: oauth.enabled,
+          state_error: stateStore.status().lastError ?? null,
         });
       }
       if (await oauth.handle(request, response, url)) return;
@@ -216,6 +217,7 @@ export function createWorker(options = {}) {
       const args = operation[1] ? await body(request) : {};
       return json(response, 200, await callTool(operation[0], args));
     } catch (error) {
+      if (!error.status) process.stderr.write(`${JSON.stringify({ event: "browser_operation_failed", path: pathname, error: /^[a-z0-9_:A-Z]{1,80}$/.test(error?.message ?? "") ? error.message : "unexpected" })}\n`);
       return json(response, error.status ?? 500, { error: error.message === "browser_sleeping" ? error.message : "browser_operation_failed" });
     }
   }

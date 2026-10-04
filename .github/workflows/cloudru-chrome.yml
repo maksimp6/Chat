@@ -4,28 +4,29 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: Deploy or inspect the separate Chrome MCP service behind Gateway
+        description: Deploy or inspect the separate Chrome MCP service on its Container Apps origin
         type: choice
         options: [preflight, deploy, status, restart, stop]
         default: preflight
+      lane:
+        description: production (reviewed master only) or test (any branch, separate container and bucket)
+        type: choice
+        options: [production, test]
+        default: production
       storage_tenant_id:
         description: Object Storage tenant ID (not a secret); required for preflight/deploy unless configured
-        type: string
-        required: false
-      public_url:
-        description: Gateway HTTPS origin; defaults to the Chrome container name under maxxxpavlov.online
         type: string
         required: false
 
 permissions:
   contents: read
 concurrency:
-  group: alice-cloudru-persistent-chrome
+  group: alice-cloudru-persistent-chrome-${{ inputs.lane }}
   cancel-in-progress: false
 
 jobs:
   chrome:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || inputs.lane == 'test'
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -36,6 +37,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Require reviewed master commit
+        if: inputs.lane != 'test'
         run: |
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD FETCH_HEAD
@@ -53,36 +55,24 @@ jobs:
       - name: Install official MCP client
         if: inputs.action == 'deploy'
         run: npm ci --prefix deploy/chrome-worker
-      - name: Prepare live acceptance identity
+      - name: Prepare live acceptance marker
         if: inputs.action == 'deploy'
-        env:
-          CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
-          BROWSER_PUBLIC_URL: ${{ inputs.public_url || vars.BROWSER_PUBLIC_URL }}
-        run: |
-          python - <<'PY'
-          import os
-          from uuid import uuid4
-          from scripts.cloudru_chrome import names, public_origin
-          origin = os.environ.get("BROWSER_PUBLIC_URL") or f"https://{names(os.environ['CLOUDRU_PROJECT_ID'])[0]}.maxxxpavlov.online"
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
-              stream.write("BROWSER_PUBLIC_URL=" + public_origin(origin) + "\n")
-              stream.write("BROWSER_SMOKE_MARKER=" + uuid4().hex + "\n")
-          PY
+        run: python -c "import uuid; print('BROWSER_SMOKE_MARKER=' + uuid.uuid4().hex)" >> "$GITHUB_ENV"
       - name: Operate separate Chrome service
         env:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
+          CHROME_LANE: ${{ inputs.lane }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
-          BROWSER_PUBLIC_URL: ${{ inputs.public_url || vars.BROWSER_PUBLIC_URL }}
           ALICE_GITHUB_CLIENT_ID: ${{ secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID }}
           ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
         run: python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
-      - name: Seed real browser profile through Gateway MCP
+      - name: Seed real browser profile through public MCP
         if: inputs.action == 'deploy'
         env:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
@@ -91,11 +81,12 @@ jobs:
         if: inputs.action == 'deploy'
         env:
           SOURCE_SHA: ${{ github.sha }}
+          CHROME_LANE: ${{ inputs.lane }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"
-      - name: Verify MCP and restored browser profile through Gateway
+      - name: Verify MCP and restored browser profile through public origin
         if: inputs.action == 'deploy'
         env:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
