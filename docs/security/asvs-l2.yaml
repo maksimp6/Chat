@@ -1,117 +1,139 @@
-# OWASP ASVS 4.0.3, level 2: the requirements that apply to Alice Pro.
-# status: met | partial | gap | n/a. Every "met" names evidence: a test file
-# (optionally ::test_name) that proves it. tests/test_asvs_checklist.py
-# checks the evidence exists and that the number of gaps never grows.
-version: "4.0.3"
+# Selected applicable OWASP ASVS 5.0.0 requirements for Alice Pro.
+# IDs are version-qualified because ASVS requirement identifiers can change
+# across major releases. Status: met | partial | gap | n/a.
+version: "5.0.0"
 level: 2
+source: "OWASP/ASVS v5.0.0"
+mapping_source: "OWASP/ASVS 4.0.3 -> 5.0.0 official mapping"
 requirements:
-  - id: V2.1.1
-    title: Password length and complexity
-    status: n/a
-    note: No passwords; sign-in is GitHub OAuth or the deployment short token.
-  - id: V2.2.1
-    title: Anti-automation on authentication
+  - id: v5.0.0-2.4.1
+    title: Anti-automation for excessive application calls
     status: gap
-    note: No rate limit on short-token or OAuth callback endpoints.
-  - id: V2.10.4
-    title: Service secrets kept out of source and config files
-    status: met
-    evidence: tests/test_cloudru_secret_management.py
-  - id: V3.4.1
-    title: Session cookies use the Secure attribute
+    note: No unified rate-limit/anti-automation control yet for all costly or abuse-sensitive endpoints.
+
+  - id: v5.0.0-13.3.1
+    title: Backend secrets use a secrets-management solution
     status: partial
-    note: alice_user_token and the short-token refresh set Secure only on HTTPS requests.
-  - id: V3.4.2
-    title: Session cookies use HttpOnly
+    note: Cloud.ru Secret Management is implemented, but consumer migration remains open in #755.
+
+  - id: v5.0.0-3.3.1
+    title: Session cookies use Secure and hardened naming
+    status: partial
+    note: Secure handling exists on supported auth paths, but cookie-prefix and all-path consistency are not yet proven.
+
+  - id: v5.0.0-3.3.4
+    title: Session cookies inaccessible to client-side scripts use HttpOnly
     status: met
     evidence: tests/test_short_token_auth.py::test_session_cookie_is_secure_httponly_and_samesite
-  - id: V3.4.3
-    title: Session cookies use SameSite
+
+  - id: v5.0.0-3.3.2
+    title: SameSite is set according to cookie purpose
     status: met
     evidence: tests/test_short_token_auth.py::test_session_cookie_is_secure_httponly_and_samesite
-  - id: V3.5.2
-    title: OAuth uses PKCE with S256
-    status: met
-    evidence: deploy/chrome-worker/oauth.test.mjs
-  - id: V3.5.3
-    title: OAuth state is bound to the browser and single use
+
+  - id: v5.0.0-10.1.2
+    title: OAuth authorization results are bound to the initiating browser transaction
     status: met
     evidence: tests/test_github_oauth.py
-  - id: V4.1.1
-    title: Access control enforced on a trusted server
-    status: partial
-    note: Conversation ownership checks exist; no consolidated evidence test yet.
-  - id: V4.2.2
-    title: Cross-site request forgery protection
-    status: partial
-    note: Relies on SameSite=Lax cookies; no CSRF token on state-changing JSON routes.
-  - id: V5.1.3
-    title: Input validated at trust boundaries
-    status: partial
-    note: Tool arguments are schema-validated; HTTP routes validate ad hoc.
-  - id: V5.3.3
-    title: Output encoding prevents XSS
-    status: partial
-    note: The UI uses textContent; parseMarkdown escapes but has no dedicated XSS test.
-  - id: V6.2.1
-    title: Cryptographic modules fail securely
+
+  - id: v5.0.0-10.2.1
+    title: OAuth code flow is protected against browser request forgery with PKCE or state
     status: met
-    evidence: tests/test_provider_credential_runtime.py
-  - id: V7.1.1
-    title: Credentials and session tokens are not logged
+    evidence: deploy/chrome-worker/oauth.test.mjs
+
+  - id: v5.0.0-8.3.1
+    title: Authorization is enforced at a trusted service layer
+    status: partial
+    note: Owner/conversation/tool authorization exists, but one consolidated current-master evidence test is still missing.
+
+  - id: v5.0.0-3.5.1
+    title: Sensitive browser requests are protected against cross-origin request forgery
+    status: partial
+    note: SameSite protections exist, but state-changing JSON routes do not yet have one uniform anti-forgery contract.
+
+  - id: v5.0.0-2.2.1
+    title: Input is validated against business and functional expectations
+    status: partial
+    note: Tool arguments and many boundaries are validated, while HTTP-route validation remains inconsistent.
+
+  - id: v5.0.0-3.2.2
+    title: Text content uses safe rendering functions instead of unintended HTML interpretation
+    status: partial
+    note: Main UI paths use textContent/escaping, but complete frontend evidence is not yet consolidated.
+
+  - id: v5.0.0-1.2.3
+    title: JavaScript and JSON output is encoded or escaped for its context
+    status: partial
+    note: Existing rendering escapes untrusted content, but there is no complete context-by-context proof yet.
+
+  - id: v5.0.0-16.2.5
+    title: Sensitive data is excluded, masked, or protected in logs
     status: met
     evidence: tests/test_trace_security.py
-  - id: V7.4.1
-    title: Generic error messages without internal details
+
+  - id: v5.0.0-16.5.1
+    title: Unexpected errors return generic messages without sensitive internals
     status: partial
     evidence: tests/test_api_problem_details.py
-    note: Ratchet tracks 75 responses that still echo exceptions.
-  - id: V8.1.1
-    title: Sensitive responses are not cached
+    note: The migration ratchet still tracks legacy responses that may expose exception-derived details.
+
+  - id: v5.0.0-14.2.2
+    title: Sensitive data is not retained in server-side caches
     status: met
     evidence: tests/test_http_cache_headers.py::test_api_responses_are_not_cached
-  - id: V10.3.2
-    title: Dependencies are scanned for known vulnerabilities
+
+  - id: v5.0.0-5.3.2
+    title: File paths do not trust unsanitized user-submitted filenames or metadata
     status: partial
-    note: Trivy runs in CI; Dependabot reports open vulnerabilities on master.
-  - id: V12.3.1
-    title: File paths from users cannot escape the allowed root
+    note: Filesystem tools enforce an allowed root; broader file surfaces still require consolidated evidence.
+
+  - id: v5.0.0-14.2.1
+    title: Sensitive data is not placed in URLs or query strings
     status: partial
-    note: filesystem tool enforces BASE_DIR; see docs/security/path-traversal.md.
-  - id: V13.1.3
-    title: API URLs do not expose sensitive information
+    note: The deployment short token is still accepted once in a URL path before being moved to a cookie.
+
+  - id: v5.0.0-4.1.1
+    title: HTTP response Content-Type matches the actual response body
     status: partial
-    note: The short token is accepted in the URL path once and then moved to a cookie.
-  - id: V13.2.1
-    title: State-changing actions require explicit approval where risky
-    status: met
-    evidence: tests/test_browser_action_approval.py
-  - id: V14.4.1
-    title: Responses declare a safe Content-Type
-    status: partial
-    note: JSON and problem+json are typed; HTML sets charset via the template.
-  - id: V14.4.3
-    title: Content Security Policy
+    note: JSON/problem responses are explicitly typed; full route/static charset evidence is not yet consolidated.
+
+  - id: v5.0.0-3.4.3
+    title: Content Security Policy restricts executable and embedded content
     status: partial
     evidence: tests/test_security_headers.py
-    note: Report-only until the inline style in templates/index.html is removed.
-  - id: V14.4.4
-    title: X-Content-Type-Options nosniff
+    note: CSP is report-only until remaining inline style debt is removed.
+
+  - id: v5.0.0-3.4.4
+    title: Responses set X-Content-Type-Options nosniff
     status: met
     evidence: tests/test_security_headers.py
-  - id: V14.4.5
-    title: Strict-Transport-Security
-    status: n/a
-    note: TLS terminates at the Cloud.ru API Gateway, which owns HSTS.
-  - id: V14.4.6
-    title: Referrer-Policy
+
+  - id: v5.0.0-3.4.1
+    title: HSTS is enforced for HTTPS responses and subdomains
+    status: partial
+    note: TLS/HSTS is delegated to the Cloud.ru ingress/API Gateway, but current end-to-end evidence is not yet part of this checklist.
+
+  - id: v5.0.0-3.4.5
+    title: Referrer policy limits leakage of sensitive URL information
     status: met
     evidence: tests/test_security_headers.py
-  - id: V14.4.7
-    title: Framing restricted (frame-ancestors / X-Frame-Options)
+
+  - id: v5.0.0-3.4.6
+    title: frame-ancestors prevents unintended framing
     status: met
     evidence: tests/test_security_headers.py
-  - id: V14.5.3
-    title: CORS allows only trusted origins
+
+  - id: v5.0.0-3.4.2
+    title: CORS origins are fixed or validated against trusted origins
     status: gap
-    note: mcp_server/transport.py answers Access-Control-Allow-Origin "*".
+    note: mcp_server/transport.py currently permits Access-Control-Allow-Origin "*".
+
+  - id: v5.0.0-15.1.1
+    title: Vulnerable third-party components have documented remediation time frames
+    status: partial
+    note: Scanner findings are tracked in #695, but explicit severity-based remediation time frames are not yet canonical.
+
+  - id: v5.0.0-15.2.1
+    title: Components do not exceed documented vulnerability-remediation time frames
+    status: partial
+    note: Trivy/Dependabot evidence exists, but open findings and the missing remediation-time contract prevent a met status.
