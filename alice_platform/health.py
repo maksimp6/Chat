@@ -1,7 +1,10 @@
 """Health checks derived from config."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -13,6 +16,8 @@ class HealthCheck:
     expected_sign_in: str
     lane: str
     protocol: str = "https"
+    status: Optional[str] = None
+    error: Optional[str] = None
 
 
 def generate_health_plan(
@@ -71,3 +76,43 @@ def generate_health_plan(
         checks.append(check)
 
     return checks
+
+
+async def run_health_check(check: HealthCheck) -> HealthCheck:
+    """
+    Run a health check using Playwright.
+
+    Args:
+        check: Health check to run
+
+    Returns:
+        Health check with status and error fields populated
+    """
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        check.status = "skip"
+        check.error = "playwright not installed"
+        return check
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+
+            try:
+                await page.goto(check.endpoint, wait_until="networkidle", timeout=30000)
+                check.status = "ok"
+                logger.info(f"Health check {check.service}: OK ({check.endpoint})")
+            except Exception as e:
+                check.status = "failed"
+                check.error = str(e)
+                logger.error(f"Health check {check.service}: FAILED ({check.endpoint}): {e}")
+            finally:
+                await browser.close()
+    except Exception as e:
+        check.status = "error"
+        check.error = str(e)
+        logger.error(f"Health check error for {check.service}: {e}")
+
+    return check

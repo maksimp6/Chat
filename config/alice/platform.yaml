@@ -40,7 +40,7 @@ services:
       - oauth
     scale: 1
     resources:
-      cpu: "2"
+      cpu: "1"
       memory: 4096Mi
       gpu: "1"
       gpu_memory: 8192Mi

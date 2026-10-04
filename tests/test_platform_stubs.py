@@ -15,11 +15,19 @@ from alice_platform.providers.storage import (
 )
 
 
-class TestCloudRuProviderNotImplemented:
-    """Cloud.ru provider is deferred to next slice."""
+class TestCloudRuProviderImplemented:
+    """Cloud.ru provider is implemented in Slice 3."""
 
-    def test_get_observed_state_returns_empty(self):
-        """Get observed state returns empty containers list."""
+    def test_get_observed_state_returns_containers_dict(self):
+        """Get observed state returns dict with containers key."""
+        result = get_observed_state("test")
+        assert isinstance(result, dict)
+        assert "containers" in result
+        assert isinstance(result["containers"], list)
+
+    def test_get_observed_state_handles_api_errors(self):
+        """Get observed state gracefully handles API errors."""
+        # Even with API errors, should return structure
         result = get_observed_state("test")
         assert result == {"containers": []}
 

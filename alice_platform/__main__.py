@@ -9,6 +9,7 @@ from alice_platform.config import load_config, ConfigError
 from alice_platform.planner import plan_actions
 from alice_platform.health import generate_health_plan
 from alice_platform.reconciler import reconcile
+from alice_platform.billing import calculate_lane_cost
 
 
 def cmd_validate(args):
@@ -116,6 +117,34 @@ def cmd_reconcile(args):
         return 1
 
 
+def cmd_billing(args):
+    """Show billing information for a lane."""
+    config_dir = Path(args.config_dir) if args.config_dir else Path("config/alice")
+
+    try:
+        config = load_config(config_dir)
+
+        result = calculate_lane_cost(args.lane, config)
+
+        print(f"Billing for {args.lane}:")
+        print(f"  Total: {result['total_rub_per_month']:.2f} RUB/month")
+        print(f"  Services: {result['services']}")
+
+        if result["breakdown"]:
+            print(f"  Breakdown:")
+            for billing in result["breakdown"]:
+                gpu_str = f" + GPU {billing.gpu_cost_rub:.2f}" if billing.gpu_cost_rub else ""
+                print(f"    {billing.service}: {billing.base_cost_rub:.2f} RUB/month{gpu_str}")
+
+        return 0
+    except ConfigError as e:
+        print(f"✗ Config error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"✗ Error: {e}", file=sys.stderr)
+        return 1
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Alice Platform config management")
@@ -143,6 +172,12 @@ def main():
     reconcile_parser.add_argument("lane", help="Lane name (test, production, etc)")
     reconcile_parser.add_argument("--config-dir", help="Config directory (default: config/alice)")
     reconcile_parser.set_defaults(func=cmd_reconcile)
+
+    # Billing command
+    billing_parser = subparsers.add_parser("billing", help="Show billing information")
+    billing_parser.add_argument("lane", help="Lane name (test, production, etc)")
+    billing_parser.add_argument("--config-dir", help="Config directory (default: config/alice)")
+    billing_parser.set_defaults(func=cmd_billing)
 
     args = parser.parse_args()
 
