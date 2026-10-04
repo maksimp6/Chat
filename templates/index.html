@@ -318,7 +318,7 @@
         </div>
         <div id="text-ui">
           <div id="response-mode-wrap" style="display: none">
-            <select id="response-mode-select">
+            <select id="response-mode-select" aria-label="Режим ответа">
               <option value="audio">🔊 Голос</option>
               <option value="text">📝 Текст</option>
               <option value="both">🔊+📝 Оба</option>
@@ -326,13 +326,13 @@
           </div>
           <button id="upload-image-btn" type="button" class="icon-btn alice-btn">📷</button
           ><button id="mic-btn-inline" type="button" class="icon-btn alice-btn">🎤</button
-          ><input id="msg-input" type="text" placeholder="Сообщение..." autocomplete="off" /><button
-            id="send-btn"
-            type="button"
-            class="alice-btn"
-          >
-            ➤
-          </button>
+          ><input
+            id="msg-input"
+            type="text"
+            aria-label="Сообщение"
+            placeholder="Сообщение..."
+            autocomplete="off"
+          /><button id="send-btn" type="button" class="alice-btn">➤</button>
         </div>
       </div>
       <div

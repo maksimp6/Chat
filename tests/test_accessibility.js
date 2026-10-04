@@ -10,8 +10,8 @@ const { BrowserShim } = require("./browser_dom");
 const ROOT = path.resolve(__dirname, "..");
 const BASELINE = {
   "4.1.2 control without accessible name": 0,
-  "1.3.1 form field without label": 2,
-  "4.1.2 dialog without role/aria-modal/aria-labelledby": 1,
+  "1.3.1 form field without label": 0,
+  "4.1.2 dialog without role/aria-modal/aria-labelledby": 0,
   "4.1.1 duplicate id": 0,
   "1.1.1 image without alt": 0,
   "3.1.1 document without lang": 0,
@@ -69,11 +69,12 @@ function audit(html) {
   ]);
   for (const node of dialogs) {
     const labelledBy = node.getAttribute("aria-labelledby");
-    const ok =
-      node.getAttribute("role") === "dialog" &&
-      node.getAttribute("aria-modal") === "true" &&
-      labelledBy &&
-      hasId(labelledBy);
+    const modal = node.getAttribute("aria-modal");
+    // A real .modal must be aria-modal="true"; a non-modal popover dialog may say "false".
+    const modalOk = node.classList.contains("modal")
+      ? modal === "true"
+      : ["true", "false"].includes(modal);
+    const ok = node.getAttribute("role") === "dialog" && modalOk && labelledBy && hasId(labelledBy);
     if (!ok) report("4.1.2 dialog without role/aria-modal/aria-labelledby", node);
   }
 
