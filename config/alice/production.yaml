@@ -7,5 +7,6 @@ lanes:
     services:
       - oauth
       - chrome
+      - remote-desktop
       - agent-shell
     owner_id: "293531601"
