@@ -50,7 +50,7 @@ test("a closed profile, empty directories and OAuth survive a fresh local filesy
   assert.equal(await fs.readFile(path.join(value.authDir, "oauth.json"), "utf8"), '{"refresh":"test-only"}');
   assert.deepEqual(await fs.readdir(path.join(value.profileDir, "Default", "Empty")), []);
   assert.equal((await fs.stat(path.join(value.profileDir, "Default", "Cookies"))).mode & 0o777, 0o600);
-  assert.deepEqual(restored.status(), { enabled: true, restored: true, generation: 1, authGeneration: 1 });
+  assert.deepEqual(restored.status(), { enabled: true, restored: true, generation: 1, authGeneration: 1, lastError: null });
 });
 
 test("OAuth checkpoints never read the live browser profile", async (t) => {
@@ -129,14 +129,23 @@ test("existing local data is never overwritten during restore", async (t) => {
   assert.equal(await fs.readFile(path.join(value.profileDir, "Cookies"), "utf8"), "unsaved local");
 });
 
-test("a stale writer cannot overwrite a newer generation", async (t) => {
+test("the live replica adopts a newer generation written by an overlapping one", async (t) => {
   const value = await fixture(t);
   const other = createChromeStateStore({ ...value.options,
     profileDir: path.join(value.base, "other-profile"), authDir: path.join(value.base, "other-auth"),
   });
   await other.restore();
   await value.store.checkpoint();
-  await assert.rejects(other.checkpoint(), /chrome_state_multiple_writers/);
+  await fs.writeFile(path.join(value.base, "other-profile", "Cookies"), "live replica");
+  await other.checkpoint();
+  assert.equal(other.status().generation, 2);
+  await other.checkpoint();
+  assert.equal(other.status().lastError, null);
+  const fresh = createChromeStateStore({ ...value.options,
+    profileDir: path.join(value.base, "fresh-profile"), authDir: path.join(value.base, "fresh-auth"),
+  });
+  await fresh.restore();
+  assert.equal(await fs.readFile(path.join(value.base, "fresh-profile", "Cookies"), "utf8"), "live replica");
 });
 
 test("same-process auth checkpoints are serialized", async (t) => {
@@ -186,4 +195,15 @@ test("persistence is optional for local development", async () => {
   const store = createChromeStateStore({ stateDir: "" });
   assert.equal((await store.restore()).enabled, false);
   assert.equal((await store.checkpoint()).generation, 0);
+});
+
+test("status exposes only a fixed code for the last checkpoint failure", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "chrome-state-error-"));
+  const store = createChromeStateStore({ stateDir: path.join(root, "durable"), profileDir: path.join(root, "profile"), authDir: path.join(root, "auth") });
+  await assert.rejects(store.checkpoint(), /chrome_state_/);
+  assert.match(store.status().lastError, /^chrome_state_[a-z_]+(:E[A-Z]+)?$/);
+  await fs.mkdir(path.join(root, "durable"), { recursive: true });
+  await store.restore();
+  await store.checkpoint();
+  assert.equal(store.status().lastError, null);
 });

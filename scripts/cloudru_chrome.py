@@ -13,12 +13,14 @@ token, and deployment verifies that refusal on the public origin.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from urllib.parse import urlsplit
@@ -109,8 +111,19 @@ def uuid(value):
     return result
 
 
+def lane(env=os.environ):
+    # The test lane deploys any branch to a separate container and bucket so
+    # experiments never touch the production worker or its browser profile.
+    value = env.get("CHROME_LANE") or "production"
+    if value not in ("production", "test"):
+        fail("validation_error")
+    return value
+
+
 def names(project):
     suffix = uuid(project).replace("-", "")[:12]
+    if lane() == "test":
+        return "chrome-test-" + suffix, "alice-chrome-test-state-" + suffix
     return "chrome-" + suffix, "alice-chrome-state-" + suffix
 
 
@@ -213,7 +226,7 @@ def creation_body(project, image, environment):
 def owned_record(apps, *, identifier=None):
     matches = [
         item
-        for item in apps.list(require_total=True)
+        for item in provider(apps.list, require_total=True)
         if item.get("name") == names(apps.project_id)[0]
     ]
     if not matches:
@@ -368,10 +381,27 @@ def prepare_registry(registry, *, sleep=time.sleep, clock=time.monotonic):
     fail("registry_not_ready")
 
 
+def export_source(sha, root, dest):
+    if lane() != "test":
+        _export_commit(sha, str(root), dest)
+        return
+    # The test lane builds the checked-out branch commit; require_reviewed_head
+    # already proved HEAD is exactly this clean commit.
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        fail("validation_error")
+    archive = subprocess.run(
+        ["git", "-C", str(root), "archive", "--format=tar", sha], capture_output=True, check=False
+    )
+    if archive.returncode:
+        fail("validation_error")
+    with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as stream:
+        stream.extractall(dest, filter="data")
+
+
 def build_image(root, sha):
     registry = CloudRuRegistryClient()
     with tempfile.TemporaryDirectory(prefix="chrome-build-") as exported:
-        _export_commit(sha, str(root), exported)
+        export_source(sha, root, exported)
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "chrome-worker"
         print(json.dumps({"stage": "chrome_build_push"}), flush=True)
@@ -387,7 +417,27 @@ def build_image(root, sha):
         return image.pinned
 
 
-def request_worker(apps, record, token, path, *, method="GET"):
+# The provider proxy abandons a testCall while a cold or 0.5 vCPU replica is
+# still starting Chrome; these worker operations are idempotent, so retry.
+RETRY_STATUSES = frozenset({499, 502, 503, 504})
+
+
+def provider(operation, *args, timeout=240, sleep=time.sleep, clock=time.monotonic, **kwargs):
+    # Lifecycle and inventory calls are idempotent; the provider proxy abandons
+    # them (HTTP 499) while a slow operation is still in progress.
+    deadline = clock() + timeout
+    while True:
+        try:
+            return operation(*args, **kwargs)
+        except CloudProviderError as exc:
+            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+                raise
+            sleep(5)
+
+
+def request_worker(
+    apps, record, token, path, *, method="GET", timeout=240, sleep=time.sleep, clock=time.monotonic
+):
     if (path, method) not in (
         ("/healthz", "GET"),
         ("/browser/v1/status", "GET"),
@@ -405,9 +455,20 @@ def request_worker(apps, record, token, path, *, method="GET"):
     }
     if path != "/healthz":
         body["headers"] = {"Authorization": "Bearer " + token}
-    response = apps.client.request(
-        "container_apps", "POST", f"/v2/containers/{record['name']}:testCall", json_body=body
-    )
+    deadline = clock() + timeout
+    while True:
+        try:
+            response = apps.client.request(
+                "container_apps",
+                "POST",
+                f"/v2/containers/{record['name']}:testCall",
+                json_body=body,
+            )
+            break
+        except CloudProviderError as exc:
+            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+                raise
+            sleep(5)
     if (
         response.get("statusCode") != 200
         or not isinstance(response.get("body"), str)
@@ -523,7 +584,7 @@ def stop_owned(apps, record, *, timeout=300, sleep=time.sleep, clock=time.monoto
     if current is None:
         fail("chrome_ownership_unconfirmed")
     if str(current.get("status", "")).lower() != "suspended":
-        apps.stop(current["name"])
+        provider(apps.stop, current["name"])
     deadline = clock() + timeout
     while clock() < deadline:
         current = owned_record(apps, identifier=record["id"])
@@ -579,7 +640,17 @@ def deploy(apps, store, credentials, image, environment):
     generation = None
     prepare_bucket(store, credentials, apps.project_id)
     if previous and str(previous.get("status", "")).lower() == "running":
-        generation = checkpoint(apps, previous)
+        try:
+            generation = checkpoint(apps, previous)
+        except CloudProviderError as exc:
+            # A broken test replica must not block replacing it; production
+            # never replaces a worker whose profile could not be saved.
+            if lane() != "test":
+                raise
+            print(
+                json.dumps({"stage": "chrome_test_checkpoint_skipped", **safe_error(exc)}),
+                flush=True,
+            )
     if previous:
         stop_owned(apps, previous)
     attempted = False
@@ -588,8 +659,8 @@ def deploy(apps, store, credentials, image, environment):
         body = creation_body(apps.project_id, image, environment)
         attempted = True
         if previous:
-            apps.restore(previous["name"], body)
-            apps.start(previous["name"])
+            provider(apps.restore, previous["name"], body)
+            provider(apps.start, previous["name"])
         else:
             operation = apps.client.request(
                 "container_apps", "POST", "/v2/containers", json_body=body
@@ -612,21 +683,25 @@ def deploy(apps, store, credentials, image, environment):
             # The origin is assigned on creation; bind OAuth to it on the same
             # container instead of creating another one.
             environment = {**environment, "BROWSER_PUBLIC_URL": application_origin(record)}
-            apps.restore(record["name"], creation_body(apps.project_id, image, environment))
-            apps.start(record["name"])
+            provider(
+                apps.restore, record["name"], creation_body(apps.project_id, image, environment)
+            )
+            provider(apps.start, record["name"])
             record = wait_ready(apps, identifier=record["id"], image=image)
             verify_restored(apps, record, generation)
         return summary(record)
-    except Exception:
+    except Exception as exc:
+        # Rollback may raise its own code; keep the original cause visible.
+        print(json.dumps({"stage": "chrome_deploy_failed", **safe_error(exc)}), flush=True)
         if attempted:
             try:
                 current = owned_record(apps, identifier=identifier)
                 if current is not None:
                     stop_owned(apps, current)
                 if previous:
-                    apps.restore(previous["name"], previous)
+                    provider(apps.restore, previous["name"], previous)
                     if str(previous.get("status", "")).lower() == "running":
-                        apps.start(previous["name"])
+                        provider(apps.start, previous["name"])
                         wait_ready(
                             apps,
                             identifier=previous["id"],
@@ -652,9 +727,14 @@ def deploy(apps, store, credentials, image, environment):
 def require_reviewed_head(root, sha):
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         fail("validation_error")
+    # Production runs only reviewed master commits; the test lane may run a branch.
     for args in (
-        ["git", "fetch", "--no-tags", "origin", "master"],
-        ["git", "merge-base", "--is-ancestor", sha, "FETCH_HEAD"],
+        ()
+        if lane() == "test"
+        else (
+            ["git", "fetch", "--no-tags", "origin", "master"],
+            ["git", "merge-base", "--is-ancestor", sha, "FETCH_HEAD"],
+        )
     ):
         result = subprocess.run(args, cwd=root, capture_output=True, check=False)
         if result.returncode:
@@ -727,7 +807,7 @@ def main(argv=None):
                 generation = checkpoint(apps, record)
             stop_owned(apps, record)
             if args.action == "restart":
-                apps.start(record["name"])
+                provider(apps.start, record["name"])
                 record = wait_ready(apps, identifier=record["id"])
                 if generation is not None:
                     verify_restored(apps, record, generation)
@@ -737,21 +817,20 @@ def main(argv=None):
     print(json.dumps(result, sort_keys=True), flush=True)
 
 
+def safe_error(exc):
+    code = getattr(exc, "code", None)
+    status = getattr(exc, "http_status", None)
+    return {
+        "error": code if code in SAFE_ERRORS else "chrome_operation_failed",
+        "http_status": status if type(status) is int and 100 <= status <= 599 else None,
+    }
+
+
 def cli():
     try:
         main()
     except Exception as exc:
-        code = getattr(exc, "code", None)
-        status = getattr(exc, "http_status", None)
-        print(
-            json.dumps(
-                {
-                    "error": code if code in SAFE_ERRORS else "chrome_operation_failed",
-                    "http_status": status if type(status) is int and 100 <= status <= 599 else None,
-                }
-            ),
-            flush=True,
-        )
+        print(json.dumps(safe_error(exc)), flush=True)
         return 1
     return 0
 

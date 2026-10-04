@@ -619,3 +619,179 @@ def test_legacy_always_on_revision_is_still_recognized_for_in_place_update():
     legacy["template"]["containers"][0]["resources"] = {"cpu": "0.3", "memory": "768Mi"}
     with pytest.raises(CloudProviderError):
         chrome.owned_record(apps)
+
+
+def test_failed_deploy_reports_safe_original_cause_before_rollback(monkeypatch, capsys):
+    apps = SimpleNamespace(
+        project_id=PROJECT,
+        client=SimpleNamespace(
+            request=Mock(
+                side_effect=CloudProviderError(
+                    "private-provider-text", code="provider_http_error", http_status=400
+                )
+            )
+        ),
+    )
+    monkeypatch.setattr(chrome, "owned_record", Mock(return_value=None))
+    monkeypatch.setattr(chrome, "prepare_bucket", Mock())
+    with pytest.raises(CloudProviderError):
+        chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+    out = capsys.readouterr().out
+    assert json.loads(out.splitlines()[0]) == {
+        "stage": "chrome_deploy_failed",
+        "error": "provider_http_error",
+        "http_status": 400,
+    }
+    assert "private-provider-text" not in out
+
+
+def test_test_lane_uses_separate_container_and_bucket(monkeypatch):
+    assert chrome.names(PROJECT) == ("chrome-22706bfa6066", "alice-chrome-state-22706bfa6066")
+    monkeypatch.setenv("CHROME_LANE", "test")
+    assert chrome.names(PROJECT) == (
+        "chrome-test-22706bfa6066",
+        "alice-chrome-test-state-22706bfa6066",
+    )
+    assert chrome.owner_marker(PROJECT)["container_name"] == "chrome-test-22706bfa6066"
+    monkeypatch.setenv("CHROME_LANE", "staging")
+    with pytest.raises(CloudProviderError):
+        chrome.names(PROJECT)
+
+
+def test_only_test_lane_skips_the_reviewed_master_check(monkeypatch, tmp_path):
+    execute = Mock(return_value=SimpleNamespace(returncode=1))
+    monkeypatch.setattr(chrome.subprocess, "run", execute)
+    monkeypatch.setattr(chrome.subprocess, "check_output", Mock(side_effect=[SHA + "\n", ""]))
+    with pytest.raises(CloudProviderError):
+        chrome.require_reviewed_head(tmp_path, SHA)
+    monkeypatch.setenv("CHROME_LANE", "test")
+    execute.reset_mock()
+    chrome.subprocess.check_output.side_effect = [SHA + "\n", ""]
+    chrome.require_reviewed_head(tmp_path, SHA)
+    execute.assert_not_called()
+
+
+def test_workflow_test_lane_is_isolated_from_production():
+    import yaml
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml").read_text()
+    )
+    job = workflow["jobs"]["chrome"]
+    assert job["if"] == "github.ref == 'refs/heads/master' || inputs.lane == 'test'"
+    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane }}")
+    review = next(
+        step for step in job["steps"] if step.get("name") == "Require reviewed master commit"
+    )
+    assert review["if"] == "inputs.lane != 'test'"
+    python_steps = [step for step in job["steps"] if "cloudru_chrome.py" in step.get("run", "")]
+    assert python_steps and all(
+        step["env"]["CHROME_LANE"] == "${{ inputs.lane }}" for step in python_steps
+    )
+
+
+def test_test_lane_exports_branch_commit_without_master_ancestry(monkeypatch, tmp_path):
+    import io
+    import tarfile
+
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w") as archive:
+        data = b"FROM scratch\n"
+        info = tarfile.TarInfo("deploy/chrome-worker/Dockerfile")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    run = Mock(return_value=SimpleNamespace(returncode=0, stdout=payload.getvalue()))
+    monkeypatch.setattr(chrome.subprocess, "run", run)
+    monkeypatch.setattr(chrome, "_export_commit", Mock())
+    monkeypatch.setenv("CHROME_LANE", "test")
+    chrome.export_source(SHA, tmp_path, tmp_path / "out")
+    assert run.call_args.args[0] == ["git", "-C", str(tmp_path), "archive", "--format=tar", SHA]
+    assert (tmp_path / "out/deploy/chrome-worker/Dockerfile").read_bytes() == b"FROM scratch\n"
+    chrome._export_commit.assert_not_called()
+    monkeypatch.setenv("CHROME_LANE", "production")
+    chrome.export_source(SHA, tmp_path, tmp_path / "prod")
+    chrome._export_commit.assert_called_once()
+
+
+class _Clock:
+    def __init__(self):
+        self.value = 0
+
+    def now(self):
+        return self.value
+
+    def sleep(self, seconds):
+        self.value += seconds
+
+
+def test_worker_call_retries_provider_timeouts_during_cold_start():
+    clock = _Clock()
+    ok = {"statusCode": 200, "body": json.dumps({"state": "awake"})}
+    request = Mock(
+        side_effect=[
+            CloudProviderError("abandoned", code="provider_http_error", http_status=499),
+            CloudProviderError("gateway", code="provider_http_error", http_status=504),
+            ok,
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, client=SimpleNamespace(request=request))
+    result = chrome.request_worker(
+        apps, record(), "t", "/browser/v1/wake", method="POST", sleep=clock.sleep, clock=clock.now
+    )
+    assert result == {"state": "awake"} and request.call_count == 3
+
+
+def test_worker_call_does_not_retry_other_errors_or_past_deadline():
+    clock = _Clock()
+    apps = SimpleNamespace(
+        project_id=PROJECT,
+        client=SimpleNamespace(
+            request=Mock(side_effect=CloudProviderError("bad", http_status=400))
+        ),
+    )
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(apps, record(), "t", "/healthz", sleep=clock.sleep, clock=clock.now)
+    assert apps.client.request.call_count == 1
+    apps.client.request = Mock(side_effect=CloudProviderError("slow", http_status=499))
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(
+            apps, record(), "t", "/healthz", timeout=12, sleep=clock.sleep, clock=clock.now
+        )
+    assert apps.client.request.call_count == 4
+
+
+@pytest.mark.parametrize("lane_name, replaced", [("test", True), ("production", False)])
+def test_only_test_lane_replaces_a_worker_whose_checkpoint_failed(monkeypatch, lane_name, replaced):
+    monkeypatch.setenv("CHROME_LANE", lane_name)
+    old = record(OLD_IMAGE)
+    apps = SimpleNamespace(project_id=PROJECT, restore=Mock(), start=Mock())
+    monkeypatch.setattr(chrome, "owned_record", Mock(return_value=old))
+    monkeypatch.setattr(chrome, "prepare_bucket", Mock())
+    monkeypatch.setattr(
+        chrome,
+        "checkpoint",
+        Mock(side_effect=CloudProviderError("x", code="chrome_runtime_failed")),
+    )
+    monkeypatch.setattr(chrome, "stop_owned", Mock())
+    monkeypatch.setattr(chrome, "wait_ready", Mock(return_value=record()))
+    monkeypatch.setattr(chrome, "request_worker", Mock(return_value={"state": "awake"}))
+    monkeypatch.setattr(chrome, "verify_restored", Mock())
+    if replaced:
+        chrome.checkpoint.side_effect = [CloudProviderError("x", code="chrome_runtime_failed"), 3]
+        chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+        apps.restore.assert_called()
+    else:
+        with pytest.raises(CloudProviderError):
+            chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+        apps.restore.assert_not_called()
+
+
+def test_provider_lifecycle_calls_retry_abandoned_requests():
+    clock = _Clock()
+    stop = Mock(side_effect=[CloudProviderError("x", http_status=499), {"ok": True}])
+    assert chrome.provider(stop, "chrome-x", sleep=clock.sleep, clock=clock.now) == {"ok": True}
+    assert stop.call_count == 2
+    bad = Mock(side_effect=CloudProviderError("x", http_status=409))
+    with pytest.raises(CloudProviderError):
+        chrome.provider(bad, "chrome-x", sleep=clock.sleep, clock=clock.now)
+    assert bad.call_count == 1

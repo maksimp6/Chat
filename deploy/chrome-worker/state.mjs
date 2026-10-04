@@ -230,11 +230,21 @@ export function createChromeStateStore(options = {}) {
     }
   }
 
-  const status = () => ({ enabled, restored, generation: generations.profile, authGeneration: generations.auth });
+  // Last failure as a fixed code (plus errno name for I/O), never paths or data,
+  // so a deployed worker without log access can still be diagnosed.
+  let lastError = null;
+  const status = () => ({ enabled, restored, generation: generations.profile, authGeneration: generations.auth, lastError });
   function serialized(operation) {
     const result = queue.then(async () => {
-      try { return await operation(); }
-      catch (error) { if (error.stateError) throw error; fail("io_failed"); }
+      try { const value = await operation(); lastError = null; return value; }
+      catch (error) {
+        const errno = typeof error?.code === "string" && /^E[A-Z]+$/.test(error.code) ? `:${error.code}` : "";
+        lastError = error.stateError ? error.message : `chrome_state_io_failed${errno}`;
+        // Container stdout/stderr goes to Cloud.ru logging; codes only.
+        process.stderr.write(`${JSON.stringify({ event: "chrome_state_failed", error: lastError })}\n`);
+        if (error.stateError) throw error;
+        fail("io_failed");
+      }
     });
     queue = result.catch(() => {});
     return result;
@@ -322,6 +332,14 @@ export function createChromeStateStore(options = {}) {
     const root = roots[kind];
     await directory(root, true);
     const previous = await latest(kind);
+    if ((previous?.generation ?? 0) > generations[kind]) {
+      // Container Apps briefly overlaps replicas on restart/scale: the old one
+      // checkpoints on SIGTERM after the new one restored. The live replica
+      // adopts the newer generation (last writer wins) instead of refusing every
+      // future save, which broke OAuth until the next restart.
+      process.stderr.write(`${JSON.stringify({ event: "chrome_state_adopted_newer", kind, local: generations[kind], remote: previous.generation })}\n`);
+      generations[kind] = previous.generation;
+    }
     if ((previous?.generation ?? 0) !== generations[kind]) fail("multiple_writers");
     const generation = (previous?.generation ?? 0) + 1;
     if (!Number.isSafeInteger(generation)) fail("generation_exhausted");
