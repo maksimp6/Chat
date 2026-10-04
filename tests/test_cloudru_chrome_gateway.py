@@ -400,7 +400,20 @@ def test_inventory_paginates_and_rejects_repeated_records():
 def test_endpoint_overrides_cannot_redirect_iam_token(monkeypatch):
     monkeypatch.setenv("CLOUDRU_CHROME_GATEWAY_ENDPOINT", "https://attacker.invalid")
     client = gateway.ChromeGatewayClient(iam_client=object())
-    assert client.endpoint("chrome_gateway") == "https://console.cloud.ru/u-api/apigw/v2"
+    assert client.endpoint("chrome_gateway") == "https://apigw.api.cloud.ru"
+
+
+@pytest.mark.parametrize("service", ["chrome_gateway", "chrome_certificates"])
+def test_unverified_console_contract_stops_before_auth_or_network(monkeypatch, service):
+    client = gateway.ChromeGatewayClient(iam_client=object())
+
+    def unexpected_call(*args, **kwargs):
+        pytest.fail("Unverified management contract must not acquire or send IAM credentials")
+
+    monkeypatch.setattr(client, "_auth_header", unexpected_call)
+    monkeypatch.setattr(gateway.requests, "request", unexpected_call)
+    with pytest.raises(CloudProviderError, match="official_contract_unverified"):
+        client.request(service, "GET", "/certificate", params={"projectId": PROJECT})
 
 
 def test_target_validation_checks_owned_container_origin_and_reviewed_sha(

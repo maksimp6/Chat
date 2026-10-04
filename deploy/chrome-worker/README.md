@@ -115,6 +115,28 @@ recovery after container restart.
 
 ## Deployment
 
+**Current blocker:** automatic Gateway inventory/deployment stops with
+`chrome_gateway_official_contract_unverified`, before obtaining an IAM token.
+The original management routes were inferred from console bundles rather than
+an official REST contract and must not be used for production deployment.
+The official public hosts are `apigw.api.cloud.ru` and
+`certificatemanager.api.cloud.ru`; a hostname alone does not establish their
+REST paths, versions or request payloads. The Gateway host also returned
+NXDOMAIN from independent Google and Cloudflare DNS checks on 2026-10-04.
+No browser deployment or ChatGPT connection is confirmed.
+
+Official sources for completing this integration:
+
+- [Gateway API reference](https://cloud.ru/docs/api-gateway-svp/ug/topics/api-ref)
+- [Gateway IAM authentication](https://cloud.ru/docs/api-gateway-svp/ug/topics/api-ref__authentication)
+- [Certificate Manager API reference](https://cloud.ru/docs/certificate-manager/ug/topics/api-ref)
+- [Create Gateway from OpenAPI](https://cloud.ru/docs/api-gateway-svp/ug/topics/guides__apigw__spec__create)
+- [Gateway extensions and container backend](https://cloud.ru/docs/api-gateway-svp/ug/topics/concepts__apigw-extensions)
+- [Manage permanent Gateway domains](https://cloud.ru/docs/api-gateway-svp/ug/topics/guides__api-gateway__managedomains)
+
+The procedures below describe the intended workflow after the official
+management contract is verified and the public management API is available.
+
 The `Cloud.ru persistent Chrome MCP` workflow operates only from reviewed
 `master`. It uses the production Cloud.ru IAM credentials and Object Storage
 tenant ID. Run `preflight` before `deploy`; the default public origin is

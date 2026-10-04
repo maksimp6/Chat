@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Inventory and reconcile only the Chrome worker's Shared Gateway and DNS record.
 
-Management paths and camelCase payloads were checked against Cloud.ru's public
-console bundles: /sources/appservices-api-gateway/, /sources/certificate-manager/
-and /sources/dns/. Evolution DNS also documents https://dns.api.cloud.ru.
+Use only management contracts published in official Cloud.ru documentation.
+Gateway and Certificate Manager REST routes have not yet been verified against
+that documentation, so their requests stop before acquiring an IAM token.
 No certificates are created, exported, replaced, or modified by this script.
 """
 
@@ -32,9 +32,13 @@ from scripts.cloudru_deploy import _load_cloudru_credentials  # noqa: E402
 
 ZONE = "maxxxpavlov.online"
 ENDPOINTS = {
-    "chrome_gateway": "https://console.cloud.ru/u-api/apigw/v2",
-    "chrome_certificates": "https://console.cloud.ru/u-api/ccm/v1",
+    "chrome_gateway": "https://apigw.api.cloud.ru",
+    "chrome_certificates": "https://certificatemanager.api.cloud.ru",
     "chrome_dns": "https://dns.api.cloud.ru",
+}
+DOCUMENTATION = {
+    "chrome_gateway": "https://cloud.ru/docs/api-gateway-svp/ug/topics/api-ref",
+    "chrome_certificates": "https://cloud.ru/docs/certificate-manager/ug/topics/api-ref",
 }
 SAFE_ERRORS = frozenset(
     {
@@ -49,6 +53,7 @@ SAFE_ERRORS = frozenset(
         "auth_failed",
         "provider_http_error",
         "invalid_response",
+        "chrome_gateway_official_contract_unverified",
     }
 )
 
@@ -95,6 +100,13 @@ class ChromeGatewayClient(CloudRuClient):
         # Fixed official hosts avoid forwarding IAM credentials to arbitrary
         # endpoint environment overrides during deployment.
         return ENDPOINTS[service]
+
+    def request(self, service, method, path, *, params=None, json_body=None):
+        # A documented hostname does not verify a REST version, path or payload.
+        # Never reuse console routes with a production IAM bearer token.
+        if service in DOCUMENTATION:
+            fail("chrome_gateway_official_contract_unverified")
+        return super().request(service, method, path, params=params, json_body=json_body)
 
 
 def items(client, service, resource, key, params, *, gateway=False):
