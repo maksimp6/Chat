@@ -20,12 +20,12 @@ def test_ci_does_not_rerun_frontend_tests_only_for_logging() -> None:
 def test_full_python_suites_report_slowest_tests() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
-    application_step = workflow.split(
-        "- name: Run Python application tests with coverage", 1
-    )[1].split("- name: Generate validation report", 1)[0]
-    postgres_step = workflow.split(
-        "- name: Run full application suite on PostgreSQL", 1
-    )[1].split("- name: Verify backup and restore", 1)[0]
+    application_step = workflow.split("- name: Run Python application tests with coverage", 1)[
+        1
+    ].split("- name: Generate validation report", 1)[0]
+    postgres_step = workflow.split("- name: Run full application suite on PostgreSQL", 1)[
+        1
+    ].split("- name: Verify backup and restore", 1)[0]
 
     for argument in (
         "pytest",
