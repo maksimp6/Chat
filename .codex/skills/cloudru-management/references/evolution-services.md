@@ -59,10 +59,14 @@ not prove the image matches an approved commit.
 
 ## DNS, TLS and API Gateway
 
-- Cloud DNS management endpoint documented at
-  `https://console.cloud.ru/api/clouddns`; service operations use an Evolution IAM
+- Our zones live in **Evolution DNS** (`https://dns.api.cloud.ru`). The classic
+  Cloud DNS endpoint `https://console.cloud.ru/api/clouddns` is a separate
+  service; do not mix them. Service operations use an Evolution IAM
   Bearer token. The zone API needs the Cloud DNS Service Instance ID (`parentId`),
   which differs from the Cloud project UUID. List/inventory first.
+- Evolution API Gateway has **no public management API** (console only;
+  `apigw.api.cloud.ru` is NXDOMAIN as of 2026-10-04). Automation must not depend
+  on it; the Chrome MCP worker is served from its Container Apps origin.
 - Container Apps currently issues a provider URL, not a custom domain. Shared
   API Gateway supports a system `*.apigw.cloud.ru` domain and custom domain via
   Certificate Manager. Gateway domain validation uses CNAME to the gateway system

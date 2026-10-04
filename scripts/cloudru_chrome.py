@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Deploy the reviewed Chrome MCP worker without touching the existing RDC service."""
+"""Deploy the reviewed Chrome MCP worker without touching the existing RDC service.
+
+The worker is served directly from its stable Container Apps origin. Evolution API
+Gateway has no public management API, so the service does not depend on it; the
+worker protects every route except ``/healthz`` with its own bearer token or the
+GitHub OAuth owner check, and deployment verifies that refusal on the public origin.
+"""
 
 from __future__ import annotations
 
@@ -32,8 +38,7 @@ from scripts.cloudru_browser_probe import (  # noqa: E402
     wait_registry_operation,
 )
 from scripts.cloudru_deploy import _export_commit, _load_cloudru_credentials  # noqa: E402
-from scripts.cloudru_chrome_gateway import SAFE_ERRORS as GATEWAY_ERRORS  # noqa: E402
-from scripts.cloudru_rdc import application_origin, verify_anonymous_gate, verify_private_acl  # noqa: E402
+from scripts.cloudru_rdc import application_origin, verify_private_acl  # noqa: E402
 from storage import StorageObjectNotFound  # noqa: E402
 
 REGISTRY = "alice-chrome-browser"
@@ -57,7 +62,7 @@ APP_ENV = frozenset(
         "CHROME_STATE_REQUIRE_MOUNT",
     }
 )
-SAFE_ERRORS = GATEWAY_ERRORS | frozenset(
+SAFE_ERRORS = frozenset(
     {
         "validation_error",
         "auth_not_configured",
@@ -75,7 +80,6 @@ SAFE_ERRORS = GATEWAY_ERRORS | frozenset(
         "chrome_stop_timeout",
         "chrome_rollback_failed",
         "chrome_ingress_unconfirmed",
-        "chrome_gateway_preflight_failed",
     }
 )
 
@@ -114,7 +118,7 @@ def public_origin(value):
         valid = (
             parts.scheme == "https"
             and parts.hostname
-            and parts.hostname.endswith((".maxxxpavlov.online", ".apigw.cloud.ru"))
+            and parts.hostname.endswith((".containerapps.ru", ".containers.cloud.ru"))
             and not parts.username
             and not parts.password
             and parts.port in (None, 443)
@@ -176,7 +180,7 @@ def creation_body(project, image, environment):
         "projectId": project,
         "description": DESCRIPTION,
         "configuration": {
-            "ingress": {"publiclyAccessible": True, "accessSettings": {"enableAuth": True}},
+            "ingress": {"publiclyAccessible": True, "accessSettings": {"enableAuth": False}},
             "autoDeployments": {"enabled": False},
         },
         "template": {
@@ -248,7 +252,7 @@ def owned_record(apps, *, identifier=None):
             and mounts[0].get("readOnly", False) is False
             and mounts[0].get("subPath", "") == ""
             and ingress.get("publiclyAccessible") is True
-            and ingress.get("accessSettings", {}).get("enableAuth") is True
+            and isinstance(ingress.get("accessSettings", {}).get("enableAuth", False), bool)
             and record["configuration"].get("privileged", False) is False
             and record["configuration"].get("autoDeployments", {}).get("enabled", False) is False
         )
@@ -408,7 +412,20 @@ def request_worker(apps, record, token, path, *, method="GET"):
 
 
 def verify_ingress(record, *, http_get=requests.get):
-    verify_anonymous_gate(record, http_get=http_get)
+    # The public origin must reach the worker itself, and the worker must refuse
+    # anonymous browser and MCP access. No credentials are sent; redirects are refused.
+    origin = application_origin(record)
+    try:
+        health = http_get(origin + "/healthz", timeout=10, allow_redirects=False)
+        healthy = health.status_code == 200 and health.json().get("status") == "ok"
+        refused = all(
+            http_get(origin + path, timeout=10, allow_redirects=False).status_code == 401
+            for path in ("/browser/v1/status", "/browser/v1/mcp")
+        )
+    except (requests.RequestException, ValueError, AttributeError):
+        fail("chrome_ingress_unconfirmed")
+    if not healthy or not refused:
+        fail("chrome_ingress_unconfirmed")
 
 
 def verify_health(apps, record, environment):
@@ -523,16 +540,16 @@ def summary(record):
         "provider_url": origin,
         "mcp_url": public + "/browser/v1/mcp",
         "oauth_callback_url": public + "/browser/oauth/github/callback",
-        "ingress": "provider_auth_gateway_required",
-        "gateway_deployed": False,
+        "ingress": "public_worker_auth",
         "cost_floor": estimate_monthly_cost("1", 1),
     }
 
 
 def deploy(apps, store, credentials, image, environment):
-    if not environment.get("BROWSER_PUBLIC_URL"):
-        fail("validation_error")
     previous = owned_record(apps)
+    if previous:
+        # The container keeps its name, so its provider origin stays stable.
+        environment = {**environment, "BROWSER_PUBLIC_URL": application_origin(previous)}
     generation = None
     prepare_bucket(store, credentials, apps.project_id)
     if previous and str(previous.get("status", "")).lower() == "running":
@@ -566,6 +583,10 @@ def deploy(apps, store, credentials, image, environment):
                 fail("chrome_runtime_failed")
             generation = checkpoint(apps, record)
             stop_owned(apps, record)
+            # The origin is assigned on creation; bind OAuth to it on the same
+            # container instead of creating another one.
+            environment = {**environment, "BROWSER_PUBLIC_URL": application_origin(record)}
+            apps.restore(record["name"], creation_body(apps.project_id, image, environment))
             apps.start(record["name"])
             record = wait_ready(apps, identifier=record["id"], image=image)
             verify_restored(apps, record, generation)
@@ -620,21 +641,11 @@ def require_reviewed_head(root, sha):
         fail("validation_error")
 
 
-def gateway_preflight(project, origin, name):
-    from scripts.cloudru_chrome_gateway import ChromeGatewayClient, preflight
-
-    client = ChromeGatewayClient()
-    plan = preflight(client, project, origin, name)
-    if plan.get("blockers"):
-        print(json.dumps({"stage": "gateway_preflight", **plan["safe_summary"]}), flush=True)
-        fail("chrome_gateway_preflight_failed")
-    return client, plan
-
-
-def gateway_deploy(client, project, identifier, origin, name, plan, sha):
-    from scripts.cloudru_chrome_gateway import deploy as deploy_gateway
-
-    return deploy_gateway(client, project, identifier, origin, name, plan=plan, expected_sha=sha)
+def export_public_url(origin, env=os.environ):
+    # Live MCP acceptance in the workflow targets the deployed origin.
+    if env.get("GITHUB_ENV"):
+        with open(env["GITHUB_ENV"], "a", encoding="utf-8") as stream:
+            stream.write("BROWSER_PUBLIC_URL=" + public_origin(origin) + "\n")
 
 
 def main(argv=None):
@@ -651,16 +662,10 @@ def main(argv=None):
         fail("auth_not_configured")
     apps = CloudRuContainerAppsClient(project_id=project)
     if args.action in ("preflight", "deploy"):
+        # The public origin is always the container's own provider origin.
         environment = runtime_env(
             args.sha,
-            {
-                **os.environ,
-                "BROWSER_PUBLIC_URL": os.environ.get("BROWSER_PUBLIC_URL")
-                or f"https://{names(project)[0]}.maxxxpavlov.online",
-            },
-        )
-        gateway_client, gateway_plan = gateway_preflight(
-            project, environment["BROWSER_PUBLIC_URL"], names(project)[0]
+            {key: value for key, value in os.environ.items() if key != "BROWSER_PUBLIC_URL"},
         )
         store, credentials = storage_client(project, args.tenant_id)
         record = owned_record(apps)
@@ -670,25 +675,11 @@ def main(argv=None):
             "container_exists": record is not None,
             "bucket_exists": exists,
             "cost_floor": estimate_monthly_cost("1", 1),
-            "gateway": gateway_plan["safe_summary"],
         }
         if args.action == "deploy":
             image = build_image(root, args.sha)
             result = deploy(apps, store, credentials, image, environment)
-            gateway_result = gateway_deploy(
-                gateway_client,
-                project,
-                result["container_id"],
-                environment["BROWSER_PUBLIC_URL"],
-                names(project)[0],
-                gateway_plan,
-                args.sha,
-            )
-            result = {
-                **result,
-                "gateway": gateway_result,
-                "gateway_deployed": gateway_result.get("gateway_deployed") is True,
-            }
+            export_public_url(result["provider_url"])
     else:
         record = owned_record(apps)
         if record is None:

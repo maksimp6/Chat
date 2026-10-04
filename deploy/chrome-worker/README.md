@@ -11,10 +11,7 @@ original Russian CA installation and certificate files.
 HTTP, using the MCP SDK transport. It supports POST (initialize, notifications and
 tool calls), GET (event stream), and DELETE (end session). Every request requires
 `Authorization: Bearer` with an OAuth access token or `BROWSER_API_TOKEN`, including
-requests carrying an `Mcp-Session-Id`. The Gateway must forward this session header,
-Authorization, the MCP protocol version header and Accept header, and return
-`Mcp-Session-Id` and `WWW-Authenticate` to the client. The OAuth routes also require
-query strings, Cookie and Set-Cookie to pass through unchanged.
+requests carrying an `Mcp-Session-Id`.
 
 The advertised tools are Playwright MCP's standard tools, including
 `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, and
@@ -29,7 +26,7 @@ flushes its profile. The next MCP browser operation wakes it again. The optional
 `BROWSER_ALLOWED_HOSTS` setting belongs to the legacy REST navigate operation;
 it does not restrict the official MCP tools.
 
-Use the Gateway's actual deployed URL with path `/browser/v1/mcp` in your client.
+Use the deployed Container Apps origin with path `/browser/v1/mcp` in your client.
 For a locally running worker, the Codex configuration is:
 
 ```toml
@@ -39,7 +36,7 @@ bearer_token_env_var = "BROWSER_API_TOKEN"
 ```
 
 Set the token through the client's environment/secret store. In a remote setup,
-replace the local URL with the deployed Gateway endpoint. No live Gateway URL
+replace the local URL with the deployed endpoint. No live URL
 or credentials are embedded in this repository.
 
 ## Run and check
@@ -92,11 +89,18 @@ The final acceptance step requires the owner's real GitHub sign-in from ChatGPT.
 ## Cloud.ru runtime state
 
 The Cloud.ru lane uses a separate Chrome container and state bucket; it does not
-replace the RDC container. The public endpoint is
-`https://<container-name>.maxxxpavlov.online` on API Gateway.
-OAuth runs behind Gateway; direct Container Apps control remains
-protected by the provider's authentication. The worker and its OAuth metadata use the public
-Gateway origin consistently.
+replace the RDC container. The public endpoint is the container's own stable
+Container Apps origin (`https://<host>.containerapps.ru`), kept for as long as
+the container name `chrome-<project-prefix>` is unchanged. Evolution API Gateway
+is not used: it has no public management API, and `apigw.api.cloud.ru` returned
+NXDOMAIN from Google and Cloudflare DNS on 2026-10-04.
+
+Provider IAM authentication on the container ingress is disabled because ChatGPT
+cannot send a Cloud.ru IAM token. The worker itself is the access boundary: only
+`GET /healthz` is anonymous; every other route requires `BROWSER_API_TOKEN` or a
+GitHub OAuth token for the single allowed account. Every deployment and restart
+verifies on the public origin, without credentials or redirects, that `/healthz`
+answers 200 and `/browser/v1/status` and `/browser/v1/mcp` answer 401.
 
 Keep `CHROME_PROFILE_DIR=/tmp/chrome-profile` on local storage and mount the
 private state volume at `CHROME_STATE_DIR=/chrome-state`. OAuth state lives at
@@ -115,56 +119,30 @@ recovery after container restart.
 
 ## Deployment
 
-**Current blocker:** automatic Gateway inventory/deployment stops with
-`chrome_gateway_official_contract_unverified`, before obtaining an IAM token.
-The original management routes were inferred from console bundles rather than
-an official REST contract and must not be used for production deployment.
-The official public hosts are `apigw.api.cloud.ru` and
-`certificatemanager.api.cloud.ru`; a hostname alone does not establish their
-REST paths, versions or request payloads. The Gateway host also returned
-NXDOMAIN from independent Google and Cloudflare DNS checks on 2026-10-04.
-No browser deployment or ChatGPT connection is confirmed.
-
-Official sources for completing this integration:
-
-- [Gateway API reference](https://cloud.ru/docs/api-gateway-svp/ug/topics/api-ref)
-- [Gateway IAM authentication](https://cloud.ru/docs/api-gateway-svp/ug/topics/api-ref__authentication)
-- [Certificate Manager API reference](https://cloud.ru/docs/certificate-manager/ug/topics/api-ref)
-- [Create Gateway from OpenAPI](https://cloud.ru/docs/api-gateway-svp/ug/topics/guides__apigw__spec__create)
-- [Gateway extensions and container backend](https://cloud.ru/docs/api-gateway-svp/ug/topics/concepts__apigw-extensions)
-- [Manage permanent Gateway domains](https://cloud.ru/docs/api-gateway-svp/ug/topics/guides__api-gateway__managedomains)
-
-The procedures below describe the intended workflow after the official
-management contract is verified and the public management API is available.
-
-The `Cloud.ru persistent Chrome MCP` workflow operates only from reviewed
-`master`. It uses the production Cloud.ru IAM credentials and Object Storage
-tenant ID. Run `preflight` before `deploy`; the default public origin is
-`https://chrome-<project-prefix>.maxxxpavlov.online`, using the first 12 project
-UUID digits as the prefix. `BROWSER_PUBLIC_URL` can supply the exact origin.
-
-Preflight inventories the existing Evolution DNS zone, a matching enabled
-Certificate Manager certificate and the dedicated API Gateway before creating
-resources. It stops on conflicting records, absent certificates or missing
-credentials. It does not modify certificate contents, the zone apex or other
-applications. `scripts/chrome_gateway_spec.py` renders the exact MCP, OAuth,
-health and legacy REST routes; no catch-all is added.
+The `Cloud.ru persistent Chrome MCP` workflow runs only by manual dispatch from
+reviewed `master`, one run at a time; merging a pull request does not start it.
+It uses the production Cloud.ru IAM credentials and Object Storage tenant ID.
+Run `preflight` (read-only) before `deploy`.
 
 Deployment creates a private image registry/repository, a private state bucket
-and a single 1 CPU / 4 GiB Chrome replica. It verifies Chrome startup and a real
-state checkpoint/restart before publishing the Gateway. Existing deployments
-checkpoint and stop the previous replica before replacing it; a worker rollout
-failure restores the prior configuration. A later Gateway failure leaves the
-verified private worker available for retry and reports a failed deployment.
-The public URL is accepted only after TLS, health, OAuth metadata and anonymous
-access rejection pass through the Gateway.
+and a single 1 CPU / 4 GiB Chrome replica. The container is found by its fixed
+name; an existing one is checkpointed, stopped and updated in place, two
+containers with that name stop the run, and a new one is created only when none
+exists. On first install the provider assigns the origin, and `BROWSER_PUBLIC_URL`
+is then bound to that same container before the restart check, so OAuth metadata
+and callbacks use it. A rollout failure restores the prior configuration, or
+suspends only the new container on first install.
 
-The workflow then runs the official MCP SDK through the public Gateway: client
+The workflow then runs the official MCP SDK against the deployed origin: client
 registration and consent redirects, navigation, a synthetic form interaction,
 and a screenshot. It writes a temporary cookie/localStorage marker on
-`example.com`, restarts the private container, verifies both values through MCP
+`example.com`, restarts the container, verifies both values through MCP
 and removes the marker. This checks transport and profile recovery without
 claiming that the owner has completed GitHub or ChatGPT consent.
+
+After the first deploy, register `<provider_url>/browser/oauth/github/callback`
+(from the deploy output) as the GitHub OAuth App callback, then add
+`<provider_url>/browser/v1/mcp` in ChatGPT.
 
 The `restart` and `stop` workflow actions checkpoint the current profile before
 stopping the worker. Status output contains resource IDs and readiness evidence,
