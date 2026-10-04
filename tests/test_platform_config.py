@@ -411,7 +411,8 @@ def test_core_platform_config_excludes_product_and_lab_experiments():
 
     services = config["services"]
     assert "dota-commentator" not in services
+    assert "agent-shell" not in services
 
     serialized = json.dumps(config, sort_keys=True).lower()
-    for forbidden in ("dota", "steam", "openai", "stripe", "gpu"):
+    for forbidden in ("dota", "steam", "openai", "stripe", "gpu", "agent-shell"):
         assert forbidden not in serialized
