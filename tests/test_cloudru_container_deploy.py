@@ -1038,3 +1038,42 @@ def test_provider_advertises_deploy_services(monkeypatch):
         ]
         is False
     )
+
+
+def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
+    monkeypatch, capsys
+):
+    import json
+    from cloud.cloudru import registry_client
+
+    ticks = iter([1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
+    monkeypatch.setattr(registry_client.time, "perf_counter", lambda: next(ticks))
+
+    def runner(argv, **kwargs):
+        if argv[1] == "build":
+            return subprocess.CompletedProcess(
+                argv, 0, stdout="", stderr="#1 CACHED\n#2 CACHED\nsecret-source"
+            )
+        code = 1 if argv[-1].endswith(":buildcache") else 0
+        return subprocess.CompletedProcess(
+            argv, code, stdout=f"digest: {DIGEST}", stderr="key-secret"
+        )
+
+    registry = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=runner
+    )
+    assert (
+        registry.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc").digest
+        == DIGEST
+    )
+    output = capsys.readouterr().out
+    records = [json.loads(line) for line in output.splitlines()]
+    assert [r["stage"] for r in records] == [
+        "registry_build",
+        "registry_push",
+        "registry_cache_refresh",
+    ]
+    assert [r["seconds"] for r in records] == [0.125, 0.25, 0.0625]
+    assert records[0]["cached_steps"] == 2
+    assert records[-1]["returncode"] == 1
+    assert "key-secret" not in output and "secret-source" not in output

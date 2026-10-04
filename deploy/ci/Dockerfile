@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM python:3.14-slim
 
 ARG NODE_MAJOR=22
@@ -14,11 +15,10 @@ RUN apt-get update \
 WORKDIR /opt/alice-ci
 
 COPY requirements.txt requirements-dev.txt ./
-RUN pip install -r requirements.txt -r requirements-dev.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt -r requirements-dev.txt
 
 COPY package.json ./
-RUN npm install --ignore-scripts --no-audit --no-fund --package-lock=false \
-    && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 
 ENV PATH="/opt/alice-ci/node_modules/.bin:${PATH}"
 

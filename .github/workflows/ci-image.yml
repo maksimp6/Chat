@@ -9,11 +9,12 @@ on:
       - requirements-dev.txt
       - package.json
       - scripts/ci_environment_hash.py
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: alice-ci-image-${{ github.ref }}
@@ -22,7 +23,14 @@ concurrency:
 jobs:
   build:
     name: Build reusable CI environment
+    if: github.event_name != 'pull_request' || (github.event.pull_request.number == 762 && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ghcr.io/maksimp6/chat/alice-ci:${{ steps.tag.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,13 +51,25 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
+      - name: Preserve an already published content tag
+        id: existing
+        env:
+          CI_IMAGE_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          if docker buildx imagetools inspect "ghcr.io/maksimp6/chat/alice-ci:$CI_IMAGE_TAG" > /dev/null 2>&1; then
+            echo 'found=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'found=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and publish immutable CI image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: deploy/ci/Dockerfile
-          push: true
+          push: ${{ steps.existing.outputs.found != 'true' }}
           tags: ghcr.io/maksimp6/chat/alice-ci:${{ steps.tag.outputs.value }}
+          labels: org.opencontainers.image.source=https://github.com/maksimp6/Chat
           cache-from: type=gha,scope=alice-ci-image
           cache-to: type=gha,mode=max,scope=alice-ci-image
 
@@ -58,3 +78,153 @@ jobs:
           CI_IMAGE_TAG: ${{ steps.tag.outputs.value }}
         run: |
           echo "alice-ci image: ghcr.io/maksimp6/chat/alice-ci:$CI_IMAGE_TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  cache-scenarios:
+    name: CI image cache / ${{ matrix.scenario }}
+    needs: build
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        scenario: [cold, warm, source, dev-requirements, requirements, npm]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare isolated cache invalidation scenario
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: |
+          case "$SCENARIO" in
+            cold|warm) ;;
+            source) echo '# cache experiment: source only' >> app.py ;;
+            dev-requirements) sed -i 's/pytest-xdist==3.8.0/pytest-xdist==3.7.0/' requirements-dev.txt ;;
+            requirements) sed -i 's/requests>=2.34.2/requests==2.34.2/' requirements.txt ;;
+            npm) sed -i 's/"prettier": "3.6.2"/"prettier": "3.6.1"/' package.json ;;
+            *) exit 2 ;;
+          esac
+          python scripts/ci_environment_hash.py
+      - name: Set up Buildx on a fresh runner
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: Measure build with imported baseline layers
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: deploy/ci/Dockerfile
+          push: false
+          load: true
+          tags: alice-ci-experiment:local
+          no-cache: ${{ matrix.scenario == 'cold' }}
+          cache-from: type=gha,scope=alice-ci-image
+      - name: Measure local startup and installed toolchain
+        run: |
+          started=$(date +%s.%N)
+          docker run --rm alice-ci-experiment:local bash -c 'python --version; node --version; python -m pip check; prettier --version'
+          ended=$(date +%s.%N)
+          echo "startup_started=$started startup_finished=$ended" >> "$GITHUB_STEP_SUMMARY"
+      - name: Measure package mounts on the same live builder
+        if: matrix.scenario == 'dev-requirements' || matrix.scenario == 'npm'
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: |
+          # Invalidate the install layer without changing resolved packages.
+          # GHA exports layers, not cache-mount contents; this is a separate L3 probe.
+          if [[ "$SCENARIO" == npm ]]; then
+            echo '' >> package.json
+          else
+            echo '# package mount probe' >> requirements-dev.txt
+          fi
+          docker buildx build --progress=plain --load -f deploy/ci/Dockerfile -t alice-ci-experiment:local .
+
+  benchmark:
+    name: SQLite A/B / ${{ matrix.method }} / ${{ matrix.repeat }}
+    permissions:
+      contents: read
+      packages: read
+    needs: build
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        method: [setup, image]
+        repeat: [1, 2, 3]
+    env:
+      YANDEX_API_KEY: ci-test-placeholder
+      CI_IMAGE: ${{ needs.build.outputs.image }}
+      METHOD: ${{ matrix.method }}
+    steps:
+      - name: Record runner arrival
+        run: echo "runner_arrived=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Checkout identical test source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Python with existing pip cache
+        if: matrix.method == 'setup'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Set up Node with existing npm cache
+        if: matrix.method == 'setup'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.2'
+          cache: npm
+          cache-dependency-path: package.json
+      - name: Install Python dependencies
+        if: matrix.method == 'setup'
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Install npm toolchain
+        if: matrix.method == 'setup'
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Authenticate to initially private GHCR package
+        if: matrix.method == 'image'
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull immutable CI image
+        if: matrix.method == 'image'
+        run: docker pull "$CI_IMAGE"
+      - name: Start CI container
+        if: matrix.method == 'image'
+        run: |
+          docker run --detach --name alice-ci-benchmark \
+            --env YANDEX_API_KEY --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace" \
+            --workdir /workspace "$CI_IMAGE" sleep infinity
+          docker exec alice-ci-benchmark bash -c 'python --version; node --version; python -m pip check'
+      - name: Record time to useful test
+        run: echo "tests_started=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Run identical full SQLite suite with coverage
+        run: |
+          command=(python -m pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q)
+          if [[ "$METHOD" == image ]]; then
+            docker exec alice-ci-benchmark "${command[@]}"
+          else
+            "${command[@]}"
+          fi
+          echo "tests_finished=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop CI container
+        if: always() && matrix.method == 'image'
+        run: docker rm --force alice-ci-benchmark
+      - name: Save independent benchmark coverage evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ci-ab-${{ matrix.method }}-${{ matrix.repeat }}
+          path: |
+            coverage.xml
+            coverage.json
+          retention-days: 7
