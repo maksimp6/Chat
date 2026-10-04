@@ -1,9 +1,11 @@
 """Tests verify that future-work stubs raise NotImplementedError."""
 
+from unittest.mock import patch
+
 import pytest
 from alice_platform.reconciler import reconcile
 from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
-from alice_platform.providers.cloudru import get_observed_state
+from alice_platform.providers.cloudru import CloudProviderUnavailable, get_observed_state
 from alice_platform.providers.dns import create_dns_record, update_dns_records, verify_dns
 from alice_platform.providers.storage import (
     create_storage,
@@ -15,12 +17,11 @@ from alice_platform.providers.storage import (
 
 
 class TestCloudRuProviderNotImplemented:
-    """Cloud.ru provider is deferred to next slice."""
+    """Unavailable Cloud.ru provider must fail closed."""
 
-    def test_get_observed_state_returns_empty(self):
-        """Get observed state returns empty containers list."""
-        result = get_observed_state("test")
-        assert result == {"containers": []}
+    def test_get_observed_state_is_not_fake_empty_inventory(self):
+        with pytest.raises(CloudProviderUnavailable, match="observed-state read"):
+            get_observed_state("test")
 
 
 class TestReconcilerImplemented:
@@ -31,8 +32,8 @@ class TestReconcilerImplemented:
         # Should not raise - reconcile now works
         reconcile("test", [], {})
 
-    def test_reconcile_dry_run_mode(self):
-        """Reconcile runs in dry-run mode (no actual deployments)."""
+    def test_reconcile_routes_create_through_provider_boundary(self):
+        """Reconciler routing is testable without pretending the provider is available."""
         from alice_platform.planner import Action, ActionType
 
         actions = [
@@ -44,8 +45,9 @@ class TestReconcilerImplemented:
             )
         ]
         config = {"services": {"test-service": {"resources": {"cpu": "0.5", "memory": "512Mi"}}}}
-        # Should complete without error
-        reconcile("test", actions, config)
+        with patch("alice_platform.reconciler.create_container") as create:
+            reconcile("test", actions, config)
+        create.assert_called_once()
 
 
 class TestRecoveryImplemented:
