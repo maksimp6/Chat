@@ -59,3 +59,19 @@ container start/readiness, seed, restart, verify separately. Production timings
 are historical evidence, not permission to deploy production during experiments.
 Use the existing registry cache for cold/warm/source/worker-JS/dependency trials;
 do not add a second cache. A shared alice-base remains a later measured experiment.
+
+SQLite xdist workers select a separate temporary default database before test
+collection imports db/app modules. Explicit per-test database overrides remain
+intact. PostgreSQL is serial; the hook rejects PostgreSQL xdist until separate
+worker databases exist. Container startup trusts only the mounted checkout path
+for Git, and jq is part of the shared system dependencies.
+
+Chrome build-only probes use action=cache-benchmark, lane=test and cache_scenario
+in cold/warm/python/worker-js/dependencies order, on separate dispatched runners.
+They reuse #763's registry/cache refresh code and never create/start containers.
+Cold disables build-layer reuse; dependency probe adds procps to the system layer.
+Python-only changes are outside the worker Docker context. Variant tags identify
+the exact source SHA and scenario; the existing buildcache tag is refreshed by
+these probes, so rerun the warm baseline after dependency probes if comparing it.
+Full deploy/readiness still needs an Object Storage tenant ID, supplied via the
+existing workflow input. Build-only probes do not need that storage input.

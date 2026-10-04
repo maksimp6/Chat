@@ -204,7 +204,7 @@ jobs:
           docker run --detach --name alice-ci-benchmark \
             --env YANDEX_API_KEY --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/workspace" \
             --workdir /workspace "$CI_IMAGE" sleep infinity
-          docker exec alice-ci-benchmark bash -c 'python --version; node --version; python -m pip check'
+          docker exec alice-ci-benchmark bash -c 'git config --global --add safe.directory /workspace; python --version; node --version; python -m pip check'
       - name: Record time to useful test
         run: echo "tests_started=$(date +%s.%N)" >> "$GITHUB_STEP_SUMMARY"
       - name: Run identical full SQLite suite with coverage
