@@ -456,3 +456,43 @@ test("multiple services share one login: each token is only valid for its own se
   assert.equal(verifyAccess(app.idp, issued.access_token, { audience: second }).aud, second);
   assert.throws(() => verifyAccess(app.idp, issued.access_token, { audience: RESOURCE }), /invalid_token/);
 });
+
+test("auto-approve (test lane only) signs in without GitHub and still enforces the other gates", async (t) => {
+  const app = await fixture(t, { autoApprove: true, githubClientId: undefined, githubClientSecret: undefined, fetch: async () => { throw new Error("GitHub must not be contacted"); } });
+  assert.equal(app.idp.ready, true);
+  assert.deepEqual(await (await app.request("/healthz")).json(), { status: "ok", auto_approve: true });
+
+  const client = await app.registered();
+  const flow = await app.begin(client);
+  assert.equal(flow.response.status, 200);
+  const approved = await app.form("/authorize", { tx: flow.tx }, { cookie: flow.cookie });
+  assert.equal(approved.status, 302);
+  const target = new URL(approved.headers.get("location"));
+  assert.equal(target.origin + target.pathname, REDIRECT);
+  assert.equal(target.searchParams.get("state"), "client-state");
+  assert.equal(target.searchParams.get("iss"), ISSUER);
+
+  const tokens = await (await app.exchange(app.tokens({ code: target.searchParams.get("code"), client_id: client.client_id }))).json();
+  const jwk = app.idp.jwk;
+  const claims = verifyJwt(tokens.access_token, { keys: new Map([[jwk.kid, publicKeyFromJwk(jwk).key]]), issuer: ISSUER, audience: RESOURCE, now: START / 1000 });
+  assert.equal(claims.sub, OWNER);
+
+  // The browser binding, the resource allowlist and the redirect allowlist still apply.
+  assert.equal((await app.form("/authorize", { tx: flow.tx })).status, 400);
+  assert.equal((await app.begin(client, { resource: "https://evil.example.test/mcp" })).response.status, 400);
+  assert.equal((await app.registered({ redirect_uris: ["https://evil.example.test/cb"] })).error, "invalid_redirect_uri");
+});
+
+test("without auto-approve GitHub credentials stay mandatory and nothing is auto-approved", async (t) => {
+  const app = await fixture(t, { githubClientId: undefined });
+  assert.equal(app.idp.ready, false);
+  assert.deepEqual(app.idp.missing, ["IDP_GITHUB_CLIENT_ID"]);
+  const healthy = await fixture(t);
+  assert.deepEqual(await (await healthy.request("/healthz")).json(), { status: "ok" });
+});
+
+test("IDP_AUTO_APPROVE is opt-in and exactly '1'", () => {
+  assert.equal(configFromEnv({}).autoApprove, false);
+  assert.equal(configFromEnv({ IDP_AUTO_APPROVE: "true" }).autoApprove, false);
+  assert.equal(configFromEnv({ IDP_AUTO_APPROVE: "1" }).autoApprove, true);
+});
