@@ -239,3 +239,89 @@ def test_only_allow_listed_failure_codes_are_stored(store):
     run_next(store, {"sneaky": sneaky})
     assert store.get(task_id)["error"] == "task_failed"
     assert "leaked-token" not in json.dumps([store.get(task_id), store.events(task_id)])
+
+
+def test_cli_lists_approves_recovers_and_reports_an_empty_queue(tmp_path, capsys):
+    db = str(tmp_path / "shell.sqlite3")
+    handlers = {"echo": ok_handler}
+    assert cli.main(["--db", db, "run-next"], handlers=handlers) == 0
+    assert capsys.readouterr().out.strip() == "no queued task"
+    cli.main(
+        [
+            "--db",
+            db,
+            "add",
+            "--role",
+            "release-manager",
+            "--title",
+            "deploy",
+            "--kind",
+            "echo",
+            "--needs-approval",
+        ],
+        handlers=handlers,
+    )
+    task_id = capsys.readouterr().out.strip()
+    assert cli.main(["--db", db, "list"], handlers=handlers) == 0
+    assert capsys.readouterr().out.strip() == f"{task_id}\tblocked\trelease-manager\techo\tdeploy"
+    assert cli.main(["--db", db, "approve", task_id], handlers=handlers) == 0
+    assert cli.main(["--db", db, "approve", task_id], handlers=handlers) == 1
+    assert "not waiting for approval" in capsys.readouterr().err
+    assert cli.main(["--db", db, "recover"], handlers=handlers) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == []
+
+
+def test_cli_uses_the_built_in_handlers_by_default_and_runs_as_a_module(
+    tmp_path, capsys, monkeypatch
+):
+    import runpy
+    import sys
+    import types
+
+    db = str(tmp_path / "shell.sqlite3")
+    fake = types.ModuleType("scripts.cloudru_check")
+    fake.run = lambda names, **kwargs: {"names": names}
+    monkeypatch.setitem(sys.modules, "scripts.cloudru_check", fake)
+    cli.main(
+        ["--db", db, "add", "--role", "infra-engineer", "--title", "s", "--kind", "cloudru_status"]
+    )
+    capsys.readouterr()
+    assert cli.main(["--db", db, "run-next"]) == 0
+    assert capsys.readouterr().out.strip() == "1 done"
+    monkeypatch.setattr(sys, "argv", ["agent_shell", "--db", db, "list"])
+    monkeypatch.delitem(sys.modules, "agent_shell.__main__", raising=False)
+    with pytest.raises(SystemExit) as stopped:
+        runpy.run_module("agent_shell", run_name="__main__")
+    assert stopped.value.code == 0
+
+
+def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):
+    import alice_agent_runner
+
+    calls = []
+
+    def fake(issue, title, body, model):
+        calls.append(model)
+        return {"status": "changed", "changed_files": []}
+
+    monkeypatch.setattr(alice_agent_runner, "run_issue_task", fake)
+    handler = builtin.default_handlers()["alice_task"]
+    assert handler(PAYLOAD)["status"] == "changed"
+    assert calls == [alice_agent_runner.DEFAULT_MODEL]
+
+
+def test_a_failure_result_that_is_not_json_is_dropped_but_the_code_is_kept(store):
+    def handler(payload):
+        raise TaskFailed("agent_failed", {"x": object()})
+
+    task_id = store.add(role="infra-engineer", title="t", kind="bad")
+    run_next(store, {"bad": handler})
+    task = store.get(task_id)
+    assert (task["status"], task["error"], task["result"]) == ("failed", "agent_failed", None)
+
+
+def test_oversized_payloads_and_bad_kinds_are_refused(store):
+    with pytest.raises(ValueError):
+        store.add(role="infra-engineer", title="t", kind="Bad Kind")
+    with pytest.raises(ValueError):
+        store.add(role="infra-engineer", title="t", kind="echo", payload={"x": "y" * 20000})
