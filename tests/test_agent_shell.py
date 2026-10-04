@@ -8,7 +8,7 @@ import pytest
 
 from agent_shell import __main__ as cli
 from agent_shell import handlers as builtin
-from agent_shell.runner import run_next
+from agent_shell.runner import TaskFailed, run_next
 from agent_shell.store import TaskStore
 
 
@@ -135,7 +135,7 @@ def test_first_task_reads_cloudru_status_through_the_read_only_check():
         return {"containers": {"ok": True, "data": [{"name": "chrome-test"}]}}
 
     handlers = builtin.default_handlers(check_run=fake_run)
-    assert set(handlers) == {"cloudru_status"}
+    assert set(handlers) == {"cloudru_status", "alice_task"}
     result = handlers["cloudru_status"]({})
     assert calls == [["containers", "registries"]]
     assert result["containers"]["data"][0]["name"] == "chrome-test"
@@ -158,3 +158,75 @@ def test_cli_adds_runs_and_shows_a_task(tmp_path, capsys):
     shown = json.loads(capsys.readouterr().out)
     assert shown["status"] == "done" and [e["stage"] for e in shown["events"]][-1] == "finished"
     assert cli.main(["--db", db, "show", "404"], handlers=handlers) == 1
+
+
+def alice(result, calls=None):
+    def fake(issue, title, body, model, **kwargs):
+        if calls is not None:
+            calls.append((issue, title, body, model))
+        return result
+
+    return builtin.default_handlers(run_issue=fake)["alice_task"]
+
+
+PAYLOAD = {"issue": 7, "title": "Fix typo", "body": "The README has a typo."}
+
+
+def test_alice_task_runs_the_issue_agent_and_keeps_its_summary(store):
+    calls = []
+    handler = alice({"status": "changed", "changed_files": ["README.md"], "summary": "fixed"}, calls)
+    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload={**PAYLOAD, "model": "aliceai-llm"})
+    run_next(store, {"alice_task": handler})
+    task = store.get(task_id)
+    assert task["status"] == "done"
+    assert task["result"]["changed_files"] == ["README.md"]
+    assert calls == [(7, "Fix typo", "The README has a typo.", "aliceai-llm")]
+
+
+def test_alice_task_fails_with_a_fixed_code_and_keeps_the_result(store):
+    failed = alice({"status": "failed", "error": "RuntimeError", "changed_files": []})
+    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=PAYLOAD)
+    run_next(store, {"alice_task": failed})
+    task = store.get(task_id)
+    assert (task["status"], task["error"]) == ("failed", "agent_failed")
+    assert task["result"]["error"] == "RuntimeError"
+
+
+def test_alice_task_stops_at_approval_gated_tools_and_never_auto_approves(store):
+    waiting = alice({"status": "needs_approval", "pending_tools": ["run_command"], "changed_files": []})
+    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=PAYLOAD)
+    run_next(store, {"alice_task": waiting})
+    task = store.get(task_id)
+    assert (task["status"], task["error"]) == ("failed", "needs_approval")
+    assert task["result"]["pending_tools"] == ["run_command"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"issue": 0, "title": "t", "body": "b"},
+        {"issue": "7", "title": "t", "body": "b"},
+        {"issue": 7, "title": "", "body": "b"},
+        {"issue": 7, "title": "t" * 300, "body": "b"},
+        {"issue": 7, "title": "t", "body": "b" * 9000},
+        {"issue": 7, "title": "t", "body": "b", "model": "../../etc/passwd"},
+    ],
+)
+def test_alice_task_rejects_a_malformed_payload_before_calling_the_agent(store, payload):
+    calls = []
+    handler = alice({"status": "changed", "changed_files": []}, calls)
+    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=payload)
+    run_next(store, {"alice_task": handler})
+    assert store.get(task_id)["error"] == "invalid_payload"
+    assert calls == []
+
+
+def test_only_allow_listed_failure_codes_are_stored(store):
+    def sneaky(payload):
+        raise TaskFailed("Bearer leaked-token")
+
+    task_id = store.add(role="infra-engineer", title="t", kind="sneaky")
+    run_next(store, {"sneaky": sneaky})
+    assert store.get(task_id)["error"] == "task_failed"
+    assert "leaked-token" not in json.dumps([store.get(task_id), store.events(task_id)])

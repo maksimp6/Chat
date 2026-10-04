@@ -139,8 +139,14 @@ class TaskStore:
     def finish(self, task_id, result):
         self._close(task_id, "done", result=json.dumps(result), stage="finished")
 
-    def fail(self, task_id, code):
-        self._close(task_id, "failed", error=code, stage="failed")
+    def fail(self, task_id, code, result=None):
+        self._close(
+            task_id,
+            "failed",
+            error=code,
+            result=None if result is None else json.dumps(result),
+            stage="failed",
+        )
 
     def _close(self, task_id, status, *, result=None, error=None, stage):
         with self._connect() as db:
