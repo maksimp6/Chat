@@ -55,6 +55,9 @@ function renderApprovalCard(toolCall, origMsg) {
       arguments: toolCall.arguments,
       original_message: origMsg,
     };
+    if (toolCall.call_id) {
+      approvalPayload.idempotency_key = currentConvId + ":" + toolCall.call_id;
+    }
     if (toolCall.name === "set_ui_theme" && window.AliceTheme) {
       approvalPayload.current_theme = window.AliceTheme.getStored();
     }

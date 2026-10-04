@@ -13,6 +13,7 @@ from invocation.manager import (
     fail_invocation,
     persist_invocation_trace,
 )
+from invocation.idempotency import IdempotencyInProgress, IdempotencyStore, validate_key
 from invocation.trace import create_invocation_trace
 from mcp_trace import record_yandex_mcp_activity
 import mcp_storage
@@ -632,60 +633,82 @@ def get_conv_messages(conv_id):
     return jsonify({"messages": get_messages(conv_id)})
 
 
+APPROVED_EXECUTIONS = IdempotencyStore(max_entries=1024, ttl_seconds=3600.0)
+
+
+def _run_approved_tool(data):
+    """Effect: execute an approved tool once and record the assistant reply."""
+    conv_id = data.get("conversation_id")
+    func_name = data.get("name")
+    arguments = data.get("arguments", {})
+    model_key = data.get("model", "aliceai-llm")
+
+    tool_config = registry.get_tool_meta(func_name)
+    if not tool_config:
+        return {"error": f"Неизвестный инструмент: {func_name}"}, 400
+
+    owner_id = get_current_owner_id(required=False)
+    tool_arguments = dict(arguments or {})
+    if func_name == "set_ui_theme":
+        current_theme = str(data.get("current_theme") or "").strip().lower()
+        if current_theme:
+            tool_arguments["current_theme"] = current_theme
+    call = UniversalToolCall(
+        tool_name=func_name,
+        arguments=tool_arguments,
+        transport="internal",
+        user_id=owner_id,
+        approved=True,
+        metadata={"source": "approved_action"},
+    )
+    exec_res = UniversalToolExecutor(registry).execute(call)
+    if not exec_res.get("success"):
+        phase = (exec_res.get("metadata") or {}).get("phase")
+        status = 403 if phase in {"authorization", "approval_required"} else 400
+        return {
+            "error": exec_res.get("error") or "Tool execution failed",
+            "execution_result": exec_res,
+        }, status
+
+    execution_data = exec_res.get("data")
+    client = AliceClient(Config)
+    prompt = (
+        f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
+        f"Результат: {execution_data}.\nДай краткий ответ о завершении."
+    )
+    synth_response = client.ask(
+        prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."}
+    )
+    reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
+    usage = client.extract_usage(synth_response)
+    cost = calculate_full_cost(model_key, usage) if usage else 0.0
+
+    add_message(conv_id, "assistant", reply, cost=cost)
+    return {"reply": reply, "cost": cost, "execution_result": exec_res}, 200
+
+
 @mcp_bp.route("/api/mcp/execute-approved", methods=["POST"])
 def execute_approved():
+    data = request.get_json(silent=True) or {}
+    key = data.get("idempotency_key")
     try:
-        data = request.get_json(silent=True) or {}
-        conv_id = data.get("conversation_id")
-        func_name = data.get("name")
-        arguments = data.get("arguments", {})
-        model_key = data.get("model", "aliceai-llm")
-
-        tool_config = registry.get_tool_meta(func_name)
-        if not tool_config:
-            return jsonify({"error": f"Неизвестный инструмент: {func_name}"}), 400
-
-        owner_id = get_current_owner_id(required=False)
-        tool_arguments = dict(arguments or {})
-        if func_name == "set_ui_theme":
-            current_theme = str(data.get("current_theme") or "").strip().lower()
-            if current_theme:
-                tool_arguments["current_theme"] = current_theme
-        call = UniversalToolCall(
-            tool_name=func_name,
-            arguments=tool_arguments,
-            transport="internal",
-            user_id=owner_id,
-            approved=True,
-            metadata={"source": "approved_action"},
+        if key is None:
+            payload, status = _run_approved_tool(data)
+            return jsonify(payload), status
+        try:
+            validate_key(key)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        scoped_key = f"{get_current_owner_id(required=False)}:{key}"
+        outcome = APPROVED_EXECUTIONS.run(
+            scoped_key,
+            lambda: _run_approved_tool(data),
+            is_success=lambda result: result[1] == 200,
         )
-        exec_res = UniversalToolExecutor(registry).execute(call)
-        if not exec_res.get("success"):
-            return jsonify(
-                {
-                    "error": exec_res.get("error") or "Tool execution failed",
-                    "execution_result": exec_res,
-                }
-            ), 403 if (exec_res.get("metadata") or {}).get("phase") in {
-                "authorization",
-                "approval_required",
-            } else 400
-
-        execution_data = exec_res.get("data")
-        client = AliceClient(Config)
-        prompt = (
-            f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
-            f"Результат: {execution_data}.\nДай краткий ответ о завершении."
-        )
-        synth_response = client.ask(
-            prompt, model_key, conv_id, {"instructions": "Ты системный ассистент."}
-        )
-        reply = client.extract_text(synth_response) or f"Действие {func_name} успешно выполнено."
-        usage = client.extract_usage(synth_response)
-        cost = calculate_full_cost(model_key, usage) if usage else 0.0
-
-        add_message(conv_id, "assistant", reply, cost=cost)
-        return jsonify({"reply": reply, "cost": cost, "execution_result": exec_res})
+        payload, status = outcome.value
+        return jsonify({**payload, "replayed": outcome.replayed}), status
+    except IdempotencyInProgress:
+        return jsonify({"error": "approved_action_in_progress"}), 409
     except Exception:
         logger.exception("[TOOL_APPROVAL] Tool execution failed")
         return jsonify({"error": "tool_execution_failed"}), 500
