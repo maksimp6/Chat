@@ -112,7 +112,8 @@ def test_requests_without_key_keep_previous_behaviour(client):
 
 
 def test_invalid_key_and_in_progress_and_crash(client):
-    assert _post(client, idempotency_key="").status_code == 400
+    invalid = _post(client, idempotency_key="")
+    assert (invalid.status_code, invalid.get_json()) == (400, {"error": "invalid_idempotency_key"})
     with patch.object(
         mcp_routes.APPROVED_EXECUTIONS, "run", side_effect=IdempotencyInProgress("k")
     ):

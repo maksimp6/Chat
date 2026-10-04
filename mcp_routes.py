@@ -697,8 +697,8 @@ def execute_approved():
             return jsonify(payload), status
         try:
             validate_key(key)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+        except ValueError:
+            return jsonify({"error": "invalid_idempotency_key"}), 400
         scoped_key = f"{get_current_owner_id(required=False)}:{key}"
         outcome = APPROVED_EXECUTIONS.run(
             scoped_key,
