@@ -1,0 +1,34 @@
+# Production lane configuration
+# Services and behavior for production environment
+
+lanes:
+  production:
+    sign_in: github
+    services:
+      - oauth
+      - chrome
+      - agent-shell
+
+    oauth_owner_id: "293531601"  # GitHub user ID for owner checks
+
+    # Production requires approval for any deployment
+    approval_required: true
+
+    # Scaling and resource allocation
+    oauth:
+      scale: 2
+      resources:
+        cpu: 1.0
+        memory: 1024
+
+    chrome:
+      scale: 1
+      resources:
+        cpu: 0.5
+        memory: 512
+
+    agent_shell:
+      scale: 1
+      resources:
+        cpu: 0.5
+        memory: 512

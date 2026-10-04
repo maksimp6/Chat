@@ -1,0 +1,29 @@
+# Alice Platform services definition
+# Each service represents a deployable component
+
+services:
+  oauth:
+    type: oauth
+    depends_on: []
+    scale: 1
+    resources:
+      cpu: 0.5
+      memory: 512
+
+  chrome:
+    type: chrome
+    depends_on:
+      - oauth
+    scale: 0
+    resources:
+      cpu: 0.1
+      memory: 256
+
+  agent-shell:
+    type: agent-shell
+    depends_on:
+      - oauth
+    scale: 1
+    resources:
+      cpu: 0.5
+      memory: 512

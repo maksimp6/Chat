@@ -1,0 +1,14 @@
+# Storage configuration
+# Persistent storage for services
+
+chrome_state:
+  path: /chrome-state
+  persistent: true
+  backup_policy: daily
+  retention_days: 30
+
+oauth_session:
+  path: /oauth-session
+  persistent: true
+  backup_policy: hourly
+  retention_days: 7

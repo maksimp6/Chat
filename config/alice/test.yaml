@@ -1,0 +1,32 @@
+# Test lane configuration
+# Services and behavior for test environment
+
+lanes:
+  test:
+    sign_in: passphrase
+    services:
+      - oauth
+      - chrome
+      - agent-shell
+
+    # Test allows auto-deployment without approval
+    approval_required: false
+
+    # Minimal resources for test
+    oauth:
+      scale: 1
+      resources:
+        cpu: 0.1
+        memory: 256
+
+    chrome:
+      scale: 0
+      resources:
+        cpu: 0.05
+        memory: 128
+
+    agent_shell:
+      scale: 1
+      resources:
+        cpu: 0.1
+        memory: 256
