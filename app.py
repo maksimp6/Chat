@@ -194,7 +194,20 @@ def index():
 
 @app.route("/healthz", methods=["GET"])
 def healthz():
-    return jsonify({"status": "ok"})
+    """Liveness plus database readiness without exposing backend credentials."""
+    conn = None
+    try:
+        from db import get_conn
+
+        conn = get_conn()
+        conn.execute("SELECT 1").fetchone()
+    except Exception:
+        logger.exception("[HEALTH] database readiness check failed")
+        return jsonify({"status": "error", "database": "unavailable"}), 503
+    finally:
+        if conn is not None:
+            conn.close()
+    return jsonify({"status": "ok", "database": "ok"})
 
 
 @app.route("/api/users/bootstrap", methods=["POST"])
