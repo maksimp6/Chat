@@ -61,7 +61,8 @@ async function testSendShowsApprovalCard() {
   card.querySelector(".approval-btn-approve").click();
   await settle();
   const approved = requests.find((r) => r.url === "/api/mcp/execute-approved");
-  assert.deepEqual(approved.body, {
+  const { idempotency_key: _key, ...approvedBody } = approved.body;
+  assert.deepEqual(approvedBody, {
     conversation_id: "conv-1",
     model: "test-model",
     name: "delete_file",
