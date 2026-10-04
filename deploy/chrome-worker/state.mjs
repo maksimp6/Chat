@@ -240,6 +240,8 @@ export function createChromeStateStore(options = {}) {
       catch (error) {
         const errno = typeof error?.code === "string" && /^E[A-Z]+$/.test(error.code) ? `:${error.code}` : "";
         lastError = error.stateError ? error.message : `chrome_state_io_failed${errno}`;
+        // Container stdout/stderr goes to Cloud.ru logging; codes only.
+        process.stderr.write(`${JSON.stringify({ event: "chrome_state_failed", error: lastError })}\n`);
         if (error.stateError) throw error;
         fail("io_failed");
       }

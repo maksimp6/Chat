@@ -288,6 +288,11 @@ export function createOAuth(options = {}) {
       else if (request.method === "POST" && path === `${OAUTH_PATH}/revoke`) await revoke(request, response);
       else json(response, 404, { error: "not_found" });
     } catch (error) {
+      if (!(error.message === "invalid_request" || error instanceof SyntaxError)) {
+        // Fixed codes only: never tokens, cookies, client data or request bodies.
+        const code = /^[a-z0-9_:A-Z]{1,80}$/.test(error?.message ?? "") ? error.message : "unexpected";
+        process.stderr.write(`${JSON.stringify({ event: "oauth_failed", path, error: code })}\n`);
+      }
       json(response, error.message === "invalid_request" || error instanceof SyntaxError ? 400 : 500, { error: error.message === "invalid_request" || error instanceof SyntaxError ? "invalid_request" : "oauth_unavailable" });
     }
     return true;
