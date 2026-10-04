@@ -4,7 +4,6 @@ import pytest
 from alice_platform.reconciler import reconcile
 from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
 from alice_platform.providers.cloudru import get_observed_state
-from alice_platform.providers.secrets import get_secret, resolve_all_secrets
 from alice_platform.providers.dns import create_dns_record, update_dns_records, verify_dns
 from alice_platform.providers.storage import (
     create_storage,
@@ -74,20 +73,6 @@ class TestRecoveryImplemented:
     def test_rollback_config_production_requires_approval(self):
         """Rollback config in production lane requires approval."""
         rollback_config("abc1234", "production", approve=False)
-
-
-class TestSecretsProviderNotImplemented:
-    """Secrets provider is deferred to next slice."""
-
-    def test_get_secret_raises(self):
-        """Get secret raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Secrets provider deferred"):
-            get_secret("alice/prod/oauth-client-secret")
-
-    def test_resolve_all_secrets_raises(self):
-        """Resolve all secrets raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Secrets provider deferred"):
-            resolve_all_secrets({"oauth": {"client_secret": "alice/prod/oauth-client-secret"}})
 
 
 class TestDNSProviderNotImplemented:
