@@ -67,6 +67,7 @@ STRICT_CLEAN_FILES = {
     "identity/__init__.py",
     "invocation/__init__.py",
     "invocation/context.py",
+    "invocation/problems.py",
     "knowledge_economics.py",
     "local_tool_agent.py",
     "mcp_server/runtime_bridge.py",
