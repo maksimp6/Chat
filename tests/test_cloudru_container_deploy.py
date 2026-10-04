@@ -1077,3 +1077,32 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     assert records[0]["cached_steps"] == 2
     assert records[-1]["returncode"] == 1
     assert "key-secret" not in output and "secret-source" not in output
+
+
+def test_cloudru_workflow_uses_one_existing_project_and_separate_test_target():
+    from pathlib import Path
+    import yaml
+
+    path = Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-deploy.yml"
+    text = path.read_text()
+    workflow = yaml.safe_load(text)
+    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+
+    assert inputs["target"]["options"] == ["test", "production"]
+    assert inputs["target"]["default"] == "test"
+    assert "CLOUDRU_TEST_CONTAINER_NAME" in text
+    assert "ALICE_TEST_DATABASE_URL" in text
+    assert "create project" not in text.lower()
+    assert "delete project" not in text.lower()
+    assert "CLOUDRU_PROJECT_ID" in workflow["jobs"]["cloudru"]["env"]
+
+
+def test_cloudru_workflow_test_and_production_database_secrets_are_distinct():
+    from pathlib import Path
+
+    text = (
+        Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-deploy.yml"
+    ).read_text()
+    assert "secrets.ALICE_TEST_DATABASE_URL" in text
+    assert "secrets.ALICE_DATABASE_URL" in text
+    assert "inputs.target == 'production'" in text
