@@ -273,3 +273,16 @@ test("concurrent real worker OAuth registrations checkpoint complete immutable s
   for (const client of clients) assert.equal(disk.clients[client.client_id].client_id, client.client_id);
   assert.equal(restored.status().authGeneration, 20);
 });
+
+test("consent page CSP lets the form redirect to GitHub sign-in", async (t) => {
+  // Browsers enforce form-action on the redirect after submit; 'self' alone
+  // silently blocks the GitHub redirect and the consent page appears to hang.
+  const app = await fixture(t);
+  const client = await (await app.register()).json();
+  const started = await app.start(client);
+  const policy = started.response.headers.get("content-security-policy");
+  const formAction = policy.split(";").map((part) => part.trim()).find((part) => part.startsWith("form-action"));
+  assert.deepEqual(formAction.split(/\s+/).slice(1).sort(), ["'self'", "https://github.com"]);
+  const login = await app.form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie);
+  assert.equal(new URL(login.headers.get("location")).origin, "https://github.com");
+});
