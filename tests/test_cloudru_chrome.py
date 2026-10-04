@@ -619,3 +619,27 @@ def test_legacy_always_on_revision_is_still_recognized_for_in_place_update():
     legacy["template"]["containers"][0]["resources"] = {"cpu": "0.3", "memory": "768Mi"}
     with pytest.raises(CloudProviderError):
         chrome.owned_record(apps)
+
+
+def test_failed_deploy_reports_safe_original_cause_before_rollback(monkeypatch, capsys):
+    apps = SimpleNamespace(
+        project_id=PROJECT,
+        client=SimpleNamespace(
+            request=Mock(
+                side_effect=CloudProviderError(
+                    "private-provider-text", code="provider_http_error", http_status=400
+                )
+            )
+        ),
+    )
+    monkeypatch.setattr(chrome, "owned_record", Mock(return_value=None))
+    monkeypatch.setattr(chrome, "prepare_bucket", Mock())
+    with pytest.raises(CloudProviderError):
+        chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+    out = capsys.readouterr().out
+    assert json.loads(out.splitlines()[0]) == {
+        "stage": "chrome_deploy_failed",
+        "error": "provider_http_error",
+        "http_status": 400,
+    }
+    assert "private-provider-text" not in out

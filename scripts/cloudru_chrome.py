@@ -617,7 +617,9 @@ def deploy(apps, store, credentials, image, environment):
             record = wait_ready(apps, identifier=record["id"], image=image)
             verify_restored(apps, record, generation)
         return summary(record)
-    except Exception:
+    except Exception as exc:
+        # Rollback may raise its own code; keep the original cause visible.
+        print(json.dumps({"stage": "chrome_deploy_failed", **safe_error(exc)}), flush=True)
         if attempted:
             try:
                 current = owned_record(apps, identifier=identifier)
@@ -737,21 +739,20 @@ def main(argv=None):
     print(json.dumps(result, sort_keys=True), flush=True)
 
 
+def safe_error(exc):
+    code = getattr(exc, "code", None)
+    status = getattr(exc, "http_status", None)
+    return {
+        "error": code if code in SAFE_ERRORS else "chrome_operation_failed",
+        "http_status": status if type(status) is int and 100 <= status <= 599 else None,
+    }
+
+
 def cli():
     try:
         main()
     except Exception as exc:
-        code = getattr(exc, "code", None)
-        status = getattr(exc, "http_status", None)
-        print(
-            json.dumps(
-                {
-                    "error": code if code in SAFE_ERRORS else "chrome_operation_failed",
-                    "http_status": status if type(status) is int and 100 <= status <= 599 else None,
-                }
-            ),
-            flush=True,
-        )
+        print(json.dumps(safe_error(exc)), flush=True)
         return 1
     return 0
 
