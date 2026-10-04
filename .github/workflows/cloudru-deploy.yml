@@ -19,6 +19,7 @@ on:
           - status
           - inventory
           - estimate
+          - verify
       target:
         description: Existing environment inside the configured Cloud.ru project
         required: true
@@ -143,6 +144,21 @@ jobs:
       - name: Estimate
         if: inputs.action == 'estimate'
         run: python scripts/cloudru_deploy.py estimate
+      - name: Verify test persistence
+        if: inputs.action == 'verify'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_REQUIRE_SHORT_TOKEN: "1"
+          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          ALICE_DATABASE_URL: ${{ inputs.target == 'production' && secrets.ALICE_DATABASE_URL || secrets.ALICE_TEST_DATABASE_URL }}
+        run: |
+          if [ "${{ inputs.target }}" != test ]; then
+            echo '::error::verify is restricted to the reusable test environment'
+            exit 1
+          fi
+          python scripts/cloudru_deploy.py verify-persistence
+
       - name: Inventory
         if: inputs.action == 'inventory'
         env:
