@@ -18,6 +18,7 @@ export function configFromEnv(env = process.env) {
     allowedResources: list(env.IDP_ALLOWED_RESOURCES),
     allowedRedirectHosts: env.IDP_ALLOWED_REDIRECT_HOSTS ? list(env.IDP_ALLOWED_REDIRECT_HOSTS) : undefined,
     scopes: list(env.IDP_SCOPES),
+    deploymentSha: env.IDP_DEPLOYMENT_SHA,
     ownerPassphrase: env.IDP_OWNER_PASSPHRASE || undefined,
     notBefore: env.IDP_NOT_BEFORE ? Number(env.IDP_NOT_BEFORE) : 0,
   };
