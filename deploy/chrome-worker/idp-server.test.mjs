@@ -36,6 +36,7 @@ test("MCP endpoint accepts IdP tokens and challenges everything else", async (t)
   assert.match(anonymous.headers.get("www-authenticate"), /resource_metadata=/);
   assert.equal((await app.call("/browser/v1/mcp", token({ sub: "999" }))).status, 401);
   assert.equal((await app.call("/browser/v1/mcp", token({ scope: "mcp" }))).status, 401);
+  assert.equal((await app.call("/browser/v1/mcp", token({ scope: "browser.read" }))).status, 401);
 });
 
 test("IdP tokens do not open the REST control surface; the static token still does", async (t) => {
