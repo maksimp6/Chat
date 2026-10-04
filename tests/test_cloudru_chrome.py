@@ -688,3 +688,26 @@ def test_workflow_test_lane_is_isolated_from_production():
     assert python_steps and all(
         step["env"]["CHROME_LANE"] == "${{ inputs.lane }}" for step in python_steps
     )
+
+
+def test_test_lane_exports_branch_commit_without_master_ancestry(monkeypatch, tmp_path):
+    import io
+    import tarfile
+
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w") as archive:
+        data = b"FROM scratch\n"
+        info = tarfile.TarInfo("deploy/chrome-worker/Dockerfile")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    run = Mock(return_value=SimpleNamespace(returncode=0, stdout=payload.getvalue()))
+    monkeypatch.setattr(chrome.subprocess, "run", run)
+    monkeypatch.setattr(chrome, "_export_commit", Mock())
+    monkeypatch.setenv("CHROME_LANE", "test")
+    chrome.export_source(SHA, tmp_path, tmp_path / "out")
+    assert run.call_args.args[0] == ["git", "-C", str(tmp_path), "archive", "--format=tar", SHA]
+    assert (tmp_path / "out/deploy/chrome-worker/Dockerfile").read_bytes() == b"FROM scratch\n"
+    chrome._export_commit.assert_not_called()
+    monkeypatch.setenv("CHROME_LANE", "production")
+    chrome.export_source(SHA, tmp_path, tmp_path / "prod")
+    chrome._export_commit.assert_called_once()

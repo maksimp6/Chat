@@ -13,12 +13,14 @@ token, and deployment verifies that refusal on the public origin.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from urllib.parse import urlsplit
@@ -379,10 +381,27 @@ def prepare_registry(registry, *, sleep=time.sleep, clock=time.monotonic):
     fail("registry_not_ready")
 
 
+def export_source(sha, root, dest):
+    if lane() != "test":
+        _export_commit(sha, str(root), dest)
+        return
+    # The test lane builds the checked-out branch commit; require_reviewed_head
+    # already proved HEAD is exactly this clean commit.
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        fail("validation_error")
+    archive = subprocess.run(
+        ["git", "-C", str(root), "archive", "--format=tar", sha], capture_output=True, check=False
+    )
+    if archive.returncode:
+        fail("validation_error")
+    with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as stream:
+        stream.extractall(dest, filter="data")
+
+
 def build_image(root, sha):
     registry = CloudRuRegistryClient()
     with tempfile.TemporaryDirectory(prefix="chrome-build-") as exported:
-        _export_commit(sha, str(root), exported)
+        export_source(sha, root, exported)
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "chrome-worker"
         print(json.dumps({"stage": "chrome_build_push"}), flush=True)
