@@ -537,3 +537,15 @@ test("IDP_OWNER_PASSPHRASE is read from the environment only when non-empty", ()
   assert.equal(configFromEnv({ IDP_OWNER_PASSPHRASE: "" }).ownerPassphrase, undefined);
   assert.equal(configFromEnv({ IDP_OWNER_PASSPHRASE: PASSPHRASE }).ownerPassphrase, PASSPHRASE);
 });
+
+test("healthz reports the deployed revision when one is configured", async (t) => {
+  const sha = "a".repeat(40);
+  const app = await fixture(t, { deploymentSha: sha });
+  assert.deepEqual(await (await app.request("/healthz")).json(), { status: "ok", deployment_sha: sha });
+  const passphrase = await passphraseApp(t, { deploymentSha: sha });
+  assert.deepEqual(await (await passphrase.request("/healthz")).json(), { status: "ok", sign_in: "passphrase", deployment_sha: sha });
+  // Anything that is not a full commit hash is ignored instead of echoed.
+  const odd = await fixture(t, { deploymentSha: "<script>" });
+  assert.deepEqual(await (await odd.request("/healthz")).json(), { status: "ok" });
+  assert.equal(configFromEnv({ IDP_DEPLOYMENT_SHA: sha }).deploymentSha, sha);
+});

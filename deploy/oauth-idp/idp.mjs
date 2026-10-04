@@ -92,6 +92,7 @@ export function createIdp(options = {}) {
   const passphraseMode = passphraseConfigured && String(options.ownerPassphrase).length >= MIN_PASSPHRASE_LENGTH;
   const passphraseDigest = passphraseMode ? sha256b64u(options.ownerPassphrase) : "";
   let failures = [];
+  const deploymentSha = /^[0-9a-f]{40}$/.test(options.deploymentSha ?? "") ? options.deploymentSha : "";
   const usedCodes = new Map();
 
   // Fail closed: report which settings are missing (names only, never values).
@@ -443,7 +444,7 @@ export function createIdp(options = {}) {
       }
       const get = request.method === "GET";
       const post = request.method === "POST";
-      if (get && path === "/healthz") return json(response, 200, passphraseMode ? { status: "ok", sign_in: "passphrase" } : { status: "ok" });
+      if (get && path === "/healthz") return json(response, 200, { status: "ok", ...(passphraseMode ? { sign_in: "passphrase" } : {}), ...(deploymentSha ? { deployment_sha: deploymentSha } : {}) });
       if (get && path === "/.well-known/oauth-authorization-server") {
         return json(response, 200, metadata, { "access-control-allow-origin": "*", "cache-control": "public, max-age=300" });
       }
