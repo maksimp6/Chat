@@ -14,7 +14,5 @@ chrome.maxxxpavlov.online:
   service: chrome
   protocol: https
 
-agent-shell.maxxxpavlov.online:
-  service: agent-shell
-  protocol: https
+
 
