@@ -139,6 +139,10 @@ def _validate_schema(data: Dict[str, Any]) -> None:
             "owner_id",
             "secret_ref",
             "repository",
+            "provider",
+            "desired_state",
+            "recovery",
+            "health",
         }
         for key in service_config.keys():
             if key not in allowed_service_fields and not key.startswith("_"):
