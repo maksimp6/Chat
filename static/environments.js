@@ -41,7 +41,7 @@
 
     node = UI.modal.create({
       id: "environments-modal",
-      title: "Environments",
+      title: "Окружения",
       className: "environments-modal",
       contentClassName: "environments-box",
       closeAction: "environments.close",
@@ -166,8 +166,8 @@
     const button = document.createElement("button");
     button.id = "environments-btn";
     button.className = "alice-btn header-btn";
-    button.title = "Environments";
-    button.setAttribute("aria-label", "Environments");
+    button.title = "Окружения";
+    button.setAttribute("aria-label", "Окружения");
     button.textContent = "🌿";
     button.onclick = open;
     header.insertBefore(button, header.firstChild);

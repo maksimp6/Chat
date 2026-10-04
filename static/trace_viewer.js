@@ -261,7 +261,11 @@
     });
     if (!timed.length) {
       wrap.appendChild(
-        el("div", { className: "alice-trace-notice" }, "Trace не содержит временных событий."),
+        el(
+          "div",
+          { className: "alice-trace-notice" },
+          "Трассировка не содержит временных событий.",
+        ),
       );
       return wrap;
     }
@@ -821,11 +825,11 @@
         className: "alice-trace-window",
         role: "dialog",
         "aria-modal": "true",
-        "aria-label": "Execution Trace",
+        "aria-label": "Трассировка выполнения",
       });
     var header = el("div", { className: "alice-trace-header" });
     header.appendChild(el("span", {}, "⚡"));
-    header.appendChild(el("div", { className: "alice-trace-title" }, "Execution Trace"));
+    header.appendChild(el("div", { className: "alice-trace-title" }, "Трассировка выполнения"));
     header.appendChild(
       el(
         "div",

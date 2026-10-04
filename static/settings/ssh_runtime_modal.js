@@ -7,9 +7,9 @@
     if (existing) existing.remove();
     var tabSsh = [
       '<div id="tab-ssh" class="llm-tab-content">',
-      UI.section("SSH Runtime"),
+      UI.section("Среда SSH"),
       '<div id="ssh-settings-status" style="font-size:12px;color:var(--m-muted,#666);margin-bottom:10px;">Загрузка конфигурации...</div>',
-      UI.chk("set-ssh-enabled", false, "<strong>🔐 SSH Runtime</strong> включён"),
+      UI.chk("set-ssh-enabled", false, "<strong>🔐 Среда SSH</strong> включена"),
       UI.gap2(
         "<div>" + UI.chk("set-ssh-readonly", false, "Только чтение") + "</div>",
         "<div>" +
@@ -74,7 +74,7 @@
 
     var ov = CoreUI.modal.create({
       id: "ssh-runtime-modal-custom",
-      title: "🔐 SSH Runtime",
+      title: "🔐 Среда SSH",
       className: "ssh-runtime-modal-custom",
       contentClassName: "ssh-runtime-modal-content",
       body: content,
@@ -198,7 +198,7 @@
         })
         .then(function (data) {
           populateSshSettings(data.settings || payload);
-          setSshStatus("SSH Runtime settings сохранены.");
+          setSshStatus("Настройки среды SSH сохранены.");
         })
         .catch(function (err) {
           setSshStatus(err.message, true);

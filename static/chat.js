@@ -418,7 +418,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
       summary.className = "msg-meta-summary";
       const traceId = traceObj.trace_id ? String(traceObj.trace_id).substring(0, 8) : "local";
       const eventsCount = Array.isArray(traceObj.events) ? traceObj.events.length : 0;
-      summary.textContent = `🔍 Trace [${traceId}...] (${eventsCount} соб.)`;
+      summary.textContent = `🔍 Трассировка [${traceId}...] (${eventsCount} соб.)`;
       traceEl.appendChild(summary);
 
       // The Trace Viewer is a first-class chat action. Do not rely only on
@@ -427,8 +427,8 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
       const openTraceBtn = document.createElement("button");
       openTraceBtn.type = "button";
       openTraceBtn.className = "alice-btn alice-trace-open-viewer";
-      openTraceBtn.textContent = "🔍 Открыть Trace Viewer";
-      openTraceBtn.title = "Открыть Execution Trace viewer";
+      openTraceBtn.textContent = "🔍 Открыть трассировку";
+      openTraceBtn.title = "Открыть просмотр трассировки";
 
       openTraceBtn.addEventListener("click", function (event) {
         event.preventDefault();

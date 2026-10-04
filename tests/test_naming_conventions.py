@@ -119,7 +119,7 @@ TEMPLATE_ID_ALLOWLIST = {
     "memoryFactsList",
 }
 
-UI_TEXT_ALLOWLIST = {"Departments", "SSH Runtime"}
+UI_TEXT_ALLOWLIST: set[str] = set()
 
 SNAKE_JS = re.compile(r"^[a-z][a-z0-9_]*\.js$")
 PATCH_SUFFIX = re.compile(r"_(fix|new|old|tmp|auto|v\d+)(?=[_.])")

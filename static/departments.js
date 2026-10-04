@@ -27,7 +27,7 @@
     var list = el("div", { class: "alice-dept-list" }, "Загрузка…");
     modal = UI.modal.create({
       id: "departments-modal",
-      title: "Departments",
+      title: "Отделы",
       titleTag: "h3",
       className: "alice-dept-overlay",
       contentClassName: "alice-dept-card",

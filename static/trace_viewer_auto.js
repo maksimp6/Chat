@@ -35,8 +35,8 @@
       var button = document.createElement("button");
       button.type = "button";
       button.className = "alice-btn trace-viewer-auto-button";
-      button.textContent = isError ? "🔍 Трейс ошибки" : summaryText;
-      button.title = isError ? "Открыть Execution Trace ошибки" : "Открыть Execution Trace viewer";
+      button.textContent = isError ? "🔍 Трассировка ошибки" : summaryText;
+      button.title = isError ? "Открыть трассировку ошибки" : "Открыть просмотр трассировки";
       button.onclick = function (event) {
         event.preventDefault();
         event.stopPropagation();
