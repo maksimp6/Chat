@@ -19,6 +19,14 @@ on:
           - status
           - inventory
           - estimate
+      target:
+        description: Existing environment inside the configured Cloud.ru project
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - production
 
 concurrency:
   group: alice-cloudru
@@ -30,14 +38,16 @@ permissions:
 jobs:
   cloudru:
     name: Cloud.ru ${{ inputs.action }}
-    environment: production
+    environment: ${{ inputs.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
       CLOUDRU_REGISTRY_NAME: ${{ vars.CLOUDRU_REGISTRY_NAME || 'alice-pro' }}
       CLOUDRU_REPOSITORY_NAME: ${{ vars.CLOUDRU_REPOSITORY_NAME || 'alice-pro' }}
-      CLOUDRU_CONTAINER_NAME: ${{ vars.CLOUDRU_CONTAINER_NAME || 'alice-pro' }}
+      # Both targets live in the same pre-existing CLOUDRU_PROJECT_ID. The runner
+      # selects resources inside it; it never creates or deletes Cloud.ru projects.
+      CLOUDRU_CONTAINER_NAME: ${{ inputs.target == 'production' && (vars.CLOUDRU_CONTAINER_NAME || 'alice-prod') || (vars.CLOUDRU_TEST_CONTAINER_NAME || 'alice-test') }}
       CLOUDRU_CONTAINER_CPU: ${{ vars.CLOUDRU_CONTAINER_CPU || '0.5' }}
       CLOUDRU_MIN_INSTANCES: ${{ vars.CLOUDRU_MIN_INSTANCES || '0' }}
       CLOUDRU_MAX_INSTANCES: ${{ vars.CLOUDRU_MAX_INSTANCES || '1' }}
@@ -60,12 +70,17 @@ jobs:
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
-          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
+          ALICE_DATABASE_URL: ${{ inputs.target == 'production' && secrets.ALICE_DATABASE_URL || secrets.ALICE_TEST_DATABASE_URL }}
           ALICE_GITHUB_CLIENT_ID: ${{ secrets.ALICE_GITHUB_CLIENT_ID }}
           ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ACTION: ${{ inputs.action }}
+          TARGET: ${{ inputs.target }}
         run: |
           required=(CLOUDRU_IAM_KEY_ID CLOUDRU_IAM_KEY_SECRET CLOUDRU_PROJECT_ID)
+          case "$TARGET" in
+            test|production) ;;
+            *) echo '::error::target must be test or production'; exit 1 ;;
+          esac
           if [ "$ACTION" = deploy ] || [ "$ACTION" = preflight ]; then
             required+=(ALICE_SHORT_TOKEN ALICE_DATABASE_URL ALICE_GITHUB_CLIENT_ID ALICE_GITHUB_CLIENT_SECRET)
           fi
@@ -100,7 +115,7 @@ jobs:
           ALICE_REQUIRE_SHORT_TOKEN: "1"
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
           ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
-          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
+          ALICE_DATABASE_URL: ${{ inputs.target == 'production' && secrets.ALICE_DATABASE_URL || secrets.ALICE_TEST_DATABASE_URL }}
           ALICE_GITHUB_CLIENT_ID: ${{ secrets.ALICE_GITHUB_CLIENT_ID }}
           ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
