@@ -26,6 +26,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       MERGE_REQUIRED_CHECKS: >-
+        Code rules,
         Application tests,
         PostgreSQL integration,
         Android debug APK,

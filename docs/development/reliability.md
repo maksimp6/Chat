@@ -68,3 +68,14 @@ and compares each rule's violation count with `RATCHET_BASELINE`.
 - Fixing violations also fails the test until you lower the baseline to the
   new count in the same change, so the improvement is locked in.
 - Rules at zero stay at zero.
+
+## Where the rules run
+
+- **Locally:** `bash scripts/check_code_rules.sh` runs the naming, root-layout
+  and reliability checks in under a second.
+- **Pull requests:** the CI job **Code rules** runs the same script and is a
+  required check in `merge-readiness.yml`.
+- **Deployments:** `production-deploy.yml` and the `deploy` action of
+  `cloudru-deploy.yml` run **Code rules** on the exact ref being deployed and
+  ship only if it passes. Read-only Cloud.ru actions (`preflight`, `status`,
+  `inventory`) skip the gate.
