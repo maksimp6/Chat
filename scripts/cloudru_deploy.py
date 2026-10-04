@@ -307,15 +307,12 @@ def cmd_verify_persistence(_: argparse.Namespace) -> dict:
     image = _image_of_deployed_app(app)
     if not image:
         raise CloudProviderError("alice-test image is unavailable", code="invalid_response")
-    spec = ContainerSpec(
-        name=cfg["name"],
-        image=image,
-        cpu=cfg["cpu"],
-        min_instances=cfg["min_instances"],
-        max_instances=cfg["max_instances"],
-        env=_deployed_env(app),
-    )
-    restarted = apps.deploy_verified(spec)
+
+    # Force a real runtime restart without mutating project or production state.
+    apps.stop(cfg["name"])
+    apps.start(cfg["name"])
+    ready = apps.wait_until_ready(cfg["name"], image=image)
+    health = apps.health_check(ready["public_uri"])
 
     conn = get_conn()
     try:
@@ -336,25 +333,14 @@ def cmd_verify_persistence(_: argparse.Namespace) -> dict:
         "status": "PERSISTENCE_VERIFIED",
         "container": cfg["name"],
         "before_status": before.get("status"),
-        "revision": restarted.get("revision"),
-        "health": restarted.get("health"),
+        "image": image,
+        "health": health,
     }
 
 
 def _image_of_deployed_app(app: dict) -> str | None:
     containers = (app.get("template") or {}).get("containers") or [{}]
     return containers[0].get("image")
-
-
-def _deployed_env(app: dict) -> dict[str, str]:
-    containers = (app.get("template") or {}).get("containers") or [{}]
-    items = containers[0].get("env") or []
-    result = {}
-    for item in items:
-        if isinstance(item, dict) and isinstance(item.get("name"), str) and isinstance(item.get("value"), str):
-            result[item["name"]] = item["value"]
-    return result
-
 
 def cmd_estimate(_: argparse.Namespace) -> dict:
     cfg = _settings()
