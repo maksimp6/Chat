@@ -96,4 +96,3 @@ Container Apps cannot serve a custom domain itself, and API Gateway has no publi
 4. Deploy production with the `public_url` input (or the variable `IDP_PUBLIC_URL`) set to `https://oauth.maxxxpavlov.online`, create the GitHub OAuth App with callback `https://oauth.maxxxpavlov.online/github/callback`, and set `BROWSER_IDP_ISSUER` to the same origin.
 
 The issuer is part of every token, so changing it later means reconnecting ChatGPT once and updating the GitHub callback.
-
