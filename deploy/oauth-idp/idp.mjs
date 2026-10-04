@@ -22,6 +22,9 @@ const DEFAULT_REDIRECT_HOSTS = ["chatgpt.com", "chat.openai.com", "claude.ai", "
 const GITHUB_AUTHORIZE = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN = "https://github.com/login/oauth/access_token";
 const GITHUB_USER = "https://api.github.com/user";
+const MIN_PASSPHRASE_LENGTH = 16;
+const MAX_PASSPHRASE_FAILURES = 5;
+const LOCKOUT_SECONDS = 600;
 const GRANT_TYPES = ["authorization_code", "refresh_token"];
 
 const escapeHtml = (value) =>
@@ -83,22 +86,26 @@ export function createIdp(options = {}) {
   const allowedResources = new Set(options.allowedResources ?? []);
   const redirectHosts = new Set(options.allowedRedirectHosts ?? DEFAULT_REDIRECT_HOSTS);
   const notBefore = Number(options.notBefore ?? 0);
-  // Test lane only: skip GitHub and approve the consent click directly. Every other
-  // gate (browser binding, redirect and resource allowlists, PKCE) still applies.
-  const autoApprove = options.autoApprove === true;
+  // Test lane: the owner proves identity with a passphrase instead of GitHub. Every
+  // other gate (browser binding, redirect and resource allowlists, PKCE) still applies.
+  const passphraseConfigured = options.ownerPassphrase !== undefined;
+  const passphraseMode = passphraseConfigured && String(options.ownerPassphrase).length >= MIN_PASSPHRASE_LENGTH;
+  const passphraseDigest = passphraseMode ? sha256b64u(options.ownerPassphrase) : "";
+  let failures = [];
   const usedCodes = new Map();
 
   // Fail closed: report which settings are missing (names only, never values).
   const missing = [];
   if (typeof options.secret !== "string" || options.secret.length < MIN_SECRET_LENGTH) missing.push("IDP_SECRET");
   if (!options.publicUrl) missing.push("IDP_PUBLIC_URL");
-  if (!autoApprove && !options.githubClientId) missing.push("IDP_GITHUB_CLIENT_ID");
-  if (!autoApprove && !options.githubClientSecret) missing.push("IDP_GITHUB_CLIENT_SECRET");
+  if (passphraseConfigured && !passphraseMode) missing.push("IDP_OWNER_PASSPHRASE");
+  if (!passphraseConfigured && !options.githubClientId) missing.push("IDP_GITHUB_CLIENT_ID");
+  if (!passphraseConfigured && !options.githubClientSecret) missing.push("IDP_GITHUB_CLIENT_SECRET");
   if (!allowedIds.size) missing.push("IDP_ALLOWED_GITHUB_IDS");
   if (!allowedResources.size) missing.push("IDP_ALLOWED_RESOURCES");
-  // Production holds GitHub credentials; auto-approve must never be reachable there.
-  if (autoApprove && (options.githubClientId || options.githubClientSecret)) {
-    missing.push("IDP_AUTO_APPROVE_conflicts_with_IDP_GITHUB_credentials");
+  // Production holds GitHub credentials; passphrase sign-in must never be reachable there.
+  if (passphraseConfigured && (options.githubClientId || options.githubClientSecret)) {
+    missing.push("IDP_OWNER_PASSPHRASE_conflicts_with_IDP_GITHUB_credentials");
   }
   const ready = missing.length === 0;
   const issuer = ready ? parseOrigin(options.publicUrl) : "";
@@ -252,10 +259,12 @@ export function createIdp(options = {}) {
       `<h1>Доступ к вашим сервисам</h1><p>Приложение: ${escapeHtml(client.name)}.</p>` +
         `<p>Адрес возврата: ${escapeHtml(new URL(params.redirect_uri).origin)}.</p>` +
         `<p>Сервис: ${escapeHtml(new URL(params.resource).host)}. Права: ${escapeHtml(scope)}.</p>` +
-        (autoApprove
-          ? `<p>Тестовая среда: вход подтверждается без GitHub.</p>`
-          : `<p>Вход доступен только владельцу через GitHub.</p>`) +
-        `<form method="post" action="/authorize"><input type="hidden" name="tx" value="${escapeHtml(transaction)}"><button type="submit">${autoApprove ? "Разрешить" : "Разрешить и войти через GitHub"}</button></form>`,
+        (passphraseMode
+          ? `<p>Тестовая среда: вход по парольной фразе владельца.</p>` +
+            `<form method="post" action="/authorize"><input type="hidden" name="tx" value="${escapeHtml(transaction)}">` +
+            `<p><input type="password" name="passphrase" autocomplete="current-password" required></p><button type="submit">Разрешить</button></form>`
+          : `<p>Вход доступен только владельцу через GitHub.</p>` +
+            `<form method="post" action="/authorize"><input type="hidden" name="tx" value="${escapeHtml(transaction)}"><button type="submit">Разрешить и войти через GitHub</button></form>`),
       { "set-cookie": cookie },
     );
   }
@@ -264,7 +273,17 @@ export function createIdp(options = {}) {
     const input = await readBody(request, "application/x-www-form-urlencoded");
     const transaction = open(keys, "tx", input.tx, now());
     if (!transaction || !boundToBrowser(request, transaction.nonce)) return oauthError(response, 400, "invalid_request");
-    if (autoApprove) return finish(response, transaction, [...allowedIds][0], { "set-cookie": clearCookie() });
+    if (passphraseMode) {
+      failures = failures.filter((time) => time > now() - LOCKOUT_SECONDS);
+      if (failures.length >= MAX_PASSPHRASE_FAILURES) {
+        return page(response, 429, "Слишком много попыток", "<h1>Слишком много попыток</h1><p>Подождите десять минут.</p>", { "retry-after": String(LOCKOUT_SECONDS) });
+      }
+      if (typeof input.passphrase !== "string" || !safeEqual(sha256b64u(input.passphrase), passphraseDigest)) {
+        failures.push(now());
+        return page(response, 403, "Неверная фраза", "<h1>Неверная фраза</h1><p>Вернитесь назад и повторите.</p>");
+      }
+      return finish(response, transaction, [...allowedIds][0], { "set-cookie": clearCookie() });
+    }
     const verifier = randomToken(32);
     const state = seal(keys, "gh", { ...transaction, ghv: verifier, exp: now() + TRANSACTION_TTL });
     const target = new URL(GITHUB_AUTHORIZE);
@@ -424,7 +443,7 @@ export function createIdp(options = {}) {
       }
       const get = request.method === "GET";
       const post = request.method === "POST";
-      if (get && path === "/healthz") return json(response, 200, autoApprove ? { status: "ok", auto_approve: true } : { status: "ok" });
+      if (get && path === "/healthz") return json(response, 200, passphraseMode ? { status: "ok", sign_in: "passphrase" } : { status: "ok" });
       if (get && path === "/.well-known/oauth-authorization-server") {
         return json(response, 200, metadata, { "access-control-allow-origin": "*", "cache-control": "public, max-age=300" });
       }

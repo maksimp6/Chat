@@ -67,8 +67,8 @@ ChatGPT / Claude ──register, authorize──▶ IdP ──GitHub sign-in (on
 `npm test --prefix deploy/oauth-idp` runs the crypto, JWT and full-flow tests
 against a real HTTP server with a fake GitHub and an injected clock.
 
-## Test lane: auto-approve
+## Test lane: passphrase sign-in
 
-`IDP_AUTO_APPROVE=1` skips GitHub: the consent button issues the code directly, signing the owner id from `IDP_ALLOWED_GITHUB_IDS` (the first entry). GitHub credentials are then optional. The browser binding, redirect and resource allowlists and PKCE still apply, and `/healthz` reports `auto_approve: true`. Use it only for the test lane, whose worker has a fresh profile with no logins; never in production.
+`IDP_OWNER_PASSPHRASE` (at least 16 characters) replaces GitHub: the consent page asks for the passphrase and, if it matches, issues the code directly, signing the owner id from `IDP_ALLOWED_GITHUB_IDS` (the first entry). GitHub credentials are then optional. The browser binding, redirect and resource allowlists and PKCE still apply. Five wrong attempts lock sign-in for ten minutes (in memory, so keep `maxInstanceCount` at 1), and `/healthz` reports `sign_in: "passphrase"`.
 
-Production uses GitHub only. The IdP refuses to start (`/healthz` 503, `missing` names the conflict) if `IDP_AUTO_APPROVE=1` is set together with `IDP_GITHUB_CLIENT_ID` or `IDP_GITHUB_CLIENT_SECRET`, so a production configuration cannot be switched to auto-approve by mistake.
+Production uses GitHub only. The IdP refuses to start (`/healthz` 503, `missing` names the conflict) if `IDP_OWNER_PASSPHRASE` is set together with `IDP_GITHUB_CLIENT_ID` or `IDP_GITHUB_CLIENT_SECRET`, so a production configuration cannot be switched to passphrase sign-in by mistake.
