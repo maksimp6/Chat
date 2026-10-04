@@ -230,11 +230,19 @@ export function createChromeStateStore(options = {}) {
     }
   }
 
-  const status = () => ({ enabled, restored, generation: generations.profile, authGeneration: generations.auth });
+  // Last failure as a fixed code (plus errno name for I/O), never paths or data,
+  // so a deployed worker without log access can still be diagnosed.
+  let lastError = null;
+  const status = () => ({ enabled, restored, generation: generations.profile, authGeneration: generations.auth, lastError });
   function serialized(operation) {
     const result = queue.then(async () => {
-      try { return await operation(); }
-      catch (error) { if (error.stateError) throw error; fail("io_failed"); }
+      try { const value = await operation(); lastError = null; return value; }
+      catch (error) {
+        const errno = typeof error?.code === "string" && /^E[A-Z]+$/.test(error.code) ? `:${error.code}` : "";
+        lastError = error.stateError ? error.message : `chrome_state_io_failed${errno}`;
+        if (error.stateError) throw error;
+        fail("io_failed");
+      }
     });
     queue = result.catch(() => {});
     return result;

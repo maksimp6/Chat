@@ -50,7 +50,7 @@ test("a closed profile, empty directories and OAuth survive a fresh local filesy
   assert.equal(await fs.readFile(path.join(value.authDir, "oauth.json"), "utf8"), '{"refresh":"test-only"}');
   assert.deepEqual(await fs.readdir(path.join(value.profileDir, "Default", "Empty")), []);
   assert.equal((await fs.stat(path.join(value.profileDir, "Default", "Cookies"))).mode & 0o777, 0o600);
-  assert.deepEqual(restored.status(), { enabled: true, restored: true, generation: 1, authGeneration: 1 });
+  assert.deepEqual(restored.status(), { enabled: true, restored: true, generation: 1, authGeneration: 1, lastError: null });
 });
 
 test("OAuth checkpoints never read the live browser profile", async (t) => {
@@ -186,4 +186,15 @@ test("persistence is optional for local development", async () => {
   const store = createChromeStateStore({ stateDir: "" });
   assert.equal((await store.restore()).enabled, false);
   assert.equal((await store.checkpoint()).generation, 0);
+});
+
+test("status exposes only a fixed code for the last checkpoint failure", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "chrome-state-error-"));
+  const store = createChromeStateStore({ stateDir: path.join(root, "durable"), profileDir: path.join(root, "profile"), authDir: path.join(root, "auth") });
+  await assert.rejects(store.checkpoint(), /chrome_state_/);
+  assert.match(store.status().lastError, /^chrome_state_[a-z_]+(:E[A-Z]+)?$/);
+  await fs.mkdir(path.join(root, "durable"), { recursive: true });
+  await store.restore();
+  await store.checkpoint();
+  assert.equal(store.status().lastError, null);
 });

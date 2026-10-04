@@ -199,6 +199,7 @@ export function createWorker(options = {}) {
           deployment_sha: process.env.BROWSER_DEPLOYMENT_SHA ?? null,
           state_ready: true,
           oauth_ready: oauth.enabled,
+          state_error: stateStore.status().lastError ?? null,
         });
       }
       if (await oauth.handle(request, response, url)) return;
