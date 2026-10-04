@@ -404,3 +404,15 @@ class TestIntegration:
         assert len(config["services"]) == 2
         assert "production" in config["lanes"]
         assert "test" in config["lanes"]
+
+
+def test_core_platform_config_excludes_product_and_lab_experiments():
+    config = load_config(Path("config/alice"))
+
+    services = config["services"]
+    assert "dota-commentator" not in services
+    assert "agent-shell" not in services
+
+    serialized = json.dumps(config, sort_keys=True).lower()
+    for forbidden in ("dota", "steam", "openai", "stripe", "gpu", "agent-shell"):
+        assert forbidden not in serialized
