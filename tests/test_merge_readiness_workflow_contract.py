@@ -54,11 +54,20 @@ def test_merge_readiness_workflow_wait_is_bounded_and_fail_closed() -> None:
     assert "cancel-in-progress: true" in workflow
 
 
-def test_merge_readiness_workflow_rechecks_after_review_events() -> None:
+def test_merge_readiness_trigger_policy_avoids_comment_churn() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
+    trigger_block = workflow.split("permissions:", 1)[0]
 
-    assert "pull_request_review:" in workflow
-    assert "types: [submitted, dismissed]" in workflow
-    assert "pull_request_review_comment:" in workflow
-    assert "types: [created, edited, deleted]" in workflow
-    assert "pull_request_review_thread:" not in workflow
+    # Head-changing PR events and review verdict changes can invalidate readiness.
+    assert "pull_request:" in trigger_block
+    for event_type in ("opened", "synchronize", "reopened", "ready_for_review"):
+        assert event_type in trigger_block
+    assert "pull_request_review:" in trigger_block
+    assert "submitted" in trigger_block
+    assert "dismissed" in trigger_block
+
+    # Individual inline comments are noisy and do not need to launch another
+    # polling readiness run. Review-thread state is still evaluated by
+    # scripts/merge_readiness.py when a supported readiness event runs.
+    assert "pull_request_review_comment:" not in trigger_block
+    assert "pull_request_review_thread:" not in trigger_block

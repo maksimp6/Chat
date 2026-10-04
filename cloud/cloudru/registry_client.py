@@ -12,10 +12,12 @@ https://cloud.ru/docs/artifact-registry-evolution/ug/index
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import os
 import re
 import subprocess
 import tempfile
+import time
 from typing import Any, Callable
 
 from cloud.base import CloudProviderError
@@ -230,7 +232,23 @@ class CloudRuRegistryClient:
             ],
             ["docker", "push", ref.tagged],
         ):
+            started = time.perf_counter()
             result = self._run(argv, text=True, capture_output=True, check=False, env=env)
+            print(
+                json.dumps(
+                    {
+                        "stage": "registry_" + argv[1],
+                        "seconds": time.perf_counter() - started,
+                        "returncode": result.returncode,
+                        "cached_steps": len(
+                            re.findall(
+                                r"(?m)^#\d+ CACHED", (result.stdout or "") + (result.stderr or "")
+                            )
+                        ),
+                    }
+                ),
+                flush=True,
+            )
             if result.returncode != 0:
                 raise CloudProviderError(
                     f"{argv[1]} failed: {(result.stderr or '').strip()[-500:]}",
@@ -247,5 +265,18 @@ class CloudRuRegistryClient:
                 ref = ImageRef(host, repository, tag, match.group(0))
         # The cache only speeds up the next build; failing to refresh it must not
         # fail a deploy whose pinned image is already pushed.
-        self._run(["docker", "push", cache], text=True, capture_output=True, check=False, env=env)
+        started = time.perf_counter()
+        refresh = self._run(
+            ["docker", "push", cache], text=True, capture_output=True, check=False, env=env
+        )
+        print(
+            json.dumps(
+                {
+                    "stage": "registry_cache_refresh",
+                    "seconds": time.perf_counter() - started,
+                    "returncode": refresh.returncode,
+                }
+            ),
+            flush=True,
+        )
         return ref

@@ -528,6 +528,7 @@ def verify_health(apps, record, environment):
 def wait_ready(
     apps, *, identifier=None, image=None, timeout=300, sleep=time.sleep, clock=time.monotonic
 ):
+    readiness_started = time.perf_counter()
     deadline = clock() + timeout
     while clock() < deadline:
         record = owned_record(apps, identifier=identifier)
@@ -553,6 +554,15 @@ def wait_ready(
                         and health["profile"].get("enabled") is True
                     ):
                         verify_ingress(record)
+                        print(
+                            json.dumps(
+                                {
+                                    "stage": "chrome_health_readiness",
+                                    "seconds": time.perf_counter() - readiness_started,
+                                }
+                            ),
+                            flush=True,
+                        )
                         return record
                 except (CloudProviderError, requests.RequestException):
                     pass
@@ -658,6 +668,7 @@ def deploy(apps, store, credentials, image, environment):
     try:
         body = creation_body(apps.project_id, image, environment)
         attempted = True
+        start_requested = time.perf_counter()
         if previous:
             provider(apps.restore, previous["name"], body)
             provider(apps.start, previous["name"])
@@ -667,6 +678,15 @@ def deploy(apps, store, credentials, image, environment):
             )
             if operation.get("resourceId"):
                 identifier = uuid(operation["resourceId"])
+        print(
+            json.dumps(
+                {
+                    "stage": "chrome_container_start",
+                    "seconds": time.perf_counter() - start_requested,
+                }
+            ),
+            flush=True,
+        )
         record = wait_ready(apps, identifier=identifier, image=image)
         if generation is not None:
             verify_restored(apps, record, generation)

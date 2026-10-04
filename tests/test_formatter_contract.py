@@ -27,13 +27,15 @@ def test_format_and_application_ci_use_same_pinned_toolchain_and_entrypoint() ->
     format_workflow = FORMAT_WORKFLOW.read_text(encoding="utf-8")
     ci_workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "pip install -r requirements-dev.txt" in format_workflow
+    assert "requirements-dev.txt" in format_workflow
+    assert "pip install" in format_workflow
     assert (
         "npm install --ignore-scripts --no-audit --no-fund --package-lock=false" in format_workflow
     )
     assert "pip install --upgrade ruff" not in format_workflow
 
-    assert "pip install -r requirements-dev.txt" in ci_workflow
+    assert "requirements-dev.txt" in ci_workflow
+    assert "pip install" in ci_workflow
     assert "npm install --ignore-scripts --no-audit --no-fund --package-lock=false" in ci_workflow
 
     assert "bash scripts/format.sh write" in format_workflow

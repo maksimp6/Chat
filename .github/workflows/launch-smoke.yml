@@ -35,8 +35,9 @@ jobs:
           cache-dependency-path: requirements.txt
       - name: Install runtime dependencies
         run: |
-          python -m pip install --upgrade pip
+          started=$SECONDS
           pip install -r requirements.txt
+          echo "- Runtime dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Run deterministic offline launch smoke
         run: |
           set -euo pipefail
@@ -69,8 +70,9 @@ jobs:
           cache-dependency-path: requirements.txt
       - name: Install runtime dependencies
         run: |
-          python -m pip install --upgrade pip
+          started=$SECONDS
           pip install -r requirements.txt
+          echo "- Runtime dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Run full protected-master launch smoke
         env:
           ALICE_LAUNCH_SMOKE_YANDEX_API_KEY: ${{ secrets.YANDEX_API_KEY }}

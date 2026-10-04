@@ -41,9 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           started=$SECONDS
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Check source formatting
@@ -138,7 +136,10 @@ jobs:
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
       - name: Run Python application tests with coverage
-        run: pytest --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+        run: |
+          started=$SECONDS
+          pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+          echo "- Parallel Python application tests: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Generate validation report
         if: always()
         run: |
@@ -219,10 +220,7 @@ jobs:
       - name: Install dependencies
         run: |
           started=$SECONDS
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-postgres.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-postgres.txt -r requirements-dev.txt
           echo "- PostgreSQL dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Run full application suite on PostgreSQL
         run: pytest --durations=30 -q
