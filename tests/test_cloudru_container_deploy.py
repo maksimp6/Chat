@@ -163,9 +163,36 @@ def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
     assert login_argv[:3] == ["docker", "login", "alice-pro.cr.cloud.ru"]
     assert "key-secret" not in login_argv
     assert login_kwargs["input"] == "key-secret"
-    assert [argv[1] for argv, _ in runs] == ["login", "build", "push"]
+    assert [argv[1] for argv, _ in runs] == ["login", "build", "push", "push"]
+    assert runs[2][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
     assert ref == ImageRef("alice-pro.cr.cloud.ru", "alice-pro", "abc123", DIGEST)
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
+
+
+def test_build_reuses_and_refreshes_registry_layer_cache():
+    runs = []
+
+    def runner(argv, **kwargs):
+        runs.append(argv)
+        code = 1 if argv[1:3] == ["push", "alice-pro.cr.cloud.ru/alice-pro:buildcache"] else 0
+        stdout = f"digest: {DIGEST}" if argv[1] == "push" else ""
+        return subprocess.CompletedProcess(argv, code, stdout=stdout, stderr="denied")
+
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=runner
+    )
+    # A failed cache refresh never fails a deploy whose pinned image was pushed.
+    ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc")
+    assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
+    build = runs[1]
+    cache = "alice-pro.cr.cloud.ru/alice-pro:buildcache"
+    assert build[build.index("--cache-from") + 1] == cache
+    assert "BUILDKIT_INLINE_CACHE=1" in build
+    assert [build[i + 1] for i, item in enumerate(build) if item == "-t"] == [
+        "alice-pro.cr.cloud.ru/alice-pro:abc",
+        cache,
+    ]
+    assert runs[-1] == ["docker", "push", cache]
 
 
 def test_build_failure_raises_without_pushing():
