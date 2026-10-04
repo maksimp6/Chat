@@ -4,8 +4,12 @@ import { dirname } from "node:path";
 
 const SCOPE = "browser";
 // ChatGPT caches its dynamically registered client and reuses the client_id on
-// later attempts; a short expiry made retries fail with invalid_client.
-const PROVISIONAL_CLIENT_SECONDS = 30 * 24 * 3600;
+// later attempts; a short expiry made retries fail with invalid_client. Anonymous
+// registrations are bounded: a week of validity, and at capacity the oldest
+// unconfirmed one is evicted so flooding can never lock out new registrations.
+// Clients confirmed by the owner's GitHub sign-in are never evicted.
+const PROVISIONAL_CLIENT_SECONDS = 7 * 24 * 3600;
+const MAX_CLIENTS = 1000;
 const COOKIE = "browser_oauth_transaction";
 const OAUTH_PATH = "/browser/oauth";
 const MAX_BODY = 16 * 1024;
@@ -162,7 +166,11 @@ export function createOAuth(options = {}) {
     const input = await body(request, "application/json");
     if (!Array.isArray(input.redirect_uris) || !input.redirect_uris.length || input.redirect_uris.length > 10 || !input.redirect_uris.every((uri) => typeof uri === "string" && uri.length <= 2048 && validRedirect(uri))) return json(response, 400, { error: "invalid_redirect_uri" });
     if ((input.token_endpoint_auth_method && input.token_endpoint_auth_method !== "none") || (input.grant_types && (!Array.isArray(input.grant_types) || input.grant_types.some((grant) => !metadata.grant_types_supported.includes(grant)))) || (input.response_types && (!Array.isArray(input.response_types) || input.response_types.some((type) => type !== "code"))) || (input.scope && input.scope !== SCOPE)) return json(response, 400, { error: "invalid_client_metadata" });
-    if (Object.keys(state.clients).length >= 1000) return json(response, 429, { error: "registration_limit" });
+    if (Object.keys(state.clients).length >= MAX_CLIENTS) {
+      const oldest = Object.entries(state.clients).filter(([, entry]) => entry.provisional_expires).sort((a, b) => a[1].provisional_expires - b[1].provisional_expires)[0];
+      if (!oldest) return json(response, 429, { error: "registration_limit" });
+      delete state.clients[oldest[0]];
+    }
     const clientId = random();
     const client = { client_id: clientId, client_id_issued_at: now(), client_name: String(input.client_name ?? "MCP client").slice(0, 100), redirect_uris: [...new Set(input.redirect_uris)], token_endpoint_auth_method: "none", grant_types: metadata.grant_types_supported, response_types: ["code"], scope: SCOPE };
     state.clients[clientId] = { ...client, provisional_expires: now() + PROVISIONAL_CLIENT_SECONDS };
