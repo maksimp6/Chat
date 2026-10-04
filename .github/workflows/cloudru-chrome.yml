@@ -8,6 +8,11 @@ on:
         type: choice
         options: [preflight, deploy, status, restart, stop]
         default: preflight
+      lane:
+        description: production (reviewed master only) or test (any branch, separate container and bucket)
+        type: choice
+        options: [production, test]
+        default: production
       storage_tenant_id:
         description: Object Storage tenant ID (not a secret); required for preflight/deploy unless configured
         type: string
@@ -16,12 +21,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: alice-cloudru-persistent-chrome
+  group: alice-cloudru-persistent-chrome-${{ inputs.lane }}
   cancel-in-progress: false
 
 jobs:
   chrome:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || inputs.lane == 'test'
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -32,6 +37,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Require reviewed master commit
+        if: inputs.lane != 'test'
         run: |
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD FETCH_HEAD
@@ -56,6 +62,7 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
+          CHROME_LANE: ${{ inputs.lane }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
@@ -74,6 +81,7 @@ jobs:
         if: inputs.action == 'deploy'
         env:
           SOURCE_SHA: ${{ github.sha }}
+          CHROME_LANE: ${{ inputs.lane }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}

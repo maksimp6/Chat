@@ -643,3 +643,48 @@ def test_failed_deploy_reports_safe_original_cause_before_rollback(monkeypatch, 
         "http_status": 400,
     }
     assert "private-provider-text" not in out
+
+
+def test_test_lane_uses_separate_container_and_bucket(monkeypatch):
+    assert chrome.names(PROJECT) == ("chrome-22706bfa6066", "alice-chrome-state-22706bfa6066")
+    monkeypatch.setenv("CHROME_LANE", "test")
+    assert chrome.names(PROJECT) == (
+        "chrome-test-22706bfa6066",
+        "alice-chrome-test-state-22706bfa6066",
+    )
+    assert chrome.owner_marker(PROJECT)["container_name"] == "chrome-test-22706bfa6066"
+    monkeypatch.setenv("CHROME_LANE", "staging")
+    with pytest.raises(CloudProviderError):
+        chrome.names(PROJECT)
+
+
+def test_only_test_lane_skips_the_reviewed_master_check(monkeypatch, tmp_path):
+    execute = Mock(return_value=SimpleNamespace(returncode=1))
+    monkeypatch.setattr(chrome.subprocess, "run", execute)
+    monkeypatch.setattr(chrome.subprocess, "check_output", Mock(side_effect=[SHA + "\n", ""]))
+    with pytest.raises(CloudProviderError):
+        chrome.require_reviewed_head(tmp_path, SHA)
+    monkeypatch.setenv("CHROME_LANE", "test")
+    execute.reset_mock()
+    chrome.subprocess.check_output.side_effect = [SHA + "\n", ""]
+    chrome.require_reviewed_head(tmp_path, SHA)
+    execute.assert_not_called()
+
+
+def test_workflow_test_lane_is_isolated_from_production():
+    import yaml
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml").read_text()
+    )
+    job = workflow["jobs"]["chrome"]
+    assert job["if"] == "github.ref == 'refs/heads/master' || inputs.lane == 'test'"
+    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane }}")
+    review = next(
+        step for step in job["steps"] if step.get("name") == "Require reviewed master commit"
+    )
+    assert review["if"] == "inputs.lane != 'test'"
+    python_steps = [step for step in job["steps"] if "cloudru_chrome.py" in step.get("run", "")]
+    assert python_steps and all(
+        step["env"]["CHROME_LANE"] == "${{ inputs.lane }}" for step in python_steps
+    )

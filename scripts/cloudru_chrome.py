@@ -109,8 +109,19 @@ def uuid(value):
     return result
 
 
+def lane(env=os.environ):
+    # The test lane deploys any branch to a separate container and bucket so
+    # experiments never touch the production worker or its browser profile.
+    value = env.get("CHROME_LANE") or "production"
+    if value not in ("production", "test"):
+        fail("validation_error")
+    return value
+
+
 def names(project):
     suffix = uuid(project).replace("-", "")[:12]
+    if lane() == "test":
+        return "chrome-test-" + suffix, "alice-chrome-test-state-" + suffix
     return "chrome-" + suffix, "alice-chrome-state-" + suffix
 
 
@@ -654,9 +665,14 @@ def deploy(apps, store, credentials, image, environment):
 def require_reviewed_head(root, sha):
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         fail("validation_error")
+    # Production runs only reviewed master commits; the test lane may run a branch.
     for args in (
-        ["git", "fetch", "--no-tags", "origin", "master"],
-        ["git", "merge-base", "--is-ancestor", sha, "FETCH_HEAD"],
+        ()
+        if lane() == "test"
+        else (
+            ["git", "fetch", "--no-tags", "origin", "master"],
+            ["git", "merge-base", "--is-ancestor", sha, "FETCH_HEAD"],
+        )
     ):
         result = subprocess.run(args, cwd=root, capture_output=True, check=False)
         if result.returncode:
