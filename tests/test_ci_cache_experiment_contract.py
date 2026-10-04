@@ -21,7 +21,7 @@ def test_only_builder_can_write_packages_and_pr_build_is_same_repo_only():
     guard = data["jobs"]["build"]["if"]
     assert "github.event.pull_request.head.repo.full_name == github.repository" in guard
     assert "github.event.pull_request.number == 762" in guard
-    assert data["jobs"]["benchmark"]["permissions"] == {"contents": "read", "packages": "read"}
+    assert data["jobs"]["benchmark"]["permissions"] == {"contents": "read"}
 
 
 def test_ab_uses_one_identical_full_suite_and_keeps_existing_setup_caches():
