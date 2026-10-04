@@ -3,6 +3,9 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 
 const SCOPE = "browser";
+// ChatGPT caches its dynamically registered client and reuses the client_id on
+// later attempts; a short expiry made retries fail with invalid_client.
+const PROVISIONAL_CLIENT_SECONDS = 30 * 24 * 3600;
 const COOKIE = "browser_oauth_transaction";
 const OAUTH_PATH = "/browser/oauth";
 const MAX_BODY = 16 * 1024;
@@ -162,7 +165,7 @@ export function createOAuth(options = {}) {
     if (Object.keys(state.clients).length >= 1000) return json(response, 429, { error: "registration_limit" });
     const clientId = random();
     const client = { client_id: clientId, client_id_issued_at: now(), client_name: String(input.client_name ?? "MCP client").slice(0, 100), redirect_uris: [...new Set(input.redirect_uris)], token_endpoint_auth_method: "none", grant_types: metadata.grant_types_supported, response_types: ["code"], scope: SCOPE };
-    state.clients[clientId] = { ...client, provisional_expires: now() + 900 };
+    state.clients[clientId] = { ...client, provisional_expires: now() + PROVISIONAL_CLIENT_SECONDS };
     await save();
     json(response, 201, client);
   }
