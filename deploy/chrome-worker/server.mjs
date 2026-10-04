@@ -88,6 +88,7 @@ export function createWorker(options = {}) {
     issuer: process.env.BROWSER_IDP_ISSUER,
     resource: publicUrl ? `${new URL(publicUrl).origin}/browser/v1/mcp` : undefined,
     ownerIds: (process.env.BROWSER_GITHUB_ALLOWED_ID ?? process.env.ALICE_GITHUB_ALLOWED_IDS ?? "").split(","),
+    requiredScopes: ["browser.control"],
     ...options.idp,
   });
   let oauth;
