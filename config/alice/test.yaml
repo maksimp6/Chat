@@ -7,5 +7,3 @@ lanes:
     services:
       - oauth
       - chrome
-      - agent-shell
-      - dota-commentator
