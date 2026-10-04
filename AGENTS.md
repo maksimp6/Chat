@@ -8,12 +8,13 @@ Use the smallest independent change that satisfies an issue or subtask.
 2. Create a branch named for the issue/change.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
-5. Run the relevant backend/Android checks in CI.
-6. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
-7. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
-8. If publication is blocked by missing remote, credentials, network access, or tooling, report the exact failing command/error and do not claim that a PR exists.
-9. Merge only after required checks and review policy are satisfied.
-10. Never rewrite `master` directly and never commit secrets.
+5. Before publishing any non-RED implementation commit, work from a real checkout/worktree and run `bash scripts/pre_push.sh` (use `bash scripts/pre_push.sh full` before final handoff). The gate formats first and must finish with a clean worktree; if the execution backend cannot provide a shell checkout, do not use repository file APIs as a substitute for a validated development environment.
+6. Run the relevant backend/Android checks in CI.
+7. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
+8. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
+9. If publication is blocked by missing remote, credentials, network access, or tooling, report the exact failing command/error and do not claim that a PR exists.
+10. Merge only after required checks and review policy are satisfied.
+11. Never rewrite `master` directly and never commit secrets.
 
 Before dispatch or resuming an agent, apply the scoped work-admission checklist in
 `docs/agents/role-based-agent-office.md`. Record the canonical task and current
