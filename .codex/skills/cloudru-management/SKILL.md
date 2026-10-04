@@ -80,8 +80,10 @@ Use `cloudru_iam.py`, `cloudru_iam_routes.py` and `provider_key_rotation.py` for
 existing key flows. Consult `docs/integrations/cloudru-iam-wizard.md` and
 `docs/provider-key-rotation.md` before changing them.
 
-For Cloud DNS, use the documented endpoint
-`https://console.cloud.ru/api/clouddns` with an Evolution IAM Bearer token.
+Our zones live in Evolution DNS: use `https://dns.api.cloud.ru` with an
+Evolution IAM Bearer token (`https://console.cloud.ru/api/clouddns` is the
+separate classic Cloud DNS service). Evolution API Gateway has no public
+management API; do not automate against it.
 Discover zones and records first; the DNS service `parentId` is its Service
 Instance ID, not the project UUID. Follow
 [`deploy/cloudru/dns/README.md`](../../../deploy/cloudru/dns/README.md) and
