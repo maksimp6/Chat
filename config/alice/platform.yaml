@@ -1,5 +1,5 @@
 # Alice Platform services definition
-# Each service represents a deployable component
+# Machine-readable desired state. Recovery-critical facts belong here, not only in docs.
 
 services:
   oauth:
@@ -24,6 +24,31 @@ services:
       memory: 1024Mi
     repository: chrome-worker
     owner_id: "293531601"
+
+  remote-desktop:
+    type: remote-desktop
+    depends_on:
+      - oauth
+    scale: 1
+    resources:
+      cpu: "1"
+      memory: 4096Mi
+    repository: rdc-browser
+    provider: cloudru
+    desired_state: running
+    recovery:
+      max_attempts: 3
+      operations:
+        - start
+        - restart
+        - redeploy_same_revision
+    health:
+      - cloud_resource
+      - rdc_connected
+      - ping
+      - shell
+      - filesystem
+      - browser
 
   agent-shell:
     type: agent-shell
