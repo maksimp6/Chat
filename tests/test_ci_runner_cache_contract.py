@@ -19,7 +19,16 @@ def test_runner_cache_contract() -> None:
     python_steps = [
         step for step in _steps_named(workflow, "Set up Python") if "cache: pip" in step
     ]
-    assert len(python_steps) == 2
+    assert len(python_steps) == 3
+    code_rules_step, *python_steps = python_steps
+    assert "uses: actions/setup-python@" in code_rules_step
+    assert (
+        """with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt"""
+        in code_rules_step
+    )
     assert "uses: actions/setup-python@" in python_steps[0]
     assert """with:
           python-version: "3.14"

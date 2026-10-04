@@ -11,6 +11,8 @@
 - [Текущий интеграционный реестр](integration/current-scope.md) — статус и правила допуска сфокусированных PR
 - [Настройка](setup/installation.md) — установка и конфигурация
 - [Рабочий процесс разработки](development_workflow.md) — formatter, локальные проверки, CI и fail-closed merge gate
+- [Правила надёжного кода](development/reliability.md) — идемпотентность операций и правила Power of Ten для Python/JS; «храповик» `tests/test_reliability_rules.py`
+- [Правила именования](development/naming.md) — тексты UI, код фронтенда, файлы, Python-модули, ветки и PR; проверка `tests/test_naming_conventions.py`
 - [Облачное окружение Claude Code для Cloud.ru](development/claude-cloud-ops-environment.md) — настройка, setup script, переменные и инструменты (Cloud.ru CLI, EDS, gh, Docker)
 - [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере

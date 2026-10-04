@@ -20,8 +20,30 @@ env:
   PREVIEW_SSH_PORT: ${{ vars.PREVIEW_SSH_PORT || '22' }}
 
 jobs:
+  code-rules:
+    name: Code rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install pinned tooling
+        run: pip install -r requirements-dev.txt
+      - name: Check naming, layout and reliability rules
+        run: bash scripts/check_code_rules.sh
+
   deploy:
     name: Deploy Alice Pro production
+    needs: code-rules
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 20
