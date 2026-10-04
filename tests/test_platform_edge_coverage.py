@@ -22,6 +22,7 @@ from alice_platform.config import (
 from alice_platform.health import generate_health_plan
 from alice_platform.planner import Action, ActionType, plan_actions
 from alice_platform.providers.cloudru import (
+    CloudProviderUnavailable,
     create_container,
     delete_container,
     update_container,
@@ -134,14 +135,15 @@ def test_health_and_planner_edge_branches():
     assert plan_actions("test", desired, {"containers": []}) == []
 
 
-def test_cloudru_dry_run_and_reconciler_all_action_types(capsys, caplog):
+def test_cloudru_provider_fails_closed_and_reconciler_all_action_types(capsys):
     config = {"resources": {"cpu": "2", "memory": "1Gi", "gpu": "L4"}}
-    create_container("test", "svc", config)
-    update_container("test", "svc", config)
-    delete_container("test", "svc")
-    assert "Would create container svc" in caplog.text
-    assert "Would update container svc" in caplog.text
-    assert "Would delete container svc" in caplog.text
+    for operation in (
+        lambda: create_container("test", "svc", config),
+        lambda: update_container("test", "svc", config),
+        lambda: delete_container("test", "svc"),
+    ):
+        with pytest.raises(CloudProviderUnavailable):
+            operation()
 
     actions = [
         Action(ActionType.CREATE, "create", "test", description="new"),
