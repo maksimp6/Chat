@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -263,6 +264,98 @@ def cmd_delete(args: argparse.Namespace) -> dict:
     return {"deleted": cfg["name"], "operation": CloudRuContainerAppsClient().delete(cfg["name"])}
 
 
+def cmd_verify_persistence(_: argparse.Namespace) -> dict:
+    """Verify durable test state across a new Container Apps revision.
+
+    Uses the existing conv_settings storage contract as a sentinel. The value is
+    intentionally non-secret and is removed after verification.
+    """
+    cfg = _settings()
+    if cfg["name"] != os.getenv("CLOUDRU_TEST_CONTAINER_NAME", "alice-test"):
+        raise CloudProviderError(
+            "persistence verification is restricted to alice-test",
+            code="validation_error",
+        )
+    database_url = os.getenv("ALICE_DATABASE_URL", "")
+    if not database_url.startswith(("postgres://", "postgresql://")):
+        raise CloudProviderError(
+            "ALICE_DATABASE_URL must select test PostgreSQL",
+            code="validation_error",
+        )
+
+    from db import get_conn, init_db
+
+    init_db()
+    sentinel_id = "ci-persistence-" + uuid.uuid4().hex
+    payload = json.dumps({"run_id": sentinel_id}, sort_keys=True)
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO conv_settings (conversation_id, settings_json, updated_at) "
+            "VALUES (?, ?, CURRENT_TIMESTAMP)",
+            (sentinel_id, payload),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    apps = CloudRuContainerAppsClient()
+    before = apps.status(cfg["name"])
+    app = apps.get(cfg["name"])
+    if not app:
+        raise CloudProviderError("alice-test is not deployed", code="not_found")
+    image = _image_of_deployed_app(app)
+    if not image:
+        raise CloudProviderError("alice-test image is unavailable", code="invalid_response")
+    spec = ContainerSpec(
+        name=cfg["name"],
+        image=image,
+        cpu=cfg["cpu"],
+        min_instances=cfg["min_instances"],
+        max_instances=cfg["max_instances"],
+        env=_deployed_env(app),
+    )
+    restarted = apps.deploy_verified(spec)
+
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT settings_json FROM conv_settings WHERE conversation_id = ?",
+            (sentinel_id,),
+        ).fetchone()
+        if row is None or row["settings_json"] != payload:
+            raise CloudProviderError(
+                "persistence sentinel missing after revision",
+                code="persistence_failed",
+            )
+        conn.execute("DELETE FROM conv_settings WHERE conversation_id = ?", (sentinel_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        "status": "PERSISTENCE_VERIFIED",
+        "container": cfg["name"],
+        "before_status": before.get("status"),
+        "revision": restarted.get("revision"),
+        "health": restarted.get("health"),
+    }
+
+
+def _image_of_deployed_app(app: dict) -> str | None:
+    containers = (app.get("template") or {}).get("containers") or [{}]
+    return containers[0].get("image")
+
+
+def _deployed_env(app: dict) -> dict[str, str]:
+    containers = (app.get("template") or {}).get("containers") or [{}]
+    items = containers[0].get("env") or []
+    result = {}
+    for item in items:
+        if isinstance(item, dict) and isinstance(item.get("name"), str) and isinstance(item.get("value"), str):
+            result[item["name"]] = item["value"]
+    return result
+
+
 def cmd_estimate(_: argparse.Namespace) -> dict:
     cfg = _settings()
     return {
@@ -301,6 +394,10 @@ def main(argv: list[str] | None = None) -> int:
     delete.set_defaults(func=cmd_delete)
 
     sub.add_parser("estimate", help="monthly cost floor").set_defaults(func=cmd_estimate)
+    sub.add_parser(
+        "verify-persistence",
+        help="verify alice-test PostgreSQL state across a new revision",
+    ).set_defaults(func=cmd_verify_persistence)
 
     args = parser.parse_args(argv)
     try:
