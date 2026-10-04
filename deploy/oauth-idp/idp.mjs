@@ -7,7 +7,7 @@
 // transactions, authorization codes and refresh tokens are sealed values (see
 // crypto.mjs), so it scales to zero, survives restarts, and an anonymous
 // registration flood has nothing to fill up.
-import { cookieMac, createKeys, MIN_SECRET_LENGTH, open, randomToken, safeEqual, seal, sha256b64u } from "./crypto.mjs";
+import { cookieMac, createKeys, hashPassphrase, MIN_SECRET_LENGTH, open, randomToken, safeEqual, seal, sha256b64u } from "./crypto.mjs";
 import { signJwt } from "./jwt-sign.mjs";
 
 const ACCESS_TTL = 3600;
@@ -90,7 +90,6 @@ export function createIdp(options = {}) {
   // other gate (browser binding, redirect and resource allowlists, PKCE) still applies.
   const passphraseConfigured = options.ownerPassphrase !== undefined;
   const passphraseMode = passphraseConfigured && String(options.ownerPassphrase).length >= MIN_PASSPHRASE_LENGTH;
-  const passphraseDigest = passphraseMode ? sha256b64u(options.ownerPassphrase) : "";
   let failures = [];
   const deploymentSha = /^[0-9a-f]{40}$/.test(options.deploymentSha ?? "") ? options.deploymentSha : "";
   const usedCodes = new Map();
@@ -111,6 +110,8 @@ export function createIdp(options = {}) {
   const ready = missing.length === 0;
   const issuer = ready ? parseOrigin(options.publicUrl) : "";
   const keys = ready ? createKeys(options.secret) : null;
+  // Salted with a value derived from IDP_SECRET; computed once, compared in constant time.
+  const passphraseDigest = ready && passphraseMode ? hashPassphrase(options.ownerPassphrase, keys.kid) : "";
   const callback = `${issuer}/github/callback`;
   const cookieName = issuer.startsWith("https:") ? "__Host-idp_tx" : "idp_tx";
 
@@ -279,7 +280,7 @@ export function createIdp(options = {}) {
       if (failures.length >= MAX_PASSPHRASE_FAILURES) {
         return page(response, 429, "Слишком много попыток", "<h1>Слишком много попыток</h1><p>Подождите десять минут.</p>", { "retry-after": String(LOCKOUT_SECONDS) });
       }
-      if (typeof input.passphrase !== "string" || !safeEqual(sha256b64u(input.passphrase), passphraseDigest)) {
+      if (typeof input.passphrase !== "string" || !safeEqual(hashPassphrase(input.passphrase, keys.kid), passphraseDigest)) {
         failures.push(now());
         return page(response, 403, "Неверная фраза", "<h1>Неверная фраза</h1><p>Вернитесь назад и повторите.</p>");
       }
