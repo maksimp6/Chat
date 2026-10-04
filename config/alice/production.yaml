@@ -7,5 +7,4 @@ lanes:
     services:
       - oauth
       - chrome
-      - agent-shell
     owner_id: "293531601"
