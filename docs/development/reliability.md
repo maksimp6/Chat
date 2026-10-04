@@ -72,6 +72,7 @@ and compares each rule's violation count with `RATCHET_BASELINE`.
 ## Static types
 
 Python code is checked with `mypy --strict` (configured in `pyproject.toml`,
+with `no_site_packages` so results do not depend on installed packages;
 pinned in `requirements-dev.txt`). `tests/test_type_checking.py` is a ratchet
 with two rules:
 

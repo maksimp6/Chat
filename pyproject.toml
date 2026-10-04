@@ -17,6 +17,8 @@ line-ending = "lf"
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+# Same result with or without app dependencies installed (Code rules vs Application tests).
+no_site_packages = true
 explicit_package_bases = true
 exclude = '^(tests|node_modules|android|scripts|deploy|plugins|r)/'
 
