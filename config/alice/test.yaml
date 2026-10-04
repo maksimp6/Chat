@@ -7,4 +7,3 @@ lanes:
     services:
       - oauth
       - chrome
-      - agent-shell
