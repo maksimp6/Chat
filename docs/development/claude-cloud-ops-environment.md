@@ -19,6 +19,10 @@ create a new environment:
    - `CLOUDRU_STORAGE_TENANT_ID` (Object Storage tenant, not a secret);
    - `EDS_PROJECT_ID`, `EDS_API_KEY` for EDS. The EDS product key is separate;
      the IAM key pair does not replace it.
+   - `GH_TOKEN` for the GitHub CLI: a fine-grained personal access token limited
+     to `maksimp6/Chat` with Contents, Pull requests, Issues and Actions set to
+     read/write, nothing broader. The setup script does not run `gh auth login`;
+     `gh` reads `GH_TOKEN` from the environment on its own.
 
 Values are set only in the environment settings, never in the repository.
 

@@ -287,15 +287,35 @@ test("consent page CSP lets the form redirect to GitHub sign-in", async (t) => {
   assert.equal(new URL(login.headers.get("location")).origin, "https://github.com");
 });
 
-test("a registered but unconfirmed client survives retries for days", async (t) => {
+test("unconfirmed clients survive retries for days but not past a week", async (t) => {
   // ChatGPT reuses its registered client_id; it must still be valid after a
   // failed or interrupted first sign-in.
   const app = await fixture(t);
   const client = await (await app.register()).json();
   app.advance(3 * 24 * 3600);
-  const started = await app.start(client);
-  assert.equal(started.response.status, 200);
-  app.advance(31 * 24 * 3600);
-  const late = await app.start(client);
-  assert.equal(late.response.status, 400);
+  assert.equal((await app.start(client)).response.status, 200);
+  app.advance(5 * 24 * 3600);
+  assert.equal((await app.start(client)).response.status, 400);
+});
+
+test("a registration flood evicts the oldest unconfirmed client and never a confirmed one", async (t) => {
+  const app = await fixture(t);
+  const confirmed = await app.code();
+  const state = JSON.parse(readFileSync(app.options.stateFile, "utf8"));
+  assert.equal(state.clients[confirmed.client.client_id].provisional_expires, undefined);
+  for (let index = 0; index < 999; index += 1) state.clients[`flood-${index}`] = { provisional_expires: 5_000_000_000 + index, redirect_uris: [] };
+  writeFileSync(app.options.stateFile, JSON.stringify(state));
+  app.reload();
+  const fresh = await app.register();
+  assert.equal(fresh.status, 201);
+  const after = JSON.parse(readFileSync(app.options.stateFile, "utf8"));
+  assert.ok(after.clients[confirmed.client.client_id], "confirmed client survives");
+  assert.equal(after.clients["flood-0"], undefined, "oldest unconfirmed client was evicted");
+  assert.ok(after.clients["flood-998"]);
+  assert.equal(Object.keys(after.clients).length, 1000);
+  // With only confirmed clients left there is nothing safe to evict.
+  for (const key of Object.keys(after.clients)) delete after.clients[key].provisional_expires;
+  writeFileSync(app.options.stateFile, JSON.stringify(after));
+  app.reload();
+  assert.equal((await app.register()).status, 429);
 });
