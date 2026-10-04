@@ -64,6 +64,7 @@ APP_ENV = frozenset(
     {
         "BROWSER_API_TOKEN",
         "BROWSER_PUBLIC_URL",
+        "BROWSER_IDP_ISSUER",
         "BROWSER_DEPLOYMENT_SHA",
         "BROWSER_OAUTH_STATE_DIR",
         "BROWSER_OAUTH_STATE_FILE",
@@ -157,6 +158,32 @@ def public_origin(value):
     return "https://" + parts.hostname
 
 
+def idp_issuer(value):
+    # The central IdP lives on its own provider origin or on the owner's domain.
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname or ""
+        valid = (
+            parts.scheme == "https"
+            and (
+                host.endswith((".containerapps.ru", ".containers.cloud.ru"))
+                or host == "maxxxpavlov.online"
+                or host.endswith(".maxxxpavlov.online")
+            )
+            and not parts.username
+            and not parts.password
+            and parts.port in (None, 443)
+            and parts.path in ("", "/")
+            and not parts.query
+            and not parts.fragment
+        )
+    except (TypeError, ValueError, AttributeError):
+        fail("validation_error")
+    if not valid:
+        fail("validation_error")
+    return "https://" + host
+
+
 def runtime_env(sha, env=os.environ):
     token = env.get("BROWSER_API_TOKEN") or env.get("ALICE_SHORT_TOKEN", "")
     required = ("ALICE_GITHUB_CLIENT_ID", "ALICE_GITHUB_CLIENT_SECRET")
@@ -179,6 +206,8 @@ def runtime_env(sha, env=os.environ):
     }
     if env.get("BROWSER_PUBLIC_URL"):
         result["BROWSER_PUBLIC_URL"] = public_origin(env["BROWSER_PUBLIC_URL"])
+    if env.get("BROWSER_IDP_ISSUER"):
+        result["BROWSER_IDP_ISSUER"] = idp_issuer(env["BROWSER_IDP_ISSUER"])
     return result
 
 
