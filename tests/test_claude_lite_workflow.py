@@ -7,11 +7,22 @@ def _workflow() -> str:
     return (ROOT / ".github" / "workflows" / "claude-lite.yml").read_text(encoding="utf-8")
 
 
-def test_claude_lite_action_trigger_matches_outer_workflow_trigger():
+def test_claude_lite_action_trigger_requires_explicit_command_position():
     workflow = _workflow()
 
-    assert "contains(github.event.comment.body, '@claude-lite')" in workflow
+    assert "startsWith(github.event.comment.body, '@claude-lite')" in workflow
+    assert "startsWith(github.event.issue.body, '@claude-lite')" in workflow
+    assert "startsWith(github.event.issue.title, '@claude-lite')" in workflow
+    assert "contains(github.event.comment.body, '@claude-lite') &&" not in workflow
     assert 'trigger_phrase: "@claude-lite"' in workflow
+
+
+def test_claude_lite_status_or_documentation_mentions_do_not_match_outer_trigger():
+    workflow = _workflow()
+
+    assert "startsWith(github.event.comment.body, '@claude-lite')" in workflow
+    assert "contains(github.event.comment.body, '@claude-lite session')" in workflow
+    assert "contains(github.event.issue.body, '@claude-lite session')" in workflow
 
 
 def test_claude_lite_keeps_pinned_action_and_least_privilege():
