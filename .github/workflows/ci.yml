@@ -125,6 +125,7 @@ jobs:
           run_node tests/test_settings_ui_security.js env
           run_node tests/test_ui_modal_contract.js env
           run_node tests/test_voice_recording.js env
+          run_node tests/test_accessibility.js env
 
           test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
       - name: Report frontend coverage
