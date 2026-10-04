@@ -10,6 +10,7 @@ from alice_platform.planner import plan_actions
 from alice_platform.health import generate_health_plan
 from alice_platform.reconciler import reconcile
 from alice_platform.billing import calculate_lane_cost
+from alice_platform.providers.secrets import get_secret
 
 
 def cmd_validate(args):
@@ -145,6 +146,18 @@ def cmd_billing(args):
         return 1
 
 
+def cmd_secret(args):
+    """Fetch a secret from Cloud.ru Secret Management."""
+    try:
+        secret_value = get_secret(args.path)
+        print(f"✓ Secret retrieved: {args.path}")
+        print(f"  Value length: {len(secret_value)} chars")
+        return 0
+    except Exception as e:
+        print(f"✗ Error retrieving secret: {e}", file=sys.stderr)
+        return 1
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Alice Platform config management")
@@ -178,6 +191,11 @@ def main():
     billing_parser.add_argument("lane", help="Lane name (test, production, etc)")
     billing_parser.add_argument("--config-dir", help="Config directory (default: config/alice)")
     billing_parser.set_defaults(func=cmd_billing)
+
+    # Secret command
+    secret_parser = subparsers.add_parser("secret", help="Fetch a secret from Cloud.ru")
+    secret_parser.add_argument("path", help="Secret path (e.g., alice/prod/oauth-client-secret)")
+    secret_parser.set_defaults(func=cmd_secret)
 
     args = parser.parse_args()
 

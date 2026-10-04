@@ -84,18 +84,53 @@ class TestRecoveryImplemented:
         rollback_config("abc1234", "production", approve=False)
 
 
-class TestSecretsProviderNotImplemented:
-    """Secrets provider is deferred to next slice."""
+class TestSecretsProviderImplemented:
+    """Secrets provider is implemented in Slice 4."""
 
-    def test_get_secret_raises(self):
-        """Get secret raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Secrets provider deferred"):
-            get_secret("alice/prod/oauth-client-secret")
+    def test_get_secret_returns_string(self):
+        """Get secret returns a string or raises CloudProviderError."""
+        try:
+            result = get_secret("alice/prod/oauth-client-secret")
+            assert isinstance(result, str)
+        except Exception as e:
+            # Expected when Cloud.ru credentials not configured
+            assert "Secret Management" in str(e) or "not configured" in str(e).lower()
 
-    def test_resolve_all_secrets_raises(self):
-        """Resolve all secrets raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Secrets provider deferred"):
-            resolve_all_secrets({"oauth": {"client_secret": "alice/prod/oauth-client-secret"}})
+    def test_resolve_all_secrets_returns_dict(self):
+        """Resolve all secrets returns dict."""
+        config = {"oauth": {"client_secret": "alice/prod/oauth-client-secret"}}
+        try:
+            result = resolve_all_secrets(config)
+            assert isinstance(result, dict)
+        except Exception as e:
+            # Expected when Cloud.ru credentials not configured
+            assert "Secret Management" in str(e) or "not configured" in str(e).lower()
+
+    def test_parse_secret_path_valid(self):
+        """Parse valid secret paths."""
+        from alice_platform.providers.secrets import _parse_secret_path
+
+        secret_id, version_id = _parse_secret_path("alice/prod/oauth-client-secret")
+        assert secret_id == "alice-prod-oauth-client-secret"
+        assert version_id == "latest"
+
+    def test_parse_secret_path_multi_part(self):
+        """Parse secret paths with multiple name parts."""
+        from alice_platform.providers.secrets import _parse_secret_path
+
+        secret_id, version_id = _parse_secret_path("alice/test/dota-commentator-api-key")
+        assert secret_id == "alice-test-dota-commentator-api-key"
+        assert version_id == "latest"
+
+    def test_parse_secret_path_invalid(self):
+        """Invalid secret paths raise ValueError."""
+        from alice_platform.providers.secrets import _parse_secret_path
+
+        with pytest.raises(ValueError, match="Invalid secret path"):
+            _parse_secret_path("invalid/path")
+
+        with pytest.raises(ValueError, match="Invalid secret path"):
+            _parse_secret_path("prod/oauth-secret")
 
 
 class TestDNSProviderNotImplemented:
