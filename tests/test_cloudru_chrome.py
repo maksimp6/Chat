@@ -758,3 +758,29 @@ def test_worker_call_does_not_retry_other_errors_or_past_deadline():
             apps, record(), "t", "/healthz", timeout=12, sleep=clock.sleep, clock=clock.now
         )
     assert apps.client.request.call_count == 4
+
+
+@pytest.mark.parametrize("lane_name, replaced", [("test", True), ("production", False)])
+def test_only_test_lane_replaces_a_worker_whose_checkpoint_failed(monkeypatch, lane_name, replaced):
+    monkeypatch.setenv("CHROME_LANE", lane_name)
+    old = record(OLD_IMAGE)
+    apps = SimpleNamespace(project_id=PROJECT, restore=Mock(), start=Mock())
+    monkeypatch.setattr(chrome, "owned_record", Mock(return_value=old))
+    monkeypatch.setattr(chrome, "prepare_bucket", Mock())
+    monkeypatch.setattr(
+        chrome,
+        "checkpoint",
+        Mock(side_effect=CloudProviderError("x", code="chrome_runtime_failed")),
+    )
+    monkeypatch.setattr(chrome, "stop_owned", Mock())
+    monkeypatch.setattr(chrome, "wait_ready", Mock(return_value=record()))
+    monkeypatch.setattr(chrome, "request_worker", Mock(return_value={"state": "awake"}))
+    monkeypatch.setattr(chrome, "verify_restored", Mock())
+    if replaced:
+        chrome.checkpoint.side_effect = [CloudProviderError("x", code="chrome_runtime_failed"), 3]
+        chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+        apps.restore.assert_called()
+    else:
+        with pytest.raises(CloudProviderError):
+            chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+        apps.restore.assert_not_called()

@@ -129,14 +129,23 @@ test("existing local data is never overwritten during restore", async (t) => {
   assert.equal(await fs.readFile(path.join(value.profileDir, "Cookies"), "utf8"), "unsaved local");
 });
 
-test("a stale writer cannot overwrite a newer generation", async (t) => {
+test("the live replica adopts a newer generation written by an overlapping one", async (t) => {
   const value = await fixture(t);
   const other = createChromeStateStore({ ...value.options,
     profileDir: path.join(value.base, "other-profile"), authDir: path.join(value.base, "other-auth"),
   });
   await other.restore();
   await value.store.checkpoint();
-  await assert.rejects(other.checkpoint(), /chrome_state_multiple_writers/);
+  await fs.writeFile(path.join(value.base, "other-profile", "Cookies"), "live replica");
+  await other.checkpoint();
+  assert.equal(other.status().generation, 2);
+  await other.checkpoint();
+  assert.equal(other.status().lastError, null);
+  const fresh = createChromeStateStore({ ...value.options,
+    profileDir: path.join(value.base, "fresh-profile"), authDir: path.join(value.base, "fresh-auth"),
+  });
+  await fresh.restore();
+  assert.equal(await fs.readFile(path.join(value.base, "fresh-profile", "Cookies"), "utf8"), "live replica");
 });
 
 test("same-process auth checkpoints are serialized", async (t) => {

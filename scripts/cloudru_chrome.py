@@ -627,7 +627,17 @@ def deploy(apps, store, credentials, image, environment):
     generation = None
     prepare_bucket(store, credentials, apps.project_id)
     if previous and str(previous.get("status", "")).lower() == "running":
-        generation = checkpoint(apps, previous)
+        try:
+            generation = checkpoint(apps, previous)
+        except CloudProviderError as exc:
+            # A broken test replica must not block replacing it; production
+            # never replaces a worker whose profile could not be saved.
+            if lane() != "test":
+                raise
+            print(
+                json.dumps({"stage": "chrome_test_checkpoint_skipped", **safe_error(exc)}),
+                flush=True,
+            )
     if previous:
         stop_owned(apps, previous)
     attempted = False

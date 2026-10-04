@@ -332,6 +332,14 @@ export function createChromeStateStore(options = {}) {
     const root = roots[kind];
     await directory(root, true);
     const previous = await latest(kind);
+    if ((previous?.generation ?? 0) > generations[kind]) {
+      // Container Apps briefly overlaps replicas on restart/scale: the old one
+      // checkpoints on SIGTERM after the new one restored. The live replica
+      // adopts the newer generation (last writer wins) instead of refusing every
+      // future save, which broke OAuth until the next restart.
+      process.stderr.write(`${JSON.stringify({ event: "chrome_state_adopted_newer", kind, local: generations[kind], remote: previous.generation })}\n`);
+      generations[kind] = previous.generation;
+    }
     if ((previous?.generation ?? 0) !== generations[kind]) fail("multiple_writers");
     const generation = (previous?.generation ?? 0) + 1;
     if (!Number.isSafeInteger(generation)) fail("generation_exhausted");
