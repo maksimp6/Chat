@@ -139,7 +139,9 @@ def _validate_dispatch_request(repository: str, request: DispatchRequest) -> Non
         raise WorkflowDispatchError("invalid_ref_sha")
 
 
-def _read_dispatch_response(\n    opener, http_request: urllib.request.Request\n) -> tuple[int | None, bytes]:
+def _read_dispatch_response(
+    opener, http_request: urllib.request.Request
+) -> tuple[int | None, bytes]:
     try:
         with opener(http_request, timeout=20) as response:
             return getattr(response, "status", None), response.read(65537)
