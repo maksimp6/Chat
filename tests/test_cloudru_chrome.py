@@ -299,8 +299,34 @@ def test_public_ingress_requires_reachable_worker_that_refuses_anonymous_access(
     assert error.value.code == "chrome_ingress_unconfirmed"
 
 
+HEALTHY = {"status": "ok", "state_ready": True, "deployment_sha": SHA, "oauth_ready": True}
+
+
+@pytest.mark.parametrize(
+    "changes", [{"deployment_sha": "d" * 40}, {"state_ready": False}, {"oauth_ready": False}]
+)
+def test_public_origin_must_serve_the_verified_revision(changes):
+    http_get = Mock(
+        side_effect=[response({**HEALTHY, **changes}), response({}, 401), response({}, 401)]
+    )
+    with pytest.raises(CloudProviderError) as error:
+        chrome.verify_ingress(record(), http_get=http_get)
+    assert error.value.code == "chrome_ingress_unconfirmed"
+
+
+def test_ingress_auth_setting_must_be_explicit_and_is_reported_truthfully():
+    value = record()
+    del value["configuration"]["ingress"]["accessSettings"]["enableAuth"]
+    apps = SimpleNamespace(project_id=PROJECT, list=Mock(return_value=[value]))
+    with pytest.raises(CloudProviderError):
+        chrome.owned_record(apps)
+    legacy = record()
+    legacy["configuration"]["ingress"]["accessSettings"]["enableAuth"] = True
+    assert chrome.summary(legacy)["ingress"] == "provider_iam"
+
+
 def test_public_ingress_check_sends_no_credentials_and_follows_no_redirects():
-    http_get = Mock(side_effect=[response({"status": "ok"}), response({}, 401), response({}, 401)])
+    http_get = Mock(side_effect=[response(HEALTHY), response({}, 401), response({}, 401)])
     chrome.verify_ingress(record(), http_get=http_get)
     assert [call.args[0] for call in http_get.call_args_list] == [
         ORIGIN + "/healthz",

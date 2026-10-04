@@ -96,11 +96,18 @@ is not used: it has no public management API, and `apigw.api.cloud.ru` returned
 NXDOMAIN from Google and Cloudflare DNS on 2026-10-04.
 
 Provider IAM authentication on the container ingress is disabled because ChatGPT
-cannot send a Cloud.ru IAM token. The worker itself is the access boundary: only
-`GET /healthz` is anonymous; every other route requires `BROWSER_API_TOKEN` or a
-GitHub OAuth token for the single allowed account. Every deployment and restart
-verifies on the public origin, without credentials or redirects, that `/healthz`
-answers 200 and `/browser/v1/status` and `/browser/v1/mcp` answer 401.
+cannot send a Cloud.ru IAM token. The worker itself is the access boundary:
+
+- Anonymous: `GET /healthz` and the protocol-required OAuth surface (protected
+  resource and authorization server metadata, dynamic client registration,
+  authorize, GitHub callback, token and revoke). Tokens are issued only after
+  GitHub sign-in by the single allowed account.
+- Authenticated: browser control (`/browser/v1/*`) and MCP (`/browser/v1/mcp`)
+  require `BROWSER_API_TOKEN` or such an OAuth access token.
+
+Every deployment and restart verifies on the public origin, without credentials
+or redirects, that `/healthz` serves the exact deployed revision (SHA, state and
+OAuth readiness) and that `/browser/v1/status` and `/browser/v1/mcp` answer 401.
 
 Keep `CHROME_PROFILE_DIR=/tmp/chrome-profile` on local storage and mount the
 private state volume at `CHROME_STATE_DIR=/chrome-state`. OAuth state lives at

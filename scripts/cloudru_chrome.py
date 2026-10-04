@@ -3,8 +3,11 @@
 
 The worker is served directly from its stable Container Apps origin. Evolution API
 Gateway has no public management API, so the service does not depend on it; the
-worker protects every route except ``/healthz`` with its own bearer token or the
-GitHub OAuth owner check, and deployment verifies that refusal on the public origin.
+worker is the access boundary. Anonymous routes are ``/healthz`` and the
+protocol-required OAuth surface (discovery, dynamic registration, authorize,
+GitHub callback, token, revoke), which issues tokens only to the allowed GitHub
+account. Browser control and MCP require the worker bearer token or such an OAuth
+token, and deployment verifies that refusal on the public origin.
 """
 
 from __future__ import annotations
@@ -252,7 +255,9 @@ def owned_record(apps, *, identifier=None):
             and mounts[0].get("readOnly", False) is False
             and mounts[0].get("subPath", "") == ""
             and ingress.get("publiclyAccessible") is True
-            and isinstance(ingress.get("accessSettings", {}).get("enableAuth", False), bool)
+            # Explicit either way: False is the current contract; True is only a
+            # legacy container that deploy restores and readiness then rejects.
+            and isinstance(ingress.get("accessSettings", {}).get("enableAuth"), bool)
             and record["configuration"].get("privileged", False) is False
             and record["configuration"].get("autoDeployments", {}).get("enabled", False) is False
         )
@@ -417,12 +422,23 @@ def verify_ingress(record, *, http_get=requests.get):
     origin = application_origin(record)
     try:
         health = http_get(origin + "/healthz", timeout=10, allow_redirects=False)
-        healthy = health.status_code == 200 and health.json().get("status") == "ok"
+        value = health.json()
+        environment = {
+            item["name"]: item["value"] for item in record["template"]["containers"][0]["env"]
+        }
+        # The public origin must serve the exact revision verified via the control plane.
+        healthy = (
+            health.status_code == 200
+            and value.get("status") == "ok"
+            and value.get("state_ready") is True
+            and value.get("deployment_sha") == environment.get("BROWSER_DEPLOYMENT_SHA")
+            and value.get("oauth_ready") is bool(environment.get("BROWSER_PUBLIC_URL"))
+        )
         refused = all(
             http_get(origin + path, timeout=10, allow_redirects=False).status_code == 401
             for path in ("/browser/v1/status", "/browser/v1/mcp")
         )
-    except (requests.RequestException, ValueError, AttributeError):
+    except (requests.RequestException, ValueError, AttributeError, KeyError, TypeError):
         fail("chrome_ingress_unconfirmed")
     if not healthy or not refused:
         fail("chrome_ingress_unconfirmed")
@@ -540,7 +556,9 @@ def summary(record):
         "provider_url": origin,
         "mcp_url": public + "/browser/v1/mcp",
         "oauth_callback_url": public + "/browser/oauth/github/callback",
-        "ingress": "public_worker_auth",
+        "ingress": "provider_iam"
+        if record["configuration"]["ingress"]["accessSettings"]["enableAuth"]
+        else "public_worker_auth",
         "cost_floor": estimate_monthly_cost("1", 1),
     }
 
