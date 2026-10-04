@@ -75,7 +75,6 @@ class TestRecoveryImplemented:
         rollback_config("abc1234", "production", approve=False)
 
 
-
 class TestDNSProviderNotImplemented:
     """DNS provider is deferred to next slice."""
 
