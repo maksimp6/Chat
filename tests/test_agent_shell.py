@@ -174,8 +174,15 @@ PAYLOAD = {"issue": 7, "title": "Fix typo", "body": "The README has a typo."}
 
 def test_alice_task_runs_the_issue_agent_and_keeps_its_summary(store):
     calls = []
-    handler = alice({"status": "changed", "changed_files": ["README.md"], "summary": "fixed"}, calls)
-    task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload={**PAYLOAD, "model": "aliceai-llm"})
+    handler = alice(
+        {"status": "changed", "changed_files": ["README.md"], "summary": "fixed"}, calls
+    )
+    task_id = store.add(
+        role="docs-engineer",
+        title="t",
+        kind="alice_task",
+        payload={**PAYLOAD, "model": "aliceai-llm"},
+    )
     run_next(store, {"alice_task": handler})
     task = store.get(task_id)
     assert task["status"] == "done"
@@ -193,7 +200,9 @@ def test_alice_task_fails_with_a_fixed_code_and_keeps_the_result(store):
 
 
 def test_alice_task_stops_at_approval_gated_tools_and_never_auto_approves(store):
-    waiting = alice({"status": "needs_approval", "pending_tools": ["run_command"], "changed_files": []})
+    waiting = alice(
+        {"status": "needs_approval", "pending_tools": ["run_command"], "changed_files": []}
+    )
     task_id = store.add(role="docs-engineer", title="t", kind="alice_task", payload=PAYLOAD)
     run_next(store, {"alice_task": waiting})
     task = store.get(task_id)
