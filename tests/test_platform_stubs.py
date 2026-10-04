@@ -35,6 +35,7 @@ class TestReconcilerImplemented:
     def test_reconcile_dry_run_mode(self):
         """Reconcile runs in dry-run mode (no actual deployments)."""
         from alice_platform.planner import Action, ActionType
+
         actions = [
             Action(
                 type=ActionType.CREATE,
@@ -43,11 +44,7 @@ class TestReconcilerImplemented:
                 description="Test create",
             )
         ]
-        config = {
-            "services": {
-                "test-service": {"resources": {"cpu": "0.5", "memory": "512Mi"}}
-            }
-        }
+        config = {"services": {"test-service": {"resources": {"cpu": "0.5", "memory": "512Mi"}}}}
         # Should complete without error
         reconcile("test", actions, config)
 

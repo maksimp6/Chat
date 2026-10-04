@@ -57,9 +57,7 @@ def restore_snapshot(
         )
         return
 
-    logger.info(
-        f"[DRY-RUN] Would restore {storage} from snapshot {snapshot_timestamp} in {lane}"
-    )
+    logger.info(f"[DRY-RUN] Would restore {storage} from snapshot {snapshot_timestamp} in {lane}")
 
 
 def rollback_config(commit: str, lane: str, approve: bool = False) -> None:
