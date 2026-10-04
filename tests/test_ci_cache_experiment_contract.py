@@ -101,3 +101,16 @@ def test_ab_toolchain_versions_match_image_versions():
     assert f"FROM python:{python_step['with']['python-version']}-slim" in dockerfile
     assert f"ARG NODE_VERSION={node_step['with']['node-version']}" in dockerfile
     assert "nodejs=${NODE_VERSION}-1nodesource1" in dockerfile
+
+
+def test_setup_arm_uses_the_same_actions_as_required_application_job():
+    required_steps = workflow("ci.yml")["jobs"]["backend"]["steps"]
+    benchmark_steps = workflow("ci-image.yml")["jobs"]["benchmark"]["steps"]
+    for action in ("actions/setup-python@", "actions/setup-node@"):
+        required = next(s for s in required_steps if action in s.get("uses", ""))
+        experiment = next(s for s in benchmark_steps if action in s.get("uses", ""))
+        assert required["uses"] == experiment["uses"]
+        assert required["with"]["cache"] == experiment["with"]["cache"]
+        assert (
+            required["with"]["cache-dependency-path"] == experiment["with"]["cache-dependency-path"]
+        )
