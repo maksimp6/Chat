@@ -643,9 +643,18 @@ def require_reviewed_head(root, sha):
 
 def export_public_url(origin, env=os.environ):
     # Live MCP acceptance in the workflow targets the deployed origin.
+    origin = public_origin(origin)
     if env.get("GITHUB_ENV"):
         with open(env["GITHUB_ENV"], "a", encoding="utf-8") as stream:
-            stream.write("BROWSER_PUBLIC_URL=" + public_origin(origin) + "\n")
+            stream.write("BROWSER_PUBLIC_URL=" + origin + "\n")
+    # The owner only needs these two URLs: the ChatGPT connector and the OAuth callback.
+    if env.get("GITHUB_STEP_SUMMARY"):
+        with open(env["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
+            stream.write(
+                "## Chrome MCP\n\n"
+                f"- ChatGPT connector URL: `{origin}/browser/v1/mcp`\n"
+                f"- GitHub OAuth callback: `{origin}/browser/oauth/github/callback`\n"
+            )
 
 
 def main(argv=None):

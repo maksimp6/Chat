@@ -319,6 +319,15 @@ def test_deployed_origin_is_exported_for_live_acceptance(tmp_path):
         chrome.export_public_url("https://evil.example", {"GITHUB_ENV": str(target)})
 
 
+def test_deploy_summary_shows_only_public_connector_and_callback_urls(tmp_path):
+    summary = tmp_path / "summary"
+    chrome.export_public_url(ORIGIN, {"GITHUB_STEP_SUMMARY": str(summary)})
+    text = summary.read_text()
+    assert ORIGIN + "/browser/v1/mcp" in text
+    assert ORIGIN + "/browser/oauth/github/callback" in text
+    assert "token" not in text.lower()
+
+
 def test_bucket_with_unknown_owner_is_not_adopted(monkeypatch):
     store = Mock()
     store.download.return_value = json.dumps({"purpose": "someone-else"}).encode()
