@@ -16,6 +16,13 @@
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
 - [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
+- [Alice Platform](platform/architecture.md) — deployment system с config-driven reconciliation
+  - [Архитектура](platform/architecture.md) — сервисы, lanes, валидация
+  - [Домены](platform/domains.md) — конфигурация маршрутизации
+  - [Хранилище](platform/storage.md) — persistent storage и backup
+  - [Секреты](platform/secrets.md) — управление credentials
+  - [Восстановление](platform/recovery.md) — аварийные процедуры
+  - [Деплой](platform/deployment.md) — процесс и gates утверждения
 - [API](api/overview.md) — описание доступных API-интерфейсов
 - [MCP](mcp/overview.md) — работа с MCP-серверами и инструментами
 - [3D Printing Business](printing3d.md) — shipped-контур заказов, P&L, финансирования и AI-first оценки
