@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { dirname, join, relative } from "node:path";
+import { createIdpAuth } from "./idp-auth.mjs";
 import { createPlaywrightMcp } from "./mcp.mjs";
 import { createOAuth } from "./oauth.mjs";
 import { createChromeStateStore } from "./state.mjs";
@@ -80,6 +81,14 @@ export function createWorker(options = {}) {
     profileDir,
     stateDir: options.stateDir ?? process.env.CHROME_STATE_DIR,
     authDir,
+  });
+  // Central Alice IdP (optional): verifies its tokens for the MCP endpoint only.
+  const publicUrl = options.publicUrl ?? process.env.BROWSER_PUBLIC_URL ?? "";
+  const idp = createIdpAuth({
+    issuer: process.env.BROWSER_IDP_ISSUER,
+    resource: publicUrl ? `${new URL(publicUrl).origin}/browser/v1/mcp` : undefined,
+    ownerIds: (process.env.BROWSER_GITHUB_ALLOWED_ID ?? process.env.ALICE_GITHUB_ALLOWED_IDS ?? "").split(","),
+    ...options.idp,
   });
   let oauth;
   const ready = (async () => {
@@ -199,13 +208,19 @@ export function createWorker(options = {}) {
           deployment_sha: process.env.BROWSER_DEPLOYMENT_SHA ?? null,
           state_ready: true,
           oauth_ready: oauth.enabled,
+          idp_ready: idp.enabled,
           state_error: stateStore.status().lastError ?? null,
         });
       }
+      if (idp.enabled && request.method === "GET" && ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/browser/v1/mcp"].includes(pathname)) {
+        return json(response, 200, idp.resourceMetadata());
+      }
       if (await oauth.handle(request, response, url)) return;
-      const mcpAccess = pathname === "/browser/v1/mcp" && oauth.authorize(request);
+      const isMcp = pathname === "/browser/v1/mcp";
+      const mcpAccess = isMcp && (oauth.authorize(request) || (idp.enabled && Boolean(await idp.authorize(request))));
       if (!authorized(request, token) && !mcpAccess) {
-        if (pathname === "/browser/v1/mcp" && oauth.enabled) response.setHeader("www-authenticate", oauth.challenge());
+        if (isMcp && idp.enabled) response.setHeader("www-authenticate", idp.challenge());
+        else if (isMcp && oauth.enabled) response.setHeader("www-authenticate", oauth.challenge());
         return json(response, 401, { error: "unauthorized" });
       }
       if (pathname === "/browser/v1/mcp") {
