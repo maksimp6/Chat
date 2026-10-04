@@ -543,7 +543,9 @@ document.addEventListener("DOMContentLoaded", function () {
             if (typeof renderSidebar === "function") renderSidebar();
           }
         }
-        if (data.reply) {
+        if (data.requires_approval && data.tool_call) {
+          renderApprovalCard(data.tool_call, data.original_message || text);
+        } else if (data.reply) {
           addMessage(
             data.reply,
             "bot",
