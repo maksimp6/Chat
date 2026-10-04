@@ -457,15 +457,22 @@ test("multiple services share one login: each token is only valid for its own se
   assert.throws(() => verifyAccess(app.idp, issued.access_token, { audience: RESOURCE }), /invalid_token/);
 });
 
-test("auto-approve (test lane only) signs in without GitHub and still enforces the other gates", async (t) => {
-  const app = await fixture(t, { autoApprove: true, githubClientId: undefined, githubClientSecret: undefined, fetch: async () => { throw new Error("GitHub must not be contacted"); } });
+const PASSPHRASE = "correct horse battery staple";
+
+async function passphraseApp(t, overrides = {}) {
+  return fixture(t, { ownerPassphrase: PASSPHRASE, githubClientId: undefined, githubClientSecret: undefined, fetch: async () => { throw new Error("GitHub must not be contacted"); }, ...overrides });
+}
+
+test("passphrase mode (test lane) signs the owner in without GitHub and keeps the other gates", async (t) => {
+  const app = await passphraseApp(t);
   assert.equal(app.idp.ready, true);
-  assert.deepEqual(await (await app.request("/healthz")).json(), { status: "ok", auto_approve: true });
+  assert.deepEqual(await (await app.request("/healthz")).json(), { status: "ok", sign_in: "passphrase" });
 
   const client = await app.registered();
   const flow = await app.begin(client);
   assert.equal(flow.response.status, 200);
-  const approved = await app.form("/authorize", { tx: flow.tx }, { cookie: flow.cookie });
+  assert.match(flow.html, /name="passphrase"/);
+  const approved = await app.form("/authorize", { tx: flow.tx, passphrase: PASSPHRASE }, { cookie: flow.cookie });
   assert.equal(approved.status, 302);
   const target = new URL(approved.headers.get("location"));
   assert.equal(target.origin + target.pathname, REDIRECT);
@@ -478,30 +485,55 @@ test("auto-approve (test lane only) signs in without GitHub and still enforces t
   assert.equal(claims.sub, OWNER);
 
   // The browser binding, the resource allowlist and the redirect allowlist still apply.
-  assert.equal((await app.form("/authorize", { tx: flow.tx })).status, 400);
+  assert.equal((await app.form("/authorize", { tx: flow.tx, passphrase: PASSPHRASE })).status, 400);
   assert.equal((await app.begin(client, { resource: "https://evil.example.test/mcp" })).response.status, 400);
   assert.equal((await app.registered({ redirect_uris: ["https://evil.example.test/cb"] })).error, "invalid_redirect_uri");
 });
 
-test("without auto-approve GitHub credentials stay mandatory and nothing is auto-approved", async (t) => {
-  const app = await fixture(t, { githubClientId: undefined });
-  assert.equal(app.idp.ready, false);
-  assert.deepEqual(app.idp.missing, ["IDP_GITHUB_CLIENT_ID"]);
-  const healthy = await fixture(t);
-  assert.deepEqual(await (await healthy.request("/healthz")).json(), { status: "ok" });
+test("passphrase mode rejects a wrong, missing or near-miss passphrase", async (t) => {
+  const app = await passphraseApp(t);
+  const client = await app.registered();
+  const flow = await app.begin(client);
+  for (const passphrase of [undefined, "", "wrong", PASSPHRASE + " ", PASSPHRASE.toUpperCase()]) {
+    const values = { tx: flow.tx, ...(passphrase === undefined ? {} : { passphrase }) };
+    const response = await app.form("/authorize", values, { cookie: flow.cookie });
+    assert.equal(response.status, 403, String(passphrase));
+    assert.equal(response.headers.get("location"), null);
+  }
 });
 
-test("IDP_AUTO_APPROVE is opt-in and exactly '1'", () => {
-  assert.equal(configFromEnv({}).autoApprove, false);
-  assert.equal(configFromEnv({ IDP_AUTO_APPROVE: "true" }).autoApprove, false);
-  assert.equal(configFromEnv({ IDP_AUTO_APPROVE: "1" }).autoApprove, true);
+test("passphrase mode locks guessing out for ten minutes after five failures", async (t) => {
+  const app = await passphraseApp(t);
+  const client = await app.registered();
+  const flow = await app.begin(client);
+  const attempt = (passphrase) => app.form("/authorize", { tx: flow.tx, passphrase }, { cookie: flow.cookie });
+  for (let i = 0; i < 5; i += 1) assert.equal((await attempt("wrong")).status, 403);
+  // Even the right passphrase is refused while locked, so guesses cannot be confirmed.
+  assert.equal((await attempt(PASSPHRASE)).status, 429);
+  app.clock.ms += 601_000;
+  // The consent session itself expires after ten minutes, so start a fresh one.
+  const again = await app.begin(client);
+  const retry = await app.form("/authorize", { tx: again.tx, passphrase: PASSPHRASE }, { cookie: again.cookie });
+  assert.equal(retry.status, 302);
 });
 
-test("auto-approve refuses to run next to GitHub credentials (production configuration)", async (t) => {
-  const app = await fixture(t, { autoApprove: true });
-  assert.equal(app.idp.ready, false);
-  assert.deepEqual(app.idp.missing, ["IDP_AUTO_APPROVE_conflicts_with_IDP_GITHUB_credentials"]);
-  const health = await app.request("/healthz");
-  assert.equal(health.status, 503);
-  assert.equal((await app.request("/register", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 503);
+test("passphrase mode needs a long passphrase and refuses to run next to GitHub credentials", async (t) => {
+  const short = await passphraseApp(t, { ownerPassphrase: "short" });
+  assert.equal(short.idp.ready, false);
+  assert.deepEqual(short.idp.missing, ["IDP_OWNER_PASSPHRASE"]);
+
+  const both = await fixture(t, { ownerPassphrase: PASSPHRASE });
+  assert.equal(both.idp.ready, false);
+  assert.deepEqual(both.idp.missing, ["IDP_OWNER_PASSPHRASE_conflicts_with_IDP_GITHUB_credentials"]);
+  assert.equal((await both.request("/healthz")).status, 503);
+
+  const plain = await fixture(t, { githubClientId: undefined });
+  assert.deepEqual(plain.idp.missing, ["IDP_GITHUB_CLIENT_ID"]);
+  assert.deepEqual(await (await (await fixture(t)).request("/healthz")).json(), { status: "ok" });
+});
+
+test("IDP_OWNER_PASSPHRASE is read from the environment only when non-empty", () => {
+  assert.equal(configFromEnv({}).ownerPassphrase, undefined);
+  assert.equal(configFromEnv({ IDP_OWNER_PASSPHRASE: "" }).ownerPassphrase, undefined);
+  assert.equal(configFromEnv({ IDP_OWNER_PASSPHRASE: PASSPHRASE }).ownerPassphrase, PASSPHRASE);
 });
