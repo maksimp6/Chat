@@ -39,9 +39,9 @@ boundaries have one-second resolution. Keep subsecond evidence from logs.
 
 Build scenarios on fresh runners: cold (`no-cache`), warm imported GHA layers,
 source-only (hash must stay unchanged), pytest-xdist 3.8.0 → 3.7.0,
-requests lower-bound → exact 2.34.2, Prettier 3.6.2 → 3.6.1. Variant builds are
-local probes: they never publish variant tags or replace the baseline cache.
-Their registry pull timings are not inferred from local image export/startup.
+requests lower-bound → exact 2.34.2, Prettier 3.6.2 → 3.6.1. Variant builders publish immutable content tags without replacing the baseline
+cache. Fresh consumer runners pull each variant and run the same source suite.
+Registry pulls are measured separately from local image export/startup.
 Cold means no build layers; upstream base-image registry/service caches are not
 under this experiment's control. Build records expose CACHED/DONE per layer.
 

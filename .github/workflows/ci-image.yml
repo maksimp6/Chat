@@ -81,6 +81,11 @@ jobs:
 
   cache-scenarios:
     name: CI image cache / ${{ matrix.scenario }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      completed: 'true'
     needs: build
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -96,6 +101,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare isolated cache invalidation scenario
+        id: variant
         env:
           SCENARIO: ${{ matrix.scenario }}
         run: |
@@ -107,23 +113,42 @@ jobs:
             npm) sed -i 's/"prettier": "3.6.2"/"prettier": "3.6.1"/' package.json ;;
             *) exit 2 ;;
           esac
-          python scripts/ci_environment_hash.py
+          echo "tag=$(python scripts/ci_environment_hash.py)" >> "$GITHUB_OUTPUT"
       - name: Set up Buildx on a fresh runner
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: Authenticate variant builder to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Preserve existing variant tag
+        id: variant-existing
+        env:
+          VARIANT_TAG: ${{ steps.variant.outputs.tag }}
+        run: |
+          if docker buildx imagetools inspect "ghcr.io/maksimp6/chat/alice-ci:$VARIANT_TAG" > /dev/null 2>&1; then
+            echo 'found=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'found=false' >> "$GITHUB_OUTPUT"
+          fi
       - name: Measure build with imported baseline layers
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: deploy/ci/Dockerfile
-          push: false
+          push: ${{ steps.variant-existing.outputs.found != 'true' }}
           load: true
-          tags: alice-ci-experiment:local
+          tags: ghcr.io/maksimp6/chat/alice-ci:${{ steps.variant.outputs.tag }}
+          labels: org.opencontainers.image.source=https://github.com/maksimp6/Chat
           no-cache: ${{ matrix.scenario == 'cold' }}
           cache-from: type=gha,scope=alice-ci-image
       - name: Measure local startup and installed toolchain
+        env:
+          VARIANT_IMAGE: ghcr.io/maksimp6/chat/alice-ci:${{ steps.variant.outputs.tag }}
         run: |
           started=$(date +%s.%N)
-          docker run --rm alice-ci-experiment:local bash -c 'python --version; node --version; python -m pip check; prettier --version'
+          docker run --rm "$VARIANT_IMAGE" bash -c 'python --version; node --version; python -m pip check; prettier --version'
           ended=$(date +%s.%N)
           echo "startup_started=$started startup_finished=$ended" >> "$GITHUB_STEP_SUMMARY"
       - name: Measure package mounts on the same live builder
@@ -145,7 +170,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    needs: build
+    needs: [build, cache-scenarios]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -154,10 +179,17 @@ jobs:
       matrix:
         method: [setup, image]
         repeat: [1, 2, 3]
+        scenario: [baseline]
+        include:
+          - {method: image, repeat: source, scenario: source}
+          - {method: image, repeat: dev-requirements, scenario: dev-requirements}
+          - {method: image, repeat: requirements, scenario: requirements}
+          - {method: image, repeat: npm, scenario: npm}
     env:
       YANDEX_API_KEY: ci-test-placeholder
       CI_IMAGE: ${{ needs.build.outputs.image }}
       METHOD: ${{ matrix.method }}
+      SCENARIO: ${{ matrix.scenario }}
     steps:
       - name: Record runner arrival
         run: echo "runner_arrived=$(date +%s.%N)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -166,6 +198,24 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Resolve variant image without modifying test source
+        if: matrix.scenario != 'baseline'
+        run: |
+          variant_root=$(mktemp -d)
+          mkdir -p "$variant_root/deploy/ci" "$variant_root/scripts"
+          cp deploy/ci/Dockerfile "$variant_root/deploy/ci/"
+          cp requirements.txt requirements-dev.txt package.json "$variant_root/"
+          cp scripts/ci_environment_hash.py "$variant_root/scripts/"
+          case "$SCENARIO" in
+            source) ;;
+            dev-requirements) sed -i 's/pytest-xdist==3.8.0/pytest-xdist==3.7.0/' "$variant_root/requirements-dev.txt" ;;
+            requirements) sed -i 's/requests>=2.34.2/requests==2.34.2/' "$variant_root/requirements.txt" ;;
+            npm) sed -i 's/"prettier": "3.6.2"/"prettier": "3.6.1"/' "$variant_root/package.json" ;;
+            *) exit 2 ;;
+          esac
+          tag=$(python "$variant_root/scripts/ci_environment_hash.py")
+          echo "CI_IMAGE=ghcr.io/maksimp6/chat/alice-ci:$tag" >> "$GITHUB_ENV"
+          rm -rf "$variant_root"
       - name: Set up Python with existing pip cache
         if: matrix.method == 'setup'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7

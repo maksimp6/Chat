@@ -17,7 +17,7 @@ def test_only_builder_can_write_packages_and_pr_build_is_same_repo_only():
         for name, job in data["jobs"].items()
         if job.get("permissions", {}).get("packages") == "write"
     ]
-    assert writers == ["build"]
+    assert writers == ["build", "cache-scenarios"]
     guard = data["jobs"]["build"]["if"]
     assert "github.event.pull_request.head.repo.full_name == github.repository" in guard
     assert "github.event.pull_request.number == 762" in guard
@@ -26,10 +26,14 @@ def test_only_builder_can_write_packages_and_pr_build_is_same_repo_only():
 
 def test_ab_uses_one_identical_full_suite_and_keeps_existing_setup_caches():
     benchmark = workflow("ci-image.yml")["jobs"]["benchmark"]
-    assert benchmark["strategy"]["matrix"] == {
-        "method": ["setup", "image"],
-        "repeat": ["1", "2", "3"],
-    }
+    assert benchmark["strategy"]["matrix"]["method"] == ["setup", "image"]
+    assert benchmark["strategy"]["matrix"]["repeat"] == ["1", "2", "3"]
+    assert [v["scenario"] for v in benchmark["strategy"]["matrix"]["include"]] == [
+        "source",
+        "dev-requirements",
+        "requirements",
+        "npm",
+    ]
     steps = benchmark["steps"]
     test_steps = [s for s in steps if s["name"] == "Run identical full SQLite suite with coverage"]
     assert len(test_steps) == 1
@@ -43,7 +47,7 @@ def test_ab_uses_one_identical_full_suite_and_keeps_existing_setup_caches():
     assert any(s["name"] == "Start CI container" for s in steps)
 
 
-def test_scenarios_import_layers_on_fresh_runners_without_exporting_mutated_layers():
+def test_scenarios_publish_immutable_variants_without_exporting_mutated_cache_layers():
     scenarios = workflow("ci-image.yml")["jobs"]["cache-scenarios"]
     assert scenarios["needs"] == "build"
     assert scenarios["strategy"]["matrix"]["scenario"] == [
@@ -60,7 +64,7 @@ def test_scenarios_import_layers_on_fresh_runners_without_exporting_mutated_laye
     assert len(builds) == 1
     assert builds[0]["cache-from"] == "type=gha,scope=alice-ci-image"
     assert "cache-to" not in builds[0]
-    assert builds[0]["push"] == "false"
+    assert builds[0]["push"] == "${{ steps.variant-existing.outputs.found != 'true' }}"
     assert builds[0]["no-cache"] == "${{ matrix.scenario == 'cold' }}"
 
 
