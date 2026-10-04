@@ -1,0 +1,11 @@
+# Production lane configuration
+# Services and behavior for production environment
+
+lanes:
+  production:
+    sign_in: github
+    services:
+      - oauth
+      - chrome
+      - agent-shell
+    owner_id: "293531601"

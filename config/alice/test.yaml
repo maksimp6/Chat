@@ -1,0 +1,10 @@
+# Test lane configuration
+# Services and behavior for test environment
+
+lanes:
+  test:
+    sign_in: passphrase
+    services:
+      - oauth
+      - chrome
+      - agent-shell
