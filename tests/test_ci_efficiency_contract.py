@@ -23,9 +23,9 @@ def test_full_python_suites_report_slowest_tests() -> None:
     application_step = workflow.split("- name: Run Python application tests with coverage", 1)[
         1
     ].split("- name: Generate validation report", 1)[0]
-    postgres_step = workflow.split("- name: Run full application suite on PostgreSQL", 1)[
-        1
-    ].split("- name: Verify backup and restore", 1)[0]
+    postgres_step = workflow.split("- name: Run full application suite on PostgreSQL", 1)[1].split(
+        "- name: Verify backup and restore", 1
+    )[0]
 
     for argument in (
         "pytest",
