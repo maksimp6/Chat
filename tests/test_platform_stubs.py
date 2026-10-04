@@ -3,6 +3,7 @@
 import pytest
 from alice_platform.reconciler import reconcile
 from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
+from alice_platform.providers.cloudru import get_observed_state
 from alice_platform.providers.secrets import get_secret, resolve_all_secrets
 from alice_platform.providers.dns import create_dns_record, update_dns_records, verify_dns
 from alice_platform.providers.storage import (
@@ -12,6 +13,15 @@ from alice_platform.providers.storage import (
     restore_from_snapshot,
     cleanup_old_snapshots,
 )
+
+
+class TestCloudRuProviderNotImplemented:
+    """Cloud.ru provider is deferred to next slice."""
+
+    def test_get_observed_state_returns_empty(self):
+        """Get observed state returns empty containers list."""
+        result = get_observed_state("test")
+        assert result == {"containers": []}
 
 
 class TestReconcilerNotImplemented:
