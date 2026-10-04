@@ -132,7 +132,12 @@ It uses the production Cloud.ru IAM credentials and Object Storage tenant ID.
 Run `preflight` (read-only) before `deploy`.
 
 Deployment creates a private image registry/repository, a private state bucket
-and a single 1 CPU / 4 GiB Chrome replica. The container is found by its fixed
+and at most one 0.5 vCPU / 1 GiB Chrome replica. Container Apps only offers
+fixed CPU/memory pairs; Chrome measured about 340 MiB idle and 800 MiB on a heavy
+page, so this is the economical size. The service scales from zero: Cloud.ru
+stops the replica after 15 minutes without requests (the profile is saved on
+SIGTERM) and starts it on the next request, so the first call after idle waits
+for a cold start. The container is found by its fixed
 name; an existing one is checkpointed, stopped and updated in place, two
 containers with that name stop the run, and a new one is created only when none
 exists. On first install the provider assigns the origin, and `BROWSER_PUBLIC_URL`

@@ -59,8 +59,9 @@ def test_runtime_passes_only_browser_secrets_and_local_profile_paths():
 def test_separate_singleton_worker_and_state_do_not_replace_rdc():
     payload = record()
     assert payload["name"] == "chrome-22706bfa6066"
-    assert payload["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
-    assert payload["template"]["containers"][0]["resources"] == {"cpu": "1", "memory": "4096Mi"}
+    assert payload["template"]["scaling"] == {"minInstanceCount": 0, "maxInstanceCount": 1}
+    assert payload["template"]["idleTimeout"] == "900s"
+    assert payload["template"]["containers"][0]["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
     assert (
         payload["template"]["volumes"][0]["volumeAttributes"]["bucketName"]
         == "alice-chrome-state-22706bfa6066"
@@ -607,3 +608,14 @@ def test_ambiguous_create_failure_never_reports_successful_rollback(monkeypatch)
     with pytest.raises(CloudProviderError) as error:
         chrome.deploy(apps, Mock(), {}, IMAGE, environment())
     assert error.value.code == "chrome_rollback_failed"
+
+
+def test_legacy_always_on_revision_is_still_recognized_for_in_place_update():
+    legacy = record()
+    legacy["template"]["containers"][0]["resources"] = {"cpu": "1", "memory": "4096Mi"}
+    legacy["template"]["scaling"]["minInstanceCount"] = 1
+    apps = SimpleNamespace(project_id=PROJECT, list=Mock(return_value=[legacy]))
+    assert chrome.owned_record(apps) == legacy
+    legacy["template"]["containers"][0]["resources"] = {"cpu": "0.3", "memory": "768Mi"}
+    with pytest.raises(CloudProviderError):
+        chrome.owned_record(apps)

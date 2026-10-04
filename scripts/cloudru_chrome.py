@@ -47,6 +47,14 @@ from storage import StorageObjectNotFound  # noqa: E402
 REGISTRY = "alice-chrome-browser"
 REPOSITORY = "chrome-worker"
 DESCRIPTION = "Alice persistent Google Chrome Playwright MCP; issue 751"
+# Container Apps offers fixed CPU/memory pairs; Chrome measured ~340 MiB idle and
+# ~800 MiB on a heavy page, so 0.5 vCPU / 1 GiB is the economical size. Scaling
+# from zero lets Cloud.ru stop the only replica when idle (profile is saved on
+# SIGTERM); a cold start on the next request is accepted for cost.
+CPU = "0.5"
+IDLE_TIMEOUT = "900s"
+# Earlier always-on revisions that deploy may still update in place.
+ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "4096Mi"})
 VOLUME = "chrome-state"
 MOUNT = "/chrome-state"
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")
@@ -170,8 +178,8 @@ def creation_body(project, image, environment):
     spec = ContainerSpec(
         name=name,
         image=image,
-        cpu="1",
-        min_instances=1,
+        cpu=CPU,
+        min_instances=0,
         max_instances=1,
         public=True,
         description=DESCRIPTION,
@@ -188,9 +196,9 @@ def creation_body(project, image, environment):
         },
         "template": {
             "timeout": "300s",
-            "idleTimeout": "3600s",
+            "idleTimeout": IDLE_TIMEOUT,
             "protocol": "http_1",
-            "scaling": {"minInstanceCount": 1, "maxInstanceCount": 1},
+            "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
             "volumes": [{"name": VOLUME, "type": "s3", "volumeAttributes": {"bucketName": bucket}}],
             "containers": [
                 {
@@ -231,7 +239,7 @@ def owned_record(apps, *, identifier=None):
             and container["name"] == record["name"]
             and container["containerPort"] == 8080
             and IMAGE_RE.fullmatch(container["image"])
-            and container.get("resources") == {"cpu": "1", "memory": "4096Mi"}
+            and container.get("resources") in ACCEPTED_RESOURCES
             and len(variables) == len(environment)
             and not (set(environment) - APP_ENV)
             and environment.get("CHROME_PROFILE_DIR") == "/tmp/chrome-profile"
@@ -240,7 +248,7 @@ def owned_record(apps, *, identifier=None):
             and environment.get("BROWSER_OAUTH_STATE_DIR") == "/tmp/chrome-auth"
             and environment.get("BROWSER_OAUTH_STATE_FILE") == "/tmp/chrome-auth/oauth.json"
             and bool(environment.get("BROWSER_API_TOKEN"))
-            and template["scaling"].get("minInstanceCount") == 1
+            and template["scaling"].get("minInstanceCount", 0) in (0, 1)
             and template["scaling"].get("maxInstanceCount") == 1
             and len(volumes) == 1
             and volume.get("name") == VOLUME
@@ -559,7 +567,7 @@ def summary(record):
         "ingress": "provider_iam"
         if record["configuration"]["ingress"]["accessSettings"]["enableAuth"]
         else "public_worker_auth",
-        "cost_floor": estimate_monthly_cost("1", 1),
+        "cost_floor": estimate_monthly_cost(CPU, 0),
     }
 
 
@@ -701,7 +709,7 @@ def main(argv=None):
             "status": "PREFLIGHT_PASSED",
             "container_exists": record is not None,
             "bucket_exists": exists,
-            "cost_floor": estimate_monthly_cost("1", 1),
+            "cost_floor": estimate_monthly_cost(CPU, 0),
         }
         if args.action == "deploy":
             image = build_image(root, args.sha)
