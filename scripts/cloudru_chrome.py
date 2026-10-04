@@ -417,7 +417,14 @@ def build_image(root, sha):
         return image.pinned
 
 
-def request_worker(apps, record, token, path, *, method="GET"):
+# The provider proxy abandons a testCall while a cold or 0.5 vCPU replica is
+# still starting Chrome; these worker operations are idempotent, so retry.
+RETRY_STATUSES = frozenset({499, 502, 503, 504})
+
+
+def request_worker(
+    apps, record, token, path, *, method="GET", timeout=240, sleep=time.sleep, clock=time.monotonic
+):
     if (path, method) not in (
         ("/healthz", "GET"),
         ("/browser/v1/status", "GET"),
@@ -435,9 +442,20 @@ def request_worker(apps, record, token, path, *, method="GET"):
     }
     if path != "/healthz":
         body["headers"] = {"Authorization": "Bearer " + token}
-    response = apps.client.request(
-        "container_apps", "POST", f"/v2/containers/{record['name']}:testCall", json_body=body
-    )
+    deadline = clock() + timeout
+    while True:
+        try:
+            response = apps.client.request(
+                "container_apps",
+                "POST",
+                f"/v2/containers/{record['name']}:testCall",
+                json_body=body,
+            )
+            break
+        except CloudProviderError as exc:
+            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+                raise
+            sleep(5)
     if (
         response.get("statusCode") != 200
         or not isinstance(response.get("body"), str)

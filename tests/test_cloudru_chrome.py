@@ -711,3 +711,50 @@ def test_test_lane_exports_branch_commit_without_master_ancestry(monkeypatch, tm
     monkeypatch.setenv("CHROME_LANE", "production")
     chrome.export_source(SHA, tmp_path, tmp_path / "prod")
     chrome._export_commit.assert_called_once()
+
+
+class _Clock:
+    def __init__(self):
+        self.value = 0
+
+    def now(self):
+        return self.value
+
+    def sleep(self, seconds):
+        self.value += seconds
+
+
+def test_worker_call_retries_provider_timeouts_during_cold_start():
+    clock = _Clock()
+    ok = {"statusCode": 200, "body": json.dumps({"state": "awake"})}
+    request = Mock(
+        side_effect=[
+            CloudProviderError("abandoned", code="provider_http_error", http_status=499),
+            CloudProviderError("gateway", code="provider_http_error", http_status=504),
+            ok,
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, client=SimpleNamespace(request=request))
+    result = chrome.request_worker(
+        apps, record(), "t", "/browser/v1/wake", method="POST", sleep=clock.sleep, clock=clock.now
+    )
+    assert result == {"state": "awake"} and request.call_count == 3
+
+
+def test_worker_call_does_not_retry_other_errors_or_past_deadline():
+    clock = _Clock()
+    apps = SimpleNamespace(
+        project_id=PROJECT,
+        client=SimpleNamespace(
+            request=Mock(side_effect=CloudProviderError("bad", http_status=400))
+        ),
+    )
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(apps, record(), "t", "/healthz", sleep=clock.sleep, clock=clock.now)
+    assert apps.client.request.call_count == 1
+    apps.client.request = Mock(side_effect=CloudProviderError("slow", http_status=499))
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(
+            apps, record(), "t", "/healthz", timeout=12, sleep=clock.sleep, clock=clock.now
+        )
+    assert apps.client.request.call_count == 4
