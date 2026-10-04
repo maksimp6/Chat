@@ -54,11 +54,10 @@ def test_merge_readiness_workflow_wait_is_bounded_and_fail_closed() -> None:
     assert "cancel-in-progress: true" in workflow
 
 
-def test_merge_readiness_workflow_rechecks_after_review_events() -> None:
+def test_merge_readiness_workflow_rechecks_after_review_events_without_comment_churn() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
     assert "pull_request_review:" in workflow
     assert "types: [submitted, dismissed]" in workflow
-    assert "pull_request_review_comment:" in workflow
-    assert "types: [created, edited, deleted]" in workflow
+    assert "pull_request_review_comment:" not in workflow
     assert "pull_request_review_thread:" not in workflow
