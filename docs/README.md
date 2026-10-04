@@ -13,6 +13,7 @@
 - [Рабочий процесс разработки](development_workflow.md) — formatter, локальные проверки, CI и fail-closed merge gate
 - [Облачное окружение Claude Code для Cloud.ru](development/claude-cloud-ops-environment.md) — настройка, setup script, переменные и инструменты (Cloud.ru CLI, EDS, gh, Docker)
 - [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
+- [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
 - [Cloud.ru Container Apps](cloudru-container-apps.md) — v2 baseline serverless deployment runbook; client contract синхронизирован с `master`, live Cloud.ru rollout пока не подтверждён
 - [API](api/overview.md) — описание доступных API-интерфейсов
