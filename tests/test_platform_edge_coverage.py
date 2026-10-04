@@ -169,9 +169,9 @@ def test_cloudru_dry_run_and_reconciler_all_action_types(capsys, caplog):
     create_container("test", "svc", config)
     update_container("test", "svc", config)
     delete_container("test", "svc")
-    assert "Would create container svc" in caplog.text
-    assert "Would update container svc" in caplog.text
-    assert "Would delete container svc" in caplog.text
+    assert "[DRY-RUN] Would create alice-test-svc" in caplog.text
+    assert "[DRY-RUN] Would update alice-test-svc" in caplog.text
+    assert "[DRY-RUN] Would delete alice-test-svc" in caplog.text
 
     actions = [
         Action(ActionType.CREATE, "create", "test", description="new"),
