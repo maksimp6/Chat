@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from alice_platform.__main__ import cmd_health, cmd_plan, cmd_reconcile, cmd_validate, main
+from alice_platform.__main__ import cmd_health, cmd_validate, main
 from alice_platform.config import (
     ConfigError,
     load_config,
@@ -44,18 +44,6 @@ def test_cli_error_and_empty_paths(tmp_path, capsys):
 
     with (
         patch("alice_platform.__main__.load_config", return_value={}),
-        patch("alice_platform.__main__.plan_actions", return_value=[]),
-    ):
-        assert cmd_plan(_args(lane="test", config_dir="config/alice")) == 0
-        assert "no changes needed" in capsys.readouterr().out
-
-    with patch("alice_platform.__main__.load_config", side_effect=ConfigError("bad")):
-        assert cmd_plan(_args(lane="test", config_dir="config/alice")) == 1
-    with patch("alice_platform.__main__.load_config", side_effect=RuntimeError("boom")):
-        assert cmd_plan(_args(lane="test", config_dir="config/alice")) == 1
-
-    with (
-        patch("alice_platform.__main__.load_config", return_value={}),
         patch("alice_platform.__main__.generate_health_plan", return_value=[]),
     ):
         assert cmd_health(_args(lane="test", config_dir="config/alice")) == 0
@@ -67,30 +55,13 @@ def test_cli_error_and_empty_paths(tmp_path, capsys):
         assert cmd_health(_args(lane="test", config_dir="config/alice")) == 1
 
 
-def test_reconcile_cli_paths(capsys):
-    with (
-        patch("alice_platform.__main__.load_config", return_value={}),
-        patch("alice_platform.__main__.plan_actions", return_value=[]),
-    ):
-        assert cmd_reconcile(_args(lane="test", config_dir="config/alice")) == 0
-        assert "no changes needed" in capsys.readouterr().out
+def test_platform_cli_does_not_expose_unobserved_plan_or_reconcile():
+    for command in ("plan", "reconcile"):
+        with patch("sys.argv", ["alice_platform", command, "test"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 2
 
-    action = Action(ActionType.CREATE, "svc", "test", description="create")
-    with (
-        patch("alice_platform.__main__.load_config", return_value={"services": {"svc": {}}}),
-        patch("alice_platform.__main__.plan_actions", return_value=[action]),
-        patch("alice_platform.__main__.reconcile") as mocked,
-    ):
-        assert cmd_reconcile(_args(lane="test", config_dir="config/alice")) == 0
-        mocked.assert_called_once()
-
-    with patch("alice_platform.__main__.load_config", side_effect=ConfigError("bad")):
-        assert cmd_reconcile(_args(lane="test", config_dir="config/alice")) == 1
-    with patch("alice_platform.__main__.load_config", side_effect=RuntimeError("boom")):
-        assert cmd_reconcile(_args(lane="test", config_dir="config/alice")) == 1
-
-    with patch("sys.argv", ["alice_platform", "reconcile", "test"]):
-        assert main() == 0
 
 
 def test_module_main_exit_path():
