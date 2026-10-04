@@ -286,3 +286,16 @@ test("consent page CSP lets the form redirect to GitHub sign-in", async (t) => {
   const login = await app.form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie);
   assert.equal(new URL(login.headers.get("location")).origin, "https://github.com");
 });
+
+test("a registered but unconfirmed client survives retries for days", async (t) => {
+  // ChatGPT reuses its registered client_id; it must still be valid after a
+  // failed or interrupted first sign-in.
+  const app = await fixture(t);
+  const client = await (await app.register()).json();
+  app.advance(3 * 24 * 3600);
+  const started = await app.start(client);
+  assert.equal(started.response.status, 200);
+  app.advance(31 * 24 * 3600);
+  const late = await app.start(client);
+  assert.equal(late.response.status, 400);
+});
