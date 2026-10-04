@@ -15,9 +15,9 @@ L3: pip/npm BuildKit cache mounts. GHA exports layers, **not cache mounts**.
 L3 probes reuse the same live builder after changing an install-layer input.
 They do not establish persistence of downloaded packages across runner VMs.
 
-Only the builder writes packages. Benchmark image consumers initially require
-packages:read because newly created GHCR packages are private. If the package is
-public, measure anonymous pulls and remove that permission in a later change.
+Only builder jobs write packages. Anonymous access to the published GHCR
+manifest returned HTTP 200, so consumers use public pulls with contents:read only
+and no registry login. Private-package consumers would need packages:read.
 The same-repository PR #762 guard admits this experimental builder without a
 merge; fork PRs cannot execute it. Default required jobs retain their setup,
 caches, permissions, full suites and coverage gates.

@@ -177,7 +177,6 @@ jobs:
     name: SQLite A/B / ${{ matrix.method }} / ${{ matrix.repeat }}
     permissions:
       contents: read
-      packages: read
     needs: [build, cache-scenarios]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -246,13 +245,6 @@ jobs:
       - name: Install npm toolchain
         if: matrix.method == 'setup'
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
-      - name: Authenticate to initially private GHCR package
-        if: matrix.method == 'image'
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Pull immutable CI image
         if: matrix.method == 'image'
         run: docker pull "$CI_IMAGE"

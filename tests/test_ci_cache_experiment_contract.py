@@ -35,6 +35,7 @@ def test_ab_uses_one_identical_full_suite_and_keeps_existing_setup_caches():
         "npm",
     ]
     steps = benchmark["steps"]
+    assert not any("docker/login-action@" in s.get("uses", "") for s in steps)
     test_steps = [s for s in steps if s["name"] == "Run identical full SQLite suite with coverage"]
     assert len(test_steps) == 1
     command = test_steps[0]["run"]
