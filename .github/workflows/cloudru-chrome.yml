@@ -6,18 +6,13 @@ on:
       action:
         description: Deploy or inspect the separate Chrome MCP service on its Container Apps origin
         type: choice
-        options: [preflight, deploy, status, restart, stop, cache-benchmark]
+        options: [preflight, deploy, status, restart, stop]
         default: preflight
       lane:
         description: production (reviewed master only) or test (any branch, separate container and bucket)
         type: choice
         options: [production, test]
         default: production
-      cache_scenario:
-        description: Build-only cache benchmark; lane=test required, no container deployment
-        type: choice
-        options: [cold, warm, python, worker-js, dependencies]
-        default: warm
       storage_tenant_id:
         description: Object Storage tenant ID (not a secret); required for preflight/deploy unless configured
         type: string
@@ -68,7 +63,6 @@ jobs:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
           CHROME_LANE: ${{ inputs.lane }}
-          CACHE_SCENARIO: ${{ inputs.cache_scenario }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
@@ -77,12 +71,7 @@ jobs:
           ALICE_GITHUB_CLIENT_ID: ${{ secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID }}
           ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
-        run: |
-          if [[ "$ACTION" == cache-benchmark ]]; then
-            python scripts/benchmark_chrome_cache.py --sha "$SOURCE_SHA" --scenario "$CACHE_SCENARIO"
-          else
-            python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
-          fi
+        run: python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
       - name: Seed real browser profile through public MCP
         if: inputs.action == 'deploy'
         env:
