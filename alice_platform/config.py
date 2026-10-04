@@ -23,10 +23,10 @@ def _is_secret_pattern(value: Any) -> bool:
     if "-----BEGIN" in value or "-----END" in value:
         return True
 
-    # Long base64 or hex (32+ chars of base64/hex)
+    # Long base64/hex-looking values (32+ chars).
+    # Hex is already a strict subset of this character class, so a second
+    # hex-only branch would be unreachable.
     if re.match(r"^[A-Za-z0-9+/=]{32,}$", value):
-        return True
-    if re.match(r"^[A-Fa-f0-9]{32,}$", value):
         return True
 
     return False
