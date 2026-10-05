@@ -1,5 +1,3 @@
-[Reading 880 lines from start (total: 880 lines, 0 remaining)]
-
 #!/usr/bin/env python3
 """Deploy the reviewed Chrome MCP worker without touching the existing RDC service.
 
@@ -880,5 +878,3 @@ def cli():
 
 if __name__ == "__main__":
     sys.exit(cli())
-
-[executed on device: rdc-22706bfa6066-00001-deployment-68b9cf96cc-r22sb (bf88308d-eebc-4fb0-98e4-96542cf47cb8)]
