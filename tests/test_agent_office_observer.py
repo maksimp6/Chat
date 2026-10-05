@@ -185,7 +185,7 @@ def test_pr_maintainer_handoff_stalls_after_two_scheduled_observer_passes():
             "created_at": dispatch_at.isoformat(),
             "author_association": "OWNER",
         },
-        comment("chatgpt-codex-connector[bot]", "Claude Code is working…" + CLAUDE_RUN_LINK, 0.5),
+        comment("chatgpt-codex-connector[bot]", "Codex acknowledged", 0.5),
     ]
     stalled = build_thread(pr_item(), base_timeline, pull(), [run("tests", "success")])
 
@@ -214,12 +214,12 @@ def test_codex_mention_is_executable_maintainer_dispatch():
         review("copilot-pull-request-reviewer[bot]", 5),
         comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
         comment("maksimp6", "@codex maintainer pass on exact head", 3),
-        comment("chatgpt-codex-connector[bot]", "Claude Code is working…" + CLAUDE_RUN_LINK, 2.5),
+        comment("chatgpt-codex-connector[bot]", "Codex acknowledged", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.dispatches == [("codex", NOW - timedelta(hours=3))]
-    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), True)]
+    assert thread.trigger_eligible_dispatches == [("codex", NOW - timedelta(hours=3), True)]
     assert thread.executable_dispatches == [("codex", NOW - timedelta(hours=3))]
     assert thread.maintainer_dispatches == [("codex", NOW - timedelta(hours=3))]
     assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
@@ -230,12 +230,12 @@ def test_executable_codex_implementation_dispatch_is_not_maintainer_handoff():
         review("copilot-pull-request-reviewer[bot]", 5),
         comment("chatgpt-codex-connector[bot]", "Tests look fine", 4.5),
         comment("maksimp6", "@codex fix the failing test", 3),
-        comment("chatgpt-codex-connector[bot]", "Claude Code is working…" + CLAUDE_RUN_LINK, 2.5),
+        comment("chatgpt-codex-connector[bot]", "Codex acknowledged", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.dispatches == [("codex", NOW - timedelta(hours=3))]
-    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), False)]
+    assert thread.trigger_eligible_dispatches == [("codex", NOW - timedelta(hours=3), False)]
     assert thread.executable_dispatches == [("codex", NOW - timedelta(hours=3))]
     assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
@@ -249,7 +249,7 @@ def test_untrusted_trigger_text_never_becomes_executable_dispatch():
             3,
             association="NONE",
         ),
-        comment("chatgpt-codex-connector[bot]", "Unrelated Claude comment", 2.5),
+        comment("chatgpt-codex-connector[bot]", "Unrelated Codex comment", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
@@ -266,7 +266,7 @@ def test_trusted_trigger_needs_backend_acknowledgement_before_execution_evidence
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
-    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), True)]
+    assert thread.trigger_eligible_dispatches == [("codex", NOW - timedelta(hours=3), True)]
     assert thread.executable_dispatches == []
     assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
@@ -275,11 +275,11 @@ def test_trusted_trigger_needs_backend_acknowledgement_before_execution_evidence
 def test_unrelated_codex_comment_does_not_acknowledge_trusted_trigger():
     timeline = [
         comment("maksimp6", "@codex maintainer pass on exact head", 3),
-        comment("chatgpt-codex-connector[bot]", "Unrelated Claude comment", 2.5),
+        comment("chatgpt-codex-connector[bot]", "Unrelated Codex comment", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
-    assert thread.trigger_eligible_dispatches == [("claude", NOW - timedelta(hours=3), True)]
+    assert thread.trigger_eligible_dispatches == [("codex", NOW - timedelta(hours=3), True)]
     assert thread.executable_dispatches == []
     assert thread.maintainer_dispatches == []
     assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
@@ -293,7 +293,7 @@ def test_only_material_maintainer_status_completes_handoff():
     ]
     acknowledged = build_thread(
         pr_item(),
-        [*base, comment("chatgpt-codex-connector[bot]", "Looking into it" + CLAUDE_RUN_LINK, 2.5)],
+        [*base, comment("chatgpt-codex-connector[bot]", "Looking into it", 2.5)],
         pull(),
         [run("tests", "success")],
     )
@@ -301,7 +301,7 @@ def test_only_material_maintainer_status_completes_handoff():
 
     blocked = build_thread(
         pr_item(),
-        [*base, comment("chatgpt-codex-connector[bot]", "BLOCKED: required check missing" + CLAUDE_RUN_LINK, 2.5)],
+        [*base, comment("chatgpt-codex-connector[bot]", "BLOCKED: required check missing", 2.5)],
         pull(),
         [run("tests", "success")],
     )
@@ -309,7 +309,7 @@ def test_only_material_maintainer_status_completes_handoff():
 
     deferred = build_thread(
         pr_item(),
-        [*base, comment("chatgpt-codex-connector[bot]", "DEFERRED: wait for master sync" + CLAUDE_RUN_LINK, 2.5)],
+        [*base, comment("chatgpt-codex-connector[bot]", "DEFERRED: wait for master sync", 2.5)],
         pull(),
         [run("tests", "success")],
     )
