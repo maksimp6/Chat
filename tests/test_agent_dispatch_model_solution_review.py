@@ -345,8 +345,8 @@ def test_release_manager_merge_gate_is_separate_from_can_bypass_approval():
 # ---------------------------------------------------------------------------
 
 
-def test_solution_review_allows_same_claude_direct_backend_as_implementation():
-    """Same backend (claude-direct) is permitted; role and stage must differ."""
+def test_solution_review_allows_same_github_actions_backend_as_implementation():
+    """Same deterministic backend is permitted; role and stage must differ."""
     impl_plan = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
@@ -358,7 +358,7 @@ def test_solution_review_allows_same_claude_direct_backend_as_implementation():
         backend="github-actions",
     )
 
-    assert impl_plan.backend == review_plan.backend == "claude-direct"
+    assert impl_plan.backend == review_plan.backend == "github-actions"
     assert impl_plan.role != review_plan.role
     assert impl_plan.stage != review_plan.stage
 
