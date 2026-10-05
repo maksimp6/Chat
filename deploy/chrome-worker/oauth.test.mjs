@@ -13,23 +13,16 @@ const PUBLIC = "https://browser.example.test";
 const RESOURCE = `${PUBLIC}/browser/v1/mcp`;
 const REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect";
 const VERIFIER = "v".repeat(43);
+const SHORT_TOKEN = "short-token-owner-secret";
 
 async function fixture(t, overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), "browser-oauth-"));
   let clock = 1_800_000_000_000;
-  let owner = "12345";
   let checkpoints = 0;
-  const upstream = [];
   const options = {
-    env: {}, publicUrl: PUBLIC, githubClientId: "synthetic-client", githubClientSecret: "synthetic-secret",
-    ownerId: "12345", stateFile: join(directory, "oauth.json"), now: () => clock,
+    env: {}, publicUrl: PUBLIC, shortToken: SHORT_TOKEN, ownerId: "owner",
+    stateFile: join(directory, "oauth.json"), now: () => clock,
     onPersist: async () => { checkpoints += 1; },
-    fetch: async (url, init) => {
-      upstream.push({ url, init });
-      if (url.endsWith("/access_token")) return Response.json({ access_token: "synthetic-upstream-token" });
-      if (url === "https://api.github.com/user") return Response.json({ id: owner, login: "owner" });
-      throw new Error("unexpected_upstream");
-    },
     ...overrides,
   };
   if (overrides.realState) options.stateFile = join(directory, "auth", "oauth.json");
@@ -77,22 +70,21 @@ async function fixture(t, overrides = {}) {
     client ??= await (await register()).json();
     const started = await start(client);
     assert.equal(started.response.status, 200);
-    const login = await form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie);
+    const login = await form("/browser/oauth/authorize", { transaction: started.transaction, password: SHORT_TOKEN }, started.cookie);
     assert.equal(login.status, 302);
-    const github = new URL(login.headers.get("location"));
-    assert.equal(github.origin, "https://github.com");
-    const callback = await request(`/browser/oauth/github/callback?${new URLSearchParams({ state: github.searchParams.get("state"), code: "synthetic-code" })}`, { headers: { cookie: started.cookie } });
-    return { client, started, github, callback, location: new URL(callback.headers.get("location")) };
+    return { client, started, login, location: new URL(login.headers.get("location")) };
   }
   const exchange = (flow, values = {}) => form("/browser/oauth/token", {
     grant_type: "authorization_code", client_id: flow.client.client_id, redirect_uri: REDIRECT, code: flow.location.searchParams.get("code"), code_verifier: VERIFIER, resource: RESOURCE, ...values,
   });
-  return { options, base, request, form, register, start, code, exchange, upstream, reload() { oauth = createOAuth(options); }, advance(seconds) { clock += seconds * 1000; }, setOwner(id) { owner = id; }, checkpoints: () => checkpoints };
+  return { options, base, request, form, register, start, code, exchange, reload() { oauth = createOAuth(options); }, advance(seconds) { clock += seconds * 1000; }, checkpoints: () => checkpoints };
 }
 
-test("OAuth remains disabled before first ingress configuration, and rejects ambiguous owners", () => {
+test("OAuth stays disabled until the public URL, short token and owner label are all configured", () => {
   assert.equal(createOAuth({ env: {} }).enabled, false);
-  assert.equal(createOAuth({ env: {}, publicUrl: PUBLIC, githubClientId: "id", githubClientSecret: "secret", ownerId: "123,456" }).enabled, false);
+  assert.equal(createOAuth({ env: {}, publicUrl: PUBLIC, ownerId: "owner" }).enabled, false);
+  assert.equal(createOAuth({ env: {}, shortToken: SHORT_TOKEN, ownerId: "owner" }).enabled, false);
+  assert.equal(createOAuth({ env: {}, publicUrl: PUBLIC, shortToken: SHORT_TOKEN, ownerId: "" }).enabled, false);
 });
 
 test("MCP discovery advertises the exact resource, issuer, PKCE and DCR endpoints", async (t) => {
@@ -109,23 +101,20 @@ test("MCP discovery advertises the exact resource, issuer, PKCE and DCR endpoint
   assert.match(protectedResponse.headers.get("www-authenticate"), /oauth-protected-resource\/browser\/v1\/mcp/);
 });
 
-test("GitHub owner login issues durable tokens; token refresh works after a restart", async (t) => {
+test("short-token login issues durable tokens; token refresh works after a restart", async (t) => {
   const app = await fixture(t);
   const flow = await app.code();
   assert.equal(flow.location.origin, "https://chatgpt.com");
   assert.equal(flow.location.searchParams.get("state"), "client-state");
   assert.equal(flow.location.searchParams.get("iss"), `${PUBLIC}/browser/oauth`);
-  assert.equal(flow.github.searchParams.get("redirect_uri"), `${PUBLIC}/browser/oauth/github/callback`);
-  const githubExchange = app.upstream[0].init.body;
-  assert.equal(hash(githubExchange.get("code_verifier")), flow.github.searchParams.get("code_challenge"));
   const response = await app.exchange(flow);
   assert.equal(response.status, 200);
   const tokens = await response.json();
   assert.equal((await app.request("/browser/v1/mcp", { headers: { authorization: `Bearer ${tokens.access_token}` } })).status, 200);
-  assert.ok(app.checkpoints() >= 5);
+  assert.ok(app.checkpoints() >= 4);
   assert.equal(statSync(app.options.stateFile).mode & 0o777, 0o600);
   const disk = readFileSync(app.options.stateFile, "utf8");
-  for (const secret of [tokens.access_token, tokens.refresh_token, "synthetic-upstream-token", "synthetic-secret"]) assert.equal(disk.includes(secret), false);
+  for (const secret of [tokens.access_token, tokens.refresh_token, SHORT_TOKEN]) assert.equal(disk.includes(secret), false);
   app.reload();
   assert.equal((await app.request("/browser/v1/mcp", { headers: { authorization: `Bearer ${tokens.access_token}` } })).status, 200);
   const refreshed = await app.form("/browser/oauth/token", { grant_type: "refresh_token", client_id: flow.client.client_id, refresh_token: tokens.refresh_token, resource: RESOURCE });
@@ -142,28 +131,50 @@ test("registered redirect, S256, resource and browser cookie prevent login/code 
   const client = await (await app.register()).json();
   for (const values of [{ redirect_uri: "https://attacker.test/callback" }, { code_challenge_method: "plain" }, { resource: "https://other.test/mcp" }]) assert.equal((await app.start(client, values)).response.status, 400);
   const started = await app.start(client);
-  assert.equal((await app.form("/browser/oauth/authorize", { transaction: started.transaction })).status, 400);
-  assert.equal((await app.form("/browser/oauth/authorize", { transaction: started.transaction }, "browser_oauth_transaction=short")).status, 400);
-  const login = await app.form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie);
-  assert.equal(login.status, 302);
-  const callbackPath = `/browser/oauth/github/callback?state=${started.transaction}&code=synthetic-code`;
-  assert.equal((await app.request(callbackPath)).status, 400);
-  assert.equal(app.upstream.length, 0);
-  const callback = await app.request(callbackPath, { headers: { cookie: started.cookie } });
-  const flow = { client, location: new URL(callback.headers.get("location")) };
+  const login = (cookie, password = SHORT_TOKEN) => app.form("/browser/oauth/authorize", { transaction: started.transaction, password }, cookie);
+  assert.equal((await login(undefined)).status, 400);
+  assert.equal((await login("browser_oauth_transaction=short")).status, 400);
+  const granted = await login(started.cookie);
+  assert.equal(granted.status, 302);
+  const flow = { client, location: new URL(granted.headers.get("location")) };
   assert.equal((await app.exchange(flow, { code_verifier: "x".repeat(43) })).status, 400);
   assert.equal((await app.exchange(flow, { resource: "https://other.test/mcp" })).status, 400);
   assert.equal((await app.exchange(flow)).status, 200);
-  assert.equal((await app.request(callbackPath, { headers: { cookie: started.cookie } })).status, 400);
+  assert.equal((await login(started.cookie)).status, 400);
 });
 
-test("only the immutable configured GitHub owner can obtain a code", async (t) => {
+test("a wrong short token never yields a code and does not consume the transaction", async (t) => {
   const app = await fixture(t);
-  app.setOwner("9");
-  const flow = await app.code();
-  assert.equal(flow.location.searchParams.get("code"), null);
-  assert.equal(flow.location.searchParams.get("error"), "access_denied");
-  assert.equal(flow.location.searchParams.get("iss"), `${PUBLIC}/browser/oauth`);
+  const client = await (await app.register()).json();
+  const started = await app.start(client);
+  const attempt = (password) => app.form("/browser/oauth/authorize", { transaction: started.transaction, password }, started.cookie);
+  for (const password of ["wrong", SHORT_TOKEN + "x", SHORT_TOKEN.slice(1)]) {
+    const denied = await attempt(password);
+    assert.equal(denied.status, 403);
+    assert.equal(denied.headers.get("location"), null);
+    assert.deepEqual(await denied.json(), { error: "access_denied" });
+  }
+  assert.equal((await app.form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie)).status, 403);
+  assert.equal((await attempt(SHORT_TOKEN)).status, 302);
+});
+
+test("repeated wrong short tokens lock sign-in out until the window passes, and success resets the count", async (t) => {
+  const app = await fixture(t);
+  const client = await (await app.register()).json();
+  const attempt = async (password) => {
+    const started = await app.start(client);
+    return app.form("/browser/oauth/authorize", { transaction: started.transaction, password }, started.cookie);
+  };
+  for (let index = 0; index < 5; index += 1) assert.equal((await attempt("wrong")).status, 403);
+  const locked = await attempt(SHORT_TOKEN);
+  assert.equal(locked.status, 429);
+  assert.deepEqual(await locked.json(), { error: "too_many_attempts" });
+  assert.ok(Number(locked.headers.get("retry-after")) > 0);
+  app.advance(901);
+  assert.equal((await attempt(SHORT_TOKEN)).status, 302);
+  for (let index = 0; index < 4; index += 1) assert.equal((await attempt("wrong")).status, 403);
+  assert.equal((await attempt(SHORT_TOKEN)).status, 302);
+  for (let index = 0; index < 5; index += 1) assert.equal((await attempt("wrong")).status, 403);
 });
 
 test("authorization code replay revokes its token family", async (t) => {
@@ -274,17 +285,15 @@ test("concurrent real worker OAuth registrations checkpoint complete immutable s
   assert.equal(restored.status().authGeneration, 20);
 });
 
-test("consent page CSP lets the form redirect to GitHub sign-in", async (t) => {
-  // Browsers enforce form-action on the redirect after submit; 'self' alone
-  // silently blocks the GitHub redirect and the consent page appears to hang.
+test("consent page posts only to itself and renders a password field", async (t) => {
   const app = await fixture(t);
   const client = await (await app.register()).json();
   const started = await app.start(client);
   const policy = started.response.headers.get("content-security-policy");
   const formAction = policy.split(";").map((part) => part.trim()).find((part) => part.startsWith("form-action"));
-  assert.deepEqual(formAction.split(/\s+/).slice(1).sort(), ["'self'", "https://github.com"]);
-  const login = await app.form("/browser/oauth/authorize", { transaction: started.transaction }, started.cookie);
-  assert.equal(new URL(login.headers.get("location")).origin, "https://github.com");
+  assert.deepEqual(formAction.split(/\s+/).slice(1), ["'self'"]);
+  assert.match(started.html, /type="password" name="password"/);
+  assert.doesNotMatch(started.html, /github\.com/i);
 });
 
 test("unconfirmed clients survive retries for days but not past a week", async (t) => {

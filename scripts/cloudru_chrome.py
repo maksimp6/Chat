@@ -5,9 +5,8 @@ The worker is served directly from its stable Container Apps origin. Evolution A
 Gateway has no public management API, so the service does not depend on it; the
 worker is the access boundary. Anonymous routes are ``/healthz`` and the
 protocol-required OAuth surface (discovery, dynamic registration, authorize,
-GitHub callback, token, revoke), which issues tokens only to the allowed GitHub
-account. Browser control and MCP require the worker bearer token or such an OAuth
-token, and deployment verifies that refusal on the public origin.
+short-token authorization, token and revoke). Browser control and MCP require the
+worker bearer token or an OAuth token issued after the owner enters that short token, and deployment verifies that refusal on the public origin.
 """
 
 from __future__ import annotations
@@ -60,6 +59,7 @@ ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "
 VOLUME = "chrome-state"
 MOUNT = "/chrome-state"
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")
+LEGACY_AUTH_ENV = frozenset({"ALICE_GITHUB_CLIENT_ID", "ALICE_GITHUB_CLIENT_SECRET"})
 APP_ENV = frozenset(
     {
         "BROWSER_API_TOKEN",
@@ -68,8 +68,6 @@ APP_ENV = frozenset(
         "BROWSER_DEPLOYMENT_SHA",
         "BROWSER_OAUTH_STATE_DIR",
         "BROWSER_OAUTH_STATE_FILE",
-        "ALICE_GITHUB_CLIENT_ID",
-        "ALICE_GITHUB_CLIENT_SECRET",
         "ALICE_GITHUB_ALLOWED_IDS",
         "CHROME_PROFILE_DIR",
         "CHROME_STATE_DIR",
@@ -186,8 +184,7 @@ def idp_issuer(value):
 
 def runtime_env(sha, env=os.environ):
     token = env.get("BROWSER_API_TOKEN") or env.get("ALICE_SHORT_TOKEN", "")
-    required = ("ALICE_GITHUB_CLIENT_ID", "ALICE_GITHUB_CLIENT_SECRET")
-    if not token or any(not env.get(key) for key in required):
+    if not token:
         fail("auth_not_configured")
     owner = env.get("ALICE_GITHUB_ALLOWED_IDS") or "293531601"
     if not re.fullmatch(r"[1-9][0-9]*", owner) or not re.fullmatch(r"[0-9a-f]{40}", sha):
@@ -195,8 +192,6 @@ def runtime_env(sha, env=os.environ):
     result = {
         "BROWSER_API_TOKEN": token,
         "BROWSER_DEPLOYMENT_SHA": sha,
-        "ALICE_GITHUB_CLIENT_ID": env["ALICE_GITHUB_CLIENT_ID"],
-        "ALICE_GITHUB_CLIENT_SECRET": env["ALICE_GITHUB_CLIENT_SECRET"],
         "ALICE_GITHUB_ALLOWED_IDS": owner,
         "CHROME_PROFILE_DIR": "/tmp/chrome-profile",
         "CHROME_STATE_DIR": MOUNT,
@@ -283,7 +278,7 @@ def owned_record(apps, *, identifier=None):
             and IMAGE_RE.fullmatch(container["image"])
             and container.get("resources") in ACCEPTED_RESOURCES
             and len(variables) == len(environment)
-            and not (set(environment) - APP_ENV)
+            and not (set(environment) - APP_ENV - LEGACY_AUTH_ENV)
             and environment.get("CHROME_PROFILE_DIR") == "/tmp/chrome-profile"
             and environment.get("CHROME_STATE_DIR") == MOUNT
             and environment.get("CHROME_STATE_REQUIRE_MOUNT") == "1"
@@ -495,7 +490,10 @@ def request_worker(
             )
             break
         except CloudProviderError as exc:
-            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+            # No status means the HTTP client timed out: a scaled-to-zero replica
+            # is still cold-starting Chrome and restoring its profile.
+            timed_out = exc.code == "provider_http_error" and exc.http_status is None
+            if not (timed_out or exc.http_status in RETRY_STATUSES) or clock() >= deadline:
                 raise
             sleep(5)
     if (
@@ -663,7 +661,6 @@ def summary(record):
         "digest": container["image"].split("@", 1)[1],
         "provider_url": origin,
         "mcp_url": public + "/browser/v1/mcp",
-        "oauth_callback_url": public + "/browser/oauth/github/callback",
         "ingress": "provider_iam"
         if record["configuration"]["ingress"]["accessSettings"]["enableAuth"]
         else "public_worker_auth",
@@ -802,14 +799,10 @@ def export_public_url(origin, env=os.environ):
     if env.get("GITHUB_ENV"):
         with open(env["GITHUB_ENV"], "a", encoding="utf-8") as stream:
             stream.write("BROWSER_PUBLIC_URL=" + origin + "\n")
-    # The owner only needs these two URLs: the ChatGPT connector and the OAuth callback.
+    # The owner only needs the ChatGPT connector URL.
     if env.get("GITHUB_STEP_SUMMARY"):
         with open(env["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
-            stream.write(
-                "## Chrome MCP\n\n"
-                f"- ChatGPT connector URL: `{origin}/browser/v1/mcp`\n"
-                f"- GitHub OAuth callback: `{origin}/browser/oauth/github/callback`\n"
-            )
+            stream.write(f"## Chrome MCP\n\n- ChatGPT connector URL: `{origin}/browser/v1/mcp`\n")
 
 
 def main(argv=None):
