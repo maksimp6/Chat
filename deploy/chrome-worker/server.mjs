@@ -221,6 +221,34 @@ export function createWorker(options = {}) {
         return json(response, 200, idp.resourceMetadata());
       }
       if (await oauth.handle(request, response, url)) return;
+      if (takeoverEnabled && request.method === "GET" && pathname === "/browser/v1/takeover") {
+        if (!oauth.ownerAuthorize?.(request)) {
+          response.writeHead(200, {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "content-security-policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+            "referrer-policy": "no-referrer",
+            "x-content-type-options": "nosniff",
+          });
+          response.end('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Chrome takeover</title><h1>Войти в браузер</h1><p>Введите short token владельца. Пароль сайта затем вводится уже непосредственно в Chrome.</p><form method="post" action="/browser/oauth/owner-session"><input type="password" name="password" autocomplete="current-password" required autofocus><button type="submit">Открыть Chrome</button></form></html>');
+          return;
+        }
+        await wake();
+        let grant;
+        try { grant = takeover.start(); }
+        catch (error) {
+          if (error.message !== "takeover_already_active") throw error;
+          takeover.stop();
+          grant = takeover.start();
+        }
+        response.writeHead(303, {
+          location: `/browser/v1/takeover/vnc.html?autoconnect=1&resize=scale&path=${encodeURIComponent(`browser/v1/takeover/websockify?takeover_token=${grant.token}`)}&takeover_token=${grant.token}`,
+          "cache-control": "no-store",
+          "referrer-policy": "no-referrer",
+        });
+        response.end();
+        return;
+      }
       if (takeoverEnabled && request.method === "GET" && pathname.startsWith("/browser/v1/takeover/")) {
         if (await takeover.proxyHttp(request, response, url)) return;
         return json(response, 401, { error: "unauthorized" });
