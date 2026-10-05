@@ -10,6 +10,7 @@ export function createTakeover(options = {}) {
   const spawnProcess = options.spawnProcess ?? spawn;
   let session;
   let processes = [];
+  let displayStarted = false;
 
   function stopProcesses() {
     for (const child of processes.splice(0)) {
@@ -29,21 +30,32 @@ export function createTakeover(options = {}) {
     return session ? { active: true, expiresAt: session.expiresAt } : { active: false };
   }
 
-  function start() {
-    expire();
-    if (session) throw Object.assign(new Error("takeover_already_active"), { status: 409 });
-    const token = randomBytes(32).toString("base64url");
-    session = { token, expiresAt: now() + ttlMs };
+  function startDisplay() {
+    if (displayStarted) return;
+    displayStarted = true;
     processes = [
       spawnProcess("Xvfb", [":99", "-screen", "0", "1440x900x24", "-nolisten", "tcp"], { stdio: "ignore" }),
       spawnProcess("x11vnc", ["-display", ":99", "-localhost", "-forever", "-shared", "-nopw", "-rfbport", "5900"], { stdio: "ignore" }),
       spawnProcess("websockify", ["--web", "/usr/share/novnc", "127.0.0.1:6080", "127.0.0.1:5900"], { stdio: "ignore" }),
     ];
+  }
+
+  function start() {
+    expire();
+    if (session) throw Object.assign(new Error("takeover_already_active"), { status: 409 });
+    startDisplay();
+    const token = randomBytes(32).toString("base64url");
+    session = { token, expiresAt: now() + ttlMs };
     return { token, expiresAt: session.expiresAt };
   }
 
   function stop() {
     session = undefined;
+  }
+
+  function close() {
+    session = undefined;
+    displayStarted = false;
     stopProcesses();
   }
 
@@ -72,5 +84,5 @@ export function createTakeover(options = {}) {
     upstream.on("error", () => socket.destroy());
   }
 
-  return { start, stop, status, authorized, proxyUpgrade };
+  return { startDisplay, start, stop, close, status, authorized, proxyUpgrade };
 }
