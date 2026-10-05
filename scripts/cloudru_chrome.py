@@ -862,10 +862,8 @@ def main(argv=None):
                 "url": grant["url"],
                 "expiresAt": grant["expiresAt"],
             }
-            summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-            if summary_path:
-                with open(summary_path, "a", encoding="utf-8") as stream:
-                    stream.write(f"## Chrome human takeover\n\n- Open: {grant['url']}\n")
+            # The URL contains a short-lived bearer grant. Do not write it to
+            # GitHub summaries, comments, artifacts, or persistent logs.
         else:
             generation = None
             if str(record.get("status", "")).lower() == "running":
