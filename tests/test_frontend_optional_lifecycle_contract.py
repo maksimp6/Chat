@@ -21,4 +21,6 @@ def test_android_diagnostics_initialization_is_idempotent():
     assert "function initDiagnostics()" in source
     assert "androidDiagnosticsInitialized" in source
     assert 'addEventListener("click"' in source
+    assert 'id = "android-browser-btn"' in source
+    assert 'bridge().openBrowserTakeover()' in source
     assert ".onclick =" not in source
