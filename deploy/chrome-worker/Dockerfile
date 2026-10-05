@@ -20,7 +20,7 @@ RUN update-ca-certificates
 WORKDIR /opt/chrome-worker
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.mjs mcp.mjs oauth.mjs state.mjs ./
+COPY server.mjs mcp.mjs oauth.mjs state.mjs idp-auth.mjs jwt-verify.mjs ./
 
 RUN mkdir -p /state/profile && chown -R node:node /state /opt/chrome-worker
 USER node
