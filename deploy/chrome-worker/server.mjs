@@ -5,6 +5,7 @@ import { createIdpAuth } from "./idp-auth.mjs";
 import { createPlaywrightMcp } from "./mcp.mjs";
 import { createOAuth } from "./oauth.mjs";
 import { createChromeStateStore } from "./state.mjs";
+import { createTakeover } from "./takeover.mjs";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TEXT_CHARS = 32 * 1024;
@@ -91,8 +92,10 @@ export function createWorker(options = {}) {
     requiredScopes: ["browser.control"],
     ...options.idp,
   });
+  const takeover = createTakeover(options.takeover);
   let oauth;
   const ready = (async () => {
+    takeover.startDisplay();
     await stateStore.restore();
     oauth = createOAuth({
       ...options.oauth,
@@ -119,7 +122,7 @@ export function createWorker(options = {}) {
       const chromium = options.chromium ?? (await import("playwright-core")).chromium;
       context = await chromium.launchPersistentContext(profileDir, {
         executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
-        headless: process.env.CHROME_HEADLESS !== "0",
+        headless: false,
         chromiumSandbox: false,
         args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
       });
@@ -230,6 +233,22 @@ export function createWorker(options = {}) {
         const message = request.method === "POST" ? await body(request) : undefined;
         return await mcp.handle(request, response, message);
       }
+      if (request.method === "POST" && pathname === "/browser/v1/takeover/start") {
+        await wake();
+        const grant = takeover.start();
+        const origin = publicUrl ? new URL(publicUrl).origin : `http://${request.headers.host}`;
+        return json(response, 200, {
+          url: `${origin}/browser/v1/takeover/vnc.html?autoconnect=1&resize=scale&path=${encodeURIComponent(`browser/v1/takeover/websockify?takeover_token=${grant.token}`)}&takeover_token=${grant.token}`,
+          expiresAt: grant.expiresAt,
+        });
+      }
+      if (request.method === "POST" && pathname === "/browser/v1/takeover/stop") {
+        takeover.stop();
+        return json(response, 200, { active: false });
+      }
+      if (request.method === "GET" && pathname === "/browser/v1/takeover/status") {
+        return json(response, 200, takeover.status());
+      }
       const operation = routeTools.get(`${request.method} ${pathname}`);
       if (!operation) return json(response, 404, { error: "not_found" });
       const args = operation[1] ? await body(request) : {};
@@ -240,13 +259,15 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, ready, async close() { await mcp.close(); await sleep(); } };
+  return { handler, callTool, ready, takeover, async close() { await mcp.close(); takeover.close(); await sleep(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const worker = createWorker();
   await worker.ready;
-  const server = createServer(worker.handler).listen(Number(process.env.PORT ?? 8080), "0.0.0.0");
+  const server = createServer(worker.handler);
+  server.on("upgrade", (request, socket, head) => worker.takeover.proxyUpgrade(request, socket, head));
+  server.listen(Number(process.env.PORT ?? 8080), "0.0.0.0");
   let stopping = false;
   async function stop() {
     if (stopping) return;
