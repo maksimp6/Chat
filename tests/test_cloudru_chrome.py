@@ -25,8 +25,6 @@ def environment(**overrides):
         SHA,
         {
             "ALICE_SHORT_TOKEN": "test-private-token",
-            "ALICE_GITHUB_CLIENT_ID": "test-client",
-            "ALICE_GITHUB_CLIENT_SECRET": "test-client-secret",
             "BROWSER_PUBLIC_URL": MCP_ORIGIN,
             **overrides,
         },
@@ -346,12 +344,32 @@ def test_deployed_origin_is_exported_for_live_acceptance(tmp_path):
         chrome.export_public_url("https://evil.example", {"GITHUB_ENV": str(target)})
 
 
-def test_deploy_summary_shows_only_public_connector_url(tmp_path):
+def test_deploy_summary_shows_only_the_public_connector_url(tmp_path):
     summary = tmp_path / "summary"
     chrome.export_public_url(ORIGIN, {"GITHUB_STEP_SUMMARY": str(summary)})
     text = summary.read_text()
-    assert ORIGIN + "/browser/v1/mcp" in text
+    assert text.splitlines()[0] == "## Chrome MCP"
+    assert f"- ChatGPT connector URL: `{ORIGIN}/browser/v1/mcp`" in text.splitlines()
+    assert "\\n" not in text
     assert "token" not in text.lower()
+    assert "github" not in text.lower()
+    assert "callback" not in text.lower()
+
+
+def test_runtime_env_needs_only_the_token_and_never_forwards_github_client_credentials():
+    result = chrome.runtime_env(
+        SHA,
+        {
+            "ALICE_SHORT_TOKEN": "test-private-token",
+            "ALICE_GITHUB_CLIENT_ID": "client",
+            "ALICE_GITHUB_CLIENT_SECRET": "client-secret",
+        },
+    )
+    assert result["BROWSER_API_TOKEN"] == "test-private-token"
+    assert not any("GITHUB_CLIENT" in key for key in result)
+    with pytest.raises(CloudProviderError) as error:
+        chrome.runtime_env(SHA, {})
+    assert error.value.code == "auth_not_configured"
 
 
 def test_bucket_with_unknown_owner_is_not_adopted(monkeypatch):
@@ -413,8 +431,7 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert "git merge-base --is-ancestor HEAD FETCH_HEAD" in workflow
     assert "environment: production" in workflow
     assert "secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN" in workflow
-    assert "BROWSER_GITHUB_CLIENT_ID" not in workflow
-    assert "BROWSER_GITHUB_CLIENT_SECRET" not in workflow
+    assert "GITHUB_CLIENT" not in workflow
     assert "CLOUDRU_STORAGE_TENANT_ID" in workflow
     assert 'python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"' in workflow
     assert "ALICE_DATABASE_URL" not in workflow
@@ -478,8 +495,6 @@ def test_cli_actions_respect_read_only_and_checkpoint_boundaries(monkeypatch, ca
         "CLOUDRU_IAM_KEY_SECRET": "test-key-secret",
         "CLOUDRU_STORAGE_TENANT_ID": IDENTIFIER,
         "ALICE_SHORT_TOKEN": "test-private-token",
-        "ALICE_GITHUB_CLIENT_ID": "test-client",
-        "ALICE_GITHUB_CLIENT_SECRET": "test-client-secret",
     }.items():
         monkeypatch.setenv(key, value)
     monkeypatch.delenv("BROWSER_PUBLIC_URL", raising=False)
