@@ -96,3 +96,18 @@ test("human takeover requires worker auth and returns only an ephemeral browser 
   assert.match(grant.url, /takeover_token=ephemeral-grant/);
   assert.equal(JSON.stringify(grant).includes("test-token"), false);
 });
+
+
+test("human takeover entry page never exposes browser UI before owner authentication", async (t) => {
+  const takeover = {
+    startDisplay() {}, start() { throw new Error("must_not_start"); }, stop() {}, close() {},
+    status() { return { active: false }; }, async proxyHttp() { return false; }, proxyUpgrade() {},
+  };
+  const app = await fixture({ takeoverEnabled: true, takeoverRuntime: takeover });
+  t.after(app.close);
+  const response = await app.request("/browser/v1/takeover", undefined, "wrong");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Введите short token владельца/);
+  assert.equal(html.includes("takeover_token"), false);
+});
