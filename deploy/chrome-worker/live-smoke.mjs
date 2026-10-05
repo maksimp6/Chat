@@ -18,37 +18,6 @@ export function evaluationResult(result) {
   catch { throw Object.assign(new Error("evaluation_result_invalid"), { smokeCode: "evaluation_result_invalid" }); }
 }
 
-async function oauthDiscovery(origin, fetchHttp) {
-  const readJson = async (url, init) => {
-    const response = await fetchHttp(url, { ...init, redirect: "manual", signal: AbortSignal.timeout(30_000) });
-    requireCheck(response.ok, "oauth_discovery_http_failed");
-    return response.json();
-  };
-  const resource = await readJson(`${origin}/.well-known/oauth-protected-resource/browser/v1/mcp`);
-  requireCheck(resource.resource === `${origin}/browser/v1/mcp`, "oauth_resource_mismatch");
-  requireCheck(resource.authorization_servers?.length === 1 && resource.authorization_servers[0] === `${origin}/browser/oauth`, "oauth_issuer_mismatch");
-  const metadata = await readJson(`${origin}/.well-known/oauth-authorization-server/browser/oauth`);
-  requireCheck(metadata.issuer === resource.authorization_servers[0] && metadata.code_challenge_methods_supported?.includes("S256"), "oauth_metadata_mismatch");
-  for (const field of ["registration_endpoint", "authorization_endpoint", "token_endpoint"]) requireCheck(new URL(metadata[field]).origin === origin, "oauth_endpoint_mismatch");
-  const redirectUri = "https://chatgpt.com/connector_platform_oauth_redirect";
-  const registered = await readJson(metadata.registration_endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_name: "Chrome deployment acceptance", redirect_uris: [redirectUri], token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] }) });
-  requireCheck(typeof registered.client_id === "string", "oauth_registration_failed");
-  const verifier = randomBytes(32).toString("base64url");
-  const authorize = new URL(metadata.authorization_endpoint);
-  authorize.search = new URLSearchParams({ client_id: registered.client_id, redirect_uri: redirectUri, response_type: "code", resource: resource.resource, scope: "browser", state: randomBytes(24).toString("hex"), code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" }).toString();
-  const consent = await fetchHttp(authorize, { redirect: "manual", signal: AbortSignal.timeout(30_000) });
-  requireCheck(consent.status === 200, "oauth_consent_failed");
-  const cookie = consent.headers.get("set-cookie") ?? "";
-  requireCheck(/HttpOnly/i.test(cookie) && /SameSite=Lax/i.test(cookie) && (origin.startsWith("http:") || /Secure/i.test(cookie)), "oauth_cookie_missing");
-  const transaction = (await consent.text()).match(/name="transaction" value="([A-Za-z0-9_-]+)"/)?.[1];
-  requireCheck(Boolean(transaction), "oauth_consent_transaction_missing");
-  const login = await fetchHttp(authorize.origin + authorize.pathname, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(30_000), headers: { "content-type": "application/x-www-form-urlencoded", cookie: cookie.split(";")[0] }, body: new URLSearchParams({ transaction }) });
-  requireCheck(login.status === 302, "oauth_browser_cookie_not_forwarded");
-  const github = new URL(login.headers.get("location") ?? "about:blank");
-  requireCheck(github.origin === "https://github.com" && github.pathname === "/login/oauth/authorize" && github.searchParams.get("redirect_uri") === `${origin}/browser/oauth/github/callback` && github.searchParams.get("code_challenge_method") === "S256" && github.searchParams.get("state") === transaction && /^[A-Za-z0-9_-]{43}$/.test(github.searchParams.get("code_challenge") ?? ""), "oauth_github_redirect_mismatch");
-  // This proves discovery/DCR/cookie/redirect transport, not the user's GitHub consent.
-}
-
 export async function runLiveSmoke(options = {}) {
   const phase = options.phase ?? process.argv[2];
   const endpoint = new URL(options.endpoint ?? `${process.env.BROWSER_PUBLIC_URL ?? ""}/browser/v1/mcp`);
@@ -90,7 +59,6 @@ export async function runLiveSmoke(options = {}) {
     requireCheck(Boolean(transport.sessionId), "mcp_session_missing");
     const tools = await client.listTools();
     for (const name of ["browser_tabs", "browser_navigate", "browser_snapshot", "browser_type", "browser_click", "browser_evaluate", "browser_take_screenshot"]) requireCheck(tools.tools.some((tool) => tool.name === name), `smoke_tool_missing_${name}`);
-    if (options.checkOAuth !== false && phase === "seed") await oauthDiscovery(endpoint.origin, fetchHttp);
     await call("browser_tabs", { action: "new" });
     tabOpened = true;
     // Carry test data in a URL fragment, never in executable JavaScript source.
@@ -146,7 +114,7 @@ export async function runLiveSmoke(options = {}) {
     await call("browser_tabs", { action: "close" });
     tabOpened = false;
     await transport.terminateSession();
-    return { status: "passed", phase, tool_count: tools.tools.length, calls, transport_headers: "passed", oauth: options.checkOAuth !== false && phase === "seed" ? "discovery_and_github_redirect_passed" : "not_exercised" };
+    return { status: "passed", phase, tool_count: tools.tools.length, calls, transport_headers: "passed", oauth: "covered_by_short_token_oauth_test" };
   } finally {
     if (tabOpened) await call("browser_tabs", { action: "close" }).catch(() => {});
     if (transport.sessionId) await transport.terminateSession().catch(() => {});
