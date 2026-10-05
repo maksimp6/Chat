@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import subprocess
 
-from scripts.build_ai_index import build_index
+from scripts.build_ai_index import build_index, query_affected
 
 
 def _write(root: Path, relative: str, source: str) -> None:
@@ -126,3 +126,116 @@ def test_python_ast_index_prefers_git_tracked_files(tmp_path):
     payload = build_index(tmp_path)
 
     assert [item["path"] for item in payload["files"]] == ["tracked.py"]
+
+
+# ---------------------------------------------------------------------------
+# query_affected tests
+# ---------------------------------------------------------------------------
+
+
+def _fixture_index(tmp_path: Path):
+    """Build a fixed, deterministic index fixture used by query_affected tests."""
+    _write(
+        tmp_path,
+        "pkg/models.py",
+        "class User:\n    pass\n",
+    )
+    _write(
+        tmp_path,
+        "pkg/service.py",
+        "from pkg.models import User\n\ndef create(name):\n    return User()\n",
+    )
+    _write(
+        tmp_path,
+        "pkg/utils.py",
+        "def helper():\n    return 1\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_service.py",
+        "from pkg.service import create\n\ndef test_create():\n    assert create('x')\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_models.py",
+        "from pkg.models import User\n\ndef test_user():\n    assert User()\n",
+    )
+    return build_index(tmp_path)
+
+
+def test_query_affected_direct_change_returns_module_and_tests(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, ["pkg/models.py"])
+
+    assert "pkg.models" in result["affected_modules"]
+    assert "tests/test_models.py" in result["affected_tests"]
+
+
+def test_query_affected_first_order_reverse_dependency(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, ["pkg/models.py"])
+
+    # pkg.service imports pkg.models, so it is also affected
+    assert "pkg.service" in result["affected_modules"]
+    # tests for pkg.service are pulled in too
+    assert "tests/test_service.py" in result["affected_tests"]
+
+
+def test_query_affected_unrelated_module_not_included(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, ["pkg/utils.py"])
+
+    assert "pkg.models" not in result["affected_modules"]
+    assert "pkg.service" not in result["affected_modules"]
+    assert "tests/test_models.py" not in result["affected_tests"]
+    assert "tests/test_service.py" not in result["affected_tests"]
+
+
+def test_query_affected_provenance_has_required_fields(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, ["pkg/models.py"])
+
+    assert result["schema_version"] == 1
+    assert result["query"] == "affected_modules"
+    assert "provenance" in result
+    assert "git_revision" in result["provenance"]
+    assert "index_root" in result["provenance"]
+    assert result["provenance"]["index_root"] == "."
+
+
+def test_query_affected_per_file_provenance(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, ["pkg/models.py", "nonexistent.py"])
+
+    records = {r["path"]: r for r in result["changed_files"]}
+    assert records["pkg/models.py"]["in_index"] is True
+    assert len(records["pkg/models.py"]["sha256_in_index"]) == 64
+    assert records["nonexistent.py"]["in_index"] is False
+    assert records["nonexistent.py"]["sha256_in_index"] is None
+
+
+def test_query_affected_deterministic(tmp_path):
+    index = _fixture_index(tmp_path)
+    first = query_affected(index, ["pkg/models.py", "pkg/utils.py"])
+    second = query_affected(index, ["pkg/models.py", "pkg/utils.py"])
+
+    assert first == second
+    assert first["affected_modules"] == sorted(first["affected_modules"])
+    assert first["affected_tests"] == sorted(first["affected_tests"])
+
+
+def test_query_affected_empty_changed_list(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, [])
+
+    assert result["affected_modules"] == []
+    assert result["affected_tests"] == []
+    assert result["changed_files"] == []
+
+
+def test_query_affected_result_is_json_serialisable(tmp_path):
+    index = _fixture_index(tmp_path)
+    result = query_affected(index, ["pkg/service.py"])
+
+    encoded = json.dumps(result, sort_keys=True)
+    assert json.loads(encoded) == result

@@ -219,16 +219,111 @@ def build_index(root: Path) -> dict[str, Any]:
     }
 
 
+def _module_matches(imported: str, changed_modules: set[str]) -> bool:
+    """True if `imported` exactly matches or is a sub-module of any changed module."""
+    return imported in changed_modules or any(
+        imported.startswith(m + ".") for m in changed_modules
+    )
+
+
+def query_affected(
+    index: dict[str, Any],
+    changed_paths: list[str],
+    git_root: Path | None = None,
+) -> dict[str, Any]:
+    """Return modules and tests affected by the given list of changed file paths.
+
+    Uses the pre-built index; no filesystem access beyond an optional git-revision
+    lookup for provenance.  No mutation authority.
+    """
+    path_to_entry: dict[str, dict[str, Any]] = {f["path"]: f for f in index["files"]}
+
+    # Per-file provenance and direct changed-module set
+    changed_file_records: list[dict[str, Any]] = []
+    changed_modules: set[str] = set()
+    for p in changed_paths:
+        entry = path_to_entry.get(p)
+        changed_file_records.append(
+            {
+                "path": p,
+                "in_index": entry is not None,
+                "sha256_in_index": entry["sha256"] if entry else None,
+            }
+        )
+        if entry:
+            changed_modules.add(entry["module"])
+
+    # First-order reverse deps: non-test modules that directly import a changed module
+    affected_modules: set[str] = set(changed_modules)
+    for f in index["files"]:
+        if f["is_test"]:
+            continue
+        for imp in f["imports"]:
+            imported = imp["module"].lstrip(".")
+            if imported and _module_matches(imported, changed_modules):
+                affected_modules.add(f["module"])
+                break
+
+    # Tests that cover any affected module via the pre-built tests_by_module map
+    tests_by_module: dict[str, list[str]] = index.get("tests_by_module", {})
+    affected_tests: set[str] = set()
+    for module in affected_modules:
+        affected_tests.update(tests_by_module.get(module, []))
+
+    git_revision: str | None = None
+    if git_root is not None:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(git_root), "rev-parse", "HEAD"],
+                capture_output=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                git_revision = result.stdout.decode().strip()
+        except OSError:
+            pass
+
+    return {
+        "schema_version": index["schema_version"],
+        "query": "affected_modules",
+        "provenance": {
+            "git_revision": git_revision,
+            "index_root": index["root"],
+        },
+        "changed_files": changed_file_records,
+        "affected_modules": sorted(affected_modules),
+        "affected_tests": sorted(affected_tests),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="repository root")
     parser.add_argument("--output", help="write JSON to this path instead of stdout")
     parser.add_argument("--compact", action="store_true", help="emit compact JSON")
+    parser.add_argument(
+        "--query-affected",
+        metavar="FILES",
+        help="comma-separated changed file paths; requires --index-file",
+    )
+    parser.add_argument(
+        "--index-file",
+        metavar="PATH",
+        help="pre-built index JSON consumed by --query-affected",
+    )
     args = parser.parse_args()
 
-    index = build_index(Path(args.root))
+    if args.query_affected is not None:
+        if not args.index_file:
+            parser.error("--query-affected requires --index-file")
+        index = json.loads(Path(args.index_file).read_text(encoding="utf-8"))
+        changed_paths = [p.strip() for p in args.query_affected.split(",") if p.strip()]
+        result: dict[str, Any] = query_affected(index, changed_paths, git_root=Path(args.root))
+    else:
+        result = build_index(Path(args.root))
+
     text = json.dumps(
-        index,
+        result,
         ensure_ascii=False,
         sort_keys=True,
         indent=None if args.compact else 2,
