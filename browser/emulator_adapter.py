@@ -38,11 +38,11 @@ class EmulatorBrowserAdapter:
                 stdin = process.stdin
                 stdout = process.stdout
                 if stdin is None or stdout is None:
-                    self.close()
-                    raise RuntimeError("browser emulator exited unexpectedly")
-                stdin.write(request + "\n")
-                stdin.flush()
-                line = stdout.readline()
+                    line = ""
+                else:
+                    stdin.write(request + "\n")
+                    stdin.flush()
+                    line = stdout.readline()
             except BrokenPipeError:
                 line = ""
         if not line:
