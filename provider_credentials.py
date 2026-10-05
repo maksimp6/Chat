@@ -24,7 +24,8 @@ DISABLED = "disabled"
 
 YANDEX = "yandex"
 CLOUDRU = "cloudru"
-SUPPORTED_PROVIDERS = (YANDEX, CLOUDRU)
+GITHUB = "github"
+SUPPORTED_PROVIDERS = (YANDEX, CLOUDRU, GITHUB)
 
 
 class CredentialError(RuntimeError):
