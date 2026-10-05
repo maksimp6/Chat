@@ -24,7 +24,7 @@ the record.
 Treat only a **trusted, backend-acknowledged dispatch that explicitly targets the
 Maintainer role** as the start of the maintainer-stall clock. Trigger text from an
 unauthorized author or a trusted trigger with no backend acknowledgement is not
-execution evidence. A normal Claude-Lite implementation task, role-only Claude mention,
+execution evidence. A normal Codex implementation task, documentary vendor mention,
 or documentary reference is also not maintainer execution evidence. The handoff remains
 incomplete until the PR merges or Claude
 posts a machine-recognizable material status: `BLOCKED:`, `DEFERRED:`, or a
