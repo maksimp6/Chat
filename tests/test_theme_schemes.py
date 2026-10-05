@@ -77,7 +77,7 @@ def test_theme_primary_text_pairs_meet_wcag_aa():
 
 
 def test_ai_theme_tool_requires_approval_and_returns_safe_frontend_action():
-    from theme_tools import set_ui_theme
+    from tool_providers.theme import set_ui_theme
 
     result = set_ui_theme({"theme": "dim", "reason": "меньше яркости", "current_theme": "light"})
     assert result["success"] is True

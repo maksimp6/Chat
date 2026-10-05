@@ -17,10 +17,10 @@
 ### Принцип работы
 
 1. Последовательно импортирует реестры из модулей:
-   - `git_mcp_tools.TOOL_REGISTRY`
-   - `termux_system_tools.SYSTEM_TOOLS`
-   - `filesystem_mcp_tools.FILESYSTEM_TOOLS`
-   - `termux_mcp_tools.TERMUX_TOOLS`
+   - `tool_providers.git.TOOL_REGISTRY`
+   - `tool_providers.termux_system.SYSTEM_TOOLS`
+   - `tool_providers.filesystem.FILESYSTEM_TOOLS`
+   - `tool_providers.termux.TERMUX_TOOLS`
 2. Ищет в каждом реестре инструмент с именем `func_name`.
 3. Возвращает метаданные инструмента или `None`, если не найден.
 
@@ -84,7 +84,7 @@ conn.execute("PRAGMA synchronous=NORMAL")
 
 ---
 
-## 3. Защита от Path Traversal в filesystem_mcp_tools
+## 3. Защита от Path Traversal в tool_providers.filesystem
 
 Функция `_get_abs_path(path: str)` гарантирует, что операции с файлами не выходят за пределы рабочей директории проекта.
 
@@ -112,7 +112,7 @@ def _get_abs_path(path: str) -> str:
 
 ## 4. Преимущества для разработчиков
 
-1. **Модульность**. Добавление нового инструмента требует только описания в его реестре (например, `git_mcp_tools.py`), без правок роутера или клиента.
+1. **Модульность**. Добавление нового инструмента требует только описания в его реестре (например, `tool_providers/git.py`), без правок роутера или клиента.
 2. **Безопасность**. Защита от Path Traversal гарантирует, что файловые операции не могут выйти за пределы рабочей директории.
 3. **Стабильность**. Режим WAL минимизирует ошибки при параллельных запросах от веб-интерфейса и фоновых воркеров.
 4. **Масштабируемость**. Единый диспетчер упрощает интеграцию новых модулей без изменения основного кода.

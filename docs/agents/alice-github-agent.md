@@ -8,7 +8,7 @@ Alice Pro can take a GitHub issue and work on her own code. The workflow is
 1. A maintainer (OWNER, MEMBER or COLLABORATOR) mentions `@alice` in an issue or
    issue comment, or adds the `alice` label. Pull request comments are ignored.
 2. The runner creates a persisted invocation, marks it running, binds an `ExecutionTrace`, and then runs Alice with only her filesystem tools. They are sandboxed to the checkout
-   (`filesystem_mcp_tools.BASE_DIR`), so Alice edits her own code. She has no git,
+   (`tool_providers.filesystem.BASE_DIR`), so Alice edits her own code. She has no git,
    shell or network tools. Tools that need approval stop the run instead of
    being approved automatically.
 3. The diff is checked: no changes under `.github/`, env files or keys, and at

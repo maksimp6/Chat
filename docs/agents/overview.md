@@ -55,10 +55,10 @@
 * логирование в `api_debug.txt` и специализированные лог‑файлы.
 
 **Поддерживаемые инструменты:**
-* файловая система (`filesystem_mcp_tools.py`);
-* Git (`git_mcp_tools.py`);
+* файловая система (`tool_providers/filesystem.py`);
+* Git (`tool_providers/git.py`);
 * архивация (`archiver.py`);
-* профайлинг (`profiler_tools.py`).
+* профайлинг (`tool_providers/profiler.py`).
 
 ### 5. Агент поиска
 
