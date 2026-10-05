@@ -27,6 +27,7 @@ USER node
 ENV PORT=8080 \
     CHROME_EXECUTABLE_PATH=/usr/bin/google-chrome-stable \
     CHROME_PROFILE_DIR=/state/profile \
-    DISPLAY=:99
+    DISPLAY=:99 \
+    BROWSER_TAKEOVER_ENABLED=1
 EXPOSE 8080
 CMD ["node", "server.mjs"]
