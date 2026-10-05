@@ -40,7 +40,7 @@ def test_solution_review_stage_is_between_verification_and_maintain():
 
 def test_solution_review_stage_is_recognized_by_resolve_task_plan():
     """resolve_task_plan must not raise AgentDispatchError for solution-review stage."""
-    plan = resolve_task_plan(stage="solution-review", role="team-lead", backend="claude-direct")
+    plan = resolve_task_plan(stage="solution-review", role="team-lead", backend="github-actions")
     assert plan.stage == "solution-review"
 
 
@@ -92,7 +92,7 @@ def test_implementation_roles_cannot_perform_solution_review():
 def test_solution_review_allows_non_implementation_supervisory_roles():
     """Non-implementation supervisory roles must be permitted as solution reviewer."""
     for role in ("team-lead", "security-reviewer", "process-governor"):
-        plan = resolve_task_plan(stage="solution-review", role=role, backend="claude-direct")
+        plan = resolve_task_plan(stage="solution-review", role=role, backend="github-actions")
         assert plan.can_review_solution is True, (
             f"expected can_review_solution True for role={role!r}"
         )
@@ -104,13 +104,13 @@ def test_solution_review_role_must_differ_from_implementation_stage_role():
         impl_plan = resolve_task_plan(
             stage="implementation",
             role=impl_role,
-            backend="claude-direct",
+            backend="github-actions",
         )
         assert impl_plan.can_implement is True
 
         # That same role must be rejected at solution-review
         with pytest.raises(AgentDispatchError):
-            resolve_task_plan(stage="solution-review", role=impl_role, backend="claude-direct")
+            resolve_task_plan(stage="solution-review", role=impl_role, backend="github-actions")
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ def test_changes_requested_requires_returning_to_implementation_stage():
     impl_plan = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
-        backend="claude-direct",
+        backend="github-actions",
     )
     assert impl_plan.can_implement is True
 
@@ -350,12 +350,12 @@ def test_solution_review_allows_same_claude_direct_backend_as_implementation():
     impl_plan = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
-        backend="claude-direct",
+        backend="github-actions",
     )
     review_plan = resolve_task_plan(
         stage="solution-review",
         role="team-lead",
-        backend="claude-direct",
+        backend="github-actions",
     )
 
     assert impl_plan.backend == review_plan.backend == "claude-direct"
