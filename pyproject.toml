@@ -13,6 +13,16 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
+[tool.mypy]
+# Python version: matches CI runtime (3.14).
+python_version = "3.14"
+strict = true
+ignore_missing_imports = true
+# Same result with or without app dependencies installed (Code rules vs Application tests).
+no_site_packages = true
+explicit_package_bases = true
+exclude = '^(tests|node_modules|android|scripts|deploy|plugins|r)/'
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = ["--strict-config", "--strict-markers"]

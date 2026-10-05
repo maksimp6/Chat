@@ -69,10 +69,25 @@ and compares each rule's violation count with `RATCHET_BASELINE`.
   new count in the same change, so the improvement is locked in.
 - Rules at zero stay at zero.
 
+## Static types
+
+Python code is checked with `mypy --strict` (configured in `pyproject.toml`,
+with `no_site_packages` so results do not depend on installed packages;
+pinned in `requirements-dev.txt`). `tests/test_type_checking.py` is a ratchet
+with two rules:
+
+- the error count for each mypy error code may only go down;
+- files listed in `STRICT_CLEAN_FILES` have zero errors and must stay that way.
+  When a file becomes clean, add it to the list in the same change.
+
+New modules are written fully typed: annotate every function, use precise
+container types (`dict[str, int]`, not `dict`) and avoid `Any` outside
+boundaries that parse external JSON.
+
 ## Where the rules run
 
-- **Locally:** `bash scripts/check_code_rules.sh` runs the naming, root-layout
-  and reliability checks in under a second.
+- **Locally:** `bash scripts/check_code_rules.sh` runs the naming, root-layout,
+  reliability and type-checking ratchets (a few seconds; mypy caches results).
 - **Pull requests:** the CI job **Code rules** runs the same script and is a
   required check in `merge-readiness.yml`.
 - **Deployments:** `production-deploy.yml` and the `deploy` action of
