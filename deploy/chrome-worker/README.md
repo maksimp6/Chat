@@ -65,26 +65,17 @@ are exposed.
 
 ## ChatGPT OAuth
 
-For ChatGPT, configure `BROWSER_PUBLIC_URL` to the deployed HTTPS origin and use
-GitHub OAuth with `BROWSER_GITHUB_CLIENT_ID`, `BROWSER_GITHUB_CLIENT_SECRET`, and the
-single permitted GitHub account ID in `BROWSER_GITHUB_ALLOWED_ID` (or
-`ALICE_GITHUB_ALLOWED_IDS`). The existing `ALICE_GITHUB_CLIENT_ID` and
-`ALICE_GITHUB_CLIENT_SECRET` names remain supported as a fallback. The OAuth
-application's callback is:
+For ChatGPT, configure `BROWSER_PUBLIC_URL` to the deployed HTTPS origin.
+The OAuth consent page asks the owner for the existing short token
+(`BROWSER_API_TOKEN`, with `ALICE_SHORT_TOKEN` as the deployment fallback).
+The short token is compared in memory, is never written into OAuth state, and
+never leaves the worker. A successful check completes the authorization-code
+flow with PKCE S256 and rotating refresh tokens.
 
-`<BROWSER_PUBLIC_URL>/browser/oauth/github/callback`
-
-The server publishes MCP protected-resource and OAuth authorization-server
-metadata, dynamic client registration, authorization-code flow with PKCE S256,
-and rotating refresh tokens. The GitHub sign-in must match the configured
-account. ChatGPT connects to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` using OAuth.
-`BROWSER_API_TOKEN` remains available only for machine/operations clients.
-
-Use a dedicated GitHub OAuth App if Alice's app has a different callback domain.
-Register the exact callback above and put its client ID and secret in the
-production GitHub Actions secrets; never put them in the plugin archive or logs.
-Having nonempty credentials does not establish that the callback is registered.
-The final acceptance step requires the owner's real GitHub sign-in from ChatGPT.
+No GitHub OAuth application, callback registration, Alice deployment, or custom
+DNS is required for this temporary owner-authentication path. ChatGPT connects
+to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` and enters the short token when the
+authorization page opens.
 
 ## Cloud.ru runtime state
 

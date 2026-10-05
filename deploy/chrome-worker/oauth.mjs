@@ -62,21 +62,19 @@ async function body(request, type) {
   return Object.fromEntries(params);
 }
 
-/** Single-owner OAuth bridge; GitHub access tokens are used once and never saved. */
+/** Single-owner OAuth bridge authenticated by the existing short token. */
 export function createOAuth(options = {}) {
   const env = options.env ?? process.env;
   const publicUrl = options.publicUrl ?? env.BROWSER_PUBLIC_URL ?? "";
-  const githubClientId = options.githubClientId ?? env.BROWSER_GITHUB_CLIENT_ID ?? env.ALICE_GITHUB_CLIENT_ID ?? "";
-  const githubClientSecret = options.githubClientSecret ?? env.BROWSER_GITHUB_CLIENT_SECRET ?? env.ALICE_GITHUB_CLIENT_SECRET ?? "";
-  const ownerId = String(options.ownerId ?? env.BROWSER_GITHUB_ALLOWED_ID ?? env.ALICE_GITHUB_ALLOWED_IDS ?? "").trim();
-  const enabled = Boolean(publicUrl && githubClientId && githubClientSecret && /^\d+$/.test(ownerId));
+  const shortToken = options.shortToken ?? env.BROWSER_API_TOKEN ?? env.ALICE_SHORT_TOKEN ?? "";
+  const ownerId = String(options.ownerId ?? env.BROWSER_GITHUB_ALLOWED_ID ?? env.ALICE_GITHUB_ALLOWED_IDS ?? "owner").trim();
+  const enabled = Boolean(publicUrl && shortToken && ownerId);
   if (!enabled) return { enabled: false, handle: async () => false, authorize: () => false, challenge: () => "Bearer", metadata: null };
   if (!validRedirect(publicUrl)) throw new Error("invalid_browser_public_url");
   const origin = new URL(publicUrl).origin;
   if (new URL(publicUrl).pathname !== "/" || new URL(publicUrl).search) throw new Error("browser_public_url_must_be_origin");
   const issuer = `${origin}${OAUTH_PATH}`;
   const resource = `${origin}/browser/v1/mcp`;
-  const callback = `${issuer}/github/callback`;
   const metadataUrl = `${origin}/.well-known/oauth-protected-resource/browser/v1/mcp`;
   const stateFile = options.stateFile ?? env.BROWSER_OAUTH_STATE_FILE ?? "/tmp/chrome-auth/oauth.json";
   const now = () => Math.floor((options.now?.() ?? Date.now()) / 1000);
@@ -190,59 +188,28 @@ export function createOAuth(options = {}) {
     await save();
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "set-cookie": cookie(transaction),
-      "content-security-policy": "default-src 'none'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'",
+      "content-security-policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
       "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
     });
-    response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Chrome к ChatGPT</title><h1>Доступ к вашему браузеру</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит управление Chrome и доступ к сайтам вашего сохранённого профиля. Вход доступен только владельцу через GitHub.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><button type="submit">Разрешить и войти через GitHub</button></form></html>`);
+    response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Chrome к ChatGPT</title><h1>Доступ к вашему браузеру</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит управление Chrome и доступ к сайтам вашего сохранённого профиля. Введите short token владельца.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><input type="password" name="password" autocomplete="current-password" required><button type="submit">Разрешить</button></form></html>`);
   }
 
-  async function githubLogin(request, response) {
+  async function ownerLogin(request, response) {
     const input = await body(request, "application/x-www-form-urlencoded");
     const transaction = input.transaction ?? "";
     const pending = state.pending[digest(transaction)];
     if (!pending || pending.expires <= now() || pending.started || !browserBound(request, transaction)) return json(response, 400, { error: "invalid_request" });
+    if (typeof input.password !== "string" || !equal(input.password, shortToken)) return json(response, 403, { error: "access_denied" });
     pending.started = true;
-    // Bind the upstream GitHub authorization code to this same browser transaction.
-    pending.github_verifier = random();
-    await save();
-    const target = new URL("https://github.com/login/oauth/authorize");
-    target.search = new URLSearchParams({ client_id: githubClientId, redirect_uri: callback, scope: "read:user", state: transaction, code_challenge: digest(pending.github_verifier), code_challenge_method: "S256", allow_signup: "false" }).toString();
-    redirect(response, target.href);
-  }
-
-  async function githubCallback(request, response, url) {
-    const transaction = url.searchParams.get("state") ?? "";
-    const pending = state.pending[digest(transaction)];
-    if (!pending || !pending.started || pending.expires <= now() || !browserBound(request, transaction)) return json(response, 400, { error: "invalid_oauth_state" });
     delete state.pending[digest(transaction)];
-    await save();
-    const target = new URL(pending.redirect_uri);
-    target.searchParams.set("iss", issuer);
-    if (pending.state) target.searchParams.set("state", pending.state);
-    const deny = () => { target.searchParams.set("error", "access_denied"); redirect(response, target.href, cookie("", true)); };
-    const code = url.searchParams.get("code");
-    if (!code || url.searchParams.has("error")) return deny();
-    let account;
-    try {
-      const tokenResponse = await fetchRemote("https://github.com/login/oauth/access_token", {
-        method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
-        headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: githubClientId, client_secret: githubClientSecret, code, redirect_uri: callback, code_verifier: pending.github_verifier }),
-      });
-      const token = await tokenResponse.json();
-      if (!tokenResponse.ok || typeof token.access_token !== "string") return deny();
-      const userResponse = await fetchRemote("https://api.github.com/user", {
-        redirect: "error", signal: AbortSignal.timeout(10_000),
-        headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token.access_token}`, "x-github-api-version": "2022-11-28", "user-agent": "Alice-Chrome-MCP" },
-      });
-      account = await userResponse.json();
-      if (!userResponse.ok || !equal(String(account.id), ownerId)) return deny();
-    } catch { return deny(); }
-    if (!Object.hasOwn(state.clients, pending.client_id)) return deny();
+    if (!Object.hasOwn(state.clients, pending.client_id)) return json(response, 400, { error: "invalid_client" });
     delete state.clients[pending.client_id].provisional_expires;
     const authorizationCode = random();
     state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, expires: now() + 300, used: false };
     await save();
+    const target = new URL(pending.redirect_uri);
+    target.searchParams.set("iss", issuer);
+    if (pending.state) target.searchParams.set("state", pending.state);
     target.searchParams.set("code", authorizationCode);
     redirect(response, target.href, cookie("", true));
   }
@@ -293,8 +260,7 @@ export function createOAuth(options = {}) {
       else if (request.method === "GET" && issuerPaths.includes(path)) json(response, 200, metadata);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/register`) await register(request, response);
       else if (request.method === "GET" && path === `${OAUTH_PATH}/authorize`) await begin(request, response, url);
-      else if (request.method === "POST" && path === `${OAUTH_PATH}/authorize`) await githubLogin(request, response);
-      else if (request.method === "GET" && path === `${OAUTH_PATH}/github/callback`) await githubCallback(request, response, url);
+      else if (request.method === "POST" && path === `${OAUTH_PATH}/authorize`) await ownerLogin(request, response);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/token`) await token(request, response);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/revoke`) await revoke(request, response);
       else json(response, 404, { error: "not_found" });
