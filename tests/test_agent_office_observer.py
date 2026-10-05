@@ -266,22 +266,22 @@ def test_trusted_trigger_needs_backend_acknowledgement_before_execution_evidence
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.trigger_eligible_dispatches == [("codex", NOW - timedelta(hours=3), True)]
-    assert thread.executable_dispatches == [("codex", NOW - timedelta(hours=3))]
-    assert thread.maintainer_dispatches == [("codex", NOW - timedelta(hours=3))]
-    assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
+    assert thread.executable_dispatches == []
+    assert thread.maintainer_dispatches == []
+    assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
 
 
 def test_codex_comment_acknowledges_trusted_trigger():
     timeline = [
         comment("maksimp6", "@codex maintainer pass on exact head", 3),
-        comment("chatgpt-codex-connector[bot]", "Unrelated Codex comment", 2.5),
+        comment("chatgpt-codex-connector[bot]", "Codex acknowledged", 2.5),
     ]
     thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
 
     assert thread.trigger_eligible_dispatches == [("codex", NOW - timedelta(hours=3), True)]
-    assert thread.executable_dispatches == []
-    assert thread.maintainer_dispatches == []
-    assert "maintainer_stall" not in kinds(detect_findings(thread, NOW))
+    assert thread.executable_dispatches == [("codex", NOW - timedelta(hours=3))]
+    assert thread.maintainer_dispatches == [("codex", NOW - timedelta(hours=3))]
+    assert "maintainer_stall" in kinds(detect_findings(thread, NOW))
 
 
 def test_only_material_maintainer_status_completes_handoff():
