@@ -717,3 +717,19 @@ def test_status_lists_github_as_not_configured(monkeypatch, tmp_path):
     assert response.status_code == 200
     statuses = {item["provider"]: item for item in response.get_json()["providers"]}
     assert statuses["github"]["status"] == "not_configured"
+
+
+def test_update_requires_at_least_one_provider_or_github_credential(monkeypatch):
+    from flask import Flask
+
+    monkeypatch.setattr(routes, "_guard", lambda: None)
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put("/api/provider-credentials", json={})
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "Yandex Cloud API key, Cloud.ru API key or GitHub token is required"
+    }
