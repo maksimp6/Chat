@@ -59,6 +59,7 @@ ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "
 VOLUME = "chrome-state"
 MOUNT = "/chrome-state"
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")
+LEGACY_AUTH_ENV = frozenset({"ALICE_GITHUB_CLIENT_ID", "ALICE_GITHUB_CLIENT_SECRET"})
 APP_ENV = frozenset(
     {
         "BROWSER_API_TOKEN",
@@ -277,7 +278,7 @@ def owned_record(apps, *, identifier=None):
             and IMAGE_RE.fullmatch(container["image"])
             and container.get("resources") in ACCEPTED_RESOURCES
             and len(variables) == len(environment)
-            and not (set(environment) - APP_ENV)
+            and not (set(environment) - APP_ENV - LEGACY_AUTH_ENV)
             and environment.get("CHROME_PROFILE_DIR") == "/tmp/chrome-profile"
             and environment.get("CHROME_STATE_DIR") == MOUNT
             and environment.get("CHROME_STATE_REQUIRE_MOUNT") == "1"
