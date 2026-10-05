@@ -88,6 +88,27 @@ def test_adapter_treats_broken_pipe_as_exit():
 
     class _DeadProcess:
         stdin = _BrokenStdin()
+        stdout = object()
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+    adapter = EmulatorBrowserAdapter()
+    adapter._process = _DeadProcess()
+    with pytest.raises(RuntimeError, match="exited unexpectedly"):
+        adapter.execute(BrowserAction("browser_local", "inspect", "page"))
+    assert adapter._process is None
+
+
+def test_adapter_treats_missing_pipes_as_exit():
+    class _DeadProcess:
+        stdin = None
         stdout = None
 
         def poll(self):
