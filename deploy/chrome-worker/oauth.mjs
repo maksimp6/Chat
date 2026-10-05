@@ -101,19 +101,19 @@ export function createOAuth(options = {}) {
     // once their owner has actually authorized them, as ChatGPT reuses that client ID.
     for (const [key, client] of Object.entries(state.clients)) if (client.provisional_expires && client.provisional_expires <= now()) delete state.clients[key];
   }
-  function save() {
-    // Serialize BOTH local replacement and remote checkpoint. A later request may
-    // update the in-memory snapshot, but cannot replace the file while it is archived.
-    // Never return a newly issued credential before its snapshot is durable.
-    durability = durability.catch(() => {}).then(async () => {
+  function save(waitForCheckpoint = true) {
+    // Persist to disk and optionally checkpoint. File write is synchronous.
+    // By default, wait for checkpoint before returning (security: never issue credentials
+    // before checkpoint). Set waitForCheckpoint=false for redirects (no credentials issued).
+    return (durability = durability.catch(() => {}).then(async () => {
       prune();
       const temporary = `${stateFile}.tmp`;
       writeFileSync(temporary, JSON.stringify(state), { mode: 0o600 });
       chmodSync(temporary, 0o600);
       renameSync(temporary, stateFile);
-      await options.onPersist?.();
-    });
-    return durability;
+      if (waitForCheckpoint) await options.onPersist?.();
+      else options.onPersist?.().catch(() => {});
+    }));
   }
   const sign = (value) => `${value}.${createHmac("sha256", state.signingKey).update(value).digest("base64url")}`;
   const cookie = (transaction, clear = false) => `${COOKIE}=${clear ? "" : sign(transaction)}; ${cookieFlags}Max-Age=${clear ? 0 : 600}`;
@@ -204,7 +204,7 @@ export function createOAuth(options = {}) {
     pending.started = true;
     // Bind the upstream GitHub authorization code to this same browser transaction.
     pending.github_verifier = random();
-    await save();
+    await save(false); // Fire checkpoint in background; this is a redirect, not credential issuance
     const target = new URL("https://github.com/login/oauth/authorize");
     target.search = new URLSearchParams({ client_id: githubClientId, redirect_uri: callback, scope: "read:user", state: transaction, code_challenge: digest(pending.github_verifier), code_challenge_method: "S256", allow_signup: "false" }).toString();
     redirect(response, target.href);
@@ -215,7 +215,7 @@ export function createOAuth(options = {}) {
     const pending = state.pending[digest(transaction)];
     if (!pending || !pending.started || pending.expires <= now() || !browserBound(request, transaction)) return json(response, 400, { error: "invalid_oauth_state" });
     delete state.pending[digest(transaction)];
-    await save();
+    await save(false); // Fire checkpoint in background; this is a redirect, not credential issuance
     const target = new URL(pending.redirect_uri);
     target.searchParams.set("iss", issuer);
     if (pending.state) target.searchParams.set("state", pending.state);
@@ -242,7 +242,7 @@ export function createOAuth(options = {}) {
     delete state.clients[pending.client_id].provisional_expires;
     const authorizationCode = random();
     state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, expires: now() + 300, used: false };
-    await save();
+    await save(false); // Fire checkpoint in background; this is a redirect, not credential issuance
     target.searchParams.set("code", authorizationCode);
     redirect(response, target.href, cookie("", true));
   }
