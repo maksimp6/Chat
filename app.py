@@ -40,6 +40,7 @@ from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
 from short_token_auth import install_short_token_auth
 from rdc_connection.pairing import install_rdc_pairing
+from invocation.problems import problem
 from identity.github_oauth import (
     current_github_login,
     github_auth_bp,
@@ -120,12 +121,12 @@ app.register_blueprint(printing3d_bp)
 @app.errorhandler(Exception)
 def _handle_unexpected_error(exc):
     logger.exception("[ERROR] Unhandled application exception")
-    return jsonify(
-        {
-            "error": "internal_server_error",
-            "code": "UNHANDLED_EXCEPTION",
-        }
-    ), 500
+    return problem(
+        500,
+        "internal_server_error",
+        "Внутренняя ошибка сервера",
+        extensions={"code": "UNHANDLED_EXCEPTION"},
+    )
 
 
 @app.after_request
