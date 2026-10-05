@@ -159,6 +159,27 @@ def test_copilot_assignment_and_alice_label_are_dispatches():
 # --- findings ---------------------------------------------------------------
 
 
+def test_failed_merge_readiness_does_not_make_implementation_ci_red():
+    thread = build_thread(
+        pr_item(),
+        [review("copilot-pull-request-reviewer[bot]", 5)],
+        pull(),
+        [
+            run("Application tests", "success"),
+            run("Security checks", "success"),
+            run("Merge readiness snapshot", "failure"),
+        ],
+    )
+
+    findings = detect_findings(thread, NOW)
+
+    assert checks_state(thread) == "passed"
+    assert "ci_failed" not in kinds(findings)
+    assert "readiness_blocked" in kinds(findings)
+    message = next(f.message for f in findings if f.kind == "readiness_blocked")
+    assert "merge readiness" in message
+
+
 def test_red_ci_and_merge_conflict_are_high():
     thread = build_thread(
         pr_item(),
