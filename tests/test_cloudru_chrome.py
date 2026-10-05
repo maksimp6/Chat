@@ -430,7 +430,9 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
 def test_chrome_worker_image_includes_idp_runtime_modules():
     root = Path(__file__).resolve().parents[1] / "deploy" / "chrome-worker"
     dockerfile = (root / "Dockerfile").read_text()
-    copy_line = next(line for line in dockerfile.splitlines() if line.startswith("COPY server.mjs "))
+    copy_line = next(
+        line for line in dockerfile.splitlines() if line.startswith("COPY server.mjs ")
+    )
     copied = set(copy_line.removeprefix("COPY ").removesuffix(" ./").split())
 
     assert 'from "./idp-auth.mjs"' in (root / "server.mjs").read_text()
