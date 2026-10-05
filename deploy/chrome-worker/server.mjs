@@ -123,7 +123,7 @@ export function createWorker(options = {}) {
       const chromium = options.chromium ?? (await import("playwright-core")).chromium;
       context = await chromium.launchPersistentContext(profileDir, {
         executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
-        headless: false,
+        headless: takeoverEnabled ? false : process.env.CHROME_HEADLESS !== "0",
         chromiumSandbox: false,
         args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
       });
