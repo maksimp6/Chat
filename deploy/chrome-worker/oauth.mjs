@@ -101,17 +101,18 @@ export function createOAuth(options = {}) {
     // once their owner has actually authorized them, as ChatGPT reuses that client ID.
     for (const [key, client] of Object.entries(state.clients)) if (client.provisional_expires && client.provisional_expires <= now()) delete state.clients[key];
   }
-  function save() {
-    // Serialize BOTH local replacement and remote checkpoint. A later request may
-    // update the in-memory snapshot, but cannot replace the file while it is archived.
-    // Never return a newly issued credential before its snapshot is durable.
+  function save({ checkpoint = true } = {}) {
+    // Serialize local replacement for every state mutation. Credential endpoints also
+    // wait for the remote checkpoint; redirect-only authorization may checkpoint in
+    // the background so a slow archive cannot strand the browser before redirect.
     durability = durability.catch(() => {}).then(async () => {
       prune();
       const temporary = `${stateFile}.tmp`;
       writeFileSync(temporary, JSON.stringify(state), { mode: 0o600 });
       chmodSync(temporary, 0o600);
       renameSync(temporary, stateFile);
-      await options.onPersist?.();
+      if (checkpoint) await options.onPersist?.();
+      else Promise.resolve(options.onPersist?.()).catch(() => {});
     });
     return durability;
   }
@@ -217,7 +218,7 @@ export function createOAuth(options = {}) {
     delete state.clients[pending.client_id].provisional_expires;
     const authorizationCode = random();
     state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, expires: now() + 300, used: false };
-    await save();
+    await save({ checkpoint: false });
     const target = new URL(pending.redirect_uri);
     target.searchParams.set("iss", issuer);
     if (pending.state) target.searchParams.set("state", pending.state);
