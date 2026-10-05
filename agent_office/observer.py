@@ -40,7 +40,7 @@ TRACKING_TITLE = "Наблюдатель: офис агентов"
 DIGEST_MARKER = "<!-- agent-office-observer -->"
 ISSUE_BODY_LIMIT = 60000
 
-AGENTS = ("claude", "codex", "copilot", "alice")
+AGENTS = ("codex", "copilot", "alice")
 AGENT_LABELS = {
     "claude": "Claude",
     "codex": "Codex",
