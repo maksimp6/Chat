@@ -219,6 +219,32 @@ def build_index(root: Path) -> dict[str, Any]:
     }
 
 
+def _reverse_dependencies(index: dict[str, Any], direct_modules: set[str]) -> set[str]:
+    reverse_deps: set[str] = set()
+    for file_entry in index.get("files", []):
+        if file_entry["module"] in direct_modules:
+            continue
+        imported = {
+            str(imp.get("module") or "").lstrip(".")
+            for imp in file_entry.get("imports", [])
+        }
+        if any(
+            imp and (imp == module or imp.startswith(module + "."))
+            for imp in imported
+            for module in direct_modules
+        ):
+            reverse_deps.add(file_entry["module"])
+    return reverse_deps
+
+
+def _affected_tests(tests_by_module: dict[str, list[str]], modules: list[str]) -> list[str]:
+    affected: set[str] = set()
+    for module in modules:
+        affected.update(tests_by_module.get(module, []))
+        affected.update(tests_by_module.get(module.split(".", 1)[0], []))
+    return sorted(affected)
+
+
 def query_affected(
     index: dict[str, Any],
     changed_paths: list[str],
@@ -245,30 +271,8 @@ def query_affected(
             direct_modules.add(entry["module"])
         provenance_files[path] = prov
 
-    # Find first-order reverse deps: modules that import any directly changed module.
-    reverse_deps: set[str] = set()
-    for file_entry in index.get("files", []):
-        if file_entry["module"] in direct_modules:
-            continue
-        for imp in file_entry.get("imports", []):
-            imp_module = str(imp.get("module") or "").lstrip(".")
-            if not imp_module:
-                continue
-            for dm in direct_modules:
-                if imp_module == dm or imp_module.startswith(dm + "."):
-                    reverse_deps.add(file_entry["module"])
-                    break
-
-    affected_modules = sorted(direct_modules | reverse_deps)
-
-    # Collect tests for all affected modules (exact match + first-segment fallback).
-    affected_tests: set[str] = set()
-    for module in affected_modules:
-        for test_path in tests_by_module.get(module, []):
-            affected_tests.add(test_path)
-        first = module.split(".", 1)[0]
-        for test_path in tests_by_module.get(first, []):
-            affected_tests.add(test_path)
+    affected_modules = sorted(direct_modules | _reverse_dependencies(index, direct_modules))
+    affected_tests = _affected_tests(tests_by_module, affected_modules)
 
     provenance: dict[str, Any] = {
         "index_schema_version": index.get("schema_version"),
@@ -282,7 +286,7 @@ def query_affected(
         "query": "affected_modules",
         "changed_files": sorted(changed_paths),
         "affected_modules": affected_modules,
-        "affected_tests": sorted(affected_tests),
+        "affected_tests": affected_tests,
         "provenance": provenance,
     }
 
