@@ -126,8 +126,10 @@ recovery after container restart.
 
 ## Deployment
 
-The `Cloud.ru persistent Chrome MCP` workflow runs only by manual dispatch from
-reviewed `master`, one run at a time; merging a pull request does not start it.
+The `Cloud.ru persistent Chrome MCP` workflow runs from reviewed `master` by manual
+dispatch or by an exact owner-only command on issue #409 (`/chrome preflight`,
+`/chrome deploy`, `/chrome status`, `/chrome restart`, `/chrome stop`). Runs are
+serialized; merging a pull request does not start it.
 It uses the production Cloud.ru IAM credentials and Object Storage tenant ID.
 Run `preflight` (read-only) before `deploy`.
 
