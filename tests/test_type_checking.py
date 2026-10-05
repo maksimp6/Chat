@@ -61,6 +61,7 @@ STRICT_CLEAN_FILES = {
     "alice_platform/recovery.py",
     "archiver.py",
     "browser/__init__.py",
+    "browser/emulator_adapter.py",
     "browser/capabilities.py",
     "browser/orchestration.py",
     "browser/pipeline.py",
