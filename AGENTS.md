@@ -81,24 +81,13 @@ stops converging.
 
 ### Execution backends and escalation
 
-- `@claude` is reserved for the **Anthropic Claude GitHub Partner Agent**.
-  Start it from the Agents UI or assign it to an issue; on an existing PR,
-  mention the partner agent. Use **Claude Sonnet 4.6** for the normal strong
-  path. Use it for architecture-heavy, ambiguous or multi-domain work.
-- `@claude-lite` is our repository GitHub Actions worker
-  (`.github/workflows/claude-lite.yml`). Its current execution profile is
-  `claude-sonnet-4-6` with a maximum of 45 turns. Use this backend only when
-  repository execution is intentional. In evidence/status prose that must not
-  execute a workflow, write **Claude-Lite backend** without reproducing the
-  literal mention trigger.
-- `@codex` is the OpenAI GitHub Partner Agent. Routine Codex sessions should
-  use **GPT-5.4 nano**; `.codex/config.toml` also sets nano/low defaults for
-  repository Codex tooling.
+- `@codex` is the default repository implementation backend. Routine and mechanical
+  Codex work uses **GPT-5.4 nano**; `.codex/config.toml` keeps nano/low defaults.
 - `@copilot` remains the native Copilot cloud agent and automatic PR reviewer.
-  The role profiles above run on Copilot cloud agent with lightweight models
-  unless explicitly escalated.
 - `@alice` remains Alice Pro's self-improver for her own UI, translations,
   prompts, tools and docs.
+- Anthropic/Claude execution backends are not part of the repository execution
+  path. Do not dispatch routine or maintainer work to Claude.
 
 Do not create a new vendor-named agent profile when a reusable engineering role
 describes the work better. Prefer adding or refining a role profile, then choose
@@ -106,45 +95,33 @@ the cheapest backend/model that can reliably perform that role.
 
 ### Model policy
 
-Routine role agents use `gpt-5.4-mini`; Docs Engineer uses
-`gpt-5.4-nano`. Escalate to the Claude Partner Agent on Sonnet for a concrete
-architecture/reasoning need. Do not silently escalate routine work to a larger
-model.
+Repository automation should prefer deterministic GitHub workflows and explicit tool execution. Model-backed execution is optional, never required by policy, and must not become a merge prerequisite.
 
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push to `master`.
 
 ## Maintainer
 
-The maintainer is a **role**, currently executed for repository PR handoffs through
-our Claude-Lite GitHub Actions backend. The owner (@maksimp6) does not merge by hand.
-The role name, provider identity, and executable backend trigger are separate facts:
-`@claude` is reserved for the Claude Partner Agent and must not be used as shorthand
-for the repository maintainer backend.
+The maintainer is a **role**, not a model/provider identity. It consumes the
+deterministic #496 admission evidence and performs protected GitHub merge operations.
+There is no dedicated Claude maintainer backend.
 
-A maintainer handoff becomes executable evidence only after the configured repository
-backend trigger is posted by an author association allowed by that workflow **and** the
-backend visibly acknowledges the dispatch. Trigger text alone is intent, not proof that
-execution started. A handoff is complete only when it reaches a material
+A maintainer handoff becomes executable evidence only after an allowed configured
+backend visibly acknowledges the dispatch. Trigger text alone is intent, not proof
+that execution started. A handoff is complete only when it reaches a material
 terminal/status transition: merged, a `BLOCKED:` comment (or changes-requested review)
 with evidence, or a `DEFERRED:` comment with the next trigger. Ordinary
-progress/acknowledgement comments and reactions such as 👀 are not completion. The
-Observer starts the `maintainer_stall` clock only when the dispatch contains both
-explicit **Maintainer** intent and executable-backend evidence; implementation or other
-Claude-Lite work on a PR is not a maintainer handoff. A role-only or documentary
-mention also does not start the clock. Evidence/status comments must describe trigger
-names without reproducing an active literal mention unless execution is intended.
+progress/acknowledgement comments and reactions are not completion. The Observer
+starts the `maintainer_stall` clock only for actual executable-backend evidence.
 
-- Claude merges its own pull requests once CI is green on the current head and
-  no review thread is open.
-- Claude reviews pull requests from the other agents (`@codex`, `@copilot`,
-  `@alice`) and merges them when CI is green and the review finds no blocking
-  issue; otherwise it comments with what must change.
+- The maintainer merges pull requests only after exact-head CI/review/readiness
+  evidence is valid and no required review thread remains open.
+- Use deterministic GitHub evidence first; model review is supplementary and must not
+  bypass protected admission.
 - Draft pull requests are not merged; the author marks them ready first.
   Alice always opens drafts, so the maintainer marks an Alice draft ready once
   its CI is green, then reviews it like any other pull request.
-- Keep a pull request in working/draft state while implementation and CI are
-  still changing. Do not request Codex or Copilot review during this phase.
+- Keep a pull request in working/draft state while implementation and CI are still changing. Do not request extra model review during this phase.
 - A pull request enters its single final review cycle only when the current head
   has passed required CI and there are no open review threads from earlier work.
   At that point mark it ready for review.
@@ -152,13 +129,7 @@ names without reproducing an active literal mention unless execution is intended
   a Copilot review; duplicate triggers waste resources and can create redundant
   review findings. Fix or answer every automatic Copilot comment and resolve each
   thread before merging.
-- Request `@codex review` exactly once for the ready-to-merge head. Add or answer
-  every regression test Codex proposes. If Codex has not responded by the next
-  hourly maintainer pass, Claude may continue once CI and other review gates are
-  satisfied.
-- After feedback fixes, do not request another Codex review and do not retrigger
-  Copilot. The final corrected head is validated by required CI plus resolved
-  review threads. A repeated review is allowed only when the owner explicitly asks for it.
+- The final corrected head is validated by required CI plus resolved review threads. Extra model review is optional and never a merge prerequisite.
 - Merge is fail-closed. Immediately before merge, verify the pull request is
   synchronized with the current `master` (`behind master = 0`). Required
   checks must be green on the exact current PR head after that synchronization,

@@ -1,17 +1,15 @@
 # Role-based GitHub agent office
 
-Alice Pro treats AI providers as execution backends and repository agents as roles.
+Alice Pro treats repository roles as the stable contract and execution mechanisms as replaceable infrastructure.
 
 ## Layers
 
 1. **Role** — the job to be done: backend, frontend, Android, testing, infrastructure,
    security review, documentation, release management, or coordination.
-2. **Agent runtime** — GitHub Copilot custom agent, GitHub Partner Agent, or the
-   repository Claude Lite workflow.
-3. **Model** — the smallest model that is reliable for the task.
+2. **Execution runtime** — deterministic GitHub Actions and approved repository tools.
+3. **Optional model assistance** — supplementary, never required for execution or merge.
 
-This keeps prompts, permissions and expertise stable even when model vendors or model
-versions change.
+This keeps prompts, permissions and expertise stable even when model vendors or model versions change.
 
 ## Default routing
 
@@ -28,21 +26,13 @@ versions change.
 | Merge/release preparation | Release Manager | GPT-5.4 mini |
 | Cross-agent non-convergence observation | Operations Observer | GPT-5.4 mini |
 | Process-gap diagnosis and correction | Process Governor | GPT-5.4 mini |
-| Architecture-heavy or ambiguous work | Anthropic Claude Partner Agent | Claude Sonnet 4.6 |
-| Bounded repository maintenance | Claude Lite workflow | Claude Sonnet 4.6 |
-| Focused Codex session | OpenAI Codex Partner Agent | GPT-5.4 nano |
 
 ## Dispatch rules
 
 Prefer a repository role from the GitHub Agents UI for normal development. Team Lead
 can delegate to other custom agents with the custom-agent tool.
 
-Use provider agents as escalation/backends, not as permanent job titles:
-
-- assign the Anthropic Claude Partner Agent for architecture-heavy or multi-domain work;
-- use the OpenAI Codex Partner Agent for focused code/test tasks;
-- use `@claude-lite` for short bounded repository maintenance;
-- keep native Copilot automatic PR review enabled, but do not retrigger it manually.
+Repository roles execute through approved deterministic tools and GitHub workflows. Optional external model assistance may be used ad hoc, but no model provider is a required executor or merge gate. Keep native Copilot automatic PR review enabled, but do not retrigger it manually.
 
 One issue has one primary owner. Split an issue only when independent deliverables can
 be reviewed and merged separately.
@@ -126,8 +116,7 @@ Role profiles restrict tools where useful. Security Reviewer is read-mostly. Tea
 does not edit code. Production deployment, destructive database changes, secrets,
 CODEOWNERS and branch protection still require the owner's explicit approval.
 
-Use the lightest configured model by default. Escalation must have a concrete reason,
-not merely a preference for a larger model.
+Prefer deterministic tools first. Optional model assistance must have a concrete reason and must not become a required workflow dependency.
 
 
 ## Skill layer
