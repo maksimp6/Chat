@@ -92,10 +92,11 @@ export function createWorker(options = {}) {
     requiredScopes: ["browser.control"],
     ...options.idp,
   });
-  const takeover = createTakeover(options.takeover);
+  const takeoverEnabled = options.takeoverEnabled ?? process.env.BROWSER_TAKEOVER_ENABLED === "1";
+  const takeover = options.takeoverRuntime ?? createTakeover(options.takeover);
   let oauth;
   const ready = (async () => {
-    takeover.startDisplay();
+    if (takeoverEnabled) takeover.startDisplay();
     await stateStore.restore();
     oauth = createOAuth({
       ...options.oauth,
@@ -220,7 +221,7 @@ export function createWorker(options = {}) {
         return json(response, 200, idp.resourceMetadata());
       }
       if (await oauth.handle(request, response, url)) return;
-      if (request.method === "GET" && pathname.startsWith("/browser/v1/takeover/")) {
+      if (takeoverEnabled && request.method === "GET" && pathname.startsWith("/browser/v1/takeover/")) {
         if (await takeover.proxyHttp(request, response, url)) return;
         return json(response, 401, { error: "unauthorized" });
       }
@@ -237,7 +238,7 @@ export function createWorker(options = {}) {
         const message = request.method === "POST" ? await body(request) : undefined;
         return await mcp.handle(request, response, message);
       }
-      if (request.method === "POST" && pathname === "/browser/v1/takeover/start") {
+      if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/start") {
         await wake();
         const grant = takeover.start();
         const origin = publicUrl ? new URL(publicUrl).origin : `http://${request.headers.host}`;
@@ -246,11 +247,11 @@ export function createWorker(options = {}) {
           expiresAt: grant.expiresAt,
         });
       }
-      if (request.method === "POST" && pathname === "/browser/v1/takeover/stop") {
+      if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/stop") {
         takeover.stop();
         return json(response, 200, { active: false });
       }
-      if (request.method === "GET" && pathname === "/browser/v1/takeover/status") {
+      if (takeoverEnabled && request.method === "GET" && pathname === "/browser/v1/takeover/status") {
         return json(response, 200, takeover.status());
       }
       const operation = routeTools.get(`${request.method} ${pathname}`);
