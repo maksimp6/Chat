@@ -64,6 +64,25 @@ test("official Playwright MCP initializes, lists tools, and executes a browser f
 });
 
 
+test("first MCP client binds the worker and a second client is rejected until release", async (t) => {
+  const app = await fixture(t);
+  const second = new Client({ name: "second-client", version: "1.0.0" });
+  const secondTransport = new StreamableHTTPClientTransport(app.endpoint, {
+    requestInit: { headers: { Authorization: "Bearer synthetic-test-token" } },
+  });
+  await assert.rejects(second.connect(secondTransport), /409|already bound/i);
+  await app.transport.terminateSession();
+
+  const replacement = new Client({ name: "replacement-client", version: "1.0.0" });
+  const replacementTransport = new StreamableHTTPClientTransport(app.endpoint, {
+    requestInit: { headers: { Authorization: "Bearer synthetic-test-token" } },
+  });
+  t.after(async () => replacement.close());
+  await replacement.connect(replacementTransport);
+  assert.ok(replacementTransport.sessionId);
+});
+
+
 test("Chrome cookies and localStorage survive a cold worker/profile restore", async (t) => {
   const base = await mkdtemp(join(tmpdir(), "chrome-cold-restore-"));
   const stateDir = join(base, "volume");
