@@ -21,7 +21,6 @@ export function createTakeover(options = {}) {
   function expire() {
     if (session && session.expiresAt <= now()) {
       session = undefined;
-      stopProcesses();
     }
   }
 
