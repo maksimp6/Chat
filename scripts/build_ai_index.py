@@ -225,8 +225,7 @@ def _reverse_dependencies(index: dict[str, Any], direct_modules: set[str]) -> se
         if file_entry["module"] in direct_modules:
             continue
         imported = {
-            str(imp.get("module") or "").lstrip(".")
-            for imp in file_entry.get("imports", [])
+            str(imp.get("module") or "").lstrip(".") for imp in file_entry.get("imports", [])
         }
         if any(
             imp and (imp == module or imp.startswith(module + "."))
