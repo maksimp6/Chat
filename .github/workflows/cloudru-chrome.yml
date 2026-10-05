@@ -8,7 +8,7 @@ on:
       action:
         description: Deploy or inspect the separate Chrome MCP service on its Container Apps origin
         type: choice
-        options: [preflight, deploy, status, restart, stop]
+        options: [preflight, deploy, status, restart, stop, takeover]
         default: preflight
       lane:
         description: production (reviewed master only) or test (any branch, separate container and bucket)
@@ -40,9 +40,9 @@ jobs:
        github.event.issue.number == 409 &&
        github.event.comment.author_association == 'OWNER' &&
        github.event.comment.user.login == github.repository_owner &&
-       contains(fromJSON('["/chrome preflight","/chrome deploy","/chrome status","/chrome restart","/chrome stop"]'), github.event.comment.body))
+       contains(fromJSON('["/chrome preflight","/chrome deploy","/chrome status","/chrome restart","/chrome stop","/chrome takeover"]'), github.event.comment.body))
     env:
-      CHROME_ACTION: ${{ inputs.action || (github.event.comment.body == '/chrome deploy' && 'deploy') || (github.event.comment.body == '/chrome status' && 'status') || (github.event.comment.body == '/chrome restart' && 'restart') || (github.event.comment.body == '/chrome stop' && 'stop') || 'preflight' }}
+      CHROME_ACTION: ${{ inputs.action || (github.event.comment.body == '/chrome deploy' && 'deploy') || (github.event.comment.body == '/chrome status' && 'status') || (github.event.comment.body == '/chrome restart' && 'restart') || (github.event.comment.body == '/chrome stop' && 'stop') || (github.event.comment.body == '/chrome takeover' && 'takeover') || 'preflight' }}
       CHROME_LANE: ${{ inputs.lane || 'production' }}
     environment: production
     runs-on: ubuntu-latest
@@ -88,6 +88,13 @@ jobs:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
         run: python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
+      - name: Create short-lived human takeover URL
+        if: env.CHROME_ACTION == 'takeover'
+        env:
+          BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
+        run: |
+          python scripts/cloudru_chrome.py takeover --sha "$GITHUB_SHA"
+
       - name: Seed real browser profile through public MCP
         if: env.CHROME_ACTION == 'deploy'
         env:
