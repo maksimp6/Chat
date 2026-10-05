@@ -16,9 +16,7 @@ requests carrying an `Mcp-Session-Id`.
 The advertised tools are Playwright MCP's standard tools, including
 `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, and
 `browser_take_screenshot`. This replaces the earlier hand-written JSON-RPC
-adapter. A tool call starts Chrome on demand. MCP clients share the worker's
-browser context and profile; they are not isolated browser users. MCP sessions
-are process-local, so keep a single worker replica or use sticky routing.
+adapter. A tool call starts Chrome on demand. MCP clients share the worker's browser context and profile; they are not isolated browser users. The first successful MCP `initialize` binds the worker to that session immediately. While that session is active, every second client initialization is rejected with HTTP 409. An explicit session DELETE releases the binding so a new client can connect. MCP sessions are process-local, so keep a single worker replica or use sticky routing.
 
 The existing REST operations remain available, including
 `POST /browser/v1/sleep` and `POST /browser/v1/wake`. Sleep closes Chrome and
