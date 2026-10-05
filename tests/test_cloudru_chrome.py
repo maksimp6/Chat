@@ -426,7 +426,6 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert 'node-version: "22.22.2"' in workflow
 
 
-
 def test_chrome_worker_image_includes_idp_runtime_modules():
     root = Path(__file__).resolve().parents[1] / "deploy" / "chrome-worker"
     dockerfile = (root / "Dockerfile").read_text()
@@ -438,6 +437,7 @@ def test_chrome_worker_image_includes_idp_runtime_modules():
     assert 'from "./idp-auth.mjs"' in (root / "server.mjs").read_text()
     assert 'from "./jwt-verify.mjs"' in (root / "idp-auth.mjs").read_text()
     assert {"idp-auth.mjs", "jwt-verify.mjs"} <= copied
+
 
 def test_workflow_runs_only_on_manual_or_owner_comment_one_at_a_time():
     import yaml
