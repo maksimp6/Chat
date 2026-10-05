@@ -154,9 +154,9 @@ def test_pruned_legacy_agent_modules_stay_deleted():
     assert not resurrected, f"Pruned legacy agent loops were restored: {resurrected}"
 
 
-def test_claude_instructions_import_repository_rules():
-    claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "@AGENTS.md" in claude_md.splitlines()
+def test_repository_agent_rules_have_single_canonical_source():
+    assert (ROOT / "AGENTS.md").exists()
+    assert not (ROOT / "CLAUDE.md").exists()
 
     codeowners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
-    assert any(line.split()[:1] == ["CLAUDE.md"] for line in codeowners.splitlines())
+    assert not any(line.split()[:1] == ["CLAUDE.md"] for line in codeowners.splitlines())
