@@ -173,9 +173,8 @@ def classify_branch(ref: str | None) -> str | None:
 
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
-_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(claude-lite|codex|copilot|alice)\b", re.I)
+_EXECUTABLE_MENTION = re.compile(r"(?<![\\w/])@(codex|copilot|alice)\\b", re.I)
 _EXECUTABLE_AGENT = {
-    "claude-lite": "claude",
     "codex": "codex",
     "copilot": "copilot",
     "alice": "alice",
