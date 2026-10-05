@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { BrowserShim, applyHeaderFlexLayout } = require("./browser_dom");
+const { BrowserShim, applyHeaderFlexLayout } = require("../browser/emulator/browser_dom");
 
 async function flush() {
   await Promise.resolve();

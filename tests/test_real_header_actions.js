@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const template = fs.readFileSync("templates/index.html", "utf8");
 const shim = new BrowserShim(template);

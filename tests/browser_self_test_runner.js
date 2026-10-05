@@ -1,6 +1,6 @@
 "use strict";
 
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 class BrowserShimScenarioError extends Error {
   constructor(code, message) {
