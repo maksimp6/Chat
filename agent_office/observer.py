@@ -181,7 +181,6 @@ _EXECUTABLE_AGENT = {
 }
 _MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
 _EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
-_CLAUDE_ACTION_RUN = re.compile(r"https://github\.com/[^)\s]+/actions/runs/\d+")
 
 
 def mentioned_agents(text: str | None) -> list[str]:
@@ -433,12 +432,8 @@ def _record_dispatch(
 
 
 def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
-    """Require provider-specific evidence that a trigger reached the execution backend."""
-    if kind == "reviewed":
-        return True
-    if agent == "claude":
-        return kind == "commented" and bool(_CLAUDE_ACTION_RUN.search(body or ""))
-    return kind == "commented"
+    """Require visible backend evidence after an eligible trigger."""
+    return kind in {"commented", "reviewed"}
 
 
 def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
@@ -456,7 +451,7 @@ def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> N
 
     target, dispatched_at, maintainer_intent = max(candidates, key=lambda item: item[1])
     thread.executable_dispatches.append((target, dispatched_at))
-    if target == "claude" and maintainer_intent:
+    if maintainer_intent:
         thread.maintainer_dispatches.append((target, dispatched_at))
 
 
