@@ -1,3 +1,4 @@
+from dataclasses import replace
 import io
 import json
 import urllib.error
@@ -153,6 +154,86 @@ def test_github_client_rejects_ambiguous_run_identity():
 
     request = build_rdc_restart_request(protected_head_sha=SHA, approval=approval())
     client = GitHubWorkflowDispatchClient("token", opener=opener)
+
+    with pytest.raises(WorkflowDispatchError, match="github_dispatch_invalid_response"):
+        client.dispatch("maksimp6/Chat", request)
+
+
+@pytest.mark.parametrize("field_name", ["work_order_id", "approver_id", "idempotency_key"])
+def test_request_rejects_invalid_approval_identifiers(field_name):
+    with pytest.raises(WorkflowDispatchError, match=f"invalid_{field_name}"):
+        build_rdc_restart_request(
+            protected_head_sha=SHA,
+            approval=approval(**{field_name: "bad value with spaces"}),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutator", "repository", "error"),
+    [
+        (lambda request: request, "not-a-repository", "invalid_repository"),
+        (
+            lambda request: replace(request, workflow=".github/workflows/other.yml"),
+            "maksimp6/Chat",
+            "workflow_not_allowed",
+        ),
+        (
+            lambda request: replace(request, inputs=(("action", "stop"),)),
+            "maksimp6/Chat",
+            "workflow_input_not_allowed",
+        ),
+        (
+            lambda request: replace(request, ref_sha="master"),
+            "maksimp6/Chat",
+            "invalid_ref_sha",
+        ),
+    ],
+)
+def test_github_client_revalidates_boundary_inputs(mutator, repository, error):
+    request = build_rdc_restart_request(protected_head_sha=SHA, approval=approval())
+    client = GitHubWorkflowDispatchClient("token", opener=lambda *_args, **_kwargs: None)
+
+    with pytest.raises(WorkflowDispatchError, match=error):
+        client.dispatch(repository, mutator(request))
+
+
+def test_github_client_requires_token():
+    with pytest.raises(WorkflowDispatchError, match="github_token_missing"):
+        GitHubWorkflowDispatchClient("")
+
+
+def test_github_client_sanitizes_transport_failure():
+    def opener(_request, timeout):
+        assert timeout == 20
+        raise urllib.error.URLError("provider detail")
+
+    request = build_rdc_restart_request(protected_head_sha=SHA, approval=approval())
+    client = GitHubWorkflowDispatchClient("token", opener=opener)
+
+    with pytest.raises(WorkflowDispatchError, match="github_dispatch_transport_error"):
+        client.dispatch("maksimp6/Chat", request)
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        FakeResponse(b"not-json"),
+        FakeResponse(json.dumps(["not", "an", "object"]).encode()),
+    ],
+)
+def test_github_client_rejects_malformed_response_body(response):
+    request = build_rdc_restart_request(protected_head_sha=SHA, approval=approval())
+    client = GitHubWorkflowDispatchClient("token", opener=lambda *_args, **_kwargs: response)
+
+    with pytest.raises(WorkflowDispatchError, match="github_dispatch_invalid_response"):
+        client.dispatch("maksimp6/Chat", request)
+
+
+def test_github_client_rejects_non_success_status():
+    response = FakeResponse(b"{}")
+    response.status = 204
+    request = build_rdc_restart_request(protected_head_sha=SHA, approval=approval())
+    client = GitHubWorkflowDispatchClient("token", opener=lambda *_args, **_kwargs: response)
 
     with pytest.raises(WorkflowDispatchError, match="github_dispatch_invalid_response"):
         client.dispatch("maksimp6/Chat", request)
