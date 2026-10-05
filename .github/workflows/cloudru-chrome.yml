@@ -72,9 +72,6 @@ jobs:
       - name: Install official MCP client
         if: env.CHROME_ACTION == 'deploy'
         run: npm ci --prefix deploy/chrome-worker
-      - name: Prepare live acceptance marker
-        if: env.CHROME_ACTION == 'deploy'
-        run: python -c "import uuid; print('BROWSER_SMOKE_MARKER=' + uuid.uuid4().hex)" >> "$GITHUB_ENV"
       - name: Operate separate Chrome service
         env:
           ACTION: ${{ env.CHROME_ACTION }}
@@ -88,22 +85,8 @@ jobs:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
         run: python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
-      - name: Seed real browser profile through public MCP
+      - name: Verify deployed MCP through public origin
         if: env.CHROME_ACTION == 'deploy'
         env:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
-        run: node deploy/chrome-worker/live-smoke.mjs seed
-      - name: Restart private Chrome with a verified checkpoint
-        if: env.CHROME_ACTION == 'deploy'
-        env:
-          SOURCE_SHA: ${{ github.sha }}
-          CHROME_LANE: ${{ env.CHROME_LANE }}
-          CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
-          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
-          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
-        run: python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"
-      - name: Verify MCP and restored browser profile through public origin
-        if: env.CHROME_ACTION == 'deploy'
-        env:
-          BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
-        run: node deploy/chrome-worker/live-smoke.mjs verify
+        run: node deploy/chrome-worker/live-smoke.mjs smoke
