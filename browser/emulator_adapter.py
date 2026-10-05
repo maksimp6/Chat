@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import threading
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, TextIO
 
 from .capabilities import BrowserAction
 
@@ -35,15 +35,20 @@ class EmulatorBrowserAdapter:
         with self._lock:
             process = self._ensure_process()
             try:
-                process.stdin.write(request + "\n")
-                process.stdin.flush()
-                line = process.stdout.readline()
+                stdin = process.stdin
+                stdout = process.stdout
+                if stdin is None or stdout is None:
+                    raise RuntimeError("browser emulator pipes are unavailable")
+                stdin.write(request + "\n")
+                stdin.flush()
+                line = stdout.readline()
             except BrokenPipeError:
                 line = ""
         if not line:
             self.close()
             raise RuntimeError("browser emulator exited unexpectedly")
-        return json.loads(line)
+        result: dict[str, Any] = json.loads(line)
+        return result
 
     def close(self) -> None:
         with self._lock:
