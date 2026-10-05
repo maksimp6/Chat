@@ -144,6 +144,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun openBrowserTakeover() {
+            AppLogger.info("AndroidBridge", "Browser takeover opened from web UI")
+            runOnUiThread {
+                startActivity(android.content.Intent(this@MainActivity, BrowserTakeoverActivity::class.java))
+            }
+        }
+
+        @JavascriptInterface
         fun log(level: String, tag: String, message: String) {
             val mappedLevel = when (level.uppercase()) {
                 "DEBUG" -> AppLogger.LogLevel.DEBUG
