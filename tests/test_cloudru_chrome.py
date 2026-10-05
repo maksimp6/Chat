@@ -645,6 +645,21 @@ def test_ambiguous_create_failure_never_reports_successful_rollback(monkeypatch)
     assert error.value.code == "chrome_rollback_failed"
 
 
+def test_legacy_github_auth_env_is_recognized_only_for_in_place_migration():
+    legacy = record()
+    legacy["template"]["containers"][0]["env"].extend(
+        [
+            {"name": "ALICE_GITHUB_CLIENT_ID", "value": "legacy-client"},
+            {"name": "ALICE_GITHUB_CLIENT_SECRET", "value": "legacy-secret"},
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, list=Mock(return_value=[legacy]))
+    assert chrome.owned_record(apps) == legacy
+    legacy["template"]["containers"][0]["env"].append({"name": "UNEXPECTED_SECRET", "value": "no"})
+    with pytest.raises(CloudProviderError):
+        chrome.owned_record(apps)
+
+
 def test_legacy_always_on_revision_is_still_recognized_for_in_place_update():
     legacy = record()
     legacy["template"]["containers"][0]["resources"] = {"cpu": "1", "memory": "4096Mi"}
