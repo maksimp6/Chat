@@ -77,7 +77,7 @@ async function fixture(t, overrides = {}) {
   const exchange = (flow, values = {}) => form("/browser/oauth/token", {
     grant_type: "authorization_code", client_id: flow.client.client_id, redirect_uri: REDIRECT, code: flow.location.searchParams.get("code"), code_verifier: VERIFIER, resource: RESOURCE, ...values,
   });
-  return { options, base, request, form, register, start, code, exchange, reload() { oauth = createOAuth(options); }, advance(seconds) { clock += seconds * 1000; }, checkpoints: () => checkpoints };
+  return { options, base, request, form, register, start, code, exchange, oauth, reload() { oauth = createOAuth(options); }, advance(seconds) { clock += seconds * 1000; }, checkpoints: () => checkpoints };
 }
 
 test("OAuth stays disabled until the public URL, short token and owner label are all configured", () => {
