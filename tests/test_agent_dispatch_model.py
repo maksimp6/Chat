@@ -25,17 +25,17 @@ def test_lifecycle_stages_are_not_agent_roles():
 
 def test_implementation_requires_a_concrete_engineering_role():
     with pytest.raises(AgentDispatchError, match="concrete implementation role"):
-        resolve_task_plan(stage="implementation", role=None, backend="claude-direct")
+        resolve_task_plan(stage="implementation", role=None, backend="codex")
 
     plan = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
-        backend="claude-direct",
+        backend="codex",
     )
     assert isinstance(plan, AgentTaskPlan)
     assert plan.stage == "implementation"
     assert plan.role == "backend-engineer"
-    assert plan.backend == "claude-direct"
+    assert plan.backend == "codex"
 
 
 def test_implementation_rejects_supervisory_and_review_roles():
@@ -51,16 +51,16 @@ def test_implementation_rejects_supervisory_and_review_roles():
             resolve_task_plan(
                 stage="implementation",
                 role=role,
-                backend="claude-direct",
+                backend="codex",
             )
 
 
-def test_current_default_backend_for_test_and_implementation_is_claude_direct():
+def test_current_default_backend_for_test_and_implementation_is_codex():
     test_plan = resolve_task_plan(stage="contract", role="test-engineer")
     impl_plan = resolve_task_plan(stage="implementation", role="infra-engineer")
 
-    assert test_plan.backend == "claude-direct"
-    assert impl_plan.backend == "claude-direct"
+    assert test_plan.backend == "codex"
+    assert impl_plan.backend == "codex"
 
 
 def test_copilot_is_review_only_not_implementation_backend():
@@ -75,20 +75,20 @@ def test_copilot_is_review_only_not_implementation_backend():
 
 
 def test_backend_does_not_change_role_or_authority():
-    direct = resolve_task_plan(
-        stage="implementation",
-        role="backend-engineer",
-        backend="claude-direct",
-    )
     codex = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
         backend="codex",
     )
+    actions = resolve_task_plan(
+        stage="implementation",
+        role="backend-engineer",
+        backend="github-actions",
+    )
 
-    assert direct.role == codex.role == "backend-engineer"
-    assert direct.can_merge is codex.can_merge is False
-    assert direct.can_bypass_approval is codex.can_bypass_approval is False
+    assert codex.role == actions.role == "backend-engineer"
+    assert codex.can_merge is actions.can_merge is False
+    assert codex.can_bypass_approval is actions.can_bypass_approval is False
 
 
 def test_test_engineer_can_author_contract_but_not_implement():
