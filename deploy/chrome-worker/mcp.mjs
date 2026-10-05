@@ -6,6 +6,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 // Authentication is checked by the worker before every request reaches this handler.
 export function createPlaywrightMcp(contextGetter, outputDir) {
   const sessions = new Map();
+  let boundSessionId;
 
   async function handle(request, response, message) {
     const sessionId = request.headers["mcp-session-id"];
@@ -16,16 +17,25 @@ export function createPlaywrightMcp(contextGetter, outputDir) {
         response.end(JSON.stringify({ jsonrpc: "2.0", id: message?.id ?? null, error: { code: -32000, message: "Initialize an MCP session first" } }));
         return;
       }
+      if (boundSessionId) {
+        response.writeHead(409, { "content-type": "application/json", "cache-control": "no-store" });
+        response.end(JSON.stringify({ jsonrpc: "2.0", id: message?.id ?? null, error: { code: -32001, message: "MCP client already bound" } }));
+        return;
+      }
       const server = await createConnection({ saveSession: false, outputDir }, contextGetter);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: randomUUID,
         enableJsonResponse: true,
-        onsessioninitialized: (id) => sessions.set(id, { server, transport }),
+        onsessioninitialized: (id) => {
+          boundSessionId = id;
+          sessions.set(id, { server, transport });
+        },
       });
       await server.connect(transport);
       const onclose = transport.onclose;
       transport.onclose = () => {
         sessions.delete(transport.sessionId);
+        if (boundSessionId === transport.sessionId) boundSessionId = undefined;
         onclose?.();
       };
       session = { server, transport };
@@ -36,6 +46,7 @@ export function createPlaywrightMcp(contextGetter, outputDir) {
   async function close() {
     await Promise.all([...sessions.values()].map(({ server }) => server.close()));
     sessions.clear();
+    boundSessionId = undefined;
   }
 
   return { handle, close };
