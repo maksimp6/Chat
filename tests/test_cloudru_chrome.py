@@ -25,8 +25,6 @@ def environment(**overrides):
         SHA,
         {
             "ALICE_SHORT_TOKEN": "test-private-token",
-            "ALICE_GITHUB_CLIENT_ID": "test-client",
-            "ALICE_GITHUB_CLIENT_SECRET": "test-client-secret",
             "BROWSER_PUBLIC_URL": MCP_ORIGIN,
             **overrides,
         },
@@ -346,13 +344,32 @@ def test_deployed_origin_is_exported_for_live_acceptance(tmp_path):
         chrome.export_public_url("https://evil.example", {"GITHUB_ENV": str(target)})
 
 
-def test_deploy_summary_shows_only_public_connector_and_callback_urls(tmp_path):
+def test_deploy_summary_shows_only_the_public_connector_url(tmp_path):
     summary = tmp_path / "summary"
     chrome.export_public_url(ORIGIN, {"GITHUB_STEP_SUMMARY": str(summary)})
     text = summary.read_text()
-    assert ORIGIN + "/browser/v1/mcp" in text
-    assert ORIGIN + "/browser/oauth/github/callback" in text
+    assert text.splitlines()[0] == "## Chrome MCP"
+    assert f"- ChatGPT connector URL: `{ORIGIN}/browser/v1/mcp`" in text.splitlines()
+    assert "\\n" not in text
     assert "token" not in text.lower()
+    assert "github" not in text.lower()
+    assert "callback" not in text.lower()
+
+
+def test_runtime_env_needs_only_the_token_and_never_forwards_github_client_credentials():
+    result = chrome.runtime_env(
+        SHA,
+        {
+            "ALICE_SHORT_TOKEN": "test-private-token",
+            "ALICE_GITHUB_CLIENT_ID": "client",
+            "ALICE_GITHUB_CLIENT_SECRET": "client-secret",
+        },
+    )
+    assert result["BROWSER_API_TOKEN"] == "test-private-token"
+    assert not any("GITHUB_CLIENT" in key for key in result)
+    with pytest.raises(CloudProviderError) as error:
+        chrome.runtime_env(SHA, {})
+    assert error.value.code == "auth_not_configured"
 
 
 def test_bucket_with_unknown_owner_is_not_adopted(monkeypatch):
@@ -400,6 +417,12 @@ def test_cli_never_prints_provider_error_or_token(monkeypatch, capsys):
     }
 
 
+def test_wait_ready_default_covers_slow_cloudru_cold_start():
+    import inspect
+
+    assert inspect.signature(chrome.wait_ready).parameters["timeout"].default == 420
+
+
 def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     workflow = (
         Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml"
@@ -408,8 +431,7 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert "git merge-base --is-ancestor HEAD FETCH_HEAD" in workflow
     assert "environment: production" in workflow
     assert "secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN" in workflow
-    assert "secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID" in workflow
-    assert "secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET" in workflow
+    assert "GITHUB_CLIENT" not in workflow
     assert "CLOUDRU_STORAGE_TENANT_ID" in workflow
     assert 'python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"' in workflow
     assert "ALICE_DATABASE_URL" not in workflow
@@ -420,17 +442,47 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert 'node-version: "22.22.2"' in workflow
 
 
-def test_workflow_runs_only_on_manual_dispatch_one_at_a_time():
+def test_chrome_worker_image_includes_idp_runtime_modules():
+    root = Path(__file__).resolve().parents[1] / "deploy" / "chrome-worker"
+    dockerfile = (root / "Dockerfile").read_text()
+    copy_line = next(
+        line for line in dockerfile.splitlines() if line.startswith("COPY server.mjs ")
+    )
+    copied = set(copy_line.removeprefix("COPY ").removesuffix(" ./").split())
+
+    assert 'from "./idp-auth.mjs"' in (root / "server.mjs").read_text()
+    assert 'from "./jwt-verify.mjs"' in (root / "idp-auth.mjs").read_text()
+    assert {"idp-auth.mjs", "jwt-verify.mjs"} <= copied
+
+
+def test_workflow_runs_only_on_manual_or_owner_comment_one_at_a_time():
     import yaml
 
     workflow = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml").read_text()
     )
     # PyYAML reads the bare `on` key as boolean True.
-    assert set(workflow[True]) == {"workflow_dispatch"}
+    assert set(workflow[True]) == {"workflow_dispatch", "issue_comment"}
+    assert workflow[True]["issue_comment"]["types"] == ["created"]
     assert workflow["concurrency"]["cancel-in-progress"] is False
+    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane || 'production' }}")
     assert workflow["jobs"]["chrome"]["timeout-minutes"] <= 35
     assert "public_url" not in workflow[True]["workflow_dispatch"]["inputs"]
+    job = workflow["jobs"]["chrome"]
+    condition = job["if"]
+    assert "github.event.issue.number == 409" in condition
+    assert "github.event.comment.author_association == 'OWNER'" in condition
+    assert "github.event.comment.user.login == github.repository_owner" in condition
+    for command in [
+        "/chrome preflight",
+        "/chrome deploy",
+        "/chrome status",
+        "/chrome restart",
+        "/chrome stop",
+    ]:
+        assert command in condition
+    assert job["env"]["CHROME_ACTION"].endswith("|| 'preflight' }}")
+    assert job["env"]["CHROME_LANE"] == "${{ inputs.lane || 'production' }}"
     text = yaml.safe_dump(workflow)
     assert "maxxxpavlov" not in text and "Gateway" not in text
 
@@ -443,8 +495,6 @@ def test_cli_actions_respect_read_only_and_checkpoint_boundaries(monkeypatch, ca
         "CLOUDRU_IAM_KEY_SECRET": "test-key-secret",
         "CLOUDRU_STORAGE_TENANT_ID": IDENTIFIER,
         "ALICE_SHORT_TOKEN": "test-private-token",
-        "ALICE_GITHUB_CLIENT_ID": "test-client",
-        "ALICE_GITHUB_CLIENT_SECRET": "test-client-secret",
     }.items():
         monkeypatch.setenv(key, value)
     monkeypatch.delenv("BROWSER_PUBLIC_URL", raising=False)
@@ -610,6 +660,21 @@ def test_ambiguous_create_failure_never_reports_successful_rollback(monkeypatch)
     assert error.value.code == "chrome_rollback_failed"
 
 
+def test_legacy_github_auth_env_is_recognized_only_for_in_place_migration():
+    legacy = record()
+    legacy["template"]["containers"][0]["env"].extend(
+        [
+            {"name": "ALICE_GITHUB_CLIENT_ID", "value": "legacy-client"},
+            {"name": "ALICE_GITHUB_CLIENT_SECRET", "value": "legacy-secret"},
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, list=Mock(return_value=[legacy]))
+    assert chrome.owned_record(apps) == legacy
+    legacy["template"]["containers"][0]["env"].append({"name": "UNEXPECTED_SECRET", "value": "no"})
+    with pytest.raises(CloudProviderError):
+        chrome.owned_record(apps)
+
+
 def test_legacy_always_on_revision_is_still_recognized_for_in_place_update():
     legacy = record()
     legacy["template"]["containers"][0]["resources"] = {"cpu": "1", "memory": "4096Mi"}
@@ -678,15 +743,15 @@ def test_workflow_test_lane_is_isolated_from_production():
         (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml").read_text()
     )
     job = workflow["jobs"]["chrome"]
-    assert job["if"] == "github.ref == 'refs/heads/master' || inputs.lane == 'test'"
-    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane }}")
+    assert "github.ref == 'refs/heads/master' || inputs.lane == 'test'" in job["if"]
+    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane || 'production' }}")
     review = next(
         step for step in job["steps"] if step.get("name") == "Require reviewed master commit"
     )
-    assert review["if"] == "inputs.lane != 'test'"
+    assert review["if"] == "env.CHROME_LANE != 'test'"
     python_steps = [step for step in job["steps"] if "cloudru_chrome.py" in step.get("run", "")]
     assert python_steps and all(
-        step["env"]["CHROME_LANE"] == "${{ inputs.lane }}" for step in python_steps
+        step["env"]["CHROME_LANE"] == "${{ env.CHROME_LANE }}" for step in python_steps
     )
 
 
@@ -739,6 +804,37 @@ def test_worker_call_retries_provider_timeouts_during_cold_start():
         apps, record(), "t", "/browser/v1/wake", method="POST", sleep=clock.sleep, clock=clock.now
     )
     assert result == {"state": "awake"} and request.call_count == 3
+
+
+def test_worker_call_retries_client_timeouts_while_a_scaled_to_zero_replica_starts():
+    # requests raises a timeout with no response while Chrome cold-starts and
+    # restores its profile; the worker operation is idempotent, so keep trying.
+    clock = _Clock()
+    ok = {"statusCode": 200, "body": json.dumps({"state": "sleeping"})}
+    request = Mock(
+        side_effect=[
+            CloudProviderError("timeout", code="provider_http_error", http_status=None),
+            CloudProviderError("timeout", code="provider_http_error", http_status=None),
+            ok,
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, client=SimpleNamespace(request=request))
+    result = chrome.request_worker(
+        apps, record(), "t", "/browser/v1/sleep", method="POST", sleep=clock.sleep, clock=clock.now
+    )
+    assert result == {"state": "sleeping"} and request.call_count == 3
+    apps.client.request = Mock(
+        side_effect=CloudProviderError("timeout", code="provider_http_error", http_status=None)
+    )
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(
+            apps, record(), "t", "/healthz", timeout=12, sleep=clock.sleep, clock=clock.now
+        )
+    assert apps.client.request.call_count == 4
+    apps.client.request = Mock(side_effect=CloudProviderError("not a transport error"))
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(apps, record(), "t", "/healthz", sleep=clock.sleep, clock=clock.now)
+    assert apps.client.request.call_count == 1
 
 
 def test_worker_call_does_not_retry_other_errors_or_past_deadline():

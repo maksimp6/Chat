@@ -1,6 +1,8 @@
 name: Cloud.ru persistent Chrome MCP
 
 on:
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
       action:
@@ -25,12 +27,23 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: alice-cloudru-persistent-chrome-${{ inputs.lane }}
+  group: alice-cloudru-persistent-chrome-${{ inputs.lane || 'production' }}
   cancel-in-progress: false
 
 jobs:
   chrome:
-    if: github.ref == 'refs/heads/master' || inputs.lane == 'test'
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       (github.ref == 'refs/heads/master' || inputs.lane == 'test')) ||
+      (github.event_name == 'issue_comment' &&
+       github.ref == 'refs/heads/master' &&
+       github.event.issue.number == 409 &&
+       github.event.comment.author_association == 'OWNER' &&
+       github.event.comment.user.login == github.repository_owner &&
+       contains(fromJSON('["/chrome preflight","/chrome deploy","/chrome status","/chrome restart","/chrome stop"]'), github.event.comment.body))
+    env:
+      CHROME_ACTION: ${{ inputs.action || (github.event.comment.body == '/chrome deploy' && 'deploy') || (github.event.comment.body == '/chrome status' && 'status') || (github.event.comment.body == '/chrome restart' && 'restart') || (github.event.comment.body == '/chrome stop' && 'stop') || 'preflight' }}
+      CHROME_LANE: ${{ inputs.lane || 'production' }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -41,7 +54,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Require reviewed master commit
-        if: inputs.lane != 'test'
+        if: env.CHROME_LANE != 'test'
         run: |
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD FETCH_HEAD
@@ -51,48 +64,46 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: inputs.action == 'deploy'
+        if: env.CHROME_ACTION == 'deploy'
         with:
           node-version: "22.22.2"
           cache: npm
           cache-dependency-path: deploy/chrome-worker/package-lock.json
       - name: Install official MCP client
-        if: inputs.action == 'deploy'
+        if: env.CHROME_ACTION == 'deploy'
         run: npm ci --prefix deploy/chrome-worker
       - name: Prepare live acceptance marker
-        if: inputs.action == 'deploy'
+        if: env.CHROME_ACTION == 'deploy'
         run: python -c "import uuid; print('BROWSER_SMOKE_MARKER=' + uuid.uuid4().hex)" >> "$GITHUB_ENV"
       - name: Operate separate Chrome service
         env:
-          ACTION: ${{ inputs.action }}
+          ACTION: ${{ env.CHROME_ACTION }}
           SOURCE_SHA: ${{ github.sha }}
-          CHROME_LANE: ${{ inputs.lane }}
-          BROWSER_IDP_ISSUER: ${{ inputs.idp_issuer || (inputs.lane == 'test' && vars.BROWSER_IDP_ISSUER_TEST) || (inputs.lane != 'test' && vars.BROWSER_IDP_ISSUER) || '' }}
+          CHROME_LANE: ${{ env.CHROME_LANE }}
+          BROWSER_IDP_ISSUER: ${{ inputs.idp_issuer || (env.CHROME_LANE == 'test' && vars.BROWSER_IDP_ISSUER_TEST) || (env.CHROME_LANE != 'test' && vars.BROWSER_IDP_ISSUER) || '' }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
-          ALICE_GITHUB_CLIENT_ID: ${{ secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID }}
-          ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
         run: python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
       - name: Seed real browser profile through public MCP
-        if: inputs.action == 'deploy'
+        if: env.CHROME_ACTION == 'deploy'
         env:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
         run: node deploy/chrome-worker/live-smoke.mjs seed
       - name: Restart private Chrome with a verified checkpoint
-        if: inputs.action == 'deploy'
+        if: env.CHROME_ACTION == 'deploy'
         env:
           SOURCE_SHA: ${{ github.sha }}
-          CHROME_LANE: ${{ inputs.lane }}
+          CHROME_LANE: ${{ env.CHROME_LANE }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"
       - name: Verify MCP and restored browser profile through public origin
-        if: inputs.action == 'deploy'
+        if: env.CHROME_ACTION == 'deploy'
         env:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
         run: node deploy/chrome-worker/live-smoke.mjs verify
