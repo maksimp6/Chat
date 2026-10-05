@@ -435,10 +435,10 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert "CLOUDRU_STORAGE_TENANT_ID" in workflow
     assert 'python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"' in workflow
     assert "ALICE_DATABASE_URL" not in workflow
-    seed = workflow.index("node deploy/chrome-worker/live-smoke.mjs seed")
-    restart = workflow.index('python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"')
-    verify = workflow.index("node deploy/chrome-worker/live-smoke.mjs verify")
-    assert seed < restart < verify
+    assert "node deploy/chrome-worker/live-smoke.mjs seed" not in workflow
+    assert 'python scripts/cloudru_chrome.py restart --sha "$SOURCE_SHA"' not in workflow
+    assert "node deploy/chrome-worker/live-smoke.mjs verify" not in workflow
+    assert "node deploy/chrome-worker/live-smoke.mjs smoke" in workflow
     assert 'node-version: "22.22.2"' in workflow
 
 
