@@ -44,13 +44,12 @@ _ALL_ROLES = frozenset(
 
 _ALL_BACKENDS = frozenset(
     {
-        "codex",
         "copilot",
         "github-actions",
     }
 )
 
-_DEFAULT_BACKEND = "codex"
+_DEFAULT_BACKEND = "github-actions"
 
 
 class AgentDispatchError(Exception):
