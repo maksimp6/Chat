@@ -145,7 +145,6 @@ Cloud.ru migration is coordinated in [#440](https://github.com/maksimp6/Chat/iss
 - [#227](https://github.com/maksimp6/Chat/issues/227) and [#223](https://github.com/maksimp6/Chat/issues/223) — frontend progressive enhancement;
 - [#326](https://github.com/maksimp6/Chat/issues/326) and [#238](https://github.com/maksimp6/Chat/issues/238) — MCP/ChatGPT compatibility;
 - [#254](https://github.com/maksimp6/Chat/issues/254) and [#256](https://github.com/maksimp6/Chat/issues/256) — plugin platform and autonomous development;
-- [#340](https://github.com/maksimp6/Chat/issues/340) — provider-neutral cloud storage, Google Drive first;
 - [#116](https://github.com/maksimp6/Chat/issues/116) — conversation agents;
 - [#195](https://github.com/maksimp6/Chat/issues/195) — Android/release safety;
 - [#104](https://github.com/maksimp6/Chat/issues/104) — public release;
