@@ -77,6 +77,13 @@ DNS is required for this temporary owner-authentication path. ChatGPT connects
 to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` and enters the short token when the
 authorization page opens.
 
+The token is the only gate to a browser with saved logins, so use a long random value.
+After 5 wrong tokens within 15 minutes the consent page answers
+`429 too_many_attempts` until the oldest failure ages out, even for the correct token;
+a successful sign-in resets the count. The counter is in memory, so a restart clears
+it. Rotating the token does not revoke grants that were already issued; they expire
+on their own or can be revoked.
+
 ## Cloud.ru runtime state
 
 The Cloud.ru lane uses a separate Chrome container and state bucket; it does not
@@ -91,8 +98,8 @@ cannot send a Cloud.ru IAM token. The worker itself is the access boundary:
 
 - Anonymous: `GET /healthz` and the protocol-required OAuth surface (protected
   resource and authorization server metadata, dynamic client registration,
-  authorize, GitHub callback, token and revoke). Tokens are issued only after
-  GitHub sign-in by the single allowed account.
+  authorize, token and revoke). Authorization codes are issued only after the
+  owner enters the short token.
 - Authenticated: browser control (`/browser/v1/*`) and MCP (`/browser/v1/mcp`)
   require `BROWSER_API_TOKEN` or such an OAuth access token.
 
@@ -138,16 +145,15 @@ is then bound to that same container before the restart check, so OAuth metadata
 and callbacks use it. A rollout failure restores the prior configuration, or
 suspends only the new container on first install.
 
-The workflow then runs the official MCP SDK against the deployed origin: client
-registration and consent redirects, navigation, a synthetic form interaction,
-and a screenshot. It writes a temporary cookie/localStorage marker on
-`example.com`, restarts the container, verifies both values through MCP
-and removes the marker. This checks transport and profile recovery without
-claiming that the owner has completed GitHub or ChatGPT consent.
+The workflow then runs the official MCP SDK against the deployed origin with the
+worker token: navigation, a synthetic form interaction, and a screenshot. It writes a temporary cookie/localStorage marker on `example.com`,
+restarts the container, verifies both values through MCP and removes the marker.
+This checks transport and profile recovery. It does not exercise the OAuth consent
+page; the short-token sign-in is covered by `oauth.test.mjs` and
+`short-token-oauth.test.mjs`.
 
-After the first deploy, register `<provider_url>/browser/oauth/github/callback`
-(from the deploy output) as the GitHub OAuth App callback, then add
-`<provider_url>/browser/v1/mcp` in ChatGPT.
+After the deploy, add `<provider_url>/browser/v1/mcp` in ChatGPT as a connector that
+uses OAuth. ChatGPT opens the consent page, where the owner enters the short token.
 
 The `restart` and `stop` workflow actions checkpoint the current profile before
 stopping the worker. Status output contains resource IDs and readiness evidence,

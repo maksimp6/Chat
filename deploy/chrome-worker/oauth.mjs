@@ -12,6 +12,8 @@ const PROVISIONAL_CLIENT_SECONDS = 7 * 24 * 3600;
 const MAX_CLIENTS = 1000;
 const COOKIE = "browser_oauth_transaction";
 const OAUTH_PATH = "/browser/oauth";
+const MAX_FAILURES = 5;
+const FAILURE_WINDOW = 900;
 const MAX_BODY = 16 * 1024;
 const ACCESS_TTL = 15 * 60;
 const REFRESH_TTL = 30 * 24 * 60 * 60;
@@ -194,12 +196,21 @@ export function createOAuth(options = {}) {
     response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Chrome к ChatGPT</title><h1>Доступ к вашему браузеру</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит управление Chrome и доступ к сайтам вашего сохранённого профиля. Введите short token владельца.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><input type="password" name="password" autocomplete="current-password" required><button type="submit">Разрешить</button></form></html>`);
   }
 
+  // Wrong short tokens seen recently, in memory only. Registration is anonymous, so
+  // without a global cap a caller could guess the token with unlimited transactions.
+  const failures = [];
   async function ownerLogin(request, response) {
     const input = await body(request, "application/x-www-form-urlencoded");
     const transaction = input.transaction ?? "";
     const pending = state.pending[digest(transaction)];
     if (!pending || pending.expires <= now() || pending.started || !browserBound(request, transaction)) return json(response, 400, { error: "invalid_request" });
-    if (typeof input.password !== "string" || !equal(input.password, shortToken)) return json(response, 403, { error: "access_denied" });
+    while (failures.length && failures[0] <= now() - FAILURE_WINDOW) failures.shift();
+    if (failures.length >= MAX_FAILURES) return json(response, 429, { error: "too_many_attempts" }, { "retry-after": String(failures[0] + FAILURE_WINDOW - now()) });
+    if (typeof input.password !== "string" || !equal(input.password, shortToken)) {
+      failures.push(now());
+      return json(response, 403, { error: "access_denied" });
+    }
+    failures.length = 0;
     pending.started = true;
     delete state.pending[digest(transaction)];
     if (!Object.hasOwn(state.clients, pending.client_id)) return json(response, 400, { error: "invalid_client" });
