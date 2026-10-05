@@ -11,6 +11,7 @@ const SCOPE = "browser";
 const PROVISIONAL_CLIENT_SECONDS = 7 * 24 * 3600;
 const MAX_CLIENTS = 1000;
 const COOKIE = "browser_oauth_transaction";
+const OWNER_COOKIE = "browser_owner_session";
 const OAUTH_PATH = "/browser/oauth";
 const MAX_FAILURES = 5;
 const FAILURE_WINDOW = 900;
@@ -118,6 +119,29 @@ export function createOAuth(options = {}) {
   }
   const sign = (value) => `${value}.${createHmac("sha256", state.signingKey).update(value).digest("base64url")}`;
   const cookie = (transaction, clear = false) => `${COOKIE}=${clear ? "" : sign(transaction)}; ${cookieFlags}Max-Age=${clear ? 0 : 600}`;
+  const ownerCookie = (value, clear = false) => `${OWNER_COOKIE}=${clear ? "" : sign(value)}; HttpOnly; SameSite=Strict; Path=/browser/v1/takeover; ${origin.startsWith("https:") ? "Secure; " : ""}Max-Age=${clear ? 0 : 600}`;
+  function ownerAuthorize(request) {
+    const supplied = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${OWNER_COOKIE}=`))?.slice(OWNER_COOKIE.length + 1);
+    if (typeof supplied !== "string") return false;
+    const dot = supplied.lastIndexOf(".");
+    if (dot <= 0) return false;
+    const value = supplied.slice(0, dot);
+    const expires = Number(value);
+    return Number.isInteger(expires) && expires > now() && equal(supplied, sign(value));
+  }
+  async function ownerSession(request, response) {
+    const input = await body(request, "application/x-www-form-urlencoded");
+    while (failures.length && failures[0] <= now() - FAILURE_WINDOW) failures.shift();
+    if (failures.length >= MAX_FAILURES) return json(response, 429, { error: "too_many_attempts" }, { "retry-after": String(failures[0] + FAILURE_WINDOW - now()) });
+    if (typeof input.password !== "string" || !equal(input.password, shortToken)) {
+      failures.push(now());
+      return json(response, 403, { error: "access_denied" });
+    }
+    failures.length = 0;
+    const expires = now() + 600;
+    response.writeHead(303, { location: "/browser/v1/takeover", "cache-control": "no-store", "set-cookie": ownerCookie(String(expires)) });
+    response.end();
+  }
   function browserBound(request, transaction) {
     const supplied = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
     return typeof supplied === "string" && equal(supplied, sign(transaction));
@@ -273,6 +297,7 @@ export function createOAuth(options = {}) {
       else if (request.method === "POST" && path === `${OAUTH_PATH}/register`) await register(request, response);
       else if (request.method === "GET" && path === `${OAUTH_PATH}/authorize`) await begin(request, response, url);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/authorize`) await ownerLogin(request, response);
+      else if (request.method === "POST" && path === "/browser/oauth/owner-session") await ownerSession(request, response);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/token`) await token(request, response);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/revoke`) await revoke(request, response);
       else json(response, 404, { error: "not_found" });
@@ -287,5 +312,5 @@ export function createOAuth(options = {}) {
     return true;
   }
 
-  return { enabled, handle, authorize, challenge, metadata };
+  return { enabled, handle, authorize, ownerAuthorize, ownerSession, challenge, metadata };
 }
