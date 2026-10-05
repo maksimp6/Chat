@@ -807,7 +807,7 @@ def export_public_url(origin, env=os.environ):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("preflight", "deploy", "status", "restart", "stop"))
+    parser.add_argument("action", choices=("preflight", "deploy", "status", "restart", "stop", "takeover"))
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
     args = parser.parse_args(argv)
@@ -843,6 +843,29 @@ def main(argv=None):
             result = {"status": "CHROME_NOT_FOUND", "container_name": names(project)[0]}
         elif args.action == "status":
             result = summary(record)
+        elif args.action == "takeover":
+            if str(record.get("status", "")).lower() != "running":
+                provider(apps.start, record["name"])
+                record = wait_ready(apps, identifier=record["id"])
+            environment = {
+                item["name"]: item["value"] for item in record["template"]["containers"][0]["env"]
+            }
+            grant = request_worker(
+                apps,
+                record,
+                environment["BROWSER_API_TOKEN"],
+                "/browser/v1/takeover/start",
+                method="POST",
+            )
+            result = {
+                "status": "TAKEOVER_READY",
+                "url": grant["url"],
+                "expiresAt": grant["expiresAt"],
+            }
+            summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+            if summary_path:
+                with open(summary_path, "a", encoding="utf-8") as stream:
+                    stream.write(f"## Chrome human takeover\n\n- Open: {grant['url']}\n")
         else:
             generation = None
             if str(record.get("status", "")).lower() == "running":
