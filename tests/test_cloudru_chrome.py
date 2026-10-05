@@ -806,6 +806,37 @@ def test_worker_call_retries_provider_timeouts_during_cold_start():
     assert result == {"state": "awake"} and request.call_count == 3
 
 
+def test_worker_call_retries_client_timeouts_while_a_scaled_to_zero_replica_starts():
+    # requests raises a timeout with no response while Chrome cold-starts and
+    # restores its profile; the worker operation is idempotent, so keep trying.
+    clock = _Clock()
+    ok = {"statusCode": 200, "body": json.dumps({"state": "sleeping"})}
+    request = Mock(
+        side_effect=[
+            CloudProviderError("timeout", code="provider_http_error", http_status=None),
+            CloudProviderError("timeout", code="provider_http_error", http_status=None),
+            ok,
+        ]
+    )
+    apps = SimpleNamespace(project_id=PROJECT, client=SimpleNamespace(request=request))
+    result = chrome.request_worker(
+        apps, record(), "t", "/browser/v1/sleep", method="POST", sleep=clock.sleep, clock=clock.now
+    )
+    assert result == {"state": "sleeping"} and request.call_count == 3
+    apps.client.request = Mock(
+        side_effect=CloudProviderError("timeout", code="provider_http_error", http_status=None)
+    )
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(
+            apps, record(), "t", "/healthz", timeout=12, sleep=clock.sleep, clock=clock.now
+        )
+    assert apps.client.request.call_count == 4
+    apps.client.request = Mock(side_effect=CloudProviderError("not a transport error"))
+    with pytest.raises(CloudProviderError):
+        chrome.request_worker(apps, record(), "t", "/healthz", sleep=clock.sleep, clock=clock.now)
+    assert apps.client.request.call_count == 1
+
+
 def test_worker_call_does_not_retry_other_errors_or_past_deadline():
     clock = _Clock()
     apps = SimpleNamespace(
