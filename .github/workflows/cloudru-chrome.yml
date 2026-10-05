@@ -1,5 +1,3 @@
-[Reading 109 lines from start (total: 109 lines, 0 remaining)]
-
 name: Cloud.ru persistent Chrome MCP
 
 on:
@@ -109,5 +107,3 @@ jobs:
         env:
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
         run: node deploy/chrome-worker/live-smoke.mjs verify
-
-[executed on device: rdc-22706bfa6066-00001-deployment-68b9cf96cc-r22sb (bf88308d-eebc-4fb0-98e4-96542cf47cb8)]
