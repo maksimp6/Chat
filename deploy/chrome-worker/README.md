@@ -37,6 +37,16 @@ Set the token through the client's environment/secret store. In a remote setup,
 replace the local URL with the deployed endpoint. No live URL
 or credentials are embedded in this repository.
 
+## Human takeover
+
+The production Chrome image runs its persistent profile on a private Xvfb display. The VNC server and noVNC/websockify listener bind only to loopback and are never exposed as container ports.
+
+An authenticated owner may call `POST /browser/v1/takeover/start`. The worker wakes the same persistent Chrome context used by Playwright and returns a short-lived noVNC URL. Only one takeover grant may be active at once. The grant expires after 10 minutes by default and can be ended early with `POST /browser/v1/takeover/stop`.
+
+The human types passwords and second-factor codes directly into Chrome's framebuffer. Those values do not pass through the worker JSON API, MCP messages, Execution Trace, or GitHub Actions. The initial takeover URL carries an ephemeral random grant; after the first page load it is also held in an HttpOnly, Secure, SameSite=Strict cookie for noVNC assets. Raw VNC, websockify and Chrome DevTools ports remain private.
+
+Closing or expiring takeover removes remote human access but does not close Chrome. Playwright MCP can continue using the same cookies, localStorage and authenticated profile. Worker shutdown closes Chrome first, checkpoints the profile, then stops the private display services.
+
 ## Run and check
 
 ```bash
