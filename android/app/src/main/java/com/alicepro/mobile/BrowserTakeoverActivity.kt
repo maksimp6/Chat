@@ -21,10 +21,7 @@ class BrowserTakeoverActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            setAcceptThirdPartyCookies(webViewOrNull(), false)
-        }
+        CookieManager.getInstance().setAcceptCookie(true)
 
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -34,6 +31,7 @@ class BrowserTakeoverActivity : AppCompatActivity() {
             settings.setSupportZoom(true)
             settings.useWideViewPort = true
             settings.loadWithOverviewMode = true
+            settings.mediaPlaybackRequiresUserGesture = true
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -56,8 +54,6 @@ class BrowserTakeoverActivity : AppCompatActivity() {
         })
         webView.loadUrl(TAKEOVER_URL)
     }
-
-    private fun webViewOrNull(): WebView = WebView(this)
 
     override fun onDestroy() {
         CookieManager.getInstance().flush()
