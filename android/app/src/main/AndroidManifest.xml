@@ -11,6 +11,16 @@
         <activity
             android:name=".DiagnosticsActivity"
             android:exported="false" />
+        <activity
+            android:name=".BrowserTakeoverActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="alicepro" android:host="browser" />
+            </intent-filter>
+        </activity>
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
