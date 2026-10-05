@@ -32,7 +32,7 @@ test("live SDK seed and verify survive a cold profile restore and reject wrong/r
     const auth = join(local, "auth");
     const worker = createWorker({
       token: "synthetic-smoke-token", profileDir: join(local, "profile"), stateDir: durable, authDir: auth,
-      oauth: { env: {}, publicUrl: "https://gateway.example.test", githubClientId: "synthetic-client", githubClientSecret: "synthetic-secret", ownerId: "12345", stateFile: join(auth, "oauth.json") },
+      oauth: { env: {}, publicUrl: "https://gateway.example.test", shortToken: "synthetic-smoke-token", ownerId: "12345", stateFile: join(auth, "oauth.json") },
       chromium: {
         async launchPersistentContext(path, options) {
           const context = await chromium.launchPersistentContext(path, options);
