@@ -95,9 +95,7 @@ the cheapest backend/model that can reliably perform that role.
 
 ### Model policy
 
-Routine mechanical work and Docs Engineer work use `gpt-5.4-nano`. Escalate to a
-larger OpenAI model only for a concrete capability or reasoning need, with the
-reason recorded in the task handoff. Do not silently escalate routine work.
+Repository automation should prefer deterministic GitHub workflows and explicit tool execution. Model-backed execution is optional, never required by policy, and must not become a merge prerequisite.
 
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push to `master`.
@@ -123,8 +121,7 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
 - Draft pull requests are not merged; the author marks them ready first.
   Alice always opens drafts, so the maintainer marks an Alice draft ready once
   its CI is green, then reviews it like any other pull request.
-- Keep a pull request in working/draft state while implementation and CI are
-  still changing. Do not request Codex or Copilot review during this phase.
+- Keep a pull request in working/draft state while implementation and CI are still changing. Do not request extra model review during this phase.
 - A pull request enters its single final review cycle only when the current head
   has passed required CI and there are no open review threads from earlier work.
   At that point mark it ready for review.
@@ -132,13 +129,7 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   a Copilot review; duplicate triggers waste resources and can create redundant
   review findings. Fix or answer every automatic Copilot comment and resolve each
   thread before merging.
-- Request `@codex review` exactly once for the ready-to-merge head. Add or answer
-  every regression test Codex proposes. If Codex has not responded by the next
-  hourly maintainer pass, Claude may continue once CI and other review gates are
-  satisfied.
-- After feedback fixes, do not request another Codex review and do not retrigger
-  Copilot. The final corrected head is validated by required CI plus resolved
-  review threads. A repeated review is allowed only when the owner explicitly asks for it.
+- The final corrected head is validated by required CI plus resolved review threads. Extra model review is optional and never a merge prerequisite.
 - Merge is fail-closed. Immediately before merge, verify the pull request is
   synchronized with the current `master` (`behind master = 0`). Required
   checks must be green on the exact current PR head after that synchronization,
