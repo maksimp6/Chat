@@ -32,9 +32,9 @@ function fakeChromium() {
   };
 }
 
-async function fixture() {
+async function fixture(options = {}) {
   const fake = fakeChromium();
-  const worker = createWorker({ token: "test-token", allowedHosts: "example.test", profileDir: "/state/profile", chromium: fake.chromium });
+  const worker = createWorker({ token: "test-token", allowedHosts: "example.test", profileDir: "/state/profile", chromium: fake.chromium, ...options });
   const server = createServer(worker.handler).listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -71,4 +71,28 @@ test("worker preserves its REST navigation and input operations", async (t) => {
 
   assert.equal((await app.request("/browser/v1/type", { locator: "#name", text: "Alice" })).status, 200);
   assert.equal(app.fake.profile.value, "Alice");
+});
+
+
+test("human takeover requires worker auth and returns only an ephemeral browser URL", async (t) => {
+  const takeover = {
+    startDisplay() {},
+    start() { return { token: "ephemeral-grant", expiresAt: 123456 }; },
+    stop() {},
+    close() {},
+    status() { return { active: true, expiresAt: 123456 }; },
+    async proxyHttp() { return false; },
+    proxyUpgrade() {},
+  };
+  const app = await fixture({ takeoverEnabled: true, takeoverRuntime: takeover });
+  t.after(app.close);
+
+  assert.equal((await app.request("/browser/v1/takeover/start", {}, "wrong")).status, 401);
+  const response = await app.request("/browser/v1/takeover/start", {});
+  assert.equal(response.status, 200);
+  const grant = await response.json();
+  assert.equal(grant.expiresAt, 123456);
+  assert.match(grant.url, /^http:\/\/127\.0\.0\.1:\d+\/browser\/v1\/takeover\/vnc\.html\?/);
+  assert.match(grant.url, /takeover_token=ephemeral-grant/);
+  assert.equal(JSON.stringify(grant).includes("test-token"), false);
 });
