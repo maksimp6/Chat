@@ -400,6 +400,12 @@ def test_cli_never_prints_provider_error_or_token(monkeypatch, capsys):
     }
 
 
+def test_wait_ready_default_covers_slow_cloudru_cold_start():
+    import inspect
+
+    assert inspect.signature(chrome.wait_ready).parameters["timeout"].default == 420
+
+
 def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     workflow = (
         Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml"
