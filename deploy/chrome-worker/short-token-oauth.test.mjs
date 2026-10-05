@@ -1,5 +1,3 @@
-[Reading 46 lines from start (total: 46 lines, 0 remaining)]
-
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
@@ -46,5 +44,3 @@ test("short token authorizes ChatGPT OAuth without GitHub", async (t) => {
   assert.ok(location.searchParams.get("code"));
   assert.equal(location.searchParams.get("state"), "client-state");
 });
-
-[executed on device: rdc-22706bfa6066-00001-deployment-68b9cf96cc-r22sb (bf88308d-eebc-4fb0-98e4-96542cf47cb8)]
