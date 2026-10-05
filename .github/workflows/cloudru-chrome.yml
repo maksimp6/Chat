@@ -86,8 +86,6 @@ jobs:
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
           BROWSER_API_TOKEN: ${{ secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN }}
-          ALICE_GITHUB_CLIENT_ID: ${{ secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID }}
-          ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
         run: python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"
       - name: Seed real browser profile through public MCP
