@@ -40,7 +40,7 @@ TRACKING_TITLE = "Наблюдатель: офис агентов"
 DIGEST_MARKER = "<!-- agent-office-observer -->"
 ISSUE_BODY_LIMIT = 60000
 
-AGENTS = ("claude", "codex", "copilot", "alice")
+AGENTS = ("codex", "copilot", "alice")
 AGENT_LABELS = {
     "claude": "Claude",
     "codex": "Codex",
@@ -174,16 +174,14 @@ def classify_branch(ref: str | None) -> str | None:
 
 
 _MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
-_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(claude-lite|codex|copilot|alice)\b", re.I)
+_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(codex|copilot|alice)\b", re.I)
 _EXECUTABLE_AGENT = {
-    "claude-lite": "claude",
     "codex": "codex",
     "copilot": "copilot",
     "alice": "alice",
 }
 _MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
 _EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
-_CLAUDE_ACTION_RUN = re.compile(r"https://github\.com/[^)\s]+/actions/runs/\d+")
 
 
 def mentioned_agents(text: str | None) -> list[str]:
@@ -435,12 +433,8 @@ def _record_dispatch(
 
 
 def _is_backend_acknowledgement(agent: str, body: str | None, kind: str) -> bool:
-    """Require provider-specific evidence that a trigger reached the execution backend."""
-    if kind == "reviewed":
-        return True
-    if agent == "claude":
-        return kind == "commented" and bool(_CLAUDE_ACTION_RUN.search(body or ""))
-    return kind == "commented"
+    """Require visible backend evidence after an eligible trigger."""
+    return kind in {"commented", "reviewed"}
 
 
 def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> None:
@@ -458,7 +452,7 @@ def _acknowledge_backend_dispatch(thread: Thread, agent: str, at: datetime) -> N
 
     target, dispatched_at, maintainer_intent = max(candidates, key=lambda item: item[1])
     thread.executable_dispatches.append((target, dispatched_at))
-    if target == "claude" and maintainer_intent:
+    if maintainer_intent:
         thread.maintainer_dispatches.append((target, dispatched_at))
 
 
@@ -520,9 +514,9 @@ _MAINTAINER_STATUS = re.compile(
 )
 
 
-def _maintainer_outcome_after(thread: Thread, since: datetime) -> bool:
+def _maintainer_outcome_after(thread: Thread, since: datetime, target: str) -> bool:
     for event in thread.events:
-        if event.agent != "claude" or event.at <= since:
+        if event.agent != target or event.at <= since:
             continue
         if event.action == "запросил изменения":
             return True
@@ -561,9 +555,10 @@ def detect_findings(
 
     if thread.kind == "pr":
         state = checks_state(thread)
-        maintainer_since = max(
-            (at for target, at in thread.maintainer_dispatches if target == "claude"),
-            default=None,
+        maintainer_target, maintainer_since = max(
+            thread.maintainer_dispatches,
+            key=lambda item: item[1],
+            default=(None, None),
         )
         if (
             maintainer_since is not None
@@ -573,13 +568,13 @@ def detect_findings(
                 limits.observer_minute,
             )
             >= limits.maintainer_passes
-            and not _maintainer_outcome_after(thread, maintainer_since)
+            and not _maintainer_outcome_after(thread, maintainer_since, maintainer_target)
         ):
             found.append(
                 finding(
                     "medium",
                     "maintainer_stall",
-                    "maintainer handoff без merge, blocker/defer статуса или ответа Claude",
+                    "maintainer handoff без merge, blocker/defer статуса или ответа backend",
                 )
             )
         if thread.behind_by is not None and thread.behind_by > 0:
