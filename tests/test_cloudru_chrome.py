@@ -346,12 +346,11 @@ def test_deployed_origin_is_exported_for_live_acceptance(tmp_path):
         chrome.export_public_url("https://evil.example", {"GITHUB_ENV": str(target)})
 
 
-def test_deploy_summary_shows_only_public_connector_and_callback_urls(tmp_path):
+def test_deploy_summary_shows_only_public_connector_url(tmp_path):
     summary = tmp_path / "summary"
     chrome.export_public_url(ORIGIN, {"GITHUB_STEP_SUMMARY": str(summary)})
     text = summary.read_text()
     assert ORIGIN + "/browser/v1/mcp" in text
-    assert ORIGIN + "/browser/oauth/github/callback" in text
     assert "token" not in text.lower()
 
 
@@ -414,8 +413,8 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert "git merge-base --is-ancestor HEAD FETCH_HEAD" in workflow
     assert "environment: production" in workflow
     assert "secrets.BROWSER_API_TOKEN || secrets.ALICE_SHORT_TOKEN" in workflow
-    assert "secrets.BROWSER_GITHUB_CLIENT_ID || secrets.ALICE_GITHUB_CLIENT_ID" in workflow
-    assert "secrets.BROWSER_GITHUB_CLIENT_SECRET || secrets.ALICE_GITHUB_CLIENT_SECRET" in workflow
+    assert "BROWSER_GITHUB_CLIENT_ID" not in workflow
+    assert "BROWSER_GITHUB_CLIENT_SECRET" not in workflow
     assert "CLOUDRU_STORAGE_TENANT_ID" in workflow
     assert 'python scripts/cloudru_chrome.py "$ACTION" --sha "$SOURCE_SHA"' in workflow
     assert "ALICE_DATABASE_URL" not in workflow
