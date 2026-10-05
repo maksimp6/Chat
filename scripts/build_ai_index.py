@@ -219,12 +219,124 @@ def build_index(root: Path) -> dict[str, Any]:
     }
 
 
+def _reverse_dependencies(index: dict[str, Any], direct_modules: set[str]) -> set[str]:
+    reverse_deps: set[str] = set()
+    for file_entry in index.get("files", []):
+        if file_entry["module"] in direct_modules:
+            continue
+        imported = {
+            str(imp.get("module") or "").lstrip(".") for imp in file_entry.get("imports", [])
+        }
+        if any(
+            imp and (imp == module or imp.startswith(module + "."))
+            for imp in imported
+            for module in direct_modules
+        ):
+            reverse_deps.add(file_entry["module"])
+    return reverse_deps
+
+
+def _affected_tests(tests_by_module: dict[str, list[str]], modules: list[str]) -> list[str]:
+    affected: set[str] = set()
+    for module in modules:
+        affected.update(tests_by_module.get(module, []))
+        affected.update(tests_by_module.get(module.split(".", 1)[0], []))
+    return sorted(affected)
+
+
+def query_affected(
+    index: dict[str, Any],
+    changed_paths: list[str],
+    *,
+    git_revision: str | None = None,
+) -> dict[str, Any]:
+    """Return affected Python modules and tests for a list of changed file paths.
+
+    First-order reverse dependencies only. No filesystem access; all data is
+    derived from the pre-built *index*.
+    """
+    by_path: dict[str, dict[str, Any]] = {f["path"]: f for f in index.get("files", [])}
+    tests_by_module: dict[str, list[str]] = index.get("tests_by_module", {})
+
+    # Resolve each changed path to its indexed module, recording provenance.
+    direct_modules: set[str] = set()
+    provenance_files: dict[str, dict[str, Any]] = {}
+    for path in changed_paths:
+        entry = by_path.get(path)
+        prov: dict[str, Any] = {"in_index": entry is not None}
+        if entry is not None:
+            prov["module"] = entry["module"]
+            prov["sha256_in_index"] = entry["sha256"]
+            direct_modules.add(entry["module"])
+        provenance_files[path] = prov
+
+    affected_modules = sorted(direct_modules | _reverse_dependencies(index, direct_modules))
+    affected_tests = _affected_tests(tests_by_module, affected_modules)
+
+    provenance: dict[str, Any] = {
+        "index_schema_version": index.get("schema_version"),
+        "files": provenance_files,
+    }
+    if git_revision is not None:
+        provenance["git_revision"] = git_revision
+
+    return {
+        "schema_version": index.get("schema_version"),
+        "query": "affected_modules",
+        "changed_files": sorted(changed_paths),
+        "affected_modules": affected_modules,
+        "affected_tests": affected_tests,
+        "provenance": provenance,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="repository root")
     parser.add_argument("--output", help="write JSON to this path instead of stdout")
     parser.add_argument("--compact", action="store_true", help="emit compact JSON")
+    parser.add_argument(
+        "--query-affected",
+        metavar="FILE",
+        nargs="+",
+        dest="query_affected",
+        help="query affected modules/tests for these changed file paths (requires --index-file)",
+    )
+    parser.add_argument(
+        "--index-file",
+        metavar="PATH",
+        help="pre-built index JSON for --query-affected",
+    )
+    parser.add_argument(
+        "--git-revision",
+        metavar="REV",
+        help="git revision to embed in --query-affected provenance",
+    )
     args = parser.parse_args()
+
+    if args.query_affected is not None:
+        if not args.index_file:
+            parser.error("--query-affected requires --index-file")
+        index = json.loads(Path(args.index_file).read_text(encoding="utf-8"))
+        result = query_affected(
+            index,
+            args.query_affected,
+            git_revision=args.git_revision,
+        )
+        text = json.dumps(
+            result,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=None if args.compact else 2,
+            separators=(",", ":") if args.compact else None,
+        )
+        if args.output:
+            output = Path(args.output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(text + "\n", encoding="utf-8")
+        else:
+            print(text)
+        return 0
 
     index = build_index(Path(args.root))
     text = json.dumps(
