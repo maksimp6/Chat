@@ -118,7 +118,8 @@ def test_github_client_posts_only_allowlisted_dispatch_and_returns_run_identity(
 def test_github_client_sanitizes_provider_error_body():
     secret = "provider-secret-body"
 
-    def opener(_request, _timeout):
+    def opener(_request, timeout):
+        assert timeout == 20
         raise urllib.error.HTTPError(
             "https://api.github.com/example",
             403,
@@ -138,7 +139,8 @@ def test_github_client_sanitizes_provider_error_body():
 
 
 def test_github_client_rejects_ambiguous_run_identity():
-    def opener(_request, _timeout):
+    def opener(_request, timeout):
+        assert timeout == 20
         return FakeResponse(
             json.dumps(
                 {
