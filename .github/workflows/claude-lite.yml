@@ -80,8 +80,8 @@ jobs:
           trigger_phrase: "@claude-lite"
           track_progress: true
           claude_args: |
-            --model claude-sonnet-4-6
-            --max-turns 45
+            --model claude-haiku-4-5-20251001
+            --max-turns 20
             --allowedTools "Edit,Write,WebFetch,WebSearch,Bash(git status:*),Bash(git diff:*),Bash(pytest:*),Bash(python:*),Bash(bash scripts/format.sh:*)"
 
   dialogue:
