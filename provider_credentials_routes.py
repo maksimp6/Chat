@@ -15,6 +15,7 @@ from credential_crypto import decrypt_secret, encrypt_secret
 from db import get_conn
 from provider_credentials import (
     CLOUDRU,
+    GITHUB,
     YANDEX,
     ProviderCredential,
     CredentialError,
@@ -177,6 +178,20 @@ def _status_for(provider: str) -> dict:
         }
         health_status = row["last_check_status"] or "unknown"
         authorization_ok = health_status == "connected"
+        if provider == GITHUB:
+            return {
+                "provider": provider,
+                "status": "configured",
+                "authorization_ok": False,
+                "error": None,
+                "credential": credential,
+                "rotation": {
+                    "supported": False,
+                    "due": False,
+                    "active_key_verified": False,
+                },
+                "last_checked_at": str(row["last_checked_at"]) if row["last_checked_at"] else None,
+            }
         return {
             "provider": provider,
             "status": (
@@ -292,6 +307,7 @@ def provider_credentials_status():
             "providers": [
                 _status_for(YANDEX),
                 _status_for(CLOUDRU),
+                _status_for(GITHUB),
             ]
         }
     )
@@ -509,6 +525,7 @@ def update_provider_credentials():
     values = (
         (YANDEX, yandex_api_key),
         (CLOUDRU, data.get("cloudru_api_key")),
+        (GITHUB, data.get("github_token")),
     )
     supplied = [
         (provider, value.strip())
@@ -534,12 +551,16 @@ def update_provider_credentials():
             }
         ), 400
     if not supplied:
-        return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
+        return jsonify(
+            {"error": "Yandex Cloud API key, Cloud.ru API key or GitHub token is required"}
+        ), 400
     if any(len(value) > 4096 for _, value in supplied):
         return jsonify({"error": "API key is too long"}), 400
 
     try:
         for provider, api_key in supplied:
+            if provider == GITHUB:
+                continue
             client = _provider_client(provider, yandex_project_id if provider == YANDEX else None)
             logger.debug("provider credential validation started: provider=%s", provider)
             try:
@@ -579,12 +600,12 @@ def update_provider_credentials():
                     encrypt_secret,
                     provider,
                     provider_key_id=None,
-                    ttl=timedelta(hours=12),
+                    ttl=timedelta(days=3650) if provider == GITHUB else timedelta(hours=12),
                 )
                 record_health_check(
                     conn,
                     provider,
-                    status="connected",
+                    status="configured" if provider == GITHUB else "connected",
                     error=None,
                 )
         finally:
