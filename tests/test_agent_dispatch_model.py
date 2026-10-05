@@ -25,17 +25,17 @@ def test_lifecycle_stages_are_not_agent_roles():
 
 def test_implementation_requires_a_concrete_engineering_role():
     with pytest.raises(AgentDispatchError, match="concrete implementation role"):
-        resolve_task_plan(stage="implementation", role=None, backend="codex")
+        resolve_task_plan(stage="implementation", role=None, backend="github-actions")
 
     plan = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
-        backend="codex",
+        backend="github-actions",
     )
     assert isinstance(plan, AgentTaskPlan)
     assert plan.stage == "implementation"
     assert plan.role == "backend-engineer"
-    assert plan.backend == "codex"
+    assert plan.backend == "github-actions"
 
 
 def test_implementation_rejects_supervisory_and_review_roles():
@@ -51,16 +51,16 @@ def test_implementation_rejects_supervisory_and_review_roles():
             resolve_task_plan(
                 stage="implementation",
                 role=role,
-                backend="codex",
+                backend="github-actions",
             )
 
 
-def test_current_default_backend_for_test_and_implementation_is_codex():
+def test_current_default_backend_for_test_and_implementation_is_github_actions():
     test_plan = resolve_task_plan(stage="contract", role="test-engineer")
     impl_plan = resolve_task_plan(stage="implementation", role="infra-engineer")
 
-    assert test_plan.backend == "codex"
-    assert impl_plan.backend == "codex"
+    assert test_plan.backend == "github-actions"
+    assert impl_plan.backend == "github-actions"
 
 
 def test_copilot_is_review_only_not_implementation_backend():
@@ -75,20 +75,15 @@ def test_copilot_is_review_only_not_implementation_backend():
 
 
 def test_backend_does_not_change_role_or_authority():
-    codex = resolve_task_plan(
-        stage="implementation",
-        role="backend-engineer",
-        backend="codex",
-    )
     actions = resolve_task_plan(
         stage="implementation",
         role="backend-engineer",
         backend="github-actions",
     )
 
-    assert codex.role == actions.role == "backend-engineer"
-    assert codex.can_merge is actions.can_merge is False
-    assert codex.can_bypass_approval is actions.can_bypass_approval is False
+    assert actions.role == "backend-engineer"
+    assert actions.can_merge is False
+    assert actions.can_bypass_approval is False
 
 
 def test_test_engineer_can_author_contract_but_not_implement():
@@ -119,9 +114,10 @@ def test_unknown_stage_role_or_backend_fails_closed():
         resolve_task_plan(stage="magic", role="backend-engineer")
     with pytest.raises(AgentDispatchError, match="unknown role"):
         resolve_task_plan(stage="implementation", role="wizard")
-    with pytest.raises(AgentDispatchError, match="unknown backend"):
-        resolve_task_plan(
-            stage="implementation",
-            role="backend-engineer",
-            backend="mystery-ai",
-        )
+    for backend in ("mystery-ai", "codex", "claude-direct"):
+        with pytest.raises(AgentDispatchError, match="unknown backend"):
+            resolve_task_plan(
+                stage="implementation",
+                role="backend-engineer",
+                backend=backend,
+            )
