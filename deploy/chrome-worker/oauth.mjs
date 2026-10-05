@@ -1,5 +1,3 @@
-[Reading 279 lines from start (total: 279 lines, 0 remaining)]
-
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -279,5 +277,3 @@ export function createOAuth(options = {}) {
 
   return { enabled, handle, authorize, challenge, metadata };
 }
-
-[executed on device: rdc-22706bfa6066-00001-deployment-68b9cf96cc-r22sb (bf88308d-eebc-4fb0-98e4-96542cf47cb8)]
