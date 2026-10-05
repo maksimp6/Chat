@@ -188,8 +188,8 @@ def test_red_ci_and_merge_conflict_are_high():
         [run("Application tests", "failure"), run("lint", "success")],
     )
     findings = detect_findings(thread, NOW)
-    assert kinds(findings) == ["ci_failed", "merge_conflict", "no_codex_check"]
-    assert {f.severity for f in findings if f.kind != "no_codex_check"} == {"high"}
+    assert kinds(findings) == ["ci_failed", "merge_conflict"]
+    assert {f.severity for f in findings} == {"high"}
     assert "Application tests" in next(f.message for f in findings if f.kind == "ci_failed")
 
 
@@ -397,17 +397,11 @@ def test_ready_pr_without_reviews_and_quiet_drafts():
     fresh = build_thread(pr_item(hours_ago=0.5), [], pull(), [run("tests", "success")])
     assert detect_findings(fresh, NOW) == []
     waiting = build_thread(pr_item(hours_ago=3), [], pull(), [run("tests", "success")])
-    assert kinds(detect_findings(waiting, NOW)) == ["no_codex_check", "no_copilot_review"]
+    assert kinds(detect_findings(waiting, NOW)) == ["no_copilot_review"]
     codex_asked = build_thread(
         pr_item(hours_ago=3), [comment("maksimp6", "@codex review", 2)], pull()
     )
-    assert "no_codex_check" in kinds(detect_findings(codex_asked, NOW))
-    codex_reviewed = build_thread(
-        pr_item(hours_ago=3),
-        [comment("maksimp6", "@codex review", 2), review("chatgpt-codex-connector[bot]", 1)],
-        pull(),
-    )
-    assert "no_codex_check" not in kinds(detect_findings(codex_reviewed, NOW))
+    assert "no_codex_check" not in kinds(detect_findings(codex_asked, NOW))
     draft = build_thread(pr_item(hours_ago=30), [], pull(draft=True))
     assert kinds(detect_findings(draft, NOW)) == ["stale"]
 
@@ -566,7 +560,7 @@ def test_run_builds_threads_and_publishes_to_tracking_issue():
     assert result["threads"][0]["trigger_eligible_dispatches"] == []
     assert result["threads"][0]["executable_dispatches"] == []
     assert result["threads"][0]["maintainer_dispatches"] == []
-    assert {f["kind"] for f in result["findings"]} == {"ci_failed", "no_codex_check"}
+    assert {f["kind"] for f in result["findings"]} == {"ci_failed"}
     assert result["tracking_issue"].endswith("/99")
     patch = next(call for call in fake.calls if call[0] == "PATCH")
     assert json.loads(patch[2])["body"] == result["digest"]
@@ -746,7 +740,7 @@ def test_main_reports_api_errors_and_tracking_issue(monkeypatch, capsys):
     assert "Tracking issue: https://github.com/o/r/issues/1" in capsys.readouterr().err
 
 
-def test_codex_authored_pr_still_needs_a_codex_test_check():
+def test_codex_authored_pr_does_not_create_a_required_codex_check():
     commit = {
         "event": "committed",
         "author": {"name": "chatgpt-codex-connector[bot]", "date": ts(4)},
@@ -756,7 +750,7 @@ def test_codex_authored_pr_still_needs_a_codex_test_check():
     item["user"] = {"login": "chatgpt-codex-connector[bot]"}
     thread = build_thread(item, [commit], pull(ref="codex/tests"))
     assert thread.owner_agent == "codex"
-    assert "no_codex_check" in kinds(detect_findings(thread, NOW))
+    assert "no_codex_check" not in kinds(detect_findings(thread, NOW))
 
 
 def test_copilot_unassigned_before_answering_cancels_the_dispatch():
