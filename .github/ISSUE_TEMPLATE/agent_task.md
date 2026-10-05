@@ -25,7 +25,7 @@ Choose the narrowest matching role in the GitHub Agents UI:
 
 Use a provider agent directly only when the role needs escalation:
 Claude Partner Agent (Sonnet) for architecture-heavy/multi-domain work,
-Codex for focused test/code work, or `@claude-lite` for bounded cheap maintenance.
+Codex with GPT-5.4 nano for focused test/code work and bounded cheap maintenance.
 
 ## Acceptance criteria
 
