@@ -438,7 +438,13 @@ def test_workflow_runs_only_on_manual_or_owner_comment_one_at_a_time():
     assert "github.event.issue.number == 409" in condition
     assert "github.event.comment.author_association == 'OWNER'" in condition
     assert "github.event.comment.user.login == github.repository_owner" in condition
-    for command in ["/chrome preflight", "/chrome deploy", "/chrome status", "/chrome restart", "/chrome stop"]:
+    for command in [
+        "/chrome preflight",
+        "/chrome deploy",
+        "/chrome status",
+        "/chrome restart",
+        "/chrome stop",
+    ]:
         assert command in condition
     assert job["env"]["CHROME_ACTION"].endswith("|| 'preflight' }}")
     assert job["env"]["CHROME_LANE"] == "${{ inputs.lane || 'production' }}"
