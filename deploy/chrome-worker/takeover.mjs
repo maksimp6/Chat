@@ -59,26 +59,34 @@ export function createTakeover(options = {}) {
     stopProcesses();
   }
 
-  function authorized(url) {
+  function authorized(url, request) {
     expire();
-    return Boolean(session && url.searchParams.get("takeover_token") === session.token);
+    if (!session) return false;
+    if (url.searchParams.get("takeover_token") === session.token) return true;
+    const cookie = String(request?.headers?.cookie ?? "");
+    return cookie.split(";").some((part) => part.trim() === `browser_takeover=${session.token}`);
   }
 
   async function proxyHttp(request, response, url) {
-    if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url)) return false;
+    if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url, request)) return false;
+    const supplied = url.searchParams.get("takeover_token");
     const upstreamPath = url.pathname.replace("/browser/v1/takeover", "") || "/vnc.html";
     const upstream = await fetch(`http://127.0.0.1:6080${upstreamPath}`);
-    response.writeHead(upstream.status, {
+    const headers = {
       "content-type": upstream.headers.get("content-type") ?? "application/octet-stream",
       "cache-control": "no-store",
-    });
+    };
+    if (supplied && session && supplied === session.token) {
+      headers["set-cookie"] = `browser_takeover=${session.token}; Path=/browser/v1/takeover/; HttpOnly; Secure; SameSite=Strict; Max-Age=${Math.max(1, Math.floor((session.expiresAt - now()) / 1000))}`;
+    }
+    response.writeHead(upstream.status, headers);
     response.end(Buffer.from(await upstream.arrayBuffer()));
     return true;
   }
 
   function proxyUpgrade(request, socket, head) {
     const url = new URL(request.url, "http://worker.invalid");
-    if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url)) {
+    if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url, request)) {
       socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
