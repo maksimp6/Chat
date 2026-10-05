@@ -42,6 +42,7 @@
     setFieldError("provider-yandex-key", "");
     setFieldError("provider-yandex-project", "");
     setFieldError("provider-cloudru-key", "");
+    setFieldError("provider-github-token", "");
   }
 
   function providerErrorMessage(data, provider) {
@@ -85,7 +86,12 @@
       card.className = "provider-status-card";
       var title = document.createElement("div");
       title.className = "provider-status-title";
-      title.textContent = item.provider === "yandex" ? "Yandex Cloud" : "Cloud.ru";
+      title.textContent =
+        item.provider === "yandex"
+          ? "Yandex Cloud"
+          : item.provider === "github"
+            ? "GitHub"
+            : "Cloud.ru";
       var line = document.createElement("div");
       line.textContent = statusText(item);
       line.className = "provider-status-line";
@@ -148,6 +154,15 @@
     box.appendChild(
       makeField("provider-cloudru-key", "Cloud.ru API key", "", "Cloud.ru API key", "password"),
     );
+    box.appendChild(
+      makeField(
+        "provider-github-token",
+        "GitHub token",
+        "Токен сохраняется на сервере в зашифрованном виде. Проверка GitHub API пока не выполняется.",
+        "github_pat_…",
+        "password",
+      ),
+    );
 
     var actions = document.createElement("div");
     actions.className = "provider-credentials-actions";
@@ -158,6 +173,7 @@
       var y = document.getElementById("provider-yandex-key").value.trim();
       var project = document.getElementById("provider-yandex-project").value.trim();
       var cloudru = document.getElementById("provider-cloudru-key").value.trim();
+      var github = document.getElementById("provider-github-token").value.trim();
       clearFieldErrors();
       output.textContent = "";
       if (y && !project) {
@@ -168,9 +184,10 @@
         setFieldError("provider-yandex-key", "Введите Yandex Cloud API key.");
         return;
       }
-      if (!y && !cloudru) {
-        setFieldError("provider-yandex-key", "Введите API key.");
-        setFieldError("provider-cloudru-key", "Введите API key.");
+      if (!y && !cloudru && !github) {
+        setFieldError("provider-yandex-key", "Введите API key или GitHub token.");
+        setFieldError("provider-cloudru-key", "Введите API key или GitHub token.");
+        setFieldError("provider-github-token", "Введите GitHub token.");
         return;
       }
       save.disabled = true;
@@ -181,6 +198,7 @@
           body.yandex_project_id = project;
         }
         if (cloudru) body.cloudru_api_key = cloudru;
+        if (github) body.github_token = github;
         var response = await window.AliceDispatcher.request("/api/provider-credentials", {
           method: "PUT",
           credentials: "same-origin",
@@ -193,9 +211,11 @@
           var fieldId =
             provider === "cloudru"
               ? "provider-cloudru-key"
-              : provider === "yandex"
-                ? "provider-yandex-key"
-                : null;
+              : provider === "github"
+                ? "provider-github-token"
+                : provider === "yandex"
+                  ? "provider-yandex-key"
+                  : null;
           var message = providerErrorMessage(data, provider);
           if (fieldId) setFieldError(fieldId, message);
           else output.textContent = message;
@@ -204,6 +224,7 @@
         document.getElementById("provider-yandex-key").value = "";
         document.getElementById("provider-yandex-project").value = "";
         document.getElementById("provider-cloudru-key").value = "";
+        document.getElementById("provider-github-token").value = "";
         await fetchStatus(output);
       } catch (error) {
         output.textContent = "Ошибка подключения: " + error.message;
