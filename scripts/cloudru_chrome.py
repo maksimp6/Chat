@@ -490,7 +490,10 @@ def request_worker(
             )
             break
         except CloudProviderError as exc:
-            if exc.http_status not in RETRY_STATUSES or clock() >= deadline:
+            # No status means the HTTP client timed out: a scaled-to-zero replica
+            # is still cold-starting Chrome and restoring its profile.
+            timed_out = exc.code == "provider_http_error" and exc.http_status is None
+            if not (timed_out or exc.http_status in RETRY_STATUSES) or clock() >= deadline:
                 raise
             sleep(5)
     if (
