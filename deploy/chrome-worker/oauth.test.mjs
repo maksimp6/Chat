@@ -328,3 +328,35 @@ test("a registration flood evicts the oldest unconfirmed client and never a conf
   app.reload();
   assert.equal((await app.register()).status, 429);
 });
+
+
+test("owner takeover session requires the short token and expires", async (t) => {
+  let clock = 1_800_000_000_000;
+  const app = await fixture(t, { now: () => clock });
+
+  let response = await fetch(app.base + "/browser/oauth/owner-session", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ password: "wrong" }),
+    redirect: "manual",
+  });
+  assert.equal(response.status, 403);
+
+  response = await fetch(app.base + "/browser/oauth/owner-session", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ password: SHORT_TOKEN }),
+    redirect: "manual",
+  });
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "/browser/v1/takeover");
+  const cookie = response.headers.get("set-cookie");
+  assert.match(cookie, /browser_owner_session=/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /SameSite=Strict/);
+
+  const request = { headers: { cookie: cookie.split(";")[0] } };
+  assert.equal(app.oauth.ownerAuthorize(request), true);
+  clock += 601_000;
+  assert.equal(app.oauth.ownerAuthorize(request), false);
+});
