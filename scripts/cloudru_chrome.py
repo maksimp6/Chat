@@ -555,7 +555,7 @@ def verify_health(apps, record, environment):
 
 
 def wait_ready(
-    apps, *, identifier=None, image=None, timeout=300, sleep=time.sleep, clock=time.monotonic
+    apps, *, identifier=None, image=None, timeout=420, sleep=time.sleep, clock=time.monotonic
 ):
     readiness_started = time.perf_counter()
     deadline = clock() + timeout
