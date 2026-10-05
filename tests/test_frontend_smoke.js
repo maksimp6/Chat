@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 function load(sources, html, extra = {}) {
   return new BrowserShim(html).load(sources, extra);

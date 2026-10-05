@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const ROOT = require("path").resolve(__dirname, "..");
 

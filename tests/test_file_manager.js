@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const source = fs.readFileSync("static/file_manager.js", "utf8");
 
