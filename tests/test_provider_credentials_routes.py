@@ -652,3 +652,68 @@ def test_provider_validation_failure_is_sanitized(monkeypatch):
     assert payload["error"] == "provider_health_check_failed"
     assert payload["provider"] == "cloudru"
     assert internal_marker not in str(payload)
+
+
+def test_update_saves_github_token_encrypted_without_remote_validation(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+
+    db.DB_PATH = str(tmp_path / "github-token.db")
+    db.init_db()
+    monkeypatch.setenv(
+        "ALICE_PROVIDER_CREDENTIAL_KEY",
+        base64.urlsafe_b64encode(b"8" * 32).decode("ascii"),
+    )
+
+    def unexpected_provider_client(*_args, **_kwargs):
+        raise AssertionError("GitHub token save must not call a provider API yet")
+
+    monkeypatch.setattr(routes, "_provider_client", unexpected_provider_client)
+
+    from flask import Flask
+
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.put(
+            "/api/provider-credentials",
+            json={"github_token": "github_pat_secret-value"},
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "github_pat_secret-value" not in str(payload)
+    statuses = {item["provider"]: item for item in payload["providers"]}
+    assert statuses["github"]["status"] == "configured"
+
+    conn = db.get_conn()
+    row = conn.execute(
+        "SELECT api_key_encrypted, provider, status FROM provider_credentials "
+        "WHERE provider = 'github'"
+    ).fetchone()
+    conn.close()
+    assert row["provider"] == "github"
+    assert row["status"] == "active"
+    assert "github_pat_secret-value" not in row["api_key_encrypted"]
+
+
+def test_status_lists_github_as_not_configured(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    import db
+
+    db.DB_PATH = str(tmp_path / "github-empty.db")
+    db.init_db()
+    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "true")
+
+    from flask import Flask
+
+    app = Flask(__name__)
+    app.register_blueprint(routes.provider_credentials_bp)
+
+    with app.test_client() as client:
+        response = client.get("/api/provider-credentials/status")
+
+    assert response.status_code == 200
+    statuses = {item["provider"]: item for item in response.get_json()["providers"]}
+    assert statuses["github"]["status"] == "not_configured"
