@@ -45,11 +45,12 @@ def test_claude_lite_progress_tracking_is_enabled_for_execution_evidence():
     assert "track_progress: true" in workflow
 
 
-def test_claude_direct_implementation_profile_uses_sonnet_and_enough_turns():
+def test_claude_lite_uses_cheap_haiku_and_bounded_turns():
     workflow = _workflow()
 
-    assert "--model claude-sonnet-4-6" in workflow
-    assert "--max-turns 45" in workflow
+    assert "--model claude-haiku-4-5-20251001" in workflow
+    assert "--max-turns 20" in workflow
+    assert "--model claude-sonnet-4-6" not in workflow
 
 
 def test_claude_direct_implementation_profile_has_bounded_write_and_validation_tools():
