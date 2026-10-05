@@ -72,9 +72,6 @@ jobs:
       - name: Install official MCP client
         if: env.CHROME_ACTION == 'deploy'
         run: npm ci --prefix deploy/chrome-worker
-      - name: Prepare live acceptance marker
-        if: env.CHROME_ACTION == 'deploy'
-        run: python -c "import uuid; print('BROWSER_SMOKE_MARKER=' + uuid.uuid4().hex)" >> "$GITHUB_ENV"
       - name: Operate separate Chrome service
         env:
           ACTION: ${{ env.CHROME_ACTION }}
