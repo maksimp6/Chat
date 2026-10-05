@@ -57,7 +57,7 @@ The MCP endpoint exposes the following audited tools through the Universal Tool 
 | `git_pull` | Pull and merge changes | approval required |
 | `git_fetch` | Fetch remote changes | approval required |
 
-The Git functions are the existing implementations from `git_mcp_tools.py`; ChatGPT access adds no duplicate Git implementations. Any tool marked approval-required is rejected by `UniversalToolExecutor` until the existing Alice Pro approval flow supplies an approved call.
+The Git functions are the existing implementations from `tool_providers/git.py`; ChatGPT access adds no duplicate Git implementations. Any tool marked approval-required is rejected by `UniversalToolExecutor` until the existing Alice Pro approval flow supplies an approved call.
 
 Tool results use MCP `structuredContent` plus text `content`. No custom widget is required for the initial integration.
 

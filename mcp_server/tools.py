@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional
 from agent_gateway import AgentGateway
 from conversation_ownership import check_access, get_owned_conversation, list_owned_conversations
 from db import get_messages
-from filesystem_mcp_tools import grep_search, list_directory, read_file
+from tool_providers.filesystem import grep_search, list_directory, read_file
 from invocation.api import get_invocation_status, get_invocation_trace
 from session_manager import get_session
 from tool_registry import registry
