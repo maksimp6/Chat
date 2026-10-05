@@ -420,17 +420,34 @@ def test_workflow_uses_reviewed_master_production_and_fixed_credentials():
     assert 'node-version: "22.22.2"' in workflow
 
 
-def test_workflow_runs_only_on_manual_dispatch_one_at_a_time():
+def test_workflow_runs_only_on_manual_or_owner_comment_one_at_a_time():
     import yaml
 
     workflow = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml").read_text()
     )
     # PyYAML reads the bare `on` key as boolean True.
-    assert set(workflow[True]) == {"workflow_dispatch"}
+    assert set(workflow[True]) == {"workflow_dispatch", "issue_comment"}
+    assert workflow[True]["issue_comment"]["types"] == ["created"]
     assert workflow["concurrency"]["cancel-in-progress"] is False
+    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane || 'production' }}")
     assert workflow["jobs"]["chrome"]["timeout-minutes"] <= 35
     assert "public_url" not in workflow[True]["workflow_dispatch"]["inputs"]
+    job = workflow["jobs"]["chrome"]
+    condition = job["if"]
+    assert "github.event.issue.number == 409" in condition
+    assert "github.event.comment.author_association == 'OWNER'" in condition
+    assert "github.event.comment.user.login == github.repository_owner" in condition
+    for command in [
+        "/chrome preflight",
+        "/chrome deploy",
+        "/chrome status",
+        "/chrome restart",
+        "/chrome stop",
+    ]:
+        assert command in condition
+    assert job["env"]["CHROME_ACTION"].endswith("|| 'preflight' }}")
+    assert job["env"]["CHROME_LANE"] == "${{ inputs.lane || 'production' }}"
     text = yaml.safe_dump(workflow)
     assert "maxxxpavlov" not in text and "Gateway" not in text
 
@@ -678,15 +695,15 @@ def test_workflow_test_lane_is_isolated_from_production():
         (Path(__file__).resolve().parents[1] / ".github/workflows/cloudru-chrome.yml").read_text()
     )
     job = workflow["jobs"]["chrome"]
-    assert job["if"] == "github.ref == 'refs/heads/master' || inputs.lane == 'test'"
-    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane }}")
+    assert "github.ref == 'refs/heads/master' || inputs.lane == 'test'" in job["if"]
+    assert workflow["concurrency"]["group"].endswith("${{ inputs.lane || 'production' }}")
     review = next(
         step for step in job["steps"] if step.get("name") == "Require reviewed master commit"
     )
-    assert review["if"] == "inputs.lane != 'test'"
+    assert review["if"] == "env.CHROME_LANE != 'test'"
     python_steps = [step for step in job["steps"] if "cloudru_chrome.py" in step.get("run", "")]
     assert python_steps and all(
-        step["env"]["CHROME_LANE"] == "${{ inputs.lane }}" for step in python_steps
+        step["env"]["CHROME_LANE"] == "${{ env.CHROME_LANE }}" for step in python_steps
     )
 
 
