@@ -64,6 +64,18 @@ export function createTakeover(options = {}) {
     return Boolean(session && url.searchParams.get("takeover_token") === session.token);
   }
 
+  async function proxyHttp(request, response, url) {
+    if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url)) return false;
+    const upstreamPath = url.pathname.replace("/browser/v1/takeover", "") || "/vnc.html";
+    const upstream = await fetch(`http://127.0.0.1:6080${upstreamPath}`);
+    response.writeHead(upstream.status, {
+      "content-type": upstream.headers.get("content-type") ?? "application/octet-stream",
+      "cache-control": "no-store",
+    });
+    response.end(Buffer.from(await upstream.arrayBuffer()));
+    return true;
+  }
+
   function proxyUpgrade(request, socket, head) {
     const url = new URL(request.url, "http://worker.invalid");
     if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url)) {
@@ -84,5 +96,5 @@ export function createTakeover(options = {}) {
     upstream.on("error", () => socket.destroy());
   }
 
-  return { startDisplay, start, stop, close, status, authorized, proxyUpgrade };
+  return { startDisplay, start, stop, close, status, authorized, proxyHttp, proxyUpgrade };
 }
