@@ -118,7 +118,7 @@ The hourly Observer separates a role/provider mention from an **executable dispa
 For maintainer-stall timing it requires explicit Maintainer intent, a trigger from an
 author association allowed by the repository workflow, and a later visible
 acknowledgement from that backend. Trigger text alone is only dispatch intent. A
-Claude-Lite implementation task can execute without becoming a maintainer handoff. A
+Codex implementation task can execute without becoming a maintainer handoff. A
 role-only Claude mention is retained as timeline
 context but does not start the stall clock. Completion is deliberately
 narrow: the PR merges, Claude posts an explicit `BLOCKED:` or `DEFERRED:` status, or
