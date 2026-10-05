@@ -23,17 +23,17 @@ MYPY_ERROR_BASELINE = {
     "dict-item": 2,
     "index": 7,
     "misc": 1,
-    "no-any-return": 48,
+    "no-any-return": 43,
     "no-redef": 3,
-    "no-untyped-call": 481,
-    "no-untyped-def": 451,
+    "no-untyped-call": 459,
+    "no-untyped-def": 432,
     "operator": 27,
     "return": 1,
     "return-value": 11,
-    "type-arg": 164,
+    "type-arg": 146,
     "union-attr": 16,
     "untyped-decorator": 52,
-    "var-annotated": 5,
+    "var-annotated": 4,
 }
 
 # Files with zero strict errors. Errors here fail outright.
