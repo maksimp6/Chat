@@ -38,7 +38,8 @@ class EmulatorBrowserAdapter:
                 stdin = process.stdin
                 stdout = process.stdout
                 if stdin is None or stdout is None:
-                    raise RuntimeError("browser emulator pipes are unavailable")
+                    self.close()
+                    raise RuntimeError("browser emulator exited unexpectedly")
                 stdin.write(request + "\n")
                 stdin.flush()
                 line = stdout.readline()
