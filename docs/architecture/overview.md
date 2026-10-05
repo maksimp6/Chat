@@ -46,9 +46,9 @@ Flask / app.py
 * `mcp_routes.py` — маршруты MCP.
 
 ### 3. MCP‑инструменты
-* `filesystem_mcp_tools.py` — работа с файловой системой;
-* `git_mcp_tools.py` — Git‑операции;
-* `profiler_tools.py` — профайлинг;
+* `tool_providers/filesystem.py` — работа с файловой системой;
+* `tool_providers/git.py` — Git‑операции;
+* `tool_providers/profiler.py` — профайлинг;
 * `archiver.py` — архивация;
 * `file_manager.py` — управление файлами.
 

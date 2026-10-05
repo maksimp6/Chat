@@ -97,6 +97,7 @@ STRICT_CLEAN_FILES = {
     "ssh_runtime.py",
     "storage.py",
     "trace_timing.py",
+    "tool_providers/__init__.py",
     "treasury_identity.py",
     "yandex_api_logger.py",
 }
