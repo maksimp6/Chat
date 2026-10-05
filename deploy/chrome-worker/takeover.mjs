@@ -66,11 +66,21 @@ export function createTakeover(options = {}) {
     return cookie.split(";").some((part) => part.trim() === `browser_takeover=${session.token}`);
   }
 
+  function noVncPath(pathname) {
+    const prefix = "/browser/v1/takeover/";
+    if (!pathname.startsWith(prefix)) return undefined;
+    const relative = pathname.slice(prefix.length);
+    if (!relative || relative === "vnc.html") return "/vnc.html";
+    if (!/^[A-Za-z0-9._/-]+$/.test(relative) || relative.includes("..") || relative.includes("\\")) return undefined;
+    return "/" + relative;
+  }
+
   async function proxyHttp(request, response, url) {
-    if (!url.pathname.startsWith("/browser/v1/takeover/") || !authorized(url, request)) return false;
+    if (!authorized(url, request)) return false;
     const supplied = url.searchParams.get("takeover_token");
-    const upstreamPath = url.pathname.replace("/browser/v1/takeover", "") || "/vnc.html";
-    const upstream = await fetch(`http://127.0.0.1:6080${upstreamPath}`);
+    const upstreamPath = noVncPath(url.pathname);
+    if (!upstreamPath) return false;
+    const upstream = await fetch(new URL(upstreamPath, "http://127.0.0.1:6080"));
     const headers = {
       "content-type": upstream.headers.get("content-type") ?? "application/octet-stream",
       "cache-control": "no-store",
@@ -91,7 +101,12 @@ export function createTakeover(options = {}) {
       return;
     }
     const upstream = createConnection({ host: "127.0.0.1", port: 6080 }, () => {
-      const path = url.pathname.endsWith("/websockify") ? "/websockify" : url.pathname.replace("/browser/v1/takeover", "");
+      const path = url.pathname.endsWith("/websockify") ? "/websockify" : undefined;
+      if (!path) {
+        socket.destroy();
+        upstream.destroy();
+        return;
+      }
       const headers = Object.entries(request.headers)
         .filter(([name]) => name.toLowerCase() !== "host")
         .map(([name, value]) => `${name}: ${value}`)
