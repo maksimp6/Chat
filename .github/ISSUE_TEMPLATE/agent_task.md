@@ -23,9 +23,7 @@ Choose the narrowest matching role in the GitHub Agents UI:
 - [ ] Docs Engineer
 - [ ] Release Manager
 
-Use a provider agent directly only when the role needs escalation:
-Claude Partner Agent (Sonnet) for architecture-heavy/multi-domain work,
-Codex with GPT-5.4 nano for focused test/code work and bounded cheap maintenance.
+Use the repository role and its approved deterministic tools. External model-backed agents are optional escalation paths, not required executors.
 
 ## Acceptance criteria
 
@@ -49,4 +47,4 @@ What the agent must not change.
 ## Dispatch
 
 Assign exactly one primary role/agent. The agent opens a pull request; the maintainer
-(Claude, see `AGENTS.md`) merges it only after the repository merge gates are satisfied.
+(see `AGENTS.md`) merges it only after the repository merge gates are satisfied.
