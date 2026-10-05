@@ -3,7 +3,7 @@
 The observer reads open issues and pull requests (plus the ones closed in the
 last day), turns each GitHub timeline into one chronological "thread" with the
 agent behind every step, and flags work that is stuck: red CI, merge conflicts,
-missing Copilot or Codex reviews, green pull requests nobody merged, and agents
+missing required reviews, green pull requests nobody merged, and agents
 that went silent after being given a task.
 
 It only reads GitHub, except with ``--publish``: then it rewrites the body of
@@ -618,8 +618,6 @@ def detect_findings(
             waiting = now - _ready_since(thread)
             if not _has_copilot_review(thread) and waiting > limits.review_wait:
                 found.append(finding("medium", "no_copilot_review", "нет ревью Copilot"))
-            if not _has_codex_check(thread) and waiting > limits.review_wait:
-                found.append(finding("low", "no_codex_check", "Codex ещё не проверял тесты"))
             if (
                 state == "passed"
                 and _has_copilot_review(thread)
