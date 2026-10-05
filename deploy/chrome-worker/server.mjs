@@ -263,7 +263,7 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, ready, takeover, async close() { await mcp.close(); takeover.close(); await sleep(); } };
+  return { handler, callTool, ready, takeover, async close() { await mcp.close(); await sleep(); takeover.close(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
