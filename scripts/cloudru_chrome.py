@@ -798,10 +798,7 @@ def export_public_url(origin, env=os.environ):
     # The owner only needs these two URLs: the ChatGPT connector and the OAuth callback.
     if env.get("GITHUB_STEP_SUMMARY"):
         with open(env["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
-            stream.write(
-                "## Chrome MCP\n\n"
-                f"- ChatGPT connector URL: `{origin}/browser/v1/mcp`\n"
-            )
+            stream.write(f"## Chrome MCP\\n\\n- ChatGPT connector URL: `{origin}/browser/v1/mcp`\\n")
 
 
 def main(argv=None):
