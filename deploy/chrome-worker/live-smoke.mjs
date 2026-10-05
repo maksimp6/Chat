@@ -23,8 +23,8 @@ export async function runLiveSmoke(options = {}) {
   const endpoint = new URL(options.endpoint ?? `${process.env.BROWSER_PUBLIC_URL ?? ""}/browser/v1/mcp`);
   const token = options.token ?? process.env.BROWSER_API_TOKEN ?? "";
   const marker = options.marker ?? process.env.BROWSER_SMOKE_MARKER ?? "";
-  requireCheck(["seed", "verify"].includes(phase), "invalid_smoke_phase");
-  if (typeof marker !== "string" || !/^[a-f0-9]{32}$/.test(marker)) {
+  requireCheck(["smoke", "seed", "verify"].includes(phase), "invalid_smoke_phase");
+  if (phase !== "smoke" && (typeof marker !== "string" || !/^[a-f0-9]{32}$/.test(marker))) {
     throw Object.assign(new Error("invalid_smoke_marker"), { smokeCode: "invalid_smoke_marker" });
   }
   requireCheck(Boolean(token), "smoke_token_missing");
@@ -63,8 +63,13 @@ export async function runLiveSmoke(options = {}) {
     tabOpened = true;
     // Carry test data in a URL fragment, never in executable JavaScript source.
     // The fragment is not sent to example.com's HTTP server.
-    await call("browser_navigate", { url: `https://example.com/#${marker}` });
-    if (phase === "seed") {
+    await call("browser_navigate", { url: phase === "smoke" ? "https://example.com/" : `https://example.com/#${marker}` });
+    if (phase === "smoke") {
+      const snapshot = await call("browser_snapshot");
+      requireCheck(JSON.stringify(snapshot).includes("Example Domain"), "smoke_snapshot_missing");
+      const screenshot = await call("browser_take_screenshot", { type: "png" });
+      requireCheck(screenshot.content.some((item) => item.type === "image"), "smoke_screenshot_missing");
+    } else if (phase === "seed") {
       const seeded = await evaluate(`() => {
         if (location.origin !== "https://example.com") return { origin: location.origin };
         const marker = location.hash.slice(1);
@@ -90,14 +95,14 @@ export async function runLiveSmoke(options = {}) {
       const screenshot = await call("browser_take_screenshot", { type: "png" });
       requireCheck(screenshot.content.some((item) => item.type === "image"), "smoke_screenshot_missing");
     }
-    const persisted = await evaluate(`() => {
+    const persisted = phase === "smoke" ? null : await evaluate(`() => {
       if (location.origin !== "https://example.com") return { origin: location.origin };
       const marker = location.hash.slice(1);
       if (!/^[a-f0-9]{32}$/.test(marker)) throw new Error("invalid_smoke_fragment");
       const key = "alice_mcp_smoke_" + marker;
       return { origin: location.origin, marker, storage: localStorage.getItem(key), cookie: document.cookie.split('; ').find(value => value.startsWith(key + "="))?.slice(key.length + 1) ?? null };
     }`);
-    requireCheck(persisted.origin === "https://example.com" && persisted.marker === marker && persisted.storage === marker && persisted.cookie === marker, phase === "seed" ? "smoke_seed_marker_missing" : "smoke_persistent_profile_marker_mismatch");
+    if (phase !== "smoke") requireCheck(persisted.origin === "https://example.com" && persisted.marker === marker && persisted.storage === marker && persisted.cookie === marker, phase === "seed" ? "smoke_seed_marker_missing" : "smoke_persistent_profile_marker_mismatch");
     if (phase === "verify") {
       const cleaned = await evaluate(`() => {
         if (location.origin !== "https://example.com") return { origin: location.origin };
