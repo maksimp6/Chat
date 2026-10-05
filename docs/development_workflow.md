@@ -384,9 +384,8 @@ Snapshot относится только к состоянию, которое �
 - required checks зелёные на exact current PR head;
 - нет unresolved review threads;
 - Copilot review используется автоматически и не триггерится вручную;
-- `@codex review` запускается один раз на финальном ready-to-merge head.
 
-После review-fix повторный Codex/Copilot review не требуется: новый head должен пройти свежий CI, а исправленные threads должны оставаться закрытыми.
+После review-fix повторный model review не требуется: новый head должен пройти свежий CI, а исправленные threads должны оставаться закрытыми.
 
 ## 10. Rollback
 
