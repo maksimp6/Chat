@@ -220,6 +220,10 @@ export function createWorker(options = {}) {
         return json(response, 200, idp.resourceMetadata());
       }
       if (await oauth.handle(request, response, url)) return;
+      if (request.method === "GET" && pathname.startsWith("/browser/v1/takeover/")) {
+        if (await takeover.proxyHttp(request, response, url)) return;
+        return json(response, 401, { error: "unauthorized" });
+      }
       const isMcp = pathname === "/browser/v1/mcp";
       const idpGrant = isMcp && idp.enabled ? await idp.authorize(request) : false;
       const idpControlAccess = Boolean(idpGrant && idpGrant.scopes.includes("browser.control"));
