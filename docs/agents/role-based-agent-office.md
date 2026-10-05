@@ -41,7 +41,7 @@ Use provider agents as escalation/backends, not as permanent job titles:
 
 - assign the Anthropic Claude Partner Agent for architecture-heavy or multi-domain work;
 - use the OpenAI Codex Partner Agent for focused code/test tasks;
-- use `@claude-lite` for short bounded repository maintenance;
+- use the OpenAI Codex Partner Agent with GPT-5.4 nano for short bounded repository maintenance;
 - keep native Copilot automatic PR review enabled, but do not retrigger it manually.
 
 One issue has one primary owner. Split an issue only when independent deliverables can
