@@ -13,6 +13,44 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Platform changes
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.classify.outputs.web }}
+      backend: ${{ steps.classify.outputs.backend }}
+      android: ${{ steps.classify.outputs.android }}
+      infra: ${{ steps.classify.outputs.infra }}
+      database: ${{ steps.classify.outputs.database }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Classify changed platforms
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          git diff --name-only "$base" "$GITHUB_SHA" > /tmp/changed-paths.txt
+          python scripts/ci_platform_changes.py < /tmp/changed-paths.txt > /tmp/platforms.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          data = json.load(open("/tmp/platforms.json"))
+          for key, value in data.items():
+              print(f"{key}={str(value).lower()}")
+          PY
+
   code-rules:
     name: Code rules
     runs-on: ubuntu-latest
@@ -35,6 +73,8 @@ jobs:
 
   backend:
     name: Application tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     env:
       YANDEX_API_KEY: ci-test-placeholder
@@ -211,6 +251,8 @@ jobs:
 
   postgres:
     name: PostgreSQL integration
+    needs: changes
+    if: needs.changes.outputs.database == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     env:
       ALICE_DATABASE_URL: postgresql://alice:ci-postgres-password@localhost:5432/alice_pro_test
@@ -268,6 +310,8 @@ jobs:
 
   android:
     name: Android debug APK
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     env:
       ALICE_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/android/app/debug-signing.keystore
@@ -330,3 +374,28 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+
+  required:
+    name: CI required
+    if: always()
+    needs: [changes, code-rules, backend, postgres, android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify routed platform checks
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          CODE_RULES: ${{ needs.code-rules.result }}
+          BACKEND: ${{ needs.backend.result }}
+          POSTGRES: ${{ needs.postgres.result }}
+          ANDROID: ${{ needs.android.result }}
+        run: |
+          set -euo pipefail
+          test "$CHANGES" = success
+          test "$CODE_RULES" = success
+          for result in "$BACKEND" "$POSTGRES" "$ANDROID"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "platform check failed: $result" >&2; exit 1 ;;
+            esac
+          done
