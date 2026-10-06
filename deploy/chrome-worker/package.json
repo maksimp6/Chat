@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test server.test.mjs oauth.test.mjs state.test.mjs idp-auth.test.mjs idp-server.test.mjs idp-e2e.test.mjs short-token-oauth.test.mjs takeover.test.mjs",
+    "test": "node --test server.test.mjs oauth.test.mjs state.test.mjs idp-auth.test.mjs idp-server.test.mjs idp-e2e.test.mjs short-token-oauth.test.mjs takeover.test.mjs secret-manager-e2e.test.mjs",
     "test:browser": "BROWSER_LIVE_SMOKE_TEST=1 node --test browser.test.mjs live-smoke.test.mjs"
   },
   "dependencies": {
