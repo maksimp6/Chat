@@ -8,7 +8,6 @@ from dataclasses import dataclass
 class StackTopologyError(ValueError):
     """Fail-closed topology error."""
 
-
 @dataclass(frozen=True, slots=True)
 class PullNode:
     number: int
@@ -60,15 +59,13 @@ def build_ancestor_chain(
         parent = owners[0]
         if parent.number in seen:
             raise StackTopologyError("stack topology cycle")
-        if parent.state != "open":
+        if parent.state != "open" and not parent.absorbed:
             raise StackTopologyError("stale ancestor")
         ancestors.append(parent)
         seen.add(parent.number)
         cursor = parent
 
     return AncestorChain(current=current, ancestors=tuple(ancestors), root=cursor)
-
-
 
 
 def derive_stack_evidence(
@@ -107,7 +104,11 @@ def nodes_from_github(pulls: list[dict[str, object]]) -> tuple[PullNode, ...]:
         number = pull.get("number")
         head_ref = head.get("ref")
         base_ref = base.get("ref")
-        if not isinstance(number, int) or not isinstance(head_ref, str) or not isinstance(base_ref, str):
+        if (
+            not isinstance(number, int)
+            or not isinstance(head_ref, str)
+            or not isinstance(base_ref, str)
+        ):
             raise StackTopologyError("invalid pull request topology payload")
         state = str(pull.get("state") or "")
         if state not in {"open", "closed"}:
@@ -163,10 +164,6 @@ def build_stack(
     heads: dict[str, list[PullNode]] = {}
     for node in nodes:
         heads.setdefault(node.head, []).append(node)
-    ambiguous_heads = {head for head, owners in heads.items() if len(owners) > 1}
-    if ambiguous_heads:
-        raise StackTopologyError("ambiguous ancestor")
-
     children: dict[str, list[PullNode]] = {}
     for node in nodes:
         children.setdefault(node.base, []).append(node)
@@ -190,6 +187,11 @@ def build_stack(
         visiting.remove(parent.number)
 
     walk(root)
+    reachable_heads = {root.head, *(node.head for node in descendants)}
+    for head, owners in heads.items():
+        if head in reachable_heads and len(owners) > 1:
+            raise StackTopologyError("ambiguous ancestor")
+
     return StackTopology(
         root=root,
         descendants=tuple(descendants),
@@ -198,8 +200,6 @@ def build_stack(
             node for node in descendants if node.state == "closed" and not node.absorbed
         ),
     )
-
-
 
 
 def root_number_for(nodes: tuple[PullNode, ...], pr_number: int, target: str = "master") -> int:
@@ -230,7 +230,6 @@ def render_mermaid(topology: StackTopology) -> str:
         lines.append(f"    P{parent.number} --> P{child.number}")
 
     return "\n".join(lines)
-
 
 
 def root_status_payload(
