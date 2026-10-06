@@ -14,7 +14,7 @@ from scripts.stacked_pr_topology import derive_stack_evidence, nodes_from_github
 _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
 
 
-def _gh_json(args: list[str]) -> dict[str, Any]:
+def _gh_json(args: list[str]) -> Any:
     command = ["gh", "api", *args]
     completed = subprocess.run(
         command,
