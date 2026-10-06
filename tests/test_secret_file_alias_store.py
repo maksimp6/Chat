@@ -68,3 +68,30 @@ def test_file_alias_store_corruption_fails_closed(tmp_path, payload):
 
     with pytest.raises(ValueError, match="invalid secret alias store"):
         FileSecretAliasStore(path).list()
+
+
+def test_file_alias_store_rejects_non_object_alias_entry(tmp_path):
+    path = tmp_path / "aliases.json"
+    path.write_text('{"schema":1,"aliases":[1]}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid secret alias store"):
+        FileSecretAliasStore(path).list()
+
+
+def test_file_alias_store_rejects_duplicate_alias(tmp_path):
+    path = tmp_path / "aliases.json"
+    item = {
+        "alias": "github",
+        "provider": "cloudru",
+        "secret_id": "secret-1",
+        "version_id": "v1",
+        "secret_purpose": "github",
+        "allowed_purposes": ["browser.password"],
+    }
+    path.write_text(
+        json.dumps({"schema": 1, "aliases": [item, item]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="invalid secret alias store"):
+        FileSecretAliasStore(path).list()
