@@ -4,10 +4,11 @@ FROM python:3.14-slim-bookworm
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PATH="/usr/local/bin:$PATH"
+ENV HOME=/home/node
 
 # Node's official bookworm image installs Node/npm under /usr/local. Copy that
 # toolchain into the matching Debian base so Alice uses the same Python major
-# version as CI without carrying Chromium or a database server.
+# version as CI without carrying a browser or a database server.
 COPY --from=node-runtime /usr/local/ /usr/local/
 
 RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
