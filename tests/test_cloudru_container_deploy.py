@@ -1163,3 +1163,18 @@ def test_find_for_deploy_rejects_duplicate_inventory_names():
 
     with pytest.raises(CloudProviderError, match="duplicate name"):
         apps.find_for_deploy("alice-pro", transient_attempts=1)
+
+
+def test_update_from_current_reuses_verified_snapshot_without_second_get():
+    current = _app()
+    client = RecordingClient([{"operationId": "update-op"}])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+    spec = ContainerSpec(name="alice-pro", image="registry/new@sha256:" + "b" * 64)
+
+    result = apps.update_from_current(spec, current)
+
+    assert result == {"operationId": "update-op"}
+    assert len(client.calls) == 1
+    _, method, path, _, body = client.calls[0]
+    assert (method, path) == ("PATCH", "/v2/containers/alice-pro")
+    assert body["template"]["containers"][0]["image"] == spec.image

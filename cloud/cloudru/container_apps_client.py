@@ -343,12 +343,9 @@ class CloudRuContainerAppsClient:
         }
         return self.client.request(SERVICE, "POST", "/v2/containers", json_body=body)
 
-    def update(self, spec: ContainerSpec) -> dict[str, Any]:
-        """Roll out a new revision with ``spec`` applied to the current configuration."""
+    def update_from_current(self, spec: ContainerSpec, current: dict[str, Any]) -> dict[str, Any]:
+        """Roll out ``spec`` using a caller-verified current service snapshot."""
         spec.validate()
-        current = self.get(spec.name)
-        if current is None:
-            raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
         body = _patch_body(current, project_id=self._project())
         body.setdefault("configuration", {}).setdefault("ingress", {})["publiclyAccessible"] = (
             spec.public
@@ -368,6 +365,13 @@ class CloudRuContainerAppsClient:
             f"/v2/containers/{spec.name}",
             json_body=body,
         )
+
+    def update(self, spec: ContainerSpec) -> dict[str, Any]:
+        """Roll out a new revision with ``spec`` applied to the current configuration."""
+        current = self.get(spec.name)
+        if current is None:
+            raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
+        return self.update_from_current(spec, current)
 
     def restore(self, name: str, previous: dict[str, Any]) -> dict[str, Any]:
         """Roll out a revision with exactly the configuration captured in ``previous``."""

@@ -61,8 +61,7 @@ def build_image(root: Path, sha: str) -> str:
 def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -> dict:
     project = project_id()
     name = candidate_name(project)
-    if apps.find_for_deploy(name) is not None:
-        fail("already_exists")
+    current = apps.find_for_deploy(name)
     spec = ContainerSpec(
         name=name,
         image=image,
@@ -99,7 +98,14 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
             "containers": [spec.container_body()],
         },
     }
-    apps.client.request(SERVICE, "POST", "/v2/containers", json_body=body)
+    if current is None:
+        apps.client.request(SERVICE, "POST", "/v2/containers", json_body=body)
+    else:
+        if current.get("name") not in {None, name}:
+            fail("resource_mismatch")
+        if current.get("description") not in {None, DESCRIPTION}:
+            fail("resource_mismatch")
+        apps.update_from_current(spec, current)
     status = apps.wait_until_ready(name, image=image, timeout_s=300, poll_s=5)
     health = apps.health_check(status["public_uri"], attempts=18, delay_s=5)
     origin = health["url"].removesuffix("/healthz")
