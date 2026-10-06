@@ -63,7 +63,7 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
     spec = ContainerSpec(
         name=name,
         image=image,
-        cpu="0.5",
+        cpu="0.2",
         min_instances=0,
         max_instances=1,
         public=True,
