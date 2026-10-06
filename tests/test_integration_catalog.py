@@ -29,9 +29,10 @@ def test_catalog_and_schema_are_valid_and_seeded():
         "sber_business",
         "gigachat",
     }
-    assert set(
-        schema["properties"]["integrations"]["items"]["properties"]["status"]["enum"]
-    ) == ALLOWED_STATUSES
+    assert (
+        set(schema["properties"]["integrations"]["items"]["properties"]["status"]["enum"])
+        == ALLOWED_STATUSES
+    )
 
 
 def test_human_view_is_exactly_generated_from_machine_source():
@@ -63,7 +64,10 @@ def test_supported_requires_provider_implementation_and_e2e():
 
     errors = validate_catalog(broken)
 
-    assert any("supported requires provider + implementation + E2E verification" in error for error in errors)
+    assert any(
+        "supported requires provider + implementation + E2E verification" in error
+        for error in errors
+    )
 
 
 def test_e2e_cannot_exist_without_implementation():
