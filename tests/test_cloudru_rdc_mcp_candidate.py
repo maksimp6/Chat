@@ -24,18 +24,18 @@ class FakeApps:
         self.client = FakeClient()
         self.project_id = PROJECT
         self._status = {
-            "public_uri": "rdc-mcp-22706bfa6066.containerapps.ru",
-            "image": "registry/rdc-mcp@sha256:" + "a" * 64,
-            "resources": {"cpu": "0.5", "memory": "1024Mi"},
+            "public_uri": "alice-dev-22706bfa6066.containerapps.ru",
+            "image": "registry/alice-dev@sha256:" + "a" * 64,
+            "resources": {"cpu": "0.2", "memory": "512Mi"},
             "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
         }
 
     def get(self, name):
-        assert name == "rdc-mcp-22706bfa6066"
+        assert name == "alice-dev-22706bfa6066"
         return self.existing
 
     def wait_until_ready(self, name, *, image, timeout_s, poll_s):
-        assert name == "rdc-mcp-22706bfa6066"
+        assert name == "alice-dev-22706bfa6066"
         assert image == self._status["image"]
         assert timeout_s == 300
         assert poll_s == 5
@@ -51,7 +51,7 @@ class FakeApps:
 def test_candidate_name_is_distinct_from_persistent_rdc(monkeypatch):
     monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
 
-    assert candidate.candidate_name(PROJECT) == "rdc-mcp-22706bfa6066"
+    assert candidate.candidate_name(PROJECT) == "alice-dev-22706bfa6066"
     assert candidate.candidate_name(PROJECT) != "rdc-22706bfa6066"
 
 
@@ -62,11 +62,11 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
 
     result = candidate.create_candidate(apps, image, "synthetic-token")
 
-    assert result["status"] == "RDC_MCP_CANDIDATE_READY"
+    assert result["status"] == "ALICE_DEV_READY"
     _, method, path, kwargs = apps.client.requests[0]
     assert (method, path) == ("POST", "/v2/containers")
     body = kwargs["json_body"]
-    assert body["name"] == "rdc-mcp-22706bfa6066"
+    assert body["name"] == "alice-dev-22706bfa6066"
     assert body["configuration"]["ingress"] == {
         "publiclyAccessible": True,
         "accessSettings": {"enableAuth": False},
@@ -76,8 +76,8 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
         "maxInstanceCount": 1,
     }
     container = body["template"]["containers"][0]
-    assert container["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
-    assert {item["name"] for item in container["env"]} == {"ALICE_RDC_MCP_TOKEN"}
+    assert container["resources"] == {"cpu": "0.2", "memory": "512Mi"}
+    assert {item["name"] for item in container["env"]} == {"ALICE_DEV_TOKEN"}
     assert "synthetic-token" not in repr(result)
 
 
@@ -120,4 +120,4 @@ def test_candidate_script_runs_directly_from_repo_root():
         check=False,
     )
     assert result.returncode == 0
-    assert "Deploy an isolated lightweight RDC MCP candidate" in result.stdout
+    assert "Deploy an isolated lightweight Alice Dev candidate" in result.stdout

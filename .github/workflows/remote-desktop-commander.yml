@@ -24,18 +24,18 @@ jobs:
           node --test deploy/remote-desktop-commander/desktop-session.test.cjs
           docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
           docker compose -f deploy/remote-desktop-commander/compose.yaml build
-      - name: Validate lightweight MCP image
+      - name: Validate Alice Dev MCP image
         working-directory: deploy/remote-desktop-commander
         run: |
           set -euo pipefail
-          docker build -f Dockerfile.mcp -t alice-rdc-mcp:candidate .
-          trap 'docker rm -f rdc-mcp-ci >/dev/null 2>&1 || true' EXIT
-          docker run -d --name rdc-mcp-ci -e ALICE_RDC_MCP_TOKEN=ci-smoke-token alice-rdc-mcp:candidate
-          timeout 30s bash -c 'until docker exec rdc-mcp-ci node -e "fetch(\"http://127.0.0.1:8080/healthz\").then(r=>{if(!r.ok)process.exit(1)})"; do sleep 1; done'
-          docker exec rdc-mcp-ci sh -euc '! command -v chromium; ! command -v chromium-browser'
-          docker exec -e RDC_MCP_SMOKE_URL=http://127.0.0.1:8080/mcp \
-            -e RDC_MCP_SMOKE_TOKEN=ci-smoke-token \
-            rdc-mcp-ci node /opt/desktop-commander/mcp-gateway-live-smoke.mjs
+          docker build -f Dockerfile.mcp -t alice-dev:candidate .
+          trap 'docker rm -f alice-dev-ci >/dev/null 2>&1 || true' EXIT
+          docker run -d --name alice-dev-ci -e ALICE_DEV_TOKEN=ci-smoke-token alice-dev:candidate
+          timeout 30s bash -c 'until docker exec alice-dev-ci node -e "fetch(\"http://127.0.0.1:8080/healthz\").then(r=>{if(!r.ok)process.exit(1)})"; do sleep 1; done'
+          docker exec alice-dev-ci sh -euc '! command -v chromium; ! command -v chromium-browser'
+          docker exec -e ALICE_DEV_SMOKE_URL=http://127.0.0.1:8080/mcp \
+            -e ALICE_DEV_SMOKE_TOKEN=ci-smoke-token \
+            alice-dev-ci node /opt/desktop-commander/mcp-gateway-live-smoke.mjs
       - name: Exercise volume initialization and non-root CLI startup
         working-directory: deploy/remote-desktop-commander
         run: |
