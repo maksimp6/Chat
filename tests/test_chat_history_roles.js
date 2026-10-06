@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { BrowserShim } = require("./browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const ROOT = path.resolve(__dirname, "..");
 const HTML =
