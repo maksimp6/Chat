@@ -143,7 +143,6 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
   t.after(() => browser.close());
   const context = await browser.newContext();
   const page = await context.newPage();
-  let callbackUrl;
   const navigation = { responses: [], failed: [], console: [] };
   page.on("response", (response) => {
     if (response.url().includes("/browser/oauth/authorize")) {
@@ -154,15 +153,6 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
     navigation.failed.push({ url: request.url(), error: request.failure()?.errorText ?? "unknown" });
   });
   page.on("console", (message) => navigation.console.push(message.text()));
-  await context.route(/^https:\/\/chatgpt\.com\/connector_platform_oauth_redirect(?:\?.*)?$/, async (route) => {
-    callbackUrl = route.request().url();
-    await route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<title>ChatGPT callback reached</title><h1>callback reached</h1>",
-    });
-  });
-
   await page.goto(authorize.href);
   await page.locator('input[name="password"]').fill("browser-e2e-short-token");
   await Promise.all([
@@ -170,14 +160,13 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
     page.getByRole("button", { name: "Разрешить" }).click(),
   ]);
 
-  assert.ok(callbackUrl, `the browser must reach the ChatGPT redirect URI; page=${page.url()} navigation=${JSON.stringify(navigation)}`);
-  const callback = new URL(callbackUrl);
+  const callback = new URL(page.url());
+  assert.equal(callback.origin, "https://chatgpt.com", `page=${page.url()} navigation=${JSON.stringify(navigation)}`);
   assert.equal(callback.origin, "https://chatgpt.com");
   assert.equal(callback.pathname, "/connector_platform_oauth_redirect");
   assert.equal(callback.searchParams.get("state"), "browser-e2e-state");
   assert.equal(callback.searchParams.get("iss"), base + "/browser/oauth");
   assert.match(callback.searchParams.get("code") ?? "", /^[A-Za-z0-9_-]{20,}$/);
-  assert.equal(await page.title(), "ChatGPT callback reached");
 });
 
 
