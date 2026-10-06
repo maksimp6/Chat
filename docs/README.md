@@ -34,7 +34,8 @@
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
 - [Work Map: trips.db workflow](integrations/work-map-trips.md) — обработка путешествий из SQLite баз данных; прототип, не интегрирован
-- [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
+- [Alice runtime агенты](agents/overview.md) — архитектура и взаимодействие компонентов backend/transport
+- [Repository development roles](agents/role-based-agent-office.md) — роли разработчиков и coordination в GitHub office
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
 - [База данных](database/overview.md) — модели данных и схема БД

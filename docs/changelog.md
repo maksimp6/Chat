@@ -5,7 +5,22 @@
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
 
-## 2026-09-29 — безопасность, CI, async runtime и Cloud.ru
+## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
+
+### Repository role-based GitHub office
+
+- Добавлена role-first/provider-second модель для координации разработки:
+  [#560](https://github.com/maksimp6/Chat/pull/560).
+- Определены девять repository roles: Team Lead, Backend, Frontend, Android, Test, Infra, Security Reviewer, Docs Engineer, Release Manager.
+- Routine модели: GPT-5.4 mini, Docs Engineer/Codex default GPT-5.4 nano.
+- Claude Partner Agent / Sonnet как явная эскалация для сложной архитектурной работы.
+- `@claude-lite` workflow для Haiku с bounded turns для быстрых операций.
+- Copilot остаётся автоматическим reviewer; Codex запускается один раз перед merge.
+- Один primary owner и один focused PR на issue; стирание ownership или множественные PRs на issue не допускаются.
+- Safety/owner-approval boundaries для deployment, data changes и secrets не изменены.
+- Документация: [`docs/agents/role-based-agent-office.md`](docs/agents/role-based-agent-office.md) и [`AGENTS.md`](AGENTS.md).
+
+Это shipped repository policy в `master`. Плагин-based runtime skill discovery остаётся roadmap [#566](https://github.com/maksimp6/Chat/pull/566).
 
 ### 3D business и AI-first tools
 
