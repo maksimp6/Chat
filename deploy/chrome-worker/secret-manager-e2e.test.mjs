@@ -2,14 +2,16 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { createWorker } from "./server.mjs";
 
 function resolveThroughPython(alias, purpose) {
   return new Promise((resolve, reject) => {
-    const child = spawn("python", ["../../tests/secret_manager_browser_bridge.py"], {
-      cwd: new URL(".", import.meta.url).pathname,
+    const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+    const child = spawn("python", ["tests/secret_manager_browser_bridge.py"], {
+      cwd: repoRoot,
       stdio: ["pipe", "pipe", "pipe"],
     });
     let output = "";
