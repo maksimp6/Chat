@@ -285,13 +285,13 @@ test("concurrent real worker OAuth registrations checkpoint complete immutable s
   assert.equal(restored.status().authGeneration, 20);
 });
 
-test("consent page posts only to itself and renders a password field", async (t) => {
+test("consent page allows self and the registered redirect origin", async (t) => {
   const app = await fixture(t);
   const client = await (await app.register()).json();
   const started = await app.start(client);
   const policy = started.response.headers.get("content-security-policy");
   const formAction = policy.split(";").map((part) => part.trim()).find((part) => part.startsWith("form-action"));
-  assert.deepEqual(formAction.split(/\s+/).slice(1), ["'self'"]);
+  assert.deepEqual(formAction.split(/\s+/).slice(1), ["'self'", "https://chatgpt.com"]);
   assert.match(started.html, /type="password" name="password"/);
   assert.doesNotMatch(started.html, /github\.com/i);
 });

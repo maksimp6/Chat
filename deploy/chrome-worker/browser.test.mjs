@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -7,6 +8,7 @@ import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createWorker } from "./server.mjs";
+import { createOAuth } from "./oauth.mjs";
 import { chromium } from "playwright-core";
 
 async function fixture(t) {
@@ -80,6 +82,91 @@ test("first MCP client binds the worker and a second client is rejected until re
   t.after(async () => replacement.close());
   await replacement.connect(replacementTransport);
   assert.ok(replacementTransport.sessionId);
+});
+
+
+test("real Chromium consent redirects back to the registered ChatGPT callback", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "oauth-browser-e2e-"));
+  const http = createServer();
+  await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${http.address().port}`;
+  const redirectUri = "https://chatgpt.com/connector_platform_oauth_redirect";
+  const verifier = "v".repeat(43);
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const oauth = createOAuth({
+    env: {},
+    publicUrl: base,
+    shortToken: "browser-e2e-short-token",
+    ownerId: "owner",
+    stateFile: join(directory, "oauth.json"),
+  });
+  http.on("request", async (request, response) => {
+    if (await oauth.handle(request, response, new URL(request.url, base))) return;
+    response.writeHead(404).end();
+  });
+  t.after(async () => {
+    await new Promise((resolve) => http.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  const registration = await fetch(base + "/browser/oauth/register", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      client_name: "ChatGPT browser E2E",
+      redirect_uris: [redirectUri],
+      token_endpoint_auth_method: "none",
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      scope: "browser",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const client = await registration.json();
+
+  const authorize = new URL(base + "/browser/oauth/authorize");
+  authorize.search = new URLSearchParams({
+    client_id: client.client_id,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    resource: base + "/browser/v1/mcp",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    scope: "browser",
+    state: "browser-e2e-state",
+  }).toString();
+
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
+    headless: true,
+  });
+  t.after(() => browser.close());
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const navigation = { responses: [], failed: [], console: [] };
+  page.on("response", (response) => {
+    if (response.url().includes("/browser/oauth/authorize")) {
+      navigation.responses.push({ url: response.url(), status: response.status(), location: response.headers()["location"] ?? null });
+    }
+  });
+  page.on("requestfailed", (request) => {
+    navigation.failed.push({ url: request.url(), error: request.failure()?.errorText ?? "unknown" });
+  });
+  page.on("console", (message) => navigation.console.push(message.text()));
+  await page.goto(authorize.href);
+  await page.locator('input[name="password"]').fill("browser-e2e-short-token");
+  await Promise.all([
+    page.waitForURL("https://chatgpt.com/connector_platform_oauth_redirect**"),
+    page.getByRole("button", { name: "Разрешить" }).click(),
+  ]);
+
+  const callback = new URL(page.url());
+  assert.equal(callback.origin, "https://chatgpt.com", `page=${page.url()} navigation=${JSON.stringify(navigation)}`);
+  assert.equal(callback.origin, "https://chatgpt.com");
+  assert.equal(callback.pathname, "/connector_platform_oauth_redirect");
+  assert.equal(callback.searchParams.get("state"), "browser-e2e-state");
+  assert.equal(callback.searchParams.get("iss"), base + "/browser/oauth");
+  assert.match(callback.searchParams.get("code") ?? "", /^[A-Za-z0-9_-]{20,}$/);
 });
 
 
