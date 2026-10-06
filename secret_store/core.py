@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import Never, Protocol
 
 
 class SecretErrorCode(StrEnum):
@@ -55,7 +55,7 @@ class SecretValue:
     def __str__(self) -> str:
         return "[REDACTED]"
 
-    def __reduce__(self) -> object:
+    def __reduce__(self) -> Never:
         raise TypeError("SecretValue cannot be serialized")
 
 
