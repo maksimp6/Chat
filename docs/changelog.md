@@ -5,6 +5,45 @@
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
 
+## 2026-10-06 — Memory DB Wave 1, Alice Dev worker, и ChatGPT OAuth
+
+### Memory DB Wave 1: файловый бэкенд для conversation и user identity
+
+- Переведено управление conversation ownership на file-native storage вместо SQLite (issue #776):
+  [#920](https://github.com/maksimp6/Chat/pull/920).
+- Переведена user identity и GitHub mapping на file-native aggregate (issue #776):
+  [#921](https://github.com/maksimp6/Chat/pull/921).
+- Conversation state теперь читается из файловой системы; database transaction не требуется для новых conversation.
+- Миграция слоя памяти позволяет отделить conversation lifecycle от centralized DB.
+
+Это first wave. Дальнейшая миграция shared state (sessions, runtime events) остаётся roadmap.
+
+### Alice Dev worker: замена RDC на production lifecycle
+
+- Lightweight HTTP MCP worker переименован из RDC в Alice Dev и поднят как production lifecycle для Alice deployment ([#919](https://github.com/maksimp6/Chat/pull/919)).
+- Alice Dev replaces cloudru-rdc.yml в production deployment path.
+- Добавлена одноходовая handoff credential ([#933](https://github.com/maksimp6/Chat/pull/933)) для безопасного deployment без хранения secrets в Git.
+- Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Alice Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
+- Добавлены immutable commit workers и worker recycling policy ([#930](https://github.com/maksimp6/Chat/pull/930)).
+- Добавлена обработка tombstone deletion и in-place worker updates ([#928](https://github.com/maksimp6/Chat/pull/928), [#931](https://github.com/maksimp6/Chat/pull/931)).
+- Cloud.ru HTTP 499 recovery для Alice Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
+
+**Архитектурное изменение**: Decision 2026-10-06 о замене production-deploy.yml SSH workflow на Alice Dev переходит из proposed в shipped. Однако prior decision про "cloudru-rdc.yml как sole production lifecycle" требует пересмотра — это будет Alice Dev в настоящее время. Issue #869 отслеживает уточнение границ.
+
+### Secrets и authorization
+
+- Добавлена capability-only agent secret delivery без хранения plaintext в memory ([#897](https://github.com/maksimp6/Chat/pull/897)).
+- Добавлен file import и ephemeral materialization для secrets ([#895](https://github.com/maksimp6/Chat/pull/895)).
+- Secrets infrastructure (#872–#874) из previous month теперь полностью интегрирована в password-manager lifecycle.
+
+### CI и platform routing
+
+- Добавлен platform-aware CI routing: checks маршрутизируются по affected platform (backend, frontend, Android, CI changes) ([#935](https://github.com/maksimp6/Chat/pull/935)).
+- Добавлена документация: [`docs/development/platform-ci-routing.md`](docs/development/platform-ci-routing.md).
+- Performance improvement: reuse registry build cache между Alice Dev deployments ([#934](https://github.com/maksimp6/Chat/pull/934)).
+
+Это shipped-функционал, но live Alice Dev deployment verification всё ещё в progress.
+
 ## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
 
 ### Repository role-based GitHub office
