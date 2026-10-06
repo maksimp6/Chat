@@ -106,3 +106,22 @@ def test_gateway_blocks_pdf_tool():
     source = (root / "deploy" / "remote-desktop-commander" / "mcp-gateway.mjs").read_text()
 
     assert 'new Set(["write_pdf"])' in source
+
+
+def test_lightweight_image_is_alice_dev_ready_without_browser_or_db_server():
+    root = Path(__file__).resolve().parents[1]
+    deploy = root / "deploy" / "remote-desktop-commander"
+    dockerfile = (deploy / "Dockerfile.mcp").read_text()
+    bootstrap = (deploy / "dev-bootstrap.sh").read_text()
+
+    assert "FROM python:3.14-slim-bookworm" in dockerfile
+    assert "FROM node:22-bookworm-slim AS node-runtime" in dockerfile
+    assert "chromium" not in dockerfile.lower()
+    assert "postgresql" not in dockerfile.lower()
+    assert "python -m pip" in dockerfile
+    assert "node --version" in dockerfile
+    assert "-r \"$repo/requirements.txt\"" in bootstrap
+    assert "-r \"$repo/requirements-dev.txt\"" in bootstrap
+    assert "npm install --ignore-scripts --no-audit --no-fund --package-lock=false" in bootstrap
+    assert "bash scripts/format.sh check" in bootstrap
+    assert 'import app; assert app.app.test_client().get("/healthz").status_code == 200' in bootstrap
