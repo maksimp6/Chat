@@ -71,3 +71,19 @@ def test_merge_readiness_trigger_policy_avoids_comment_churn() -> None:
     # scripts/merge_readiness.py when a supported readiness event runs.
     assert "pull_request_review_comment:" not in trigger_block
     assert "pull_request_review_thread:" not in trigger_block
+
+
+def test_stacked_readiness_runs_for_child_prs_and_can_update_one_comment():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "github.event.pull_request.base.ref == 'master'" not in text
+    assert "pull-requests: write" in text
+    assert "<!-- alice-stack-readiness -->" in text
+    assert "--method PATCH" in text
+    assert "--method POST" in text
+    assert "contains(\"<!-- alice-stack-readiness -->\")" in text
+
+
+def test_stacked_readiness_reacts_to_topology_edit_and_close_events():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "edited" in text
+    assert "closed" in text
