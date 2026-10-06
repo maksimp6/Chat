@@ -87,3 +87,13 @@ def test_stacked_readiness_reacts_to_topology_edit_and_close_events():
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "edited" in text
     assert "closed" in text
+
+
+def test_descendant_event_refreshes_root_comment_without_recursive_dispatch():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "scripts/stack_status.py" in text
+    assert '"root_pr"' in text
+    assert "<!-- alice-stack-root-readiness -->" in text
+    assert "~~~mermaid" in text
+    assert 'issues/$root_pr/comments' in text
+    assert "workflow_dispatch" not in text
