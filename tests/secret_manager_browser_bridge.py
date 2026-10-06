@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import sys
 
-from secret_store.core import SecretRef, SecretResolutionError, SecretValue
+from secret_store.core import SecretErrorCode, SecretRef, SecretResolutionError, SecretValue
 from secret_store.fake_admin import FakeSecretAdminBackend
 from secret_store.manager import InMemorySecretAliasStore, SecretManager
 
@@ -21,7 +21,7 @@ class _AdminResolver:
     def resolve(self, ref: SecretRef) -> SecretValue:
         value = self._admin.resolve_for_test(ref)
         if value is None:
-            raise SecretResolutionError("not_found", ref)  # type: ignore[arg-type]
+            raise SecretResolutionError(SecretErrorCode.NOT_FOUND, ref)
         return SecretValue(value)
 
 
