@@ -116,6 +116,34 @@ export function createWorker(options = {}) {
   let page;
   let state = "sleeping";
   let generation = 0;
+  const idleSleepMs = Number(options.idleSleepMs ?? process.env.BROWSER_IDLE_SLEEP_MS ?? 300000);
+  if (!Number.isFinite(idleSleepMs) || idleSleepMs < 1000) throw new Error("invalid_browser_idle_sleep_ms");
+  let idleTimer;
+  let closing = false;
+
+  function cancelIdleSleep() {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = undefined;
+  }
+
+  function scheduleIdleSleep() {
+    cancelIdleSleep();
+    if (!context || closing) return;
+    idleTimer = setTimeout(async () => {
+      idleTimer = undefined;
+      if (takeoverEnabled && takeover.status?.().active) {
+        scheduleIdleSleep();
+        return;
+      }
+      try {
+        await mcp.close();
+        await sleep();
+      } catch {
+        process.stderr.write('{"event":"browser_idle_sleep_failed"}\n');
+      }
+    }, idleSleepMs);
+    idleTimer.unref?.();
+  }
 
   async function wake() {
     await ready;
@@ -136,6 +164,7 @@ export function createWorker(options = {}) {
       page = context.pages()[0] ?? (await context.newPage());
       generation += 1;
       state = "awake";
+      scheduleIdleSleep();
     });
   }
 
@@ -146,6 +175,7 @@ export function createWorker(options = {}) {
       context = undefined;
       page = undefined;
       state = "sleeping";
+      cancelIdleSleep();
       await stateStore.checkpoint();
     });
   }
@@ -157,6 +187,7 @@ export function createWorker(options = {}) {
     }
     if (name === "wake") {
       await wake();
+      scheduleIdleSleep();
       return { state, generation, profile: stateStore.status() };
     }
     if (name === "sleep") {
@@ -166,14 +197,17 @@ export function createWorker(options = {}) {
     if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
     if (name === "navigate") {
       await page.goto(safeUrl(args.url, allowedHosts), { waitUntil: "domcontentloaded" });
+      scheduleIdleSleep();
       return { url: page.url(), title: await page.title() };
     }
     if (name === "click") {
       await page.locator(String(args.locator ?? "")).click();
+      scheduleIdleSleep();
       return { ok: true };
     }
     if (name === "type") {
       await page.locator(String(args.locator ?? "")).fill(String(args.text ?? ""));
+      scheduleIdleSleep();
       return { ok: true };
     }
     if (name === "secret_fill") {
@@ -196,14 +230,17 @@ export function createWorker(options = {}) {
       } finally {
         secret = undefined;
       }
+      scheduleIdleSleep();
       return { ok: true };
     }
     if (name === "extract") {
       const text = await page.locator(String(args.locator ?? "body")).innerText();
+      scheduleIdleSleep();
       return { text: text.slice(0, MAX_TEXT_CHARS), truncated: text.length > MAX_TEXT_CHARS };
     }
     if (name === "screenshot") {
       const bytes = await page.screenshot({ type: "png" });
+      scheduleIdleSleep();
       return { mediaType: "image/png", data: bytes.toString("base64") };
     }
     throw Object.assign(new Error("unknown_operation"), { status: 404 });
@@ -288,7 +325,9 @@ export function createWorker(options = {}) {
       }
       if (pathname === "/browser/v1/mcp") {
         const message = request.method === "POST" ? await body(request) : undefined;
-        return await mcp.handle(request, response, message);
+        await mcp.handle(request, response, message);
+        scheduleIdleSleep();
+        return;
       }
       if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/start") {
         await wake();
@@ -316,7 +355,7 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, ready, takeover, async close() { await mcp.close(); await sleep(); takeover.close(); } };
+  return { handler, callTool, ready, takeover, async close() { closing = true; cancelIdleSleep(); await mcp.close(); await sleep(); takeover.close(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
