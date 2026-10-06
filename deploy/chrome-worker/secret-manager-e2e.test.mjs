@@ -26,7 +26,7 @@ function resolveThroughPython(alias, purpose) {
     child.on("close", (code) => {
       if (code !== 0) {
         resolverFailures += 1;
-        return reject(new Error("resolver_process_failed"));
+        return reject(new Error(`resolver_process_failed_exit_${code}`));
       }
       resolve(output);
     });
