@@ -1317,3 +1317,100 @@ def test_readiness_starting_deadline_never_calls_health(monkeypatch):
     apps.client.request.assert_not_called()
     apps.start.assert_not_called()
     apps.stop.assert_not_called()
+
+def test_secret_import_testcall_base64_encodes_body_and_returns_metadata_only():
+    apps = apps_with()
+    apps.client.request.return_value = response(
+        {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}, status=201
+    )
+    secret = b"synthetic-private-value"
+
+    result = rdc.test_call(
+        apps,
+        "/rdc/secrets",
+        "POST",
+        nonce=NONCE,
+        body_bytes=secret,
+        alias=rdc.SECRET_ALIAS,
+    )
+
+    assert result == {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}
+    request = apps.client.request.call_args.kwargs["json_body"]
+    assert request["method"] == "post"
+    assert request["path"] == "/rdc/secrets"
+    assert request["isBase64Encoded"] is True
+    assert request["body"] != secret.decode()
+    assert secret.decode() not in json.dumps(request)
+    assert request["headers"] == {
+        rdc.CONTROL_HEADER: NONCE,
+        "Content-Type": "application/octet-stream",
+        "X-Alice-Secret-Alias": rdc.SECRET_ALIAS,
+    }
+
+
+def test_secret_import_permit_binds_alias_and_body_digest():
+    apps = apps_with()
+    store = private_store()
+    clock = Clock()
+    digest = hashlib.sha256(b"synthetic-private-value").hexdigest()
+
+    nonce = rdc.issue_control_permit(
+        apps,
+        store,
+        object(),
+        30,
+        clock=clock,
+        sleep=clock.sleep,
+        action="secret_import",
+        alias=rdc.SECRET_ALIAS,
+        body_sha256=digest,
+    )
+
+    assert len(nonce) == 64
+    permit = json.loads(store.download(rdc.CONTROL_FILE))
+    assert permit["action"] == "secret_import"
+    assert permit["alias"] == rdc.SECRET_ALIAS
+    assert permit["body_sha256"] == digest
+    assert "synthetic-private-value" not in json.dumps(permit)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"body_bytes": b"", "alias": rdc.SECRET_ALIAS},
+        {"body_bytes": b"x" * (rdc.SECRET_MAX_BYTES + 1), "alias": rdc.SECRET_ALIAS},
+        {"body_bytes": b"ok", "alias": "other"},
+    ],
+)
+def test_secret_import_testcall_rejects_invalid_body_or_alias(kwargs):
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps_with(), "/rdc/secrets", "POST", nonce=NONCE, **kwargs)
+
+
+def test_import_runtime_secret_uses_digest_bound_permit_and_returns_no_plaintext(monkeypatch):
+    apps = apps_with()
+    store = private_store()
+    secret = b"synthetic-private-value"
+    captured = {}
+
+    monkeypatch.setattr(rdc, "require_owned_bucket", lambda *args, **kwargs: None)
+
+    def permit(*args, **kwargs):
+        captured["permit"] = kwargs
+        return NONCE
+
+    def call(*args, **kwargs):
+        captured["call"] = kwargs
+        return {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}
+
+    monkeypatch.setattr(rdc, "issue_control_permit", permit)
+    monkeypatch.setattr(rdc, "test_call", call)
+
+    result = rdc.import_runtime_secret(apps, store, object(), secret)
+
+    assert result == {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}
+    assert captured["permit"]["action"] == "secret_import"
+    assert captured["permit"]["alias"] == rdc.SECRET_ALIAS
+    assert captured["permit"]["body_sha256"] == hashlib.sha256(secret).hexdigest()
+    assert captured["call"]["body_bytes"] == secret
+    assert secret.decode() not in json.dumps(result)
