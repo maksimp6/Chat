@@ -8,8 +8,10 @@ from secret_store.manager import (
     SecretAliasError,
     SecretManager,
 )
+from secret_store.core import SecretValue
 from secret_store.core import SecretRef
 from secret_store.fake import FakeSecretResolver
+from secret_store.fake_admin import FakeSecretAdminBackend
 
 
 def _ref(version="v1"):
@@ -144,3 +146,37 @@ def test_resolver_failure_is_audited_without_secret_material():
     assert event.success is False
     assert "canary-secret" not in repr(event)
     assert "canary-secret" not in str(error.value)
+
+
+def test_admin_operations_fail_closed_without_admin_backend():
+    ref = _ref()
+    manager = SecretManager(
+        InMemorySecretAliasStore(),
+        FakeSecretResolver({ref: "canary-secret"}),
+    )
+    manager.put_alias(_entry(ref))
+
+    with pytest.raises(SecretAliasError, match="admin backend"):
+        manager.rotate("github", SecretValue("new-secret"))
+
+
+def test_rotate_missing_alias_fails_closed():
+    manager = SecretManager(
+        InMemorySecretAliasStore(),
+        FakeSecretResolver(),
+        FakeSecretAdminBackend(),
+    )
+
+    with pytest.raises(SecretAliasError, match="not found"):
+        manager.rotate("missing", SecretValue("new-secret"))
+
+
+def test_delete_missing_alias_fails_closed():
+    manager = SecretManager(
+        InMemorySecretAliasStore(),
+        FakeSecretResolver(),
+        FakeSecretAdminBackend(),
+    )
+
+    with pytest.raises(SecretAliasError, match="not found"):
+        manager.delete("missing")
