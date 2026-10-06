@@ -1,3 +1,5 @@
+import pytest
+
 from flask import Flask
 
 import short_token_auth
