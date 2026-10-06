@@ -567,3 +567,20 @@ test("pairing redirect accepts only current bounded official HTTPS handoff", { t
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+test("secret import permit is distinct from checkpoint permit", () => {
+  const source = readFileSync(join(__dirname, "desktop-session.cjs"), "utf8");
+  assert.match(source, /action: "secret_import"/);
+  assert.match(source, /expectedAction = options\.action \?\? "checkpoint"/);
+});
+
+test("secret import route is bounded allowlisted and fail closed before storage wiring", () => {
+  const source = readFileSync(join(__dirname, "desktop-session.cjs"), "utf8");
+  assert.match(source, /request\.url === "\/rdc\/secrets"/);
+  assert.match(source, /alias !== "rdc\.git\.ssh"/);
+  assert.match(source, /length > 16384/);
+  assert.match(source, /BEGIN OPENSSH PRIVATE KEY/);
+  assert.match(source, /secret_store_unavailable/);
+  assert.doesNotMatch(source, /writeFileSync\([^\n]*rdc\.git\.ssh/);
+});
