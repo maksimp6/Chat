@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import re
 from typing import Protocol
 
+from secret_store.admin import SecretAdminBackend
 from secret_store.core import SecretRef, SecretResolutionError, SecretResolver, SecretValue
 
 _ALIAS_RE = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
@@ -72,13 +73,58 @@ class InMemorySecretAliasStore:
 
 
 class SecretManager:
-    def __init__(self, store: SecretAliasStore, resolver: SecretResolver) -> None:
+    def __init__(
+        self,
+        store: SecretAliasStore,
+        resolver: SecretResolver,
+        admin: SecretAdminBackend | None = None,
+    ) -> None:
         self._store = store
         self._resolver = resolver
+        self._admin = admin
         self._audit: list[SecretAccessEvent] = []
 
     def put_alias(self, entry: SecretAlias) -> None:
         self._store.put(entry)
+
+    def create(
+        self,
+        alias: str,
+        value: SecretValue,
+        *,
+        secret_purpose: str,
+        allowed_purposes: frozenset[str],
+    ) -> SecretAlias:
+        admin = self._require_admin()
+        result = admin.create(purpose=secret_purpose, value=value)
+        entry = SecretAlias(alias=alias, ref=result.ref, allowed_purposes=allowed_purposes)
+        self._store.put(entry)
+        self._record(alias, secret_purpose, "create", True)
+        return entry
+
+    def rotate(self, alias: str, value: SecretValue) -> SecretAlias:
+        admin = self._require_admin()
+        entry = self._store.get(alias)
+        if entry is None:
+            raise SecretAliasError("secret alias not found")
+        result = admin.rotate(entry.ref, value)
+        rotated = SecretAlias(
+            alias=entry.alias,
+            ref=result.ref,
+            allowed_purposes=entry.allowed_purposes,
+        )
+        self._store.put(rotated)
+        self._record(alias, entry.ref.purpose, "rotate", True)
+        return rotated
+
+    def delete(self, alias: str) -> None:
+        admin = self._require_admin()
+        entry = self._store.get(alias)
+        if entry is None:
+            raise SecretAliasError("secret alias not found")
+        admin.delete(entry.ref)
+        self._store.delete(alias)
+        self._record(alias, entry.ref.purpose, "delete", True)
 
     def delete_alias(self, alias: str) -> None:
         self._store.delete(alias)
@@ -104,6 +150,11 @@ class SecretManager:
 
     def audit_events(self) -> tuple[SecretAccessEvent, ...]:
         return tuple(self._audit)
+
+    def _require_admin(self) -> SecretAdminBackend:
+        if self._admin is None:
+            raise SecretAliasError("secret admin backend is not configured")
+        return self._admin
 
     def _record(self, alias: str, purpose: str, operation: str, success: bool) -> None:
         self._audit.append(
