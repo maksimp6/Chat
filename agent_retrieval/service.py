@@ -215,6 +215,15 @@ def _code_hits(
     ):
         return []
 
+    # Embedded snapshot identity must agree even if external labels match.
+    if repository_index.get("snapshot_schema_version") is not None and (
+        repository_index.get("snapshot_schema_version") != 1
+        or repository_index.get("source_kind") != "git_commit"
+        or repository_index.get("source_version") != query.head_sha
+        or repository_index.get("repository") != query.repository.lower()
+    ):
+        return []
+
     files = list(repository_index.get("files") or [])
     tests_by_module = repository_index.get("tests_by_module") or {}
     documents: list[str] = []
@@ -240,7 +249,7 @@ def _code_hits(
         hits.append(
             RetrievalHit(
                 source_type="code",
-                ref=str(item.get("path") or "code"),
+                ref=str(item.get("source_ref") or item.get("path") or "code"),
                 score=1.0 + score,
                 text=summary,
                 metadata={
