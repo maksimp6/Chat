@@ -1,7 +1,7 @@
 "use strict";
 
 const { spawn, execFile } = require("node:child_process");
-const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync, openSync, closeSync, fstatSync, readSync, constants } = require("node:fs");
+const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync, openSync, closeSync, fstatSync, readSync, writeFileSync, constants } = require("node:fs");
 const { setTimeout: delay } = require("node:timers/promises");
 const { createServer } = require("node:http");
 const { promisify } = require("node:util");
@@ -11,6 +11,8 @@ const { join } = require("node:path");
 const execute = promisify(execFile);
 const HELPER_TIMEOUT_MS = Object.freeze({ status: 60000, "save-auth": 60000, checkpoint: 120000, restore: 120000 });
 const CHECKPOINT_TIMEOUT_MS = 240000;
+const SECRET_ALIAS = "rdc.git.ssh";
+const SECRET_MAX_BYTES = 16 * 1024;
 
 const PROFILE = "/home/node/.config/chromium";
 const VERSION_URL = "http://127.0.0.1:9222/json/version";
@@ -113,19 +115,62 @@ function controlPermit(request, options = {}) {
     if (count !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) return false;
     const raw = buffer.subarray(0, count);
     const value = JSON.parse(raw.toString("utf8"));
-    if (!value || Array.isArray(value) || Object.keys(value).sort().join(",") !==
-        "action,container_name,expires_at,issued_at,project_id,schema,sha256") return false;
+    const action = options.action ?? "checkpoint";
+    const keys = action === "checkpoint"
+      ? "action,container_name,expires_at,issued_at,project_id,schema,sha256"
+      : "action,alias,body_sha256,container_name,expires_at,issued_at,project_id,schema,sha256";
+    if (!value || Array.isArray(value) || Object.keys(value).sort().join(",") !== keys) return false;
     const canonical = JSON.stringify(Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))) + "\n";
     const now = options.now ?? Math.floor(Date.now() / 1000);
-    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== "checkpoint" ||
+    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== action ||
         value.project_id !== project || value.container_name !== "rdc-" + project.replaceAll("-", "").slice(0, 12) ||
         !Number.isSafeInteger(value.issued_at) || !Number.isSafeInteger(value.expires_at) ||
         value.issued_at < 0 || value.issued_at > now || value.expires_at <= now ||
         value.expires_at <= value.issued_at || value.expires_at - value.issued_at > 300 ||
         typeof value.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.sha256)) return false;
+    if (action === "secret_import") {
+      if (value.alias !== SECRET_ALIAS || value.alias !== options.alias ||
+          typeof value.body_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.body_sha256) ||
+          (options.bodySha256 !== undefined && value.body_sha256 !== options.bodySha256)) return false;
+    } else if (action !== "checkpoint") return false;
     return timingSafeEqual(createHash("sha256").update(nonce, "ascii").digest(), Buffer.from(value.sha256, "hex"));
   } catch { return false; }
   finally { if (fd !== undefined) closeSync(fd); }
+}
+
+function secretRequestMetadata(request) {
+  const aliasCount = request.rawHeaders.filter((_value, index) => index % 2 === 0 &&
+    request.rawHeaders[index].toLowerCase() === "x-alice-secret-alias").length;
+  const alias = request.headers["x-alice-secret-alias"];
+  const length = request.headers["content-length"];
+  if (aliasCount !== 1 || alias !== SECRET_ALIAS ||
+      request.headers["content-type"] !== "application/octet-stream" ||
+      request.headers["transfer-encoding"] || typeof length !== "string" || !/^[0-9]+$/.test(length)) return null;
+  const size = Number(length);
+  if (!Number.isSafeInteger(size) || size < 1 || size > SECRET_MAX_BYTES) return null;
+  return { alias, size };
+}
+
+async function readSecretBody(request, size) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of request) {
+    total += chunk.length;
+    if (total > size || total > SECRET_MAX_BYTES) throw new Error("invalid_secret_body");
+    chunks.push(chunk);
+  }
+  if (total !== size) throw new Error("invalid_secret_body");
+  return Buffer.concat(chunks, total);
+}
+
+function storeRuntimeSecret(alias, body, directory = "/home/node/.alice-secrets") {
+  if (alias !== SECRET_ALIAS) throw new Error("invalid_secret_alias");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  const target = join(directory, alias);
+  writeFileSync(target, body, { flag: "wx", mode: 0o600 });
+  chmodSync(target, 0o600);
+  return target;
 }
 
 function stateSummary(value) {
@@ -367,6 +412,33 @@ async function superviseCloudRdc(argv, options = {}) {
         const href = !stopping && !quiescing && !summary.paired && pairingHandoff(handoffFile);
         if (href) response.writeHead(303, { Location: href }).end();
         else response.writeHead(404).end('{"status":"pairing_unavailable"}');
+      } else if (request.method === "POST" && request.url === "/rdc/secrets") {
+        const metadata = secretRequestMetadata(request);
+        const nonce = request.headers["x-alice-rdc-control"];
+        if (!metadata || typeof nonce !== "string" ||
+            !authorize(request, { action: "secret_import", alias: metadata?.alias })) {
+          request.resume();
+          response.writeHead(metadata ? 403 : 400).end(metadata ? '{"status":"control_denied"}' : '{"status":"invalid_request"}');
+          return;
+        }
+        let body;
+        try { body = await readSecretBody(request, metadata.size); }
+        catch {
+          response.writeHead(400).end('{"status":"invalid_request"}');
+          return;
+        }
+        const bodySha256 = createHash("sha256").update(body).digest("hex");
+        if (!authorize(request, { action: "secret_import", alias: metadata.alias, bodySha256 })) {
+          response.writeHead(403).end('{"status":"control_denied"}');
+          return;
+        }
+        try {
+          storeRuntimeSecret(metadata.alias, body, options.secretDir);
+          response.writeHead(201).end(JSON.stringify({ status: "secret_imported", alias: metadata.alias }));
+        } catch (error) {
+          response.writeHead(error?.code === "EEXIST" ? 409 : 503)
+            .end(error?.code === "EEXIST" ? '{"status":"secret_exists"}' : '{"status":"secret_import_failed"}');
+        }
       } else if (request.method === "POST" && request.url === "/checkpoint") {
         if (!authorize(request)) {
           request.resume();
