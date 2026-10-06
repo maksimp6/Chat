@@ -139,31 +139,28 @@ def test_compose_isolated_mounts_and_no_host_control():
     assert defaults["telemetryEnabled"] is False
 
 
-def test_workflow_master_only_and_no_pairing_logs():
-    workflow = yaml.safe_load(
-        (DEPLOY.parents[1] / ".github/workflows/remote-desktop-commander.yml").read_text()
-    )
-    job = workflow["jobs"]["deploy"]
-    assert job["environment"] == "production"
-    gate = job["if"]
-    assert "github.ref == 'refs/heads/master'" in gate
-    assert "github.event_name == 'workflow_dispatch'" in gate
-    assert "github.event.issue.number == 409" in gate
-    assert "github.event.comment.author_association == 'OWNER'" in gate
-    assert "github.event.comment.user.login == github.repository_owner" in gate
-    assert (
-        json.dumps(["/rdc preflight", "/rdc install", "/rdc status"], separators=(",", ":")) in gate
-    )
-    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
-    assert "github.event.comment.body" not in "\n".join(
-        step.get("run", "") for step in job["steps"]
-    )
+def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
+    path = DEPLOY.parents[1] / ".github/workflows/remote-desktop-commander.yml"
+    source = path.read_text()
+    workflow = yaml.safe_load(source)
+
+    assert set(workflow["jobs"]) == {"validate-image"}
+    job = workflow["jobs"]["validate-image"]
+    assert job["runs-on"] == "ubuntu-latest"
     assert workflow["permissions"] == {"contents": "read"}
+
+    assert "issue_comment:" not in source
+    assert "workflow_dispatch:" not in source
+    assert "PREVIEW_SSH_" not in source
+    assert "/rdc preflight" not in source
+    assert "/rdc install" not in source
+    assert "/rdc status" not in source
+    assert "environment: production" not in source
+    assert "StrictHostKeyChecking=yes" not in source
+
     scripts = "\n".join(step.get("run", "") for step in job["steps"])
-    assert "StrictHostKeyChecking=yes" in scripts
     assert "docker compose logs" not in scripts
     assert "device.json" not in scripts
-    assert "${{ inputs." not in scripts
     assert "${{ secrets." not in scripts
 
 
