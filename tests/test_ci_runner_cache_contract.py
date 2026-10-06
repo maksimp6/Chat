@@ -1,4 +1,4 @@
-import re
+import yaml
 from pathlib import Path
 
 
@@ -6,55 +6,47 @@ ROOT = Path(__file__).resolve().parents[1]
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 
-def _steps_named(workflow: str, name: str) -> list[str]:
-    return re.findall(
-        rf"(?ms)^      - name: {re.escape(name)}\n(.*?)(?=^      - name:|\Z)",
-        workflow,
-    )
-
-
 def test_runner_cache_contract() -> None:
-    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    source = CI_WORKFLOW.read_text(encoding="utf-8")
+    jobs = yaml.safe_load(source)["jobs"]
+    dependencies = {
+        "code-rules": ["requirements-dev.txt"],
+        "backend": ["requirements.txt", "requirements-dev.txt"],
+        "infra": ["requirements.txt", "requirements-dev.txt"],
+        "postgres": ["requirements.txt", "requirements-postgres.txt", "requirements-dev.txt"],
+    }
+    for job, expected in dependencies.items():
+        steps = [
+            s for s in jobs[job]["steps"] if s.get("uses", "").startswith("actions/setup-python@")
+        ]
+        assert len(steps) == 1
+        config = steps[0]["with"]
+        assert config["cache"] == "pip"
+        assert config["cache-dependency-path"].splitlines() == expected
+        assert (
+            config.get("python-version") == "3.14"
+            or config.get("python-version-file") == ".python-version"
+        )
 
-    python_steps = [
-        step for step in _steps_named(workflow, "Set up Python") if "cache: pip" in step
-    ]
-    assert len(python_steps) == 3
-    code_rules_step, *python_steps = python_steps
-    assert "uses: actions/setup-python@" in code_rules_step
-    assert (
-        """with:
-          python-version: "3.14"
-          cache: pip
-          cache-dependency-path: requirements-dev.txt"""
-        in code_rules_step
-    )
-    assert "uses: actions/setup-python@" in python_steps[0]
-    assert """with:
-          python-version: "3.14"
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt""" in python_steps[0]
-    assert "uses: actions/setup-python@" in python_steps[1]
-    assert """with:
-          python-version: "3.14"
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-postgres.txt
-            requirements-dev.txt""" in python_steps[1]
+    npm_dependencies = {
+        "backend": ["package.json"],
+        "mcp": [
+            "deploy/chrome-worker/package-lock.json",
+            "deploy/remote-desktop-commander/package-lock.json",
+        ],
+    }
+    for job, expected in npm_dependencies.items():
+        steps = [
+            s for s in jobs[job]["steps"] if s.get("uses", "").startswith("actions/setup-node@")
+        ]
+        assert len(steps) == 1
+        config = steps[0]["with"]
+        assert config["node-version"] == "22.22.2"
+        assert config["cache"] == "npm"
+        assert config["cache-dependency-path"].splitlines() == expected
 
-    node_steps = _steps_named(workflow, "Set up Node")
-    assert len(node_steps) == 1
-    assert "uses: actions/setup-node@" in node_steps[0]
-    assert """with:
-          node-version: "22.22.2"
-          cache: npm
-          cache-dependency-path: package.json""" in node_steps[0]
-
-    assert "cache: gradle" not in workflow
-    assert workflow.count("uses: gradle/actions/setup-gradle@") == 1
+    assert "cache: gradle" not in source
+    assert source.count("uses: gradle/actions/setup-gradle@") == 1
 
 
 def test_runner_cache_timings_are_reported() -> None:
