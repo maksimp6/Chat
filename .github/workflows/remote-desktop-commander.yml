@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           docker build -f Dockerfile.mcp -t alice-dev:candidate .
           trap 'docker rm -f alice-dev-ci >/dev/null 2>&1 || true' EXIT
-          docker run -d --name alice-dev-ci -e ALICE_DEV_TOKEN=ci-smoke-token alice-dev:candidate
+          docker run -d --name alice-dev-ci -e ALICE_SHORT_TOKEN=ci-smoke-token alice-dev:candidate
           timeout 30s bash -c 'until docker exec alice-dev-ci node -e "fetch(\"http://127.0.0.1:8080/healthz\").then(r=>{if(!r.ok)process.exit(1)})"; do sleep 1; done'
           docker exec alice-dev-ci sh -euc '! command -v chromium; ! command -v chromium-browser'
           docker exec -e ALICE_DEV_SMOKE_URL=http://127.0.0.1:8080/mcp \
