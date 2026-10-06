@@ -12,6 +12,7 @@ from scripts.stacked_pr_topology import (
     nodes_from_github,
     render_mermaid,
     root_number_for,
+    topology_blockers,
 )
 
 
@@ -28,8 +29,12 @@ def collect(repo: str, pr_number: int) -> dict[str, object]:
     nodes = nodes_from_github(payload)
     root_number = root_number_for(nodes, pr_number)
     topology = build_stack(nodes, root_number)
+    blockers = list(topology_blockers(topology))
     return {
         "root_pr": root_number,
+        "trigger_pr": pr_number,
+        "ready": not blockers,
+        "blockers": blockers,
         "mermaid": render_mermaid(topology),
         "descendants": [node.number for node in topology.descendants],
     }
