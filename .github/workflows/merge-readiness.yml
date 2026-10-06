@@ -110,6 +110,48 @@ jobs:
           cat "$result_file"
           emit_summary
 
+      - name: Update root stack tree
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_file="$RUNNER_TEMP/stack-status.json"
+          python scripts/stack_status.py --repo "$GITHUB_REPOSITORY" --pr "$PR_NUMBER" --pretty > "$status_file"
+
+          root_pr="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["root_pr"])' "$status_file")"
+          body_file="$RUNNER_TEMP/root-stack-comment.md"
+          python - "$status_file" "$body_file" <<'PY'
+          import json
+          import sys
+
+          status_path, body_path = sys.argv[1:]
+          with open(status_path, encoding="utf-8") as handle:
+              status = json.load(handle)
+          verdict = "PASS" if status["ready"] else "BLOCKED"
+          lines = [
+              "<!-- alice-root-stack -->",
+              "### PR stack",
+              "",
+              "```mermaid",
+              status["mermaid"],
+              "```",
+              "",
+              f"Root #{status['root_pr']}: **{verdict}**",
+          ]
+          if status["blockers"]:
+              lines += ["", "Blockers:"]
+              lines += [f"- {item}" for item in status["blockers"]]
+          with open(body_path, "w", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
+
+          comment_id="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$root_pr/comments?per_page=100"             --jq '.[] | select(.body | contains("<!-- alice-root-stack -->")) | .id' | head -n1)"
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"               -F body=@"$body_file" >/dev/null
+          else
+            gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$root_pr/comments"               -F body=@"$body_file" >/dev/null
+          fi
+
       - name: Update stack status comment
         if: always() && github.event.pull_request.state == 'open'
         shell: bash
