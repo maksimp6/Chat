@@ -144,6 +144,16 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
   const context = await browser.newContext();
   const page = await context.newPage();
   let callbackUrl;
+  const navigation = { responses: [], failed: [], console: [] };
+  page.on("response", (response) => {
+    if (response.url().includes("/browser/oauth/authorize")) {
+      navigation.responses.push({ url: response.url(), status: response.status(), location: response.headers()["location"] ?? null });
+    }
+  });
+  page.on("requestfailed", (request) => {
+    navigation.failed.push({ url: request.url(), error: request.failure()?.errorText ?? "unknown" });
+  });
+  page.on("console", (message) => navigation.console.push(message.text()));
   await page.route("https://chatgpt.com/connector_platform_oauth_redirect**", async (route) => {
     callbackUrl = route.request().url();
     await route.fulfill({
@@ -160,7 +170,7 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
     page.getByRole("button", { name: "Разрешить" }).click(),
   ]);
 
-  assert.ok(callbackUrl, "the browser must reach the ChatGPT redirect URI");
+  assert.ok(callbackUrl, `the browser must reach the ChatGPT redirect URI; page=${page.url()} navigation=${JSON.stringify(navigation)}`);
   const callback = new URL(callbackUrl);
   assert.equal(callback.origin, "https://chatgpt.com");
   assert.equal(callback.pathname, "/connector_platform_oauth_redirect");
