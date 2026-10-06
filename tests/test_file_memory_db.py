@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from file_memory_db import FileMemoryCorruption, FileMemoryDB
+from runtime.file_memory_db import FileMemoryCorruption, FileMemoryDB
 
 
 def test_append_recover_and_delete(tmp_path):
@@ -88,7 +88,7 @@ def test_fsync_failure_does_not_publish_memory_state(tmp_path, monkeypatch):
     def fail(_fd):
         raise OSError("disk unavailable")
 
-    monkeypatch.setattr("file_memory_db.os.fsync", fail)
+    monkeypatch.setattr("runtime.file_memory_db.os.fsync", fail)
     with pytest.raises(OSError):
         db.put("a", 1)
 
