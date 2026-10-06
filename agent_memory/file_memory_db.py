@@ -121,7 +121,6 @@ class FileMemoryDB:
         last_good = 0
 
         for index, raw in enumerate(data.splitlines(keepends=True)):
-            is_last = offset + len(raw) == len(data)
             offset += len(raw)
 
             if not raw.endswith(b"\n"):
