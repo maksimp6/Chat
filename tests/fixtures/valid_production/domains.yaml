@@ -1,7 +1,0 @@
-oauth.example.com:
-  service: oauth
-  protocol: https
-
-chrome.example.com:
-  service: chrome
-  protocol: https

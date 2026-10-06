@@ -1,8 +1,0 @@
-# Alice Pro lightweight Codex defaults.
-# An explicit GitHub Partner Agent model selection can override these defaults.
-model = "gpt-5.4-nano"
-model_reasoning_effort = "low"
-
-[agents]
-default_subagent_model = "gpt-5.4-nano"
-default_subagent_reasoning_effort = "low"
