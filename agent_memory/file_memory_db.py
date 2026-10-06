@@ -24,6 +24,10 @@ class FileMemoryCorruption(FileMemoryError):
     """Raised when committed content is corrupt."""
 
 
+class FileMemoryRecoveryRequired(FileMemoryError):
+    """Raised when a failed writer must be retired and the file recovered."""
+
+
 class FileMemoryDB:
     VERSION = 1
 
@@ -32,6 +36,7 @@ class FileMemoryDB:
         self._lock = RLock()
         self._state: dict[str, Any] = {}
         self._seq = 0
+        self._write_faulted = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._recover()
 
@@ -52,26 +57,31 @@ class FileMemoryDB:
         if not isinstance(key, str) or not key:
             raise ValueError("key must be a non-empty string")
         with self._lock:
+            self._require_writable()
             seq = self._seq + 1
             record = {"v": self.VERSION, "seq": seq, "op": "put", "key": key, "value": value}
             self._append(record)
             self._state[key] = value
             self._seq = seq
+            self._write_faulted = False
             return seq
 
     def delete(self, key: str) -> int:
         if not isinstance(key, str) or not key:
             raise ValueError("key must be a non-empty string")
         with self._lock:
+            self._require_writable()
             seq = self._seq + 1
             record = {"v": self.VERSION, "seq": seq, "op": "delete", "key": key}
             self._append(record)
             self._state.pop(key, None)
             self._seq = seq
+            self._write_faulted = False
             return seq
 
     def compact(self) -> None:
         with self._lock:
+            self._require_writable()
             snapshot = {
                 "v": self.VERSION,
                 "seq": self._seq,
@@ -80,6 +90,7 @@ class FileMemoryDB:
             }
             payload = self._encode(snapshot)
             temporary = self.path.with_name(f"{self.path.name}.tmp")
+            self._write_faulted = True
             fd = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
             try:
                 self._write_all(fd, payload)
@@ -88,10 +99,20 @@ class FileMemoryDB:
                 os.close(fd)
             os.replace(temporary, self.path)
             self._fsync_parent()
+            self._write_faulted = False
+
+    def _require_writable(self) -> None:
+        if self._write_faulted:
+            raise FileMemoryRecoveryRequired(
+                "writer requires recovery; retire this instance and reopen the database"
+            )
 
     def _append(self, record: dict[str, Any]) -> None:
         payload = self._encode(record)
         existed = self.path.exists()
+        # Clear the fence only after I/O and in-memory publication both complete.
+        # This also fences interruptions, close failures and failed parent barriers.
+        self._write_faulted = True
         fd = os.open(self.path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
         try:
             self._write_all(fd, payload)
@@ -151,8 +172,19 @@ class FileMemoryDB:
             seq = record["seq"]
             last_good = offset
 
+        self._sync_recovered_file()
         self._state = state
         self._seq = seq
+
+    def _sync_recovered_file(self) -> None:
+        # A complete unacknowledged append or an uncertain rename may survive.
+        # Validate first, then make the recovered file and its name durable.
+        fd = os.open(self.path, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        self._fsync_parent()
 
     def _validate_record(self, record: dict[str, Any], previous_seq: int, first: bool) -> None:
         if record.get("v") != self.VERSION:
@@ -205,4 +237,9 @@ class FileMemoryDB:
             os.close(fd)
 
 
-__all__ = ["FileMemoryCorruption", "FileMemoryDB", "FileMemoryError"]
+__all__ = [
+    "FileMemoryCorruption",
+    "FileMemoryDB",
+    "FileMemoryError",
+    "FileMemoryRecoveryRequired",
+]

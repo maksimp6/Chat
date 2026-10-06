@@ -290,3 +290,65 @@ print(json.dumps({"sequence": db.sequence, "items": db.items()}, sort_keys=True)
     reopened = FileMemoryDB(path)
     assert evidence == {"sequence": 3, "items": reopened.items()}
     assert reopened.items() == {"confirmed": 100, "uncertain": 200, "after_recovery": 300}
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX SIGKILL and pipe readiness")
+def test_ack_after_recovery_survives_sigkill_and_another_fresh_process(tmp_path, monkeypatch):
+    import select
+
+    path = tmp_path / "alice.memory"
+    db = FileMemoryDB(path)
+    db.put("confirmed", 100)
+    with monkeypatch.context() as patch:
+        inject_append_failure(patch, "file_fsync")
+        with pytest.raises(OSError):
+            db.put("uncertain", 200)
+    assert_writer_fenced(db)
+    writer_script = """
+import signal, sys
+from agent_memory.file_memory_db import FileMemoryDB
+db = FileMemoryDB(sys.argv[1])
+assert db.put("after_recovery", 300) == 3
+print("ACK:3", flush=True)
+signal.pause()
+"""
+    environment = {"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}
+    root = Path(__file__).resolve().parents[1]
+    writer = subprocess.Popen(
+        [sys.executable, "-u", "-c", writer_script, str(path)],
+        cwd=root,
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert writer.stdout is not None
+        assert select.select([writer.stdout], [], [], 10)[0], "writer did not acknowledge"
+        assert writer.stdout.readline().strip() == "ACK:3"
+    finally:
+        writer.kill()
+        writer.communicate(timeout=10)
+    assert writer.returncode == -9
+    reader_script = """
+import json, sys
+from agent_memory.file_memory_db import FileMemoryDB
+db = FileMemoryDB(sys.argv[1])
+print(json.dumps({"sequence": db.sequence, "items": db.items()}))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", reader_script, str(path)],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=True,
+    )
+    assert json.loads(result.stdout) == {
+        "sequence": 3,
+        "items": {"confirmed": 100, "uncertain": 200, "after_recovery": 300},
+    }
+    assert db.sequence == 1
+    assert_writer_fenced(db)

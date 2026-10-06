@@ -62,11 +62,49 @@ Checksum/integrity failures are never ignored. Suspect data is quarantined and t
 
 ENOSPC/read-only/fsync failures are explicit write failures. They must not publish an in-memory success that cannot be recovered.
 
+### Unknown write outcomes and writer recovery
+
+`FileMemoryDB` fences its writer before starting file I/O. The fence clears only
+when the mutation's file barriers and in-memory publication complete. An open,
+partial/zero write, fsync, close, parent-directory barrier, or interruption failure
+leaves that instance faulted. Compaction uses the same fence, including uncertain
+replace outcomes. Validation/serialization failures before file I/O do not fault
+a healthy writer.
+
+The triggering call reports its original error and does not acknowledge the
+mutation. All later `put`, `delete`, and `compact` calls on that instance raise
+`FileMemoryRecoveryRequired` before changing either database file. This also
+applies to callers already waiting for the write lock. Read methods retain the
+last acknowledged in-memory view; they do not assert that an unacknowledged
+record is absent from the journal. Do not use a faulted instance for backup or
+consumer cutover.
+
+There is no automatic retry, in-place reset, or compaction-based repair. To resume:
+
+1. Stop/drain every caller of the faulted instance and preserve single-writer
+   ownership of the database path. Do not open a competing live writer.
+2. Resolve the underlying storage/capacity/permission fault. Preserve the journal;
+   do not manually append, edit, or restore an older file to hide the failure.
+3. Construct a new `FileMemoryDB` for the same path. Recovery verifies records,
+   truncates only an incomplete final record, and fsyncs the validated file and
+   its parent directory before returning. Any recovery/barrier error prevents
+   admission. A complete invalid record remains fatal and is not silently lost.
+4. Reconcile the failed operation's logical identity against recovered state
+   before retrying it. A complete checksummed record without an ACK may survive;
+   it consumes its recovered sequence and must not be overwritten by sequence
+   reuse. This engine does not implement business-operation idempotency.
+5. Admit callers to the new instance only after recovery succeeds. The old
+   instance stays faulted even after another instance has recovered the path.
+
+This is a single-instance/process ownership contract, not an interprocess lock
+or a proof against power loss or cloud-volume failure. No recovery policy grants
+permission for a production restart, data migration, or backup rollback.
+
 ## Compaction
 
 Compaction acquires the same write lock as ordinary mutations. It writes one checksummed snapshot record containing the current logical state and current sequence to `alice.memory.tmp`, flushes and fsyncs it, atomically replaces `alice.memory`, and fsyncs the parent directory.
 
-Until the atomic replace succeeds, the old authoritative file remains valid. If compaction fails, the old file remains the source of truth.
+Until the atomic replace succeeds, the old authoritative file remains valid. If replacement or its parent barrier reports an uncertain outcome, the path may contain either the old journal or the equivalent compacted snapshot. The writer stays faulted; verified reopen determines the authoritative file instead of assuming the old layout survived.
 
 ## Backup and restore
 
