@@ -190,23 +190,26 @@ jobs:
               result = json.load(handle)
           with open(stack_path, encoding="utf-8") as handle:
               stack = json.load(handle)
-          status = "PASS" if result.get("ready") else "BLOCKED"
+          status = "PASS" if not stack.get("blockers") else "BLOCKED"
           blockers = result.get("blockers", [])
           lines = [
               "<!-- alice-stack-readiness -->",
               "### Stack readiness",
               "",
-              f"- PR: #{result.get('pr_number')}",
-              f"- Role: `{result.get('stack_role', 'unknown')}`",
-              f"- Exact head: `{result.get('head_sha') or 'unknown'}`",
-              f"- Merge: **{status}**",
+              f"- Root PR: #{stack.get('root_number')}",
+              f"- Event PR: #{result.get('pr_number')} (`{result.get('stack_role', 'unknown')}`)",
+              f"- Event exact head: `{result.get('head_sha') or 'unknown'}`",
+              f"- Stack: **{status}**",
               "",
               "```mermaid",
               str(stack["mermaid"]),
               "```",
           ]
+          if stack.get("blockers"):
+              lines += ["", "Stack blockers:"]
+              lines += [f"- {item}" for item in stack["blockers"]]
           if blockers:
-              lines += ["", "Blockers:"]
+              lines += ["", "Event PR readiness blockers:"]
               lines += [f"- {item.get('detail', item.get('code', 'unknown blocker'))}" for item in blockers]
           with open(body_path, "w", encoding="utf-8") as handle:
               handle.write("\n".join(lines) + "\n")
