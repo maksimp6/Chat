@@ -180,9 +180,7 @@ def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> 
     return errors
 
 
-def _validate_records(
-    integrations: list[Any], as_of: date
-) -> tuple[list[str], set[str]]:
+def _validate_records(integrations: list[Any], as_of: date) -> tuple[list[str], set[str]]:
     errors: list[str] = []
     ids: set[str] = set()
     for index, record in enumerate(integrations):
@@ -219,9 +217,10 @@ def stale_integrations(data: dict[str, Any]) -> list[str]:
     stale: list[str] = []
     for record in data["integrations"]:
         value = record["last_verified"]
-        too_old = value is not None and (
-            as_of - _date(value, f"{record['id']}.last_verified")
-        ).days > threshold
+        too_old = (
+            value is not None
+            and (as_of - _date(value, f"{record['id']}.last_verified")).days > threshold
+        )
         if value is None or too_old:
             stale.append(record["id"])
     return stale
