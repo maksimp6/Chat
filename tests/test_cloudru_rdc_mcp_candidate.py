@@ -77,7 +77,7 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
     }
     container = body["template"]["containers"][0]
     assert container["resources"] == {"cpu": "0.2", "memory": "512Mi"}
-    assert {item["name"] for item in container["env"]} == {"ALICE_DEV_TOKEN"}
+    assert {item["name"] for item in container["env"]} == {"ALICE_SHORT_TOKEN"}
     assert "synthetic-token" not in repr(result)
 
 
