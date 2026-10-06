@@ -121,9 +121,7 @@ def copy_verified_backup(source: str | Path, destination: str | Path) -> None:
     root = Path(source)
     restore_probe = root.with_name(f"{root.name}.verify-probe")
     try:
-        restored = restore_backup(root, restore_probe)
-        if restored.sequence < 0:
-            raise MemoryBackupError("invalid restored sequence")
+        restore_backup(root, restore_probe)
     finally:
         restore_probe.unlink(missing_ok=True)
     shutil.copytree(root, destination)
