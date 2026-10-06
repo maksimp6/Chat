@@ -41,9 +41,7 @@ def test_admin_client_create_encodes_secret_without_returning_plaintext(monkeypa
 
     def request(method, url, **kwargs):
         seen.update(method=method, url=url, json=kwargs["json"])
-        return Response(
-            payload={"id": "secret-1", "version": {"id": "version-1"}}
-        )
+        return Response(payload={"id": "secret-1", "version": {"id": "version-1"}})
 
     monkeypatch.setattr("requests.request", request)
     secret_id, version_id = client().create_secret(
