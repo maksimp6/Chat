@@ -95,6 +95,8 @@ test("MCP discovery advertises the exact resource, issuer, PKCE and DCR endpoint
   const metadata = await (await app.request("/.well-known/oauth-authorization-server/browser/oauth")).json();
   assert.deepEqual(metadata.code_challenge_methods_supported, ["S256"]);
   assert.deepEqual(metadata.token_endpoint_auth_methods_supported, ["none"]);
+  assert.deepEqual(metadata.scopes_supported, ["browser", "offline_access"]);
+  assert.deepEqual(resource.scopes_supported, ["browser", "offline_access"]);
   assert.equal(metadata.authorization_response_iss_parameter_supported, true);
   const protectedResponse = await app.request("/browser/v1/mcp");
   assert.equal(protectedResponse.status, 401);
@@ -120,6 +122,39 @@ test("short-token login issues durable tokens; token refresh works after a resta
   const refreshed = await app.form("/browser/oauth/token", { grant_type: "refresh_token", client_id: flow.client.client_id, refresh_token: tokens.refresh_token, resource: RESOURCE });
   assert.equal(refreshed.status, 200);
   assert.notEqual((await refreshed.json()).refresh_token, tokens.refresh_token);
+});
+
+test("ChatGPT offline_access scope survives authorization and refresh", async (t) => {
+  const app = await fixture(t);
+  const clientResponse = await app.register({ scope: "browser offline_access" });
+  assert.equal(clientResponse.status, 201);
+  const client = await clientResponse.json();
+  assert.equal(client.scope, "browser offline_access");
+
+  const started = await app.start(client, { scope: "browser offline_access" });
+  assert.equal(started.response.status, 200);
+  const login = await app.form("/browser/oauth/authorize", { transaction: started.transaction, password: SHORT_TOKEN }, started.cookie);
+  assert.equal(login.status, 302);
+  const flow = { client, location: new URL(login.headers.get("location")) };
+
+  const exchanged = await app.exchange(flow, { scope: "browser offline_access" });
+  assert.equal(exchanged.status, 200);
+  const tokens = await exchanged.json();
+  assert.equal(tokens.scope, "browser offline_access");
+  assert.ok(tokens.refresh_token);
+
+  app.reload();
+  assert.equal((await app.request("/browser/v1/mcp", { headers: { authorization: `Bearer ${tokens.access_token}` } })).status, 200);
+  const refreshed = await app.form("/browser/oauth/token", {
+    grant_type: "refresh_token",
+    client_id: client.client_id,
+    refresh_token: tokens.refresh_token,
+    resource: RESOURCE,
+  });
+  assert.equal(refreshed.status, 200);
+  const next = await refreshed.json();
+  assert.equal(next.scope, "browser offline_access");
+  assert.notEqual(next.refresh_token, tokens.refresh_token);
 });
 
 test("registered redirect, S256, resource and browser cookie prevent login/code substitution", async (t) => {
