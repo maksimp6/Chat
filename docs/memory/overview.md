@@ -5,7 +5,7 @@
 Система памяти находится в переходе к дurable file-native Storage Engine. На данный момент:
 
 - **Извлечение памяти** использует SQL-backed модель: `memory_manager.py` и `memory_extractor.py` создают таблицу `global_memory` для хранения фактов, извлечённых из диалогов
-- **Дurable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857), но пока не интегрирован в приложение
+- **Durable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857); первый Wave 1 consumer — `conversation_ownership.py` — переносится на file-native ownership с verified one-time import из legacy SQL
 - **Целевая архитектура** описана в [issue #776](https://github.com/maksimp6/Chat/issues/776): одна дurable file-native Memory DB с crash recovery, deterministic tests и миграцией от SQL
 
 ## Компоненты
@@ -16,11 +16,13 @@
 - `memory_extractor.py` — извлечение фактов из диалогов, сохранение в SQL таблицу `global_memory`
 - `db.py` — связь с `ALICE_DATABASE_URL`, инициализация схемы
 
-### Внедряемые (File-native, не интегрированы)
+### File-native foundation и Wave 1
 
-- `agent_memory/file_memory_db.py` — одноявный append-only JSONL файл с fsync-гарантиями, recovery и compaction
+- `agent_memory/file_memory_db.py` — append-only JSONL файл с fsync-гарантиями, recovery и compaction
 - `agent_memory/backup.py` — verified backup/restore с manifest и SHA256 checksum
-- `tests/test_file_memory_db.py`, `tests/test_memory_backup.py` — доказательство crash/corruption/ENOSPC safety
+- `agent_memory/conversation_ownership_store.py` — durable typed ownership repository
+- `agent_memory/conversation_ownership_migration.py` — bounded legacy SQL import; после migration marker runtime ownership SQL больше не читает
+- `tests/test_file_memory_db.py`, `tests/test_memory_backup.py`, `tests/test_conversation_ownership_memory.py` — доказательства durability, recovery и первого consumer cutover
 
 ## Миграция (issue #776)
 
@@ -36,7 +38,7 @@ Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит
 3. Atomic cutover только после verified equivalence
 4. Explicit rollback capability
 
-**Статус**: дurable engine готов и протестирован; интеграция с приложением — следующий шаг.
+**Статус**: durable engine и backup/restore готовы; Wave 1 начат с conversation ownership. User identity, sessions и memory extraction всё ещё требуют миграции.
 
 ## Сценарии использования (текущие)
 
