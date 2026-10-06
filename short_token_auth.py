@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 from typing import Optional
+
+from secret_store.core import SecretRef, SecretResolutionError, SecretResolver
 from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, request
@@ -23,6 +25,22 @@ _PUBLIC_PATHS = frozenset({"/healthz", "/auth/logout"})
 _PUBLIC_PREFIXES = ("/auth/github/",)
 _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
 _PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
+_secret_resolver: SecretResolver | None = None
+_secret_ref: SecretRef | None = None
+
+
+def configure_short_token_secret(resolver: SecretResolver, ref: SecretRef) -> None:
+    """Configure the canonical Secret Store source for the runtime short token."""
+    global _secret_resolver, _secret_ref
+    _secret_resolver = resolver
+    _secret_ref = ref
+
+
+def reset_short_token_secret() -> None:
+    """Reset process-local resolver wiring. Intended for tests/bootstrap reloads."""
+    global _secret_resolver, _secret_ref
+    _secret_resolver = None
+    _secret_ref = None
 
 
 def _enabled() -> bool:
@@ -35,7 +53,12 @@ def _enabled() -> bool:
 
 
 def _token() -> str:
-    return os.environ.get("ALICE_SHORT_TOKEN", "")
+    if _secret_resolver is None or _secret_ref is None:
+        return os.environ.get("ALICE_SHORT_TOKEN", "")
+    try:
+        return _secret_resolver.resolve(_secret_ref).reveal()
+    except SecretResolutionError:
+        return ""
 
 
 def _serializer(token: str) -> URLSafeTimedSerializer:
