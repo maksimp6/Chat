@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "merge-readiness.yml"
+WORKFLOW_PATH = WORKFLOW
 
 
 def test_merge_readiness_workflow_is_read_only_and_exact_head() -> None:
@@ -11,13 +12,11 @@ def test_merge_readiness_workflow_is_read_only_and_exact_head() -> None:
     assert "name: Merge readiness snapshot" in workflow
     assert "contents: read" in workflow
     assert "checks: read" in workflow
-    assert "pull-requests: read" in workflow
+    assert "pull-requests: write" in workflow
     assert "contents: write" not in workflow
-    assert "pull-requests: write" not in workflow
     assert "actions: write" not in workflow
     assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
     assert "persist-credentials: false" in workflow
-    assert "github.event.pull_request.base.ref == 'master'" in workflow
     assert "github.event.pull_request.draft == false" in workflow
 
 
@@ -80,10 +79,38 @@ def test_stacked_readiness_runs_for_child_prs_and_can_update_one_comment():
     assert "<!-- alice-stack-readiness -->" in text
     assert "--method PATCH" in text
     assert "--method POST" in text
-    assert "contains(\"<!-- alice-stack-readiness -->\")" in text
+    assert 'contains("<!-- alice-stack-readiness -->")' in text
 
 
 def test_stacked_readiness_reacts_to_topology_edit_and_close_events():
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "edited" in text
     assert "closed" in text
+
+
+def test_descendant_event_refreshes_root_comment_without_recursive_dispatch():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "scripts/stack_status.py" in text
+    assert '"root_pr"' in text
+    assert "<!-- alice-stack-root-readiness -->" in text
+    assert "~~~mermaid" in text
+    assert "issues/$root_pr/comments" in text
+    assert "workflow_dispatch" not in text
+
+
+def test_descendant_events_refresh_root_stack_comment_without_dispatch_loop():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "scripts/stack_status.py" in text
+    assert "issues/$root_pr/comments" in text
+    assert "repository_dispatch" not in text
+    assert "Stack topology" in text
+    assert "mermaid" in text
+
+
+def test_descendant_event_updates_one_mermaid_comment_on_root():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "python scripts/stack_status.py" in text
+    assert "<!-- alice-root-stack -->" in text
+    assert "```mermaid" in text
+    assert "issues/$root_pr/comments" in text
+    assert "issues/comments/$comment_id" in text

@@ -325,6 +325,15 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
 
     def fake_gh_json(args):
         joined = " ".join(args)
+        if "/pulls?state=all&per_page=100" in joined:
+            return [
+                {
+                    "number": 123,
+                    "state": "open",
+                    "head": {"ref": "feature", "sha": "head-1"},
+                    "base": {"ref": "master", "sha": "base-1"},
+                }
+            ]
         if "/pulls/123" in joined:
             return next(pulls)
         if "/compare/master...head-1" in joined:
@@ -393,7 +402,11 @@ def test_root_is_blocked_by_open_stack_descendants():
         )
     )
     assert result["ready"] is False
-    assert [item["detail"] for item in result["blockers"] if item["code"] == "stack_descendant"] == [
+    assert [
+        item["detail"]
+        for item in result["blockers"]
+        if item["code"] == "stack_descendant"
+    ] == [
         "open descendant #878",
         "open descendant #879",
     ]

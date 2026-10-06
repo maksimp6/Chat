@@ -8,7 +8,6 @@ from dataclasses import dataclass
 class StackTopologyError(ValueError):
     """Fail-closed topology error."""
 
-
 @dataclass(frozen=True, slots=True)
 class PullNode:
     number: int
@@ -60,15 +59,13 @@ def build_ancestor_chain(
         parent = owners[0]
         if parent.number in seen:
             raise StackTopologyError("stack topology cycle")
-        if parent.state != "open":
+        if parent.state != "open" and not parent.absorbed:
             raise StackTopologyError("stale ancestor")
         ancestors.append(parent)
         seen.add(parent.number)
         cursor = parent
 
     return AncestorChain(current=current, ancestors=tuple(ancestors), root=cursor)
-
-
 
 
 def derive_stack_evidence(
@@ -107,7 +104,11 @@ def nodes_from_github(pulls: list[dict[str, object]]) -> tuple[PullNode, ...]:
         number = pull.get("number")
         head_ref = head.get("ref")
         base_ref = base.get("ref")
-        if not isinstance(number, int) or not isinstance(head_ref, str) or not isinstance(base_ref, str):
+        if (
+            not isinstance(number, int)
+            or not isinstance(head_ref, str)
+            or not isinstance(base_ref, str)
+        ):
             raise StackTopologyError("invalid pull request topology payload")
         state = str(pull.get("state") or "")
         if state not in {"open", "closed"}:
@@ -145,32 +146,24 @@ def collect_github_nodes(repo: str) -> tuple[PullNode, ...]:
     return nodes_from_github(payload)
 
 
-def build_stack(
+def _index_nodes(
     nodes: tuple[PullNode, ...],
-    root_number: int,
-    target: str = "master",
-) -> StackTopology:
+) -> tuple[dict[int, PullNode], dict[str, list[PullNode]], dict[str, list[PullNode]]]:
     by_number = {node.number: node for node in nodes}
     if len(by_number) != len(nodes):
         raise StackTopologyError("duplicate pull request number")
-
-    root = by_number.get(root_number)
-    if root is None:
-        raise StackTopologyError("root pull request not found")
-    if root.base != target:
-        raise StackTopologyError("root pull request must target protected branch")
-
     heads: dict[str, list[PullNode]] = {}
-    for node in nodes:
-        heads.setdefault(node.head, []).append(node)
-    ambiguous_heads = {head for head, owners in heads.items() if len(owners) > 1}
-    if ambiguous_heads:
-        raise StackTopologyError("ambiguous ancestor")
-
     children: dict[str, list[PullNode]] = {}
     for node in nodes:
+        heads.setdefault(node.head, []).append(node)
         children.setdefault(node.base, []).append(node)
+    return by_number, heads, children
 
+
+def _walk_descendants(
+    root: PullNode,
+    children: dict[str, list[PullNode]],
+) -> list[PullNode]:
     descendants: list[PullNode] = []
     visiting: set[int] = set()
     visited: set[int] = set()
@@ -182,14 +175,33 @@ def build_stack(
         for child in children.get(parent.head, []):
             if child.number == parent.number or child.number in visiting:
                 raise StackTopologyError("stack topology cycle")
-            if child.number in visited:
-                continue
-            descendants.append(child)
-            walk(child)
-            visited.add(child.number)
+            if child.number not in visited:
+                descendants.append(child)
+                walk(child)
+                visited.add(child.number)
         visiting.remove(parent.number)
 
     walk(root)
+    return descendants
+
+
+def build_stack(
+    nodes: tuple[PullNode, ...],
+    root_number: int,
+    target: str = "master",
+) -> StackTopology:
+    by_number, heads, children = _index_nodes(nodes)
+    root = by_number.get(root_number)
+    if root is None:
+        raise StackTopologyError("root pull request not found")
+    if root.base != target:
+        raise StackTopologyError("root pull request must target protected branch")
+
+    descendants = _walk_descendants(root, children)
+    reachable_heads = {root.head, *(node.head for node in descendants)}
+    if any(len(heads[head]) > 1 for head in reachable_heads):
+        raise StackTopologyError("ambiguous ancestor")
+
     return StackTopology(
         root=root,
         descendants=tuple(descendants),
@@ -199,6 +211,8 @@ def build_stack(
         ),
     )
 
+def root_number_for(nodes: tuple[PullNode, ...], pr_number: int, target: str = "master") -> int:
+    return build_ancestor_chain(nodes, pr_number, target).root.number
 
 
 def render_mermaid(topology: StackTopology) -> str:
@@ -227,6 +241,21 @@ def render_mermaid(topology: StackTopology) -> str:
     return "\n".join(lines)
 
 
+def root_status_payload(
+    nodes: tuple[PullNode, ...],
+    pr_number: int,
+    target: str = "master",
+) -> dict[str, object]:
+    root_number = root_number_for(nodes, pr_number, target)
+    topology = build_stack(nodes, root_number, target)
+    return {
+        "root_number": root_number,
+        "descendants": [node.number for node in topology.descendants],
+        "blockers": list(topology_blockers(topology)),
+        "mermaid": render_mermaid(topology),
+    }
+
+
 def topology_blockers(topology: StackTopology) -> tuple[str, ...]:
     blockers = [f"open descendant #{node.number}" for node in topology.open_descendants]
     blockers.extend(
@@ -246,6 +275,8 @@ __all__ = [
     "derive_stack_evidence",
     "nodes_from_github",
     "render_mermaid",
+    "root_number_for",
+    "root_status_payload",
     "build_stack",
     "topology_blockers",
 ]
