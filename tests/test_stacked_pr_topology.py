@@ -86,7 +86,8 @@ def test_cycle_fails_closed():
             (
                 node(1, "root", "master"),
                 node(2, "child", "root"),
-                node(3, "root", "child"),
+                node(3, "loop", "child"),
+                node(4, "child", "loop"),
             ),
             1,
         )
