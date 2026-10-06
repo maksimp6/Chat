@@ -18,7 +18,7 @@ COPY entrypoint.sh /usr/local/bin/alice-desktop-commander
 COPY dev-bootstrap.sh /usr/local/bin/alice-rdc-dev-bootstrap
 RUN chmod 0755 /usr/local/bin/alice-rdc-dev-bootstrap
 COPY pairing-handoff.cjs /opt/desktop-commander/pairing-handoff.cjs
-COPY desktop-session.cjs browser-smoke.cjs /opt/desktop-commander/
+COPY desktop-session.cjs browser-smoke.cjs mcp-gateway.mjs stdio-server.mjs /opt/desktop-commander/
 COPY state-store.py /opt/desktop-commander/state-store.py
 USER node
 WORKDIR /workspace
