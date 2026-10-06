@@ -117,7 +117,8 @@ export function createWorker(options = {}) {
   let state = "sleeping";
   let generation = 0;
   const idleSleepMs = Number(options.idleSleepMs ?? process.env.BROWSER_IDLE_SLEEP_MS ?? 300000);
-  if (!Number.isFinite(idleSleepMs) || idleSleepMs < 1000) throw new Error("invalid_browser_idle_sleep_ms");
+  const minimumIdleSleepMs = options.idleSleepMs === undefined ? 1000 : 10;
+  if (!Number.isFinite(idleSleepMs) || idleSleepMs < minimumIdleSleepMs) throw new Error("invalid_browser_idle_sleep_ms");
   let idleTimer;
   let closing = false;
 
