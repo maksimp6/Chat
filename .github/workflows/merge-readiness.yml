@@ -152,22 +152,44 @@ jobs:
             gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$root_pr/comments"               -F body=@"$body_file" >/dev/null
           fi
 
+      - name: Build root stack status
+        if: always() && github.event.pull_request.state == 'open'
+        id: stack_root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/stack_root_status.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "$PR_NUMBER" \
+            --base master > "$RUNNER_TEMP/stack-root.json"
+          python - "$RUNNER_TEMP/stack-root.json" >> "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          print(f"root_number={payload['root_number']}")
+          PY
+
       - name: Update stack status comment
         if: always() && github.event.pull_request.state == 'open'
         shell: bash
         run: |
           set -euo pipefail
           result_file="$RUNNER_TEMP/merge-readiness.json"
+          stack_file="$RUNNER_TEMP/stack-root.json"
           [ -f "$result_file" ] || exit 0
+          [ -f "$stack_file" ] || exit 0
           marker='<!-- alice-stack-readiness -->'
           body_file="$RUNNER_TEMP/stack-comment.md"
-          python - "$result_file" "$body_file" <<'PY'
+          python - "$result_file" "$stack_file" "$body_file" <<'PY'
           import json
           import sys
 
-          result_path, body_path = sys.argv[1:]
+          result_path, stack_path, body_path = sys.argv[1:]
           with open(result_path, encoding="utf-8") as handle:
               result = json.load(handle)
+          with open(stack_path, encoding="utf-8") as handle:
+              stack = json.load(handle)
           status = "PASS" if result.get("ready") else "BLOCKED"
           blockers = result.get("blockers", [])
           lines = [
@@ -178,6 +200,10 @@ jobs:
               f"- Role: `{result.get('stack_role', 'unknown')}`",
               f"- Exact head: `{result.get('head_sha') or 'unknown'}`",
               f"- Merge: **{status}**",
+              "",
+              "```mermaid",
+              str(stack["mermaid"]),
+              "```",
           ]
           if blockers:
               lines += ["", "Blockers:"]
@@ -186,11 +212,12 @@ jobs:
               handle.write("\n".join(lines) + "\n")
           PY
 
-          comment_id="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100"             --jq '.[] | select(.body | contains("<!-- alice-stack-readiness -->")) | .id' | head -n1)"
+          ROOT_NUMBER="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["root_number"])' "$stack_file")"
+          comment_id="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$ROOT_NUMBER/comments?per_page=100"             --jq '.[] | select(.body | contains("<!-- alice-stack-readiness -->")) | .id' | head -n1)"
           if [ -n "$comment_id" ]; then
             gh api --method PATCH "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"               -F body=@"$body_file" >/dev/null
           else
-            gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments"               -F body=@"$body_file" >/dev/null
+            gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$ROOT_NUMBER/comments"               -F body=@"$body_file" >/dev/null
           fi
 
 
@@ -291,3 +318,4 @@ jobs:
           else
             gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$root_pr/comments" -F body=@"$comment_file" >/dev/null
           fi
+
