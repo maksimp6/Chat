@@ -7,18 +7,21 @@ import argparse
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 from uuid import UUID
 
-from cloud.base import CloudProviderError
-from cloud.cloudru.container_apps_client import (
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from cloud.base import CloudProviderError  # noqa: E402
+from cloud.cloudru.container_apps_client import (  # noqa: E402
     SERVICE,
     CloudRuContainerAppsClient,
     ContainerSpec,
 )
-from cloud.cloudru.registry_client import CloudRuRegistryClient
-from scripts.cloudru_browser_probe import REGISTRY, prepare_registry
-from scripts.cloudru_deploy import _export_commit
+from cloud.cloudru.registry_client import CloudRuRegistryClient  # noqa: E402
+from scripts.cloudru_browser_probe import REGISTRY, prepare_registry  # noqa: E402
+from scripts.cloudru_deploy import _export_commit  # noqa: E402
 
 REPOSITORY = "rdc-mcp"
 DESCRIPTION = "Alice lightweight RDC MCP candidate; issue 892"
