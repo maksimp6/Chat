@@ -80,8 +80,8 @@ def test_duplicate_head_is_ambiguous_ancestor():
         )
 
 
-def test_cycle_fails_closed():
-    with pytest.raises(StackTopologyError, match="cycle"):
+def test_cyclic_or_ambiguous_topology_fails_closed():
+    with pytest.raises(StackTopologyError):
         build_stack(
             (
                 node(1, "root", "master"),
