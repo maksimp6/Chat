@@ -120,18 +120,19 @@ def test_short_write_is_an_error(monkeypatch):
         lambda record: record.update(sha256="bad"),
     ],
 )
-def test_invalid_last_record_is_discarded(tmp_path, mutate):
+def test_invalid_complete_last_record_is_corruption(tmp_path, mutate):
     path = tmp_path / "alice.memory"
     db = FileMemoryDB(path)
     db.put("a", 1)
     record = json.loads(path.read_text().splitlines()[0])
     mutate(record)
-    path.write_text(json.dumps(record, separators=(",", ":"), sort_keys=True) + "\n")
+    corrupted = (json.dumps(record, separators=(",", ":"), sort_keys=True) + "\n").encode()
+    path.write_bytes(corrupted)
 
-    restored = FileMemoryDB(path)
-    assert restored.sequence == 0
-    assert restored.items() == {}
-    assert path.read_bytes() == b""
+    with pytest.raises(FileMemoryCorruption, match="corrupt record"):
+        FileMemoryDB(path)
+
+    assert path.read_bytes() == corrupted
 
 
 def test_non_monotonic_committed_record_is_corruption(tmp_path):
@@ -145,15 +146,17 @@ def test_non_monotonic_committed_record_is_corruption(tmp_path):
         FileMemoryDB(path)
 
 
-def test_invalid_snapshot_is_discarded_at_tail(tmp_path):
+def test_invalid_snapshot_at_tail_is_corruption(tmp_path):
     path = tmp_path / "alice.memory"
     bad = {"v": 1, "seq": 0, "op": "snapshot", "value": []}
     bad["sha256"] = FileMemoryDB._checksum({k: v for k, v in bad.items() if k != "sha256"})
-    path.write_text(json.dumps(bad, separators=(",", ":"), sort_keys=True) + "\n")
+    corrupted = (json.dumps(bad, separators=(",", ":"), sort_keys=True) + "\n").encode()
+    path.write_bytes(corrupted)
 
-    restored = FileMemoryDB(path)
-    assert restored.items() == {}
-    assert path.read_bytes() == b""
+    with pytest.raises(FileMemoryCorruption, match="corrupt record"):
+        FileMemoryDB(path)
+
+    assert path.read_bytes() == corrupted
 
 
 def test_parent_fsync_failure_is_reported(tmp_path, monkeypatch):
