@@ -141,9 +141,6 @@ class FileMemoryDB:
                 TypeError,
                 ValueError,
             ) as exc:
-                if is_last:
-                    self._truncate(last_good)
-                    break
                 raise FileMemoryCorruption(f"corrupt record at offset {last_good}") from exc
 
             op = record["op"]
