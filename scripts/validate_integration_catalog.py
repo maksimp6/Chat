@@ -59,6 +59,14 @@ REQUIRED_FIELDS = {
     "data_residency",
     "notes",
 }
+BOOLEAN_FIELDS = (
+    "provider_exists",
+    "alice_implemented",
+    "e2e_verified",
+    "secret_store_required",
+    "approval_required",
+)
+STRING_ARRAY_FIELDS = ("docs", "transports", "auth")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -68,7 +76,7 @@ def load_json(path: Path) -> dict[str, Any]:
     return data
 
 
-def _date(value: str, field: str) -> date:
+def _date(value: Any, field: str) -> date:
     try:
         return date.fromisoformat(value)
     except (TypeError, ValueError) as exc:
@@ -79,7 +87,7 @@ def _find_forbidden_keys(value: Any, prefix: str = "") -> list[str]:
     found: list[str] = []
     if isinstance(value, dict):
         for key, child in value.items():
-            path = f"{prefix}.{key}" if prefix else key
+            path = f"{prefix}.{key}" if prefix else str(key)
             if str(key).lower() in FORBIDDEN_KEYS:
                 found.append(path)
             found.extend(_find_forbidden_keys(child, path))
@@ -89,105 +97,119 @@ def _find_forbidden_keys(value: Any, prefix: str = "") -> list[str]:
     return found
 
 
-def validate_catalog(data: dict[str, Any]) -> list[str]:
+def _validate_root(data: dict[str, Any]) -> tuple[list[str], date]:
     errors: list[str] = []
     if data.get("schema_version") != 1:
         errors.append("schema_version must be 1")
-
     try:
         as_of = _date(data.get("as_of"), "as_of")
     except ValueError as exc:
         errors.append(str(exc))
         as_of = date.min
-
     stale_after = data.get("stale_after_days")
-    if not isinstance(stale_after, int) or isinstance(stale_after, bool) or stale_after < 1:
+    valid_stale = isinstance(stale_after, int) and not isinstance(stale_after, bool)
+    if not valid_stale or stale_after < 1:
         errors.append("stale_after_days must be a positive integer")
+    return errors, as_of
 
-    integrations = data.get("integrations")
-    if not isinstance(integrations, list):
-        return errors + ["integrations must be an array"]
 
+def _validate_identity(record: dict[str, Any], prefix: str, ids: set[str]) -> list[str]:
+    errors: list[str] = []
+    missing = sorted(REQUIRED_FIELDS - set(record))
+    if missing:
+        errors.append(f"{prefix} missing fields: {', '.join(missing)}")
+    integration_id = record.get("id")
+    if not isinstance(integration_id, str) or not ID_RE.fullmatch(integration_id):
+        errors.append(f"{prefix}.id is invalid")
+    elif integration_id in ids:
+        errors.append(f"duplicate integration id: {integration_id}")
+    else:
+        ids.add(integration_id)
+    if record.get("status") not in ALLOWED_STATUSES:
+        errors.append(f"{prefix}.status is invalid: {record.get('status')!r}")
+    issue = record.get("issue")
+    if not isinstance(issue, int) or isinstance(issue, bool) or issue < 1:
+        errors.append(f"{prefix}.issue must be a positive integer")
+    return errors
+
+
+def _validate_types(record: dict[str, Any], prefix: str) -> list[str]:
+    errors = [
+        f"{prefix}.{field} must be boolean"
+        for field in BOOLEAN_FIELDS
+        if not isinstance(record.get(field), bool)
+    ]
+    for field in STRING_ARRAY_FIELDS:
+        values = record.get(field)
+        if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
+            errors.append(f"{prefix}.{field} must be a string array")
+    capabilities = record.get("capabilities")
+    expected = {"read", "write", "events"}
+    if not isinstance(capabilities, dict) or set(capabilities) != expected:
+        errors.append(f"{prefix}.capabilities must contain read/write/events only")
+    elif not all(isinstance(value, bool) for value in capabilities.values()):
+        errors.append(f"{prefix}.capabilities values must be boolean")
+    return errors
+
+
+def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> list[str]:
+    errors: list[str] = []
+    last_verified = record.get("last_verified")
+    if last_verified is not None:
+        try:
+            if _date(last_verified, f"{prefix}.last_verified") > as_of:
+                errors.append(f"{prefix}.last_verified is after catalog as_of")
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    provider_exists = record.get("provider_exists") is True
+    implemented = record.get("alice_implemented") is True
+    e2e = record.get("e2e_verified") is True
+    status = record.get("status")
+    if implemented and not provider_exists:
+        errors.append(f"{prefix}: Alice implementation requires provider_exists")
+    if e2e and not implemented:
+        errors.append(f"{prefix}: e2e_verified requires alice_implemented")
+    supported = provider_exists and implemented and e2e and last_verified is not None
+    if status == "supported" and not supported:
+        errors.append(f"{prefix}: supported requires provider + implementation + E2E verification")
+    if status == "partial" and not implemented:
+        errors.append(f"{prefix}: partial requires an Alice implementation")
+    if status == "planned" and implemented:
+        errors.append(f"{prefix}: planned cannot already be Alice-implemented")
+    return errors
+
+
+def _validate_records(
+    integrations: list[Any], as_of: date
+) -> tuple[list[str], set[str]]:
+    errors: list[str] = []
     ids: set[str] = set()
     for index, record in enumerate(integrations):
         prefix = f"integrations[{index}]"
         if not isinstance(record, dict):
             errors.append(f"{prefix} must be an object")
             continue
+        errors.extend(_validate_identity(record, prefix, ids))
+        errors.extend(_validate_types(record, prefix))
+        errors.extend(_validate_verification(record, prefix, as_of))
+    return errors, ids
 
-        missing = sorted(REQUIRED_FIELDS - set(record))
-        if missing:
-            errors.append(f"{prefix} missing fields: {', '.join(missing)}")
 
-        integration_id = record.get("id")
-        if not isinstance(integration_id, str) or not ID_RE.fullmatch(integration_id):
-            errors.append(f"{prefix}.id is invalid")
-        elif integration_id in ids:
-            errors.append(f"duplicate integration id: {integration_id}")
-        else:
-            ids.add(integration_id)
+def validate_catalog(data: dict[str, Any]) -> list[str]:
+    errors, as_of = _validate_root(data)
+    integrations = data.get("integrations")
+    if not isinstance(integrations, list):
+        return errors + ["integrations must be an array"]
 
-        status = record.get("status")
-        if status not in ALLOWED_STATUSES:
-            errors.append(f"{prefix}.status is invalid: {status!r}")
-
-        for field in (
-            "provider_exists",
-            "alice_implemented",
-            "e2e_verified",
-            "secret_store_required",
-            "approval_required",
-        ):
-            if not isinstance(record.get(field), bool):
-                errors.append(f"{prefix}.{field} must be boolean")
-
-        issue = record.get("issue")
-        if not isinstance(issue, int) or isinstance(issue, bool) or issue < 1:
-            errors.append(f"{prefix}.issue must be a positive integer")
-
-        last_verified = record.get("last_verified")
-        if last_verified is not None:
-            try:
-                verified_date = _date(last_verified, f"{prefix}.last_verified")
-                if verified_date > as_of:
-                    errors.append(f"{prefix}.last_verified is after catalog as_of")
-            except ValueError as exc:
-                errors.append(str(exc))
-
-        provider_exists = record.get("provider_exists") is True
-        implemented = record.get("alice_implemented") is True
-        e2e = record.get("e2e_verified") is True
-
-        if implemented and not provider_exists:
-            errors.append(f"{prefix}: Alice implementation requires provider_exists")
-        if e2e and not implemented:
-            errors.append(f"{prefix}: e2e_verified requires alice_implemented")
-        if status == "supported" and not (
-            provider_exists and implemented and e2e and last_verified is not None
-        ):
-            errors.append(f"{prefix}: supported requires provider + implementation + E2E verification")
-        if status == "partial" and not implemented:
-            errors.append(f"{prefix}: partial requires an Alice implementation")
-        if status == "planned" and implemented:
-            errors.append(f"{prefix}: planned cannot already be Alice-implemented")
-
-        capabilities = record.get("capabilities")
-        if not isinstance(capabilities, dict) or set(capabilities) != {"read", "write", "events"}:
-            errors.append(f"{prefix}.capabilities must contain read/write/events only")
-        elif not all(isinstance(value, bool) for value in capabilities.values()):
-            errors.append(f"{prefix}.capabilities values must be boolean")
-
-        for field in ("docs", "transports", "auth"):
-            values = record.get(field)
-            if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
-                errors.append(f"{prefix}.{field} must be a string array")
-
+    record_errors, ids = _validate_records(integrations, as_of)
+    errors.extend(record_errors)
     forbidden = _find_forbidden_keys(data)
     if forbidden:
         errors.append("catalog contains forbidden secret-value keys: " + ", ".join(forbidden))
-
-    if not SEED_IDS.issubset(ids):
-        errors.append("missing bootstrap integrations: " + ", ".join(sorted(SEED_IDS - ids)))
+    missing_seeds = SEED_IDS - ids
+    if missing_seeds:
+        errors.append("missing bootstrap integrations: " + ", ".join(sorted(missing_seeds)))
     return errors
 
 
@@ -197,7 +219,10 @@ def stale_integrations(data: dict[str, Any]) -> list[str]:
     stale: list[str] = []
     for record in data["integrations"]:
         value = record["last_verified"]
-        if value is None or (as_of - _date(value, f"{record['id']}.last_verified")).days > threshold:
+        too_old = value is not None and (
+            as_of - _date(value, f"{record['id']}.last_verified")
+        ).days > threshold
+        if value is None or too_old:
             stale.append(record["id"])
     return stale
 
@@ -216,7 +241,8 @@ def render_markdown(data: dict[str, Any]) -> str:
     for record in data["integrations"]:
         verified = record["last_verified"] or "unverified"
         lines.append(
-            "| {id} | {name} | {status} | {provider} | {implemented} | {e2e} | {verified} | #{issue} |".format(
+            "| {id} | {name} | {status} | {provider} | {implemented} | {e2e} | "
+            "{verified} | #{issue} |".format(
                 id=record["id"],
                 name=record["name"],
                 status=record["status"],
@@ -228,16 +254,16 @@ def render_markdown(data: dict[str, Any]) -> str:
             )
         )
     stale = stale_integrations(data)
+    attention = ", ".join(f"`{item}`" for item in stale) if stale else "none"
     lines.extend(
         [
             "",
             "## Verification attention",
             "",
-            "Entries reported as stale or unverified: "
-            + (", ".join(f"`{item}`" for item in stale) if stale else "none")
-            + ".",
+            f"Entries reported as stale or unverified: {attention}.",
             "",
-            "An integration PR that changes implementation/support status must update the structured catalog in the same slice.",
+            "An integration PR that changes implementation/support status must update "
+            "the structured catalog in the same slice.",
             "",
         ]
     )
@@ -245,17 +271,16 @@ def render_markdown(data: dict[str, Any]) -> str:
 
 
 def validate_schema_enum(schema: dict[str, Any]) -> list[str]:
-    enum = set(
-        schema["properties"]["integrations"]["items"]["properties"]["status"]["enum"]
-    )
-    return [] if enum == ALLOWED_STATUSES else ["schema status enum differs from validator enum"]
+    enum = set(schema["properties"]["integrations"]["items"]["properties"]["status"]["enum"])
+    if enum == ALLOWED_STATUSES:
+        return []
+    return ["schema status enum differs from validator enum"]
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write-doc", action="store_true")
     args = parser.parse_args()
-
     data = load_json(CATALOG_PATH)
     schema = load_json(SCHEMA_PATH)
     errors = validate_catalog(data) + validate_schema_enum(schema)
