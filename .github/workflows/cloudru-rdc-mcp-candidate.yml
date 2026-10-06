@@ -1,0 +1,59 @@
+name: Deploy lightweight RDC MCP candidate
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "deploy/remote-desktop-commander/Dockerfile.mcp"
+      - "deploy/remote-desktop-commander/mcp-gateway.mjs"
+      - "deploy/remote-desktop-commander/stdio-server.mjs"
+      - "deploy/remote-desktop-commander/mcp-gateway-live-smoke.mjs"
+      - "deploy/remote-desktop-commander/package.json"
+      - "deploy/remote-desktop-commander/package-lock.json"
+      - "scripts/cloudru_rdc_mcp_candidate.py"
+      - ".github/workflows/cloudru-rdc-mcp-candidate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alice-cloudru-rdc-mcp-candidate
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Deploy isolated candidate
+        id: candidate
+        env:
+          CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/rdc-mcp-result.log
+          result="$(tail -n 1 /tmp/rdc-mcp-result.log)"
+          origin="$(python -c 'import json,sys; print(json.loads(sys.argv[1])["origin"])' "$result")"
+          echo "origin=$origin" >> "$GITHUB_OUTPUT"
+      - name: Install MCP smoke dependencies
+        working-directory: deploy/remote-desktop-commander
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Verify public MCP end to end
+        working-directory: deploy/remote-desktop-commander
+        env:
+          RDC_MCP_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp
+          RDC_MCP_SMOKE_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+        run: node mcp-gateway-live-smoke.mjs
