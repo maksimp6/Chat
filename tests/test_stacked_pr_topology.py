@@ -6,6 +6,7 @@ from scripts.stacked_pr_topology import (
     build_ancestor_chain,
     build_stack,
     collect_github_nodes,
+    derive_stack_evidence,
     nodes_from_github,
     topology_blockers,
 )
@@ -181,3 +182,36 @@ def test_collector_uses_all_pull_requests_and_maps_payload(monkeypatch):
     assert nodes == (node(877, "root", "master"),)
     assert "--paginate" in calls[0][0]
     assert "state=all" in calls[0][0][-1]
+
+
+def test_stack_evidence_blocks_root_only_for_its_descendants():
+    nodes = (
+        node(877, "root", "master"),
+        node(878, "child", "root"),
+        node(879, "leaf", "child"),
+        node(999, "unrelated", "master"),
+    )
+    evidence = derive_stack_evidence(nodes, 877)
+    assert evidence["stack_role"] == "root"
+    assert evidence["stack_root"] == 877
+    assert evidence["descendants"] == [878, 879]
+    assert set(evidence["topology_blockers"]) == {
+        "open descendant #878",
+        "open descendant #879",
+    }
+
+
+def test_stack_evidence_for_child_identifies_immediate_parent_and_root():
+    nodes = (
+        node(877, "root", "master"),
+        node(878, "child", "root"),
+        node(879, "leaf", "child"),
+    )
+    evidence = derive_stack_evidence(nodes, 879)
+    assert evidence == {
+        "stack_role": "child",
+        "stack_root": 877,
+        "stack_parent_head": "child",
+        "topology_blockers": [],
+        "descendants": [],
+    }
