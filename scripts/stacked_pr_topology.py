@@ -232,6 +232,22 @@ def render_mermaid(topology: StackTopology) -> str:
     return "\n".join(lines)
 
 
+
+def root_status_payload(
+    nodes: tuple[PullNode, ...],
+    pr_number: int,
+    target: str = "master",
+) -> dict[str, object]:
+    root_number = root_number_for(nodes, pr_number, target)
+    topology = build_stack(nodes, root_number, target)
+    return {
+        "root_number": root_number,
+        "descendants": [node.number for node in topology.descendants],
+        "blockers": list(topology_blockers(topology)),
+        "mermaid": render_mermaid(topology),
+    }
+
+
 def topology_blockers(topology: StackTopology) -> tuple[str, ...]:
     blockers = [f"open descendant #{node.number}" for node in topology.open_descendants]
     blockers.extend(
@@ -252,6 +268,7 @@ __all__ = [
     "nodes_from_github",
     "render_mermaid",
     "root_number_for",
+    "root_status_payload",
     "build_stack",
     "topology_blockers",
 ]
