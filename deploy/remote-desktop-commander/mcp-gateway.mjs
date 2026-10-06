@@ -7,7 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createOAuth } from "./oauth.mjs";
 import { createCredentialHandoff } from "./credential-handoff.mjs";
-import { firstHeader } from "./request-origin.mjs";
+import { canonicalPublicOrigin } from "./request-origin.mjs";
 
 const DEFAULT_UPSTREAM = "/opt/desktop-commander/stdio-server.mjs";
 const MAX_BODY = 1024 * 1024;
@@ -38,22 +38,19 @@ async function readJson(request) {
 export async function startGateway(options = {}) {
   const token = options.token ?? process.env.ALICE_SHORT_TOKEN ?? "";
   if (!token) throw new Error("MCP token is required");
-  const configuredPublicUrl = options.publicUrl ?? process.env.ALICE_DEV_PUBLIC_URL ?? "";
-  let oauth = options.oauth ?? (configuredPublicUrl ? createOAuth({
+  const configuredPublicUrl = canonicalPublicOrigin(
+    options.publicUrl ?? process.env.ALICE_DEV_PUBLIC_URL ?? "",
+  );
+  const oauth = options.oauth ?? createOAuth({
     publicUrl: configuredPublicUrl,
     shortToken: token,
     ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
     stateFile: options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE,
-  }) : null);
+  });
   const credentialHandoff = options.credentialHandoff ?? createCredentialHandoff({
     token,
     path: options.credentialFile ?? process.env.ALICE_DEV_CREDENTIAL_FILE,
   });
-  const oauthOptions = {
-    shortToken: token,
-    ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
-    stateFile: options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE,
-  };
   const upstream = options.upstream ?? new Client(
     { name: "alice-dev-gateway", version: "0.1.0" },
     { capabilities: {} },
@@ -97,18 +94,15 @@ export async function startGateway(options = {}) {
         .end('{"status":"ok","mode":"mcp-gateway"}');
       return;
     }
-    if (!oauth) {
-      const forwardedProto = firstHeader(
-        request.headers["x-forwarded-proto"],
-        request.socket.encrypted ? "https" : "http",
-      );
-      const host = firstHeader(request.headers["x-forwarded-host"], request.headers.host);
-      if (host) oauth = createOAuth({ ...oauthOptions, publicUrl: `${forwardedProto}://${host}` });
+    let requestUrl;
+    try {
+      requestUrl = new URL(request.url ?? "/", configuredPublicUrl);
+    } catch {
+      request.resume();
+      response.writeHead(400, { "Content-Type": "application/json" })
+        .end('{"status":"invalid_request"}');
+      return;
     }
-    const requestUrl = new URL(
-      request.url ?? "/",
-      configuredPublicUrl || `${firstHeader(request.headers["x-forwarded-proto"], request.socket.encrypted ? "https" : "http")}://${firstHeader(request.headers["x-forwarded-host"], request.headers.host, "localhost")}`,
-    );
     if (await credentialHandoff.handle(request, response, requestUrl)) return;
     if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;
     if (requestUrl.pathname !== "/mcp" || request.method !== "POST") {
