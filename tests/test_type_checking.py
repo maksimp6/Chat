@@ -98,6 +98,8 @@ STRICT_CLEAN_FILES = {
     "secret_store/cloudru.py",
     "secret_store/core.py",
     "secret_store/fake.py",
+    "secret_store/admin.py",
+    "secret_store/fake_admin.py",
     "agent_memory/backup.py",
     "agent_memory/file_memory_db.py",
     "session_profiles.py",
