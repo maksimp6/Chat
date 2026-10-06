@@ -48,6 +48,7 @@ def _walk_descendants(
     visiting.remove(parent.number)
 
 
+
 def build_stack(
     nodes: tuple[PullNode, ...],
     root_number: int,
