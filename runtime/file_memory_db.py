@@ -184,11 +184,15 @@ class FileMemoryDB:
     def _encode(cls, record: dict[str, Any]) -> bytes:
         signed = dict(record)
         signed["sha256"] = cls._checksum(record)
-        return (\n            json.dumps(signed, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n"\n        ).encode("utf-8")
+        return (
+            json.dumps(signed, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n"
+        ).encode("utf-8")
 
     @staticmethod
     def _checksum(record: dict[str, Any]) -> str:
-        canonical = json.dumps(\n            record, ensure_ascii=False, separators=(",", ":"), sort_keys=True\n        ).encode("utf-8")
+        canonical = json.dumps(
+            record, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+        ).encode("utf-8")
         return hashlib.sha256(canonical).hexdigest()
 
     def _truncate(self, size: int) -> None:
