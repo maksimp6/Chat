@@ -1,23 +1,36 @@
-FROM node:22-bookworm-slim
+FROM node:22-bookworm-slim AS node-runtime
+
+FROM python:3.14-slim-bookworm
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PATH="/usr/local/bin:$PATH"
+
+# Node's official bookworm image installs Node/npm under /usr/local. Copy that
+# toolchain into the matching Debian base so Alice uses the same Python major
+# version as CI without carrying Chromium or a database server.
+COPY --from=node-runtime /usr/local/ /usr/local/
+
 RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
     && apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-      bash ca-certificates git openssh-client ripgrep python3 python3-pip python3-venv \
+      bash ca-certificates curl git openssh-client ripgrep tini \
     && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --upgrade pip \
+    && python --version | grep -E '^Python 3\\.14\\.' \
+    && node --version | grep -E '^v22\\.' \
+    && npm --version \
     && mkdir -p /workspace /home/node/.claude-server-commander \
-    && chown -R node:node /workspace /home/node
+    && chown -R 1000:1000 /workspace /home/node
 
 COPY package.json package-lock.json dependency-smoke.cjs /opt/desktop-commander/
 RUN cd /opt/desktop-commander \
     && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
     && node dependency-smoke.cjs
 
-COPY --chown=node:node config.json /home/node/.claude-server-commander/config.json
+COPY --chown=1000:1000 config.json /home/node/.claude-server-commander/config.json
 COPY mcp-gateway.mjs stdio-server.mjs mcp-gateway-live-smoke.mjs /opt/desktop-commander/
 COPY dev-bootstrap.sh /usr/local/bin/alice-rdc-dev-bootstrap
 RUN chmod 0755 /usr/local/bin/alice-rdc-dev-bootstrap
 
-USER node
+USER 1000:1000
 WORKDIR /workspace
-ENTRYPOINT ["node", "/opt/desktop-commander/mcp-gateway.mjs"]
+ENTRYPOINT ["tini", "--", "node", "/opt/desktop-commander/mcp-gateway.mjs"]
