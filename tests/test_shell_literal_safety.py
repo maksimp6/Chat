@@ -6,11 +6,15 @@ import pytest
 from scripts.shell_literal import join_argv
 
 
+DOLLAR = chr(36)
+BACKTICK = chr(96)
+PERCENT = chr(37)
+
 CANARIES = [
-    "%one-million-dollar-cheque",
-    "${NOT_A_VARIABLE}",
-    "$(printf SHOULD_NOT_EXECUTE)",
-    "`printf SHOULD_NOT_EXECUTE`",
+    PERCENT + "one-million-dollar-cheque",
+    DOLLAR + "{NOT_A_VARIABLE}",
+    DOLLAR + "(printf SHOULD_NOT_EXECUTE)",
+    BACKTICK + "printf SHOULD_NOT_EXECUTE" + BACKTICK,
     "space separated value",
     "single'quote",
     'double"quote',
