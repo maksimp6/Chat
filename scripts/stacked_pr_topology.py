@@ -201,6 +201,11 @@ def build_stack(
 
 
 
+
+def root_number_for(nodes: tuple[PullNode, ...], pr_number: int, target: str = "master") -> int:
+    return build_ancestor_chain(nodes, pr_number, target).root.number
+
+
 def render_mermaid(topology: StackTopology) -> str:
     by_head = {node.head: node for node in (topology.root, *topology.descendants)}
     lines = ["graph TD"]
@@ -246,6 +251,7 @@ __all__ = [
     "derive_stack_evidence",
     "nodes_from_github",
     "render_mermaid",
+    "root_number_for",
     "build_stack",
     "topology_blockers",
 ]
