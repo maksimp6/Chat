@@ -200,6 +200,33 @@ def build_stack(
     )
 
 
+
+def render_mermaid(topology: StackTopology) -> str:
+    by_head = {node.head: node for node in (topology.root, *topology.descendants)}
+    lines = ["graph TD"]
+
+    def label(node: PullNode) -> str:
+        if node.state == "open":
+            status = "OPEN"
+        elif node.absorbed:
+            status = "ABSORBED"
+        else:
+            status = "CLOSED / NOT ABSORBED"
+        return f"#{node.number} {status}"
+
+    for node in (topology.root, *topology.descendants):
+        safe = label(node).replace('"', "&quot;")
+        lines.append(f'    P{node.number}["{safe}"]')
+
+    for child in topology.descendants:
+        parent = by_head.get(child.base)
+        if parent is None:
+            raise StackTopologyError("ancestor chain broken")
+        lines.append(f"    P{parent.number} --> P{child.number}")
+
+    return "\n".join(lines)
+
+
 def topology_blockers(topology: StackTopology) -> tuple[str, ...]:
     blockers = [f"open descendant #{node.number}" for node in topology.open_descendants]
     blockers.extend(
@@ -218,6 +245,7 @@ __all__ = [
     "collect_github_nodes",
     "derive_stack_evidence",
     "nodes_from_github",
+    "render_mermaid",
     "build_stack",
     "topology_blockers",
 ]
