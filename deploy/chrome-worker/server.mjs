@@ -93,6 +93,7 @@ export function createWorker(options = {}) {
     ...options.idp,
   });
   const takeoverEnabled = options.takeoverEnabled ?? process.env.BROWSER_TAKEOVER_ENABLED === "1";
+  const secretResolver = options.secretResolver;
   const takeover = options.takeoverRuntime ?? createTakeover(options.takeover);
   let oauth;
   const ready = (async () => {
@@ -175,6 +176,28 @@ export function createWorker(options = {}) {
       await page.locator(String(args.locator ?? "")).fill(String(args.text ?? ""));
       return { ok: true };
     }
+    if (name === "secret_fill") {
+      const alias = String(args.alias ?? "");
+      const locator = String(args.locator ?? "");
+      const purpose = String(args.purpose ?? "");
+      if (!alias || !locator || !purpose.startsWith("browser.")) {
+        throw Object.assign(new Error("invalid_secret_fill_request"), { status: 400 });
+      }
+      if (typeof secretResolver !== "function") {
+        throw Object.assign(new Error("secret_resolver_unavailable"), { status: 503 });
+      }
+      let secret;
+      try {
+        secret = await secretResolver(alias, purpose);
+        if (typeof secret !== "string" || !secret) throw new Error("invalid_secret_value");
+        await page.locator(locator).fill(secret);
+      } catch {
+        throw Object.assign(new Error("secret_fill_failed"), { status: 503 });
+      } finally {
+        secret = undefined;
+      }
+      return { ok: true };
+    }
     if (name === "extract") {
       const text = await page.locator(String(args.locator ?? "body")).innerText();
       return { text: text.slice(0, MAX_TEXT_CHARS), truncated: text.length > MAX_TEXT_CHARS };
@@ -193,6 +216,7 @@ export function createWorker(options = {}) {
     ["POST /browser/v1/navigate", ["navigate", true]],
     ["POST /browser/v1/click", ["click", true]],
     ["POST /browser/v1/type", ["type", true]],
+    ["POST /browser/v1/secret/fill", ["secret_fill", true]],
     ["POST /browser/v1/extract", ["extract", true]],
     ["POST /browser/v1/screenshot", ["screenshot", true]],
   ]);

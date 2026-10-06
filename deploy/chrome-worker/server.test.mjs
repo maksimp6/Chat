@@ -111,3 +111,73 @@ test("human takeover entry page never exposes browser UI before owner authentica
   assert.match(html, /Введите short token владельца/);
   assert.equal(html.includes("takeover_token"), false);
 });
+
+
+test("secret fill resolves inside worker and never returns plaintext", async (t) => {
+  const calls = [];
+  const app = await fixture({
+    secretResolver: async (alias, purpose) => {
+      calls.push({ alias, purpose });
+      assert.equal(alias, "github");
+      assert.equal(purpose, "browser.password");
+      return "canary-browser-secret";
+    },
+  });
+  t.after(app.close);
+  await app.request("/browser/v1/wake", {});
+
+  const response = await app.request("/browser/v1/secret/fill", {
+    alias: "github",
+    locator: "#password",
+    purpose: "browser.password",
+  });
+
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.deepEqual(result, { ok: true });
+  assert.equal(JSON.stringify(result).includes("canary-browser-secret"), false);
+  assert.equal(app.fake.profile.value, "canary-browser-secret");
+  assert.deepEqual(calls, [{ alias: "github", purpose: "browser.password" }]);
+});
+
+test("secret fill fails closed without leaking resolver values", async (t) => {
+  const app = await fixture({
+    secretResolver: async () => {
+      throw new Error("provider said canary-browser-secret");
+    },
+  });
+  t.after(app.close);
+  await app.request("/browser/v1/wake", {});
+
+  const response = await app.request("/browser/v1/secret/fill", {
+    alias: "github",
+    locator: "#password",
+    purpose: "browser.password",
+  });
+
+  assert.equal(response.status, 503);
+  const body = await response.text();
+  assert.equal(body.includes("canary-browser-secret"), false);
+  assert.deepEqual(JSON.parse(body), { error: "browser_operation_failed" });
+});
+
+test("secret fill rejects non-browser purpose before resolver use", async (t) => {
+  let resolved = false;
+  const app = await fixture({
+    secretResolver: async () => {
+      resolved = true;
+      return "canary-browser-secret";
+    },
+  });
+  t.after(app.close);
+  await app.request("/browser/v1/wake", {});
+
+  const response = await app.request("/browser/v1/secret/fill", {
+    alias: "github",
+    locator: "#password",
+    purpose: "rdc.github",
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(resolved, false);
+});
