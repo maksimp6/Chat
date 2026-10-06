@@ -26,7 +26,6 @@ class StackTopology:
     unabsorbed_closed: tuple[PullNode, ...]
 
 
-
 def _walk_descendants(
     parent: PullNode,
     children: dict[str, list[PullNode]],
@@ -46,7 +45,6 @@ def _walk_descendants(
         _walk_descendants(child, children, descendants, visiting, visited)
         visited.add(child.number)
     visiting.remove(parent.number)
-
 
 
 def build_stack(
