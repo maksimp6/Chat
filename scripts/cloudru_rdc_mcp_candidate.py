@@ -73,7 +73,7 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
         description=DESCRIPTION,
         idle_timeout="900s",
         env={
-            "ALICE_DEV_TOKEN": token,
+            "ALICE_SHORT_TOKEN": token,
         },
     )
     spec.validate()
