@@ -135,9 +135,7 @@ def test_dev_bootstrap_installs_cloud_and_github_clis():
 
     assert 'gh_version="2.96.0"' in bootstrap
     assert "scripts/install_eds.py" in bootstrap
-    assert "https://storage.yandexcloud.net/yandexcloud-yc/install.sh" in bootstrap
     assert "gh --version" in bootstrap
     assert "eds version" in bootstrap
-    assert "yc version" in bootstrap
     assert "GITHUB_TOKEN" not in bootstrap
     assert "CLOUDRU_IAM_KEY_SECRET" not in bootstrap

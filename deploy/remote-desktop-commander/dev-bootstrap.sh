@@ -33,7 +33,7 @@ python -m venv "$venv"
 
 bin_dir="$HOME/.local/bin"
 mkdir -p "$bin_dir"
-export PATH="$bin_dir:$HOME/yandex-cloud/bin:$PATH"
+export PATH="$bin_dir:$PATH"
 
 # GitHub CLI: pinned to the version already required by repository bootstrap CI.
 if ! command -v gh >/dev/null 2>&1; then
@@ -59,15 +59,6 @@ eds version >/dev/null
 # Cloud.ru general CLI: repository-owned mirror with pinned SHA-256 verification.
 CLOUD_CLI_INSTALL_DIR="$bin_dir" bash "$repo/scripts/install_cloud_cli.sh"
 cloud --version >/dev/null 2>&1 || cloud version >/dev/null
-
-# Yandex Cloud CLI: official non-interactive installer, credentials remain external.
-if ! command -v yc >/dev/null 2>&1; then
-  yc_install="$(mktemp)"
-  curl --fail --location --retry 3     https://storage.yandexcloud.net/yandexcloud-yc/install.sh     -o "$yc_install"
-  bash "$yc_install" -i "$HOME/yandex-cloud" -n
-  rm -f "$yc_install"
-fi
-yc version >/dev/null
 
 # Prove the same local gate used before publishing is executable in this image.
 (
