@@ -54,6 +54,7 @@ DESCRIPTION = "Alice persistent Google Chrome Playwright MCP; issue 751"
 # SIGTERM); a cold start on the next request is accepted for cost.
 CPU = "0.5"
 IDLE_TIMEOUT = "900s"
+BROWSER_IDLE_SLEEP_MS = "300000"
 HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS = 10.0
 # Earlier always-on revisions that deploy may still update in place.
 ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "4096Mi"})
@@ -73,6 +74,7 @@ APP_ENV = frozenset(
         "CHROME_PROFILE_DIR",
         "CHROME_STATE_DIR",
         "CHROME_STATE_REQUIRE_MOUNT",
+        "BROWSER_IDLE_SLEEP_MS",
     }
 )
 SAFE_ERRORS = frozenset(
@@ -197,6 +199,7 @@ def runtime_env(sha, env=os.environ):
         "CHROME_PROFILE_DIR": "/tmp/chrome-profile",
         "CHROME_STATE_DIR": MOUNT,
         "CHROME_STATE_REQUIRE_MOUNT": "1",
+        "BROWSER_IDLE_SLEEP_MS": BROWSER_IDLE_SLEEP_MS,
         "BROWSER_OAUTH_STATE_DIR": "/tmp/chrome-auth",
         "BROWSER_OAUTH_STATE_FILE": "/tmp/chrome-auth/oauth.json",
     }
@@ -652,10 +655,14 @@ def summary(record):
     environment = {item["name"]: item["value"] for item in container["env"]}
     origin = application_origin(record)
     public = public_origin(environment["BROWSER_PUBLIC_URL"])
+    scaling = record["template"]["scaling"]
+    resources = container["resources"]
+    service_state = str(record.get("status", "")).lower()
     return {
         "status": "CHROME_PRIVATE_RUNNING"
-        if str(record.get("status", "")).lower() == "running"
+        if service_state == "running"
         else "CHROME_STOPPED",
+        "service_state": service_state,
         "container_name": record["name"],
         "container_id": uuid(record["id"]),
         "image": container["image"],
@@ -665,6 +672,16 @@ def summary(record):
         "ingress": "provider_iam"
         if record["configuration"]["ingress"]["accessSettings"]["enableAuth"]
         else "public_worker_auth",
+        "resources": resources,
+        "scaling": {
+            "min_instances": scaling.get("minInstanceCount"),
+            "max_instances": scaling.get("maxInstanceCount"),
+            "idle_timeout": record["template"].get("idleTimeout"),
+            "scale_to_zero_configured": scaling.get("minInstanceCount") == 0,
+        },
+        "browser_idle_sleep_ms": int(environment["BROWSER_IDLE_SLEEP_MS"])
+        if environment.get("BROWSER_IDLE_SLEEP_MS", "").isdigit()
+        else None,
         "cost_floor": estimate_monthly_cost(CPU, 0),
     }
 
