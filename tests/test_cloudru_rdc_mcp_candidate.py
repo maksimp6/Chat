@@ -26,7 +26,7 @@ class FakeApps:
         self.updates = []
         self._status = {
             "id": "11111111-1111-1111-1111-111111111111",
-            "public_uri": "alice-dev-22706bfa6066.containerapps.ru",
+            "public_uri": "alice-dev-22706bfa6066-aaaaaaaa.containerapps.ru",
             "image": "registry/alice-dev@sha256:" + "a" * 64,
             "resources": {"cpu": "0.2", "memory": "512Mi"},
             "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
@@ -35,6 +35,15 @@ class FakeApps:
     def find_for_deploy(self, name):
         assert name == "alice-dev-22706bfa6066-aaaaaaaa"
         return self.existing
+
+    def list(self, *, require_total):
+        assert require_total is True
+        return [
+            {
+                "id": self._status["id"],
+                "name": "alice-dev-22706bfa6066-aaaaaaaa",
+            }
+        ]
 
     def update_from_current(self, spec, current):
         self.updates.append((spec, current))
@@ -91,7 +100,10 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
     }
     container = body["template"]["containers"][0]
     assert container["resources"] == {"cpu": "0.2", "memory": "512Mi"}
-    assert {item["name"] for item in container["env"]} == {"ALICE_SHORT_TOKEN"}
+    assert {item["name"] for item in container["env"]} == {
+        "ALICE_SHORT_TOKEN",
+        "ALICE_DEV_PUBLIC_URL",
+    }
     assert "synthetic-token" not in repr(result)
 
 
@@ -317,3 +329,73 @@ def test_tombstone_waits_for_async_cloudru_deletion(monkeypatch, tmp_path):
     assert candidate.purge_tombstones(apps) == [identifier]
     assert apps.deleted == ["alice-dev-old"]
     assert sleeps == [3]
+
+
+def test_candidate_sets_canonical_oauth_origin(monkeypatch):
+    monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
+    apps = FakeApps()
+    result = candidate.create_candidate(apps, apps._status["image"], "synthetic-token", "a" * 40)
+    body = apps.client.requests[0][3]["json_body"]
+    env = {item["name"]: item["value"] for item in body["template"]["containers"][0]["env"]}
+    assert env["ALICE_DEV_PUBLIC_URL"] == "https://alice-dev-22706bfa6066-aaaaaaaa.containerapps.ru"
+    assert result["origin"] == env["ALICE_DEV_PUBLIC_URL"]
+
+
+@pytest.mark.parametrize(
+    "inventory",
+    [
+        [],
+        [{"name": "alice-dev-22706bfa6066-aaaaaaaa", "id": None}],
+        [{"name": "alice-dev-22706bfa6066-aaaaaaaa", "id": "not-a-uuid"}],
+    ],
+)
+def test_candidate_rejects_missing_or_invalid_provider_id(monkeypatch, inventory):
+    monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
+    apps = FakeApps()
+    monkeypatch.setattr(apps, "list", lambda **kwargs: inventory)
+    with pytest.raises(CloudProviderError):
+        candidate.create_candidate(apps, apps._status["image"], "synthetic-token", "a" * 40)
+
+
+def test_candidate_rejects_different_public_origin(monkeypatch):
+    monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
+    apps = FakeApps()
+    apps._status["public_uri"] = "unexpected.containerapps.ru"
+    with pytest.raises(CloudProviderError) as error:
+        candidate.create_candidate(apps, apps._status["image"], "synthetic-token", "a" * 40)
+    assert error.value.code == "public_origin_mismatch"
+
+
+def test_public_acceptance_workflows_run_regressions_and_have_time_limits():
+    import yaml
+
+    root = Path(__file__).resolve().parents[1]
+    deploy = yaml.load(
+        (root / ".github/workflows/cloudru-rdc-mcp-candidate.yml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    paths = deploy["on"]["push"]["paths"]
+    for required in (
+        "cloud/cloudru/registry_client.py",
+        "requirements-deploy.txt",
+        "config/alice/alice-dev-delete-ids.txt",
+        "deploy/remote-desktop-commander/request-origin.mjs",
+        "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs",
+        ".github/workflows/cloudru-rdc-mcp-candidate.yml",
+    ):
+        assert required in paths
+    steps = {step.get("name"): step for step in deploy["jobs"]["deploy"]["steps"]}
+    assert steps["Verify OAuth discovery"]["timeout-minutes"] == "2"
+    assert steps["Verify public MCP end to end"]["timeout-minutes"] == "2"
+    validation = yaml.load(
+        (root / ".github/workflows/remote-desktop-commander.yml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    steps = validation["jobs"]["validate-image"]["steps"]
+    regressions = next(
+        step for step in steps if step.get("name") == "Test Alice Dev OAuth and gateway contracts"
+    )
+    assert "oauth-discovery-smoke.test.mjs" in regressions["run"]
+    assert "mcp-gateway-origin.test.mjs" in regressions["run"]
+    image = next(step for step in steps if step.get("name") == "Validate Alice Dev MCP image")
+    assert "ALICE_DEV_PUBLIC_URL=http://127.0.0.1:8080" in image["run"]
