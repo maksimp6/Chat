@@ -5,12 +5,13 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { createOAuth } from "./oauth.mjs";
 
 const DEFAULT_UPSTREAM = "/opt/desktop-commander/stdio-server.mjs";
 const MAX_BODY = 1024 * 1024;
 const BLOCKED_TOOLS = new Set(["write_pdf"]);
 
-function authorized(request, token) {
+function shortTokenAuthorized(request, token) {
   if (!token) return false;
   const value = request.headers.authorization;
   return typeof value === "string" && value === `Bearer ${token}`;
@@ -35,6 +36,18 @@ async function readJson(request) {
 export async function startGateway(options = {}) {
   const token = options.token ?? process.env.ALICE_SHORT_TOKEN ?? "";
   if (!token) throw new Error("MCP token is required");
+  const configuredPublicUrl = options.publicUrl ?? process.env.ALICE_DEV_PUBLIC_URL ?? "";
+  let oauth = options.oauth ?? (configuredPublicUrl ? createOAuth({
+    publicUrl: configuredPublicUrl,
+    shortToken: token,
+    ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
+    stateFile: options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE,
+  }) : null);
+  const oauthOptions = {
+    shortToken: token,
+    ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
+    stateFile: options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE,
+  };
   const upstream = options.upstream ?? new Client(
     { name: "alice-dev-gateway", version: "0.1.0" },
     { capabilities: {} },
@@ -78,17 +91,32 @@ export async function startGateway(options = {}) {
         .end('{"status":"ok","mode":"mcp-gateway"}');
       return;
     }
-    if (request.url !== "/mcp" || request.method !== "POST") {
+    if (!oauth) {
+      const forwardedProto = String(
+        request.headers["x-forwarded-proto"] ?? (request.socket.encrypted ? "https" : "http"),
+      ).split(",")[0].trim();
+      const host = String(request.headers["x-forwarded-host"] ?? request.headers.host ?? "")
+        .split(",")[0].trim();
+      if (host) oauth = createOAuth({ ...oauthOptions, publicUrl: `${forwardedProto}://${host}` });
+    }
+    const requestUrl = new URL(
+      request.url ?? "/",
+      configuredPublicUrl || `${String(request.headers["x-forwarded-proto"] ?? (request.socket.encrypted ? "https" : "http")).split(",")[0].trim()}://${String(request.headers["x-forwarded-host"] ?? request.headers.host ?? "localhost").split(",")[0].trim()}`,
+    );
+    if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;
+    if (requestUrl.pathname !== "/mcp" || request.method !== "POST") {
       request.resume();
       response.writeHead(404, { "Content-Type": "application/json" })
         .end('{"status":"not_found"}');
       return;
     }
-    if (!authorized(request, token)) {
+    if (!((oauth?.authorize(request) ?? false) || shortTokenAuthorized(request, token))) {
       request.resume();
       response.writeHead(401, {
         "Content-Type": "application/json",
-        "WWW-Authenticate": 'Bearer realm="alice-dev"',
+        "WWW-Authenticate": oauth?.enabled
+          ? oauth.challenge()
+          : 'Bearer realm="alice-dev"',
       }).end('{"status":"unauthorized"}');
       return;
     }
