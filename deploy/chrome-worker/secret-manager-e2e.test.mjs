@@ -7,7 +7,11 @@ import test from "node:test";
 
 import { createWorker } from "./server.mjs";
 
+let resolverCalls = 0;
+let resolverFailures = 0;
+
 function resolveThroughPython(alias, purpose) {
+  resolverCalls += 1;
   return new Promise((resolve, reject) => {
     const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
     const child = spawn("python3", ["tests/secret_manager_browser_bridge.py"], {
@@ -20,7 +24,10 @@ function resolveThroughPython(alias, purpose) {
     child.stderr.on("data", (chunk) => { error += chunk; });
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code !== 0) return reject(new Error(error || "resolver_failed"));
+      if (code !== 0) {
+        resolverFailures += 1;
+        return reject(new Error("resolver_process_failed"));
+      }
       resolve(output);
     });
     child.stdin.end(JSON.stringify({ alias, purpose }) + "\n");
@@ -80,7 +87,7 @@ test("password manager resolves rotated canary into browser without response dis
   });
   const body = await response.text();
 
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 200, `resolverCalls=${resolverCalls} resolverFailures=${resolverFailures}`);
   assert.deepEqual(JSON.parse(body), { ok: true });
   assert.equal(fake.profile.value, "canary-cross-runtime-v2");
   assert.equal(body.includes("canary-cross-runtime-v1"), false);
