@@ -47,6 +47,9 @@ function fakeChromium() {
 }
 
 test("password manager resolves rotated canary into browser without response disclosure", async (t) => {
+  const resolved = await resolveThroughPython("github", "browser.password");
+  assert.equal(resolved === "canary-cross-runtime-v2", true);
+
   const fake = fakeChromium();
   const worker = createWorker({
     token: "test-token",
