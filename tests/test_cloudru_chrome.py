@@ -261,6 +261,10 @@ def test_update_reuses_existing_container_without_stop_or_start(monkeypatch):
     assert {"name": "BROWSER_PUBLIC_URL", "value": ORIGIN} in env
 
 
+def test_hot_update_orchestration_budget_is_ten_seconds():
+    assert chrome.HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS == 10.0
+
+
 def test_hot_update_eligibility_requires_running_worker_and_verified_generation():
     assert chrome.hot_update_eligible(record(), 1) is True
     assert chrome.hot_update_eligible(record(status="suspended"), 1) is False
