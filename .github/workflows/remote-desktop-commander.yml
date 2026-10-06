@@ -36,6 +36,14 @@ jobs:
           docker exec -e RDC_MCP_SMOKE_URL=http://127.0.0.1:8080/mcp \
             -e RDC_MCP_SMOKE_TOKEN=ci-smoke-token \
             rdc-mcp-ci node /opt/desktop-commander/mcp-gateway-live-smoke.mjs
+          docker exec rdc-mcp-ci bash -euc 'python --version | grep -E "^Python 3\.14\."; node --version | grep -E "^v22\."; npm --version'
+          docker exec -u 0 rdc-mcp-ci bash -euc 'mkdir -p /tmp/alice-src; chown 1000:1000 /tmp/alice-src'
+          docker cp "$GITHUB_WORKSPACE/." rdc-mcp-ci:/tmp/alice-src/
+          docker exec -u 0 rdc-mcp-ci chown -R 1000:1000 /tmp/alice-src
+          docker exec -e ALICE_RDC_DEV_VENV=/tmp/alice-venv rdc-mcp-ci \
+            alice-rdc-dev-bootstrap /tmp/alice-src
+          docker exec rdc-mcp-ci bash -euc \
+            'cd /tmp/alice-src; PATH=/tmp/alice-venv/bin:$PATH bash scripts/pre_push.sh'
       - name: Exercise volume initialization and non-root CLI startup
         working-directory: deploy/remote-desktop-commander
         run: |
