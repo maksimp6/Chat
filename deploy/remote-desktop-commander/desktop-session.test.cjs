@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { EventEmitter } = require("node:events");
+const { receiveGitKey, EventEmitter } = require("node:events");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -566,4 +566,36 @@ test("pairing redirect accepts only current bounded official HTTPS handoff", { t
     assert.equal(await running, 0);
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+
+test("receiveGitKey writes a private 0600 file without returning secret material", async () => {
+  const { Readable } = require("node:stream");
+  const { mkdtempSync, readFileSync, statSync, rmSync } = require("node:fs");
+  const { tmpdir } = require("node:os");
+  const { join } = require("node:path");
+  const root = mkdtempSync(join(tmpdir(), "rdc-key-"));
+  const target = join(root, "secrets", "id_ed25519");
+  const key = "-----BEGIN OPENSSH PRIVATE KEY-----\nsynthetic-canary\n-----END OPENSSH PRIVATE KEY-----\n";
+  const request = Readable.from([Buffer.from(key)]);
+  request.headers = { "content-length": String(Buffer.byteLength(key)) };
+  try {
+    const result = await receiveGitKey(request, { target });
+    assert.equal(result, undefined);
+    assert.equal(readFileSync(target, "utf8"), key);
+    assert.equal(statSync(target).mode & 0o777, 0o600);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("receiveGitKey rejects invalid or oversized bodies", async () => {
+  const { Readable } = require("node:stream");
+  const invalid = Readable.from([Buffer.from("not-a-key")]);
+  invalid.headers = { "content-length": "9" };
+  await assert.rejects(() => receiveGitKey(invalid, { target: "/tmp/unused-rdc-key" }));
+
+  const oversized = Readable.from([Buffer.from("x".repeat(20))]);
+  oversized.headers = { "content-length": "20" };
+  await assert.rejects(() => receiveGitKey(oversized, { limit: 10, target: "/tmp/unused-rdc-key" }));
 });
