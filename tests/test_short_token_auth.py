@@ -5,6 +5,13 @@ from secret_store.core import SecretRef
 from secret_store.fake import FakeSecretResolver
 
 
+@pytest.fixture(autouse=True)
+def _reset_short_token_source():
+    short_token_auth.reset_short_token_secret()
+    yield
+    short_token_auth.reset_short_token_secret()
+
+
 def _client(monkeypatch, token=None, require=True, preview=False, resolver=None, ref=None):
     short_token_auth.reset_short_token_secret()
     if resolver is not None and ref is not None:
