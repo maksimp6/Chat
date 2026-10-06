@@ -93,6 +93,16 @@ Do not create a new vendor-named agent profile when a reusable engineering role
 describes the work better. Prefer adding or refining a role profile, then choose
 the cheapest backend/model that can reliably perform that role.
 
+### Cost-control policy
+
+- Choose the cheapest sufficient tool, backend, and model for the task. Escalate to a more expensive model only when task complexity or observed failure provides a concrete reason.
+- Reuse current evidence, authenticated sessions, traces, artifacts, and completed checks before starting paid work again. Do not repeat an up-to-date paid check merely for reassurance.
+- Before a paid browser or agent run, define a bounded objective and use supported technical limits such as maximum steps, calls, or runtime. Do not turn a timeout or delayed response into a duplicate paid run; inspect, poll, or continue the existing run when the provider supports it.
+- Keep one primary owner for an objective. Do not spend tokens by assigning multiple agents to independently redo the same work unless parallel independent work or an explicit comparison is justified.
+- Do not enable automatic wallet reloads, recurring paid monitors, or other continuing spend without explicit owner approval.
+- Cost saving must never remove required security checks, deterministic regression tests, protected exact-head CI, or real-scenario verification needed by the task. Save money by removing redundant work, not required evidence.
+- When reporting cost, distinguish provider-confirmed spend from estimates. Do not hard-code provider prices into repository policy; query current pricing when a concrete budget decision depends on it.
+
 ### Model policy
 
 Repository automation should prefer deterministic GitHub workflows and explicit tool execution. Model-backed execution is optional, never required by policy, and must not become a merge prerequisite.
