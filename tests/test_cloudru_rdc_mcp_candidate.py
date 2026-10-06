@@ -23,6 +23,7 @@ class FakeApps:
         self.existing = existing
         self.client = FakeClient()
         self.project_id = PROJECT
+        self.updates = []
         self._status = {
             "public_uri": "alice-dev-22706bfa6066.containerapps.ru",
             "image": "registry/alice-dev@sha256:" + "a" * 64,
@@ -33,6 +34,10 @@ class FakeApps:
     def find_for_deploy(self, name):
         assert name == "alice-dev-22706bfa6066"
         return self.existing
+
+    def update_from_current(self, spec, current):
+        self.updates.append((spec, current))
+        return {}
 
     def wait_until_ready(self, name, *, image, timeout_s, poll_s):
         assert name == "alice-dev-22706bfa6066"
@@ -81,15 +86,24 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
     assert "synthetic-token" not in repr(result)
 
 
-def test_candidate_refuses_to_take_over_existing_resource(monkeypatch):
+def test_candidate_updates_existing_alice_dev_in_place(monkeypatch):
     monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
-    apps = FakeApps(existing={"id": "existing"})
+    existing = {
+        "id": "existing",
+        "name": "alice-dev-22706bfa6066",
+        "description": candidate.DESCRIPTION,
+    }
+    apps = FakeApps(existing=existing)
 
-    with pytest.raises(CloudProviderError) as error:
-        candidate.create_candidate(apps, apps._status["image"], "synthetic-token")
+    result = candidate.create_candidate(apps, apps._status["image"], "synthetic-token")
 
-    assert error.value.code == "already_exists"
+    assert result["status"] == "ALICE_DEV_READY"
     assert apps.client.requests == []
+    assert len(apps.updates) == 1
+    spec, current = apps.updates[0]
+    assert current is existing
+    assert spec.name == "alice-dev-22706bfa6066"
+    assert spec.image == apps._status["image"]
 
 
 def test_lightweight_dockerfile_has_no_browser_packages():
@@ -121,3 +135,19 @@ def test_candidate_script_runs_directly_from_repo_root():
     )
     assert result.returncode == 0
     assert "Deploy an isolated lightweight Alice Dev candidate" in result.stdout
+
+
+def test_candidate_refuses_mismatched_existing_resource(monkeypatch):
+    monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
+    apps = FakeApps(
+        existing={
+            "name": "alice-dev-22706bfa6066",
+            "description": "some other service",
+        }
+    )
+
+    with pytest.raises(CloudProviderError) as error:
+        candidate.create_candidate(apps, apps._status["image"], "synthetic-token")
+
+    assert error.value.code == "resource_mismatch"
+    assert apps.updates == []
