@@ -624,7 +624,7 @@ async function main() {
   if (process.exitCode) console.error("RDC/browser session stopped; check container startup and sandbox support.");
 }
 
-module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit };
+module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit, receiveGitKey };
 if (require.main === module) main().catch(() => {
   console.error("RDC/browser startup failed.");
   process.exitCode = 1;
