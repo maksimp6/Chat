@@ -5,7 +5,7 @@
 Система памяти находится в переходе к дurable file-native Storage Engine. На данный момент:
 
 - **Извлечение памяти** использует SQL-backed модель: `memory_manager.py` и `memory_extractor.py` создают таблицу `global_memory` для хранения фактов, извлечённых из диалогов
-- **Durable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857); первый Wave 1 consumer — `conversation_ownership.py` — переносится на file-native ownership с verified one-time import из legacy SQL
+- **Durable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857); Wave 1 уже перевёл `conversation_ownership.py` на file-native ownership (#920) и переводит `user_identity.py` вместе с GitHub account mapping как один atomic identity aggregate
 - **Целевая архитектура** описана в [issue #776](https://github.com/maksimp6/Chat/issues/776): одна дurable file-native Memory DB с crash recovery, deterministic tests и миграцией от SQL
 
 ## Компоненты
@@ -22,7 +22,10 @@
 - `agent_memory/backup.py` — verified backup/restore с manifest и SHA256 checksum
 - `agent_memory/conversation_ownership_store.py` — durable typed ownership repository
 - `agent_memory/conversation_ownership_migration.py` — bounded legacy SQL import; после migration marker runtime ownership SQL больше не читает
-- `tests/test_file_memory_db.py`, `tests/test_memory_backup.py`, `tests/test_conversation_ownership_memory.py` — доказательства durability, recovery и первого consumer cutover
+- `agent_memory/runtime_store.py` — один process-local `FileMemoryDB` writer/barrier на каждый `alice.memory`
+- `agent_memory/user_identity_store.py` — atomic aggregate `users + github_accounts + migration metadata`
+- `agent_memory/user_identity_migration.py` — verified one-time import legacy SQL identity state; после aggregate commit runtime identity SQL больше не читает
+- tests доказывают durability/recovery, verified cutover, failed-write no-publish, writer reuse и owner/identity isolation
 
 ## Миграция (issue #776)
 
@@ -38,7 +41,7 @@ Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит
 3. Atomic cutover только после verified equivalence
 4. Explicit rollback capability
 
-**Статус**: durable engine и backup/restore готовы; Wave 1 начат с conversation ownership. User identity, sessions и memory extraction всё ещё требуют миграции.
+**Статус**: durable engine и backup/restore готовы; conversation ownership уже shipped в master (#920). User identity + GitHub mapping переведены следующим Wave 1 slice; после него остаются sessions/profiles и memory extraction.
 
 ## Сценарии использования (текущие)
 
