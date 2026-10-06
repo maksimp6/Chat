@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
     paths:
+      - "cloud/cloudru/container_apps_client.py"
       - "deploy/remote-desktop-commander/Dockerfile.mcp"
       - "deploy/remote-desktop-commander/mcp-gateway.mjs"
       - "deploy/remote-desktop-commander/stdio-server.mjs"
