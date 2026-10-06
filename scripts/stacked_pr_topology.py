@@ -26,6 +26,28 @@ class StackTopology:
     unabsorbed_closed: tuple[PullNode, ...]
 
 
+
+def _walk_descendants(
+    parent: PullNode,
+    children: dict[str, list[PullNode]],
+    descendants: list[PullNode],
+    visiting: set[int],
+    visited: set[int],
+) -> None:
+    if parent.number in visiting:
+        raise StackTopologyError("stack topology cycle")
+    visiting.add(parent.number)
+    for child in children.get(parent.head, []):
+        if child.number == parent.number or child.number in visiting:
+            raise StackTopologyError("stack topology cycle")
+        if child.number in visited:
+            continue
+        descendants.append(child)
+        _walk_descendants(child, children, descendants, visiting, visited)
+        visited.add(child.number)
+    visiting.remove(parent.number)
+
+
 def build_stack(
     nodes: tuple[PullNode, ...],
     root_number: int,
@@ -55,22 +77,7 @@ def build_stack(
     descendants: list[PullNode] = []
     visiting: set[int] = set()
     visited: set[int] = set()
-
-    def walk(parent: PullNode) -> None:
-        if parent.number in visiting:
-            raise StackTopologyError("stack topology cycle")
-        visiting.add(parent.number)
-        for child in children.get(parent.head, []):
-            if child.number == parent.number or child.number in visiting:
-                raise StackTopologyError("stack topology cycle")
-            if child.number in visited:
-                continue
-            descendants.append(child)
-            walk(child)
-            visited.add(child.number)
-        visiting.remove(parent.number)
-
-    walk(root)
+    _walk_descendants(root, children, descendants, visiting, visited)
     return StackTopology(
         root=root,
         descendants=tuple(descendants),
