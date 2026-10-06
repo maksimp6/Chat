@@ -85,6 +85,45 @@ Do not add a catch-all browser proxy. Every externally callable browser operatio
 must be explicitly declared in the Gateway contract and covered by authorization,
 input bounds, rate limits and tests.
 
+## OAuth flows
+
+The Chrome Worker and API Gateway support ChatGPT and third-party OAuth flows
+for headless and persistent browser operations. OAuth is handled by
+`deploy/chrome-worker/oauth.mjs` and validated at each browser MCP call.
+
+### Supported OAuth scopes
+
+- `browser`: core Playwright MCP operations
+- `offline_access`: long-lived refresh tokens for ChatGPT and API integrations
+
+Both scopes are required; the worker normalizes requests to exactly `browser offline_access`.
+
+### ChatGPT offline token flow
+
+When ChatGPT requests `offline_access`:
+
+1. Owner authenticates once with GitHub sign-in at `{origin}/browser/oauth`
+2. OAuth endpoint issues refresh_token (valid 30 days) and access_token (15 min TTL)
+3. Client stores refresh_token for reuse across sessions
+4. On expiry, client exchanges refresh_token for new access_token without user interaction
+5. Offline operation continues: Chrome persists, profile retained, no interactive sign-in needed
+
+Implementation details (`deploy/chrome-worker/oauth.mjs`):
+- Refresh tokens are issued with 30-day validity and stored on the client
+- Access tokens expire in 15 minutes; expired tokens trigger automatic refresh
+- Unconfirmed OAuth clients (dynamic registration) are evicted after 7 days if not confirmed by owner
+- Confirmed clients (after GitHub sign-in) are never evicted and support long-lived refresh
+- Maximum 1000 provisional clients before eviction of oldest unconfirmed; prevents registration spam
+
+Tests in `deploy/chrome-worker/oauth.test.mjs` verify offline flow end-to-end
+including token refresh and revocation handling.
+
+### Short-token (machine) authentication
+
+Alice Pro's own browser operations use the `ALICE_SHORT_TOKEN` (or `BROWSER_API_TOKEN`)
+bearer token for direct worker calls, bypassing OAuth. This skips the interactive
+flow and is suitable for automated Playwright operations.
+
 ## First acceptance flow
 
 1. External MCP/plugin client initializes a session and lists tools through API Gateway.
@@ -95,3 +134,4 @@ input bounds, rate limits and tests.
 6. A controlled worker restart restores the same private profile.
 7. Direct anonymous access to worker control routes fails.
 8. Logs/traces contain no cookies, credentials or profile data.
+9. (Offline flow) Client stores refresh token and uses it to obtain new access tokens on expiry.
