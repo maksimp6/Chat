@@ -22,7 +22,9 @@ esac
 
 python -m venv "$venv"
 "$venv/bin/python" -m pip install --disable-pip-version-check --upgrade pip
-"$venv/bin/python" -m pip install --disable-pip-version-check   -r "$repo/requirements.txt"   -r "$repo/requirements-dev.txt"
+"$venv/bin/python" -m pip install --disable-pip-version-check \
+  -r "$repo/requirements.txt" \
+  -r "$repo/requirements-dev.txt"
 
 (
   cd "$repo"
@@ -43,7 +45,8 @@ trap 'rm -rf "$smoke_dir"' EXIT
 (
   cd "$repo"
   export ALICE_DB_PATH="$smoke_dir/alice-rdc-smoke.db"
-  PATH="$venv/bin:$PATH" "$venv/bin/python" -c     'import app; assert app.app.test_client().get("/healthz").status_code == 200'
+  PATH="$venv/bin:$PATH" "$venv/bin/python" -c \
+    'import app; assert app.app.test_client().get("/healthz").status_code == 200'
 )
 
 printf 'Alice RDC development environment ready\n'
