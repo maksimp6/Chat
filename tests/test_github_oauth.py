@@ -327,11 +327,16 @@ def test_bootstrap_cannot_mint_token_for_promoted_user(temp_db):
 
 
 def test_bootstrap_refuses_rows_that_are_no_longer_anonymous(temp_db):
+    from agent_memory.runtime_store import get_runtime_memory_db
+    from agent_memory.user_identity_store import UserIdentityStore
+
     anon = register_anonymous_user("web-installation-0004", {})
-    conn = db.get_conn()
-    conn.execute("UPDATE users SET status = 'github' WHERE id = ?", (anon["user_id"],))
-    conn.commit()
-    conn.close()
+    store = UserIdentityStore(get_runtime_memory_db(db.memory_file_path()))
+    state = store.load()
+    assert state is not None
+    state["users"][anon["user_id"]]["status"] = "github"
+    store.save(state)
+
     with pytest.raises(ValueError):
         register_anonymous_user("web-installation-0004", {})
 
@@ -386,34 +391,49 @@ def test_logout_works_after_gate_session_expired(github_env, monkeypatch):
 
 
 def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypatch):
+    import threading
+    import time
+
     import user_identity
 
     anon = register_anonymous_user("web-installation-0006", {})
-    real_get_conn = user_identity.get_conn
+    bootstrap_read = threading.Event()
+    release_bootstrap = threading.Event()
+    original_find = user_identity._find_user_by_installation
+
+    def blocked_find(state, installation_id):
+        result = original_find(state, installation_id)
+        bootstrap_read.set()
+        assert release_bootstrap.wait(timeout=5)
+        return result
+
+    monkeypatch.setattr(user_identity, "_find_user_by_installation", blocked_find)
+
+    bootstrap_result = {}
     promoted = {}
 
-    class _PromoteAfterRead:
-        """Runs a GitHub sign-in between bootstrap's read and its write."""
+    bootstrap = threading.Thread(
+        target=lambda: bootstrap_result.update(register_anonymous_user("web-installation-0006", {}))
+    )
+    bootstrap.start()
+    assert bootstrap_read.wait(timeout=5)
 
-        def __init__(self, conn):
-            self._conn = conn
+    github = threading.Thread(
+        target=lambda: promoted.update(sign_in_with_github(4, "octocat", anon["user_id"]))
+    )
+    github.start()
+    time.sleep(0.05)
+    assert github.is_alive(), "GitHub promotion bypassed the identity write lock"
 
-        def execute(self, sql, params=()):
-            if sql.lstrip().startswith("UPDATE users") and not promoted:
-                promoted["started"] = True
-                promoted.update(sign_in_with_github(4, "octocat", anon["user_id"]))
-            return self._conn.execute(sql, params)
+    release_bootstrap.set()
+    bootstrap.join(timeout=5)
+    github.join(timeout=5)
 
-        def __getattr__(self, name):
-            return getattr(self._conn, name)
-
-    monkeypatch.setattr(user_identity, "get_conn", lambda: _PromoteAfterRead(real_get_conn()))
-    with pytest.raises(ValueError):
-        register_anonymous_user("web-installation-0006", {})
-    monkeypatch.setattr(user_identity, "get_conn", real_get_conn)
-
+    assert not bootstrap.is_alive()
+    assert not github.is_alive()
     assert promoted["user_id"] == anon["user_id"]
     assert authenticate_user_token(promoted["auth_token"]) == anon["user_id"]
+    assert authenticate_user_token(bootstrap_result["auth_token"]) is None
 
 
 def test_single_user_owner_fallback_is_not_used_for_sign_in(github_env, temp_db, monkeypatch):

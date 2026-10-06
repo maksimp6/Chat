@@ -13,7 +13,7 @@ from typing import Optional, TypedDict
 
 from agent_memory.conversation_ownership_migration import ensure_conversation_ownership_migrated
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
-from agent_memory.file_memory_db import FileMemoryDB
+from agent_memory.runtime_store import get_runtime_memory_db
 from db import get_conversations, memory_file_path
 
 _OWNERSHIP_LOCK = RLock()
@@ -42,7 +42,7 @@ def _conversation_rows() -> list[ConversationView]:
 
 
 def _store() -> ConversationOwnershipStore:
-    store = ConversationOwnershipStore(FileMemoryDB(memory_file_path()))
+    store = ConversationOwnershipStore(get_runtime_memory_db(memory_file_path()))
     ensure_conversation_ownership_migrated(store)
     return store
 
