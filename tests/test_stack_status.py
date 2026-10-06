@@ -7,10 +7,20 @@ def test_stack_status_resolves_root_and_mermaid(monkeypatch):
     class Result:
         stdout = json.dumps(
             [
-                {"number": 877, "state": "open", "head": {"ref": "root"}, "base": {"ref": "master"}},
+                {
+                    "number": 877,
+                    "state": "open",
+                    "head": {"ref": "root"},
+                    "base": {"ref": "master"},
+                },
                 {"number": 878, "state": "open", "head": {"ref": "child"}, "base": {"ref": "root"}},
                 {"number": 879, "state": "open", "head": {"ref": "leaf"}, "base": {"ref": "child"}},
-                {"number": 999, "state": "open", "head": {"ref": "other"}, "base": {"ref": "master"}},
+                {
+                    "number": 999,
+                    "state": "open",
+                    "head": {"ref": "other"},
+                    "base": {"ref": "master"},
+                },
             ]
         )
 
