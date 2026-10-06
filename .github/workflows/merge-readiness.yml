@@ -2,14 +2,14 @@ name: Merge readiness snapshot
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited, closed]
   pull_request_review:
     types: [submitted, dismissed]
 
 permissions:
   contents: read
   checks: read
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: merge-readiness-${{ github.event.pull_request.number }}
@@ -19,7 +19,6 @@ jobs:
   readiness:
     name: Merge readiness snapshot
     if: >-
-      github.event.pull_request.base.ref == 'master' &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
@@ -110,3 +109,44 @@ jobs:
 
           cat "$result_file"
           emit_summary
+
+      - name: Update stack status comment
+        if: always() && github.event.pull_request.state == 'open'
+        shell: bash
+        run: |
+          set -euo pipefail
+          result_file="$RUNNER_TEMP/merge-readiness.json"
+          [ -f "$result_file" ] || exit 0
+          marker='<!-- alice-stack-readiness -->'
+          body_file="$RUNNER_TEMP/stack-comment.md"
+          python - "$result_file" "$body_file" <<'PY'
+          import json
+          import sys
+
+          result_path, body_path = sys.argv[1:]
+          with open(result_path, encoding="utf-8") as handle:
+              result = json.load(handle)
+          status = "PASS" if result.get("ready") else "BLOCKED"
+          blockers = result.get("blockers", [])
+          lines = [
+              "<!-- alice-stack-readiness -->",
+              "### Stack readiness",
+              "",
+              f"- PR: #{result.get('pr_number')}",
+              f"- Role: `{result.get('stack_role', 'unknown')}`",
+              f"- Exact head: `{result.get('head_sha') or 'unknown'}`",
+              f"- Merge: **{status}**",
+          ]
+          if blockers:
+              lines += ["", "Blockers:"]
+              lines += [f"- {item.get('detail', item.get('code', 'unknown blocker'))}" for item in blockers]
+          with open(body_path, "w", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
+
+          comment_id="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100"             --jq '.[] | select(.body | contains("<!-- alice-stack-readiness -->")) | .id' | head -n1)"
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"               -F body=@"$body_file" >/dev/null
+          else
+            gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments"               -F body=@"$body_file" >/dev/null
+          fi
