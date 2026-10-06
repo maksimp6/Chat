@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "merge-readiness.yml"
@@ -25,6 +27,10 @@ def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
     required_checks = [
+        "Platform changes",
+        "CI required",
+        "Infrastructure tests",
+        "MCP worker tests",
         "Application tests",
         "PostgreSQL integration",
         "Android debug APK",
@@ -71,3 +77,13 @@ def test_merge_readiness_trigger_policy_avoids_comment_churn() -> None:
     # scripts/merge_readiness.py when a supported readiness event runs.
     assert "pull_request_review_comment:" not in trigger_block
     assert "pull_request_review_thread:" not in trigger_block
+
+
+def test_merge_readiness_required_checks_cover_every_ci_job() -> None:
+    workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    ci = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    configured = {
+        name.strip()
+        for name in workflow["jobs"]["readiness"]["env"]["MERGE_REQUIRED_CHECKS"].split(",")
+    }
+    assert {job["name"] for job in ci["jobs"].values()} <= configured
