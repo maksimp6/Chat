@@ -12,10 +12,10 @@ Found **2 confirmed documentation drifts** and **1 incomplete feature documentat
 
 1. **Memory DB Implementation vs. Documentation** (CRITICAL)
    - **Where**: `docs/memory/overview.md` vs. `agent_memory/file_memory_db.py`, `memory_manager.py`
-   - **What the code does**: 
+   - **What the code does**:
      - Merged PRs #856 (#42a7259) and #857 (#b8a5b00) implement FileMemoryDB - a durable, single-file append-only database with verified backup/restore
      - Tests in `tests/test_file_memory_db.py` and `tests/test_memory_backup.py` prove durability
-   - **What the docs say**: 
+   - **What the docs say**:
      - `docs/memory/overview.md` claims data is stored "in оперативной памяти" (in RAM)
      - Says `memory_manager.py` manages in-memory data
    - **Reality**:
@@ -27,7 +27,7 @@ Found **2 confirmed documentation drifts** and **1 incomplete feature documentat
 
 2. **OAuth offline_access Support Not Documented**
    - **Where**: `deploy/chrome-worker/oauth.mjs` vs. architecture/deployment docs
-   - **What the code does**: 
+   - **What the code does**:
      - Lines 6-7: `SUPPORTED_SCOPES = ["browser", "offline_access"]`
      - Normalizes and handles offline_access scope for ChatGPT OAuth
      - Tests in `deploy/chrome-worker/oauth.test.mjs` cover offline access end-to-end (#7119e41)
@@ -48,16 +48,17 @@ Found **2 confirmed documentation drifts** and **1 incomplete feature documentat
 ## Recommended Actions
 
 ### Immediate (Block Issue #776 Wave 1 Integration)
+
 1. **Create Issue**: "docs(memory): update overview for current SQL-backed model and FileMemoryDB transition"
    - Update `docs/memory/overview.md` to reflect reality
    - Document that FileMemoryDB is implemented but not yet integrated
    - Link to #776 migration plan
-   
 2. **Create Doc PR**: "docs(oauth): add offline_access support to ChatGPT OAuth flow"
    - Target: New section in `docs/architecture/chatgpt-browser-tool.md` or standalone `docs/platform/oauth-flows.md`
    - Content: Offline token scope, refresh flow, integration with short-token bridge
 
 ### Follow-up (After Issue #776 Wave 1)
+
 - Once `memory_manager.py` and `memory_extractor.py` are migrated to FileMemoryDB, update `docs/memory/overview.md` to reflect durable storage model
 
 ## Files Involved
