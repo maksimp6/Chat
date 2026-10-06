@@ -390,7 +390,7 @@ function permitFixture() {
   const request = (value = nonce) => ({ rawHeaders: ["X-Alice-Rdc-Control", value], headers: { "x-alice-rdc-control": value } });
   write();
   return { directory, file, projectId, nonce, permit, canonical, write, request,
-    authorize: (value) => controlPermit(value, { file, projectId }),
+    authorize: (value, action = "checkpoint") => controlPermit(value, { file, projectId }, action),
     remove: () => fs.rmSync(directory, { recursive: true, force: true }) };
 }
 
@@ -565,5 +565,65 @@ test("pairing redirect accepts only current bounded official HTTPS handoff", { t
     h.signals.emit("SIGTERM");
     assert.equal(await running, 0);
     fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+
+test("secret import permit is action-scoped and HTTP boundary never echoes plaintext", { timeout: 5000 }, async () => {
+  const p = permitFixture();
+  p.write({ action: "secret_import" });
+  assert.equal(p.authorize(p.request(), "secret_import"), true);
+  assert.equal(p.authorize(p.request(), "checkpoint"), false);
+
+  const { h, rdcStarted } = cloudHarness();
+  let port;
+  let imported;
+  const running = superviseCloudRdc(["remote"], {
+    ...h,
+    port: 0,
+    controlPermitOptions: { file: p.file, projectId: p.projectId },
+    importSecret: async (alias, body) => {
+      imported = { alias, body: body.toString("utf8") };
+      return { fingerprint: "synthetic-fingerprint" };
+    },
+    onListening: (value) => { port = value; },
+  });
+  const rdc = await rdcStarted;
+  try {
+    const endpoint = `http://127.0.0.1:${port}/rdc/secrets`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "x-alice-rdc-control": p.nonce,
+        "x-alice-secret-alias": "rdc.git.ssh",
+        "content-type": "application/octet-stream",
+      },
+      body: "synthetic-private-value",
+    });
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert(!text.includes("synthetic-private-value"));
+    assert.deepEqual(JSON.parse(text), {
+      status: "stored",
+      alias: "rdc.git.ssh",
+      fingerprint: "synthetic-fingerprint",
+    });
+    assert.deepEqual(imported, { alias: "rdc.git.ssh", body: "synthetic-private-value" });
+
+    const wrongAlias = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "x-alice-rdc-control": p.nonce,
+        "x-alice-secret-alias": "other.secret",
+        "content-type": "application/octet-stream",
+      },
+      body: "x",
+    });
+    assert.equal(wrongAlias.status, 400);
+  } finally {
+    rdc.emit("exit", 0, null);
+    h.signals.emit("SIGTERM");
+    await running;
+    p.remove();
   }
 });

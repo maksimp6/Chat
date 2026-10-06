@@ -94,7 +94,7 @@ async function beforeDeadline(pending, deadline) {
   } finally { clearTimeout(timer); }
 }
 
-function controlPermit(request, options = {}) {
+function controlPermit(request, options = {}, expectedAction = "checkpoint") {
   let fd;
   try {
     const headerCount = request.rawHeaders.filter((_value, index) => index % 2 === 0 &&
@@ -117,7 +117,7 @@ function controlPermit(request, options = {}) {
         "action,container_name,expires_at,issued_at,project_id,schema,sha256") return false;
     const canonical = JSON.stringify(Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))) + "\n";
     const now = options.now ?? Math.floor(Date.now() / 1000);
-    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== "checkpoint" ||
+    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== expectedAction ||
         value.project_id !== project || value.container_name !== "rdc-" + project.replaceAll("-", "").slice(0, 12) ||
         !Number.isSafeInteger(value.issued_at) || !Number.isSafeInteger(value.expires_at) ||
         value.issued_at < 0 || value.issued_at > now || value.expires_at <= now ||
@@ -367,6 +367,40 @@ async function superviseCloudRdc(argv, options = {}) {
         const href = !stopping && !quiescing && !summary.paired && pairingHandoff(handoffFile);
         if (href) response.writeHead(303, { Location: href }).end();
         else response.writeHead(404).end('{"status":"pairing_unavailable"}');
+      } else if (request.method === "POST" && request.url === "/rdc/secrets") {
+        if (!controlPermit(request, options.controlPermitOptions, "secret_import")) {
+          request.resume();
+          response.writeHead(403).end('{"status":"control_denied"}');
+          return;
+        }
+        const alias = request.headers["x-alice-secret-alias"];
+        const length = Number(request.headers["content-length"] || 0);
+        if (request.headers["transfer-encoding"] || alias !== "rdc.git.ssh" ||
+            !Number.isSafeInteger(length) || length < 1 || length > 16384) {
+          request.resume();
+          response.writeHead(400).end('{"status":"invalid_request"}');
+          return;
+        }
+        const chunks = [];
+        let received = 0;
+        for await (const chunk of request) {
+          received += chunk.length;
+          if (received > 16384) {
+            response.writeHead(413).end('{"status":"too_large"}');
+            return;
+          }
+          chunks.push(chunk);
+        }
+        if (received !== length || typeof options.importSecret !== "function") {
+          response.writeHead(503).end('{"status":"secret_import_unavailable"}');
+          return;
+        }
+        try {
+          const metadata = await options.importSecret(alias, Buffer.concat(chunks));
+          response.writeHead(200).end(JSON.stringify({ status: "stored", alias, ...metadata }));
+        } catch {
+          response.writeHead(503).end('{"status":"secret_import_failed"}');
+        }
       } else if (request.method === "POST" && request.url === "/checkpoint") {
         if (!authorize(request)) {
           request.resume();
