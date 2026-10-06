@@ -1,3 +1,5 @@
 # Cloud.ru Container Apps IDs that must never survive an Alice Dev deployment.
 # One provider container UUID per line. Entries are permanent tombstones.
 # Do not add the currently accepted commit container here until it is intentionally retired.
+
+f7b3a3d9-0465-4c75-b393-85a18e07dea6

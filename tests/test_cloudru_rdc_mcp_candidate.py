@@ -245,6 +245,8 @@ def test_tombstone_that_is_already_absent_is_a_noop(monkeypatch, tmp_path):
 
 
 def test_tombstone_survivor_fails_closed(monkeypatch, tmp_path):
+    monkeypatch.setattr(candidate.time, "monotonic", iter([0, 91]).__next__)
+    monkeypatch.setattr(candidate.time, "sleep", lambda _: None)
     identifier = "11111111-1111-1111-1111-111111111111"
     tombstones = tmp_path / "delete.txt"
     tombstones.write_text(identifier + "\n")
@@ -298,3 +300,20 @@ def test_inventory_reports_all_alice_dev_public_addresses():
             "status": "IDLE",
         },
     ]
+
+
+def test_tombstone_waits_for_async_cloudru_deletion(monkeypatch, tmp_path):
+    identifier = "11111111-1111-1111-1111-111111111111"
+    tombstones = tmp_path / "delete.txt"
+    tombstones.write_text(identifier + "\n")
+    monkeypatch.setattr(candidate, "TOMBSTONES", tombstones)
+    monkeypatch.setenv("CLOUDRU_PROJECT_ID", PROJECT)
+    monkeypatch.setattr(candidate.time, "monotonic", iter([0, 1]).__next__)
+    sleeps = []
+    monkeypatch.setattr(candidate.time, "sleep", lambda seconds: sleeps.append(seconds))
+    item = {"id": identifier, "name": "alice-dev-old"}
+    apps = TombstoneApps([[item], [item], []])
+
+    assert candidate.purge_tombstones(apps) == [identifier]
+    assert apps.deleted == ["alice-dev-old"]
+    assert sleeps == [3]
