@@ -94,9 +94,7 @@ def test_candidate_refuses_to_take_over_existing_resource(monkeypatch):
 
 def test_lightweight_dockerfile_has_no_browser_packages():
     root = Path(__file__).resolve().parents[1]
-    source = (
-        root / "deploy" / "remote-desktop-commander" / "Dockerfile.mcp"
-    ).read_text()
+    source = (root / "deploy" / "remote-desktop-commander" / "Dockerfile.mcp").read_text()
 
     assert "chromium" not in source.lower()
     assert "fonts-liberation" not in source.lower()
@@ -105,8 +103,6 @@ def test_lightweight_dockerfile_has_no_browser_packages():
 
 def test_gateway_blocks_pdf_tool():
     root = Path(__file__).resolve().parents[1]
-    source = (
-        root / "deploy" / "remote-desktop-commander" / "mcp-gateway.mjs"
-    ).read_text()
+    source = (root / "deploy" / "remote-desktop-commander" / "mcp-gateway.mjs").read_text()
 
     assert 'new Set(["write_pdf"])' in source
