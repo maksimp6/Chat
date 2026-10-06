@@ -6,7 +6,7 @@ const { setTimeout: delay } = require("node:timers/promises");
 const { createServer } = require("node:http");
 const { promisify } = require("node:util");
 const { createHash, timingSafeEqual } = require("node:crypto");
-const { join } = require("node:path");
+const { dirname, join } = require("node:path");
 
 const execute = promisify(execFile);
 const HELPER_TIMEOUT_MS = Object.freeze({ status: 60000, "save-auth": 60000, checkpoint: 120000, restore: 120000 });
@@ -32,7 +32,7 @@ const browserArgs = [
 async function receiveGitKey(request, options = {}) {
   const limit = options.limit ?? 16384;
   const target = options.target ?? "/workspace/.secrets/id_ed25519";
-  const directory = join(target, "..");
+  const directory = dirname(target);
   const declared = Number(request.headers["content-length"] || 0);
   if (request.headers["transfer-encoding"] || !Number.isSafeInteger(declared) || declared < 1 || declared > limit) {
     request.resume();
