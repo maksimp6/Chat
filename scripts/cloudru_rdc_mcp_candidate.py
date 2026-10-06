@@ -61,7 +61,7 @@ def build_image(root: Path, sha: str) -> str:
 def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -> dict:
     project = project_id()
     name = candidate_name(project)
-    if apps.get(name) is not None:
+    if apps.find_for_deploy(name) is not None:
         fail("already_exists")
     spec = ContainerSpec(
         name=name,
