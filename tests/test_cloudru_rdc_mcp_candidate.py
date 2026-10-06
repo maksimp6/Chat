@@ -30,7 +30,7 @@ class FakeApps:
             "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
         }
 
-    def get(self, name):
+    def find_for_deploy(self, name):
         assert name == "alice-dev-22706bfa6066"
         return self.existing
 

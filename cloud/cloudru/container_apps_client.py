@@ -192,6 +192,42 @@ class CloudRuContainerAppsClient:
                 return None
             raise
 
+    def find_for_deploy(
+        self,
+        name: str,
+        *,
+        transient_attempts: int = 3,
+        retry_delay_s: float = 1.0,
+    ) -> dict[str, Any] | None:
+        """Resolve a deploy target without treating Cloud.ru HTTP 499 as not-found."""
+        if transient_attempts < 1:
+            raise CloudProviderError(
+                "transient_attempts must be positive",
+                code="validation_error",
+            )
+
+        last_499: CloudProviderError | None = None
+        for attempt in range(transient_attempts):
+            try:
+                return self.get(name)
+            except CloudProviderError as exc:
+                if exc.http_status != 499:
+                    raise
+                last_499 = exc
+                if attempt + 1 < transient_attempts:
+                    self._sleep(retry_delay_s)
+
+        inventory = self.list(require_total=True)
+        matches = [item for item in inventory if item.get("name") == self._name(name)]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            return None
+        raise CloudProviderError(
+            f"Cloud.ru Container Apps inventory contains duplicate name '{name}'",
+            code="invalid_response",
+        ) from last_499
+
     def list(
         self,
         *,
