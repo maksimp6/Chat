@@ -13,7 +13,7 @@ COPY --from=node-runtime /usr/local/ /usr/local/
 
 RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
     && apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-      bash ca-certificates curl git openssh-client ripgrep tini \
+      bash bash-completion ca-certificates curl file git jq less make openssh-client patch procps ripgrep tini tree unzip vim \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip install --no-cache-dir --upgrade pip \
     && python --version | grep -E '^Python 3\.14\.' \
