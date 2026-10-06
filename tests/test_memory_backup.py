@@ -61,6 +61,16 @@ def test_restore_rejects_missing_commit_marker(tmp_path):
         restore_backup(backup, tmp_path / "restored.memory")
 
 
+def test_restore_rejects_missing_payload(tmp_path):
+    db = _source(tmp_path)
+    backup = tmp_path / "backup"
+    create_backup(db, backup)
+    (backup / PAYLOAD_NAME).unlink()
+
+    with pytest.raises(MemoryBackupError, match="payload is missing"):
+        restore_backup(backup, tmp_path / "restored.memory")
+
+
 def test_restore_rejects_checksum_mismatch(tmp_path):
     db = _source(tmp_path)
     backup = tmp_path / "backup"
