@@ -33,18 +33,18 @@ async function readJson(request) {
 }
 
 export async function startGateway(options = {}) {
-  const token = options.token ?? process.env.ALICE_RDC_MCP_TOKEN ?? "";
+  const token = options.token ?? process.env.ALICE_SHORT_TOKEN ?? "";
   if (!token) throw new Error("MCP token is required");
   const upstream = options.upstream ?? new Client(
-    { name: "alice-rdc-mcp-gateway", version: "0.1.0" },
+    { name: "alice-dev-gateway", version: "0.1.0" },
     { capabilities: {} },
   );
   let transport = options.upstreamTransport;
   if (!transport) {
     transport = new StdioClientTransport({
       command: process.execPath,
-      args: [process.env.ALICE_RDC_MCP_UPSTREAM || DEFAULT_UPSTREAM, "--no-onboarding"],
-      cwd: process.env.ALICE_RDC_MCP_CWD || "/workspace",
+      args: [process.env.ALICE_DEV_UPSTREAM || DEFAULT_UPSTREAM, "--no-onboarding"],
+      cwd: process.env.ALICE_DEV_CWD || "/workspace",
       env: { ...process.env },
       stderr: "pipe",
     });
@@ -54,7 +54,7 @@ export async function startGateway(options = {}) {
 
   const makeServer = () => {
     const server = new Server(
-      { name: "alice-rdc-mcp-gateway", version: "0.1.0" },
+      { name: "alice-dev-gateway", version: "0.1.0" },
       { capabilities: { tools: {} } },
     );
     server.setRequestHandler(ListToolsRequestSchema, async (request) => {
@@ -63,7 +63,7 @@ export async function startGateway(options = {}) {
     });
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (BLOCKED_TOOLS.has(request.params.name)) {
-        throw new Error("tool_not_available_in_lightweight_rdc");
+        throw new Error("tool_not_available_in_alice_dev");
       }
       return upstream.callTool(request.params);
     });
@@ -88,7 +88,7 @@ export async function startGateway(options = {}) {
       request.resume();
       response.writeHead(401, {
         "Content-Type": "application/json",
-        "WWW-Authenticate": 'Bearer realm="alice-rdc-mcp"',
+        "WWW-Authenticate": 'Bearer realm="alice-dev"',
       }).end('{"status":"unauthorized"}');
       return;
     }

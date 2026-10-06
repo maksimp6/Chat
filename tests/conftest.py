@@ -64,7 +64,9 @@ def _make_lazy_postgres_reset_connector(connect_postgres, lock_factory=threading
 
 
 @pytest.fixture(autouse=True)
-def isolate_selected_database(request, monkeypatch):
+def isolate_selected_database(request, monkeypatch, tmp_path):
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+
     database_url = os.environ.get("ALICE_DATABASE_URL", "").strip()
     if not database_url:
         yield
