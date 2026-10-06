@@ -3,6 +3,15 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { dirname } from "node:path";
 
 const SCOPE = "browser";
+const SUPPORTED_SCOPES = ["browser", "offline_access"];
+function normalizeScopes(value = SCOPE) {
+  const requested = [...new Set(String(value).trim().split(/\s+/).filter(Boolean))];
+  if (!requested.includes(SCOPE) || requested.some((scope) => !SUPPORTED_SCOPES.includes(scope))) return null;
+  return SUPPORTED_SCOPES.filter((scope) => requested.includes(scope)).join(" ");
+}
+function includesScope(value, expected) {
+  return String(value).split(/\s+/).includes(expected);
+}
 // ChatGPT caches its dynamically registered client and reuses the client_id on
 // later attempts; a short expiry made retries fail with invalid_client. Anonymous
 // registrations are bounded: a week of validity, and at capacity the oldest
@@ -159,14 +168,14 @@ export function createOAuth(options = {}) {
     revocation_endpoint_auth_methods_supported: ["none"],
     code_challenge_methods_supported: ["S256"],
     authorization_response_iss_parameter_supported: true,
-    scopes_supported: [SCOPE],
+    scopes_supported: SUPPORTED_SCOPES,
   };
 
   function authorize(request) {
     const header = request.headers.authorization;
     if (typeof header !== "string" || !header.startsWith("Bearer ") || header.length > 4096) return false;
     const token = state.access[digest(header.slice(7))];
-    return Boolean(token && token.expires > now() && token.owner === ownerId && token.resource === resource && token.scope === SCOPE);
+    return Boolean(token && token.expires > now() && token.owner === ownerId && token.resource === resource && includesScope(token.scope, SCOPE));
   }
 
   function revokeFamily(family) {
@@ -175,13 +184,13 @@ export function createOAuth(options = {}) {
     }
   }
 
-  function issue(client, family = random()) {
+  function issue(client, family = random(), scope = SCOPE) {
     const access = random();
     const refresh = random();
-    const shared = { client, family, owner: ownerId, resource, scope: SCOPE };
+    const shared = { client, family, owner: ownerId, resource, scope };
     state.access[digest(access)] = { ...shared, expires: now() + ACCESS_TTL };
     state.refresh[digest(refresh)] = { ...shared, expires: now() + REFRESH_TTL, used: false };
-    return { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh, scope: SCOPE };
+    return { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh, scope };
   }
 
   async function register(request, response) {
@@ -190,14 +199,15 @@ export function createOAuth(options = {}) {
     registrations.push(now());
     const input = await body(request, "application/json");
     if (!Array.isArray(input.redirect_uris) || !input.redirect_uris.length || input.redirect_uris.length > 10 || !input.redirect_uris.every((uri) => typeof uri === "string" && uri.length <= 2048 && validRedirect(uri))) return json(response, 400, { error: "invalid_redirect_uri" });
-    if ((input.token_endpoint_auth_method && input.token_endpoint_auth_method !== "none") || (input.grant_types && (!Array.isArray(input.grant_types) || input.grant_types.some((grant) => !metadata.grant_types_supported.includes(grant)))) || (input.response_types && (!Array.isArray(input.response_types) || input.response_types.some((type) => type !== "code"))) || (input.scope && input.scope !== SCOPE)) return json(response, 400, { error: "invalid_client_metadata" });
+    const registeredScope = normalizeScopes(input.scope ?? SUPPORTED_SCOPES.join(" "));
+    if ((input.token_endpoint_auth_method && input.token_endpoint_auth_method !== "none") || (input.grant_types && (!Array.isArray(input.grant_types) || input.grant_types.some((grant) => !metadata.grant_types_supported.includes(grant)))) || (input.response_types && (!Array.isArray(input.response_types) || input.response_types.some((type) => type !== "code"))) || !registeredScope) return json(response, 400, { error: "invalid_client_metadata" });
     if (Object.keys(state.clients).length >= MAX_CLIENTS) {
       const oldest = Object.entries(state.clients).filter(([, entry]) => entry.provisional_expires).sort((a, b) => a[1].provisional_expires - b[1].provisional_expires)[0];
       if (!oldest) return json(response, 429, { error: "registration_limit" });
       delete state.clients[oldest[0]];
     }
     const clientId = random();
-    const client = { client_id: clientId, client_id_issued_at: now(), client_name: String(input.client_name ?? "MCP client").slice(0, 100), redirect_uris: [...new Set(input.redirect_uris)], token_endpoint_auth_method: "none", grant_types: metadata.grant_types_supported, response_types: ["code"], scope: SCOPE };
+    const client = { client_id: clientId, client_id_issued_at: now(), client_name: String(input.client_name ?? "MCP client").slice(0, 100), redirect_uris: [...new Set(input.redirect_uris)], token_endpoint_auth_method: "none", grant_types: metadata.grant_types_supported, response_types: ["code"], scope: registeredScope };
     state.clients[clientId] = { ...client, provisional_expires: now() + PROVISIONAL_CLIENT_SECONDS };
     await save();
     json(response, 201, client);
@@ -208,7 +218,10 @@ export function createOAuth(options = {}) {
     const params = Object.fromEntries(url.searchParams);
     const client = Object.hasOwn(state.clients, params.client_id) ? state.clients[params.client_id] : null;
     if (!client || !client.redirect_uris.includes(params.redirect_uri)) return json(response, 400, { error: "invalid_client" });
-    if (params.response_type !== "code" || params.resource !== resource || (params.scope && params.scope !== SCOPE) || params.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(params.code_challenge ?? "") || (params.state?.length ?? 0) > 1024) return json(response, 400, { error: "invalid_request" });
+    const requestedScope = normalizeScopes(params.scope ?? SCOPE);
+    const registeredScopes = new Set(client.scope.split(/\s+/));
+    if (params.response_type !== "code" || params.resource !== resource || !requestedScope || requestedScope.split(/\s+/).some((scope) => !registeredScopes.has(scope)) || params.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(params.code_challenge ?? "") || (params.state?.length ?? 0) > 1024) return json(response, 400, { error: "invalid_request" });
+    params.scope = requestedScope;
     if (Object.keys(state.pending).length >= 1000) return json(response, 429, { error: "authorization_limit" });
     const transaction = random();
     state.pending[digest(transaction)] = { ...params, expires: now() + 600, started: false };
@@ -242,7 +255,7 @@ export function createOAuth(options = {}) {
     if (!Object.hasOwn(state.clients, pending.client_id)) return json(response, 400, { error: "invalid_client" });
     delete state.clients[pending.client_id].provisional_expires;
     const authorizationCode = random();
-    state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, expires: now() + 300, used: false };
+    state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, scope: pending.scope ?? SCOPE, expires: now() + 300, used: false };
     await save({ checkpoint: false });
     const target = new URL(pending.redirect_uri);
     target.searchParams.set("iss", issuer);
@@ -254,14 +267,15 @@ export function createOAuth(options = {}) {
   async function token(request, response) {
     const input = await body(request, "application/x-www-form-urlencoded");
     if (!Object.hasOwn(state.clients, input.client_id)) return json(response, 401, { error: "invalid_client" });
-    if (input.resource !== resource || (input.scope && input.scope !== SCOPE)) return json(response, 400, { error: "invalid_target" });
+    if (input.resource !== resource) return json(response, 400, { error: "invalid_target" });
     if (input.grant_type === "authorization_code") {
       const code = state.codes[digest(input.code ?? "")];
-      if (!code || code.client !== input.client_id || code.redirect !== input.redirect_uri || code.owner !== ownerId || code.resource !== resource || code.expires <= now() || !/^[A-Za-z0-9._~-]{43,128}$/.test(input.code_verifier ?? "") || !equal(digest(input.code_verifier), code.challenge)) return json(response, 400, { error: "invalid_grant" });
+      const requestedScope = input.scope ? normalizeScopes(input.scope) : code?.scope;
+      if (!code || !requestedScope || requestedScope !== code.scope || code.client !== input.client_id || code.redirect !== input.redirect_uri || code.owner !== ownerId || code.resource !== resource || code.expires <= now() || !/^[A-Za-z0-9._~-]{43,128}$/.test(input.code_verifier ?? "") || !equal(digest(input.code_verifier), code.challenge)) return json(response, 400, { error: "invalid_grant" });
       if (code.used) { revokeFamily(code.family); await save(); return json(response, 400, { error: "invalid_grant" }); }
       code.used = true;
       code.family = random();
-      const result = issue(input.client_id, code.family);
+      const result = issue(input.client_id, code.family, code.scope);
       await save();
       return json(response, 200, result);
     }
@@ -270,7 +284,7 @@ export function createOAuth(options = {}) {
       if (!refresh || refresh.client !== input.client_id || refresh.owner !== ownerId || refresh.resource !== resource || refresh.expires <= now()) return json(response, 400, { error: "invalid_grant" });
       if (refresh.used) { revokeFamily(refresh.family); await save(); return json(response, 400, { error: "invalid_grant" }); }
       refresh.used = true;
-      const result = issue(input.client_id, refresh.family);
+      const result = issue(input.client_id, refresh.family, refresh.scope);
       await save();
       return json(response, 200, result);
     }
@@ -293,7 +307,7 @@ export function createOAuth(options = {}) {
     if (!path.startsWith(`${OAUTH_PATH}/`) && !resourcePaths.includes(path) && !issuerPaths.includes(path)) return false;
     try {
       prune();
-      if (request.method === "GET" && resourcePaths.includes(path)) json(response, 200, { resource, authorization_servers: [issuer], scopes_supported: [SCOPE], bearer_methods_supported: ["header"] });
+      if (request.method === "GET" && resourcePaths.includes(path)) json(response, 200, { resource, authorization_servers: [issuer], scopes_supported: SUPPORTED_SCOPES, bearer_methods_supported: ["header"] });
       else if (request.method === "GET" && issuerPaths.includes(path)) json(response, 200, metadata);
       else if (request.method === "POST" && path === `${OAUTH_PATH}/register`) await register(request, response);
       else if (request.method === "GET" && path === `${OAUTH_PATH}/authorize`) await begin(request, response, url);
