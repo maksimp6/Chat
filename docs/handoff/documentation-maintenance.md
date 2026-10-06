@@ -1,6 +1,6 @@
 # Сверка документации с master
 
-Состояние на 2026-10-06, master `d365c05`.
+Состояние на 2026-10-06, master `d1c235b` (исходный снимок `d365c05`).
 
 ## Базовый аудит (завершён)
 
@@ -19,34 +19,44 @@
 
 Каждый проход отчитывается: проверенный диапазон master, проверенные смерженные PR, затронутые docs, что изменено, что оставлено как актуальное, какие открытые PR проигнорированы как не shipped.
 
+## Изменения после снимка `d365c05` и их влияние на docs
+
+| PR | docs в master | что ещё нужно |
+|---|---|---|
+| #920 ownership → `alice.memory` | `docs/memory/overview.md` обновлён в самом PR | ничего |
+| #921 identity → file-native aggregate | `docs/memory/overview.md` обновлён в самом PR | строка 8 всё ещё пишет, что Wave 1 «переводит» `user_identity.py`, хотя #921 смержен; раздел «Статус» уже верный |
+| #919, #923 Alice Dev | отдельной страницы нет | после cutover по #906 описать Alice Dev и legacy RDC в `docs/production-deployment.md` (см. [decisions.md](decisions.md)) |
+| #918 | не требует docs | ничего |
+
 ## Watch list
 
 После merge любого из этих пунктов нужна сверка docs:
 
-| пункт | состояние на 2026-10-06 |
+| пункт | состояние на `d1c235b` |
 |---|---|
 | PR #865 chat/history roles | open, не смержен |
 | PR #868 short-token через Secret Store | open, не смержен |
 | #863 DeepSeek как провайдер | Issue open; до merge реализации описывать только как planned |
 | #755 Secret Store boundary и миграция legacy credentials | Issue open |
-| #776 Memory DB (durable file-native, Wave 1) | Issue open; после внедрения FileMemoryDB обновить `docs/memory/overview.md` |
+| #776 Memory DB | Issue open; Wave 1 идёт: ownership (#920) и identity (#921) смержены, sessions/profiles и memory extraction впереди |
+| #906 Alice Dev cutover и вывод legacy RDC | Issue open; деплой Alice Dev и MCP-смоук прошли |
 | #913 шифрование backup | Issue open |
-| Production lifecycle RDC/browser | см. [decisions.md](decisions.md), #869 |
 
 ## Открытые docs-PR
 
 | PR | что делает | основание |
 |---|---|---|
-| #871 | помечает SSH production deployment как deprecated | решение по #869 |
+| #871 | помечает SSH production deployment как deprecated | #869; перед merge сверить текст с пересмотром lifecycle (Alice Dev, legacy RDC) |
 | #884 | `docs/integrations/cloudru-docs-mirror.md`: статус planned → not_planned | #428 закрыт как not planned, crawler-а в master нет |
 | #885 | документирует workflow Work Map / trips.db | переоткрытый #470 |
 | #886 | отделяет runtime agents от repository development roles | переоткрытый #569 |
 
 Все четыре в draft и не смержены, поэтому их содержание пока не shipped.
 
-## Известные расхождения docs (из аудита Issues)
+## Известные расхождения docs
 
-- `docs/production-deployment.md` описывает только SSH (#869, PR #871).
+- `docs/production-deployment.md` описывает только SSH (#869, PR #871) и не знает про Alice Dev (#906).
 - `docs/integrations/cloudru-docs-mirror.md` пишет «Статус: planned» (PR #884).
 - Нет страницы Work Map (#470, PR #885) и навигации по role-based office (#569, PR #886).
+- `docs/memory/overview.md:8` отстаёт от #921 (см. таблицу выше).
 - В теле Issue #409 устарели описания #791 и #843.

@@ -2,10 +2,20 @@
 
 ## 2026-10-06: отказ от SSH-деплоя (#869)
 
-- `cloudru-rdc.yml` единственный production lifecycle.
-- SSH-путь в `production-deploy.yml` считается legacy.
+- SSH-путь в `production-deploy.yml` считается legacy, новых SSH-деплоев нет.
 - Реализация отслеживается в Issue #869 (переоткрыт: docs и workflow ещё не изменены). Draft PR #871 помечает SSH-инструкции как deprecated.
-- После merge реализации #869 docs должны описывать `cloudru-rdc.yml` как канонический путь.
+- Исходная формулировка «`cloudru-rdc.yml` единственный production lifecycle» пересматривается, см. следующий раздел.
+
+## 2026-10-06: Alice Dev вместо RDC (#906, пересмотр lifecycle)
+
+Состояние master `d1c235b`:
+
+- Лёгкий MCP-воркер для кода и выполнения команд теперь называется Alice Dev (#919). Деплой: workflow «Deploy Alice Dev worker» (`.github/workflows/cloudru-rdc-mcp-candidate.yml`), запускается на push в master по путям воркера. Ресурсы 0.2 vCPU / 512 MiB, min=0, max=1, без Chromium, `/mcp` за отдельным bearer token.
+- Legacy RDC (`cloudru-rdc.yml`, сервис `rdc-*` с браузером и рабочим столом) становится legacy и остаётся онлайн до завершения приёмки.
+- План #906: переключить ChatGPT и dev-использование на Alice Dev, выдержать окно отката, затем остановить (не сразу удалить) legacy RDC и только после окна удалить сервис с браузером.
+- После #923 деплой Alice Dev на `d1c235b` прошёл с зелёной публичной MCP-проверкой (run 37490250904). Cutover и остановка legacy RDC ещё не выполнены.
+
+Что считать production lifecycle после cutover, нужно зафиксировать в #869 или #906 и затем в `docs/production-deployment.md`. До этого docs не должны называть `cloudru-rdc.yml` единственным путём.
 
 ## 2026-10-06: шифрование backup Memory DB (#479 → #913)
 
@@ -18,4 +28,4 @@
 - Обязателен тест восстановления зашифрованного snapshot.
 - Шифрование на стороне провайдера (Cloud.ru/S3) только второй слой и не заменяет это требование.
 
-Состояние master: `agent_memory/backup.py` пока выгружает bundle без шифрования.
+Состояние master `d1c235b`: `agent_memory/backup.py` пока выгружает bundle без шифрования. С началом Wave 1 (#920, #921) в `alice.memory` уже лежат ownership и identity, так что #913 становится важнее.
