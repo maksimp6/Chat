@@ -27,12 +27,16 @@ def test_agent_delivery_returns_metadata_not_plaintext():
 
     assert captured == ["synthetic-secret"]
     assert "synthetic-secret" not in repr(result)
-    assert "synthetic-secret" not in json.dumps(result.__dict__ if hasattr(result, "__dict__") else {
-        "alias": result.alias,
-        "purpose": result.purpose,
-        "operation": result.operation,
-        "ok": result.ok,
-    })
+    assert "synthetic-secret" not in json.dumps(
+        result.__dict__
+        if hasattr(result, "__dict__")
+        else {
+            "alias": result.alias,
+            "purpose": result.purpose,
+            "operation": result.operation,
+            "ok": result.ok,
+        }
+    )
 
 
 def test_delivery_enforces_manager_purpose_acl_before_consumer():
