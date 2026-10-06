@@ -659,9 +659,7 @@ def summary(record):
     resources = container["resources"]
     service_state = str(record.get("status", "")).lower()
     return {
-        "status": "CHROME_PRIVATE_RUNNING"
-        if service_state == "running"
-        else "CHROME_STOPPED",
+        "status": "CHROME_PRIVATE_RUNNING" if service_state == "running" else "CHROME_STOPPED",
         "service_state": service_state,
         "container_name": record["name"],
         "container_id": uuid(record["id"]),
