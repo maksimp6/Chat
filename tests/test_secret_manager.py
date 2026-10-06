@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from secret_manager import (
+from secret_store.manager import (
     InMemorySecretAliasStore,
     SecretAlias,
     SecretAliasError,
