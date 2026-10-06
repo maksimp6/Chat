@@ -150,3 +150,57 @@ jobs:
           else
             gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments"               -F body=@"$body_file" >/dev/null
           fi
+
+
+      - name: Refresh root stack status
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack_file="$RUNNER_TEMP/stack-status.json"
+          python scripts/stack_status.py             --repo "$GITHUB_REPOSITORY"             --pr "$PR_NUMBER"             --pretty > "$stack_file"
+
+          root_pr="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["root_pr"])' "$stack_file")"
+          root_result="$RUNNER_TEMP/root-readiness.json"
+
+          set +e
+          python scripts/merge_readiness.py             --repo "$GITHUB_REPOSITORY"             --pr "$root_pr"             --base master             --pretty > "$root_result"
+          set -e
+
+          body_file="$RUNNER_TEMP/root-stack-comment.md"
+          python - "$stack_file" "$root_result" "$body_file" <<'PY'
+          import json
+          import sys
+
+          stack_path, readiness_path, body_path = sys.argv[1:]
+          with open(stack_path, encoding="utf-8") as handle:
+              stack = json.load(handle)
+          with open(readiness_path, encoding="utf-8") as handle:
+              readiness = json.load(handle)
+
+          status = "PASS" if readiness.get("ready") else "BLOCKED"
+          lines = [
+              "<!-- alice-stack-root-readiness -->",
+              "### Stack topology",
+              "",
+              "~~~mermaid",
+              stack["mermaid"],
+              "~~~",
+              "",
+              f"Root #{stack['root_pr']}: **{status}**",
+              f"Exact head: `{readiness.get('head_sha') or 'unknown'}`",
+          ]
+          blockers = readiness.get("blockers", [])
+          if blockers:
+              lines += ["", "Blockers:"]
+              lines += [f"- {item.get('detail', item.get('code', 'unknown blocker'))}" for item in blockers]
+          with open(body_path, "w", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
+
+          comment_id="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$root_pr/comments?per_page=100"             --jq '.[] | select(.body | contains("<!-- alice-stack-root-readiness -->")) | .id' | head -n1)"
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"               -F body=@"$body_file" >/dev/null
+          else
+            gh api --method POST "/repos/$GITHUB_REPOSITORY/issues/$root_pr/comments"               -F body=@"$body_file" >/dev/null
+          fi
