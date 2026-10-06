@@ -102,6 +102,7 @@ STRICT_CLEAN_FILES = {
     "secret_store/admin.py",
     "secret_store/fake_admin.py",
     "secret_store/files.py",
+    "secret_store/delivery.py",
     "agent_memory/backup.py",
     "agent_memory/file_memory_db.py",
     "session_profiles.py",
