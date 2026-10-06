@@ -17,6 +17,9 @@ def test_stack_status_resolves_root_and_mermaid(monkeypatch):
     monkeypatch.setattr(stack_status.subprocess, "run", lambda *args, **kwargs: Result())
     result = stack_status.collect("maksimp6/Chat", 879)
     assert result["root_pr"] == 877
+    assert result["trigger_pr"] == 879
+    assert result["ready"] is False
+    assert set(result["blockers"]) == {"open descendant #878", "open descendant #879"}
     assert result["descendants"] == [878, 879]
     assert "P877 --> P878" in result["mermaid"]
     assert "P878 --> P879" in result["mermaid"]
