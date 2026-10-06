@@ -146,3 +146,159 @@ def test_cloudru_admin_backend_rejects_non_cloudru_reference():
 
     with pytest.raises(ValueError, match="cloudru"):
         backend.rotate(ref, SecretValue("new-secret"))
+
+
+def test_admin_client_requires_parent_for_create():
+    c = CloudRuSecretManagementAdminClient(iam_client=FakeIam(), parent_id="")
+
+    with pytest.raises(CloudProviderError) as error:
+        c.create_secret(name="x", value="synthetic-secret")
+
+    assert error.value.code == "parent_not_configured"
+
+
+def test_admin_client_requires_admin_credentials():
+    class MissingIam:
+        key_id = None
+        key_secret = None
+
+    c = CloudRuSecretManagementAdminClient(iam_client=MissingIam(), parent_id="parent-1")
+
+    with pytest.raises(CloudProviderError) as error:
+        c.create_secret(name="x", value="synthetic-secret")
+
+    assert error.value.code == "auth_not_configured"
+
+
+@pytest.mark.parametrize("method", ["version", "delete"])
+def test_admin_client_rejects_empty_secret_id(method):
+    c = client()
+
+    with pytest.raises(ValueError, match="secret_id"):
+        if method == "version":
+            c.create_version(secret_id=" ", value="synthetic-secret")
+        else:
+            c.delete_secret(" ")
+
+
+def test_admin_client_rejects_empty_secret_value():
+    with pytest.raises(ValueError, match="non-empty"):
+        client().create_version(secret_id="secret-1", value="")
+
+
+def test_admin_client_maps_iam_failure_without_secret(monkeypatch):
+    class BrokenIam(FakeIam):
+        def _token(self):
+            from cloudru_iam import CloudRuIamError
+            raise CloudRuIamError("private-detail")
+
+    c = CloudRuSecretManagementAdminClient(iam_client=BrokenIam(), parent_id="parent-1")
+    c._client.endpoint = lambda _service: "https://secretmanager.api.cloud.ru"
+
+    with pytest.raises(CloudProviderError) as error:
+        c.create_version(secret_id="secret-1", value="synthetic-secret")
+
+    assert error.value.code == "auth_failed"
+    assert "synthetic-secret" not in str(error.value)
+
+
+def test_admin_client_maps_network_failure(monkeypatch):
+    def fail(*args, **kwargs):
+        import requests
+        raise requests.ConnectionError("private-detail")
+
+    monkeypatch.setattr("requests.request", fail)
+
+    with pytest.raises(CloudProviderError) as error:
+        client().create_version(secret_id="secret-1", value="synthetic-secret")
+
+    assert error.value.code == "provider_unavailable"
+    assert "synthetic-secret" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [(401, "auth_failed"), (403, "authorization_failed"), (404, "not_found"),
+     (409, "conflict"), (500, "provider_http_error")],
+)
+def test_admin_client_maps_http_failures(monkeypatch, status, code):
+    monkeypatch.setattr(
+        "requests.request",
+        lambda *args, **kwargs: Response(status=status, payload={"detail": "synthetic-secret"}),
+    )
+
+    with pytest.raises(CloudProviderError) as error:
+        client().create_version(secret_id="secret-1", value="synthetic-secret")
+
+    assert error.value.code == code
+    assert "synthetic-secret" not in str(error.value)
+
+
+def test_admin_client_accepts_empty_success_body(monkeypatch):
+    monkeypatch.setattr("requests.request", lambda *args, **kwargs: Response(status=204))
+    assert client()._request("DELETE", "/v1/secrets/secret-1") == {}
+
+
+def test_admin_client_rejects_invalid_json(monkeypatch):
+    class InvalidJson(Response):
+        def json(self):
+            raise ValueError("private-detail")
+
+    monkeypatch.setattr(
+        "requests.request",
+        lambda *args, **kwargs: InvalidJson(status=200, payload={"x": 1}),
+    )
+
+    with pytest.raises(CloudProviderError) as error:
+        client()._request("POST", "/v1/secrets", {})
+
+    assert error.value.code == "invalid_response"
+
+
+def test_admin_client_rejects_non_object_response(monkeypatch):
+    monkeypatch.setattr(
+        "requests.request",
+        lambda *args, **kwargs: Response(status=200, payload=["wrong"]),
+    )
+
+    with pytest.raises(CloudProviderError) as error:
+        client()._request("POST", "/v1/secrets", {})
+
+    assert error.value.code == "invalid_response"
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"version_id": "v1"}, "v1"),
+        ({"versionId": "v2"}, "v2"),
+        ({"version": {"id": "v3"}}, "v3"),
+        ({"version": {"version_id": "v4"}}, "v4"),
+        ({}, ""),
+    ],
+)
+def test_version_id_shapes(payload, expected):
+    assert CloudRuSecretManagementAdminClient._version_id(payload) == expected
+
+
+def test_create_and_version_reject_missing_ids(monkeypatch):
+    monkeypatch.setattr(
+        "requests.request",
+        lambda *args, **kwargs: Response(status=200, payload={}),
+    )
+
+    with pytest.raises(CloudProviderError) as create_error:
+        client().create_secret(name="x", value="synthetic-secret")
+    assert create_error.value.code == "invalid_response"
+
+    with pytest.raises(CloudProviderError) as version_error:
+        client().create_version(secret_id="secret-1", value="synthetic-secret")
+    assert version_error.value.code == "invalid_response"
+
+
+def test_cloudru_admin_backend_delete_rejects_non_cloudru_reference():
+    backend = CloudRuSecretAdminBackend(FakeAdminClient())
+    ref = SecretRef(provider="fake", secret_id="s", version_id="v1", purpose="github")
+
+    with pytest.raises(ValueError, match="cloudru"):
+        backend.delete(ref)
