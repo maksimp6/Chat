@@ -13,6 +13,48 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Platform changes
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.classify.outputs.web }}
+      backend: ${{ steps.classify.outputs.backend }}
+      android: ${{ steps.classify.outputs.android }}
+      infra: ${{ steps.classify.outputs.infra }}
+      database: ${{ steps.classify.outputs.database }}
+      mcp: ${{ steps.classify.outputs.mcp }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Classify changed platforms
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            python scripts/ci_platform_changes.py --all > /tmp/platforms.json
+          else
+            git fetch --no-tags --depth=1 origin "$base"
+            git diff --no-renames --name-only -z "$base" "$GITHUB_SHA" | python scripts/ci_platform_changes.py --null > /tmp/platforms.json
+          fi
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          data = json.load(open("/tmp/platforms.json"))
+          for key, value in data.items():
+              print(f"{key}={str(value).lower()}")
+          PY
+
   code-rules:
     name: Code rules
     runs-on: ubuntu-latest
@@ -35,6 +77,8 @@ jobs:
 
   backend:
     name: Application tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     env:
       YANDEX_API_KEY: ci-test-placeholder
@@ -66,16 +110,6 @@ jobs:
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Check source formatting
         run: bash scripts/format.sh check
-      - name: Playwright MCP integration tests
-        env:
-          CHROME_EXECUTABLE_PATH: /usr/bin/google-chrome
-          BROWSER_OAUTH_MCP_TEST: "1"
-        run: |
-          npm ci --prefix deploy/chrome-worker
-          npm test --prefix deploy/chrome-worker
-          npm run test:browser --prefix deploy/chrome-worker
-      - name: Identity provider tests
-        run: npm test --prefix deploy/oauth-idp
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \
@@ -209,8 +243,93 @@ jobs:
           diff-cover coverage.xml --compare-branch="$DIFF_BASE" --fail-under=100
 
 
+  infra:
+    name: Infrastructure tests
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.22.2"
+      - name: Install infrastructure test dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run infrastructure regression tests with coverage
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          mapfile -t suites < <(printf '%s\n' tests/test_cloudru*.py tests/test_ci_*.py tests/test_platform*.py tests/test_*deploy*.py tests/test_rdc*.py | sort -u)
+          test "${#suites[@]}" -gt 0
+          python -m pytest -q "${suites[@]}" --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:infra-coverage.xml
+      - name: Enforce infrastructure changed-line coverage
+        if: needs.changes.outputs.backend != 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base="$PUSH_BEFORE_SHA"
+          if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE_SHA"; fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
+          git rev-parse --verify "$base^{commit}"
+          diff-cover infra-coverage.xml --compare-branch="$base" --fail-under=100
+
+  mcp:
+    name: MCP worker tests
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: |
+            deploy/chrome-worker/package-lock.json
+            deploy/remote-desktop-commander/package-lock.json
+      - name: Playwright MCP integration tests
+        env:
+          CHROME_EXECUTABLE_PATH: /usr/bin/google-chrome
+          BROWSER_OAUTH_MCP_TEST: "1"
+        run: |
+          npm ci --prefix deploy/chrome-worker
+          npm test --prefix deploy/chrome-worker
+          npm run test:browser --prefix deploy/chrome-worker
+      - name: Identity provider tests
+        run: npm test --prefix deploy/oauth-idp
+      - name: Alice Dev OAuth and handoff regression tests
+        run: |
+          npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
+          node --test deploy/remote-desktop-commander/oauth.test.mjs deploy/remote-desktop-commander/credential-handoff.test.mjs
+
   postgres:
     name: PostgreSQL integration
+    needs: changes
+    if: needs.changes.outputs.database == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     env:
       ALICE_DATABASE_URL: postgresql://alice:ci-postgres-password@localhost:5432/alice_pro_test
@@ -268,6 +387,8 @@ jobs:
 
   android:
     name: Android debug APK
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     env:
       ALICE_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/android/app/debug-signing.keystore
@@ -330,3 +451,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+
+  required:
+    name: CI required
+    if: always()
+    needs: [changes, code-rules, backend, postgres, android, infra, mcp]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify every selected platform actually passed
+        env:
+          CI_PLATFORM_PLAN: ${{ toJSON(needs.changes.outputs) }}
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: python scripts/ci_platform_changes.py --verify
