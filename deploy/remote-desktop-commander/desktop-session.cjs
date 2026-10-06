@@ -117,7 +117,8 @@ function controlPermit(request, options = {}) {
         "action,container_name,expires_at,issued_at,project_id,schema,sha256") return false;
     const canonical = JSON.stringify(Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))) + "\n";
     const now = options.now ?? Math.floor(Date.now() / 1000);
-    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== "checkpoint" ||
+    const expectedAction = options.action ?? "checkpoint";
+    if (!raw.equals(Buffer.from(canonical)) || value.schema !== 1 || value.action !== expectedAction ||
         value.project_id !== project || value.container_name !== "rdc-" + project.replaceAll("-", "").slice(0, 12) ||
         !Number.isSafeInteger(value.issued_at) || !Number.isSafeInteger(value.expires_at) ||
         value.issued_at < 0 || value.issued_at > now || value.expires_at <= now ||
@@ -367,6 +368,43 @@ async function superviseCloudRdc(argv, options = {}) {
         const href = !stopping && !quiescing && !summary.paired && pairingHandoff(handoffFile);
         if (href) response.writeHead(303, { Location: href }).end();
         else response.writeHead(404).end('{"status":"pairing_unavailable"}');
+      } else if (request.method === "POST" && request.url === "/rdc/secrets") {
+        if (!controlPermit(request, { action: "secret_import" })) {
+          request.resume();
+          response.writeHead(403).end('{"status":"control_denied"}');
+          return;
+        }
+        const alias = request.headers["x-alice-secret-alias"];
+        const length = Number(request.headers["content-length"] || 0);
+        if (alias !== "rdc.git.ssh" || request.headers["transfer-encoding"] ||
+            !Number.isSafeInteger(length) || length < 1 || length > 16384) {
+          request.resume();
+          response.writeHead(400).end('{"status":"invalid_request"}');
+          return;
+        }
+        let received = 0;
+        const chunks = [];
+        for await (const chunk of request) {
+          received += chunk.length;
+          if (received > length || received > 16384) {
+            response.writeHead(400).end('{"status":"invalid_request"}');
+            return;
+          }
+          chunks.push(chunk);
+        }
+        if (received !== length) {
+          response.writeHead(400).end('{"status":"invalid_request"}');
+          return;
+        }
+        const value = Buffer.concat(chunks);
+        if (!value.toString("utf8").startsWith("-----BEGIN OPENSSH PRIVATE KEY-----\n") ||
+            !value.toString("utf8").trimEnd().endsWith("-----END OPENSSH PRIVATE KEY-----")) {
+          response.writeHead(400).end('{"status":"invalid_secret"}');
+          return;
+        }
+        // Storage wiring is intentionally separate: until a SecretAdminBackend is injected,
+        // fail closed rather than writing plaintext to workspace/state.
+        response.writeHead(503).end('{"status":"secret_store_unavailable"}');
       } else if (request.method === "POST" && request.url === "/checkpoint") {
         if (!authorize(request)) {
           request.resume();
