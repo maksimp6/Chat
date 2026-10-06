@@ -54,6 +54,7 @@ DESCRIPTION = "Alice persistent Google Chrome Playwright MCP; issue 751"
 # SIGTERM); a cold start on the next request is accepted for cost.
 CPU = "0.5"
 IDLE_TIMEOUT = "900s"
+HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS = 10.0
 # Earlier always-on revisions that deploy may still update in place.
 ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "4096Mi"})
 VOLUME = "chrome-state"
@@ -668,6 +669,15 @@ def summary(record):
     }
 
 
+def hot_update_eligible(record, generation):
+    return (
+        record is not None
+        and str(record.get("status", "")).lower() == "running"
+        and type(generation) is int
+        and generation >= 1
+    )
+
+
 def deploy(apps, store, credentials, image, environment):
     previous = owned_record(apps)
     if previous:
@@ -687,7 +697,8 @@ def deploy(apps, store, credentials, image, environment):
                 json.dumps({"stage": "chrome_test_checkpoint_skipped", **safe_error(exc)}),
                 flush=True,
             )
-    if previous:
+    hot_update = hot_update_eligible(previous, generation)
+    if previous and not hot_update:
         stop_owned(apps, previous)
     attempted = False
     identifier = previous["id"] if previous else None
@@ -697,22 +708,39 @@ def deploy(apps, store, credentials, image, environment):
         start_requested = time.perf_counter()
         if previous:
             provider(apps.restore, previous["name"], body)
-            provider(apps.start, previous["name"])
+            if not hot_update:
+                provider(apps.start, previous["name"])
         else:
             operation = apps.client.request(
                 "container_apps", "POST", "/v2/containers", json_body=body
             )
             if operation.get("resourceId"):
                 identifier = uuid(operation["resourceId"])
+        orchestration_seconds = time.perf_counter() - start_requested
         print(
             json.dumps(
                 {
-                    "stage": "chrome_container_start",
-                    "seconds": time.perf_counter() - start_requested,
+                    "stage": "chrome_container_patch" if hot_update else "chrome_container_start",
+                    "seconds": orchestration_seconds,
+                    "hot_update": hot_update,
+                    "budget_seconds": (
+                        HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS if hot_update else None
+                    ),
                 }
             ),
             flush=True,
         )
+        if hot_update and orchestration_seconds > HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS:
+            print(
+                json.dumps(
+                    {
+                        "stage": "chrome_hot_update_budget_exceeded",
+                        "seconds": orchestration_seconds,
+                        "budget_seconds": HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS,
+                    }
+                ),
+                flush=True,
+            )
         record = wait_ready(apps, identifier=identifier, image=image)
         if generation is not None:
             verify_restored(apps, record, generation)
@@ -742,21 +770,30 @@ def deploy(apps, store, credentials, image, environment):
         if attempted:
             try:
                 current = owned_record(apps, identifier=identifier)
-                if current is not None:
-                    stop_owned(apps, current)
                 if previous:
+                    if not hot_update and current is not None:
+                        stop_owned(apps, current)
                     provider(apps.restore, previous["name"], previous)
                     if str(previous.get("status", "")).lower() == "running":
-                        provider(apps.start, previous["name"])
+                        if not hot_update:
+                            provider(apps.start, previous["name"])
                         wait_ready(
                             apps,
                             identifier=previous["id"],
                             image=previous["template"]["containers"][0]["image"],
                         )
                     print(
-                        json.dumps({"stage": "chrome_rollback", "status": "RESTORED"}), flush=True
+                        json.dumps(
+                            {
+                                "stage": "chrome_rollback",
+                                "status": "RESTORED",
+                                "hot_update": hot_update,
+                            }
+                        ),
+                        flush=True,
                     )
                 elif current is not None:
+                    stop_owned(apps, current)
                     print(
                         json.dumps(
                             {"stage": "chrome_rollback", "status": "NEW_CONTAINER_SUSPENDED"}
