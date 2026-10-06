@@ -10,6 +10,7 @@ from scripts.stacked_pr_topology import (
     nodes_from_github,
     render_mermaid,
     root_number_for,
+    root_status_payload,
     topology_blockers,
 )
 
@@ -245,3 +246,19 @@ def test_root_number_for_descendant_walks_full_chain():
     )
     assert root_number_for(nodes, 879) == 877
     assert root_number_for(nodes, 877) == 877
+
+
+def test_root_status_payload_contains_tree_mermaid_and_blockers():
+    nodes = (
+        node(877, "root", "master"),
+        node(878, "child", "root", state="closed", absorbed=True),
+        node(879, "leaf", "child"),
+        node(999, "unrelated", "master"),
+    )
+    payload = root_status_payload(nodes, 879)
+    assert payload["root_number"] == 877
+    assert payload["descendants"] == [878, 879]
+    assert payload["blockers"] == ["open descendant #879"]
+    assert "P877 --> P878" in payload["mermaid"]
+    assert "P878 --> P879" in payload["mermaid"]
+    assert "#999" not in payload["mermaid"]
