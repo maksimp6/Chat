@@ -10,7 +10,7 @@ import { createWorker } from "./server.mjs";
 function resolveThroughPython(alias, purpose) {
   return new Promise((resolve, reject) => {
     const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
-    const child = spawn("python", ["tests/secret_manager_browser_bridge.py"], {
+    const child = spawn("python3", ["tests/secret_manager_browser_bridge.py"], {
       cwd: repoRoot,
       stdio: ["pipe", "pipe", "pipe"],
     });
