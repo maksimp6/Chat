@@ -44,7 +44,7 @@ jobs:
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
         run: |
           set -euo pipefail
-          python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/rdc-mcp-result.log
+          python -m scripts.cloudru_rdc_mcp_candidate deploy --sha "$GITHUB_SHA" | tee /tmp/rdc-mcp-result.log
           result="$(tail -n 1 /tmp/rdc-mcp-result.log)"
           origin="$(python -c 'import json,sys; print(json.loads(sys.argv[1])["origin"])' "$result")"
           echo "origin=$origin" >> "$GITHUB_OUTPUT"
