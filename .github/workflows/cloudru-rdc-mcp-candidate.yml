@@ -1,4 +1,4 @@
-name: Deploy lightweight RDC MCP candidate
+name: Deploy Alice Dev worker
 
 on:
   push:
@@ -11,13 +11,13 @@ on:
       - "deploy/remote-desktop-commander/package.json"
       - "deploy/remote-desktop-commander/package-lock.json"
       - "scripts/cloudru_rdc_mcp_candidate.py"
-      - ".github/workflows/cloudru-rdc-mcp-candidate.yml"
+      - ".github/workflows/cloudru-alice-dev.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: alice-cloudru-rdc-mcp-candidate
+  group: alice-cloudru-alice-dev
   cancel-in-progress: false
 
 jobs:
@@ -44,8 +44,8 @@ jobs:
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
         run: |
           set -euo pipefail
-          python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/rdc-mcp-result.log
-          result="$(tail -n 1 /tmp/rdc-mcp-result.log)"
+          python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/alice-dev-result.log
+          result="$(tail -n 1 /tmp/alice-dev-result.log)"
           origin="$(python -c 'import json,sys; print(json.loads(sys.argv[1])["origin"])' "$result")"
           echo "origin=$origin" >> "$GITHUB_OUTPUT"
       - name: Install MCP smoke dependencies
@@ -54,6 +54,6 @@ jobs:
       - name: Verify public MCP end to end
         working-directory: deploy/remote-desktop-commander
         env:
-          RDC_MCP_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp
-          RDC_MCP_SMOKE_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          ALICE_DEV_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp
+          ALICE_DEV_SMOKE_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
         run: node mcp-gateway-live-smoke.mjs

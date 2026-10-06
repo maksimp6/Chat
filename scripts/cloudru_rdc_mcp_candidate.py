@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy an isolated lightweight RDC MCP candidate without touching persistent RDC."""
+"""Deploy an isolated lightweight Alice Dev candidate without touching persistent RDC."""
 
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ from cloud.cloudru.registry_client import CloudRuRegistryClient
 from scripts.cloudru_browser_probe import REGISTRY, prepare_registry
 from scripts.cloudru_deploy import _export_commit
 
-REPOSITORY = "rdc-mcp"
-DESCRIPTION = "Alice lightweight RDC MCP candidate; issue 892"
+REPOSITORY = "alice-dev"
+DESCRIPTION = "Alice lightweight development worker; issue 906"
 
 
 def fail(code: str) -> None:
-    raise CloudProviderError("RDC MCP candidate operation failed", code=code)
+    raise CloudProviderError("Alice Dev candidate operation failed", code=code)
 
 
 def project_id() -> str:
@@ -40,12 +40,12 @@ def project_id() -> str:
 
 
 def candidate_name(project: str) -> str:
-    return "rdc-mcp-" + UUID(project).hex[:12]
+    return "alice-dev-" + UUID(project).hex[:12]
 
 
 def build_image(root: Path, sha: str) -> str:
     registry = CloudRuRegistryClient()
-    with tempfile.TemporaryDirectory(prefix="rdc-mcp-") as exported:
+    with tempfile.TemporaryDirectory(prefix="alice-dev-") as exported:
         _export_commit(sha, str(root), exported)
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "remote-desktop-commander"
@@ -66,14 +66,14 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
     spec = ContainerSpec(
         name=name,
         image=image,
-        cpu="0.5",
+        cpu="0.2",
         min_instances=0,
         max_instances=1,
         public=True,
         description=DESCRIPTION,
         idle_timeout="900s",
         env={
-            "ALICE_RDC_MCP_TOKEN": token,
+            "ALICE_SHORT_TOKEN": token,
         },
     )
     spec.validate()
@@ -104,7 +104,7 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
     health = apps.health_check(status["public_uri"], attempts=18, delay_s=5)
     origin = health["url"].removesuffix("/healthz")
     return {
-        "status": "RDC_MCP_CANDIDATE_READY",
+        "status": "ALICE_DEV_READY",
         "name": name,
         "origin": origin,
         "image": image,
