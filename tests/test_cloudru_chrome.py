@@ -157,29 +157,20 @@ def test_summary_contains_endpoint_digest_and_no_private_values():
     assert "test-client-secret" not in json.dumps(value)
 
 
-def test_failed_update_restores_previous_full_config_after_stopping_new_revision(monkeypatch):
+def test_failed_hot_update_rolls_back_without_stopping_running_worker(monkeypatch):
     old = record(OLD_IMAGE)
-    new = record()
     calls = []
     apps = SimpleNamespace(
         project_id=PROJECT,
         restore=Mock(side_effect=lambda *args: calls.append(("restore", args[1]))),
         start=Mock(side_effect=lambda *args: calls.append(("start", args[0]))),
     )
-    monkeypatch.setattr(chrome, "owned_record", Mock(side_effect=[old, new]))
+    monkeypatch.setattr(chrome, "owned_record", Mock(side_effect=[old, record()]))
     monkeypatch.setattr(chrome, "prepare_bucket", Mock())
     monkeypatch.setattr(
-        chrome, "checkpoint", Mock(side_effect=lambda *args: calls.append(("checkpoint", None)))
+        chrome, "checkpoint", Mock(side_effect=lambda *args: calls.append(("checkpoint", 7)) or 7)
     )
-    monkeypatch.setattr(
-        chrome,
-        "stop_owned",
-        Mock(
-            side_effect=lambda *args: calls.append(
-                ("stop", args[1]["template"]["containers"][0]["image"])
-            )
-        ),
-    )
+    monkeypatch.setattr(chrome, "stop_owned", Mock())
     monkeypatch.setattr(
         chrome,
         "wait_ready",
@@ -188,17 +179,10 @@ def test_failed_update_restores_previous_full_config_after_stopping_new_revision
     with pytest.raises(CloudProviderError) as error:
         chrome.deploy(apps, Mock(), {}, IMAGE, environment())
     assert error.value.code == "chrome_readiness_timeout"
-    assert [item[0] for item in calls] == [
-        "checkpoint",
-        "stop",
-        "restore",
-        "start",
-        "stop",
-        "restore",
-        "start",
-    ]
-    assert calls[4][1] == IMAGE
-    assert calls[5][1] == old
+    assert [item[0] for item in calls] == ["checkpoint", "restore", "restore"]
+    assert calls[2][1] == old
+    chrome.stop_owned.assert_not_called()
+    apps.start.assert_not_called()
 
 
 def test_failed_first_install_suspends_only_new_container_and_preserves_bucket(monkeypatch):
@@ -256,7 +240,7 @@ def test_first_install_binds_oauth_to_the_same_single_container(monkeypatch):
     assert result["mcp_url"] == ORIGIN + "/browser/v1/mcp"
 
 
-def test_update_reuses_existing_container_and_never_creates_another(monkeypatch):
+def test_update_reuses_existing_container_without_stop_or_start(monkeypatch):
     old = record(OLD_IMAGE)
     apps = SimpleNamespace(
         project_id=PROJECT, client=SimpleNamespace(request=Mock()), restore=Mock(), start=Mock()
@@ -271,8 +255,36 @@ def test_update_reuses_existing_container_and_never_creates_another(monkeypatch)
     chrome.deploy(apps, Mock(), {}, IMAGE, initial)
     apps.client.request.assert_not_called()
     apps.restore.assert_called_once()
+    chrome.stop_owned.assert_not_called()
+    apps.start.assert_not_called()
     env = apps.restore.call_args.args[1]["template"]["containers"][0]["env"]
     assert {"name": "BROWSER_PUBLIC_URL", "value": ORIGIN} in env
+
+
+def test_hot_update_eligibility_requires_running_worker_and_verified_generation():
+    assert chrome.hot_update_eligible(record(), 1) is True
+    assert chrome.hot_update_eligible(record(status="suspended"), 1) is False
+    assert chrome.hot_update_eligible(record(), None) is False
+    assert chrome.hot_update_eligible(record(), 0) is False
+
+
+def test_suspended_worker_uses_safe_stop_restore_start_path(monkeypatch):
+    old = record(OLD_IMAGE, status="suspended")
+    apps = SimpleNamespace(project_id=PROJECT, restore=Mock(), start=Mock())
+    monkeypatch.setattr(chrome, "owned_record", Mock(return_value=old))
+    monkeypatch.setattr(chrome, "prepare_bucket", Mock())
+    monkeypatch.setattr(chrome, "checkpoint", Mock())
+    monkeypatch.setattr(chrome, "stop_owned", Mock())
+    monkeypatch.setattr(chrome, "wait_ready", Mock(return_value=record()))
+    monkeypatch.setattr(chrome, "request_worker", Mock(return_value={"state": "awake"}))
+    monkeypatch.setattr(chrome, "verify_restored", Mock())
+    monkeypatch.setattr(chrome, "checkpoint", Mock(return_value=7))
+
+    chrome.deploy(apps, Mock(), {}, IMAGE, environment())
+
+    chrome.stop_owned.assert_called()
+    apps.restore.assert_called()
+    apps.start.assert_called()
 
 
 def test_duplicate_named_containers_stop_before_any_mutation():
