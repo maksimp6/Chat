@@ -128,6 +128,7 @@ def test_lightweight_image_is_alice_dev_ready_without_browser_or_db_server():
         'import app; assert app.app.test_client().get("/healthz").status_code == 200' in bootstrap
     )
 
+
 def test_dev_bootstrap_installs_cloud_and_github_clis():
     root = Path(__file__).resolve().parents[1]
     bootstrap = (root / "deploy" / "remote-desktop-commander" / "dev-bootstrap.sh").read_text()
