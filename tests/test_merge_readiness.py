@@ -239,6 +239,24 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
     def fake_gh_json(args):
         calls.append(args)
         joined = " ".join(args)
+        if "/pulls?state=all&per_page=100" in joined:
+            return [
+                {
+                    "number": 123,
+                    "state": "open",
+                    "head": {"ref": "feature", "sha": "head-1"},
+                    "base": {"ref": "master", "sha": "base-1"},
+                }
+            ]
+        if "/pulls?state=all&per_page=100" in joined:
+            return [
+                {
+                    "number": 123,
+                    "state": "open",
+                    "head": {"ref": "feature", "sha": "head-1"},
+                    "base": {"ref": "master", "sha": "base-1"},
+                }
+            ]
         if "/pulls/123" in joined:
             return next(pulls)
         if "/compare/master...head-1" in joined:

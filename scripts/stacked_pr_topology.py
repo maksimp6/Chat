@@ -70,6 +70,33 @@ def build_ancestor_chain(
 
 
 
+
+def derive_stack_evidence(
+    nodes: tuple[PullNode, ...],
+    pr_number: int,
+    target: str = "master",
+) -> dict[str, object]:
+    chain = build_ancestor_chain(nodes, pr_number, target)
+    if chain.current.number == chain.root.number:
+        topology = build_stack(nodes, chain.root.number, target)
+        return {
+            "stack_role": "root",
+            "stack_root": chain.root.number,
+            "stack_parent_head": None,
+            "topology_blockers": list(topology_blockers(topology)),
+            "descendants": [node.number for node in topology.descendants],
+        }
+
+    parent = chain.ancestors[0]
+    return {
+        "stack_role": "child",
+        "stack_root": chain.root.number,
+        "stack_parent_head": parent.head,
+        "topology_blockers": [],
+        "descendants": [],
+    }
+
+
 def nodes_from_github(pulls: list[dict[str, object]]) -> tuple[PullNode, ...]:
     nodes: list[PullNode] = []
     for pull in pulls:
@@ -189,6 +216,7 @@ __all__ = [
     "StackTopologyError",
     "build_ancestor_chain",
     "collect_github_nodes",
+    "derive_stack_evidence",
     "nodes_from_github",
     "build_stack",
     "topology_blockers",
