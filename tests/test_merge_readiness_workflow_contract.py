@@ -106,3 +106,12 @@ def test_descendant_events_refresh_root_stack_comment_without_dispatch_loop():
     assert "repository_dispatch" not in text
     assert "Stack topology" in text
     assert "mermaid" in text
+
+
+def test_descendant_event_updates_one_mermaid_comment_on_root():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "python scripts/stack_status.py" in text
+    assert "<!-- alice-root-stack -->" in text
+    assert "```mermaid" in text
+    assert 'issues/$root_pr/comments' in text
+    assert 'issues/comments/$comment_id' in text
