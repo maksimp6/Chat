@@ -15,8 +15,8 @@ RUN cd /opt/desktop-commander \
 
 COPY --chown=node:node config.json /home/node/.claude-server-commander/config.json
 COPY mcp-gateway.mjs stdio-server.mjs mcp-gateway-live-smoke.mjs /opt/desktop-commander/
-COPY dev-bootstrap.sh /usr/local/bin/alice-rdc-dev-bootstrap
-RUN chmod 0755 /usr/local/bin/alice-rdc-dev-bootstrap
+COPY dev-bootstrap.sh /usr/local/bin/alice-dev-bootstrap
+RUN chmod 0755 /usr/local/bin/alice-dev-bootstrap
 
 USER node
 WORKDIR /workspace
