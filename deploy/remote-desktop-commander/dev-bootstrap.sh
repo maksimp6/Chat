@@ -56,10 +56,6 @@ gh --version | head -n 1 | grep -q 'gh version 2.96.0'
 python "$repo/scripts/install_eds.py" --bin-dir "$bin_dir"
 eds version >/dev/null
 
-# Cloud.ru general CLI: repository-owned mirror with pinned SHA-256 verification.
-CLOUD_CLI_INSTALL_DIR="$bin_dir" bash "$repo/scripts/install_cloud_cli.sh"
-cloud --version >/dev/null 2>&1 || cloud version >/dev/null
-
 # Prove the same local gate used before publishing is executable in this image.
 (
   cd "$repo"
