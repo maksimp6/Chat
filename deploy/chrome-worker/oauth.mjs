@@ -213,9 +213,10 @@ export function createOAuth(options = {}) {
     const transaction = random();
     state.pending[digest(transaction)] = { ...params, expires: now() + 600, started: false };
     await save();
+    const redirectOrigin = new URL(params.redirect_uri).origin;
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "set-cookie": cookie(transaction),
-      "content-security-policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "content-security-policy": `default-src 'none'; form-action 'self' ${redirectOrigin}; frame-ancestors 'none'; base-uri 'none'`,
       "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
     });
     response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Chrome к ChatGPT</title><h1>Доступ к вашему браузеру</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит управление Chrome и доступ к сайтам вашего сохранённого профиля. Введите short token владельца.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><input type="password" name="password" autocomplete="current-password" required><button type="submit">Разрешить</button></form></html>`);
