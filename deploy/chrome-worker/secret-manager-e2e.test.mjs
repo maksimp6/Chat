@@ -16,6 +16,7 @@ function resolveThroughPython(alias, purpose) {
     const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
     const child = spawn("python3", ["tests/secret_manager_browser_bridge.py"], {
       cwd: repoRoot,
+      env: { ...process.env, PYTHONPATH: repoRoot },
       stdio: ["pipe", "pipe", "pipe"],
     });
     let output = "";
