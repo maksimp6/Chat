@@ -322,6 +322,45 @@ def _snapshot_blobs(root: Path, files: list[dict[str, Any]]) -> dict[str, bytes]
     return blobs
 
 
+def _validate_cached_ast(item: dict[str, Any]) -> None:
+    for symbol in item["symbols"]:
+        if (
+            not isinstance(symbol, dict)
+            or any(
+                not isinstance(symbol.get(key), str) for key in ("name", "qualified_name", "kind")
+            )
+            or any(
+                type(symbol.get(key)) is not int or symbol[key] < 1 for key in ("line", "end_line")
+            )
+        ):
+            raise ValueError("incompatible previous index symbol")
+    if any(
+        not isinstance(imp, dict)
+        or not isinstance(imp.get("module"), str)
+        or not {"name", "as"} <= imp.keys()
+        for imp in item["imports"]
+    ):
+        raise ValueError("incompatible previous index import")
+    if any(not isinstance(call, str) for call in item["calls"]):
+        raise ValueError("incompatible previous index call")
+
+
+def _validate_cached_entry(item: dict[str, Any]) -> None:
+    if (
+        not isinstance(item.get("module"), str)
+        or item["module"] != _module_name(Path(item["path"]))
+        or type(item.get("is_test")) is not bool
+        or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("git_blob_oid", "")))
+    ):
+        raise ValueError("incompatible previous index identity")
+    for key in ("symbols", "imports", "calls"):
+        if not isinstance(item.get(key), list):
+            raise ValueError("incompatible previous index entry")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(item.get("sha256", ""))):
+        raise ValueError("incompatible previous index content hash")
+    _validate_cached_ast(item)
+
+
 def _previous_files(previous: dict[str, Any] | None, repository: str) -> dict[str, dict[str, Any]]:
     if previous is None:
         return {}
@@ -346,42 +385,21 @@ def _previous_files(previous: dict[str, Any] | None, repository: str) -> dict[st
             or item["path"] in by_path
         ):
             raise ValueError("incompatible previous index entry")
-        if (
-            not isinstance(item.get("module"), str)
-            or item["module"] != _module_name(Path(item["path"]))
-            or type(item.get("is_test")) is not bool
-            or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("git_blob_oid", "")))
-        ):
-            raise ValueError("incompatible previous index identity")
-        for key in ("symbols", "imports", "calls"):
-            if not isinstance(item.get(key), list):
-                raise ValueError("incompatible previous index entry")
-        if not re.fullmatch(r"[0-9a-f]{64}", str(item.get("sha256", ""))):
-            raise ValueError("incompatible previous index content hash")
-        for symbol in item["symbols"]:
-            if (
-                not isinstance(symbol, dict)
-                or any(
-                    not isinstance(symbol.get(key), str)
-                    for key in ("name", "qualified_name", "kind")
-                )
-                or any(
-                    type(symbol.get(key)) is not int or symbol[key] < 1
-                    for key in ("line", "end_line")
-                )
-            ):
-                raise ValueError("incompatible previous index symbol")
-        if any(
-            not isinstance(imp, dict)
-            or not isinstance(imp.get("module"), str)
-            or not {"name", "as"} <= imp.keys()
-            for imp in item["imports"]
-        ):
-            raise ValueError("incompatible previous index import")
-        if any(not isinstance(call, str) for call in item["calls"]):
-            raise ValueError("incompatible previous index call")
+        _validate_cached_entry(item)
         by_path[item["path"]] = item
     return by_path
+
+
+def _require_complete_repository(root: Path) -> None:
+    config_names = (
+        _git(root, "config", "--list", "--name-only").decode("utf-8").lower().splitlines()
+    )
+    if any(
+        name == "extensions.partialclone"
+        or (name.startswith("remote.") and name.endswith(".promisor"))
+        for name in config_names
+    ):
+        raise ValueError("partial clone is not supported; provide a complete local repository")
 
 
 def build_index(
@@ -416,15 +434,7 @@ def build_index(
     ):
         raise ValueError("snapshot limits must be positive integers")
     previous = _previous_files(previous_index, repository)
-    config_names = (
-        _git(root, "config", "--list", "--name-only").decode("utf-8").lower().splitlines()
-    )
-    if any(
-        name == "extensions.partialclone"
-        or (name.startswith("remote.") and name.endswith(".promisor"))
-        for name in config_names
-    ):
-        raise ValueError("partial clone is not supported; provide a complete local repository")
+    _require_complete_repository(root)
     sha, tree, skipped = _snapshot_tree(
         root,
         revision,
