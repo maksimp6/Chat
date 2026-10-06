@@ -181,3 +181,24 @@ test("secret fill rejects non-browser purpose before resolver use", async (t) =>
   assert.equal(response.status, 400);
   assert.equal(resolved, false);
 });
+
+
+test("worker automatically checkpoints and sleeps after browser inactivity", async (t) => {
+  const checkpoints = [];
+  const stateStore = {
+    async restore() {},
+    async checkpoint() { checkpoints.push("checkpoint"); },
+    async checkpointAuth() {},
+    status() { return { enabled: true, restored: true, generation: checkpoints.length }; },
+  };
+  const app = await fixture({ idleSleepMs: 25, stateStore });
+  t.after(async () => { await app.worker.close(); await app.close(); });
+
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  const status = await app.worker.callTool("browser_status");
+  assert.equal(status.state, "sleeping");
+  assert.equal(app.fake.profile.closed, true);
+  assert.equal(checkpoints.length, 1);
+});
