@@ -25,6 +25,7 @@ from scripts.cloudru_deploy import _export_commit
 
 REPOSITORY = "alice-dev"
 DESCRIPTION = "Alice lightweight development worker; issue 906"
+TOMBSTONES = Path(__file__).resolve().parents[1] / "config" / "alice" / "alice-dev-delete-ids.txt"
 
 
 def fail(code: str) -> None:
@@ -39,8 +40,83 @@ def project_id() -> str:
         fail("validation_error")
 
 
-def candidate_name(project: str) -> str:
-    return "alice-dev-" + UUID(project).hex[:12]
+def candidate_name(project: str, sha: str) -> str:
+    if len(sha) != 40 or any(ch not in "0123456789abcdef" for ch in sha):
+        fail("validation_error")
+    return f"alice-dev-{UUID(project).hex[:12]}-{sha[:8]}"
+
+
+def tombstone_ids(path: Path | None = None) -> set[str]:
+    ids: set[str] = set()
+    source = path or TOMBSTONES
+    for raw in source.read_text(encoding="utf-8").splitlines():
+        value = raw.strip()
+        if not value or value.startswith("#"):
+            continue
+        try:
+            ids.add(str(UUID(value)))
+        except ValueError:
+            fail("invalid_tombstone")
+    return ids
+
+
+def alice_dev_inventory(apps: CloudRuContainerAppsClient) -> list[dict]:
+    result = []
+    for item in apps.list(require_total=True):
+        name = item.get("name")
+        if not isinstance(name, str) or not name.startswith("alice-dev-"):
+            continue
+        ingress = (item.get("configuration") or {}).get("ingress") or {}
+        containers = (item.get("template") or {}).get("containers") or [{}]
+        result.append(
+            {
+                "id": item.get("id"),
+                "name": name,
+                "origin": (f"https://{ingress['publicUri']}" if ingress.get("publicUri") else None),
+                "image": containers[0].get("image"),
+                "status": item.get("status"),
+            }
+        )
+    return sorted(result, key=lambda item: item["name"])
+
+
+def purge_tombstones(apps: CloudRuContainerAppsClient) -> list[str]:
+    forbidden = tombstone_ids()
+    inventory = apps.list(require_total=True)
+
+    legacy_name = f"alice-dev-{UUID(project_id()).hex[:12]}"
+    legacy = [item for item in inventory if item.get("name") == legacy_name]
+    if len(legacy) > 1:
+        fail("invalid_response")
+    if legacy and legacy[0].get("id"):
+        forbidden.add(str(UUID(str(legacy[0]["id"]))))
+        print(
+            json.dumps(
+                {
+                    "status": "LEGACY_TOMBSTONE_RESOLVED",
+                    "container_id": str(UUID(str(legacy[0]["id"]))),
+                    "name": legacy_name,
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+    by_id = {str(item.get("id")): item for item in inventory if item.get("id")}
+    deleted: list[str] = []
+    for identifier in sorted(forbidden):
+        item = by_id.get(identifier)
+        if item is None:
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name:
+            fail("invalid_response")
+        apps.delete(name)
+        deleted.append(identifier)
+
+    remaining = {str(item.get("id")) for item in apps.list(require_total=True) if item.get("id")}
+    if forbidden & remaining:
+        fail("tombstone_survived")
+    return deleted
 
 
 def build_image(root: Path, sha: str) -> str:
@@ -58,9 +134,9 @@ def build_image(root: Path, sha: str) -> str:
         ).pinned
 
 
-def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -> dict:
+def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str, sha: str) -> dict:
     project = project_id()
-    name = candidate_name(project)
+    name = candidate_name(project, sha)
     current = apps.find_for_deploy(name)
     spec = ContainerSpec(
         name=name,
@@ -70,7 +146,7 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
         max_instances=1,
         public=True,
         description=DESCRIPTION,
-        idle_timeout="900s",
+        idle_timeout="10s",
         env={
             "ALICE_SHORT_TOKEN": token,
         },
@@ -113,6 +189,7 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str) -
         "status": "ALICE_DEV_READY",
         "name": name,
         "origin": origin,
+        "container_id": status.get("id"),
         "image": image,
         "resources": status.get("resources"),
         "scaling": status.get("scaling"),
@@ -130,9 +207,22 @@ def main() -> int:
     if not token:
         fail("auth_not_configured")
     root = Path(__file__).resolve().parents[1]
+    apps = CloudRuContainerAppsClient(project_id=project_id())
+    deleted = purge_tombstones(apps)
+    if deleted:
+        print(
+            json.dumps({"status": "TOMBSTONES_PURGED", "ids": deleted}, sort_keys=True), flush=True
+        )
     image = build_image(root, args.sha)
-    result = create_candidate(CloudRuContainerAppsClient(project_id=project_id()), image, token)
+    result = create_candidate(apps, image, token, args.sha)
     print(json.dumps(result, sort_keys=True), flush=True)
+    print(
+        json.dumps(
+            {"status": "ALICE_DEV_INVENTORY", "containers": alice_dev_inventory(apps)},
+            sort_keys=True,
+        ),
+        flush=True,
+    )
     return 0
 
 
