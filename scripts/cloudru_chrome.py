@@ -54,6 +54,7 @@ DESCRIPTION = "Alice persistent Google Chrome Playwright MCP; issue 751"
 # SIGTERM); a cold start on the next request is accepted for cost.
 CPU = "0.5"
 IDLE_TIMEOUT = "900s"
+HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS = 10.0
 # Earlier always-on revisions that deploy may still update in place.
 ACCEPTED_RESOURCES = ({"cpu": CPU, "memory": "1024Mi"}, {"cpu": "1", "memory": "4096Mi"})
 VOLUME = "chrome-state"
@@ -715,16 +716,31 @@ def deploy(apps, store, credentials, image, environment):
             )
             if operation.get("resourceId"):
                 identifier = uuid(operation["resourceId"])
+        orchestration_seconds = time.perf_counter() - start_requested
         print(
             json.dumps(
                 {
                     "stage": "chrome_container_patch" if hot_update else "chrome_container_start",
-                    "seconds": time.perf_counter() - start_requested,
+                    "seconds": orchestration_seconds,
                     "hot_update": hot_update,
+                    "budget_seconds": (
+                        HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS if hot_update else None
+                    ),
                 }
             ),
             flush=True,
         )
+        if hot_update and orchestration_seconds > HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS:
+            print(
+                json.dumps(
+                    {
+                        "stage": "chrome_hot_update_budget_exceeded",
+                        "seconds": orchestration_seconds,
+                        "budget_seconds": HOT_UPDATE_ORCHESTRATION_BUDGET_SECONDS,
+                    }
+                ),
+                flush=True,
+            )
         record = wait_ready(apps, identifier=identifier, image=image)
         if generation is not None:
             verify_restored(apps, record, generation)
