@@ -43,4 +43,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception:
+        # Test-only fixed signal: never print exception text because provider errors
+        # may contain secret material.
+        raise SystemExit(42) from None
