@@ -69,6 +69,55 @@ def build_ancestor_chain(
     return AncestorChain(current=current, ancestors=tuple(ancestors), root=cursor)
 
 
+
+def nodes_from_github(pulls: list[dict[str, object]]) -> tuple[PullNode, ...]:
+    nodes: list[PullNode] = []
+    for pull in pulls:
+        head = pull.get("head")
+        base = pull.get("base")
+        if not isinstance(head, dict) or not isinstance(base, dict):
+            raise StackTopologyError("invalid pull request topology payload")
+        number = pull.get("number")
+        head_ref = head.get("ref")
+        base_ref = base.get("ref")
+        if not isinstance(number, int) or not isinstance(head_ref, str) or not isinstance(base_ref, str):
+            raise StackTopologyError("invalid pull request topology payload")
+        state = str(pull.get("state") or "")
+        if state not in {"open", "closed"}:
+            raise StackTopologyError("invalid pull request state")
+        nodes.append(
+            PullNode(
+                number=number,
+                head=head_ref,
+                base=base_ref,
+                state=state,
+                absorbed=bool(pull.get("absorbed", False)),
+            )
+        )
+    return tuple(nodes)
+
+
+def collect_github_nodes(repo: str) -> tuple[PullNode, ...]:
+    import json
+    import subprocess
+
+    completed = subprocess.run(
+        [
+            "gh",
+            "api",
+            "--paginate",
+            f"/repos/{repo}/pulls?state=all&per_page=100",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(completed.stdout)
+    if not isinstance(payload, list):
+        raise StackTopologyError("invalid GitHub pull request payload")
+    return nodes_from_github(payload)
+
+
 def build_stack(
     nodes: tuple[PullNode, ...],
     root_number: int,
@@ -139,6 +188,8 @@ __all__ = [
     "StackTopology",
     "StackTopologyError",
     "build_ancestor_chain",
+    "collect_github_nodes",
+    "nodes_from_github",
     "build_stack",
     "topology_blockers",
 ]

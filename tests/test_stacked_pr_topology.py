@@ -5,6 +5,8 @@ from scripts.stacked_pr_topology import (
     StackTopologyError,
     build_ancestor_chain,
     build_stack,
+    collect_github_nodes,
+    nodes_from_github,
     topology_blockers,
 )
 
@@ -129,3 +131,53 @@ def test_multiple_parent_candidates_are_ambiguous():
     )
     with pytest.raises(StackTopologyError, match="ambiguous ancestor"):
         build_ancestor_chain(nodes, 3)
+
+
+def test_github_payload_maps_base_and_head_refs_without_manual_parent_manifest():
+    nodes = nodes_from_github(
+        [
+            {
+                "number": 877,
+                "state": "open",
+                "head": {"ref": "issue-876-stacked-pr-topology"},
+                "base": {"ref": "master"},
+            },
+            {
+                "number": 878,
+                "state": "open",
+                "head": {"ref": "issue-876-ancestor-chain"},
+                "base": {"ref": "issue-876-stacked-pr-topology"},
+            },
+            {
+                "number": 879,
+                "state": "open",
+                "head": {"ref": "issue-876-github-topology-collector"},
+                "base": {"ref": "issue-876-ancestor-chain"},
+            },
+        ]
+    )
+    chain = build_ancestor_chain(nodes, 879)
+    assert [item.number for item in chain.ancestors] == [878, 877]
+    assert chain.root.number == 877
+
+
+def test_invalid_github_payload_fails_closed():
+    with pytest.raises(StackTopologyError, match="invalid pull request topology payload"):
+        nodes_from_github([{"number": 1, "state": "open"}])
+
+
+def test_collector_uses_all_pull_requests_and_maps_payload(monkeypatch):
+    class Result:
+        stdout = '[{"number":877,"state":"open","head":{"ref":"root"},"base":{"ref":"master"}}]'
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    nodes = collect_github_nodes("maksimp6/Chat")
+    assert nodes == (node(877, "root", "master"),)
+    assert "--paginate" in calls[0][0]
+    assert "state=all" in calls[0][0][-1]
