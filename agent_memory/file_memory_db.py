@@ -125,10 +125,8 @@ class FileMemoryDB:
             offset += len(raw)
 
             if not raw.endswith(b"\n"):
-                if is_last:
-                    self._truncate(last_good)
-                    break
-                raise FileMemoryCorruption("unterminated record before file tail")
+                self._truncate(last_good)
+                break
 
             line = raw[:-1]
             try:
