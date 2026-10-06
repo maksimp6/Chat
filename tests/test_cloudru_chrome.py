@@ -50,6 +50,7 @@ def test_runtime_passes_only_browser_secrets_and_local_profile_paths():
     assert values["BROWSER_OAUTH_STATE_FILE"] == "/tmp/chrome-auth/oauth.json"
     assert values["CHROME_PROFILE_DIR"] == "/tmp/chrome-profile"
     assert values["CHROME_STATE_DIR"] == "/chrome-state"
+    assert values["BROWSER_IDLE_SLEEP_MS"] == "300000"
     assert "never-forward" not in json.dumps(values)
     assert environment(BROWSER_API_TOKEN="dedicated")["BROWSER_API_TOKEN"] == "dedicated"
 
@@ -153,6 +154,15 @@ def test_summary_contains_endpoint_digest_and_no_private_values():
     assert value["digest"] == "sha256:" + "b" * 64
     assert "gateway_deployed" not in value
     assert value["ingress"] == "public_worker_auth"
+    assert value["service_state"] == "running"
+    assert value["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
+    assert value["scaling"] == {
+        "min_instances": 0,
+        "max_instances": 1,
+        "idle_timeout": "900s",
+        "scale_to_zero_configured": True,
+    }
+    assert value["browser_idle_sleep_ms"] == 300000
     assert "test-private-token" not in json.dumps(value)
     assert "test-client-secret" not in json.dumps(value)
 
