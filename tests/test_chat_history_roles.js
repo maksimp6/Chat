@@ -11,7 +11,9 @@ const HTML =
   '<button id="mic-btn" type="button"></button>';
 
 async function settle() {
-  for (let i = 0; i < 10; i += 1) await new Promise((resolve) => setImmediate(resolve));
+  for (let i = 0; i < 10; i += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 }
 
 function messages(document) {
@@ -49,7 +51,9 @@ function boot(responses) {
     conversations: [{ id: "conv-1", title: "Old" }],
     renderSidebar() {},
   });
-  const originalSet = loaded.window.localStorage.setItem.bind(loaded.window.localStorage);
+  const originalSet = loaded.window.localStorage.setItem.bind(
+    loaded.window.localStorage,
+  );
   loaded.window.localStorage.setItem = (key, value) => {
     storageWrites.push(key);
     originalSet(key, value);
@@ -93,14 +97,31 @@ async function testHistoryRenderingIsSideEffectFreeAndIdempotent() {
   );
   assert.deepEqual(storageWrites, []);
 
-  context.addMessage("Здравствуйте", "assistant", false, 0, null, 0, null, null, null, {
-    id: "m2",
-  });
-  assert.equal(messages(document).length, 2, "re-synchronized message must not duplicate");
+  context.addMessage(
+    "Здравствуйте",
+    "assistant",
+    false,
+    0,
+    null,
+    0,
+    null,
+    null,
+    null,
+    { id: "m2" },
+  );
+  assert.equal(
+    messages(document).length,
+    2,
+    "re-synchronized message must not duplicate",
+  );
 
   context.loadHistory("conv-1");
   await settle();
-  assert.equal(messages(document).length, 2, "reload renders the same messages once");
+  assert.equal(
+    messages(document).length,
+    2,
+    "reload renders the same messages once",
+  );
 }
 
 async function testHistoryEmptyAndErrors() {
@@ -111,14 +132,20 @@ async function testHistoryEmptyAndErrors() {
   });
   empty.context.loadHistory("conv-1");
   await settle();
-  assert.equal(empty.document.querySelector(".empty-state").textContent, "Начните диалог");
+  assert.equal(
+    empty.document.querySelector(".empty-state").textContent,
+    "Начните диалог",
+  );
 
   const offline = boot({
     "/api/conversations/conv-1/messages": new Error("offline"),
   });
   offline.context.loadHistory("conv-1");
   await settle();
-  assert.match(offline.document.querySelector(".error-state").textContent, /offline/);
+  assert.match(
+    offline.document.querySelector(".error-state").textContent,
+    /offline/,
+  );
 }
 
 async function testLiveSendSuccess() {
@@ -167,12 +194,16 @@ async function startVoice() {
   const sources = [];
   const dispatcher = {
     request: async (url) => {
-      const body = url === "/api/voice/session" ? { session_id: "voice-1" } : { ok: true };
+      const body =
+        url === "/api/voice/session" ? { session_id: "voice-1" } : { ok: true };
       return { ok: true, status: 200, json: async () => body };
     },
   };
   const { document, context } = browser.load(
-    [path.join(ROOT, "static", "chat.js"), path.join(ROOT, "static", "voice.js")],
+    [
+      path.join(ROOT, "static", "chat.js"),
+      path.join(ROOT, "static", "voice.js"),
+    ],
     {
       AliceDispatcher: dispatcher,
       performance: { now: () => 0 },
@@ -212,7 +243,8 @@ async function startVoice() {
   );
   document.getElementById("mic-btn").click();
   await settle();
-  const emit = (event) => sources.at(-1).onmessage({ data: JSON.stringify(event) });
+  const emit = (event) =>
+    sources.at(-1).onmessage({ data: JSON.stringify(event) });
   return { document, context, emit };
 }
 
@@ -222,7 +254,11 @@ async function testVoiceTranscriptCreatesExactlyOneUserMessage() {
     type: "conversation.item.input_audio_transcription.completed",
     transcript: "   ",
   });
-  assert.equal(messages(document).length, 0, "empty transcript creates no message");
+  assert.equal(
+    messages(document).length,
+    0,
+    "empty transcript creates no message",
+  );
 
   const done = {
     type: "conversation.item.input_audio_transcription.completed",
@@ -231,7 +267,9 @@ async function testVoiceTranscriptCreatesExactlyOneUserMessage() {
   };
   emit(done);
   emit(done);
-  assert.deepEqual(messages(document), [{ role: "user", text: "Привет, Алиса" }]);
+  assert.deepEqual(messages(document), [
+    { role: "user", text: "Привет, Алиса" },
+  ]);
 
   emit({
     type: "response.output_text.done",
@@ -241,10 +279,23 @@ async function testVoiceTranscriptCreatesExactlyOneUserMessage() {
   assert.deepEqual(messages(document)[1], { role: "bot", text: "Привет!" });
   emit({ type: "response.done" });
 
-  context.addMessage("Привет, Алиса", "user", false, 0, null, 0, null, null, null, {
-    id: "voice-item-1",
-  });
-  assert.equal(messages(document).length, 2, "server/local sync must not duplicate");
+  context.addMessage(
+    "Привет, Алиса",
+    "user",
+    false,
+    0,
+    null,
+    0,
+    null,
+    null,
+    null,
+    { id: "voice-item-1" },
+  );
+  assert.equal(
+    messages(document).length,
+    2,
+    "server/local sync must not duplicate",
+  );
 }
 
 async function main() {
