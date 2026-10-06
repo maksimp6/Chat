@@ -1,9 +1,14 @@
 from flask import Flask
 
 import short_token_auth
+from secret_store.core import SecretRef
+from secret_store.fake import FakeSecretResolver
 
 
-def _client(monkeypatch, token=None, require=True, preview=False):
+def _client(monkeypatch, token=None, require=True, preview=False, resolver=None, ref=None):
+    short_token_auth.reset_short_token_secret()
+    if resolver is not None and ref is not None:
+        short_token_auth.configure_short_token_secret(resolver, ref)
     if token is None:
         monkeypatch.delenv("ALICE_SHORT_TOKEN", raising=False)
     else:
@@ -96,3 +101,55 @@ def test_auth_can_be_disabled_for_local_development(monkeypatch):
     client = _client(monkeypatch, token=None, require=False, preview=True)
     response = client.get("/")
     assert response.status_code == 200
+
+
+def _secret_ref():
+    return SecretRef(
+        provider="fake",
+        secret_id="alice-short-token",
+        version_id="v1",
+        purpose="alice_short_token",
+    )
+
+
+def test_resolver_supplies_short_token_without_plaintext_environment(monkeypatch):
+    ref = _secret_ref()
+    resolver = FakeSecretResolver({ref: "resolver-token"})
+    client = _client(monkeypatch, token=None, require=True, resolver=resolver, ref=ref)
+
+    response = client.get("/resolver-token")
+
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "ok"
+    assert "resolver-token" not in response.get_data(as_text=True)
+
+
+def test_resolver_failure_fails_closed_without_environment_fallback(monkeypatch):
+    ref = _secret_ref()
+    resolver = FakeSecretResolver()
+    client = _client(
+        monkeypatch,
+        token="legacy-env-token",
+        require=True,
+        resolver=resolver,
+        ref=ref,
+    )
+
+    response = client.get("/legacy-env-token")
+
+    assert response.status_code == 503
+    body = response.get_data(as_text=True)
+    assert "legacy-env-token" not in body
+    assert "alice-short-token" not in body
+    assert "v1" not in body
+
+
+def test_resolver_unavailable_fails_closed_without_secret_disclosure(monkeypatch):
+    ref = _secret_ref()
+    resolver = FakeSecretResolver({ref: "canary-token"}, available=False)
+    client = _client(monkeypatch, token=None, require=True, resolver=resolver, ref=ref)
+
+    response = client.get("/canary-token")
+
+    assert response.status_code == 503
+    assert "canary-token" not in response.get_data(as_text=True)
