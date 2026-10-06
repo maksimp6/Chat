@@ -5,16 +5,29 @@ on:
     branches: [master]
     paths:
       - "cloud/cloudru/container_apps_client.py"
+      - "cloud/cloudru/registry_client.py"
+      - "requirements-deploy.txt"
+      - ".python-version"
+      - "config/alice/alice-dev-delete-ids.txt"
+      - "deploy/remote-desktop-commander/config.json"
+      - "deploy/remote-desktop-commander/dependency-smoke.cjs"
+      - "deploy/remote-desktop-commander/dev-bootstrap.sh"
       - "deploy/remote-desktop-commander/Dockerfile.mcp"
       - "deploy/remote-desktop-commander/mcp-gateway.mjs"
+      - "deploy/remote-desktop-commander/mcp-gateway-origin.test.mjs"
+      - "deploy/remote-desktop-commander/request-origin.mjs"
+      - "deploy/remote-desktop-commander/credential-handoff.mjs"
+      - "deploy/remote-desktop-commander/credential-handoff.test.mjs"
       - "deploy/remote-desktop-commander/oauth.mjs"
+      - "deploy/remote-desktop-commander/oauth.test.mjs"
       - "deploy/remote-desktop-commander/oauth-discovery-smoke.mjs"
+      - "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs"
       - "deploy/remote-desktop-commander/stdio-server.mjs"
       - "deploy/remote-desktop-commander/mcp-gateway-live-smoke.mjs"
       - "deploy/remote-desktop-commander/package.json"
       - "deploy/remote-desktop-commander/package-lock.json"
       - "scripts/cloudru_rdc_mcp_candidate.py"
-      - ".github/workflows/cloudru-alice-dev.yml"
+      - ".github/workflows/cloudru-rdc-mcp-candidate.yml"
 
 permissions:
   contents: read
@@ -64,11 +77,13 @@ jobs:
         working-directory: deploy/remote-desktop-commander
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
       - name: Verify OAuth discovery
+        timeout-minutes: 2
         working-directory: deploy/remote-desktop-commander
         env:
           ALICE_DEV_SMOKE_ORIGIN: ${{ steps.candidate.outputs.origin }}
         run: node oauth-discovery-smoke.mjs
       - name: Verify public MCP end to end
+        timeout-minutes: 2
         working-directory: deploy/remote-desktop-commander
         env:
           ALICE_DEV_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp

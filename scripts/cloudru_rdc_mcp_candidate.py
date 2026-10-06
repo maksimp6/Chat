@@ -146,6 +146,7 @@ def build_image(root: Path, sha: str) -> str:
 def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str, sha: str) -> dict:
     project = project_id()
     name = candidate_name(project, sha)
+    expected_origin = f"https://{name}.containerapps.ru"
     current = apps.find_for_deploy(name)
     spec = ContainerSpec(
         name=name,
@@ -158,6 +159,7 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str, s
         idle_timeout="10s",
         env={
             "ALICE_SHORT_TOKEN": token,
+            "ALICE_DEV_PUBLIC_URL": expected_origin,
         },
     )
     spec.validate()
@@ -192,13 +194,24 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str, s
             fail("resource_mismatch")
         apps.update_from_current(spec, current)
     status = apps.wait_until_ready(name, image=image, timeout_s=300, poll_s=5)
+    public_uri = str(status.get("public_uri") or "")
+    actual_origin = public_uri if public_uri.startswith("https://") else f"https://{public_uri}"
+    if actual_origin.rstrip("/") != expected_origin:
+        fail("public_origin_mismatch")
     health = apps.health_check(status["public_uri"], attempts=18, delay_s=5)
     origin = health["url"].removesuffix("/healthz")
+    matches = [item for item in apps.list(require_total=True) if item.get("name") == name]
+    if len(matches) != 1 or not matches[0].get("id"):
+        fail("invalid_response")
+    try:
+        identifier = str(UUID(str(matches[0]["id"])))
+    except ValueError:
+        fail("invalid_response")
     return {
         "status": "ALICE_DEV_READY",
         "name": name,
         "origin": origin,
-        "container_id": status.get("id"),
+        "container_id": identifier,
         "image": image,
         "resources": status.get("resources"),
         "scaling": status.get("scaling"),
