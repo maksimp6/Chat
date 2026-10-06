@@ -4,6 +4,19 @@ on:
   push:
     branches: [master]
     paths:
+      - "cloud/base.py"
+      - "cloud/cloudru/client.py"
+      - "cloud/cloudru/registry_client.py"
+      - "cloudru_iam.py"
+      - "requirements-deploy.txt"
+      - ".python-version"
+      - "scripts/cloudru_deploy.py"
+      - "scripts/cloudru_browser_probe.py"
+      - "config/alice/alice-dev-delete-ids.txt"
+      - "deploy/remote-desktop-commander/config.json"
+      - "deploy/remote-desktop-commander/dependency-smoke.cjs"
+      - "deploy/remote-desktop-commander/dev-bootstrap.sh"
+      - "deploy/remote-desktop-commander/credential-handoff.mjs"
       - "cloud/cloudru/container_apps_client.py"
       - "deploy/remote-desktop-commander/Dockerfile.mcp"
       - "deploy/remote-desktop-commander/mcp-gateway.mjs"
@@ -14,7 +27,7 @@ on:
       - "deploy/remote-desktop-commander/package.json"
       - "deploy/remote-desktop-commander/package-lock.json"
       - "scripts/cloudru_rdc_mcp_candidate.py"
-      - ".github/workflows/cloudru-alice-dev.yml"
+      - ".github/workflows/cloudru-rdc-mcp-candidate.yml"
 
 permissions:
   contents: read
@@ -40,6 +53,8 @@ jobs:
           cache-dependency-path: requirements-deploy.txt
       - name: Install Python deploy dependencies
         run: pip install -r requirements-deploy.txt
+      - name: Validate minimal deploy environment
+        run: python scripts/cloudru_rdc_mcp_candidate.py --help > /dev/null
       - name: Deploy isolated candidate
         id: candidate
         env:
