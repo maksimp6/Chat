@@ -362,3 +362,48 @@ def test_main_emits_structured_collection_error(monkeypatch, capsys):
     assert payload["ready"] is False
     assert blocker_codes(payload) == {"collection_error"}
     assert "secret provider output" not in payload["blockers"][0]["detail"]
+
+
+def test_root_is_blocked_by_open_stack_descendants():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            stack_role="root",
+            topology_blockers=[
+                "open descendant #878",
+                "open descendant #879",
+            ],
+        )
+    )
+    assert result["ready"] is False
+    assert [item["detail"] for item in result["blockers"] if item["code"] == "stack_descendant"] == [
+        "open descendant #878",
+        "open descendant #879",
+    ]
+
+
+def test_child_is_valid_against_parent_head_instead_of_master():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            pr_base_ref="issue-876-stacked-pr-topology",
+            stack_role="child",
+            stack_parent_head="issue-876-stacked-pr-topology",
+        )
+    )
+    assert result["ready"] is True
+    assert result["stack_role"] == "child"
+
+
+def test_child_retargeted_away_from_parent_fails_closed():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            pr_base_ref="master",
+            stack_role="child",
+            stack_parent_head="issue-876-stacked-pr-topology",
+        )
+    )
+    assert "wrong_base" in blocker_codes(result)
+
+
+def test_invalid_stack_role_fails_closed():
+    result = merge_readiness.evaluate_snapshot(snapshot(stack_role="unknown"))
+    assert "stack_topology_invalid" in blocker_codes(result)
