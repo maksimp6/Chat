@@ -127,3 +127,20 @@ def test_alias_validation(alias):
 def test_alias_requires_acl():
     with pytest.raises(ValueError, match="allowed purpose"):
         SecretAlias(alias="github", ref=_ref(), allowed_purposes=frozenset())
+
+
+def test_resolver_failure_is_audited_without_secret_material():
+    ref = _ref()
+    manager = SecretManager(
+        InMemorySecretAliasStore(),
+        FakeSecretResolver({ref: "canary-secret"}, available=False),
+    )
+    manager.put_alias(_entry(ref))
+
+    with pytest.raises(Exception) as error:
+        manager.use("github", "rdc.github")
+
+    event = manager.audit_events()[-1]
+    assert event.success is False
+    assert "canary-secret" not in repr(event)
+    assert "canary-secret" not in str(error.value)
