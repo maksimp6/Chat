@@ -231,9 +231,9 @@ def test_mermaid_renders_recursive_stack_and_status():
     )
     diagram = render_mermaid(topology)
     assert "graph TD" in diagram
-    assert '#877 OPEN' in diagram
-    assert '#878 ABSORBED' in diagram
-    assert '#879 OPEN' in diagram
+    assert "#877 OPEN" in diagram
+    assert "#878 ABSORBED" in diagram
+    assert "#879 OPEN" in diagram
     assert "P877 --> P878" in diagram
     assert "P878 --> P879" in diagram
 
