@@ -9,6 +9,8 @@ import os
 import subprocess
 from typing import Any
 
+from scripts.stacked_pr_topology import derive_stack_evidence, nodes_from_github
+
 _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
 
 
@@ -40,6 +42,10 @@ def collect_snapshot(
 ) -> dict[str, Any]:
     owner, name = _split_repo(repo)
     pull = _gh_json([f"/repos/{repo}/pulls/{pr_number}"])
+    pulls_payload = _gh_json([f"/repos/{repo}/pulls?state=all&per_page=100"])
+    if not isinstance(pulls_payload, list):
+        raise ValueError("invalid pull request topology payload")
+    stack_evidence = derive_stack_evidence(nodes_from_github(pulls_payload), pr_number, base_ref)
     head_sha = str(pull["head"]["sha"])
     base_sha = str(pull["base"]["sha"])
 
@@ -101,6 +107,7 @@ def collect_snapshot(
         "required_checks": list(dict.fromkeys(required_checks or [])),
         "review_threads": threads.get("nodes", []),
         "review_threads_truncated": bool(threads.get("pageInfo", {}).get("hasNextPage")),
+        **stack_evidence,
     }
 
 
