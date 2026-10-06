@@ -9,6 +9,7 @@ from scripts.stacked_pr_topology import (
     derive_stack_evidence,
     nodes_from_github,
     render_mermaid,
+    root_number_for,
     topology_blockers,
 )
 
@@ -234,3 +235,13 @@ def test_mermaid_renders_recursive_stack_and_status():
     assert '#879 OPEN' in diagram
     assert "P877 --> P878" in diagram
     assert "P878 --> P879" in diagram
+
+
+def test_root_number_for_descendant_walks_full_chain():
+    nodes = (
+        node(877, "root", "master"),
+        node(878, "child", "root"),
+        node(879, "leaf", "child"),
+    )
+    assert root_number_for(nodes, 879) == 877
+    assert root_number_for(nodes, 877) == 877
