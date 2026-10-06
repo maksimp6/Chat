@@ -125,3 +125,18 @@ def test_lightweight_image_is_alice_dev_ready_without_browser_or_db_server():
     assert "npm install --ignore-scripts --no-audit --no-fund --package-lock=false" in bootstrap
     assert "bash scripts/format.sh check" in bootstrap
     assert 'import app; assert app.app.test_client().get("/healthz").status_code == 200' in bootstrap
+
+def test_dev_bootstrap_installs_cloud_and_github_clis():
+    root = Path(__file__).resolve().parents[1]
+    bootstrap = (
+        root / "deploy" / "remote-desktop-commander" / "dev-bootstrap.sh"
+    ).read_text()
+
+    assert 'gh_version="2.96.0"' in bootstrap
+    assert "scripts/install_eds.py" in bootstrap
+    assert "https://storage.yandexcloud.net/yandexcloud-yc/install.sh" in bootstrap
+    assert "gh --version" in bootstrap
+    assert "eds version" in bootstrap
+    assert "yc version" in bootstrap
+    assert "GITHUB_TOKEN" not in bootstrap
+    assert "CLOUDRU_IAM_KEY_SECRET" not in bootstrap
