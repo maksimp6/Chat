@@ -25,22 +25,41 @@ _PUBLIC_PATHS = frozenset({"/healthz", "/auth/logout"})
 _PUBLIC_PREFIXES = ("/auth/github/",)
 _TOKEN_PATH_MARKER = "alice.short_token_path_authenticated"
 _PROXY_AUTH_HEADER = "X-Alice-Proxy-Authenticated"
-_secret_resolver: SecretResolver | None = None
-_secret_ref: SecretRef | None = None
+
+
+class _ShortTokenSource:
+    def __init__(self) -> None:
+        self.resolver: SecretResolver | None = None
+        self.ref: SecretRef | None = None
+
+    def configure(self, resolver: SecretResolver, ref: SecretRef) -> None:
+        self.resolver = resolver
+        self.ref = ref
+
+    def reset(self) -> None:
+        self.resolver = None
+        self.ref = None
+
+    def resolve(self) -> str:
+        if self.resolver is None or self.ref is None:
+            return os.environ.get("ALICE_SHORT_TOKEN", "")
+        try:
+            return self.resolver.resolve(self.ref).reveal()
+        except SecretResolutionError:
+            return ""
+
+
+_SHORT_TOKEN_SOURCE = _ShortTokenSource()
 
 
 def configure_short_token_secret(resolver: SecretResolver, ref: SecretRef) -> None:
     """Configure the canonical Secret Store source for the runtime short token."""
-    global _secret_resolver, _secret_ref
-    _secret_resolver = resolver
-    _secret_ref = ref
+    _SHORT_TOKEN_SOURCE.configure(resolver, ref)
 
 
 def reset_short_token_secret() -> None:
     """Reset process-local resolver wiring. Intended for tests/bootstrap reloads."""
-    global _secret_resolver, _secret_ref
-    _secret_resolver = None
-    _secret_ref = None
+    _SHORT_TOKEN_SOURCE.reset()
 
 
 def _enabled() -> bool:
@@ -53,12 +72,7 @@ def _enabled() -> bool:
 
 
 def _token() -> str:
-    if _secret_resolver is None or _secret_ref is None:
-        return os.environ.get("ALICE_SHORT_TOKEN", "")
-    try:
-        return _secret_resolver.resolve(_secret_ref).reveal()
-    except SecretResolutionError:
-        return ""
+    return _SHORT_TOKEN_SOURCE.resolve()
 
 
 def _serializer(token: str) -> URLSafeTimedSerializer:
