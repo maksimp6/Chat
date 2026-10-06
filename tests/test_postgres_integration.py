@@ -132,65 +132,49 @@ def test_postgres_observability_migration_is_idempotent():
     assert len(rows) == 1
 
 
-def test_postgres_github_sign_in_promotes_anonymous_user_once():
+def test_postgres_legacy_identity_import_then_file_native_github_promotion():
     _require_postgres()
-    import threading
-    import time
+    import hashlib
     import uuid
 
+    import agent_memory.user_identity_migration as identity_migration
+    from agent_memory.runtime_store import clear_runtime_memory_db
     from user_identity import (
         authenticate_user_token,
         get_github_login,
         init_github_accounts_table,
-        register_anonymous_user,
         sign_in_with_github,
     )
 
-    init_github_accounts_table()  # app.py creates the table at startup
-    anon = register_anonymous_user(f"pg-installation-{uuid.uuid4().hex}", {})
-    github_id = int(uuid.uuid4().int % 10**12)
+    clear_runtime_memory_db(db.memory_file_path())
+    identity_migration._ensure_legacy_schema()
 
-    # A first callback has claimed the anonymous row but not committed yet.
-    first = db.get_conn()
-    first.execute(
-        "UPDATE users SET status = 'github' WHERE id = ? AND status = 'anonymous'",
-        (anon["user_id"],),
-    )
+    user_id = str(uuid.uuid4())
+    installation_id = f"pg-legacy-installation-{uuid.uuid4().hex}"
+    bootstrap_token = "pg-legacy-bootstrap-token"
+    token_hash = hashlib.sha256(bootstrap_token.encode("utf-8")).hexdigest()
 
-    results = []
-    second = threading.Thread(
-        target=lambda: results.append(
-            sign_in_with_github(github_id, "second-account", anon["user_id"])
-        )
-    )
-    second.start()
-
-    # Wait until the second callback is blocked on the row lock, then commit
-    # the first claim so the second must re-check the row's status.
-    probe = db.get_conn()
+    conn = db.get_conn()
     try:
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            waiting = probe.execute(
-                "SELECT count(*) AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
-            ).fetchone()["n"]
-            probe.commit()
-            if waiting:
-                break
-            time.sleep(0.05)
-        assert waiting, "second sign-in never waited on the claimed row"
+        conn.execute(
+            """INSERT INTO users
+               (id, installation_id, status, metadata_json, auth_token_hash, created_at, updated_at)
+               VALUES (?, ?, 'anonymous', '{}', ?, ?, ?)""",
+            (user_id, installation_id, token_hash, 10, 20),
+        )
+        conn.commit()
     finally:
-        probe.close()
-    first.commit()
-    first.close()
-    second.join(timeout=10)
+        conn.close()
 
-    assert len(results) == 1
-    identity = results[0]
-    assert identity["user_id"] != anon["user_id"]
-    assert identity["new_user"] is True
-    assert get_github_login(anon["user_id"]) is None
-    assert authenticate_user_token(identity["auth_token"]) == identity["user_id"]
+    init_github_accounts_table()
+    assert authenticate_user_token(bootstrap_token) == user_id
+
+    identity = sign_in_with_github(77, "second-account", user_id)
+
+    assert identity["user_id"] == user_id
+    assert identity["new_user"] is False
+    assert get_github_login(user_id) == "second-account"
+    assert authenticate_user_token(identity["auth_token"]) == user_id
 
 
 def test_postgres_upgrade_drops_legacy_invocation_conversation_fk():

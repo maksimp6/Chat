@@ -5,7 +5,7 @@
 Система памяти находится в переходе к дurable file-native Storage Engine. На данный момент:
 
 - **Извлечение памяти** использует SQL-backed модель: `memory_manager.py` и `memory_extractor.py` создают таблицу `global_memory` для хранения фактов, извлечённых из диалогов
-- **Дurable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857), но пока не интегрирован в приложение
+- **Durable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857); Wave 1 уже перевёл `conversation_ownership.py` на file-native ownership (#920) и переводит `user_identity.py` вместе с GitHub account mapping как один atomic identity aggregate
 - **Целевая архитектура** описана в [issue #776](https://github.com/maksimp6/Chat/issues/776): одна дurable file-native Memory DB с crash recovery, deterministic tests и миграцией от SQL
 
 ## Компоненты
@@ -16,11 +16,16 @@
 - `memory_extractor.py` — извлечение фактов из диалогов, сохранение в SQL таблицу `global_memory`
 - `db.py` — связь с `ALICE_DATABASE_URL`, инициализация схемы
 
-### Внедряемые (File-native, не интегрированы)
+### File-native foundation и Wave 1
 
-- `agent_memory/file_memory_db.py` — одноявный append-only JSONL файл с fsync-гарантиями, recovery и compaction
+- `agent_memory/file_memory_db.py` — append-only JSONL файл с fsync-гарантиями, recovery и compaction
 - `agent_memory/backup.py` — verified backup/restore с manifest и SHA256 checksum
-- `tests/test_file_memory_db.py`, `tests/test_memory_backup.py` — доказательство crash/corruption/ENOSPC safety
+- `agent_memory/conversation_ownership_store.py` — durable typed ownership repository
+- `agent_memory/conversation_ownership_migration.py` — bounded legacy SQL import; после migration marker runtime ownership SQL больше не читает
+- `agent_memory/runtime_store.py` — один process-local `FileMemoryDB` writer/barrier на каждый `alice.memory`
+- `agent_memory/user_identity_store.py` — atomic aggregate `users + github_accounts + migration metadata`
+- `agent_memory/user_identity_migration.py` — verified one-time import legacy SQL identity state; после aggregate commit runtime identity SQL больше не читает
+- tests доказывают durability/recovery, verified cutover, failed-write no-publish, writer reuse и owner/identity isolation
 
 ## Миграция (issue #776)
 
@@ -36,7 +41,7 @@ Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит
 3. Atomic cutover только после verified equivalence
 4. Explicit rollback capability
 
-**Статус**: дurable engine готов и протестирован; интеграция с приложением — следующий шаг.
+**Статус**: durable engine и backup/restore готовы; conversation ownership уже shipped в master (#920). User identity + GitHub mapping переведены следующим Wave 1 slice; после него остаются sessions/profiles и memory extraction.
 
 ## Сценарии использования (текущие)
 

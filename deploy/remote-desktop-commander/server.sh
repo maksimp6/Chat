@@ -20,7 +20,7 @@ case "$operation" in
     source_dir="$release/deploy/remote-desktop-commander"
     previous="$(mktemp -d "$root/releases/previous.XXXXXX")"
     trap 'rm -rf -- "$previous"' EXIT
-    files=(Dockerfile compose.yaml config.json entrypoint.sh pairing-handoff.cjs .dockerignore package.json package-lock.json dependency-smoke.cjs desktop-session.cjs browser-smoke.cjs state-store.py chromium-seccomp.json chromium-seccomp.LICENSE)
+    files=(Dockerfile compose.yaml config.json entrypoint.sh dev-bootstrap.sh pairing-handoff.cjs .dockerignore package.json package-lock.json dependency-smoke.cjs desktop-session.cjs browser-smoke.cjs state-store.py chromium-seccomp.json chromium-seccomp.LICENSE)
     for file in "${files[@]}"; do
       if [[ -f "$root/$file" ]]; then cp "$root/$file" "$previous/$file"; fi
       test -f "$source_dir/$file"

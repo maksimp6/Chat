@@ -7,6 +7,9 @@ case " $* " in
     exec node --require /opt/desktop-commander/pairing-handoff.cjs /opt/desktop-commander/node_modules/@wonderwhy-er/desktop-commander/dist/index.js "$@"
     ;;
 esac
+if [[ "${ALICE_RDC_MODE:-}" == "mcp-gateway" ]]; then
+  exec node /opt/desktop-commander/mcp-gateway.mjs
+fi
 if [[ "${ALICE_RDC_MODE:-}" == "cloud-rdc" ]]; then
   # The managed Object Storage mount holds only regular closed snapshots. Local
   # POSIX home/profile directories are populated only after verified recovery.

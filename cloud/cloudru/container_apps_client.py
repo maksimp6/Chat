@@ -192,6 +192,42 @@ class CloudRuContainerAppsClient:
                 return None
             raise
 
+    def find_for_deploy(
+        self,
+        name: str,
+        *,
+        transient_attempts: int = 3,
+        retry_delay_s: float = 1.0,
+    ) -> dict[str, Any] | None:
+        """Resolve a deploy target without treating Cloud.ru HTTP 499 as not-found."""
+        if transient_attempts < 1:
+            raise CloudProviderError(
+                "transient_attempts must be positive",
+                code="validation_error",
+            )
+
+        last_499: CloudProviderError | None = None
+        for attempt in range(transient_attempts):
+            try:
+                return self.get(name)
+            except CloudProviderError as exc:
+                if exc.http_status != 499:
+                    raise
+                last_499 = exc
+                if attempt + 1 < transient_attempts:
+                    self._sleep(retry_delay_s)
+
+        inventory = self.list(require_total=True)
+        matches = [item for item in inventory if item.get("name") == self._name(name)]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            return None
+        raise CloudProviderError(
+            f"Cloud.ru Container Apps inventory contains duplicate name '{name}'",
+            code="invalid_response",
+        ) from last_499
+
     def list(
         self,
         *,
@@ -307,12 +343,9 @@ class CloudRuContainerAppsClient:
         }
         return self.client.request(SERVICE, "POST", "/v2/containers", json_body=body)
 
-    def update(self, spec: ContainerSpec) -> dict[str, Any]:
-        """Roll out a new revision with ``spec`` applied to the current configuration."""
+    def update_from_current(self, spec: ContainerSpec, current: dict[str, Any]) -> dict[str, Any]:
+        """Roll out ``spec`` using a caller-verified current service snapshot."""
         spec.validate()
-        current = self.get(spec.name)
-        if current is None:
-            raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
         body = _patch_body(current, project_id=self._project())
         body.setdefault("configuration", {}).setdefault("ingress", {})["publiclyAccessible"] = (
             spec.public
@@ -332,6 +365,13 @@ class CloudRuContainerAppsClient:
             f"/v2/containers/{spec.name}",
             json_body=body,
         )
+
+    def update(self, spec: ContainerSpec) -> dict[str, Any]:
+        """Roll out a new revision with ``spec`` applied to the current configuration."""
+        current = self.get(spec.name)
+        if current is None:
+            raise CloudProviderError(f"container '{spec.name}' not found", code="not_found")
+        return self.update_from_current(spec, current)
 
     def restore(self, name: str, previous: dict[str, Any]) -> dict[str, Any]:
         """Roll out a revision with exactly the configuration captured in ``previous``."""

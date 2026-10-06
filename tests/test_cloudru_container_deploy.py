@@ -163,8 +163,8 @@ def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
     assert login_argv[:3] == ["docker", "login", "alice-pro.cr.cloud.ru"]
     assert "key-secret" not in login_argv
     assert login_kwargs["input"] == "key-secret"
-    assert [argv[1] for argv, _ in runs] == ["login", "build", "push", "push"]
-    assert runs[2][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
+    assert [argv[1] for argv, _ in runs] == ["login", "pull", "build", "push", "push"]
+    assert runs[3][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
     assert ref == ImageRef("alice-pro.cr.cloud.ru", "alice-pro", "abc123", DIGEST)
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
 
@@ -184,8 +184,9 @@ def test_build_reuses_and_refreshes_registry_layer_cache():
     # A failed cache refresh never fails a deploy whose pinned image was pushed.
     ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc")
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
-    build = runs[1]
     cache = "alice-pro.cr.cloud.ru/alice-pro:buildcache"
+    assert runs[1] == ["docker", "pull", cache]
+    build = runs[2]
     assert build[build.index("--cache-from") + 1] == cache
     assert "BUILDKIT_INLINE_CACHE=1" in build
     assert [build[i + 1] for i, item in enumerate(build) if item == "-t"] == [
@@ -1046,7 +1047,7 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     import json
     from cloud.cloudru import registry_client
 
-    ticks = iter([1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
+    ticks = iter([0.0, 0.05, 1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
     monkeypatch.setattr(registry_client.time, "perf_counter", lambda: next(ticks))
 
     def runner(argv, **kwargs):
@@ -1069,11 +1070,134 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     output = capsys.readouterr().out
     records = [json.loads(line) for line in output.splitlines()]
     assert [r["stage"] for r in records] == [
+        "registry_cache_pull",
         "registry_build",
         "registry_push",
         "registry_cache_refresh",
     ]
-    assert [r["seconds"] for r in records] == [0.125, 0.25, 0.0625]
-    assert records[0]["cached_steps"] == 2
+    assert [r["seconds"] for r in records] == [0.05, 0.125, 0.25, 0.0625]
+    assert records[1]["cached_steps"] == 2
     assert records[-1]["returncode"] == 1
     assert "key-secret" not in output and "secret-source" not in output
+
+
+def test_find_for_deploy_retries_499_then_returns_direct_get():
+    sleeps = []
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            _app(),
+        ]
+    )
+    apps = CloudRuContainerAppsClient(
+        project_id="p1",
+        client=client,
+        sleep=lambda seconds: sleeps.append(seconds),
+    )
+
+    assert apps.find_for_deploy("alice-pro")["id"] == "c-1"
+    assert sleeps == [1.0]
+    assert [call[2] for call in client.calls] == [
+        "/v2/containers/alice-pro",
+        "/v2/containers/alice-pro",
+    ]
+
+
+def test_find_for_deploy_falls_back_to_strict_inventory_after_499():
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            {"data": [], "total": 0},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client, sleep=lambda _: None)
+
+    assert apps.find_for_deploy("alice-pro") is None
+    assert client.calls[-1][2] == "/v2/containers"
+    assert client.calls[-1][3] == {"projectId": "p1", "pageSize": 100}
+
+
+def test_find_for_deploy_inventory_can_prove_existing_service():
+    existing = _app()
+    existing["name"] = "alice-pro"
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            CloudProviderError("transient", http_status=499),
+            {"data": [existing], "total": 1},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client, sleep=lambda _: None)
+
+    assert apps.find_for_deploy("alice-pro")["id"] == "c-1"
+
+
+def test_find_for_deploy_reraises_non_499_errors_without_inventory():
+    client = RecordingClient([CloudProviderError("boom", http_status=500)])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+
+    with pytest.raises(CloudProviderError, match="boom"):
+        apps.find_for_deploy("alice-pro")
+
+    assert len(client.calls) == 1
+
+
+def test_find_for_deploy_rejects_invalid_attempt_count():
+    apps = CloudRuContainerAppsClient(project_id="p1", client=RecordingClient())
+
+    with pytest.raises(CloudProviderError, match="transient_attempts"):
+        apps.find_for_deploy("alice-pro", transient_attempts=0)
+
+
+def test_find_for_deploy_rejects_duplicate_inventory_names():
+    duplicate = _app()
+    duplicate["name"] = "alice-pro"
+    client = RecordingClient(
+        [
+            CloudProviderError("transient", http_status=499),
+            {"data": [duplicate, duplicate], "total": 2},
+        ]
+    )
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client, sleep=lambda _: None)
+
+    with pytest.raises(CloudProviderError, match="duplicate name"):
+        apps.find_for_deploy("alice-pro", transient_attempts=1)
+
+
+def test_update_from_current_reuses_verified_snapshot_without_second_get():
+    current = _app()
+    client = RecordingClient([{"operationId": "update-op"}])
+    apps = CloudRuContainerAppsClient(project_id="p1", client=client)
+    spec = ContainerSpec(name="alice-pro", image="registry/new@sha256:" + "b" * 64)
+
+    result = apps.update_from_current(spec, current)
+
+    assert result == {"operationId": "update-op"}
+    assert len(client.calls) == 1
+    _, method, path, _, body = client.calls[0]
+    assert (method, path) == ("PATCH", "/v2/containers/alice-pro")
+    assert body["template"]["containers"][0]["image"] == spec.image
+
+
+def test_missing_registry_cache_does_not_block_cold_build():
+    runs = []
+
+    def runner(argv, **kwargs):
+        runs.append(argv)
+        if argv[1] == "pull":
+            return subprocess.CompletedProcess(argv, 1, stdout="", stderr="not found")
+        stdout = f"digest: {DIGEST}" if argv[1] == "push" else ""
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=runner
+    )
+
+    ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="cold")
+
+    assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
+    assert runs[1] == ["docker", "pull", "alice-pro.cr.cloud.ru/alice-pro:buildcache"]
+    assert runs[2][1] == "build"

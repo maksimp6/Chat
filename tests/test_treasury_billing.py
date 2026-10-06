@@ -7,14 +7,12 @@ def treasury_db(tmp_path, monkeypatch):
     import invocation.manager as invocation_manager
     import runtime_migrations
     import treasury
-    import user_identity
 
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
     monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
     monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
     monkeypatch.setattr(treasury, "get_conn", db.get_conn)
-    monkeypatch.setattr(user_identity, "get_conn", db.get_conn)
 
     db.init_db()
     runtime_migrations.init_runtime_tables()

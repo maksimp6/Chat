@@ -23,6 +23,25 @@ def _runtime_db_path():
     return str(root / "alice_pro.db")
 
 
+def memory_file_path() -> Path:
+    """Return the authoritative file-native Memory DB path for this runtime."""
+    data_root = current_runtime_data_root()
+    if data_root:
+        root = Path(data_root).resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        return root / "alice.memory"
+
+    explicit = os.getenv("ALICE_MEMORY_PATH", "").strip()
+    if explicit:
+        path = Path(explicit).expanduser().resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    path = Path(DB_PATH).expanduser().resolve().with_name("alice.memory")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def is_memory_configured():
     if current_runtime_data_root():
         return False
