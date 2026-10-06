@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import re
 from typing import Protocol
 
-from secret_store.core import SecretRef, SecretResolver, SecretValue
+from secret_store.core import SecretRef, SecretResolutionError, SecretResolver, SecretValue
 
 _ALIAS_RE = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 
@@ -96,7 +96,7 @@ class SecretManager:
             raise SecretAliasError("secret purpose is not allowed")
         try:
             value = self._resolver.resolve(entry.ref)
-        except Exception:
+        except SecretResolutionError:
             self._record(alias, purpose, "use", False)
             raise
         self._record(alias, purpose, "use", True)
