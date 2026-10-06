@@ -33,7 +33,7 @@ async function readJson(request) {
 }
 
 export async function startGateway(options = {}) {
-  const token = options.token ?? process.env.ALICE_DEV_TOKEN ?? "";
+  const token = options.token ?? process.env.ALICE_SHORT_TOKEN ?? "";
   if (!token) throw new Error("MCP token is required");
   const upstream = options.upstream ?? new Client(
     { name: "alice-dev-gateway", version: "0.1.0" },
