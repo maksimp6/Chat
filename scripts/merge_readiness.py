@@ -118,11 +118,29 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     if snapshot["draft"]:
         blockers.append({"code": "draft", "detail": "pull request is draft"})
 
-    if snapshot["pr_base_ref"] != snapshot["base_ref"]:
+    stack_role = str(snapshot.get("stack_role") or "root")
+    expected_pr_base = str(snapshot.get("stack_parent_head") or snapshot["base_ref"])
+    if snapshot["pr_base_ref"] != expected_pr_base:
         blockers.append(
             {
                 "code": "wrong_base",
-                "detail": f"base is {snapshot['pr_base_ref']}, expected {snapshot['base_ref']}",
+                "detail": f"base is {snapshot['pr_base_ref']}, expected {expected_pr_base}",
+            }
+        )
+
+    if stack_role == "root":
+        for item in snapshot.get("topology_blockers", []):
+            blockers.append(
+                {
+                    "code": "stack_descendant",
+                    "detail": str(item),
+                }
+            )
+    elif stack_role != "child":
+        blockers.append(
+            {
+                "code": "stack_topology_invalid",
+                "detail": "stack role must be root or child",
             }
         )
 
@@ -212,6 +230,7 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "base_ref": snapshot["base_ref"],
         "head_sha": snapshot["head_sha"],
         "behind_by": behind_by,
+        "stack_role": stack_role,
         "blockers": blockers,
     }
 
