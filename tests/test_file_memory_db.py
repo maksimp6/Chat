@@ -16,6 +16,8 @@ def test_append_recover_and_delete(tmp_path):
     restored = FileMemoryDB(path)
     assert restored.sequence == 3
     assert restored.items() == {"b": "two"}
+    assert restored.get("b") == "two"
+    assert restored.get("missing", "fallback") == "fallback"
 
 
 def test_truncated_tail_is_discarded(tmp_path):
