@@ -1,5 +1,7 @@
 # Alice Pro production deployment
 
+⚠️ **Deprecation notice**: SSH-based deployment (production-deploy.yml workflow) is being replaced with Cloud.ru persistent RDC. See [Issue #869](https://github.com/maksimp6/Chat/issues/869) for transition plan. This documentation describes the current SSH path and will be updated when RDC deployment becomes canonical.
+
 Production uses the existing VPS reverse proxy and Docker network already used by Preview.
 
 ## Domains and DNS
@@ -67,7 +69,9 @@ This means a request to a production domain such as:
 
 is not consumed by the production Host router.
 
-## Production workflow
+## Production workflow (SSH — deprecated)
+
+⚠️ **Deprecated**: This workflow uses SSH and will be replaced by Cloud.ru persistent RDC (Issue #869).
 
 Run **Actions → Production deployment → Run workflow** and select the Git ref to deploy.
 
