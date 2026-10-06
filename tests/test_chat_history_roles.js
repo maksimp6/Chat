@@ -6,8 +6,9 @@ const { BrowserShim } = require("./browser_dom");
 
 const ROOT = path.resolve(__dirname, "..");
 const HTML =
-  '<div id="chatbox"></div><textarea id="msg-input"></textarea><button id="send-btn"></button>' +
-  '<div id="voice-status"></div><button id="mic-btn" type="button"></button>';
+  '<div id="chatbox"></div><textarea id="msg-input"></textarea>' +
+  '<button id="send-btn"></button><div id="voice-status"></div>' +
+  '<button id="mic-btn" type="button"></button>';
 
 async function settle() {
   for (let i = 0; i < 10; i += 1)
@@ -115,7 +116,11 @@ async function testHistoryRenderingIsSideEffectFreeAndIdempotent() {
 
   context.loadHistory("conv-1");
   await settle();
-  assert.equal(messages(document).length, 2, "reload renders the same messages once");
+  assert.equal(
+    messages(document).length,
+    2,
+    "reload renders the same messages once",
+  );
 }
 
 async function testHistoryEmptyAndErrors() {
