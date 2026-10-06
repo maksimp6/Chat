@@ -44,6 +44,7 @@ jobs:
           docker exec -u 0 rdc-mcp-ci chown -R 1000:1000 /tmp/alice-src
           docker exec -e ALICE_RDC_DEV_VENV=/tmp/alice-venv rdc-mcp-ci \
             alice-rdc-dev-bootstrap /tmp/alice-src
+          docker exec rdc-mcp-ci bash -euc 'for tool in gh eds yc; do command -v "$tool"; done'
           docker exec rdc-mcp-ci bash -euc \
             'cd /tmp/alice-src; PATH=/tmp/alice-venv/bin:$PATH bash scripts/pre_push.sh'
       - name: Exercise volume initialization and non-root CLI startup
