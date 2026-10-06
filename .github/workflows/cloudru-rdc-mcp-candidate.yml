@@ -7,6 +7,8 @@ on:
       - "cloud/cloudru/container_apps_client.py"
       - "deploy/remote-desktop-commander/Dockerfile.mcp"
       - "deploy/remote-desktop-commander/mcp-gateway.mjs"
+      - "deploy/remote-desktop-commander/oauth.mjs"
+      - "deploy/remote-desktop-commander/oauth-discovery-smoke.mjs"
       - "deploy/remote-desktop-commander/stdio-server.mjs"
       - "deploy/remote-desktop-commander/mcp-gateway-live-smoke.mjs"
       - "deploy/remote-desktop-commander/package.json"
@@ -52,6 +54,11 @@ jobs:
       - name: Install MCP smoke dependencies
         working-directory: deploy/remote-desktop-commander
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Verify OAuth discovery
+        working-directory: deploy/remote-desktop-commander
+        env:
+          ALICE_DEV_SMOKE_ORIGIN: ${{ steps.candidate.outputs.origin }}
+        run: node oauth-discovery-smoke.mjs
       - name: Verify public MCP end to end
         working-directory: deploy/remote-desktop-commander
         env:
