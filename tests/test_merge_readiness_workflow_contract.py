@@ -25,6 +25,10 @@ def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
     required_checks = [
+        "Platform changes",
+        "CI required",
+        "Infrastructure tests",
+        "MCP worker tests",
         "Application tests",
         "PostgreSQL integration",
         "Android debug APK",
