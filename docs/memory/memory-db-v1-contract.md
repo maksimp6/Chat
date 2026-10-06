@@ -8,6 +8,8 @@ Memory DB is the durable file-native storage engine for Alice. Alice depends on 
 
 The working source of truth lives under a runtime-specific data root. Remote object/cloud storage is backup, not the live filesystem.
 
+The append-only file is the only authoritative live database file.
+
 ## Single-file layout
 
 Memory DB v1 has one authoritative append-only file per runtime:
