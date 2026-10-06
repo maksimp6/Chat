@@ -26,6 +26,49 @@ class StackTopology:
     unabsorbed_closed: tuple[PullNode, ...]
 
 
+
+@dataclass(frozen=True, slots=True)
+class AncestorChain:
+    current: PullNode
+    ancestors: tuple[PullNode, ...]
+    root: PullNode
+
+
+def build_ancestor_chain(
+    nodes: tuple[PullNode, ...],
+    pr_number: int,
+    target: str = "master",
+) -> AncestorChain:
+    by_number = {node.number: node for node in nodes}
+    current = by_number.get(pr_number)
+    if current is None:
+        raise StackTopologyError("pull request not found")
+
+    heads: dict[str, list[PullNode]] = {}
+    for node in nodes:
+        heads.setdefault(node.head, []).append(node)
+
+    ancestors: list[PullNode] = []
+    seen = {current.number}
+    cursor = current
+    while cursor.base != target:
+        owners = heads.get(cursor.base, [])
+        if not owners:
+            raise StackTopologyError("ancestor chain broken")
+        if len(owners) != 1:
+            raise StackTopologyError("ambiguous ancestor")
+        parent = owners[0]
+        if parent.number in seen:
+            raise StackTopologyError("stack topology cycle")
+        if parent.state != "open":
+            raise StackTopologyError("stale ancestor")
+        ancestors.append(parent)
+        seen.add(parent.number)
+        cursor = parent
+
+    return AncestorChain(current=current, ancestors=tuple(ancestors), root=cursor)
+
+
 def build_stack(
     nodes: tuple[PullNode, ...],
     root_number: int,
@@ -91,9 +134,11 @@ def topology_blockers(topology: StackTopology) -> tuple[str, ...]:
 
 
 __all__ = [
+    "AncestorChain",
     "PullNode",
     "StackTopology",
     "StackTopologyError",
+    "build_ancestor_chain",
     "build_stack",
     "topology_blockers",
 ]
