@@ -120,17 +120,17 @@ def test_lightweight_image_is_alice_dev_ready_without_browser_or_db_server():
     assert "postgresql" not in dockerfile.lower()
     assert "python -m pip" in dockerfile
     assert "node --version" in dockerfile
-    assert "-r \"$repo/requirements.txt\"" in bootstrap
-    assert "-r \"$repo/requirements-dev.txt\"" in bootstrap
+    assert '-r "$repo/requirements.txt"' in bootstrap
+    assert '-r "$repo/requirements-dev.txt"' in bootstrap
     assert "npm install --ignore-scripts --no-audit --no-fund --package-lock=false" in bootstrap
     assert "bash scripts/format.sh check" in bootstrap
-    assert 'import app; assert app.app.test_client().get("/healthz").status_code == 200' in bootstrap
+    assert (
+        'import app; assert app.app.test_client().get("/healthz").status_code == 200' in bootstrap
+    )
 
 def test_dev_bootstrap_installs_cloud_and_github_clis():
     root = Path(__file__).resolve().parents[1]
-    bootstrap = (
-        root / "deploy" / "remote-desktop-commander" / "dev-bootstrap.sh"
-    ).read_text()
+    bootstrap = (root / "deploy" / "remote-desktop-commander" / "dev-bootstrap.sh").read_text()
 
     assert 'gh_version="2.96.0"' in bootstrap
     assert "scripts/install_eds.py" in bootstrap
