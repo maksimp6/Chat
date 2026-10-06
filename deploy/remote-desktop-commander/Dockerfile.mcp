@@ -14,7 +14,7 @@ RUN cd /opt/desktop-commander \
     && node dependency-smoke.cjs
 
 COPY --chown=node:node config.json /home/node/.claude-server-commander/config.json
-COPY mcp-gateway.mjs oauth.mjs stdio-server.mjs mcp-gateway-live-smoke.mjs /opt/desktop-commander/
+COPY mcp-gateway.mjs oauth.mjs credential-handoff.mjs stdio-server.mjs mcp-gateway-live-smoke.mjs /opt/desktop-commander/
 COPY dev-bootstrap.sh /usr/local/bin/alice-dev-bootstrap
 RUN chmod 0755 /usr/local/bin/alice-dev-bootstrap
 

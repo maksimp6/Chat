@@ -6,6 +6,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createOAuth } from "./oauth.mjs";
+import { createCredentialHandoff } from "./credential-handoff.mjs";
 
 const DEFAULT_UPSTREAM = "/opt/desktop-commander/stdio-server.mjs";
 const MAX_BODY = 1024 * 1024;
@@ -43,6 +44,10 @@ export async function startGateway(options = {}) {
     ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
     stateFile: options.oauthStateFile ?? process.env.ALICE_DEV_OAUTH_STATE_FILE,
   }) : null);
+  const credentialHandoff = options.credentialHandoff ?? createCredentialHandoff({
+    token,
+    path: options.credentialFile ?? process.env.ALICE_DEV_CREDENTIAL_FILE,
+  });
   const oauthOptions = {
     shortToken: token,
     ownerId: options.ownerId ?? process.env.ALICE_DEV_OWNER_ID ?? "owner",
@@ -103,6 +108,7 @@ export async function startGateway(options = {}) {
       request.url ?? "/",
       configuredPublicUrl || `${String(request.headers["x-forwarded-proto"] ?? (request.socket.encrypted ? "https" : "http")).split(",")[0].trim()}://${String(request.headers["x-forwarded-host"] ?? request.headers.host ?? "localhost").split(",")[0].trim()}`,
     );
+    if (await credentialHandoff.handle(request, response, requestUrl)) return;
     if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;
     if (requestUrl.pathname !== "/mcp" || request.method !== "POST") {
       request.resume();
