@@ -26,7 +26,7 @@ class FakeApps:
         self._status = {
             "public_uri": "rdc-mcp-22706bfa6066.containerapps.ru",
             "image": "registry/rdc-mcp@sha256:" + "a" * 64,
-            "resources": {"cpu": "0.5", "memory": "1024Mi"},
+            "resources": {"cpu": "0.2", "memory": "512Mi"},
             "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
         }
 
@@ -76,7 +76,7 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
         "maxInstanceCount": 1,
     }
     container = body["template"]["containers"][0]
-    assert container["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
+    assert container["resources"] == {"cpu": "0.2", "memory": "512Mi"}
     assert {item["name"] for item in container["env"]} == {"ALICE_RDC_MCP_TOKEN"}
     assert "synthetic-token" not in repr(result)
 
@@ -106,3 +106,36 @@ def test_gateway_blocks_pdf_tool():
     source = (root / "deploy" / "remote-desktop-commander" / "mcp-gateway.mjs").read_text()
 
     assert 'new Set(["write_pdf"])' in source
+
+
+def test_lightweight_image_is_alice_dev_ready_without_browser_or_db_server():
+    root = Path(__file__).resolve().parents[1]
+    deploy = root / "deploy" / "remote-desktop-commander"
+    dockerfile = (deploy / "Dockerfile.mcp").read_text()
+    bootstrap = (deploy / "dev-bootstrap.sh").read_text()
+
+    assert "FROM python:3.14-slim-bookworm" in dockerfile
+    assert "FROM node:22-bookworm-slim AS node-runtime" in dockerfile
+    assert "chromium" not in dockerfile.lower()
+    assert "postgresql" not in dockerfile.lower()
+    assert "python -m pip" in dockerfile
+    assert "node --version" in dockerfile
+    assert '-r "$repo/requirements.txt"' in bootstrap
+    assert '-r "$repo/requirements-dev.txt"' in bootstrap
+    assert "npm install --ignore-scripts --no-audit --no-fund --package-lock=false" in bootstrap
+    assert "bash scripts/format.sh check" in bootstrap
+    assert (
+        'import app; assert app.app.test_client().get("/healthz").status_code == 200' in bootstrap
+    )
+
+
+def test_dev_bootstrap_installs_cloud_and_github_clis():
+    root = Path(__file__).resolve().parents[1]
+    bootstrap = (root / "deploy" / "remote-desktop-commander" / "dev-bootstrap.sh").read_text()
+
+    assert 'gh_version="2.96.0"' in bootstrap
+    assert "scripts/install_eds.py" in bootstrap
+    assert "gh --version" in bootstrap
+    assert "eds version" in bootstrap
+    assert "GITHUB_TOKEN" not in bootstrap
+    assert "CLOUDRU_IAM_KEY_SECRET" not in bootstrap
