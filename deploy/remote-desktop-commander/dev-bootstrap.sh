@@ -28,7 +28,7 @@ python -m venv "$venv"
 
 (
   cd "$repo"
-  npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+  npm_config_cache="${ALICE_RDC_NPM_CACHE:-/tmp/alice-npm-cache}"     npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 )
 
 bin_dir="$HOME/.local/bin"
