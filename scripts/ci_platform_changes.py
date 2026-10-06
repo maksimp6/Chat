@@ -37,69 +37,71 @@ MCP_PREFIXES = (
 )
 
 
+def _runtime_platforms(path: str) -> set[str]:
+    if (
+        path
+        in {
+            "db.py",
+            "db_backend.py",
+            "memory_db.py",
+            "provider_credentials.py",
+            "requirements-postgres.txt",
+        }
+        or path.startswith("migrations/")
+        or "postgres" in path.lower()
+    ):
+        return {"backend", "database"}
+    if path.startswith("tests/") and path.endswith(".py"):
+        return {"backend"}
+    if path.endswith(".py"):
+        # Keep SQL compatibility coverage until the runtime migration is complete.
+        return {"backend", "database"}
+    if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
+        return set()
+    return set(PLATFORMS)
+
+
+def _path_platforms(path: str) -> set[str]:
+    if (
+        not path
+        or path.startswith("/")
+        or ".." in PurePosixPath(path).parts
+        or path in SHARED_INPUTS
+    ):
+        return set(PLATFORMS)
+    if path.startswith("android/"):
+        return {"android"}
+    if (
+        path.startswith(("static/", "templates/"))
+        or path in {"app.py", "package.json", "package-lock.json"}
+        or (path.startswith("tests/") and path.endswith(".js"))
+    ):
+        return {"web"}
+    if path.startswith(MCP_PREFIXES):
+        return {"mcp", "infra"}
+    if (
+        path.startswith(INFRA_TEST_PREFIXES)
+        or path.startswith(
+            (
+                "cloud/",
+                "scripts/cloudru_",
+                "scripts/ci_",
+                "alice_platform/",
+                "config/alice/",
+                ".github/workflows/",
+            )
+        )
+        or path == "requirements-deploy.txt"
+    ):
+        return {"infra"}
+    return _runtime_platforms(path)
+
+
 def classify(paths: list[str]) -> dict[str, bool]:
     """Unknown inputs select every suite rather than silently dropping tests."""
-    selected: set[str] = set()
-    if not paths:
-        selected.update(PLATFORMS)
+    selected: set[str] = set() if paths else set(PLATFORMS)
     for path in paths:
-        if (
-            not path
-            or path.startswith("/")
-            or ".." in PurePosixPath(path).parts
-            or path in SHARED_INPUTS
-        ):
-            selected.update(PLATFORMS)
-        elif path.startswith("android/"):
-            selected.add("android")
-        elif (
-            path.startswith(("static/", "templates/"))
-            or path in {"app.py", "package.json", "package-lock.json"}
-            or (path.startswith("tests/") and path.endswith(".js"))
-        ):
-            selected.add("web")
-        elif path.startswith(MCP_PREFIXES):
-            selected.update(("mcp", "infra"))
-        elif (
-            path.startswith(INFRA_TEST_PREFIXES)
-            or path.startswith(
-                (
-                    "cloud/",
-                    "scripts/cloudru_",
-                    "scripts/ci_",
-                    "alice_platform/",
-                    "config/alice/",
-                    ".github/workflows/",
-                )
-            )
-            or path == "requirements-deploy.txt"
-        ):
-            selected.add("infra")
-        elif (
-            path
-            in {
-                "db.py",
-                "db_backend.py",
-                "memory_db.py",
-                "provider_credentials.py",
-                "requirements-postgres.txt",
-            }
-            or path.startswith("migrations/")
-            or "postgres" in path.lower()
-        ):
-            selected.update(("backend", "database"))
-        elif path.startswith("tests/") and path.endswith(".py"):
-            selected.add("backend")
-        elif path.endswith(".py"):
-            # Until SQL migration is complete, runtime Python changes may affect
-            # either backend. This is compatibility coverage, not an Android build.
-            selected.update(("backend", "database"))
-        elif path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(
-            ".md"
-        ):
-            continue
-        else:
-            selected.update(PLATFORMS)
+        selected.update(_path_platforms(path))
     if "web" in selected:
         selected.update(("backend", "android", "database", "mcp"))
     return {platform: platform in selected for platform in PLATFORMS}
