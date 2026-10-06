@@ -285,7 +285,7 @@ test("concurrent real worker OAuth registrations checkpoint complete immutable s
   assert.equal(restored.status().authGeneration, 20);
 });
 
-test("consent page posts only to itself and renders a password field", async (t) => {
+test("consent page allows self and the registered redirect origin", async (t) => {
   const app = await fixture(t);
   const client = await (await app.register()).json();
   const started = await app.start(client);
