@@ -32,12 +32,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version-file: .python-version
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+          cache: pip
+          cache-dependency-path: requirements-deploy.txt
+      - name: Install Python deploy dependencies
+        run: pip install -r requirements-deploy.txt
       - name: Deploy isolated candidate
         id: candidate
         env:

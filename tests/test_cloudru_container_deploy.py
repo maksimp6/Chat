@@ -163,8 +163,8 @@ def test_build_and_push_passes_secret_on_stdin_and_pins_digest():
     assert login_argv[:3] == ["docker", "login", "alice-pro.cr.cloud.ru"]
     assert "key-secret" not in login_argv
     assert login_kwargs["input"] == "key-secret"
-    assert [argv[1] for argv, _ in runs] == ["login", "build", "push", "push"]
-    assert runs[2][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
+    assert [argv[1] for argv, _ in runs] == ["login", "pull", "build", "push", "push"]
+    assert runs[3][0][2] == "alice-pro.cr.cloud.ru/alice-pro:abc123"
     assert ref == ImageRef("alice-pro.cr.cloud.ru", "alice-pro", "abc123", DIGEST)
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
 
@@ -184,8 +184,9 @@ def test_build_reuses_and_refreshes_registry_layer_cache():
     # A failed cache refresh never fails a deploy whose pinned image was pushed.
     ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="abc")
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
-    build = runs[1]
     cache = "alice-pro.cr.cloud.ru/alice-pro:buildcache"
+    assert runs[1] == ["docker", "pull", cache]
+    build = runs[2]
     assert build[build.index("--cache-from") + 1] == cache
     assert "BUILDKIT_INLINE_CACHE=1" in build
     assert [build[i + 1] for i, item in enumerate(build) if item == "-t"] == [
@@ -1046,7 +1047,7 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     import json
     from cloud.cloudru import registry_client
 
-    ticks = iter([1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
+    ticks = iter([0.0, 0.05, 1.0, 1.125, 2.0, 2.25, 3.0, 3.0625])
     monkeypatch.setattr(registry_client.time, "perf_counter", lambda: next(ticks))
 
     def runner(argv, **kwargs):
@@ -1069,12 +1070,13 @@ def test_registry_timings_separate_build_push_and_cache_refresh_without_secrets(
     output = capsys.readouterr().out
     records = [json.loads(line) for line in output.splitlines()]
     assert [r["stage"] for r in records] == [
+        "registry_cache_pull",
         "registry_build",
         "registry_push",
         "registry_cache_refresh",
     ]
-    assert [r["seconds"] for r in records] == [0.125, 0.25, 0.0625]
-    assert records[0]["cached_steps"] == 2
+    assert [r["seconds"] for r in records] == [0.05, 0.125, 0.25, 0.0625]
+    assert records[1]["cached_steps"] == 2
     assert records[-1]["returncode"] == 1
     assert "key-secret" not in output and "secret-source" not in output
 
@@ -1178,3 +1180,24 @@ def test_update_from_current_reuses_verified_snapshot_without_second_get():
     _, method, path, _, body = client.calls[0]
     assert (method, path) == ("PATCH", "/v2/containers/alice-pro")
     assert body["template"]["containers"][0]["image"] == spec.image
+
+
+def test_missing_registry_cache_does_not_block_cold_build():
+    runs = []
+
+    def runner(argv, **kwargs):
+        runs.append(argv)
+        if argv[1] == "pull":
+            return subprocess.CompletedProcess(argv, 1, stdout="", stderr="not found")
+        stdout = f"digest: {DIGEST}" if argv[1] == "push" else ""
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    reg = CloudRuRegistryClient(
+        project_id="p1", client=RecordingClient(), iam_client=_iam(), runner=runner
+    )
+
+    ref = reg.build_and_push(registry_name="alice-pro", repository="alice-pro", tag="cold")
+
+    assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
+    assert runs[1] == ["docker", "pull", "alice-pro.cr.cloud.ru/alice-pro:buildcache"]
+    assert runs[2][1] == "build"

@@ -212,6 +212,23 @@ class CloudRuRegistryClient:
         # CI runners start empty, so layers are reused through an inline BuildKit
         # cache kept in the same private registry under a fixed tag.
         cache = ImageRef(host, repository, CACHE_TAG).tagged
+        # Hosted runners start with an empty local image store. Classic
+        # docker build --cache-from can only reuse the registry cache after the
+        # cache image has been pulled locally. A cold/missing cache is harmless.
+        started = time.perf_counter()
+        cache_pull = self._run(
+            ["docker", "pull", cache], text=True, capture_output=True, check=False, env=env
+        )
+        print(
+            json.dumps(
+                {
+                    "stage": "registry_cache_pull",
+                    "seconds": time.perf_counter() - started,
+                    "returncode": cache_pull.returncode,
+                }
+            ),
+            flush=True,
+        )
         for argv in (
             [
                 "docker",
