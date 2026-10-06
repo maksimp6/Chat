@@ -91,3 +91,9 @@ test("gateway connects durable saves and withdraws readiness after a checkpoint 
   assert.equal(persisted, true);
   assert.equal((await fetch(`${local}/healthz`)).status, 503);
 });
+
+
+test("required durability cannot silently fall back to ephemeral local mode", async (t) => {
+  const opts = { ...await options(t), requireDurability: true };
+  await assert.rejects(startGateway(opts), /oauth_state_not_configured/);
+});

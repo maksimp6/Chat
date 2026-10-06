@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, link } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -100,4 +100,17 @@ test("disabled local mode does not pretend to provide durable state", async () =
   assert.equal(store.enabled, false);
   await store.restore();
   await store.persist();
+});
+
+
+test("hardlinked commit files are rejected before truncation", async (t) => {
+  const { root, stateDir, make } = await fixture(t);
+  const first = make("first");
+  await first.restore();
+  await save(root, "first", state("a"));
+  const target = join(root, "untouched");
+  await writeFile(target, "untouched");
+  await link(target, join(stateDir, "intent.json"));
+  await assert.rejects(first.persist(), /oauth_state_/);
+  assert.equal(await readFile(target, "utf8"), "untouched");
 });

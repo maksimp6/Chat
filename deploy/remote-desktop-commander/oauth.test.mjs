@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { once } from "node:events";
 import test from "node:test";
 
+// Keep durability/restart regressions in the existing CI and image test entrypoint.
+import "./oauth-state.test.mjs";
+import "./oauth-restart.test.mjs";
 import { createOAuth } from "./oauth.mjs";
 
 const PUBLIC = "https://alice-dev.example.test";
