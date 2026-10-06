@@ -30,7 +30,7 @@ jobs:
         Application tests,
         PostgreSQL integration,
         Android debug APK,
-        Auto-format repository,
+        Formatting check,
         Trivy repository scan,
         Zizmor GitHub Actions audit,
         CodeQL (python),
