@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createOAuth } from "./oauth.mjs";
 import { createCredentialHandoff } from "./credential-handoff.mjs";
+import { firstHeader } from "./request-origin.mjs";
 
 const DEFAULT_UPSTREAM = "/opt/desktop-commander/stdio-server.mjs";
 const MAX_BODY = 1024 * 1024;
@@ -97,16 +98,16 @@ export async function startGateway(options = {}) {
       return;
     }
     if (!oauth) {
-      const forwardedProto = String(
-        request.headers["x-forwarded-proto"] ?? (request.socket.encrypted ? "https" : "http"),
-      ).split(",")[0].trim();
-      const host = String(request.headers["x-forwarded-host"] ?? request.headers.host ?? "")
-        .split(",")[0].trim();
+      const forwardedProto = firstHeader(
+        request.headers["x-forwarded-proto"],
+        request.socket.encrypted ? "https" : "http",
+      );
+      const host = firstHeader(request.headers["x-forwarded-host"], request.headers.host);
       if (host) oauth = createOAuth({ ...oauthOptions, publicUrl: `${forwardedProto}://${host}` });
     }
     const requestUrl = new URL(
       request.url ?? "/",
-      configuredPublicUrl || `${String(request.headers["x-forwarded-proto"] ?? (request.socket.encrypted ? "https" : "http")).split(",")[0].trim()}://${String(request.headers["x-forwarded-host"] ?? request.headers.host ?? "localhost").split(",")[0].trim()}`,
+      configuredPublicUrl || `${firstHeader(request.headers["x-forwarded-proto"], request.socket.encrypted ? "https" : "http")}://${firstHeader(request.headers["x-forwarded-host"], request.headers.host, "localhost")}`,
     );
     if (await credentialHandoff.handle(request, response, requestUrl)) return;
     if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;

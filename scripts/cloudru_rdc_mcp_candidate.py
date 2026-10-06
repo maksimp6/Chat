@@ -194,11 +194,14 @@ def create_candidate(apps: CloudRuContainerAppsClient, image: str, token: str, s
     status = apps.wait_until_ready(name, image=image, timeout_s=300, poll_s=5)
     health = apps.health_check(status["public_uri"], attempts=18, delay_s=5)
     origin = health["url"].removesuffix("/healthz")
+    matches = [item for item in apps.list(require_total=True) if item.get("name") == name]
+    if len(matches) != 1 or not matches[0].get("id"):
+        fail("invalid_response")
     return {
         "status": "ALICE_DEV_READY",
         "name": name,
         "origin": origin,
-        "container_id": status.get("id"),
+        "container_id": matches[0]["id"],
         "image": image,
         "resources": status.get("resources"),
         "scaling": status.get("scaling"),

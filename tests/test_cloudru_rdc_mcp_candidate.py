@@ -36,6 +36,15 @@ class FakeApps:
         assert name == "alice-dev-22706bfa6066-aaaaaaaa"
         return self.existing
 
+    def list(self, *, require_total):
+        assert require_total is True
+        return [
+            {
+                "id": self._status["id"],
+                "name": "alice-dev-22706bfa6066-aaaaaaaa",
+            }
+        ]
+
     def update_from_current(self, spec, current):
         self.updates.append((spec, current))
         return {}

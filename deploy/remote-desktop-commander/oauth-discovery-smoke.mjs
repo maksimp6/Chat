@@ -3,6 +3,19 @@ import assert from "node:assert/strict";
 const origin = process.env.ALICE_DEV_SMOKE_ORIGIN;
 if (!origin) throw new Error("ALICE_DEV_SMOKE_ORIGIN is required");
 
+let awake = false;
+for (let attempt = 0; attempt < 30; attempt += 1) {
+  try {
+    const health = await fetch(`${origin}/healthz`);
+    if (health.status === 200) {
+      awake = true;
+      break;
+    }
+  } catch {}
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+}
+assert.ok(awake, "Alice Dev did not wake from scale-to-zero");
+
 const mcp = await fetch(`${origin}/mcp`, {
   method: "POST",
   headers: {
