@@ -94,6 +94,7 @@ STRICT_CLEAN_FILES = {
     "runtime/conversation_agents.py",
     "runtime/loader.py",
     "runtime/request_context.py",
+    "agent_memory/backup.py",
     "agent_memory/file_memory_db.py",
     "session_profiles.py",
     "ssh_runtime.py",
