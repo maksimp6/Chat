@@ -8,9 +8,12 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import sys
 from uuid import UUID
 
-from cloud.base import CloudProviderError
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from cloud.base import CloudProviderError  # noqa: E402
 from cloud.cloudru.container_apps_client import (
     SERVICE,
     CloudRuContainerAppsClient,

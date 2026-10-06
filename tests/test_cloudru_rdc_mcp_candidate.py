@@ -106,3 +106,18 @@ def test_gateway_blocks_pdf_tool():
     source = (root / "deploy" / "remote-desktop-commander" / "mcp-gateway.mjs").read_text()
 
     assert 'new Set(["write_pdf"])' in source
+
+
+def test_candidate_script_runs_directly_from_repo_root():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "scripts/cloudru_rdc_mcp_candidate.py", "--help"],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "Deploy an isolated lightweight RDC MCP candidate" in result.stdout
