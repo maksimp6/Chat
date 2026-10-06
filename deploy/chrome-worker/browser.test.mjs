@@ -118,7 +118,7 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      scope: "browser",
+      scope: "browser offline_access",
     }),
   });
   assert.equal(registration.status, 201);
@@ -132,7 +132,7 @@ test("real Chromium consent redirects back to the registered ChatGPT callback", 
     resource: base + "/browser/v1/mcp",
     code_challenge: challenge,
     code_challenge_method: "S256",
-    scope: "browser",
+    scope: "browser offline_access",
     state: "browser-e2e-state",
   }).toString();
 
