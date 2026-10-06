@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 import sys
 from uuid import UUID
 
@@ -113,9 +114,17 @@ def purge_tombstones(apps: CloudRuContainerAppsClient) -> list[str]:
         apps.delete(name)
         deleted.append(identifier)
 
-    remaining = {str(item.get("id")) for item in apps.list(require_total=True) if item.get("id")}
-    if forbidden & remaining:
-        fail("tombstone_survived")
+    if deleted:
+        deadline = time.monotonic() + 90
+        while True:
+            remaining = {
+                str(item.get("id")) for item in apps.list(require_total=True) if item.get("id")
+            }
+            if not (forbidden & remaining):
+                break
+            if time.monotonic() >= deadline:
+                fail("tombstone_survived")
+            time.sleep(3)
     return deleted
 
 
