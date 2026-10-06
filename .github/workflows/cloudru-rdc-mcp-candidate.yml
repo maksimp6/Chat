@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: alice-cloudru-alice-dev
-  cancel-in-progress: false
+  group: alice-cloudru-alice-dev-${{ github.sha }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -48,9 +48,16 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/alice-dev-result.log
-          result="$(tail -n 1 /tmp/alice-dev-result.log)"
+          result="$(python -c 'import json; lines=[json.loads(x) for x in open("/tmp/alice-dev-result.log") if x.strip().startswith("{")]; print(json.dumps(next(x for x in lines if x.get("status") == "ALICE_DEV_READY")))' )"
+          inventory="$(python -c 'import json; lines=[json.loads(x) for x in open("/tmp/alice-dev-result.log") if x.strip().startswith("{")]; print(json.dumps(next(x for x in lines if x.get("status") == "ALICE_DEV_INVENTORY")))' )"
           origin="$(python -c 'import json,sys; print(json.loads(sys.argv[1])["origin"])' "$result")"
           echo "origin=$origin" >> "$GITHUB_OUTPUT"
+          python -c 'import json,sys; r=json.loads(sys.argv[1]); print(json.dumps({"commit": sys.argv[2], "container_id": r["container_id"], "name": r["name"], "origin": r["origin"]}, sort_keys=True))' "$result" "$GITHUB_SHA" > "/tmp/alice-dev-container-$GITHUB_SHA.json"
+          {
+            echo "## Alice Dev containers"
+            echo
+            python -c 'import json,sys; d=json.loads(sys.argv[1]); [print("- `{}` — {} — id `{}`".format(x.get("name"), x.get("origin") or "no public address", x.get("id"))) for x in d["containers"]]' "$inventory"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Install MCP smoke dependencies
         working-directory: deploy/remote-desktop-commander
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
@@ -65,3 +72,10 @@ jobs:
           ALICE_DEV_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp
           ALICE_DEV_SMOKE_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
         run: node mcp-gateway-live-smoke.mjs
+      - name: Upload accepted container manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: alice-dev-container-${{ github.sha }}
+          path: /tmp/alice-dev-container-${{ github.sha }}.json
+          retention-days: 90
+          if-no-files-found: error
