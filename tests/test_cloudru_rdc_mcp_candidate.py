@@ -26,7 +26,7 @@ class FakeApps:
         self._status = {
             "public_uri": "rdc-mcp-22706bfa6066.containerapps.ru",
             "image": "registry/rdc-mcp@sha256:" + "a" * 64,
-            "resources": {"cpu": "0.5", "memory": "1024Mi"},
+            "resources": {"cpu": "0.2", "memory": "512Mi"},
             "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
         }
 
@@ -76,7 +76,7 @@ def test_candidate_create_is_small_scale_to_zero_and_disables_native_auth(monkey
         "maxInstanceCount": 1,
     }
     container = body["template"]["containers"][0]
-    assert container["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
+    assert container["resources"] == {"cpu": "0.2", "memory": "512Mi"}
     assert {item["name"] for item in container["env"]} == {"ALICE_RDC_MCP_TOKEN"}
     assert "synthetic-token" not in repr(result)
 
