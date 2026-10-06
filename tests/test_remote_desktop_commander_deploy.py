@@ -167,7 +167,10 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
 def test_image_uses_frozen_dependency_graph():
     package = json.loads((DEPLOY / "package.json").read_text())
     lock = json.loads((DEPLOY / "package-lock.json").read_text())
-    assert package["dependencies"] == {"@wonderwhy-er/desktop-commander": "0.2.52"}
+    assert package["dependencies"] == {
+        "@modelcontextprotocol/sdk": "1.31.0",
+        "@wonderwhy-er/desktop-commander": "0.2.52",
+    }
     assert package["overrides"] == {"sharp": "0.35.4", "exceljs": {"uuid": "11.1.1"}}
     assert lock["packages"][""]["dependencies"] == package["dependencies"]
     assert lock["packages"]["node_modules/@wonderwhy-er/desktop-commander"]["version"] == "0.2.52"
