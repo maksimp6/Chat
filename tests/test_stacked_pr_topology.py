@@ -8,6 +8,7 @@ from scripts.stacked_pr_topology import (
     collect_github_nodes,
     derive_stack_evidence,
     nodes_from_github,
+    render_mermaid,
     topology_blockers,
 )
 
@@ -215,3 +216,21 @@ def test_stack_evidence_for_child_identifies_immediate_parent_and_root():
         "topology_blockers": [],
         "descendants": [],
     }
+
+
+def test_mermaid_renders_recursive_stack_and_status():
+    topology = build_stack(
+        (
+            node(877, "root", "master"),
+            node(878, "child", "root", state="closed", absorbed=True),
+            node(879, "leaf", "child"),
+        ),
+        877,
+    )
+    diagram = render_mermaid(topology)
+    assert "graph TD" in diagram
+    assert '#877 OPEN' in diagram
+    assert '#878 ABSORBED' in diagram
+    assert '#879 OPEN' in diagram
+    assert "P877 --> P878" in diagram
+    assert "P878 --> P879" in diagram
