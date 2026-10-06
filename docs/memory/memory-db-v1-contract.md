@@ -8,24 +8,19 @@ Memory DB is the durable file-native storage engine for Alice. Alice depends on 
 
 The working source of truth lives under a runtime-specific data root. Remote object/cloud storage is backup, not the live filesystem.
 
-## Generation layout
+## Single-file layout
+
+Memory DB v1 has one authoritative append-only file per runtime:
 
 ```text
-/data/alice/
-  CURRENT
-  generations/
-    gen-000001/
-      manifest.json
-      checkpoint/
-      journal/
-  migrations/
-  backups/
-  quarantine/
+/data/alice/alice.memory
 ```
 
-`CURRENT` identifies exactly one authoritative generation. Activation is atomic.
+Normal mutations append one checksummed JSONL record. There are no generation directories, journal segments, or one-file-per-event layouts.
 
-Every durable record carries a format version, monotonically ordered sequence, stable record id/type, operation, payload and integrity checksum. Journal storage uses bounded immutable segments, not one filesystem file per logical event.
+Each durable record carries a format version, monotonically ordered sequence, operation, key/value payload when applicable, and integrity checksum. One process owns the write lock.
+
+The only auxiliary file permitted is a short-lived `alice.memory.tmp` during compaction. It is fsynced and atomically renamed over the authoritative file, then the parent directory is fsynced.
 
 ## Synchronous write contract
 
@@ -57,21 +52,19 @@ External model, browser, network and tool work does not hold the DB write lock. 
 
 Startup does not report ready until recovery and integrity verification complete.
 
-Recovery starts from the last verified checkpoint and replays the valid ordered journal tail. Replay is idempotent with respect to sequence identity. Re-running recovery, including after a crash during recovery, must converge to the same logical state.
+Recovery replays the authoritative file from the beginning. A truncated final record is uncommitted and may be discarded by truncating the file back to the last verified newline boundary. A checksum or format failure before the tail is corruption and must fail recovery rather than being ignored.
 
-A truncated/uncommitted tail may be discarded according to the format rules. A committed record may not silently disappear.
+Re-running recovery must converge to the same logical state. A committed record may not silently disappear.
 
 Checksum/integrity failures are never ignored. Suspect data is quarantined and the engine reports a degraded/error state rather than inventing a successful recovery.
 
 ENOSPC/read-only/fsync failures are explicit write failures. They must not publish an in-memory success that cannot be recovered.
 
-## Checkpoint and compaction
+## Compaction
 
-Checkpoint construction may run while Alice continues operating. The checkpoint represents a declared sequence boundary. New writes continue in the authoritative journal.
+Compaction acquires the same write lock as ordinary mutations. It writes one checksummed snapshot record containing the current logical state and current sequence to `alice.memory.tmp`, flushes and fsyncs it, atomically replaces `alice.memory`, and fsyncs the parent directory.
 
-A candidate checkpoint is written separately, verified, flushed/fsynced, and atomically committed. The previous verified checkpoint and required journal segments remain recoverable until the new checkpoint is durably active.
-
-Compaction may retire old segments only after proving that a verified checkpoint covers them. Thresholds are not normative in v1 until benchmark evidence exists.
+Until the atomic replace succeeds, the old authoritative file remains valid. If compaction fails, the old file remains the source of truth.
 
 ## Backup and restore
 
@@ -134,15 +127,15 @@ Do not combine a storage-format switch and application-runtime switch into one u
 Tests must cover at least:
 
 - deterministic append/read and monotonic ordering;
-- concurrent writers cannot interleave a logical transaction;
+- concurrent writers cannot interleave logical records;
 - readers cannot observe a partial commit;
 - crash before acknowledgement never creates a falsely acknowledged record;
 - crash after acknowledgement never loses the acknowledged record;
 - fsync/ENOSPC/read-only failure does not publish the mutation;
-- recovery is idempotent and survives another crash;
-- truncated/corrupt segments are detected;
-- checkpoint activation is atomic;
-- compaction cannot remove the only recoverable state;
+- recovery is idempotent;
+- a truncated final record is discarded safely;
+- corruption before the tail fails recovery;
+- compaction replacement is atomic and cannot remove the only recoverable state;
 - migration rejects one missing, unexpected, corrupt, conflicting or unverified record;
 - migration catch-up includes writes created while conversion is running;
 - cutover uses the same write barrier as ordinary commits;
