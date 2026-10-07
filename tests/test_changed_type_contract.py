@@ -36,6 +36,14 @@ def _load_checker():
             'def f(value: object) -> str:\n    """Read name."""\n    return value.name  # type: ignore\n',
             "type-ignore-policy",
         ),
+        (
+            'def f(value: object) -> str:\n    """Read name."""\n    return value.name  # type: ignore[attr-defined]\n',
+            "type-ignore-policy",
+        ),
+        (
+            'from typing import List\ndef f() -> List:\n    """Return values."""\n    return []\n',
+            "unparameterized-generic",
+        ),
         ('def f(value: str) -> str:\n    return value\n', "missing-docstring"),
     ],
 )
@@ -60,6 +68,11 @@ def test_rejects_new_function_contract_debt(source: str, expected_rule: str) -> 
             "        return key.encode()\n"
         ),
         "def _helper(value: str) -> str:\n    return value\n",
+        (
+            'def f(value: object) -> str:\n'
+            '    """Read name."""\n'
+            '    return value.name  # type: ignore[attr-defined]  # validated adapter\n'
+        ),
     ],
 )
 def test_accepts_precisely_typed_contracts(source: str) -> None:
