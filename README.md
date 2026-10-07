@@ -17,7 +17,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
-- **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
+- **Transitional storage**: legacy SQLite/PostgreSQL consumers coexist with file-native Memory DB aggregates while #776 migrates durable state consumer-by-consumer.
 
 ## Architecture
 
@@ -37,11 +37,11 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-09-29, `master` includes the fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and the Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
+As of 2026-10-07, `master` includes Memory DB Wave 1 for conversation ownership and user identity, Alice Dev immutable commit workers, ChatGPT OAuth discovery/PKCE foundations, platform-aware CI routing, capability-scoped secret handoff foundations, and immutable code-index revision snapshots/AST reuse (#950). Earlier CI, security, trace, Cloud.ru and runtime foundations remain documented in the [changelog](docs/changelog.md). These are shipped repository capabilities, not proof of production interoperability.
 
 These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). The Container Apps v2 client and deterministic contract tests are now in `master`, but the baseline deployment path is still awaiting live validation against a real Cloud.ru project. Object Storage migration, durable background workers, and production cutover remain separate work.
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Alice Dev is implemented as a separate coding-worker path; legacy deployment/RDC ownership and cutover remain unresolved under [#869](https://github.com/maksimp6/Chat/issues/869). Container Apps and OAuth/MCP contracts have deterministic repository coverage, but public production deployment and ChatGPT interoperability still require live acceptance. Memory DB Wave 1 is shipped for bounded aggregates; remaining SQL consumers continue under #776. Secret Store foundations are shipped, while consumer-by-consumer migration remains open under #755.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -75,7 +75,7 @@ Copy `.env.example` only for a fresh installation. Replace its placeholders and 
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL` only when selecting PostgreSQL.
+Legacy local consumers still default to SQLite and may select PostgreSQL with `ALICE_DATABASE_URL`. File-native Memory DB aggregates coexist during the #776 migration; selecting SQL backend does not move already migrated file-native state back into SQL.
 
 ### Android
 
