@@ -5,8 +5,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
 import test from "node:test";
 import { createOAuth } from "../../../deploy/chrome-worker/oauth.mjs";
+
+const workerRequire = createRequire(new URL("../../../deploy/chrome-worker/package.json", import.meta.url));
 
 const hash = (value) => createHash("sha256").update(value).digest("base64url");
 const PUBLIC = "https://browser.example.test";
@@ -29,10 +32,10 @@ async function fixture(t, overrides = {}) {
   let oauth = createOAuth(options);
   let worker;
   if (overrides.integration) {
-    const { createWorker } = await import("./server.mjs");
+    const { createWorker } = await import("../../../deploy/chrome-worker/server.mjs");
     let stateStore = { restore: async () => {}, checkpoint: async () => {}, checkpointAuth: options.onPersist, status: () => ({}) };
     if (overrides.realState) {
-      const { createChromeStateStore } = await import("./state.mjs");
+      const { createChromeStateStore } = await import("../../../deploy/chrome-worker/state.mjs");
       mkdirSync(join(directory, "durable"));
       stateStore = createChromeStateStore({ profileDir: join(directory, "profile"), stateDir: join(directory, "durable"), authDir: join(directory, "auth") });
     }
@@ -282,8 +285,8 @@ test("anonymous registration throttles recover and expired clients/pending reque
 });
 
 test("owner OAuth drives official Playwright MCP in the real worker but grants no lifecycle REST access", { skip: process.env.BROWSER_OAUTH_MCP_TEST !== "1" }, async (t) => {
-  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
-  const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const { Client } = await import(workerRequire.resolve("@modelcontextprotocol/sdk/client/index.js"));
+  const { StreamableHTTPClientTransport } = await import(workerRequire.resolve("@modelcontextprotocol/sdk/client/streamableHttp.js"));
   const app = await fixture(t, { integration: true });
   const flow = await app.code();
   const tokens = await (await app.exchange(flow)).json();
@@ -310,7 +313,7 @@ test("concurrent real worker OAuth registrations checkpoint complete immutable s
   const results = await Promise.all(Array.from({ length: 20 }, () => app.register()));
   assert.deepEqual(results.map((response) => response.status), Array(20).fill(201));
   const clients = await Promise.all(results.map((response) => response.json()));
-  const { createChromeStateStore } = await import("./state.mjs");
+  const { createChromeStateStore } = await import("../../../deploy/chrome-worker/state.mjs");
   const root = dirname(dirname(app.options.stateFile));
   const restoredAuth = join(root, "restored-auth");
   const restored = createChromeStateStore({ stateDir: join(root, "durable"), profileDir: join(root, "restored-profile"), authDir: restoredAuth });
