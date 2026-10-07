@@ -92,6 +92,33 @@ def validate_reference(discovered: set[str], reference: dict[str, Any]) -> list[
     return errors
 
 
+def render_markdown(reference: dict[str, Any]) -> str:
+    lines = [
+        "# Environment variables",
+        "",
+        "Generated from `environment-variables.json`. Values and secret material are intentionally excluded.",
+        "",
+        "| Variable | Class | Purpose |",
+        "| --- | --- | --- |",
+    ]
+    for key, entry in sorted(reference.items()):
+        lines.append(f"| `{key}` | {entry['class']} | {entry['purpose']} |")
+    lines.extend(
+        [
+            "",
+            "Classes:",
+            "",
+            "- `public` — non-secret runtime configuration;",
+            "- `secret` — credential/bootstrap secret; document purpose, never value;",
+            "- `secret-reference` — identifier/version/reference to a secret, not plaintext;",
+            "- `ci-only` — test/CI control not intended as application configuration;",
+            "- `compatibility` — legacy or transitional runtime input.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     reference_path = root / "docs" / "configuration" / "environment-variables.json"
@@ -101,6 +128,11 @@ def main() -> int:
     if errors:
         for error in errors:
             print(f"env-ref: {error}", file=sys.stderr)
+        return 1
+    rendered = render_markdown(reference)
+    markdown_path = reference_path.with_suffix(".md")
+    if markdown_path.exists() and markdown_path.read_text(encoding="utf-8") != rendered:
+        print("env-ref: generated environment-variables.md is stale", file=sys.stderr)
         return 1
     print(f"Environment reference valid: {len(discovered)} static Python keys")
     return 0
