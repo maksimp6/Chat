@@ -1,6 +1,6 @@
 # Voice assistant
 
-Issue #105 verifies and restores the end-to-end voice assistant path.
+Issue #105 is closed and the repository has deterministic regression coverage for the voice session/lifecycle path. Those tests mock the SpeechKit/chat stages; they are implementation evidence, not proof of a current live SpeechKit or production end-to-end run.
 
 ## Pipeline
 
@@ -18,7 +18,9 @@ The browser prefers OggOpus recording when the browser exposes it. A PCM/WAV fal
 
 ## Authentication
 
-The backend accepts either server-side `YANDEX_API_KEY` or `YANDEX_IAM_TOKEN`. The optional `YANDEX_PROJECT_ID`/folder ID is passed to SpeechKit when configured. Credentials are never sent to the browser.
+The current SpeechKit compatibility path reads server-side `YANDEX_API_KEY` or `YANDEX_IAM_TOKEN` directly from the process environment. The optional `YANDEX_PROJECT_ID`/folder ID is also read from environment and passed to SpeechKit when configured. These credential values are not intentionally sent to the browser.
+
+This direct environment lookup is **legacy secret-consumer behavior**, not the target credential architecture. Canonical Secret Store issue #755 owns migration of `voice_routes.py` to the shared resolver. New voice/provider code must not create another credential store or copy this environment lookup as the target pattern.
 
 Yandex documents IAM-token authentication with `Authorization: Bearer` and service-account API-key authentication with `Authorization: Api-Key`.
 
@@ -32,8 +34,23 @@ Voice model identifiers from `VOICE_MODELS` are not passed to the text chat prov
 
 ## Security boundaries
 
-Voice session IDs are random UUID-derived values. A session is scoped to the owner and, when supplied, to the conversation owner. Audio is kept in memory and automatically expires after the session TTL. Provider credentials remain server-side.
+Voice session IDs are random UUID-derived values. A session is scoped to the owner and, when supplied, to the conversation owner. Audio is kept in memory and automatically expires after the session TTL.
+
+The current provider-error path has a known sanitization gap: SpeechKit HTTP failures include a truncated provider response body in the raised exception, and the background processor can emit the exception text through the SSE `error` event. Truncation is not sanitization. #755 already owns this voice/provider error boundary; until that consumer is fixed and regression-tested, do not describe arbitrary provider error bodies as safe user-facing output.
 
 ## Known scope
 
 This implementation is a reliable request/response voice assistant, not a bidirectional low-latency SpeechKit realtime session. Streaming recognition and streaming TTS can be introduced later through SpeechKit API v2/v3 without changing the public browser session contract. Yandex documents streaming recognition separately from the synchronous v1 API.
+
+## Evidence and acceptance boundary
+
+Current repository tests prove:
+
+- voice session creation/upload/close/event/output lifecycle;
+- payload size limits;
+- text-model selection for the chat stage;
+- deterministic handling of mocked SpeechKit HTTP failures.
+
+They do **not** prove a current live SpeechKit STT/TTS request, browser microphone permission/playback, Android device behavior, or production routing on an exact deployed revision. When live voice acceptance is required, record the exact revision/environment and separately verify microphone → upload → real STT → Alice response → real TTS → playback.
+
+Secret migration acceptance is separate again: #755 requires the exact voice consumer to resolve through the canonical Secret Store and to fail closed for missing/inactive/auth/unavailable credentials without leaking plaintext or provider response bodies.
