@@ -1201,3 +1201,55 @@ def test_missing_registry_cache_does_not_block_cold_build():
     assert ref.pinned == f"alice-pro.cr.cloud.ru/alice-pro@{DIGEST}"
     assert runs[1] == ["docker", "pull", "alice-pro.cr.cloud.ru/alice-pro:buildcache"]
     assert runs[2][1] == "build"
+
+
+def test_deploy_no_longer_requires_postgres_before_provider_calls(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
+    monkeypatch.setenv("ALICE_REQUIRE_SHORT_TOKEN", "1")
+    monkeypatch.setenv("ALICE_SHORT_TOKEN", "test-token")
+    registry, apps = Mock(), Mock()
+    registry.build_and_push.return_value = ImageRef("registry", "alice", SHA, DIGEST)
+    apps.deploy_verified.return_value = {"action": "create"}
+    monkeypatch.setattr(script, "CloudRuRegistryClient", lambda: registry)
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+    monkeypatch.setattr(script, "_export_commit", Mock())
+
+    result = script.cmd_deploy(
+        argparse.Namespace(
+            env=["ALICE_REQUIRE_SHORT_TOKEN", "ALICE_SHORT_TOKEN"],
+            tag=SHA,
+            context=".",
+            timeout=30,
+        )
+    )
+    assert result["image"].endswith(DIGEST)
+
+
+def test_cleanup_refuses_to_delete_preexisting_container(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {"name": "alice-pro", "id": "preexisting"}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    with pytest.raises(CloudProviderError, match="created by this acceptance run"):
+        script.cmd_delete(argparse.Namespace(yes=True, acceptance_created=False))
+    apps.delete.assert_not_called()
+
+
+def test_cleanup_deletes_only_resource_created_by_acceptance_run(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {"name": "alice-pro", "id": "created-by-run"}
+    apps.delete.return_value = {"done": True}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_delete(argparse.Namespace(yes=True, acceptance_created=True))
+    assert result["deleted"] == "alice-pro"
+    apps.delete.assert_called_once_with("alice-pro")
