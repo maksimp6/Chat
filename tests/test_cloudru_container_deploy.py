@@ -1231,3 +1231,52 @@ def test_cleanup_deletes_only_resource_created_by_acceptance_run(monkeypatch):
     result = script.cmd_delete(argparse.Namespace(yes=True, acceptance_created=True))
     assert result["deleted"] == "alice-pro"
     apps.delete.assert_called_once_with("alice-pro")
+
+
+def test_acceptance_cleanup_restores_preexisting_container_snapshot(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    snapshot = {
+        "name": "alice-pro",
+        "configuration": {"ingress": {"publiclyAccessible": True}},
+        "template": {
+            "scaling": {"minInstanceCount": 0, "maxInstanceCount": 1},
+            "containers": [{"name": "alice-pro", "image": "old@sha256:abc"}],
+        },
+    }
+    apps = Mock()
+    apps.restore.return_value = {"done": True}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_cleanup(
+        argparse.Namespace(
+            yes=True,
+            acceptance_created=False,
+            acceptance_updated=True,
+            snapshot=snapshot,
+        )
+    )
+    assert result["restored"] == "alice-pro"
+    apps.restore.assert_called_once_with(snapshot)
+    apps.delete.assert_not_called()
+
+
+def test_acceptance_cleanup_fails_closed_without_snapshot(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    with pytest.raises(CloudProviderError, match="snapshot"):
+        script.cmd_cleanup(
+            argparse.Namespace(
+                yes=True,
+                acceptance_created=False,
+                acceptance_updated=True,
+                snapshot=None,
+            )
+        )
+    apps.delete.assert_not_called()
+    apps.restore.assert_not_called()
