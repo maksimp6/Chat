@@ -761,10 +761,17 @@ def prepare_bucket(store, credentials, project):
 
 def preflight(apps, store, credentials, *, tenant):
     configured_tenant(tenant)
-    record = named_record(apps)
-    if record is not None:
-        owned_record(apps, tenant=tenant)
-    exists = bucket_inventory(store, credentials, apps.project_id)
+    step = "list_containers"
+    try:
+        record = named_record(apps)
+        if record is not None:
+            step = "verify_container"
+            owned_record(apps, tenant=tenant)
+        step = "bucket_inventory"
+        exists = bucket_inventory(store, credentials, apps.project_id)
+    except CloudProviderError:
+        print(json.dumps({"stage": "rdc_preflight_failed", "step": step}), flush=True)
+        raise
     return {
         "status": "PREFLIGHT_PASSED",
         "container_exists": record is not None,
@@ -1639,12 +1646,15 @@ def main():
         if args.action == "install":
             if result["container_exists"]:
                 fail("already_exists")
-            image = os.environ.get("ALICE_RDC_IMAGE", "")
-            if not image:
-                fail("validation_error")
+            image = os.environ.get("ALICE_RDC_IMAGE", "") or build_image(root, args.sha)
             creation_body(project, image)
-            print(json.dumps({"stage": "rdc_image_reused", "image": image}), flush=True)
+            print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
+            started = time.monotonic()
             result = install(apps, store, credentials, image, tenant=tenant)
+            print(
+                json.dumps({"stage": "rdc_ready", "seconds": round(time.monotonic() - started, 1)}),
+                flush=True,
+            )
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":

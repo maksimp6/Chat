@@ -1413,3 +1413,26 @@ def test_import_runtime_secret_uses_digest_bound_permit_and_returns_no_plaintext
     assert captured["permit"]["body_sha256"] == hashlib.sha256(secret).hexdigest()
     assert captured["call"]["body_bytes"] == secret
     assert secret.decode() not in json.dumps(result)
+
+
+@pytest.mark.parametrize("failing", ["list", "bucket"])
+def test_preflight_reports_failing_step_without_provider_values(failing, capsys):
+    apps = apps_with()
+    store = Mock(_timeout=30)
+    if failing == "list":
+        apps.list.side_effect = CloudProviderError(
+            "secret-provider-detail", code="provider_http_error"
+        )
+    else:
+        apps.list.return_value = []
+        store._request.side_effect = CloudProviderError(
+            "secret-provider-detail", code="provider_http_error"
+        )
+    with pytest.raises(CloudProviderError):
+        rdc.preflight(apps, store, object(), tenant=TENANT)
+    out = capsys.readouterr().out
+    assert json.loads(out) == {
+        "stage": "rdc_preflight_failed",
+        "step": "list_containers" if failing == "list" else "bucket_inventory",
+    }
+    assert "secret-provider-detail" not in out
