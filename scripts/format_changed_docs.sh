@@ -22,7 +22,7 @@ mapfile -d '' changed < <(git diff --name-only -z "$base" "$head")
 targets=()
 for path in "${changed[@]}"; do
   case "$path" in
-    docs/*.md|docs/*.json|*.md)
+    docs/*.md|docs/*.json|README.md|.github/ISSUE_TEMPLATE/*.md)
       [[ -f "$path" ]] && targets+=("$path")
       ;;
   esac
