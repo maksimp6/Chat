@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("com.chaquo.python")
 }
 
 android {
@@ -73,15 +72,6 @@ android {
 
 kotlin {
     jvmToolchain(17)
-}
-
-chaquopy {
-    defaultConfig {
-        version = "3.13"
-        pip {
-            install("-r", "../requirements.txt")
-        }
-    }
 }
 
 dependencies {
