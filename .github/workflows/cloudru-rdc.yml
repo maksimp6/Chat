@@ -1,5 +1,10 @@
 name: Cloud.ru persistent Remote Desktop Commander
 on:
+  push:
+    branches: [fix/787-rdc-512m-single-profile]
+    paths:
+      - ".github/workflows/cloudru-rdc.yml"
+      - "scripts/cloudru_rdc.py"
   workflow_dispatch:
     inputs:
       action:
@@ -18,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   rdc:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || (github.event_name == 'push' && github.ref == 'refs/heads/fix/787-rdc-512m-single-profile')
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -29,6 +34,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Require reviewed master commit
+        if: github.ref == 'refs/heads/master'
         run: |
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD FETCH_HEAD
@@ -39,10 +45,11 @@ jobs:
         run: pip install -r requirements.txt
       - name: Operate exactly owned RDC service
         env:
-          ACTION: ${{ inputs.action }}
+          ACTION: ${{ github.event_name == 'push' && 'install' || inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+          ALICE_RDC_IMAGE: ${{ github.event_name == 'push' && 'alice-rdc-probe.cr.cloud.ru/chromium-probe@sha256:f92bd58af749191733dcf0fee808be5ede654e8a6cdc5930375dbb65c7ce9294' || '' }}
         run: python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
