@@ -236,11 +236,11 @@
     },
     {
       "path": "docs/architecture/branch-environments.md",
-      "kind": "historical",
-      "status": "historical",
+      "kind": "explanation",
+      "status": "current",
       "owner": "architecture",
-      "source_of_truth": "closed not-planned issue #13 and git history",
-      "canonical": false
+      "source_of_truth": "environment manager implementation/tests; production gaps documented in this review",
+      "canonical": true
     },
     {
       "path": "docs/architecture/browser-adapter-boundary.md",
@@ -412,11 +412,11 @@
     },
     {
       "path": "docs/branch-environments.md",
-      "kind": "historical",
-      "status": "historical",
+      "kind": "reference",
+      "status": "current",
       "owner": "architecture",
-      "source_of_truth": "closed not-planned issue #13 and git history",
-      "canonical": false
+      "source_of_truth": "environment_manager.py, environment_routes.py and environment tests",
+      "canonical": true
     },
     {
       "path": "docs/budget_controller.md",
