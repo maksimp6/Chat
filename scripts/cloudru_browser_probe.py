@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import tarfile
 import time
 from urllib.parse import quote, urlsplit
 from uuid import UUID
@@ -342,10 +344,25 @@ def prepare_registry(registry):
     print(json.dumps({"stage": "registry_ready", "registry_id": identifier}), flush=True)
 
 
+def export_source(root, sha, dest):
+    if os.environ.get("RDC_LANE") != "test":
+        _export_commit(sha, str(root), dest)
+        return
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise CloudProviderError("invalid test commit", code="validation_error")
+    archive = subprocess.run(
+        ["git", "-C", str(root), "archive", "--format=tar", sha], capture_output=True, check=False
+    )
+    if archive.returncode:
+        raise CloudProviderError("cannot export test commit", code="validation_error")
+    with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as stream:
+        stream.extractall(dest, filter="data")
+
+
 def build_image(root, sha):
     registry = CloudRuRegistryClient()
     with tempfile.TemporaryDirectory(prefix="rdc-probe-") as exported:
-        _export_commit(sha, str(root), exported)
+        export_source(root, sha, exported)
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "remote-desktop-commander"
         print('{"stage":"image_build_push"}', flush=True)
