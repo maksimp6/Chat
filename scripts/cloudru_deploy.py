@@ -194,14 +194,6 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
             "deploy needs --env ALICE_REQUIRE_SHORT_TOKEN (set to 1) and --env ALICE_SHORT_TOKEN",
             code="validation_error",
         )
-    database_url = os.environ.get("ALICE_DATABASE_URL", "")
-    if "ALICE_DATABASE_URL" not in args.env or not database_url.startswith(
-        ("postgres://", "postgresql://")
-    ):
-        raise CloudProviderError(
-            "deploy needs --env ALICE_DATABASE_URL set to durable PostgreSQL",
-            code="validation_error",
-        )
     registry = CloudRuRegistryClient()
     apps = CloudRuContainerAppsClient()
 
@@ -260,6 +252,11 @@ def cmd_delete(args: argparse.Namespace) -> dict:
         raise CloudProviderError(
             "pass --yes to delete the container service", code="validation_error"
         )
+    if not getattr(args, "acceptance_created", False):
+        raise CloudProviderError(
+            "cleanup may delete only a container created by this acceptance run",
+            code="validation_error",
+        )
     cfg = _settings()
     return {"deleted": cfg["name"], "operation": CloudRuContainerAppsClient().delete(cfg["name"])}
 
@@ -299,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
 
     delete = sub.add_parser("delete", help="delete the container service")
     delete.add_argument("--yes", action="store_true")
+    delete.add_argument("--acceptance-created", action="store_true")
     delete.set_defaults(func=cmd_delete)
 
     sub.add_parser("estimate", help="monthly cost floor").set_defaults(func=cmd_estimate)
