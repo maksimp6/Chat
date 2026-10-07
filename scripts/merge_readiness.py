@@ -7,6 +7,9 @@ import argparse
 import json
 import os
 import subprocess
+import tempfile
+import zipfile
+from pathlib import Path
 from typing import Any
 
 _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
@@ -106,10 +109,88 @@ def collect_snapshot(
         "behind_by": int(compare["behind_by"]),
         "check_runs": checks.get("check_runs", []),
         "required_checks": list(dict.fromkeys(required_checks or [])),
-        "solution_review": None,
+        "solution_review": collect_solution_review_evidence(
+            repo,
+            pr_number,
+            head_sha,
+            base_sha,
+        ),
         "review_threads": threads.get("nodes", []),
         "review_threads_truncated": bool(threads.get("pageInfo", {}).get("hasNextPage")),
     }
+
+
+def _download_solution_review_artifact(repo: str, artifact_id: int) -> dict[str, Any] | None:
+    """Download one bounded Actions artifact and parse solution-review.json."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        archive = Path(temp_dir) / "artifact.zip"
+        subprocess.run(
+            [
+                "gh",
+                "api",
+                f"/repos/{repo}/actions/artifacts/{artifact_id}/zip",
+                "--output",
+                str(archive),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if archive.stat().st_size > 1_000_000:
+            return None
+        with zipfile.ZipFile(archive) as bundle:
+            names = bundle.namelist()
+            if names != ["solution-review.json"]:
+                return None
+            info = bundle.getinfo("solution-review.json")
+            if info.file_size > 64_000:
+                return None
+            payload = json.loads(bundle.read(info).decode("utf-8"))
+    return payload if isinstance(payload, dict) else None
+
+
+def collect_solution_review_evidence(
+    repo: str,
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+) -> dict[str, Any] | None:
+    """Collect trusted evidence from successful solution-review workflow runs."""
+    run_data = _gh_json(
+        [
+            f"/repos/{repo}/actions/workflows/solution-review.yml/runs"
+            "?event=workflow_dispatch&per_page=100"
+        ]
+    )
+    runs = run_data.get("workflow_runs", [])
+    artifacts_by_run: dict[int, list[dict[str, Any]]] = {}
+    for run in runs:
+        run_id = int(run.get("id") or 0)
+        if (
+            not run_id
+            or str(run.get("head_sha") or "") != head_sha
+            or str(run.get("status") or "") != "completed"
+            or str(run.get("conclusion") or "") != "success"
+        ):
+            continue
+        artifact_data = _gh_json(
+            [f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100"]
+        )
+        enriched: list[dict[str, Any]] = []
+        for artifact in artifact_data.get("artifacts", []):
+            item = dict(artifact)
+            artifact_id = int(item.get("id") or 0)
+            if artifact_id and not item.get("expired"):
+                item["evidence"] = _download_solution_review_artifact(repo, artifact_id)
+            enriched.append(item)
+        artifacts_by_run[run_id] = enriched
+    return select_solution_review_evidence(
+        runs,
+        artifacts_by_run,
+        pr_number,
+        head_sha,
+        base_sha,
+    )
 
 
 def select_solution_review_evidence(
