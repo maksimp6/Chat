@@ -1,1 +1,446 @@
-{}
+{
+  "ALICE_AGENT_MODEL": {
+    "class": "public",
+    "purpose": "alice agent model"
+  },
+  "ALICE_BASE_URL": {
+    "class": "public",
+    "purpose": "alice base url"
+  },
+  "ALICE_CLI_TITLE": {
+    "class": "public",
+    "purpose": "alice cli title"
+  },
+  "ALICE_CLOUD_PROVIDER": {
+    "class": "public",
+    "purpose": "alice cloud provider"
+  },
+  "ALICE_CONVERSATION_ID": {
+    "class": "public",
+    "purpose": "alice conversation id"
+  },
+  "ALICE_DATABASE_URL": {
+    "class": "secret",
+    "purpose": "SQL database connection URL"
+  },
+  "ALICE_DB_BACKEND": {
+    "class": "compatibility",
+    "purpose": "alice db backend"
+  },
+  "ALICE_DB_PATH": {
+    "class": "compatibility",
+    "purpose": "alice db path"
+  },
+  "ALICE_DEPARTMENTS_ADMIN_TOKEN": {
+    "class": "secret",
+    "purpose": "alice departments admin token"
+  },
+  "ALICE_DONATION_URL": {
+    "class": "public",
+    "purpose": "alice donation url"
+  },
+  "ALICE_ENV_PUBLIC_BASE_URL": {
+    "class": "public",
+    "purpose": "alice env public base url"
+  },
+  "ALICE_ENV_REPO_ROOT": {
+    "class": "public",
+    "purpose": "alice env repo root"
+  },
+  "ALICE_ENV_RUNTIME_ROOT": {
+    "class": "public",
+    "purpose": "alice env runtime root"
+  },
+  "ALICE_GITHUB_ALLOWED_IDS": {
+    "class": "public",
+    "purpose": "alice github allowed ids"
+  },
+  "ALICE_GITHUB_CLIENT_ID": {
+    "class": "public",
+    "purpose": "alice github client id"
+  },
+  "ALICE_GITHUB_CLIENT_SECRET": {
+    "class": "secret",
+    "purpose": "GitHub OAuth client secret"
+  },
+  "ALICE_GITHUB_REDIRECT_URI": {
+    "class": "public",
+    "purpose": "alice github redirect uri"
+  },
+  "ALICE_KEY_MANAGER_KEY": {
+    "class": "secret",
+    "purpose": "legacy Key Manager encryption key"
+  },
+  "ALICE_LAUNCH_SMOKE_YANDEX_API_KEY": {
+    "class": "secret",
+    "purpose": "alice launch smoke yandex api key"
+  },
+  "ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID": {
+    "class": "ci-only",
+    "purpose": "alice launch smoke yandex project id"
+  },
+  "ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN": {
+    "class": "secret",
+    "purpose": "Local Tool Agent registration bootstrap credential"
+  },
+  "ALICE_LOCAL_REPO_DIR": {
+    "class": "compatibility",
+    "purpose": "legacy/local-files repository directory"
+  },
+  "ALICE_MCP_ALLOW_ANONYMOUS": {
+    "class": "public",
+    "purpose": "alice mcp allow anonymous"
+  },
+  "ALICE_MCP_BEARER_TOKEN": {
+    "class": "secret",
+    "purpose": "MCP bearer credential"
+  },
+  "ALICE_MCP_INTROSPECTION_CLIENT_ID": {
+    "class": "public",
+    "purpose": "alice mcp introspection client id"
+  },
+  "ALICE_MCP_INTROSPECTION_CLIENT_SECRET": {
+    "class": "secret",
+    "purpose": "alice mcp introspection client secret"
+  },
+  "ALICE_MCP_INTROSPECTION_TIMEOUT": {
+    "class": "public",
+    "purpose": "alice mcp introspection timeout"
+  },
+  "ALICE_MCP_INTROSPECTION_URL": {
+    "class": "public",
+    "purpose": "alice mcp introspection url"
+  },
+  "ALICE_MCP_OAUTH_ISSUER": {
+    "class": "public",
+    "purpose": "alice mcp oauth issuer"
+  },
+  "ALICE_MCP_OAUTH_SCOPE": {
+    "class": "public",
+    "purpose": "alice mcp oauth scope"
+  },
+  "ALICE_MCP_PUBLIC_URL": {
+    "class": "public",
+    "purpose": "alice mcp public url"
+  },
+  "ALICE_MCP_USER_ID": {
+    "class": "public",
+    "purpose": "alice mcp user id"
+  },
+  "ALICE_MEMORY_PATH": {
+    "class": "public",
+    "purpose": "file-native Memory DB path"
+  },
+  "ALICE_MODEL": {
+    "class": "public",
+    "purpose": "alice model"
+  },
+  "ALICE_OWNER_ID": {
+    "class": "public",
+    "purpose": "alice owner id"
+  },
+  "ALICE_PLUGIN_DIR": {
+    "class": "public",
+    "purpose": "alice plugin dir"
+  },
+  "ALICE_PREVIEW_BASE_PATH": {
+    "class": "public",
+    "purpose": "alice preview base path"
+  },
+  "ALICE_PROJECT_ROOT": {
+    "class": "public",
+    "purpose": "alice project root"
+  },
+  "ALICE_PROVIDER_CREDENTIALS_TOKEN": {
+    "class": "secret",
+    "purpose": "provider-credential administration credential"
+  },
+  "ALICE_PROVIDER_CREDENTIAL_KEY": {
+    "class": "secret",
+    "purpose": "legacy provider credential encryption key"
+  },
+  "ALICE_QUOTA_ADMIN_TOKEN": {
+    "class": "secret",
+    "purpose": "alice quota admin token"
+  },
+  "ALICE_QUOTA_REQUIRE_IDENTITY": {
+    "class": "public",
+    "purpose": "alice quota require identity"
+  },
+  "ALICE_RDC_PAIRING_FILE": {
+    "class": "compatibility",
+    "purpose": "alice rdc pairing file"
+  },
+  "ALICE_RDC_PROJECT_ID": {
+    "class": "compatibility",
+    "purpose": "alice rdc project id"
+  },
+  "ALICE_RDC_STATE_PATH": {
+    "class": "compatibility",
+    "purpose": "alice rdc state path"
+  },
+  "ALICE_REQUIRE_SHORT_TOKEN": {
+    "class": "public",
+    "purpose": "alice require short token"
+  },
+  "ALICE_SESSION_ID": {
+    "class": "public",
+    "purpose": "alice session id"
+  },
+  "ALICE_SHELL_DB": {
+    "class": "compatibility",
+    "purpose": "alice shell db"
+  },
+  "ALICE_SHORT_TOKEN": {
+    "class": "secret",
+    "purpose": "short-token bootstrap/auth credential"
+  },
+  "ALICE_SHORT_TOKEN_TTL_SECONDS": {
+    "class": "public",
+    "purpose": "alice short token ttl seconds"
+  },
+  "ALICE_SSH_KNOWN_HOSTS": {
+    "class": "public",
+    "purpose": "alice ssh known hosts"
+  },
+  "ALICE_SSH_TARGETS_JSON": {
+    "class": "public",
+    "purpose": "alice ssh targets json"
+  },
+  "ALICE_STATIC_VERSION": {
+    "class": "public",
+    "purpose": "alice static version"
+  },
+  "ALICE_VERSION": {
+    "class": "public",
+    "purpose": "alice version"
+  },
+  "ALICE_VOICE_CHAT_MODEL": {
+    "class": "public",
+    "purpose": "alice voice chat model"
+  },
+  "CI_JOB_RESULTS": {
+    "class": "ci-only",
+    "purpose": "ci job results"
+  },
+  "CI_PLATFORM_PLAN": {
+    "class": "ci-only",
+    "purpose": "ci platform plan"
+  },
+  "CLOUDRU_API_KEY": {
+    "class": "secret",
+    "purpose": "cloudru api key"
+  },
+  "CLOUDRU_API_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "cloudru api key id"
+  },
+  "CLOUDRU_BACKUP_PATH": {
+    "class": "public",
+    "purpose": "cloudru backup path"
+  },
+  "CLOUDRU_BASE_URL": {
+    "class": "public",
+    "purpose": "cloudru base url"
+  },
+  "CLOUDRU_BILLING_CURRENCY": {
+    "class": "public",
+    "purpose": "cloudru billing currency"
+  },
+  "CLOUDRU_BILLING_SUMMARY_PATH": {
+    "class": "public",
+    "purpose": "cloudru billing summary path"
+  },
+  "CLOUDRU_COMPUTE_ACTION_PATH": {
+    "class": "public",
+    "purpose": "cloudru compute action path"
+  },
+  "CLOUDRU_CONTAINER_CPU": {
+    "class": "public",
+    "purpose": "cloudru container cpu"
+  },
+  "CLOUDRU_CONTAINER_NAME": {
+    "class": "public",
+    "purpose": "cloudru container name"
+  },
+  "CLOUDRU_IAM_ENDPOINT": {
+    "class": "public",
+    "purpose": "cloudru iam endpoint"
+  },
+  "CLOUDRU_IAM_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "cloudru iam key id"
+  },
+  "CLOUDRU_IAM_KEY_SECRET": {
+    "class": "secret",
+    "purpose": "Cloud.ru IAM key secret"
+  },
+  "CLOUDRU_IAM_WIZARD_ENABLED": {
+    "class": "public",
+    "purpose": "cloudru iam wizard enabled"
+  },
+  "CLOUDRU_IAM_WIZARD_TOKEN": {
+    "class": "secret",
+    "purpose": "cloudru iam wizard token"
+  },
+  "CLOUDRU_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "cloudru key id"
+  },
+  "CLOUDRU_KEY_SECRET": {
+    "class": "secret",
+    "purpose": "cloudru key secret"
+  },
+  "CLOUDRU_KEY_TTL_DAYS": {
+    "class": "public",
+    "purpose": "cloudru key ttl days"
+  },
+  "CLOUDRU_MAX_INSTANCES": {
+    "class": "public",
+    "purpose": "cloudru max instances"
+  },
+  "CLOUDRU_MIN_INSTANCES": {
+    "class": "public",
+    "purpose": "cloudru min instances"
+  },
+  "CLOUDRU_OBSERVABILITY_LOGS_PATH": {
+    "class": "public",
+    "purpose": "cloudru observability logs path"
+  },
+  "CLOUDRU_OBSERVABILITY_METRICS_PATH": {
+    "class": "public",
+    "purpose": "cloudru observability metrics path"
+  },
+  "CLOUDRU_PROJECT_ID": {
+    "class": "public",
+    "purpose": "Cloud.ru project identifier"
+  },
+  "CLOUDRU_REGISTRY_DOMAIN": {
+    "class": "public",
+    "purpose": "cloudru registry domain"
+  },
+  "CLOUDRU_REGISTRY_NAME": {
+    "class": "public",
+    "purpose": "cloudru registry name"
+  },
+  "CLOUDRU_REPOSITORY_NAME": {
+    "class": "public",
+    "purpose": "cloudru repository name"
+  },
+  "CLOUDRU_SECRET_MANAGEMENT_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "cloudru secret management key id"
+  },
+  "CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET": {
+    "class": "secret",
+    "purpose": "cloudru secret management key secret"
+  },
+  "CLOUDRU_STORAGE_TENANT_ID": {
+    "class": "public",
+    "purpose": "cloudru storage tenant id"
+  },
+  "EDS_API_KEY": {
+    "class": "secret",
+    "purpose": "eds api key"
+  },
+  "EDS_PROJECT_ID": {
+    "class": "public",
+    "purpose": "eds project id"
+  },
+  "FLASK_DEBUG": {
+    "class": "public",
+    "purpose": "flask debug"
+  },
+  "GH_TOKEN": {
+    "class": "secret",
+    "purpose": "gh token"
+  },
+  "GITHUB_REPOSITORY": {
+    "class": "ci-only",
+    "purpose": "github repository"
+  },
+  "GITHUB_STEP_SUMMARY": {
+    "class": "ci-only",
+    "purpose": "github step summary"
+  },
+  "GITHUB_TOKEN": {
+    "class": "secret",
+    "purpose": "GitHub Actions/API credential"
+  },
+  "HOST": {
+    "class": "public",
+    "purpose": "host"
+  },
+  "IDP_ALLOWED_RESOURCES": {
+    "class": "public",
+    "purpose": "idp allowed resources"
+  },
+  "IDP_PUBLIC_URL": {
+    "class": "public",
+    "purpose": "idp public url"
+  },
+  "MERGE_REQUIRED_CHECKS": {
+    "class": "ci-only",
+    "purpose": "merge required checks"
+  },
+  "MODEL_DISCOVERY_TIMEOUT_SECONDS": {
+    "class": "public",
+    "purpose": "model discovery timeout seconds"
+  },
+  "MODEL_DISCOVERY_TTL_SECONDS": {
+    "class": "public",
+    "purpose": "model discovery ttl seconds"
+  },
+  "PORT": {
+    "class": "public",
+    "purpose": "port"
+  },
+  "PR_NUMBER": {
+    "class": "ci-only",
+    "purpose": "pr number"
+  },
+  "YANDEX_AI_ENDPOINT": {
+    "class": "public",
+    "purpose": "yandex ai endpoint"
+  },
+  "YANDEX_API_KEY": {
+    "class": "secret",
+    "purpose": "legacy/direct Yandex API credential"
+  },
+  "YANDEX_API_KEY_SCOPES": {
+    "class": "public",
+    "purpose": "yandex api key scopes"
+  },
+  "YANDEX_BASE_URL": {
+    "class": "public",
+    "purpose": "yandex base url"
+  },
+  "YANDEX_FOLDER_ID": {
+    "class": "public",
+    "purpose": "yandex folder id"
+  },
+  "YANDEX_IAM_ENDPOINT": {
+    "class": "public",
+    "purpose": "yandex iam endpoint"
+  },
+  "YANDEX_IAM_TOKEN": {
+    "class": "secret",
+    "purpose": "Yandex IAM bearer credential"
+  },
+  "YANDEX_PROJECT_ID": {
+    "class": "compatibility",
+    "purpose": "Yandex project/folder identifier used by legacy consumers"
+  },
+  "YANDEX_PROVIDER_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "yandex provider key id"
+  },
+  "YANDEX_SERVICE_ACCOUNT_ID": {
+    "class": "public",
+    "purpose": "yandex service account id"
+  },
+  "YC_API_KEY": {
+    "class": "secret",
+    "purpose": "yc api key"
+  }
+}
