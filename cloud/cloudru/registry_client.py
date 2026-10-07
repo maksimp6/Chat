@@ -187,6 +187,7 @@ class CloudRuRegistryClient:
         dockerfile: str = "Dockerfile",
         platform: str = "linux/amd64",
         max_seconds: float = 15.0,
+        build_args: dict[str, str] | None = None,
     ) -> ImageRef:
         """Build+push with BuildKit registry cache and no local cache-image transfer."""
         repository = validate_name(repository, "repository")
@@ -225,19 +226,26 @@ class CloudRuRegistryClient:
                 raise CloudProviderError("docker-container buildx driver required", code="docker_error")
             ref = ImageRef(host, repository, tag)
             cache = ImageRef(host, repository, CACHE_TAG).tagged
+            build_argv = [
+                "docker",
+                "buildx",
+                "build",
+                "--platform",
+                platform,
+                "--cache-from",
+                f"type=registry,ref={cache}",
+                "--cache-to",
+                f"type=registry,ref={cache},mode=max",
+            ]
+            for name, value in sorted((build_args or {}).items()):
+                if not name or not value or not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
+                    raise CloudProviderError("build arg is invalid", code="validation_error")
+                build_argv.extend(["--build-arg", f"{name}={value}"])
             with tempfile.NamedTemporaryFile(prefix="buildx-metadata-", suffix=".json") as metadata:
                 started = time.perf_counter()
                 result = self._run(
                     [
-                        "docker",
-                        "buildx",
-                        "build",
-                        "--platform",
-                        platform,
-                        "--cache-from",
-                        f"type=registry,ref={cache}",
-                        "--cache-to",
-                        f"type=registry,ref={cache},mode=max",
+                        *build_argv,
                         "--metadata-file",
                         metadata.name,
                         "-f",
