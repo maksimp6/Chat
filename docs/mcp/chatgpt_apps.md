@@ -106,6 +106,14 @@ Secrets must never be included in MCP tool metadata, results, ordinary logs, or 
 
 The production service must be reachable over HTTPS. In ChatGPT developer mode, create an app/connector using the public URL ending in `/mcp`.
 
+The protocol and local/test authentication foundation described above is shipped, but **production ChatGPT interoperability is not yet accepted**. Issue #326 owns the production remote-client boundary. A successful local OAuth test, metadata discovery, or bearer MCP smoke must not be reported as proof that ChatGPT can authenticate and use the deployed Alice MCP service.
+
+Current live acceptance is tracked separately:
+- #939 — Alice Dev OAuth/MCP deployment acceptance, including durable OAuth state across replacement;
+- #938 — public production HTTP/API/browser acceptance for `maxxxpavlov.ru`.
+
+Until those relevant gates pass, documentation and release notes must distinguish `implemented/tested locally` from `verified from ChatGPT against production`.
+
 For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish provider API keys or backend-only credentials.
 
 ## Validation
