@@ -99,6 +99,7 @@ Coverage: statically named environment reads in repository Python outside tests.
 | `GITHUB_STEP_SUMMARY` | ci-only | GitHub Actions step-summary file path |
 | `GITHUB_TOKEN` | secret | GitHub Actions/API credential |
 | `HOST` | public | Flask bind host |
+| `HOME` | public | process home directory; Android embedded server uses it to derive app-local runtime paths |
 | `IDP_ALLOWED_RESOURCES` | public | OAuth IDP allowed resource list |
 | `IDP_PUBLIC_URL` | public | OAuth IDP public URL |
 | `MERGE_REQUIRED_CHECKS` | ci-only | required check-name override used by merge readiness |
