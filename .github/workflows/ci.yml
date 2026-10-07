@@ -389,8 +389,12 @@ jobs:
     name: Android debug APK
     needs: changes
     if: needs.changes.outputs.android == 'true'
-    uses: ./.github/workflows/android-direct.yml
-    secrets: inherit
+    uses: $/.github/workflows/android-direct.yml
+    secrets:
+      ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+      ANDROID_DEBUG_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS }}
+      ANDROID_DEBUG_STORE_PASSWORD: ${{ secrets.ANDROID_DEBUG_STORE_PASSWORD }}
+      ANDROID_DEBUG_KEY_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEY_PASSWORD }}
 
   required:
     name: CI required
