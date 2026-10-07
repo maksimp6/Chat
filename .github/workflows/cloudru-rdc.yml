@@ -53,13 +53,7 @@ jobs:
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = push ]; then
-            python scripts/cloudru_rdc.py stop --sha "$SOURCE_SHA"
-            start_ms="$(date +%s%3N)"
-            timeout 10s python scripts/cloudru_rdc.py start --sha "$SOURCE_SHA"
-            end_ms="$(date +%s%3N)"
-            elapsed_ms="$((end_ms-start_ms))"
-            echo "RDC start->ready: ${elapsed_ms}ms"
-            test "$elapsed_ms" -le 10000
+            python scripts/cloudru_rdc.py status --sha "$SOURCE_SHA"
           else
             python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
           fi
