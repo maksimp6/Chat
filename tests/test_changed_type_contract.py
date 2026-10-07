@@ -104,3 +104,45 @@ def test_rename_without_function_changes_does_not_create_debt() -> None:
     checker = _load_checker()
     source = "def legacy(value):\n    return value\n"
     assert checker.check_changed_source("renamed.py", source, source) == []
+
+
+def test_repository_check_covers_debt_from_earlier_commit(tmp_path: Path) -> None:
+    checker = _load_checker()
+
+    def git(*args: str) -> None:
+        import subprocess
+
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True)
+
+    git("init")
+    git("config", "user.email", "ci@example.invalid")
+    git("config", "user.name", "CI")
+    (tmp_path / "module.py").write_text(
+        'def clean(value: str) -> str:\n    """Return value."""\n    return value\n',
+        encoding="utf-8",
+    )
+    git("add", "module.py")
+    git("commit", "-m", "base")
+    import subprocess
+
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    (tmp_path / "module.py").write_text(
+        'def broken(value):\n    """Return value."""\n    return value\n',
+        encoding="utf-8",
+    )
+    git("add", "module.py")
+    git("commit", "-m", "introduce debt")
+
+    (tmp_path / "unrelated.txt").write_text("later commit\n", encoding="utf-8")
+    git("add", "unrelated.txt")
+    git("commit", "-m", "later unrelated change")
+
+    rules = {item.rule for item in checker.check_repository(base, "HEAD", root=tmp_path)}
+    assert {"missing-parameter", "missing-return"} <= rules
