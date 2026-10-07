@@ -30,7 +30,6 @@ def record():
 def health(**overrides):
     return {
         "mode": "cloud-rdc",
-        "browser_ready": True,
         "rdc_running": True,
         "state_ready": True,
         "paired": True,
@@ -59,7 +58,6 @@ def response(value, status=200):
 def closed_health(generation=2, **overrides):
     return health(
         **{
-            "browser_ready": False,
             "rdc_running": False,
             "quiesced": True,
             "checkpoint_generation": generation,
