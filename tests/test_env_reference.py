@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_discovers_static_python_environment_reads(tmp_path):
     source = tmp_path / "app.py"
     source.write_text(
-        'import os\n'
+        "import os\n"
         'A = os.getenv("ALICE_A", "x")\n'
         'B = os.environ.get("ALICE_B")\n'
         'C = os.environ["ALICE_C"]\n',
@@ -62,9 +62,7 @@ def test_reference_never_contains_secret_values():
 
 def test_reference_matches_repository_runtime():
     reference = json.loads(
-        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(encoding="utf-8")
     )
     discovered = discover_python_env(discover_runtime_python(ROOT))
     assert validate_reference(discovered, reference) == []
