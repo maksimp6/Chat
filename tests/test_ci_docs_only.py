@@ -36,6 +36,10 @@ def test_required_checks_keep_their_names_while_docs_only_takes_fast_path():
     for workflow in (security, codeql, formatting):
         assert "ci_docs_only.py --null" in workflow
 
+    for workflow in (security, codeql):
+        assert '"**/*.md"' not in workflow
+        assert '".agents/**"' not in workflow
+
     assert "format_changed_docs.sh" in formatting
 
 
