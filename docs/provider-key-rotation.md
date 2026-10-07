@@ -1,8 +1,8 @@
 # Provider API-key lifecycle and rotation
 
-Alice Pro keeps one backend-owned runtime API key per provider. The credential
-store is provider-aware, encrypted at rest, and never exposes plaintext keys
-through metadata, traces, logs, or frontend responses.
+Alice Pro currently has a legacy provider-credential store that keeps one backend-owned runtime API key per provider. This path is still active and its rotation workers are real, so it must not be removed until its consumers are migrated. It is, however, a **legacy secret-bearing consumer** under canonical Secret Store issue #755, not the target architecture.
+
+The current credential store is provider-aware and encrypts persisted values at rest. Plaintext must not be exposed through metadata, traces, logs, or frontend responses.
 
 ## Providers
 
@@ -70,8 +70,7 @@ Plaintext API keys must never appear in:
 - GitHub issues/PRs;
 - persistent metadata.
 
-Persistent records store encrypted secrets plus non-secret provider IDs and
-SHA-256 fingerprints.
+Legacy `provider_credentials` records store encrypted secrets plus non-secret provider IDs and SHA-256 fingerprints. This is an existing compatibility path, not permission to add new secret-value storage. New durable secret contracts should store only canonical secret reference/version metadata; #755 owns migration of existing consumers.
 
 ## Rotation worker
 
@@ -113,3 +112,18 @@ Fernet-key format.
 ## Administration endpoint security
 
 The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Alice Pro short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.
+
+
+## Migration boundary (#755)
+
+The UI/API and rotation workers documented above describe current compatibility behavior. They do not mean provider credentials are already migrated to the canonical `SecretResolver` boundary.
+
+Until a provider consumer is explicitly migrated and verified:
+
+- keep its existing tested credential path working;
+- do not create a second fallback credential store;
+- do not copy its plaintext into Memory DB or agent state;
+- treat Secret Store migration as consumer-by-consumer cutover with missing/revoked/unavailable tests;
+- remove the legacy encrypted-value path only after the new resolver path is proven.
+
+A successful legacy rotation worker is evidence for that worker, not evidence that #755 is complete.
