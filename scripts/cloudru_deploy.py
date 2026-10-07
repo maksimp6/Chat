@@ -275,7 +275,7 @@ def cmd_cleanup_failed_create(args: argparse.Namespace) -> dict[str, Any]:
     current = apps.get(cfg["name"])
     if current is None:
         return {"status": "NOOP"}
-    containers = ((current.get("template") or {}).get("containers") or [])
+    containers = (current.get("template") or {}).get("containers") or []
     current_image = containers[0].get("image") if containers else None
     if not args.expected_image or current_image != args.expected_image:
         raise CloudProviderError(
