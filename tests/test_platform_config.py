@@ -502,19 +502,19 @@ class TestContainerAppsScalingContract:
                 "resources": {"cpu": "1", "memory": "1024Mi"},
                 "min_instances": 0,
                 "max_instances": 1,
-                "idle_timeout_seconds": 300,
+                "idle_timeout_seconds": 60,
             },
             "alice-lab": {
                 "resources": {"cpu": "1", "memory": "1024Mi"},
                 "min_instances": 0,
                 "max_instances": 1,
-                "idle_timeout_seconds": 120,
+                "idle_timeout_seconds": 30,
             },
             "alice-browser": {
                 "resources": {"cpu": "2", "memory": "2048Mi"},
                 "min_instances": 0,
                 "max_instances": 1,
-                "idle_timeout_seconds": 120,
+                "idle_timeout_seconds": 30,
             },
         }
 
