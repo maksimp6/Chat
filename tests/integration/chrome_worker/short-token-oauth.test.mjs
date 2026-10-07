@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createOAuth } from "./oauth.mjs";
+import { createOAuth } from "../../../deploy/chrome-worker/oauth.mjs";
 
 const PUBLIC = "https://browser.example.test";
 const RESOURCE = `${PUBLIC}/browser/v1/mcp`;

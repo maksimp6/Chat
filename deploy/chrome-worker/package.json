@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test server.test.mjs oauth.test.mjs state.test.mjs idp-auth.test.mjs idp-server.test.mjs idp-e2e.test.mjs short-token-oauth.test.mjs takeover.test.mjs secret-manager-e2e.test.mjs",
-    "test:browser": "BROWSER_LIVE_SMOKE_TEST=1 node --test browser.test.mjs live-smoke.test.mjs"
+    "test": "node --test ../../tests/unit/chrome_worker/state.test.mjs ../../tests/unit/chrome_worker/takeover.test.mjs ../../tests/integration/chrome_worker/server.test.mjs ../../tests/integration/chrome_worker/oauth.test.mjs ../../tests/integration/chrome_worker/idp-auth.test.mjs ../../tests/integration/chrome_worker/idp-server.test.mjs ../../tests/integration/chrome_worker/idp-e2e.test.mjs ../../tests/integration/chrome_worker/short-token-oauth.test.mjs ../../tests/integration/chrome_worker/secret-manager-e2e.test.mjs",
+    "test:browser": "BROWSER_LIVE_SMOKE_TEST=1 node --test ../../tests/integration/chrome_worker/browser.test.mjs ../../tests/contract/chrome_worker/live-smoke.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",

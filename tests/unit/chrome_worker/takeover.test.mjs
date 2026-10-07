@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createTakeover } from "./takeover.mjs";
+import { createTakeover } from "../../../deploy/chrome-worker/takeover.mjs";
 
 function fakeChild() {
   return { killed: false, kill() { this.killed = true; } };

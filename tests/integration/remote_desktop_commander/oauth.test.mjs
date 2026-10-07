@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { once } from "node:events";
 import test from "node:test";
 
-import { createOAuth } from "./oauth.mjs";
+import { createOAuth } from "../../../deploy/remote-desktop-commander/oauth.mjs";
 
 const PUBLIC = "https://alice-dev.example.test";
 const RESOURCE = `${PUBLIC}/mcp`;

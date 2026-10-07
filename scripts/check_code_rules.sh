@@ -7,6 +7,7 @@ python -m pytest -q -p no:cacheprovider \
   tests/test_naming_conventions.py \
   tests/test_ci_platform_changes.py \
   tests/test_repository_root_layout.py \
+  tests/test_architecture_boundaries.py \
   tests/test_reliability_rules.py \
   tests/test_type_checking.py \
   tests/test_api_problem_details.py

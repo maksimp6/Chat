@@ -324,7 +324,7 @@ jobs:
       - name: Alice Dev OAuth and handoff regression tests
         run: |
           npm ci --prefix deploy/remote-desktop-commander --omit=dev --ignore-scripts --no-audit --no-fund
-          node --test deploy/remote-desktop-commander/oauth.test.mjs deploy/remote-desktop-commander/credential-handoff.test.mjs
+          node --test tests/integration/remote_desktop_commander/oauth.test.mjs tests/integration/remote_desktop_commander/credential-handoff.test.mjs
 
   postgres:
     name: PostgreSQL integration

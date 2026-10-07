@@ -28,7 +28,7 @@ jobs:
         working-directory: deploy/remote-desktop-commander
         run: |
           npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-          node --test oauth.test.mjs credential-handoff.test.mjs mcp-gateway-origin.test.mjs oauth-discovery-smoke.test.mjs
+          node --test ../../tests/integration/remote_desktop_commander/oauth.test.mjs ../../tests/integration/remote_desktop_commander/credential-handoff.test.mjs ../../tests/integration/remote_desktop_commander/mcp-gateway-origin.test.mjs ../../tests/contract/remote_desktop_commander/oauth-discovery-smoke.test.mjs
       - name: Validate Alice Dev MCP image
         working-directory: deploy/remote-desktop-commander
         run: |
