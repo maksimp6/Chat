@@ -543,8 +543,6 @@ class CloudSpendStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
-@dataclass(frozen=True)
-
 
 def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> Dict[str, Any]:
     """Classify current-period cloud spend against a monthly limit."""
