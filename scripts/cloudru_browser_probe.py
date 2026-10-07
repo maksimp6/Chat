@@ -365,6 +365,12 @@ def build_image(root, sha):
         export_source(root, sha, exported)
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "remote-desktop-commander"
+        base_image = os.environ.get("RDC_BASE_IMAGE", "").strip()
+        expected_prefix = f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:"
+        if not base_image.startswith(expected_prefix) or not re.fullmatch(
+            re.escape(expected_prefix) + r"[0-9a-f]{64}", base_image
+        ):
+            raise CloudProviderError("RDC_BASE_IMAGE must be an immutable owned image", code="validation_error")
         print('{"stage":"image_build_push"}', flush=True)
         return registry.build_and_push_fast(
             registry_name=REGISTRY,
@@ -372,6 +378,7 @@ def build_image(root, sha):
             tag=sha,
             context_dir=str(context),
             dockerfile=str(context / "Dockerfile"),
+            build_args={"RDC_BASE_IMAGE": base_image},
         ).pinned
 
 
