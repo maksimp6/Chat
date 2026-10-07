@@ -10,7 +10,7 @@ This document explains the platform structure and principles.
 
 ## Core Services
 
-The platform manages three core services:
+The current canonical desired state contains two core services:
 
 ### OAuth
 - **Purpose**: OAuth 2.0 identity provider for Alice
@@ -28,12 +28,6 @@ The platform manages three core services:
 - **Dependencies**: `oauth` (for identity verification)
 - **Resources**: Requires more CPU and memory for browser operations
 
-### Agent Shell
-- **Purpose**: Runtime execution environment for agent scripts
-- **Configuration**: `platform.yaml`, `domains.yaml`
-- **Domain**: `agent-shell.maxxxpavlov.online` (production), test lane equivalent
-- **Dependencies**: `oauth` (for authentication)
-- **Scaling**: Horizontal scaling for parallel executions
 
 ## Deployment Lanes
 
@@ -43,7 +37,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 - **Sign-in**: `passphrase` (development only)
 - **Secrets**: Test-scoped only (`alice/test/*`)
 - **Domain protocol**: HTTPS preferred, HTTP allowed
-- **Resources**: Minimal (0.1 CPU, 256MB memory per service)
+- **Resources**: Defined by the canonical service config; current OAuth is 0.1 CPU / 256Mi and Chrome is 0.5 CPU / 1024Mi
 - **Approval**: No approval required for changes
 - **Purpose**: Development, testing, validation of changes
 
@@ -51,7 +45,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 - **Sign-in**: `github` (required, no passphrase allowed)
 - **Secrets**: Production-scoped (`alice/prod/*`)
 - **Domain protocol**: HTTPS only
-- **Resources**: Full allocation (0.5+ CPU, 512MB+ memory per service)
+- **Resources**: Defined by the same canonical service config unless a validated lane-specific contract is added
 - **Approval**: All changes require explicit approval
 - **Purpose**: Live user-facing services
 
@@ -91,9 +85,7 @@ Lane-specific overrides:
 lanes:
   production:
     sign_in: github
-    services: [oauth, chrome, agent-shell]
-    scale_overrides:
-      chrome: 2
+    services: [oauth, chrome]
 ```
 
 ### secrets.yaml
@@ -139,23 +131,20 @@ python -m alice_platform validate [--config-dir config/alice]
 ```
 Checks all YAML files for schema, semantic, and policy violations.
 
-### Planning
-```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
-```
-Compares desired state (config) to observed state (cloud provider) and shows planned changes.
-
 ### Health Checks
 ```bash
 python -m alice_platform health test
 python -m alice_platform health production
 ```
-Lists URLs and expected authentication methods for each service in the lane.
+Generates the configured health-check plan: service endpoints and expected authentication methods. It does not contact Cloud.ru or prove that the services are live.
+
+## Current implementation boundary
+
+The public `alice_platform` CLI currently exposes only `validate` and `health`. Tests intentionally reject unobserved mutation commands such as `plan` and `reconcile`. The config layer is therefore a validated desired-state contract, not evidence that Cloud.ru resources were observed, created, reconciled, restarted or recovered.
 
 ## Future Work
 
-- **Reconciliation**: Apply planned changes to cloud infrastructure
-- **Recovery**: Automated recovery procedures when services fail
-- **Real cloud.ru provider**: Fetch true observed state from Cloud.ru API
-- **CI integration**: Automate validation on every commit
+- **Provider-backed observation and planning**: acquire sanitized real Cloud.ru state and derive deterministic drift
+- **Reconciliation**: apply only bounded approved changes to cloud infrastructure
+- **Recovery**: provider-backed recovery procedures with verification and rollback evidence
+- **Convergence proof**: demonstrate the full `observe → plan → approve → apply → verify → repair/status` lifecycle owned by #783
