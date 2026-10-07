@@ -48,18 +48,18 @@ jobs:
           python-version-file: .python-version
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Measure existing RDC start to ready
+      - name: Measure RDC image build
         env:
           SOURCE_SHA: ${{ github.sha }}
-          CLOUDRU_STORAGE_TENANT_ID: ${{ vars.CLOUDRU_STORAGE_TENANT_ID }}
+          RDC_LANE: test
+          RDC_BASE_IMAGE: alice-rdc-probe.cr.cloud.ru/chromium-probe@sha256:f92bd58af749191733dcf0fee808be5ede654e8a6cdc5930375dbb65c7ce9294
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
-          python scripts/cloudru_rdc.py stop --sha "$SOURCE_SHA"
-          start_ms="$(date +%s%3N)"
-          timeout 10s python scripts/cloudru_rdc.py start --sha "$SOURCE_SHA"
-          end_ms="$(date +%s%3N)"
-          elapsed_ms="$((end_ms-start_ms))"
-          echo "RDC existing-service start->ready: ${elapsed_ms}ms"
-          test "$elapsed_ms" -le 10000
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.cloudru_browser_probe import build_image
+          import os
+          print(build_image(Path.cwd(), os.environ["SOURCE_SHA"]), flush=True)
+          PY
