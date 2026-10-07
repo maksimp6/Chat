@@ -13,17 +13,17 @@
   [#920](https://github.com/maksimp6/Chat/pull/920).
 - Переведена user identity и GitHub mapping на file-native aggregate (issue #776):
   [#921](https://github.com/maksimp6/Chat/pull/921).
-- Conversation ownership и user identity теперь читаются из файловой системы; database transaction не требуется при миграции.
+- После одноразового verified import из legacy SQL и migration marker runtime-операции ownership и identity больше не читают SQL.
 - Conversation metadata остаётся в SQL; дальнейшая миграция (sessions, runtime events, metadata) остаётся roadmap.
 - Миграция слоя памяти позволяет отделить conversation ownership lifecycle от centralized DB.
 
-### Alice Dev worker: новый MCP worker для Alice deployment
+### Alice Dev worker: отдельный coding worker
 
-- Lightweight HTTP MCP worker переименован из RDC в Alice Dev и развёрнут как отдельный coding worker для Alice deployment ([#919](https://github.com/maksimp6/Chat/pull/919)).
-- Легаси `cloudru-rdc.yml` и `production-deploy.yml` сохранены без изменений; Alice Dev — отдельный workaround.
-- Добавлена одноходовая handoff credential ([#933](https://github.com/maksimp6/Chat/pull/933)) для безопасного deployment без хранения secrets в Git.
+- Lightweight HTTP MCP worker переименован из RDC в Alice Dev как отдельный coding worker со своим lifecycle `cloudru-rdc-mcp-candidate.yml` ([#919](https://github.com/maksimp6/Chat/pull/919)).
+- Легаси `cloudru-rdc.yml` (persistent RDC) и `production-deploy.yml` сохранены без изменений; Alice Dev не заменяет ни persistent RDC, ни deployment приложения Alice.
+- Добавлен one-shot credential handoff: login/password передаются воркеру один раз через авторизованный endpoint и сохраняются в файл с правами 0600, повторная запись отклоняется ([#933](https://github.com/maksimp6/Chat/pull/933)).
 - Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Alice Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
-- Добавлены immutable commit workers и worker recycling policy ([#930](https://github.com/maksimp6/Chat/pull/930)).
+- Добавлены immutable workers на каждый commit и удаление выведенных воркеров по tombstone-списку ([#930](https://github.com/maksimp6/Chat/pull/930)).
 - Добавлена обработка tombstone deletion и in-place worker updates ([#928](https://github.com/maksimp6/Chat/pull/928), [#931](https://github.com/maksimp6/Chat/pull/931)).
 - Cloud.ru HTTP 499 recovery для Alice Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
 
@@ -31,7 +31,7 @@
 
 ### Secrets и authorization
 
-- Добавлена capability-only agent secret delivery без хранения plaintext в memory ([#897](https://github.com/maksimp6/Chat/pull/897)).
+- Добавлена capability-only agent secret delivery: агент запрашивает разрешённое использование alias, plaintext агенту не возвращается ([#897](https://github.com/maksimp6/Chat/pull/897)).
 - Добавлен file import и ephemeral materialization для secrets ([#895](https://github.com/maksimp6/Chat/pull/895)).
 - Базовые pieces secrets infrastructure (#872–#874) интегрированы; consumer-by-consumer migration к canonical Secret Store #755 остаётся незавершённой.
 
@@ -45,7 +45,7 @@
 
 ## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
 
-**Note**: Agent model settings (mini/Claude/mandatory-final-Codex) below are historical. Current [AGENTS.md](../AGENTS.md) specifies nano for routine work, excludes Claude execution from normal paths, and makes additional model review optional. See [2026-10-06 decision](https://github.com/maksimp6/Chat/issues/869#issuecomment-6023949684).
+**Note**: Agent model settings (mini/Claude/mandatory-final-Codex) below are historical. Current [AGENTS.md](../AGENTS.md) specifies nano for routine work, excludes Claude execution from normal paths, and makes additional model review optional.
 
 ### Repository role-based GitHub office
 
@@ -58,9 +58,9 @@
 - Copilot остаётся автоматическим reviewer; Codex запускается один раз перед merge.
 - Один primary owner и один focused PR на issue; стирание ownership или множественные PRs на issue не допускаются.
 - Safety/owner-approval boundaries для deployment, data changes и secrets не изменены.
-- Документация: [`docs/agents/role-based-agent-office.md`](docs/agents/role-based-agent-office.md) и [`AGENTS.md`](AGENTS.md).
+- Документация: [`docs/agents/role-based-agent-office.md`](agents/role-based-agent-office.md) и [`AGENTS.md`](../AGENTS.md).
 
-Это shipped repository policy в `master`. Плагин-based runtime skill discovery остаётся roadmap [#566](https://github.com/maksimp6/Chat/pull/566).
+Это shipped repository policy в `master`. Skill-first agent runtime добавлен позже, 2026-09-30, отдельным PR [#566](https://github.com/maksimp6/Chat/pull/566).
 
 ### 3D business и AI-first tools
 

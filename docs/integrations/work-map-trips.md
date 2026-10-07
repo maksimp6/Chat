@@ -1,8 +1,8 @@
 # Work Map: trips.db workflow
 
-**Status**: documented; not implemented in Alice Pro  
-**Issue**: #470  
-**Privacy level**: location-sensitive data; user-explicit control required
+- **Status**: documented; not implemented in Alice Pro
+- **Issue**: #470
+- **Privacy level**: location-sensitive data; user-explicit control required
 
 ## Overview
 
@@ -97,9 +97,9 @@ When Alice Pro integrates Work Map generation, the workflow should follow:
 6. **Cleanup**: Delete temporary files; retain only user-approved output
 
 Integration status and tool access must be tracked by related issues:
-- #467: provider-neutral storage in runtime
-- #340: unified file interface across runtimes
-- #350: AI tool execution and sandbox boundaries
+- #340: provider-neutral user artifact storage
+- #467: machine-readable integration catalog (integration status)
+- #350: Alice Pro infrastructure and runtime model (runtime/tool access)
 
 ## Testing
 
@@ -111,6 +111,7 @@ Integration status and tool access must be tracked by related issues:
 
 ## References
 
-- Related coordination issues: #343, #351 (Work Map and storage integration)
-- Provider-neutral storage: #340, #467
+- Umbrella/coordination issues: #343, #351
+- Provider-neutral storage: #340
+- Integration status: #467
 - Runtime/tool access boundaries: #350
