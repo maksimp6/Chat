@@ -1,25 +1,54 @@
-"""Reconciler: validate desired-state actions without a configured cloud backend."""
+"""Desired-state reconciler for Alice infrastructure."""
 
-from typing import Any, Dict, List
+from __future__ import annotations
+
 import logging
+from typing import Any, Dict, List
 
 from alice_platform.planner import Action, ActionType
+from cloud.registry import ensure_default_providers, resolve_provider_name
 
 logger = logging.getLogger(__name__)
 
 
 def reconcile(lane: str, actions: List[Action], config: Dict[str, Any]) -> None:
-    """Process reconciliation actions and fail closed for provider mutations.
+    """Apply desired-state actions through the selected infrastructure provider.
 
-    A concrete provider adapter must be installed before CREATE, UPDATE, or DELETE
-    actions can be applied. Reporting orphaned resources remains provider-neutral.
+    Production mutations remain approval-gated by the planner. Orphans are
+    reported but never deleted implicitly.
     """
-    for i, action in enumerate(actions, 1):
+
+    cloud_config = config.get("cloud", {})
+    if not isinstance(cloud_config, dict):
+        raise ValueError("cloud configuration must be an object")
+
+    provider_name = resolve_provider_name(cloud_config)
+    provider = ensure_default_providers().get(provider_name)
+
+    for index, action in enumerate(actions, 1):
         if action.needs_approval and lane == "production":
-            logger.warning("[%s] Action requires approval: %s %s", i, action.type.value, action.service)
-            print(f"  {i}. [PENDING] {action.service}: requires approval")
+            logger.warning(
+                "[%s] Action requires approval: %s %s",
+                index,
+                action.type.value,
+                action.service,
+            )
+            print(f"  {index}. [PENDING] {action.service}: requires approval")
             continue
+
         if action.type == ActionType.REPORT_ORPHAN:
-            print(f"  {i}. [ORPHAN] {action.service}: {action.description}")
+            print(f"  {index}. [ORPHAN] {action.service}: {action.description}")
             continue
-        raise RuntimeError("No infrastructure provider adapter is configured")
+
+        service_config = config.get("services", {}).get(action.service, {})
+        result = provider.reconcile_container(
+            operation=action.type.value,
+            lane=lane,
+            service=action.service,
+            config=service_config,
+        )
+        action.applied = True
+        print(
+            f"  {index}. [{action.type.value.upper()}] "
+            f"{action.service}: {result.get('state', 'accepted')}"
+        )
