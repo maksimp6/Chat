@@ -1,8 +1,6 @@
 # Cloud.ru Secret Management для секретов Alice Pro
 
-Статус: первый кодовый этап (issue #477, эпик #440). Адаптер и границы прав
-готовы; перенос реальных production-секретов и выдача прав в Cloud.ru IAM — в
-последующих узких PR, после ручной проверки владельцем.
+Статус: Cloud.ru backend foundation shipped. Исторический #477 добавил низкоуровневый adapter и SQL-backed compatibility refs; canonical provider-neutral Secret Store теперь определяется `secret_store/core.py` и issue #755. `CloudRuSecretResolver` реализован, но migration реальных consumers остаётся поэтапной и не считается завершённой только из-за наличия resolver.
 
 Источники (проверено 2026-09-29 МСК):
 
@@ -19,7 +17,16 @@
 `docs/cloudru-container-apps.md`. Проверить и при необходимости поправить
 пути/коды при первом реальном подключении.
 
-## Модель данных
+## Canonical и compatibility модели
+
+Canonical application boundary:
+
+- `SecretRef(provider, secret_id, version_id, purpose)` — только metadata;
+- `SecretResolver.resolve(ref)` — provider-neutral resolution;
+- `SecretValue` — opaque plaintext holder, redacted on string/repr surfaces and non-serializable;
+- `CloudRuSecretResolver` — Cloud.ru adapter for that contract.
+
+Существующий `secret_management_refs` в `provider_credentials.py` остаётся **compatibility path** и покрыт тестами. Его нельзя удалять до migration его consumers, но новые consumers должны ориентироваться на canonical Secret Store, а не расширять SQL reference API.
 
 Секрет в Cloud.ru Secret Management состоит из версий; версия после записи
 неизменяема, и несколько версий могут быть одновременно активны. Alice Pro не
@@ -169,9 +176,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   (`identity/github_oauth.py`);
 - `provider_credential:yandex` / `provider_credential:cloudru` — ключи
   провайдеров LLM, которые уже хранятся зашифрованными через
-  `provider_credentials.py`; Secret Management становится дополнительным
-  источником ссылки на закреплённую версию, а не заменяет существующую
-  таблицу `provider_credentials`;
+  `provider_credentials.py`; текущий `provider_credentials` остаётся legacy encrypted-value consumer до отдельного cutover; #755 определяет, будет ли и когда его secret-value storage удалён после verified resolver migration;
 - `alice_database_url` — строка подключения к управляемому PostgreSQL
   (`ALICE_DATABASE_URL`), см. известное ограничение "App secrets are plain
   container env vars" в `docs/cloudru-container-apps.md`.
@@ -211,4 +216,9 @@ limitations") секреты Container Apps — обычные переменн�
   (внутреннее шифрование, независимо от Cloud.ru).
 - `docs/cloudru-container-apps.md` — деплой и известные ограничения по
   секретам.
-- Issue: #477, #475, #440.
+- Historical foundation: #477, #475, #440. Canonical Secret Store and consumer migration: #755.
+
+
+## Acceptance rule for #755
+
+Old SQL compatibility tests and new `CloudRuSecretResolver` tests prove their respective components only. A consumer is migrated only when its exact runtime path uses the canonical resolver and PASS evidence covers success plus missing/inactive/auth/unavailable behavior. `SKIPPED` or the mere presence of a SecretRef is not migration evidence.
