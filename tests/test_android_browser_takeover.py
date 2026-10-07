@@ -6,21 +6,24 @@ MANIFEST = ROOT / "android/app/src/main/AndroidManifest.xml"
 MAIN = ROOT / "android/app/src/main/java/com/alicepro/mobile/MainActivity.kt"
 
 
-def test_android_takeover_uses_dedicated_webview_and_https_origin():
-    source = ACTIVITY.read_text()
-    assert 'const val TAKEOVER_HOST = "chrome-22706bfa6066.containerapps.ru"' in source
-    assert 'const val TAKEOVER_URL = "https://$TAKEOVER_HOST/browser/v1/takeover"' in source
+def test_android_controller_uses_local_webview_and_loopback_api():
+    source = ACTIVITY.read_text(encoding="utf-8")
     assert "WebView(this)" in source
-    assert "setAcceptThirdPartyCookies(webView, false)" in source
-    assert 'target.scheme == "https" && target.host == TAKEOVER_HOST' in source
+    assert 'const val CONTROL_HOST = "127.0.0.1"' in source
+    assert "const val CONTROL_PORT = 8765" in source
+    assert "ServerSocket(" in source
+    assert '"navigate"' in source
+    assert '"click"' in source
+    assert '"type"' in source
+    assert '"text"' in source
     assert "SOFT_INPUT_ADJUST_RESIZE" in source
 
 
-def test_android_takeover_has_internal_bridge_and_deep_link():
-    manifest = MANIFEST.read_text()
-    main = MAIN.read_text()
+def test_android_controller_has_deep_link_and_native_launcher_entry():
+    manifest = MANIFEST.read_text(encoding="utf-8")
+    main = MAIN.read_text(encoding="utf-8")
     assert 'android:name=".BrowserTakeoverActivity"' in manifest
     assert 'android:scheme="alicepro"' in manifest
     assert 'android:host="browser"' in manifest
-    assert "fun openBrowserTakeover()" in main
     assert "BrowserTakeoverActivity::class.java" in main
+    assert "Open controlled browser" in main
