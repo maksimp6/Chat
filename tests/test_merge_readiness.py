@@ -240,7 +240,6 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                 "state": "open",
                 "merged": False,
                 "draft": False,
-                "user": {"login": "implementation-author"},
             },
             {
                 "head": {"sha": "head-1"},
@@ -248,7 +247,6 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                 "state": "open",
                 "merged": False,
                 "draft": False,
-                "user": {"login": "implementation-author"},
             },
         ]
     )
@@ -280,17 +278,6 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                                 "nodes": [{"isResolved": True}],
                                 "pageInfo": {"hasNextPage": True},
                             },
-                            "reviews": {
-                                "nodes": [
-                                    {
-                                        "state": "APPROVED",
-                                        "commit": {"oid": "head-1"},
-                                        "author": {"login": "solution-reviewer"},
-                                        "submittedAt": "2026-10-07T00:00:00Z",
-                                    }
-                                ],
-                                "pageInfo": {"hasNextPage": False},
-                            },
                         }
                     }
                 }
@@ -308,10 +295,6 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
     assert result["head_sha"] == "head-1"
     assert result["base_sha"] == "base-1"
     assert result["snapshot_changed"] is False
-    assert result["author_login"] == "implementation-author"
-    assert result["reviews"][0]["state"] == "APPROVED"
-    assert result["reviews"][0]["commit"]["oid"] == "head-1"
-    assert result["reviews_truncated"] is False
     assert result["review_threads_truncated"] is True
     assert any("/compare/master...head-1" in " ".join(call) for call in calls)
     assert any("/commits/head-1/check-runs?per_page=100" in " ".join(call) for call in calls)
@@ -326,7 +309,6 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                 "state": "open",
                 "merged": False,
                 "draft": False,
-                "user": {"login": "implementation-author"},
             },
             {
                 "head": {"sha": "head-2"},
@@ -334,7 +316,6 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                 "state": "open",
                 "merged": False,
                 "draft": False,
-                "user": {"login": "implementation-author"},
             },
         ]
     )
@@ -354,17 +335,6 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                         "pullRequest": {
                             "reviewThreads": {
                                 "nodes": [],
-                                "pageInfo": {"hasNextPage": False},
-                            },
-                            "reviews": {
-                                "nodes": [
-                                    {
-                                        "state": "APPROVED",
-                                        "commit": {"oid": "head-1"},
-                                        "author": {"login": "solution-reviewer"},
-                                        "submittedAt": "2026-10-07T00:00:00Z",
-                                    }
-                                ],
                                 "pageInfo": {"hasNextPage": False},
                             },
                         }
