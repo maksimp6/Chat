@@ -76,3 +76,13 @@ def test_generated_markdown_matches_machine_reference():
         encoding="utf-8"
     )
     assert generated == render_markdown(reference)
+
+
+def test_reference_rejects_mechanical_purpose():
+    errors = validate_reference(
+        {"ALICE_EXAMPLE_FLAG"},
+        {"ALICE_EXAMPLE_FLAG": {"class": "public", "purpose": "alice example flag"}},
+    )
+    assert errors == [
+        "ALICE_EXAMPLE_FLAG: purpose must explain behavior, not repeat the variable name"
+    ]
