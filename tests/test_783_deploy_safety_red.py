@@ -33,7 +33,7 @@ def test_deploy_workflow_has_explicit_five_ruble_budget_guard_before_mutation():
 def test_deploy_workflow_guarantees_cleanup_on_every_terminal_outcome():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "if: always()" in text
-    assert "cloudru_deploy.py delete --yes" in text
+    assert "cloudru_deploy.py cleanup --yes" in text
 
 
 def test_deploy_boundary_no_longer_requires_postgresql_secret():

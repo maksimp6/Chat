@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import tarfile
+from typing import Any
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -247,7 +248,7 @@ def cmd_inventory(_: argparse.Namespace) -> dict:
     }
 
 
-def cmd_cleanup(args: argparse.Namespace) -> dict:
+def cmd_cleanup(args: argparse.Namespace) -> dict[str, Any]:
     if not args.yes:
         raise CloudProviderError("pass --yes to cleanup acceptance", code="validation_error")
     cfg = _settings()
@@ -316,14 +317,20 @@ def main(argv: list[str] | None = None) -> int:
     cleanup.add_argument("--acceptance-created", action="store_true")
     cleanup.add_argument("--acceptance-updated", action="store_true")
     cleanup.add_argument("--snapshot-json")
-    cleanup.set_defaults(func=lambda args: cmd_cleanup(
-        argparse.Namespace(
-            yes=args.yes,
-            acceptance_created=args.acceptance_created,
-            acceptance_updated=args.acceptance_updated,
-            snapshot=json.loads(Path(args.snapshot_json).read_text()) if args.snapshot_json else None,
+    cleanup.set_defaults(
+        func=lambda args: cmd_cleanup(
+            argparse.Namespace(
+                yes=args.yes,
+                acceptance_created=args.acceptance_created,
+                acceptance_updated=args.acceptance_updated,
+                snapshot=(
+                    json.loads(Path(args.snapshot_json).read_text())
+                    if args.snapshot_json
+                    else None
+                ),
+            )
         )
-    ))
+    )
 
     delete = sub.add_parser("delete", help="delete the container service")
     delete.add_argument("--yes", action="store_true")

@@ -1258,7 +1258,7 @@ def test_acceptance_cleanup_restores_preexisting_container_snapshot(monkeypatch)
         )
     )
     assert result["restored"] == "alice-pro"
-    apps.restore.assert_called_once_with(snapshot)
+    apps.restore.assert_called_once_with("alice-pro", snapshot)
     apps.delete.assert_not_called()
 
 
