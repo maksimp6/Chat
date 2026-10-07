@@ -236,11 +236,11 @@
     },
     {
       "path": "docs/architecture/branch-environments.md",
-      "kind": "explanation",
-      "status": "current",
+      "kind": "historical",
+      "status": "historical",
       "owner": "architecture",
-      "source_of_truth": "repository code/tests and canonical architecture issues",
-      "canonical": true
+      "source_of_truth": "closed not-planned issue #13 and git history",
+      "canonical": false
     },
     {
       "path": "docs/architecture/browser-adapter-boundary.md",
@@ -412,11 +412,11 @@
     },
     {
       "path": "docs/branch-environments.md",
-      "kind": "explanation",
-      "status": "experimental",
-      "owner": "docs-engineer",
-      "source_of_truth": "repository code/config/tests and referenced canonical issues",
-      "canonical": true
+      "kind": "historical",
+      "status": "historical",
+      "owner": "architecture",
+      "source_of_truth": "closed not-planned issue #13 and git history",
+      "canonical": false
     },
     {
       "path": "docs/budget_controller.md",
@@ -596,11 +596,11 @@
     },
     {
       "path": "docs/integration/current-scope.md",
-      "kind": "explanation",
-      "status": "current",
-      "owner": "docs-engineer",
-      "source_of_truth": "repository code/config/tests and referenced canonical issues",
-      "canonical": true
+      "kind": "historical",
+      "status": "historical",
+      "owner": "architecture",
+      "source_of_truth": "closed issue #351 and git history",
+      "canonical": false
     },
     {
       "path": "docs/integrations/catalog.md",
@@ -628,11 +628,11 @@
     },
     {
       "path": "docs/integrations/cloudru-docs-mirror.md",
-      "kind": "reference",
-      "status": "planned",
+      "kind": "historical",
+      "status": "historical",
       "owner": "infra",
-      "source_of_truth": "canonical issue plus repository code/config as implemented",
-      "canonical": true
+      "source_of_truth": "closed not-planned issue #428 and git history",
+      "canonical": false
     },
     {
       "path": "docs/integrations/cloudru-iam-wizard.md",
@@ -900,10 +900,10 @@
     },
     {
       "path": "docs/runtime_serverless.md",
-      "kind": "explanation",
-      "status": "experimental",
-      "owner": "docs-engineer",
-      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "kind": "reference",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "runtime_api.py, session_profiles.py and runtime/session profile tests",
       "canonical": true
     },
     {
