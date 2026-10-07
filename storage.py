@@ -127,8 +127,4 @@ def storage_provider_from_env(
     if name == "local":
         root = env.get("ALICE_STORAGE_LOCAL_ROOT") or local_root or DEFAULT_LOCAL_STORAGE_ROOT
         return LocalDirectoryStorage(root)
-    if name == "cloudru":
-        from cloud.cloudru.object_storage import CloudRuObjectStorage
-
-        return CloudRuObjectStorage.from_env(env)
     raise StorageProviderUnavailable("Storage provider is not configured")

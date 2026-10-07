@@ -73,9 +73,7 @@ against a real HTTP server with a fake GitHub and an injected clock.
 
 Production uses GitHub only. The IdP refuses to start (`/healthz` 503, `missing` names the conflict) if `IDP_OWNER_PASSPHRASE` is set together with `IDP_GITHUB_CLIENT_ID` or `IDP_GITHUB_CLIENT_SECRET`, so a production configuration cannot be switched to passphrase sign-in by mistake.
 
-## Deployment (Cloud.ru Container Apps)
 
-`scripts/cloudru_idp.py` and the `Cloud.ru Alice OAuth IdP` workflow (`workflow_dispatch`) deploy a stateless 0.1 vCPU / 256 MiB container that scales to zero. Actions: `preflight`, `deploy`, `status`, `stop`.
 
 | Lane | Source | Sign-in | Secrets | Trusts |
 | --- | --- | --- | --- | --- |
@@ -88,11 +86,9 @@ The deploy verifies on the public origin that `/healthz` reports the exact commi
 
 ### Custom domain `oauth.maxxxpavlov.online` (production)
 
-Container Apps cannot serve a custom domain itself, and API Gateway has no public management API, so these steps are done once in the Cloud.ru console:
 
 1. Create a Shared API Gateway (Development -> API Gateway) that proxies to the IdP's `*.containerapps.ru` origin (the `provider_url` from the deploy summary).
 2. Attach `oauth.maxxxpavlov.online` with a Certificate Manager certificate.
-3. Add the CNAME `oauth.maxxxpavlov.online -> <gateway-uuid>.apigw.cloud.ru.` in Evolution DNS (`deploy/cloudru/dns/README.md`).
 4. Deploy production with the `public_url` input (or the variable `IDP_PUBLIC_URL`) set to `https://oauth.maxxxpavlov.online`, create the GitHub OAuth App with callback `https://oauth.maxxxpavlov.online/github/callback`, and set `BROWSER_IDP_ISSUER` to the same origin.
 
 The issuer is part of every token, so changing it later means reconnecting ChatGPT once and updating the GitHub callback.

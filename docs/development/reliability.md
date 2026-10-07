@@ -98,6 +98,4 @@ parameter annotations, `Any` return leakage, and unqualified
 - **Pull requests:** the CI job **Code rules** runs the same script and is a
   required check in `merge-readiness.yml`.
 - **Deployments:** `production-deploy.yml` and the `deploy` action of
-  `cloudru-deploy.yml` run **Code rules** on the exact ref being deployed and
-  ship only if it passes. Read-only Cloud.ru actions (`preflight`, `status`,
   `inventory`) skip the gate.

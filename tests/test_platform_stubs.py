@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 from alice_platform.reconciler import reconcile
 from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
-from alice_platform.providers.cloudru import CloudProviderUnavailable, get_observed_state
 from alice_platform.providers.dns import create_dns_record, update_dns_records, verify_dns
 from alice_platform.providers.storage import (
     create_storage,
@@ -16,12 +15,6 @@ from alice_platform.providers.storage import (
 )
 
 
-class TestCloudRuProviderNotImplemented:
-    """Unavailable Cloud.ru provider must fail closed."""
-
-    def test_get_observed_state_is_not_fake_empty_inventory(self):
-        with pytest.raises(CloudProviderUnavailable, match="observed-state read"):
-            get_observed_state("test")
 
 
 class TestReconcilerImplemented:

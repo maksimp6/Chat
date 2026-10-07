@@ -273,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          mapfile -t suites < <(printf '%s\n' tests/test_cloudru*.py tests/test_ci_*.py tests/test_platform*.py tests/test_*deploy*.py tests/test_rdc*.py | sort -u)
+          mapfile -t suites < <(printf '%s\n' tests/test_ci_*.py tests/test_platform*.py tests/test_*deploy*.py tests/test_rdc*.py | sort -u)
           test "${#suites[@]}" -gt 0
           python -m pytest -q "${suites[@]}" --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:infra-coverage.xml
       - name: Enforce infrastructure changed-line coverage

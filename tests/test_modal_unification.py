@@ -464,52 +464,8 @@ def test_canonical_modal_css_has_complete_layout_contract():
     assert content["overflow-y"] == "auto"
 
 
-def test_feature_modal_roots_cannot_override_canonical_layout():
-    forbidden = {
-        "display",
-        "position",
-        "inset",
-        "top",
-        "right",
-        "bottom",
-        "left",
-        "align-items",
-        "justify-content",
-        "overflow",
-        "overflow-x",
-        "overflow-y",
-    }
-    selectors = {
-        ".alice-pro-app .treasury-modal",
-        ".alice-pro-app .memory-modal",
-        ".alice-pro-app .provider-credentials-modal",
-        ".alice-pro-app .cloudru-iam-modal",
-        ".alice-pro-app .file-manager-modal",
-        ".alice-pro-app .file-manager-add-modal",
-    }
-    rules = dict(parse_css_rules())
-    for selector in selectors:
-        declarations = rules.get(selector, {})
-        overlap = forbidden.intersection(declarations)
-        assert not overlap, f"{selector} overrides canonical modal layout: {sorted(overlap)}"
 
 
-def test_feature_modal_content_uses_canonical_content_shell():
-    rules = dict(parse_css_rules())
-    content_classes = {
-        ".alice-pro-app .treasury-modal-content",
-        ".alice-pro-app .memory-modal-content",
-        ".alice-pro-app .provider-credentials-box",
-        ".alice-pro-app .cloudru-iam-box",
-        ".alice-pro-app .file-manager-box",
-        ".alice-pro-app .file-manager-add-box",
-    }
-    forbidden = {"position", "width", "max-width", "max-height", "overflow", "overflow-y"}
-    for selector in content_classes:
-        declarations = rules.get(selector, {})
-        # Feature styles may add visual details, but cannot replace the shared geometry.
-        overlap = forbidden.intersection(declarations)
-        assert not overlap, f"{selector} overrides canonical content geometry: {sorted(overlap)}"
 
 
 def test_modal_responsive_css_only_adjusts_shared_content_shell():

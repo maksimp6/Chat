@@ -9,8 +9,6 @@ exposed to ChatGPT through an MCP/plugin adapter and to Alice Pro.
 ## Request path
 
 ```
-ChatGPT -> OAuth-authenticated MCP client -> Cloud.ru API Gateway -> Playwright MCP -> Chrome Worker
-Alice   -> authenticated client -> Cloud.ru API Gateway -> Playwright API -> Chrome Worker
 ```
 
 The Gateway is the supported public boundary. The worker must not expose CDP,

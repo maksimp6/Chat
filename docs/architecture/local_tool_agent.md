@@ -9,7 +9,6 @@ ChatGPT / UI / Agent
         |
         | HTTPS / MCP
         v
-Cloud.ru Alice Pro Gateway
         |
         | persistent local-agent job queue
         v
@@ -19,11 +18,9 @@ Second Android Phone
 Universal Tool Registry / local executor
 \`\`\`
 
-Телефон делает исходящие HTTPS-запросы к Cloud.ru. Входящий порт на телефоне и проброс портов домашнего роутера не нужны.
 
 ## Регистрация
 
-На Cloud.ru задаётся:
 
 \`\`\`env
 ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>

@@ -230,7 +230,7 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("Run as Local Tool Agent")
-            .setMessage("The phone will make outbound HTTPS requests to Cloud.ru. No router port forwarding or public Android port is required.")
+            .setMessage("The phone will make outbound HTTPS requests to the configured backend. No router port forwarding or public Android port is required.")
             .setView(container)
             .setCancelable(false)
             .setPositiveButton("Connect") { _, _ ->

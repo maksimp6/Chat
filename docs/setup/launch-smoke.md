@@ -1,9 +1,7 @@
 # P0 local launch smoke
 
 This smoke test turns the launch baseline from issue #427 into a reproducible
-check against Alice Pro itself before Cloud.ru deployment work continues.
 
-It does **not** deploy production, mutate Cloud.ru resources, change GitHub
 permissions, or rotate credentials.
 
 ## What is verified
@@ -124,7 +122,6 @@ Example offline shape:
 }
 ```
 
-## Relation to Cloud.ru launch
 
 Passing the local full smoke proves that the current protected application
 baseline can start, talk to the configured provider through the canonical path,

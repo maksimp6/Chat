@@ -79,7 +79,7 @@ def start_local_agent(
 ) -> str:
     """Register and start the outbound Local Tool Agent worker.
 
-    The runtime token returned by Cloud.ru is held only in the Python process.
+    The runtime token returned by the configured backend is held only in the Python process.
     The Android UI stores only the bootstrap credential needed for a future
     re-registration.
     """

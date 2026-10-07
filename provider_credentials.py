@@ -23,8 +23,7 @@ REVOKED = "revoked"
 DISABLED = "disabled"
 
 YANDEX = "yandex"
-CLOUDRU = "cloudru"
-SUPPORTED_PROVIDERS = (YANDEX, CLOUDRU)
+SUPPORTED_PROVIDERS = (YANDEX,)
 
 
 class CredentialError(RuntimeError):
@@ -83,17 +82,6 @@ def _fetch_one(db: Any, query: str, params: tuple = ()):
 
 
 def create_schema(db: Any) -> None:
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS cloudru_iam_credentials (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            key_id TEXT NOT NULL,
-            key_secret_encrypted TEXT NOT NULL,
-            project_id TEXT NOT NULL DEFAULT '',
-            service_account_id TEXT,
-            expires_at TIMESTAMP,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
 
     db.execute("""
         CREATE TABLE IF NOT EXISTS provider_credentials (
@@ -114,11 +102,6 @@ def create_schema(db: Any) -> None:
         )
     """)
 
-    iam_columns = {
-        row["name"] for row in db.execute("PRAGMA table_info(cloudru_iam_credentials)").fetchall()
-    }
-    if "expires_at" not in iam_columns:
-        db.execute("ALTER TABLE cloudru_iam_credentials ADD COLUMN expires_at TIMESTAMP")
 
     columns = {
         row["name"] for row in db.execute("PRAGMA table_info(provider_credentials)").fetchall()
@@ -175,7 +158,7 @@ def create_schema(db: Any) -> None:
         ON provider_credentials (provider, status, expires_at)
     """)
 
-    # Cloud.ru Secret Management refs: only the (immutable) secret/version
+    # secret management refs: only the (immutable) secret/version
     # identifiers live here, never a secret value. See SecretManagementRef.
     db.execute("""
         CREATE TABLE IF NOT EXISTS secret_management_refs (
@@ -201,100 +184,12 @@ def _parse_expiry(value: Any) -> Optional[datetime]:
     return None
 
 
-def get_cloudru_iam_credentials(db: Any, decrypt: Callable[[str], str]) -> Optional[dict[str, str]]:
-    create_schema(db)
-    row = db.execute(
-        "SELECT key_id, key_secret_encrypted, project_id, service_account_id, expires_at "
-        "FROM cloudru_iam_credentials WHERE id = 1"
-    ).fetchone()
-    if not row:
-        return None
-    expires_at = _parse_expiry(row["expires_at"])
-    return {
-        "key_id": str(row["key_id"]),
-        "key_secret": decrypt(row["key_secret_encrypted"]),
-        "project_id": str(row["project_id"] or ""),
-        "service_account_id": str(row["service_account_id"] or ""),
-        "expires_at": expires_at.isoformat() if expires_at else "",
-    }
 
 
-def save_cloudru_iam_credentials(
-    db: Any,
-    *,
-    key_id: str,
-    key_secret: str,
-    project_id: str,
-    service_account_id: Optional[str],
-    expires_at: Optional[datetime],
-    encrypt: Callable[[str], str],
-) -> None:
-    if not key_id.strip() or not key_secret:
-        raise ValueError("Cloud.ru IAM key_id and key_secret are required")
-    if expires_at is not None:
-        expires_at = _as_utc(expires_at)
-        if expires_at <= utcnow():
-            raise ValueError("Cloud.ru IAM master key is expired")
-    create_schema(db)
-    db.execute(
-        """
-        INSERT INTO cloudru_iam_credentials
-        (id, key_id, key_secret_encrypted, project_id, service_account_id, expires_at)
-        VALUES (1, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            key_id = excluded.key_id,
-            key_secret_encrypted = excluded.key_secret_encrypted,
-            project_id = excluded.project_id,
-            service_account_id = excluded.service_account_id,
-            expires_at = excluded.expires_at
-    """,
-        (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id, expires_at),
-    )
-    db.commit()
 
 
-def get_cloudru_iam_credentials(db: Any, decrypt: Callable[[str], str]) -> Optional[dict[str, str]]:
-    create_schema(db)
-    row = db.execute(
-        "SELECT key_id, key_secret_encrypted, project_id, service_account_id "
-        "FROM cloudru_iam_credentials WHERE id = 1"
-    ).fetchone()
-    if not row:
-        return None
-    return {
-        "key_id": str(row["key_id"]),
-        "key_secret": decrypt(row["key_secret_encrypted"]),
-        "project_id": str(row["project_id"] or ""),
-        "service_account_id": str(row["service_account_id"] or ""),
-    }
 
 
-def save_cloudru_iam_credentials(
-    db: Any,
-    *,
-    key_id: str,
-    key_secret: str,
-    project_id: str,
-    service_account_id: Optional[str],
-    encrypt: Callable[[str], str],
-) -> None:
-    if not key_id.strip() or not key_secret:
-        raise ValueError("Cloud.ru IAM key_id and key_secret are required")
-    create_schema(db)
-    db.execute(
-        """
-        INSERT INTO cloudru_iam_credentials
-        (id, key_id, key_secret_encrypted, project_id, service_account_id)
-        VALUES (1, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            key_id = excluded.key_id,
-            key_secret_encrypted = excluded.key_secret_encrypted,
-            project_id = excluded.project_id,
-            service_account_id = excluded.service_account_id
-    """,
-        (key_id.strip(), encrypt(key_secret), project_id.strip(), service_account_id),
-    )
-    db.commit()
 
 
 def get_active_credential(
@@ -624,9 +519,9 @@ def record_health_check(
 
 @dataclass(frozen=True)
 class SecretManagementRef:
-    """A local pointer to one immutable Cloud.ru Secret Management version.
+    """A local pointer to one immutable secret management version.
 
-    Cloud.ru versions cannot be edited in place, so "rotate" and "rollback"
+    Secret versions cannot be edited in place, so "rotate" and "rollback"
     are purely local: which version_id this app currently trusts for a given
     purpose (e.g. ``alice_short_token``, ``github_oauth_client_secret``,
     ``provider_credential:yandex``, ``alice_database_url``). The value itself
@@ -649,7 +544,7 @@ def set_secret_management_ref(
     *,
     now: Optional[datetime] = None,
 ) -> SecretManagementRef:
-    """Pin (or switch) one purpose's Cloud.ru Secret Management version.
+    """Pin (or switch) one purpose's secret management version.
 
     Switching to a new version_id for the same secret_id remembers the prior
     pin so ``rollback_secret_management_ref`` can restore it explicitly.
@@ -749,36 +644,5 @@ _SECRET_MANAGEMENT_CLIENT: Any = None
 _SECRET_MANAGEMENT_CLIENT_LOCK = threading.Lock()
 
 
-def _get_secret_management_client():
-    global _SECRET_MANAGEMENT_CLIENT
-    if _SECRET_MANAGEMENT_CLIENT is None:
-        with _SECRET_MANAGEMENT_CLIENT_LOCK:
-            if _SECRET_MANAGEMENT_CLIENT is None:
-                from cloud.cloudru.secret_management import CloudRuSecretManagementClient
-
-                _SECRET_MANAGEMENT_CLIENT = CloudRuSecretManagementClient()
-    return _SECRET_MANAGEMENT_CLIENT
 
 
-def resolve_secret_management_value(
-    db: Any,
-    purpose: str,
-    client: Any = None,
-) -> str:
-    """Resolve one purpose's pinned Cloud.ru secret to plaintext.
-
-    Backend-only: the caller must not log, trace, cache beyond the client's
-    own bounded cache, or return this value through any client-visible path.
-    There is no fallback path; if Secret Management cannot be reached this
-    raises instead of reading or writing an unencrypted copy anywhere.
-    """
-    ref = get_secret_management_ref(db, purpose)
-    if ref is None:
-        raise NoActiveCredentialError(f"No secret management ref configured for '{purpose}'")
-    if client is None:
-        client = _get_secret_management_client()
-    secret_value = client.get_secret_value(ref.secret_id, ref.pinned_version_id)
-    trace = get_current_trace()
-    if trace is not None:
-        trace.register_sensitive_value(secret_value)
-    return secret_value

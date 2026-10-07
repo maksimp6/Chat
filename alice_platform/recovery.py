@@ -28,10 +28,10 @@ def list_snapshots(storage: str, lane: str) -> List[Snapshot]:
         List of available snapshots
 
     Note:
-        Real implementation will query Cloud.ru snapshot API.
+        Real implementation will query provider snapshot API.
     """
     logger.info(f"[DRY-RUN] Would list snapshots for {storage} in {lane}")
-    # Placeholder - will return real snapshots from Cloud.ru API
+    # Placeholder - will return real snapshots from the provider API
     return []
 
 
@@ -48,7 +48,7 @@ def restore_snapshot(
         approve: Skip confirmation (for CI)
 
     Note:
-        Real implementation will call Cloud.ru restore API.
+        Real implementation will call provider restore API.
         Requires approval in production.
     """
     if lane == "production" and not approve:

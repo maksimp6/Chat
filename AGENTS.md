@@ -45,7 +45,6 @@ the narrowest matching repository role:
 - **Android Engineer** — Android app, packaging, signing boundaries and device
   integration.
 - **Test Engineer** — regression gaps, deterministic tests and CI diagnosis.
-- **Infra Engineer** — GitHub Actions, runners, caching, Cloud.ru and deployment
   automation.
 - **Security Reviewer** — read-mostly security review; no implementation.
 - **Docs Engineer** — documentation and runbooks.

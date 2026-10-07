@@ -1,6 +1,0 @@
-{
-  "name": "REPLACE_FULL_CUSTOM_DOMAIN_FQDN",
-  "type": "CNAME",
-  "ttl": "300",
-  "values": ["REPLACE_GATEWAY_UUID.apigw.cloud.ru."]
-}

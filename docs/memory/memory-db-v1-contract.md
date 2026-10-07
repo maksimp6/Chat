@@ -74,7 +74,6 @@ A backup is complete only after:
 
 `consistent snapshot -> manifest -> checksums -> upload -> remote verification -> commit marker`.
 
-Initial machine-oriented remote target is Cloud.ru S3/Object Storage. Yandex Disk and Google Drive may be additional independent targets.
 
 A backup that has not passed restore verification is not considered proven recoverable.
 

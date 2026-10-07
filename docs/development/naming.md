@@ -10,7 +10,6 @@ allowlist: rename an entry, then delete it from the list.
 - The interface language is Russian. Every visible label, `title`,
   `aria-label`, placeholder, status and error is written in Russian.
 - Product and protocol names keep their own spelling: GitHub, MCP, SSH,
-  Dozzle, Cloud.ru, Playwright. Generic words around them are translated:
   «Среда SSH», not «SSH Runtime»; «Отделы», not «Departments».
 - A control says what it does: «Новый чат», «Обновить приложение». Errors say
   what failed and what to do next: «Не удалось загрузить расходы. Повторите

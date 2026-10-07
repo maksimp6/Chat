@@ -2,7 +2,6 @@
 
 **Date**: 2026-10-06  
 **Auditor**: Claude Code  
-**Focus Areas**: Memory DB, Secret Store, Chrome/RDC deployment, OAuth, Cloud.ru, CI workflow
 
 ## Summary
 
@@ -39,9 +38,7 @@ Found **2 confirmed documentation drifts** and **1 incomplete feature documentat
 
 ### Areas With Adequate Documentation
 
-✓ **Secret Store** (#860): `secret_store/core.py` contract matches documented API in `docs/security/cloudru-secret-management.md`  
 ✓ **RDC Deployment** (#861): SSH deployment lane retired cleanly; no docs reference it  
-✓ **Cloud.ru Container Apps**: Detailed documentation in `docs/cloudru-container-apps.md` matches current implementation in `scripts/cloudru_deploy.py`  
 ✓ **CI Workflow**: Fail-closed merge gate (#496) properly documented in `docs/development/`  
 ✓ **Backup/Restore**: Contract defined (#780) and implementation proven (#857)
 
@@ -64,5 +61,4 @@ Found **2 confirmed documentation drifts** and **1 incomplete feature documentat
 ## Files Involved
 
 - Code: `agent_memory/file_memory_db.py`, `agent_memory/backup.py`, `memory_manager.py`, `memory_extractor.py`, `deploy/chrome-worker/oauth.mjs`
-- Docs: `docs/memory/overview.md`, `docs/architecture/chatgpt-browser-tool.md` (or new), `docs/security/cloudru-secret-management.md`
 - Tests: `tests/test_file_memory_db.py`, `tests/test_memory_backup.py`, `deploy/chrome-worker/oauth.test.mjs`

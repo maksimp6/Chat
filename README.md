@@ -37,11 +37,8 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-10-06, `master` includes Memory DB Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
 
-These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Alice Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Memory DB Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -92,7 +89,6 @@ The debug APK is for development/testing. Release signing keys must never be com
 Use `.env` or a deployment secret manager. Never commit:
 
 - Yandex API keys or IAM tokens;
-- Cloud.ru credentials or MCP bearer tokens;
 - signing keys/passwords;
 - user passwords or session secrets.
 
@@ -139,7 +135,6 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 
 ## Active issues and expected work
 
-Cloud.ru migration is coordinated in [#440](https://github.com/maksimp6/Chat/issues/440); canonical AI execution and repository layout are tracked in [#433](https://github.com/maksimp6/Chat/issues/433) and [#430](https://github.com/maksimp6/Chat/issues/430). Earlier architecture coordination remains in [#343](https://github.com/maksimp6/Chat/issues/343). Related scope includes:
 
 - [#350](https://github.com/maksimp6/Chat/issues/350) — canonical one-process runtime architecture;
 - [#351](https://github.com/maksimp6/Chat/issues/351) — integration staging and dependency order;
@@ -151,7 +146,6 @@ Cloud.ru migration is coordinated in [#440](https://github.com/maksimp6/Chat/iss
 - [#104](https://github.com/maksimp6/Chat/issues/104) — public release;
 - [#409](https://github.com/maksimp6/Chat/issues/409) — cloud/local browsing and self-testing.
 
-Relevant Discussions include [Cloud.ru CLI Q&A #406](https://github.com/maksimp6/Chat/discussions/406) and [repository cleanup #393](https://github.com/maksimp6/Chat/discussions/393). They document open questions and decisions; they do not by themselves mark a feature complete.
 
 ## License
 

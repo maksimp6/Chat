@@ -1,7 +1,7 @@
 """Provider-agnostic API-key rotation orchestration.
 
 Providers may either create a replacement resource (Yandex) or reissue the
-existing resource in place (Cloud.ru). Both paths validate the new secret
+existing resource in place. Both paths validate the new secret
 before promotion.
 """
 
@@ -69,7 +69,7 @@ def rotate_active_key(
     """Create/reissue, validate and promote one provider credential.
 
     Yandex creates a new key and then revokes the old resource.
-    Cloud.ru reissues the current key in place; its resource ID is intentionally
+    Some providers reissue the current key in place; their resource ID is
     unchanged, so revoking the old ID would also revoke the replacement.
     """
     issued_at, expires_at = issue_window(now, ttl=ttl) if ttl is not None else issue_window(now)

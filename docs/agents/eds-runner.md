@@ -10,11 +10,9 @@ In GitHub Settings → Environments → production, add the DevServices key (and
 | Secret | Value |
 | --- | --- |
 | `EDS_API_KEY` | DevServices product API key (`X-API-KEY`) |
-| `EDS_PROJECT_ID` | Optional project UUID override; otherwise the existing `CLOUDRU_PROJECT_ID` environment variable is used |
 
 The owner authorized adding these keys in the runner setup request. Obtain the
 actual values through the owner's authorized secret source or direct entry into
-GitHub's secret form. Do not put them in issues, commits, logs, or chat. Cloud.ru
 IAM Key ID/Key Secret and model-provider keys are different credentials.
 
 The secrets are injected only into the fixed read-only check in
@@ -32,7 +30,6 @@ stderr from EDS are discarded. This proves Repo access, not complete inventory,
 Workflow Studio access, a deployment, or SSH/server recovery. Missing keys fail
 the check without printing values.
 
-For operations, follow the existing Cloud.ru skill's EDS reference. Capture raw
 output privately before reporting allowlisted fields. Do not run `eds config`
 in logs or embed API keys in clone URLs. EDS manages Repo and Workflow Studio;
 it is not a VM/SSH administration CLI.

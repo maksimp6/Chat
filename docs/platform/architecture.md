@@ -157,5 +157,4 @@ Lists URLs and expected authentication methods for each service in the lane.
 
 - **Reconciliation**: Apply planned changes to cloud infrastructure
 - **Recovery**: Automated recovery procedures when services fail
-- **Real cloud.ru provider**: Fetch true observed state from Cloud.ru API
 - **CI integration**: Automate validation on every commit

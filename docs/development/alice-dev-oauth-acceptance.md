@@ -6,7 +6,6 @@
 
 `ALICE_DEV_PUBLIC_URL` задаётся deployment-кодом, не пользователем. Это не секрет.
 Для commit-worker желаемый origin: `https://alice-dev-<project12>-<sha8>.containerapps.ru`.
-До принятия контейнера код сверяет этот адрес с `publicUri` из Cloud.ru и проверяет
 provider UUID. Несовпадение останавливает rollout. `Host` и `X-Forwarded-*` не
 используются для выбора OAuth issuer или resource. Неизвестная/неверная конфигурация
 отклоняется до запуска HTTP listener. HTTP разрешён только для локальных тестов.
