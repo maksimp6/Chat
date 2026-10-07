@@ -405,13 +405,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.13"
-      - name: Stage Python runtime
-        working-directory: android
-        run: python scripts/stage_python.py
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
@@ -433,12 +426,22 @@ jobs:
           else
             echo "Stable debug signing secrets are not configured; using the ephemeral Gradle debug key."
           fi
-      - name: Run Android unit tests and build debug APK
+      - name: Build debug APK
         working-directory: android
         run: |
+          set -euo pipefail
           started=$SECONDS
-          gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} -PaliceCommitHash=${{ github.sha }} :app:testDebugUnitTest :app:assembleDebug
-          echo "- Android test/build: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+          gradle -PaliceBuildNumber=${{ github.run_number }} -PaliceCommitHash=${{ github.sha }} :app:assembleDebug
+          elapsed=$((SECONDS - started))
+          echo "- Android APK assemble: ${elapsed}s (target: <=15s)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Run Android unit tests
+        working-directory: android
+        run: |
+          set -euo pipefail
+          started=$SECONDS
+          gradle :app:testDebugUnitTest
+          elapsed=$((SECONDS - started))
+          echo "- Android unit tests after build: ${elapsed}s" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify debug APK
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
