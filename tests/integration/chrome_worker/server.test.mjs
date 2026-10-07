@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 
-import { createWorker } from "./server.mjs";
+import { createWorker } from "../../../deploy/chrome-worker/server.mjs";
 
 function fakeChromium() {
   const profile = { value: "" };

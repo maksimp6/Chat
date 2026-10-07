@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { createOAuth } from "./oauth.mjs";
+import { createOAuth } from "../../../deploy/chrome-worker/oauth.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("base64url");
 const PUBLIC = "https://browser.example.test";

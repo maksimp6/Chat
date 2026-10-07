@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { createKeys } from "../oauth-idp/crypto.mjs";
-import { signJwt } from "../oauth-idp/jwt-sign.mjs";
-import { createIdpAuth } from "./idp-auth.mjs";
+import { createKeys } from "../../../deploy/oauth-idp/crypto.mjs";
+import { signJwt } from "../../../deploy/oauth-idp/jwt-sign.mjs";
+import { createIdpAuth } from "../../../deploy/chrome-worker/idp-auth.mjs";
 
 const ISSUER = "https://oauth.example.test";
 const RESOURCE = "https://chrome.example.test/browser/v1/mcp";
@@ -118,5 +118,5 @@ test("advertises the IdP and the browser scopes in protected-resource metadata",
 });
 
 test("vendored verifier is byte-identical to the IdP copy", () => {
-  assert.equal(readFileSync(new URL("./jwt-verify.mjs", import.meta.url), "utf8"), readFileSync(new URL("../oauth-idp/jwt-verify.mjs", import.meta.url), "utf8"));
+  assert.equal(readFileSync(new URL("../../../deploy/chrome-worker/jwt-verify.mjs", import.meta.url), "utf8"), readFileSync(new URL("../../../deploy/oauth-idp/jwt-verify.mjs", import.meta.url), "utf8"));
 });

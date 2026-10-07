@@ -7,8 +7,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { createWorker } from "./server.mjs";
-import { createOAuth } from "./oauth.mjs";
+import { createWorker } from "../../../deploy/chrome-worker/server.mjs";
+import { createOAuth } from "../../../deploy/chrome-worker/oauth.mjs";
 import { chromium } from "playwright-core";
 
 async function fixture(t) {
