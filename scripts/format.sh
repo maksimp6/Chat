@@ -22,7 +22,7 @@ case "$mode" in
     ;;
   check)
     python -m ruff format --check .
-    run_prettier --check "static/**/*.{js,css,json}" "templates/**/*.html" "tests/**/*.js" "${DOC_GLOBS[@]}"
+    run_prettier --check "static/**/*.{js,css,json}" "templates/**/*.html" "tests/**/*.js" "*.md"
     ;;
   *)
     echo "Usage: $0 [write|check]" >&2
