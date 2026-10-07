@@ -94,14 +94,12 @@ def runtime_env(project):
     }
 
 
-def creation_body(project, image, *, profile="persistent"):
+def creation_body(project, image):
     if not isinstance(image, str) or not IMAGE_RE.fullmatch(image):
         fail("validation_error")
-    if profile not in {"persistent", "bootstrap"}:
-        fail("validation_error")
     name, bucket = names(project)
-    cpu = "0.5" if profile == "bootstrap" else "1"
-    memory = "512Mi" if profile == "bootstrap" else "4096Mi"
+    cpu = "0.2"
+    memory = "512Mi"
     spec = ContainerSpec(
         name=name,
         image=image,
@@ -238,8 +236,8 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             "port": type(container.get("containerPort")) is int
             and container["containerPort"] == 8080,
             "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
-            "cpu": resource_map.get("cpu") == "1",
-            "memory": resource_map.get("memory") == "4096Mi",
+            "cpu": resource_map.get("cpu") == "0.2",
+            "memory": resource_map.get("memory") == "512Mi",
             "scaling_types": type(scaling.get("minInstanceCount")) is int
             and type(scaling.get("maxInstanceCount")) is int,
             "scaling_min": scaling.get("minInstanceCount") == 1,
@@ -1509,7 +1507,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "install", "bootstrap_install", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "install", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1530,16 +1528,15 @@ def main():
     tenant = configured_tenant(args.tenant_id)
     store, credentials = storage_client(project, tenant)
     apps = CloudRuContainerAppsClient(project_id=project)
-    if args.action in ("preflight", "install", "bootstrap_install"):
+    if args.action in ("preflight", "install"):
         result = preflight(apps, store, credentials, tenant=tenant)
-        if args.action in ("install", "bootstrap_install"):
+        if args.action == "install":
             if result["container_exists"]:
                 fail("already_exists")
             image = build_image(root, args.sha)
-            profile = "bootstrap" if args.action == "bootstrap_install" else "persistent"
-            creation_body(project, image, profile=profile)
+            creation_body(project, image)
             print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
-            result = install(apps, store, credentials, image, tenant=tenant, profile=profile)
+            result = install(apps, store, credentials, image, tenant=tenant)
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":
