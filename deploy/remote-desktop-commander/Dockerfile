@@ -3,7 +3,7 @@ ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
     && apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-      bash ca-certificates git openssh-client ripgrep python3 python3-pip python3-venv chromium fonts-liberation \
+      bash ca-certificates git openssh-client ripgrep python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /workspace /rdc-state /home/node/.desktop-commander-device /home/node/.claude-server-commander \
     && chown -R node:node /workspace /rdc-state /home/node
