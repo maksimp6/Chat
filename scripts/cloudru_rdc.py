@@ -1309,6 +1309,21 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
         apps.client.timeout = previous_timeout
 
 
+def observe(apps, *, tenant):
+    configured_tenant(tenant)
+    record = owned_record(apps, tenant=tenant)
+    if record is None:
+        return {"status": "RDC_ABSENT"}
+    state = str(record.get("status", "")).lower()
+    known = {"running", "suspended", "pending", "created", "creating", "deploying", "starting", "stopping", "stopped", "failed", "error", "ready", "rejected", "deleted", "suspended_product"}
+    return {
+        "status": "RDC_OBSERVED",
+        "container_name": record["name"],
+        "container_id": record["id"],
+        "resource_state": state if state in known else "other",
+    }
+
+
 def status(apps, *, tenant, http_get=requests.get):
     configured_tenant(tenant)
     record = owned_record(apps, tenant=tenant)
@@ -1507,7 +1522,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "install", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "install", "observe", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1542,6 +1557,8 @@ def main():
                 creation_body(project, image)
                 print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
             result = install(apps, store, credentials, image, tenant=tenant)
+    elif args.action == "observe":
+        result = observe(apps, tenant=tenant)
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":
