@@ -247,6 +247,23 @@ def cmd_inventory(_: argparse.Namespace) -> dict:
     }
 
 
+def cmd_cleanup(args: argparse.Namespace) -> dict:
+    if not args.yes:
+        raise CloudProviderError("pass --yes to cleanup acceptance", code="validation_error")
+    cfg = _settings()
+    apps = CloudRuContainerAppsClient()
+    if args.acceptance_created:
+        return {"deleted": cfg["name"], "operation": apps.delete(cfg["name"])}
+    if args.acceptance_updated:
+        if not isinstance(args.snapshot, dict):
+            raise CloudProviderError(
+                "pre-existing acceptance target requires a rollback snapshot",
+                code="validation_error",
+            )
+        return {"restored": cfg["name"], "operation": apps.restore(cfg["name"], args.snapshot)}
+    return {"status": "NOOP"}
+
+
 def cmd_delete(args: argparse.Namespace) -> dict:
     if not args.yes:
         raise CloudProviderError(
@@ -293,6 +310,20 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("inventory", help="check project-level container access").set_defaults(
         func=cmd_inventory
     )
+
+    cleanup = sub.add_parser("cleanup", help="restore or remove an acceptance target")
+    cleanup.add_argument("--yes", action="store_true")
+    cleanup.add_argument("--acceptance-created", action="store_true")
+    cleanup.add_argument("--acceptance-updated", action="store_true")
+    cleanup.add_argument("--snapshot-json")
+    cleanup.set_defaults(func=lambda args: cmd_cleanup(
+        argparse.Namespace(
+            yes=args.yes,
+            acceptance_created=args.acceptance_created,
+            acceptance_updated=args.acceptance_updated,
+            snapshot=json.loads(Path(args.snapshot_json).read_text()) if args.snapshot_json else None,
+        )
+    ))
 
     delete = sub.add_parser("delete", help="delete the container service")
     delete.add_argument("--yes", action="store_true")

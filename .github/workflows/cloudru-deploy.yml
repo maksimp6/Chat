@@ -144,6 +144,17 @@ jobs:
           ).authorize(predicted_rub=Decimal(os.environ["ALICE_LIVE_MAX_RUB"]), elapsed_seconds=0)
           PY
           set -o pipefail
+          umask 077
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from cloud.cloudru.container_apps_client import CloudRuContainerAppsClient
+
+          name = os.environ.get("CLOUDRU_CONTAINER_NAME", "alice-pro")
+          previous = CloudRuContainerAppsClient().get(name)
+          Path("acceptance-before.json").write_text(json.dumps(previous))
+          PY
           python scripts/cloudru_deploy.py inventory > before.json
           python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" "${env_args[@]}" | tee deploy.json
           python - <<'PY'
@@ -167,11 +178,16 @@ jobs:
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
-          if [ -f acceptance-created ] && [ "$(cat acceptance-created)" = 1 ]; then
-            python scripts/cloudru_deploy.py delete --yes --acceptance-created
+          created=0
+          [ -f acceptance-created ] && created="$(cat acceptance-created)"
+          if [ "$created" = 1 ]; then
+            python scripts/cloudru_deploy.py cleanup --yes --acceptance-created
+          elif [ -f acceptance-before.json ] && [ "$(cat acceptance-before.json)" != "null" ]; then
+            python scripts/cloudru_deploy.py cleanup --yes --acceptance-updated --snapshot-json acceptance-before.json
           else
-            echo "Cleanup no-op: this acceptance run did not prove it created the container."
+            echo "Cleanup no-op: no acceptance-owned mutation was proven."
           fi
+          rm -f acceptance-before.json acceptance-created before.json deploy.json
 
       - name: Status
         if: inputs.action == 'status'
