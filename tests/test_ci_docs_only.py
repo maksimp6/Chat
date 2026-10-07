@@ -20,6 +20,7 @@ def test_docs_only_scope_is_narrow_and_fail_closed():
     assert not is_docs_only(["scripts/check_docs.py"])
     assert not is_docs_only(["docs/README.md", ".github/workflows/ci.yml"])
     assert not is_docs_only([".agents/skills/docs-sync/SKILL.md"])
+    assert not is_docs_only(["AGENTS.md"])
 
 
 def test_required_checks_keep_their_names_while_docs_only_takes_fast_path():
@@ -42,4 +43,5 @@ def test_local_launch_smoke_ignores_documentation_only_pull_requests():
     workflow = (ROOT / ".github/workflows/launch-smoke.yml").read_text(encoding="utf-8")
     assert "paths-ignore:" in workflow
     assert '"docs/**"' in workflow
-    assert '"**/*.md"' in workflow
+    assert '"README.md"' in workflow
+    assert '"**/*.md"' not in workflow
