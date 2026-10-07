@@ -1509,7 +1509,8 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "install", "bootstrap_install", "status", "start", "restart", "stop")
+        "action",
+        choices=("preflight", "install", "bootstrap_install", "status", "start", "restart", "stop"),
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
