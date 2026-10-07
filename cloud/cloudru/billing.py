@@ -156,3 +156,57 @@ def estimate_container_runtime_cost(
         "estimated_rub": (cpu_rub + memory_rub).quantize(quantum),
         "free_tier_applied": False,
     }
+
+
+def reconcile_container_runtime_cost(
+    *, estimated_rub: Decimal, actual_rub: Decimal | None
+) -> dict[str, Any]:
+    """Compare a gross runtime estimate with provider-measured billing."""
+    estimated = _decimal(estimated_rub)
+    if estimated is None or estimated < 0:
+        raise ValueError("estimated_rub must be a non-negative finite decimal")
+    if actual_rub is None:
+        return {
+            "status": "unknown",
+            "estimated_rub": estimated,
+            "actual_rub": None,
+            "variance_rub": None,
+            "variance_percent": None,
+        }
+
+    actual = _decimal(actual_rub)
+    if actual is None or actual < 0:
+        raise ValueError("actual_rub must be a non-negative finite decimal")
+
+    variance = (actual - estimated).quantize(Decimal("0.0000001"))
+    variance_percent = None
+    if estimated:
+        variance_percent = (
+            variance / estimated * Decimal(100)
+        ).quantize(Decimal("0.0001"))
+
+    return {
+        "status": "measured",
+        "estimated_rub": estimated,
+        "actual_rub": actual,
+        "variance_rub": variance,
+        "variance_percent": variance_percent,
+    }
+
+
+def detect_unexpected_hot(
+    *,
+    idle_seconds: int,
+    configured_idle_timeout_seconds: int,
+    running_instances: int,
+) -> bool:
+    """Return true when a running instance outlives its configured idle budget."""
+    values = {
+        "idle_seconds": (idle_seconds, 0),
+        "configured_idle_timeout_seconds": (configured_idle_timeout_seconds, 1),
+        "running_instances": (running_instances, 0),
+    }
+    for name, (value, minimum) in values.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f"{name} is outside the allowed range")
+    return running_instances > 0 and idle_seconds > configured_idle_timeout_seconds
