@@ -33,7 +33,7 @@
   },
   "ALICE_DEPARTMENTS_ADMIN_TOKEN": {
     "class": "secret",
-    "purpose": "alice departments admin token"
+    "purpose": "backend credential required by mutating department endpoints via X-Department-Admin-Token"
   },
   "ALICE_DONATION_URL": {
     "class": "public",
@@ -169,15 +169,15 @@
   },
   "ALICE_RDC_PAIRING_FILE": {
     "class": "compatibility",
-    "purpose": "alice rdc pairing file"
+    "purpose": "path to the RDC pairing handoff JSON consumed by the redirect/session bridge"
   },
   "ALICE_RDC_PROJECT_ID": {
     "class": "compatibility",
-    "purpose": "alice rdc project id"
+    "purpose": "Cloud.ru project UUID bound to RDC persistent state and control permits"
   },
   "ALICE_RDC_STATE_PATH": {
     "class": "compatibility",
-    "purpose": "alice rdc state path"
+    "purpose": "mounted directory containing persistent RDC state and control-permit files"
   },
   "ALICE_REQUIRE_SHORT_TOKEN": {
     "class": "public",
@@ -189,7 +189,7 @@
   },
   "ALICE_SHELL_DB": {
     "class": "compatibility",
-    "purpose": "alice shell db"
+    "purpose": "SQLite file selected by the legacy agent_shell CLI when --db is not provided"
   },
   "ALICE_SHORT_TOKEN": {
     "class": "secret",
