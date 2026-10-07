@@ -756,7 +756,7 @@ def deployment_summary(record, health):
     }
 
 
-def install(apps, store, credentials, image, *, tenant, http_get=requests.get):
+def install(apps, store, credentials, image, *, tenant, profile="persistent", http_get=requests.get):
     configured_tenant(tenant)
     if named_record(apps) is not None:
         fail("already_exists")
@@ -769,7 +769,7 @@ def install(apps, store, credentials, image, *, tenant, http_get=requests.get):
             "container_apps",
             "POST",
             "/v2/containers",
-            json_body=creation_body(apps.project_id, image),
+            json_body=creation_body(apps.project_id, image, profile=profile),
         )
         resource = operation.get("resourceId")
         if resource is not None:
