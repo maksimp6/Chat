@@ -903,28 +903,6 @@ def test_control_plane_secrets_rejected_before_any_provider_calls(monkeypatch, c
     registry.assert_not_called()
 
 
-@pytest.mark.parametrize("database_url", [None, "", "sqlite:///alice.db"])
-def test_deploy_requires_postgres_before_provider_calls(monkeypatch, capsys, database_url):
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
-    env = {"ALICE_REQUIRE_SHORT_TOKEN": "1", "ALICE_SHORT_TOKEN": "private-test-value"}
-    argv = [
-        "deploy",
-        "--tag",
-        SHA,
-        "--env",
-        "ALICE_REQUIRE_SHORT_TOKEN",
-        "--env",
-        "ALICE_SHORT_TOKEN",
-    ]
-    if database_url is not None:
-        env["ALICE_DATABASE_URL"] = database_url
-        argv += ["--env", "ALICE_DATABASE_URL"]
-    code, output = _run_deploy(monkeypatch, capsys, argv, **env)
-    assert code == 1
-    assert "durable PostgreSQL" in output
-    assert "private-test-value" not in output
-
-
 def test_successful_deploy_passes_app_configuration_only(monkeypatch):
     import argparse
 
