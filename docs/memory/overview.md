@@ -29,11 +29,13 @@
 
 ## Миграция (issue #776)
 
-Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит SQL хранилище дurable engine для:
-- пользовательской идентичности (`user_identity.py`)
-- владения разговорами (`conversation_ownership.py`)
-- сессий и профилей (`session_manager.py`)
-- истории сообщений и памяти (`memory_manager.py`, `memory_extractor.py`)
+Wave 1 поэтапно переводит runtime с legacy SQL на FileMemoryDB. Уже переведены:
+- пользовательская идентичность и GitHub account mapping (`user_identity.py`);
+- владение разговорами (`conversation_ownership.py`).
+
+Следующие потребители ещё остаются на legacy SQL и требуют отдельных проверяемых срезов:
+- сессии и профили (`session_manager.py`);
+- история сообщений и извлечённая память (`memory_manager.py`, `memory_extractor.py`).
 
 Миграция требует:
 1. Доказательства crash recovery и integrity на новом engine
