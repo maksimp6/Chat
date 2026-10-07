@@ -4,6 +4,30 @@
 
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
+## 2026-10-07 — current runtime/storage status
+
+### Durable state
+
+- Memory DB Wave 1 has moved conversation ownership and user identity/GitHub mapping to file-native authoritative stores (#920, #921).
+- This is a bounded migration, not a declaration that SQL has been removed. Remaining consumers continue under #776.
+
+### Alice Dev and OAuth
+
+- Alice Dev immutable commit-worker lifecycle, worker recycling/recovery and one-shot credential handoff foundations are shipped (#919, #923, #925, #928, #930, #931, #933).
+- OAuth discovery/PKCE and local acceptance hardening are implemented, but live ChatGPT/production acceptance remains separate (#939, #326).
+- Deployment/RDC ownership and cutover remain unresolved under #869; shipped code is not itself accepted production cutover evidence.
+
+### Secrets
+
+- Capability-scoped handoff and Cloud.ru Secret Management foundations are shipped.
+- Canonical Secret Store migration is **not complete**: #755 still owns provider-neutral resolution and consumer-by-consumer cutover. Do not describe the secret infrastructure as fully integrated until those consumers are verified.
+
+### CI and developer tooling
+
+- Platform-aware CI routing is shipped (#935).
+- Immutable code-index revision snapshots and AST reuse landed in #950.
+- Exact-head/fail-closed merge rules remain authoritative; a green stale head is not merge-ready.
+
 
 ## 2026-09-29 — безопасность, CI, async runtime и Cloud.ru
 
