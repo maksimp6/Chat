@@ -86,6 +86,20 @@ match; external labels cannot make a different snapshot current. Code hits expos
 the immutable source link when available. Existing legacy-index behavior and
 retrieval ordering remain unchanged.
 
+Snapshot classification is shared by both consumers through \`snapshot_revision()\`.
+Any snapshot-only field, including a null field or nested file/symbol source
+metadata, selects strict validation. An absent/null/unsupported schema, source
+kind, commit, repository or parser label cannot downgrade a snapshot to legacy.
+Schema versions must be integers, not booleans, floats or strings. The producer's
+nonempty parser label does not have to equal the consumer's Python runtime tag.
+
+\`query_affected()\` rejects invalid snapshot identity with \`ValueError\`; the CLI
+exits with status 2 without replacing an existing output or echoing raw input.
+Retrieval excludes invalid code-index hits while leaving its other sources alone.
+A genuine legacy index has no snapshot metadata, including nested source markers;
+its existing caller-label behavior remains available. This is metadata validation,
+not an artifact signature or an authenticity check for arbitrary modified input.
+
 The existing impact query is still a first-order Python-import heuristic. It is
 not a complete dynamic dependency analysis, a safe reason to disable CI, or proof
 that an unknown path has no affected tests. Frontend, issue/PR ingestion, chunked
@@ -96,7 +110,8 @@ outside this slice.
 
 ```sh
 python -m pytest -q tests/test_repository_revision_index.py \
-  tests/test_ai_repository_index.py tests/test_agent_retrieval.py
+  tests/test_ai_repository_index.py tests/test_agent_retrieval.py \
+  tests/test_repository_snapshot_provenance.py
 bash scripts/pre_push.sh
 ```
 

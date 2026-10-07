@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from agent_context import CacheLookup
 from agent_memory import AgentMemoryStore, MemoryRecord
+from scripts.build_ai_index import snapshot_revision
 
 from .models import RetrievalBundle, RetrievalHit, RetrievalQuery
 
@@ -215,11 +216,13 @@ def _code_hits(
     ):
         return []
 
-    # Embedded snapshot identity must agree even if external labels match.
-    if repository_index.get("snapshot_schema_version") is not None and (
-        repository_index.get("snapshot_schema_version") != 1
-        or repository_index.get("source_kind") != "git_commit"
-        or repository_index.get("source_version") != query.head_sha
+    # Both consumers use the same fail-closed snapshot/legacy classification.
+    try:
+        bound_revision = snapshot_revision(repository_index)
+    except ValueError:
+        return []
+    if bound_revision is not None and (
+        bound_revision != query.head_sha
         or repository_index.get("repository") != query.repository.lower()
     ):
         return []
