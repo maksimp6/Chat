@@ -180,7 +180,9 @@ def test_image_uses_frozen_dependency_graph():
     assert "FROM ${RDC_BASE_IMAGE}" in dockerfile
     assert "npm ci --omit=dev --ignore-scripts" in base
     assert "npm install" not in base
-    assert "python3-minimal" in base
+    assert "python3-minimal" not in base
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
 
 
 def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
