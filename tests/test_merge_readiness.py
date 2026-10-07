@@ -528,3 +528,44 @@ def test_owner_github_identity_is_not_used_as_solution_review_independence():
 
     assert result["ready"] is False
     assert blocker_codes(result) == {"solution_review_missing"}
+
+
+
+def test_select_solution_review_evidence_accepts_only_exact_successful_run():
+    runs = [
+        {"id": 1, "head_sha": "old", "status": "completed", "conclusion": "success"},
+        {"id": 2, "head_sha": "abc123", "status": "completed", "conclusion": "failure"},
+        {"id": 3, "head_sha": "abc123", "status": "completed", "conclusion": "success"},
+    ]
+    artifacts = {
+        3: [
+            {
+                "id": 88,
+                "name": "solution-review-pr-123-abc123",
+                "expired": False,
+                "evidence": dict(snapshot()["solution_review"], workflow_run_id=3),
+            }
+        ]
+    }
+
+    evidence = merge_readiness.select_solution_review_evidence(
+        runs, artifacts, 123, "abc123", "base123"
+    )
+
+    assert evidence["workflow_run_id"] == 3
+
+
+def test_select_solution_review_evidence_rejects_mismatched_payload():
+    run = {"id": 3, "head_sha": "abc123", "status": "completed", "conclusion": "success"}
+    bad = dict(snapshot()["solution_review"], task="pr:999", workflow_run_id=3)
+
+    assert (
+        merge_readiness.select_solution_review_evidence(
+            [run],
+            {3: [{"id": 88, "name": "solution-review-pr-123-abc123", "expired": False, "evidence": bad}]},
+            123,
+            "abc123",
+            "base123",
+        )
+        is None
+    )
