@@ -23,11 +23,7 @@ class EnvVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
-        if (
-            isinstance(func, ast.Attribute)
-            and func.attr in {"getenv", "get"}
-            and node.args
-        ):
+        if isinstance(func, ast.Attribute) and func.attr in {"getenv", "get"} and node.args:
             owner = func.value
             is_getenv = isinstance(owner, ast.Name) and owner.id == "os" and func.attr == "getenv"
             is_environ_get = (
@@ -124,7 +120,9 @@ def render_markdown(reference: dict[str, Any]) -> str:
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     reference_path = root / "docs" / "configuration" / "environment-variables.json"
-    reference = json.loads(reference_path.read_text(encoding="utf-8")) if reference_path.exists() else {}
+    reference = (
+        json.loads(reference_path.read_text(encoding="utf-8")) if reference_path.exists() else {}
+    )
     discovered = discover_python_env(discover_runtime_python(root))
     errors = validate_reference(discovered, reference)
     if errors:
