@@ -8,12 +8,11 @@
 - [Канонический AI pipeline](architecture/ai-execution-pipeline.md) — единый путь model/tool execution и правила адаптеров
 - [Координация архитектурной интеграции](architecture/integration-coordination.md) — порядок и границы активных потоков работ
 - [Async/concurrency runtime contract](runtime/async-concurrency-contract.md) — cancellation, timeout, task/thread boundaries и atomic reservations
-- [Текущий интеграционный реестр](integration/current-scope.md) — статус и правила допуска сфокусированных PR
 - [Настройка](setup/installation.md) — установка и конфигурация
 - [Рабочий процесс разработки](development_workflow.md) — formatter, локальные проверки, CI и fail-closed merge gate
 - [Правила надёжного кода](development/reliability.md) — идемпотентность операций и правила Power of Ten для Python/JS; «храповик» `tests/test_reliability_rules.py`
 - [Правила именования](development/naming.md) — тексты UI, код фронтенда, файлы, Python-модули, ветки и PR; проверка `tests/test_naming_conventions.py`
-- [Облачное окружение Claude Code для Cloud.ru](development/claude-cloud-ops-environment.md) — настройка, setup script, переменные и инструменты (Cloud.ru CLI, EDS, gh, Docker)
+- [Codex environment bootstrap](setup/codex-environment.md) — безопасная настройка GitHub/GPG/SSH credentials для Codex environment
 - [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
@@ -32,7 +31,6 @@
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
-- [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
 - [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
@@ -43,3 +41,11 @@
 - [Работа с памятью](memory/overview.md) — переход от legacy SQL к durable file-native Memory DB
 
 - [Структура репозитория](architecture/repository-layout.md) — правила размещения модулей и план очистки корня
+
+## Historical / retired / not planned
+
+Эти материалы сохранены как контекст и evidence, но не являются текущими operational contracts:
+
+- [Integration current-scope staging ledger](integration/current-scope.md) — исторический staging ledger для закрытого #351.
+- [Cloud.ru Markdown mirror specification](integrations/cloudru-docs-mirror.md) — проектная спецификация закрытого как not planned #428/#967.
+- [local_bare synchronization](bare_sync.md) — retired local Android/Termux mirror workflow; не использовать для текущего backup/recovery.
