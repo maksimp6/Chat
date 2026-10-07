@@ -17,7 +17,15 @@ def test_android_build_has_no_embedded_python_runtime():
 
 def test_android_main_activity_is_native_controller():
     source = (
-        ROOT / "android" / "app" / "src" / "main" / "java" / "com" / "alicepro" / "mobile"
+        ROOT
+        / "android"
+        / "app"
+        / "src"
+        / "main"
+        / "java"
+        / "com"
+        / "alicepro"
+        / "mobile"
         / "MainActivity.kt"
     ).read_text(encoding="utf-8")
 
