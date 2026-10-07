@@ -69,6 +69,8 @@ def _path_platforms(path: str) -> set[str]:
         or path in SHARED_INPUTS
     ):
         return set(PLATFORMS)
+    if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
+        return set()
     if path.startswith("android/"):
         return {"android"}
     if (
@@ -151,6 +153,11 @@ def main() -> int:
             print("All selected platform suites passed")
         elif mode == ["--all"]:
             print(json.dumps(dict.fromkeys(PLATFORMS, True), sort_keys=True))
+        elif len(mode) == 2 and mode[0] == "--platform" and mode[1] in PLATFORMS:
+            selected = {mode[1]}
+            if mode[1] == "web":
+                selected.update(("backend", "android", "database", "mcp"))
+            print(json.dumps({name: name in selected for name in PLATFORMS}, sort_keys=True))
         elif mode in ([], ["--null"]):
             data = sys.stdin.read()
             paths = data.split("\0") if mode else data.splitlines()
