@@ -2,7 +2,7 @@
 
 Generated from `environment-variables.json`. Values and secret material are intentionally excluded.
 
-Coverage: statically named environment reads in repository Python outside tests and `android/`. Dynamic names, shell/JavaScript/Kotlin and Android Python are follow-up surfaces, not silently assumed covered.
+Coverage: statically named environment reads in repository Python outside tests. Dynamic names and shell/JavaScript/Kotlin environment access are follow-up surfaces, not silently assumed covered.
 
 | Variable | Class | Purpose |
 | --- | --- | --- |
