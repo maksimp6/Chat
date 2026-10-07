@@ -1306,7 +1306,6 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
         apps.client.timeout = previous_timeout
 
 
-
 def status(apps, *, tenant, http_get=requests.get):
     configured_tenant(tenant)
     record = owned_record(apps, tenant=tenant)
