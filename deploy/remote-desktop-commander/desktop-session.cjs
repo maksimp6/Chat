@@ -1,12 +1,12 @@
 "use strict";
 
 const { spawn, execFile } = require("node:child_process");
-const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync, openSync, closeSync, fstatSync, readSync, constants } = require("node:fs");
+const { mkdirSync, chmodSync, lstatSync, readFileSync, readdirSync, openSync, closeSync, fstatSync, readSync, writeFileSync, renameSync, unlinkSync, constants } = require("node:fs");
 const { setTimeout: delay } = require("node:timers/promises");
 const { createServer } = require("node:http");
 const { promisify } = require("node:util");
 const { createHash, timingSafeEqual } = require("node:crypto");
-const { join } = require("node:path");
+const { dirname, join } = require("node:path");
 
 const execute = promisify(execFile);
 const HELPER_TIMEOUT_MS = Object.freeze({ status: 60000, "save-auth": 60000, checkpoint: 120000, restore: 120000 });
@@ -27,6 +27,43 @@ const browserArgs = [
   "--disable-sync",
   "about:blank",
 ];
+
+async function receiveGitKey(request, options = {}) {
+  const limit = options.limit ?? 16384;
+  const target = options.target ?? "/workspace/.secrets/id_ed25519";
+  const directory = dirname(target);
+  const declared = Number(request.headers["content-length"] || 0);
+  if (request.headers["transfer-encoding"] || !Number.isSafeInteger(declared) || declared < 1 || declared > limit) {
+    request.resume();
+    throw new Error("invalid_request");
+  }
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > limit) throw new Error("invalid_request");
+    chunks.push(chunk);
+  }
+  if (size !== declared) throw new Error("invalid_request");
+  const value = Buffer.concat(chunks);
+  if (!value.toString("utf8").startsWith("-----BEGIN OPENSSH PRIVATE KEY-----\n") ||
+      !value.toString("utf8").trimEnd().endsWith("-----END OPENSSH PRIVATE KEY-----")) {
+    value.fill(0);
+    throw new Error("invalid_key");
+  }
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  const temporary = target + ".incoming";
+  try {
+    writeFileSync(temporary, value, { mode: 0o600, flag: "wx" });
+    chmodSync(temporary, 0o600);
+    renameSync(temporary, target);
+    chmodSync(target, 0o600);
+  } finally {
+    try { unlinkSync(temporary); } catch {}
+    value.fill(0);
+  }
+}
 
 async function healthy(fetchImpl = fetch) {
   try {
@@ -339,6 +376,18 @@ async function superviseCloudRdc(argv, options = {}) {
         const href = !stopping && !quiescing && !summary.paired && pairingHandoff(handoffFile);
         if (href) response.writeHead(303, { Location: href }).end();
         else response.writeHead(404).end('{"status":"pairing_unavailable"}');
+      } else if (request.method === "POST" && request.url === "/rdc/git-key") {
+        if (!authorize(request)) {
+          request.resume();
+          response.writeHead(403).end('{"status":"control_denied"}');
+          return;
+        }
+        try {
+          await receiveGitKey(request);
+          response.writeHead(204).end();
+        } catch {
+          response.writeHead(400).end('{"status":"invalid_request"}');
+        }
       } else if (request.method === "POST" && request.url === "/checkpoint") {
         if (!authorize(request)) {
           request.resume();
@@ -536,7 +585,7 @@ async function main() {
   if (process.exitCode) console.error("RDC/browser session stopped; check container startup and sandbox support.");
 }
 
-module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit };
+module.exports = { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, stateSummary, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit, receiveGitKey };
 if (require.main === module) main().catch(() => {
   console.error("RDC/browser startup failed.");
   process.exitCode = 1;
