@@ -106,9 +106,7 @@ Local focused command:
 python scripts/check_changed_types.py --base <base-revision> --head HEAD
 ```
 
-Pull-request CI runs the same checker in the existing **Code rules** job against
-the PR merge revision's first parent, so the full candidate delta is checked
-without adding a new runner job.
+Pull-request CI runs the same checker in the existing **Code rules** job against\nthe explicit pull-request base SHA from the GitHub event. The job fetches and\nverifies that commit and fails closed when the comparison base is unavailable,\nso a multi-commit PR checks the full candidate delta without adding a new runner job.
 
 ## Where the rules run
 
