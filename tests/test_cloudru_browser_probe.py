@@ -678,7 +678,10 @@ def test_provider_diagnostics_report_request_id_and_detail_types_only():
             "code": 13,
             "message": "secret-canary",
             "details": [
-                {"@type": "type.googleapis.com/google.rpc.RequestInfo", "requestId": "secret-canary"},
+                {
+                    "@type": "type.googleapis.com/google.rpc.RequestInfo",
+                    "requestId": "secret-canary",
+                },
                 {"@type": "secret canary"},
             ],
         }
