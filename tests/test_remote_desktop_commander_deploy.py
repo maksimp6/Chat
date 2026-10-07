@@ -148,6 +148,8 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     job = workflow["jobs"]["validate-image"]
     assert job["runs-on"] == "ubuntu-latest"
     assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["concurrency"]["group"] == "alice-rdc-validation-${{ github.event.pull_request.number }}"
+    assert workflow["concurrency"]["cancel-in-progress"] is True
 
     assert "issue_comment:" not in source
     assert "workflow_dispatch:" not in source
@@ -162,6 +164,16 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     assert "docker compose logs" not in scripts
     assert "device.json" not in scripts
     assert "${{ secrets." not in scripts
+    assert "timeout 15s" in scripts
+    assert "Dockerfile.base" not in scripts
+    assert "docker build" not in scripts
+    assert "docker compose" in scripts
+    assert "desktop-session.test.cjs" in scripts
+    assert "pairing-handoff.test.cjs" in scripts
+    assert "Alice Dev" not in source
+    assert "oauth" not in scripts.lower()
+    assert "browser-smoke-test" not in scripts
+    assert "chromium" not in scripts.lower()
 
 
 def test_image_uses_frozen_dependency_graph():
@@ -180,7 +192,9 @@ def test_image_uses_frozen_dependency_graph():
     assert "FROM ${RDC_BASE_IMAGE}" in dockerfile
     assert "npm ci --omit=dev --ignore-scripts" in base
     assert "npm install" not in base
-    assert "python3-minimal" in base
+    assert "python3-minimal" not in base
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
 
 
 def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
@@ -202,3 +216,11 @@ def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
     assert "compose down --remove-orphans" in commands
     assert "tag alice-remote-desktop-commander:rollback-" in commands
     assert commands.count("compose up -d --no-build") == 2
+
+
+def test_rdc_base_contains_runtime_dependencies_for_state_and_git_key_handoff() -> None:
+    base = (DEPLOY / "Dockerfile.base").read_text()
+
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
+    assert "python3-minimal" not in base
