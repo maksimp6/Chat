@@ -1607,7 +1607,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "deploy", "install", "resize", "observe_raw", "observe", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "build", "deploy", "install", "resize", "observe_raw", "observe", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1628,7 +1628,10 @@ def main():
     tenant = configured_tenant(args.tenant_id)
     store, credentials = storage_client(project, tenant)
     apps = CloudRuContainerAppsClient(project_id=project)
-    if args.action == "deploy":
+    if args.action == "build":
+        image = build_image(root, args.sha)
+        result = {"status": "RDC_IMAGE_BUILT", "image": image}
+    elif args.action == "deploy":
         result = deploy_existing(apps, tenant=tenant)
     elif args.action in ("preflight", "install"):
         result = preflight(apps, store, credentials, tenant=tenant)
