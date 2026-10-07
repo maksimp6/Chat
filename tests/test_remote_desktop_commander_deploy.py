@@ -175,9 +175,12 @@ def test_image_uses_frozen_dependency_graph():
     assert lock["packages"][""]["dependencies"] == package["dependencies"]
     assert lock["packages"]["node_modules/@wonderwhy-er/desktop-commander"]["version"] == "0.2.52"
     dockerfile = (DEPLOY / "Dockerfile").read_text()
-    assert "npm ci --omit=dev --ignore-scripts" in dockerfile
-    assert "npm install" not in dockerfile
-    assert "chromium fonts-liberation" in dockerfile
+    base = (DEPLOY / "Dockerfile.base").read_text()
+    assert "ARG RDC_BASE_IMAGE" in dockerfile
+    assert "FROM ${RDC_BASE_IMAGE}" in dockerfile
+    assert "npm ci --omit=dev --ignore-scripts" in base
+    assert "npm install" not in base
+    assert "python3-minimal" in base
 
 
 def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
