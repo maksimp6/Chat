@@ -1359,6 +1359,26 @@ def resize_working_minimum(apps, *, tenant, timeout=10, clock=time.monotonic, sl
     fail("rdc_readiness_timeout")
 
 
+def observe_provider_shape(apps):
+    record = named_record(apps)
+    if record is None:
+        return {"status": "RDC_ABSENT"}
+    containers = (record.get("template") or {}).get("containers") or []
+    resources = containers[0].get("resources") if len(containers) == 1 else {}
+    cpu = resources.get("cpu") if isinstance(resources, dict) else None
+    memory = resources.get("memory") if isinstance(resources, dict) else None
+    cpu_form = cpu if cpu in {"0.1", "0.2", "0.3", "0.5", "1"} else "other"
+    memory_form = memory if memory in {"256Mi", "512Mi", "768Mi", "1024Mi", "4096Mi"} else "other"
+    state = str(record.get("status", "")).lower()
+    known = {"running", "suspended", "pending", "created", "creating", "deploying", "starting", "stopping", "stopped", "failed", "error", "ready", "rejected", "deleted", "suspended_product"}
+    return {
+        "status": "RDC_PROVIDER_OBSERVED",
+        "resource_state": state if state in known else "other",
+        "cpu": cpu_form,
+        "memory": memory_form,
+    }
+
+
 def observe(apps, *, tenant):
     configured_tenant(tenant)
     record = owned_record(apps, tenant=tenant)
@@ -1572,7 +1592,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "install", "resize", "observe", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "install", "resize", "observe_raw", "observe", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1609,6 +1629,8 @@ def main():
             result = install(apps, store, credentials, image, tenant=tenant)
     elif args.action == "resize":
         result = resize_working_minimum(apps, tenant=tenant)
+    elif args.action == "observe_raw":
+        result = observe_provider_shape(apps)
     elif args.action == "observe":
         result = observe(apps, tenant=tenant)
     elif args.action == "status":
