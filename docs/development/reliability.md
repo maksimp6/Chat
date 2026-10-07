@@ -93,7 +93,7 @@ Python. It compares functions between a base revision and the candidate head:
 - bare container/generic annotations are rejected;
 - `Any` may not leak through a production return type;
 - public top-level functions and methods require a concise docstring;
-- unqualified `# type: ignore` is rejected; use a narrow mypy error code;
+- `# type: ignore` requires a narrow mypy error code plus an inline reason;
 - untouched legacy functions are not re-linted by this checker.
 
 The checker deliberately does not replace semantic type analysis. Optional
