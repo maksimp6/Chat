@@ -20,8 +20,7 @@ The script `scripts/local_launch_smoke.py` starts the documented
 7. the runtime session survives the restart.
 
 Those checks are the deterministic **offline** half of the P0 baseline. The
-workflow runs them on every pull request, including changes to application code,
-templates and runtime dependencies. They are deliberately reported as
+workflow runs them on pull requests that can affect runtime/application behavior. Documentation-only PRs are intentionally excluded by the #978 docs-only CI fast path; application, templates, runtime dependencies and other non-doc changes still run the smoke. They are deliberately reported as
 `PARTIAL`, not as proof that model chat works.
 
 The optional **full** mode additionally verifies the provider-dependent half:
@@ -59,9 +58,12 @@ For the real provider path, inject the two values through the environment. Do
 not put them in shell history, Issues, pull requests, screenshots or artifacts.
 
 ```bash
-export ALICE_LAUNCH_SMOKE_YANDEX_API_KEY='...'
-export ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID='...'
-python scripts/local_launch_smoke.py
+read -rsp 'Yandex API key: ' ALICE_LAUNCH_SMOKE_YANDEX_API_KEY; echo
+read -rp 'Yandex Project ID: ' ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID
+ALICE_LAUNCH_SMOKE_YANDEX_API_KEY="$ALICE_LAUNCH_SMOKE_YANDEX_API_KEY" \
+ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID="$ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID" \
+  python scripts/local_launch_smoke.py
+unset ALICE_LAUNCH_SMOKE_YANDEX_API_KEY ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID
 ```
 
 The script uses a temporary SQLite database by default. To inspect persistence
@@ -75,8 +77,7 @@ python scripts/local_launch_smoke.py --offline --db-path /tmp/alice-launch-smoke
 
 `.github/workflows/launch-smoke.yml` has two jobs.
 
-The **Offline startup and restart smoke** runs on every pull request and on
-manual dispatch. It makes no provider/model call and therefore cannot consume
+The **Offline startup and restart smoke** runs on non-documentation pull requests and on manual dispatch. Pure `docs/**`, root `README.md`, and documentation issue-template changes skip this non-required runtime smoke; agent-policy Markdown and mixed code/docs changes do not use that exemption. It makes no provider/model call and therefore cannot consume
 Yandex inference quota.
 
 The **Live Yandex chat and persisted trace smoke** is opt-in only. It runs only

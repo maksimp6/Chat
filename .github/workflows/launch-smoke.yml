@@ -2,6 +2,10 @@ name: Local launch smoke
 
 on:
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
     inputs:
       live_provider:

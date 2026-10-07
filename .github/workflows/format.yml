@@ -25,7 +25,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Stop on formatter commit
         id: guard
         run: |
@@ -35,8 +35,20 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Set up Python
+      - name: Detect documentation-only change
         if: steps.guard.outputs.skip != 'true'
+        id: scope
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          docs_only="$(git diff --name-only -z "$PR_BASE_SHA" HEAD | python scripts/ci_docs_only.py --null)"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "base=$PR_BASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        if: steps.guard.outputs.skip != 'true' && steps.scope.outputs.docs_only != 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.14"
@@ -51,12 +63,30 @@ jobs:
           cache-dependency-path: package.json
       - name: Install formatter toolchain
         if: steps.guard.outputs.skip != 'true'
+        env:
+          DOCS_ONLY: ${{ steps.scope.outputs.docs_only }}
         run: |
-          python -m pip install -r requirements-dev.txt
+          if [ "$DOCS_ONLY" != "true" ]; then
+            python -m pip install -r requirements-dev.txt
+          fi
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Check changed documentation formatting
+        if: steps.guard.outputs.skip != 'true' && steps.scope.outputs.docs_only == 'true'
+        env:
+          BASE_SHA: ${{ steps.scope.outputs.base }}
+        run: bash scripts/format_changed_docs.sh check "$BASE_SHA" HEAD
+
       - name: Format sources
         if: steps.guard.outputs.skip != 'true'
-        run: bash scripts/format.sh write
+        env:
+          DOCS_ONLY: ${{ steps.scope.outputs.docs_only }}
+          BASE_SHA: ${{ steps.scope.outputs.base }}
+        run: |
+          set -euo pipefail
+          if [ "$DOCS_ONLY" != "true" ]; then
+            bash scripts/format.sh write
+          fi
+          bash scripts/format_changed_docs.sh write "$BASE_SHA" HEAD
       - name: Build formatting artifact
         if: steps.guard.outputs.skip != 'true'
         id: artifact
