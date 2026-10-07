@@ -12,12 +12,13 @@ from pathlib import PurePosixPath
 import sys
 
 DOC_PREFIXES = ("docs/", ".github/ISSUE_TEMPLATE/")
+ROOT_DOCS = {"README.md"}
 
 
 def _is_documentation_path(path: str) -> bool:
     if not path or path.startswith("/") or ".." in PurePosixPath(path).parts:
         return False
-    return path.startswith(DOC_PREFIXES) or path.endswith(".md")
+    return path.startswith(DOC_PREFIXES) or path in ROOT_DOCS
 
 
 def is_docs_only(paths: list[str]) -> bool:
