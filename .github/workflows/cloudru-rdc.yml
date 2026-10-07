@@ -5,7 +5,7 @@ on:
       action:
         description: One persistent RDC service; install starts device pairing
         type: choice
-        options: [preflight, bootstrap_install, install, status, start, restart, stop]
+        options: [preflight, install, status, start, restart, stop]
         default: preflight
       storage_tenant_id:
         description: Object Storage tenant ID (not a secret); required for all actions unless configured
