@@ -10,7 +10,7 @@ import sys
 from typing import Any
 
 ALLOWED_CLASSES = {"public", "secret", "secret-reference", "ci-only", "compatibility"}
-SKIP_PARTS = {"tests", ".venv", "node_modules", "android"}
+SKIP_PARTS = {"tests", ".venv", "node_modules"}
 
 
 def _literal_string(node: ast.AST) -> str | None:
@@ -94,7 +94,7 @@ def render_markdown(reference: dict[str, Any]) -> str:
         "",
         "Generated from `environment-variables.json`. Values and secret material are intentionally excluded.",
         "",
-        "Coverage: statically named environment reads in repository Python outside tests and `android/`. Dynamic names, shell/JavaScript/Kotlin and Android Python are follow-up surfaces, not silently assumed covered.",
+        "Coverage: statically named environment reads in repository Python outside tests. Dynamic names and shell/JavaScript/Kotlin environment access are follow-up surfaces, not silently assumed covered.",
         "",
         "| Variable | Class | Purpose |",
         "| --- | --- | --- |",
