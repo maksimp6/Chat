@@ -436,3 +436,132 @@ class TestCanonicalRuntimeServices:
             assert service_name in services
             assert services[service_name]["resources"] == resources
             assert services[service_name]["scale"] == 0
+
+
+class TestContainerAppsScalingContract:
+    """Cloud.ru runtime scaling must be bounded, cheap at idle, and responsive."""
+
+    @staticmethod
+    def _service(**overrides):
+        service = {
+            "type": "alice",
+            "depends_on": [],
+            "scale": 0,
+            "resources": {"cpu": "1", "memory": "1024Mi"},
+            "min_instances": 0,
+            "max_instances": 1,
+            "idle_timeout_seconds": 300,
+        }
+        service.update(overrides)
+        return service
+
+    def test_valid_scale_to_zero_service_loads(self, tmp_path):
+        config_dir = make_minimal_config(
+            tmp_path, services={"alice": self._service()}
+        )
+        config = load_config(config_dir)
+        assert config["services"]["alice"]["min_instances"] == 0
+        assert config["services"]["alice"]["max_instances"] == 1
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("min_instances", -1),
+            ("max_instances", 0),
+            ("idle_timeout_seconds", 0),
+            ("idle_timeout_seconds", -1),
+        ],
+    )
+    def test_invalid_scaling_values_fail_closed(self, tmp_path, field, value):
+        config_dir = make_minimal_config(
+            tmp_path, services={"alice": self._service(**{field: value})}
+        )
+        with pytest.raises(ConfigError, match="instance|idle|scal"):
+            load_config(config_dir)
+
+    def test_min_cannot_exceed_max(self, tmp_path):
+        config_dir = make_minimal_config(
+            tmp_path,
+            services={
+                "alice": self._service(min_instances=2, max_instances=1)
+            },
+        )
+        with pytest.raises(ConfigError, match="min_instances|max_instances|scal"):
+            load_config(config_dir)
+
+    def test_idle_timeout_must_be_integer(self, tmp_path):
+        config_dir = make_minimal_config(
+            tmp_path,
+            services={"alice": self._service(idle_timeout_seconds="120")},
+        )
+        with pytest.raises(ConfigError, match="idle"):
+            load_config(config_dir)
+
+    def test_repository_runtime_profiles_are_exact(self):
+        config = load_config(Path("config/alice"))
+        services = config["services"]
+
+        expected = {
+            "alice": {
+                "resources": {"cpu": "1", "memory": "1024Mi"},
+                "min_instances": 0,
+                "max_instances": 1,
+                "idle_timeout_seconds": 300,
+            },
+            "alice-lab": {
+                "resources": {"cpu": "1", "memory": "1024Mi"},
+                "min_instances": 0,
+                "max_instances": 1,
+                "idle_timeout_seconds": 120,
+            },
+            "alice-browser": {
+                "resources": {"cpu": "2", "memory": "2048Mi"},
+                "min_instances": 0,
+                "max_instances": 1,
+                "idle_timeout_seconds": 120,
+            },
+        }
+
+        for name, contract in expected.items():
+            service = services[name]
+            assert service["resources"] == contract["resources"]
+            assert service["scale"] == 0
+            assert service["min_instances"] == contract["min_instances"]
+            assert service["max_instances"] == contract["max_instances"]
+            assert service["idle_timeout_seconds"] == contract["idle_timeout_seconds"]
+
+    def test_prod_and_lab_are_isolated_by_lane(self):
+        config = load_config(Path("config/alice"))
+        production = set(config["lanes"]["production"]["services"])
+        test = set(config["lanes"]["test"]["services"])
+
+        assert "alice" in production
+        assert "alice" not in test
+        assert "alice-lab" in test
+        assert "alice-lab" not in production
+
+    def test_browser_is_shared_capability_but_single_instance(self):
+        config = load_config(Path("config/alice"))
+        browser = config["services"]["alice-browser"]
+
+        assert "alice-browser" in config["lanes"]["production"]["services"]
+        assert "alice-browser" in config["lanes"]["test"]["services"]
+        assert browser["min_instances"] == 0
+        assert browser["max_instances"] == 1
+
+    def test_runtime_services_keep_oauth_dependency(self):
+        config = load_config(Path("config/alice"))
+        for name in ("alice", "alice-lab", "alice-browser"):
+            assert "oauth" in config["services"][name]["depends_on"]
+
+    def test_legacy_services_remain_during_migration(self):
+        config = load_config(Path("config/alice"))
+        assert "oauth" in config["services"]
+        assert "chrome" in config["services"]
+
+    def test_runtime_names_are_stable(self):
+        config = load_config(Path("config/alice"))
+        runtime = {"alice", "alice-lab", "alice-browser"}
+        assert runtime.issubset(config["services"])
+        for forbidden in ("alice-prod", "alice-dev", "browser"):
+            assert forbidden not in config["services"]
