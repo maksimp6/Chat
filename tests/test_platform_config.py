@@ -416,3 +416,23 @@ def test_core_platform_config_excludes_product_and_lab_experiments():
     serialized = json.dumps(config, sort_keys=True).lower()
     for forbidden in ("dota", "steam", "openai", "stripe", "gpu", "agent-shell"):
         assert forbidden not in serialized
+
+
+class TestCanonicalRuntimeServices:
+    """Canonical Container Apps runtime names and sizing are explicit."""
+
+    def test_repository_config_declares_canonical_runtime_services(self):
+        config_dir = Path(__file__).parent.parent / "config" / "alice"
+        config = load_config(config_dir)
+
+        services = config["services"]
+        expected = {
+            "alice": {"cpu": "1", "memory": "1024Mi"},
+            "alice-lab": {"cpu": "1", "memory": "1024Mi"},
+            "alice-browser": {"cpu": "2", "memory": "2048Mi"},
+        }
+
+        for service_name, resources in expected.items():
+            assert service_name in services
+            assert services[service_name]["resources"] == resources
+            assert services[service_name]["scale"] == 0
