@@ -761,10 +761,17 @@ def prepare_bucket(store, credentials, project):
 
 def preflight(apps, store, credentials, *, tenant):
     configured_tenant(tenant)
-    record = named_record(apps)
-    if record is not None:
-        owned_record(apps, tenant=tenant)
-    exists = bucket_inventory(store, credentials, apps.project_id)
+    step = "list_containers"
+    try:
+        record = named_record(apps)
+        if record is not None:
+            step = "verify_container"
+            owned_record(apps, tenant=tenant)
+        step = "bucket_inventory"
+        exists = bucket_inventory(store, credentials, apps.project_id)
+    except CloudProviderError:
+        print(json.dumps({"stage": "rdc_preflight_failed", "step": step}), flush=True)
+        raise
     return {
         "status": "PREFLIGHT_PASSED",
         "container_exists": record is not None,
