@@ -37,11 +37,11 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-09-29, `master` includes the fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and the Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
+As of 2026-10-06, `master` includes Memory DB Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
 
 These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). The Container Apps v2 client and deterministic contract tests are now in `master`, but the baseline deployment path is still awaiting live validation against a real Cloud.ru project. Object Storage migration, durable background workers, and production cutover remain separate work.
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Alice Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Memory DB Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -127,7 +127,8 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [API overview](docs/api/overview.md)
 - [MCP overview](docs/mcp/overview.md)
 - [3D Printing Business](docs/printing3d.md)
-- [Agent architecture](docs/agents/overview.md)
+- [Alice runtime agents](docs/agents/overview.md)
+- [Repository development roles](docs/agents/role-based-agent-office.md)
 - [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
 - [Alice GitHub agent](docs/agents/alice-github-agent.md)
 - [Compute energy billing](docs/compute-energy-billing.md)

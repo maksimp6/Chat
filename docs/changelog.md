@@ -5,7 +5,62 @@
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
 
-## 2026-09-29 — безопасность, CI, async runtime и Cloud.ru
+## 2026-10-06 — Memory DB Wave 1, Alice Dev worker, и ChatGPT OAuth
+
+### Memory DB Wave 1: файловый бэкенд для conversation и user identity
+
+- Переведено управление conversation ownership на file-native storage вместо SQLite (issue #776):
+  [#920](https://github.com/maksimp6/Chat/pull/920).
+- Переведена user identity и GitHub mapping на file-native aggregate (issue #776):
+  [#921](https://github.com/maksimp6/Chat/pull/921).
+- После одноразового verified import из legacy SQL и migration marker runtime-операции ownership и identity больше не читают SQL.
+- Conversation metadata остаётся в SQL; дальнейшая миграция (sessions, runtime events, metadata) остаётся roadmap.
+- Миграция слоя памяти позволяет отделить conversation ownership lifecycle от centralized DB.
+
+### Alice Dev worker: отдельный coding worker
+
+- Lightweight HTTP MCP worker переименован из RDC в Alice Dev как отдельный coding worker со своим lifecycle `cloudru-rdc-mcp-candidate.yml` ([#919](https://github.com/maksimp6/Chat/pull/919)).
+- Легаси `cloudru-rdc.yml` (persistent RDC) и `production-deploy.yml` сохранены без изменений; Alice Dev не заменяет ни persistent RDC, ни deployment приложения Alice.
+- Добавлен one-shot credential handoff: login/password передаются воркеру один раз через авторизованный endpoint и сохраняются в файл с правами 0600, повторная запись отклоняется ([#933](https://github.com/maksimp6/Chat/pull/933)).
+- Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Alice Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
+- Добавлены immutable workers на каждый commit и удаление выведенных воркеров по tombstone-списку ([#930](https://github.com/maksimp6/Chat/pull/930)).
+- Добавлена обработка tombstone deletion и in-place worker updates ([#928](https://github.com/maksimp6/Chat/pull/928), [#931](https://github.com/maksimp6/Chat/pull/931)).
+- Cloud.ru HTTP 499 recovery для Alice Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
+
+**Статус**: Alice Dev worker реализован; живая верификация и approved cutover persistent RDC/production-deploy.yml остаются в roadmap. Resource-scoped ownership, решение о замене и acceptance criteria — в [#869](https://github.com/maksimp6/Chat/issues/869#issuecomment-6023949684).
+
+### Secrets и authorization
+
+- Добавлена capability-only agent secret delivery: агент запрашивает разрешённое использование alias, plaintext агенту не возвращается ([#897](https://github.com/maksimp6/Chat/pull/897)).
+- Добавлен file import и ephemeral materialization для secrets ([#895](https://github.com/maksimp6/Chat/pull/895)).
+- Базовые pieces secrets infrastructure (#872–#874) интегрированы; consumer-by-consumer migration к canonical Secret Store #755 остаётся незавершённой.
+
+### CI и platform routing
+
+- Добавлен platform-aware CI routing: checks маршрутизируются по affected platform (backend, frontend, Android, CI changes) ([#935](https://github.com/maksimp6/Chat/pull/935)).
+- Добавлена документация: [`development/platform-ci-routing.md`](development/platform-ci-routing.md).
+- Performance improvement: reuse registry build cache между Alice Dev deployments ([#934](https://github.com/maksimp6/Chat/pull/934)).
+
+Это shipped-функционал, но live Alice Dev deployment verification всё ещё в progress.
+
+## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
+
+**Note**: Agent model settings (mini/Claude/mandatory-final-Codex) below are historical. Current [AGENTS.md](../AGENTS.md) specifies nano for routine work, excludes Claude execution from normal paths, and makes additional model review optional.
+
+### Repository role-based GitHub office
+
+- Добавлена role-first/provider-second модель для координации разработки:
+  [#560](https://github.com/maksimp6/Chat/pull/560).
+- Определены девять repository roles: Team Lead, Backend, Frontend, Android, Test, Infra, Security Reviewer, Docs Engineer, Release Manager.
+- Routine модели: GPT-5.4 mini, Docs Engineer/Codex default GPT-5.4 nano.
+- Claude Partner Agent / Sonnet как явная эскалация для сложной архитектурной работы.
+- `@claude-lite` workflow для Haiku с bounded turns для быстрых операций.
+- Copilot остаётся автоматическим reviewer; Codex запускается один раз перед merge.
+- Один primary owner и один focused PR на issue; стирание ownership или множественные PRs на issue не допускаются.
+- Safety/owner-approval boundaries для deployment, data changes и secrets не изменены.
+- Документация: [`docs/agents/role-based-agent-office.md`](agents/role-based-agent-office.md) и [`AGENTS.md`](../AGENTS.md).
+
+Это shipped repository policy в `master`. Skill-first agent runtime добавлен позже, 2026-09-30, отдельным PR [#566](https://github.com/maksimp6/Chat/pull/566).
 
 ### 3D business и AI-first tools
 
