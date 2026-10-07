@@ -45,11 +45,21 @@ jobs:
         run: pip install -r requirements.txt
       - name: Operate exactly owned RDC service
         env:
-          ACTION: ${{ github.event_name == 'push' && 'install' || inputs.action }}
+          ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
-          ALICE_RDC_IMAGE: ${{ github.event_name == 'push' && 'alice-rdc-probe.cr.cloud.ru/chromium-probe@sha256:f92bd58af749191733dcf0fee808be5ede654e8a6cdc5930375dbb65c7ce9294' || '' }}
-        run: python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            python scripts/cloudru_rdc.py stop --sha "$SOURCE_SHA"
+            start_ms="$(date +%s%3N)"
+            timeout 10s python scripts/cloudru_rdc.py start --sha "$SOURCE_SHA"
+            end_ms="$(date +%s%3N)"
+            elapsed_ms="$((end_ms-start_ms))"
+            echo "RDC start->ready: ${elapsed_ms}ms"
+            test "$elapsed_ms" -le 10000
+          else
+            python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
+          fi
