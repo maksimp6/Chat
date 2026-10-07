@@ -62,15 +62,12 @@ def _runtime_platforms(path: str) -> set[str]:
 
 
 def _path_platforms(path: str) -> set[str]:
-    if (
-        not path
-        or path.startswith("/")
-        or ".." in PurePosixPath(path).parts
-        or path in SHARED_INPUTS
-    ):
+    if not path or path.startswith("/") or ".." in PurePosixPath(path).parts:
         return set(PLATFORMS)
-    if path.startswith("android/"):
+    if path == ".github/workflows/android-direct.yml" or path.startswith("android/"):
         return {"android"}
+    if path in SHARED_INPUTS:
+        return set(PLATFORMS)
     if (
         path.startswith(("static/", "templates/"))
         or path in {"app.py", "package.json", "package-lock.json"}
