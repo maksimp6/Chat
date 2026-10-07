@@ -26,7 +26,9 @@ def _resolve(root: Path, source: Path, destination: str) -> tuple[Path | None, s
     if not path_part or path_part.startswith(IGNORED_PREFIXES):
         return None, None
 
-    candidate = root / path_part.lstrip("/") if path_part.startswith("/") else source.parent / path_part
+    candidate = (
+        root / path_part.lstrip("/") if path_part.startswith("/") else source.parent / path_part
+    )
     try:
         resolved = candidate.resolve(strict=False)
         resolved.relative_to(root.resolve())
