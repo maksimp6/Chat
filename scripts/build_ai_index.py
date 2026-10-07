@@ -524,7 +524,6 @@ def _affected_tests(tests_by_module: dict[str, list[str]], modules: list[str]) -
     return sorted(affected)
 
 
-
 def query_affected(
     index: dict[str, Any],
     changed_paths: list[str],
