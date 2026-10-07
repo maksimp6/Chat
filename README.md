@@ -82,7 +82,7 @@ Legacy local consumers still default to SQLite and may select PostgreSQL with `A
 ```bash
 cd android
 python scripts/stage_python.py
-gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
 The debug APK is for development/testing. Release signing keys must never be committed.
