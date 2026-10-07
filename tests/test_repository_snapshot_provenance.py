@@ -18,8 +18,12 @@ from scripts import build_ai_index
 
 REPOSITORY = "maksimp6/Chat"
 IDENTITY_FIELDS = (
-    "schema_version", "snapshot_schema_version", "source_kind",
-    "source_version", "repository", "parser_version",
+    "schema_version",
+    "snapshot_schema_version",
+    "source_kind",
+    "source_version",
+    "repository",
+    "parser_version",
 )
 SNAPSHOT_FIELDS = (*IDENTITY_FIELDS[1:], "skipped_paths")
 MISSING = object()
@@ -27,9 +31,13 @@ MISSING = object()
 
 def _query(revision: str) -> RetrievalQuery:
     return RetrievalQuery(
-        text="alpha", repository=REPOSITORY, work_item="issue:538",
-        branch="fix/538-revision-index-reuse", head_sha=revision,
-        role="backend-engineer", skills_version="test-v1",
+        text="alpha",
+        repository=REPOSITORY,
+        work_item="issue:538",
+        branch="fix/538-revision-index-reuse",
+        head_sha=revision,
+        role="backend-engineer",
+        skills_version="test-v1",
     )
 
 
@@ -38,12 +46,25 @@ def _git(root: Path, *args: str) -> str:
     env.update(
         GIT_AUTHOR_DATE="2026-10-07T00:00:00Z",
         GIT_COMMITTER_DATE="2026-10-07T00:00:00Z",
-        GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1",
+        GIT_CONFIG_GLOBAL=os.devnull,
+        GIT_CONFIG_NOSYSTEM="1",
     )
     return subprocess.check_output(
-        ["git", "-C", str(root), "-c", "user.name=Fixture",
-         "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", *args],
-        env=env, text=True, stderr=subprocess.STDOUT,
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            *args,
+        ],
+        env=env,
+        text=True,
+        stderr=subprocess.STDOUT,
     ).strip()
 
 
@@ -54,7 +75,8 @@ def repository(tmp_path_factory):
     (root / "app.py").write_text("def alpha():\n    return 1\n", encoding="utf-8")
     (root / "tests").mkdir()
     (root / "tests/test_app.py").write_text(
-        "from app import alpha\n\ndef test_alpha():\n    assert alpha() == 1\n", encoding="utf-8",
+        "from app import alpha\n\ndef test_alpha():\n    assert alpha() == 1\n",
+        encoding="utf-8",
     )
     _git(root, "add", ".")
     _git(root, "commit", "-qm", "fixture A")
@@ -96,12 +118,22 @@ def test_unsupported_or_coerced_schema_is_rejected(repository, snapshot, field, 
     _assert_rejected(snapshot, repository[1])
 
 
-@pytest.mark.parametrize("field,value", [
-    ("source_kind", "filesystem"), ("source_kind", []),
-    ("source_version", ""), ("source_version", "HEAD"), ("source_version", "a" * 39),
-    ("source_version", 123), ("repository", ""), ("repository", "not/a/repo"),
-    ("repository", "Maksimp6/Chat"), ("parser_version", ""), ("parser_version", []),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("source_kind", "filesystem"),
+        ("source_kind", []),
+        ("source_version", ""),
+        ("source_version", "HEAD"),
+        ("source_version", "a" * 39),
+        ("source_version", 123),
+        ("repository", ""),
+        ("repository", "not/a/repo"),
+        ("repository", "Maksimp6/Chat"),
+        ("parser_version", ""),
+        ("parser_version", []),
+    ],
+)
 def test_invalid_identity_values_are_rejected(repository, snapshot, field, value):
     snapshot[field] = value
     _assert_rejected(snapshot, repository[1])
@@ -159,14 +191,21 @@ def test_consumer_allows_other_python_parser_tag(repository, snapshot):
     snapshot["parser_version"] = "python-ast-v1:cpython-314"
     revision = repository[1]
     assert _code_hits(_query(revision), snapshot, revision, REPOSITORY)
-    assert build_ai_index.query_affected(snapshot, ["app.py"])["provenance"]["git_revision"] == revision
+    assert (
+        build_ai_index.query_affected(snapshot, ["app.py"])["provenance"]["git_revision"]
+        == revision
+    )
 
 
 def test_full_and_incremental_build_remain_identical(repository):
     root, _, revision, previous, expected = repository
-    stats = {}
+    stats: dict[str, int] = {}
     actual = build_ai_index.build_index(
-        root, revision=revision, repository=REPOSITORY, previous_index=previous, stats=stats,
+        root,
+        revision=revision,
+        repository=REPOSITORY,
+        previous_index=previous,
+        stats=stats,
     )
     assert actual == expected
     assert stats == {"parsed_files": 1, "reused_files": 1, "deleted_files": 0}
@@ -179,10 +218,21 @@ def test_cli_rejects_partial_snapshot_without_replacing_output(repository, snaps
     input_path.write_text(json.dumps(snapshot), encoding="utf-8")
     output_path.write_text("previous-result\n", encoding="utf-8")
     result = subprocess.run(
-        [sys.executable, build_ai_index.__file__, "--query-affected", "app.py",
-         "--index-file", str(input_path), "--git-revision", repository[2],
-         "--output", str(output_path)],
-        text=True, capture_output=True, timeout=15,
+        [
+            sys.executable,
+            build_ai_index.__file__,
+            "--query-affected",
+            "app.py",
+            "--index-file",
+            str(input_path),
+            "--git-revision",
+            repository[2],
+            "--output",
+            str(output_path),
+        ],
+        text=True,
+        capture_output=True,
+        timeout=15,
     )
     assert result.returncode == 2
     assert result.stdout == ""
@@ -202,8 +252,10 @@ def test_hybrid_retriever_rejects_bad_code_and_accepts_fresh_code(repository, sn
     revision = repository[2]
     snapshot.pop("snapshot_schema_version")
     retriever = HybridRetriever(
-        memory_store=_EmptyMemory(), repository_index=snapshot,
-        repository_index_version=revision, repository_index_repository=REPOSITORY,
+        memory_store=_EmptyMemory(),
+        repository_index=snapshot,
+        repository_index_version=revision,
+        repository_index_repository=REPOSITORY,
     )
     assert retriever.retrieve(_query(revision)).status == "miss"
     retriever.repository_index = repository[4]

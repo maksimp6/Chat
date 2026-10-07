@@ -525,11 +525,14 @@ def _affected_tests(tests_by_module: dict[str, list[str]], modules: list[str]) -
     return sorted(affected)
 
 
-
 def _has_snapshot_provenance(index: Mapping[str, Any]) -> bool:
-    markers = {
-        "snapshot_schema_version", "parser_version", "repository",
-        "source_version", "source_kind", "skipped_paths",
+    markers: set[str] = {
+        "snapshot_schema_version",
+        "parser_version",
+        "repository",
+        "source_version",
+        "source_kind",
+        "skipped_paths",
     }
     # Presence matters: missing/null version fields must not select legacy mode.
     if markers.intersection(index):
@@ -555,7 +558,7 @@ def snapshot_revision(index: Mapping[str, Any]) -> str | None:
     """
     if not _has_snapshot_provenance(index):
         return None
-    versions = {
+    versions: dict[str, int] = {
         "schema_version": SCHEMA_VERSION,
         "snapshot_schema_version": SNAPSHOT_SCHEMA_VERSION,
     }
@@ -564,7 +567,7 @@ def snapshot_revision(index: Mapping[str, Any]) -> str | None:
             raise ValueError("unsupported or incomplete snapshot schema")
     if index.get("source_kind") != "git_commit":
         raise ValueError("unsupported snapshot source kind")
-    patterns = {
+    patterns: dict[str, str] = {
         "source_version": r"[0-9a-f]{40}|[0-9a-f]{64}",
         "repository": r"[a-z0-9_-][a-z0-9_.-]*/[a-z0-9_-][a-z0-9_.-]*",
     }
@@ -576,6 +579,7 @@ def snapshot_revision(index: Mapping[str, Any]) -> str | None:
     if not isinstance(parser_version, str) or not parser_version.strip():
         raise ValueError("missing snapshot parser version")
     return str(index["source_version"])
+
 
 def query_affected(
     index: dict[str, Any],
