@@ -140,10 +140,38 @@ def _validate_schema(data: Dict[str, Any]) -> None:
             "secret_ref",
             "repository",
             "billing",
+            "min_instances",
+            "max_instances",
+            "idle_timeout_seconds",
         }
         for key in service_config.keys():
             if key not in allowed_service_fields and not key.startswith("_"):
                 raise ConfigError(f"Unknown field in service '{service_name}': '{key}'")
+
+        min_instances = service_config.get("min_instances")
+        max_instances = service_config.get("max_instances")
+        idle_timeout = service_config.get("idle_timeout_seconds")
+
+        if min_instances is not None:
+            if not isinstance(min_instances, int) or isinstance(min_instances, bool) or min_instances < 0:
+                raise ConfigError(
+                    f"Service '{service_name}': min_instances must be a non-negative integer"
+                )
+        if max_instances is not None:
+            if not isinstance(max_instances, int) or isinstance(max_instances, bool) or max_instances < 1:
+                raise ConfigError(
+                    f"Service '{service_name}': max_instances must be a positive integer"
+                )
+        if min_instances is not None and max_instances is not None:
+            if min_instances > max_instances:
+                raise ConfigError(
+                    f"Service '{service_name}': min_instances cannot exceed max_instances"
+                )
+        if idle_timeout is not None:
+            if not isinstance(idle_timeout, int) or isinstance(idle_timeout, bool) or idle_timeout < 1:
+                raise ConfigError(
+                    f"Service '{service_name}': idle_timeout_seconds must be a positive integer"
+                )
 
 
 def validate_no_cycles(services: Dict[str, Dict[str, Any]]) -> None:
