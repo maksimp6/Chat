@@ -4,7 +4,12 @@ from pathlib import Path
 
 import json
 
-from scripts.check_env_reference import discover_python_env, discover_runtime_python, validate_reference
+from scripts.check_env_reference import (
+    discover_python_env,
+    discover_runtime_python,
+    render_markdown,
+    validate_reference,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -63,3 +68,15 @@ def test_reference_matches_repository_runtime():
     )
     discovered = discover_python_env(discover_runtime_python(ROOT))
     assert validate_reference(discovered, reference) == []
+
+
+def test_generated_markdown_matches_machine_reference():
+    reference = json.loads(
+        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    generated = (ROOT / "docs" / "configuration" / "environment-variables.md").read_text(
+        encoding="utf-8"
+    )
+    assert generated == render_markdown(reference)
