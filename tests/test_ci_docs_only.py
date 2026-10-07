@@ -49,3 +49,9 @@ def test_local_launch_smoke_ignores_documentation_only_pull_requests():
     assert '"docs/**"' in workflow
     assert '"README.md"' in workflow
     assert '"**/*.md"' not in workflow
+
+
+def test_docs_only_formatter_is_a_gate_not_only_an_autofix():
+    formatting = (ROOT / ".github/workflows/format.yml").read_text(encoding="utf-8")
+    assert 'bash scripts/format_changed_docs.sh check "$BASE_SHA" HEAD' in formatting
+    assert "Check changed documentation formatting" in formatting
