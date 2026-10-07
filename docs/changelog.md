@@ -5,6 +5,21 @@
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
 
+## 2026-10-07 — code index and current migration boundaries
+
+### Repository intelligence
+
+- Immutable repository revision snapshots and Python AST reuse landed in #950. The index reuses parsed structure across an exact revision without changing the runtime source of truth.
+
+### Secret Store boundary
+
+- The provider-neutral `SecretRef` / `SecretValue` / `SecretResolver` contract and tested Cloud.ru resolver are present on `master`.
+- This is foundation evidence, not completion of credential migration. #755 remains open until supported secret-bearing consumers have verified resolver cutovers and legacy durable secret-value writes are removed.
+
+### Storage wording
+
+- Memory DB Wave 1 remains a bounded migration. File-native ownership/identity aggregates coexist with legacy SQL consumers under #776; documentation must not describe either “all SQL” or “SQL fully removed” as the current state.
+
 ## 2026-10-06 — Memory DB Wave 1, Alice Dev worker, и ChatGPT OAuth
 
 ### Memory DB Wave 1: файловый бэкенд для conversation и user identity
