@@ -91,3 +91,60 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
             return {"total_cost": total, "currency": currency, "rows": counted}
 
     return {"total_cost": None, "currency": currency, "rows": 0}
+
+
+def estimate_container_runtime_cost(
+    *,
+    active_seconds: int,
+    idle_seconds: int,
+    cold_starts: int,
+    vcpu: Decimal,
+    memory_gb: Decimal,
+    vcpu_rub_per_hour: Decimal,
+    memory_rub_per_gb_hour: Decimal,
+) -> dict[str, Any]:
+    """Estimate gross Container Apps runtime cost from measured runtime seconds.
+
+    This helper deliberately does not apply organization-level free tier because
+    free-tier allocation is shared across services and must be reconciled against
+    provider billing rather than guessed per container.
+    """
+
+    integer_fields = {
+        "active_seconds": active_seconds,
+        "idle_seconds": idle_seconds,
+        "cold_starts": cold_starts,
+    }
+    for name, value in integer_fields.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{name} must be a non-negative integer")
+
+    decimal_fields = {
+        "vcpu": vcpu,
+        "memory_gb": memory_gb,
+        "vcpu_rub_per_hour": vcpu_rub_per_hour,
+        "memory_rub_per_gb_hour": memory_rub_per_gb_hour,
+    }
+    normalized: dict[str, Decimal] = {}
+    for name, value in decimal_fields.items():
+        amount = _decimal(value)
+        if amount is None or amount < 0:
+            raise ValueError(f"{name} must be a non-negative finite decimal")
+        normalized[name] = amount
+
+    billable_seconds = active_seconds + idle_seconds
+    hours = Decimal(billable_seconds) / Decimal(3600)
+    cpu_rub = hours * normalized["vcpu"] * normalized["vcpu_rub_per_hour"]
+    memory_rub = hours * normalized["memory_gb"] * normalized["memory_rub_per_gb_hour"]
+
+    return {
+        "status": "estimated",
+        "active_seconds": active_seconds,
+        "idle_seconds": idle_seconds,
+        "billable_seconds": billable_seconds,
+        "cold_starts": cold_starts,
+        "cpu_rub": cpu_rub,
+        "memory_rub": memory_rub,
+        "estimated_rub": cpu_rub + memory_rub,
+        "free_tier_applied": False,
+    }
