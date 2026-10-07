@@ -159,6 +159,16 @@ def test_nested_provenance_cannot_downgrade_to_legacy(repository, snapshot, keep
     _assert_rejected(snapshot, repository[2])
 
 
+def test_malformed_nested_file_entry_is_rejected_as_snapshot_metadata(repository):
+    payload = {"schema_version": 1, "files": ["not-a-file-record"]}
+    _assert_rejected(payload, repository[2])
+
+
+def test_malformed_nested_symbol_entry_is_rejected_as_snapshot_metadata(repository):
+    payload = {"schema_version": 1, "files": [{"symbols": ["not-a-symbol-record"]}]}
+    _assert_rejected(payload, repository[2])
+
+
 def test_real_current_snapshot_has_consistent_provenance(repository):
     _, _, revision, _, payload = repository
     hits = _code_hits(_query(revision), payload, revision, REPOSITORY)
