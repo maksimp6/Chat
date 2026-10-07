@@ -43,17 +43,21 @@ jobs:
           python-version-file: .python-version
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Operate exactly owned RDC service
+      - name: Measure RDC image build
         env:
-          ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
-          CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
-            python scripts/cloudru_rdc.py deploy --sha "$SOURCE_SHA"
-          else
-            python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
-          fi
+          start_ms="$(date +%s%3N)"
+          timeout 15s python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.cloudru_browser_probe import build_image
+          print(build_image(Path.cwd(), os.environ["SOURCE_SHA"]))
+          PY
+          end_ms="$(date +%s%3N)"
+          elapsed_ms="$((end_ms-start_ms))"
+          echo "RDC image build+push: ${elapsed_ms}ms"
+          test "$elapsed_ms" -le 15000
