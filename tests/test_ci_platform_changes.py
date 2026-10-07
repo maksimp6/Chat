@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
     "paths, expected",
     [
         (["android/app/src/main/Main.kt"], {"android"}),
+        ([".github/workflows/android-direct.yml"], {"android"}),
         (["cloud/cloudru/registry_client.py"], {"infra"}),
         (["cloud/cloudru/registry_client.py", "tests/test_cloudru_container_deploy.py"], {"infra"}),
         (["scripts/cloudru_rdc_mcp_candidate.py"], {"infra"}),
