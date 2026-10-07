@@ -248,6 +248,18 @@ def cmd_inventory(_: argparse.Namespace) -> dict:
     }
 
 
+def _cleanup_from_cli(args: argparse.Namespace) -> dict[str, Any]:
+    snapshot = json.loads(Path(args.snapshot_json).read_text()) if args.snapshot_json else None
+    return cmd_cleanup(
+        argparse.Namespace(
+            yes=args.yes,
+            acceptance_created=args.acceptance_created,
+            acceptance_updated=args.acceptance_updated,
+            snapshot=snapshot,
+        )
+    )
+
+
 def cmd_cleanup(args: argparse.Namespace) -> dict[str, Any]:
     if not args.yes:
         raise CloudProviderError("pass --yes to cleanup acceptance", code="validation_error")
@@ -317,16 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     cleanup.add_argument("--acceptance-created", action="store_true")
     cleanup.add_argument("--acceptance-updated", action="store_true")
     cleanup.add_argument("--snapshot-json")
-    cleanup.set_defaults(
-        func=lambda args: cmd_cleanup(
-            argparse.Namespace(
-                yes=args.yes,
-                acceptance_created=args.acceptance_created,
-                acceptance_updated=args.acceptance_updated,
-                snapshot=(json.loads(Path(args.snapshot_json).read_text()) if args.snapshot_json else None),
-            )
-        )
-    )
+    cleanup.set_defaults(func=_cleanup_from_cli)
 
     delete = sub.add_parser("delete", help="delete the container service")
     delete.add_argument("--yes", action="store_true")
