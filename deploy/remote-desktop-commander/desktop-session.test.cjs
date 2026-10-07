@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
-const { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit, receiveGitKey } = require("./desktop-session.cjs");
+const { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit } = require("./desktop-session.cjs");
 
 function harness(onLaunch = () => {}) {
   const signals = new EventEmitter();
@@ -417,6 +417,74 @@ test("control permit requires a unique nonce header and canonical bounded projec
   } finally { p.remove(); }
 });
 
+
+test("secret import permit is action alias and body-digest bound", () => {
+  const p = permitFixture();
+  const bodySha256 = createHash("sha256").update("synthetic-secret").digest("hex");
+  try {
+    p.write({ action: "secret_import", alias: "rdc.git.ssh", body_sha256: bodySha256 });
+    assert.equal(controlPermit(p.request(), {
+      file: p.file, projectId: p.projectId, action: "secret_import", alias: "rdc.git.ssh",
+    }), true);
+    assert.equal(controlPermit(p.request(), {
+      file: p.file, projectId: p.projectId, action: "secret_import", alias: "other",
+    }), false);
+    assert.equal(controlPermit(p.request(), {
+      file: p.file, projectId: p.projectId, action: "secret_import", alias: "rdc.git.ssh",
+      bodySha256: "00".repeat(32),
+    }), false);
+    assert.equal(controlPermit(p.request(), { file: p.file, projectId: p.projectId }), false);
+  } finally { p.remove(); }
+});
+
+test("HTTP secret import is bounded private and never echoes plaintext", { timeout: 5000 }, async () => {
+  const { h, rdcStarted } = cloudHarness();
+  const secretDir = fs.mkdtempSync(path.join(os.tmpdir(), "rdc-secrets-"));
+  const canary = "synthetic-private-value";
+  const bodySha256 = createHash("sha256").update(canary).digest("hex");
+  const calls = [];
+  h.authorizeControl = (_request, options = {}) => {
+    calls.push(options);
+    return options.action === "secret_import" && options.alias === "rdc.git.ssh" &&
+      (options.bodySha256 === undefined || options.bodySha256 === bodySha256);
+  };
+  let port;
+  const running = superviseCloudRdc(["remote"], {
+    ...h, port: 0, secretDir, onListening: (value) => { port = value; },
+  });
+  await rdcStarted;
+  const endpoint = `http://127.0.0.1:${port}/rdc/secrets`;
+  const headers = {
+    "X-Alice-Rdc-Control": "ab".repeat(32),
+    "X-Alice-Secret-Alias": "rdc.git.ssh",
+    "Content-Type": "application/octet-stream",
+  };
+  try {
+    const wrongAlias = await fetch(endpoint, {
+      method: "POST", headers: { ...headers, "X-Alice-Secret-Alias": "../bad" }, body: canary,
+    });
+    assert.equal(wrongAlias.status, 400);
+
+    const response = await fetch(endpoint, { method: "POST", headers, body: canary });
+    assert.equal(response.status, 201);
+    const result = await response.json();
+    assert.deepEqual(result, { status: "secret_imported", alias: "rdc.git.ssh" });
+    assert.equal(JSON.stringify(result).includes(canary), false);
+    const stored = path.join(secretDir, "rdc.git.ssh");
+    assert.equal(fs.readFileSync(stored, "utf8"), canary);
+    assert.equal(fs.statSync(stored).mode & 0o777, 0o600);
+    assert(calls.some((value) => value.bodySha256 === bodySha256));
+
+    const duplicate = await fetch(endpoint, { method: "POST", headers, body: canary });
+    assert.equal(duplicate.status, 409);
+    assert.equal((await duplicate.text()).includes(canary), false);
+  } finally {
+    h.signals.emit("SIGTERM");
+    assert.equal(await running, 0);
+    fs.rmSync(secretDir, { recursive: true, force: true });
+  }
+});
+
 test("control permit rejects symlinks, hardlinks, non-files and missing grants", () => {
   const p = permitFixture();
   try {
@@ -562,27 +630,3 @@ test("pairing redirect accepts only current bounded official HTTPS handoff", { t
 });
 
 
-test("receiveGitKey writes a private 0600 OpenSSH key without returning secret material", async () => {
-  const { Readable } = require("node:stream");
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdc-key-"));
-  const target = path.join(root, "secrets", "id_ed25519");
-  const key = "-----BEGIN OPENSSH PRIVATE KEY-----\nsynthetic-canary\n-----END OPENSSH PRIVATE KEY-----\n";
-  const request = Readable.from([Buffer.from(key)]);
-  request.headers = { "content-length": String(Buffer.byteLength(key)) };
-  try {
-    assert.equal(await receiveGitKey(request, { target }), undefined);
-    assert.equal(fs.readFileSync(target, "utf8"), key);
-    assert.equal(fs.statSync(target).mode & 0o777, 0o600);
-    assert.equal(fs.statSync(path.dirname(target)).mode & 0o777, 0o700);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("receiveGitKey rejects invalid, chunked and oversized bodies", async () => {
-  const { Readable } = require("node:stream");
-  const make = (body, headers) => { const r = Readable.from([Buffer.from(body)]); r.headers = headers; return r; };
-  await assert.rejects(() => receiveGitKey(make("not-a-key", { "content-length": "9" }), { target: "/tmp/unused-rdc-key" }));
-  await assert.rejects(() => receiveGitKey(make("x".repeat(20), { "content-length": "20" }), { limit: 10, target: "/tmp/unused-rdc-key" }));
-  await assert.rejects(() => receiveGitKey(make("x", { "content-length": "1", "transfer-encoding": "chunked" }), { target: "/tmp/unused-rdc-key" }));
-});

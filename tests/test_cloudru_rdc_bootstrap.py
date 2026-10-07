@@ -9,5 +9,5 @@ IMAGE = "alice-rdc-probe.cr.cloud.ru/chromium-probe@sha256:" + "a" * 64
 def test_rdc_uses_provider_minimum_resources():
     body = rdc.creation_body(PROJECT, IMAGE)
     container = body["template"]["containers"][0]
-    assert container["resources"] == {"cpu": "0.1", "memory": "256Mi"}
+    assert container["resources"] == {"cpu": "0.2", "memory": "512Mi"}
     assert body["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
