@@ -1,8 +1,6 @@
 # Cloud.ru Secret Management для секретов Alice Pro
 
-Статус: первый кодовый этап (issue #477, эпик #440). Адаптер и границы прав
-готовы; перенос реальных production-секретов и выдача прав в Cloud.ru IAM — в
-последующих узких PR, после ручной проверки владельцем.
+Статус: **shipped Cloud.ru backend foundation; consumer migration остаётся открытой в #755**. Version-pinned Cloud.ru adapter, local reference/rollback path и redaction tests существуют на master. Provider-neutral typed contract (`SecretRef`, `SecretValue`, `SecretResolver`) также уже существует в `secret_store/core.py`. Следующая работа — адаптация backend к общему resolver contract и поочерёдный cutover поддерживаемых consumers, а не создание нового Secret Store с нуля.
 
 Источники (проверено 2026-09-29 МСК):
 
@@ -160,8 +158,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
    локального plaintext. Эта замена — отдельный, следующий узкий PR по
    каждому назначению, не часть данного этапа.
 
-Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
-схему:
+Поддерживаемые secret-bearing consumers, которые canonical #755 переводит на общий resolver по одному:
 
 - `alice_short_token` — короткий токен доступа (`short_token_auth.py`,
   `ALICE_SHORT_TOKEN`);
@@ -201,9 +198,7 @@ limitations") секреты Container Apps — обычные переменн�
    становятся версиями в Secret Management; Container Apps перестаёт быть
    местом, где они видны в открытом виде.
 
-Этот bootstrap-переход — не часть текущего этапа: сейчас подключён только
-адаптер и локальная граница ссылок, без переноса живых секретов и без выдачи
-прав в Cloud.ru IAM (см. "Out of scope" в issue #477).
+Этот bootstrap/cutover не считается завершённым автоматически из-за наличия adapter/reference code. Для каждого consumer #755 требует явный target secret/reference/version, успешное resolution evidence и проверку missing/revoked/unavailable behavior. `SKIPPED` не является доказательством cutover.
 
 ## Связанные материалы
 
@@ -211,4 +206,5 @@ limitations") секреты Container Apps — обычные переменн�
   (внутреннее шифрование, независимо от Cloud.ru).
 - `docs/cloudru-container-apps.md` — деплой и известные ограничения по
   секретам.
-- Issue: #477, #475, #440.
+- Canonical Secret Store and consumer migration: #755.
+- Historical Cloud.ru foundation: #477, #475, #440.
