@@ -1,159 +1,94 @@
 # Secrets Configuration
 
-Alice Platform uses external secret storage to keep sensitive credentials out of configuration files. This document explains how secrets are configured and referenced.
+Status: **reference-only platform configuration**. Canonical Secret Store architecture and consumer migration are owned by #755.
 
-## Secret Concepts
+Alice Platform configuration may name secrets, but it must never become a second credential database or imply that a secret value is already provisioned/resolvable merely because a logical reference exists in YAML.
 
-A **secret** is sensitive data (API keys, passwords, signing keys) that:
+## Current configuration contract
 
-- Never appears in config files or code
-- Lives in secure external storage (e.g., HashiCorp Vault, AWS Secrets Manager)
-- Is referenced by a canonical path (e.g., `alice/prod/oauth-client-secret`)
-- Is injected at runtime by the deployment system
-
-## Secret References
-
-Configuration files reference secrets by path, never by value:
+`config/alice/secrets.yaml` contains logical references only:
 
 ```yaml
-# config/alice/secrets.yaml
-secrets:
-  oauth:
-    client_secret: alice/prod/oauth-client-secret
-    signing_key: alice/prod/oauth-signing-key
+oauth:
+  client_secret: alice/prod/oauth-client-secret
+  signing_key: alice/prod/oauth-signing-key
+
+chrome:
+  oauth_client_id: alice/prod/chrome-oauth-client-id
+  oauth_client_secret: alice/prod/chrome-oauth-client-secret
+  github_client_id: alice/prod/github-client-id
+  github_client_secret: alice/prod/github-client-secret
+  github_allowed_ids: alice/prod/github-allowed-ids
 ```
 
-The actual secret values are:
-1. Created and stored in external secret storage
-2. Fetched by the deployment system at runtime
-3. Injected as environment variables or mounted files into containers
-4. Never logged or exposed in config
+These strings are desired-state names. They are **not** secret values and, by themselves, are not proof that a corresponding remote secret/version exists.
 
-## Path Structure
+## Canonical runtime boundary
 
-Secret paths follow a pattern: `alice/<lane>/<service>/<secret-name>`
+The provider-neutral foundation lives in `secret_store/core.py`:
 
-Examples:
-- `alice/prod/oauth-client-secret` — OAuth client secret in production
-- `alice/test/oauth-client-secret` — OAuth client secret for testing
-- `alice/prod/chrome-signing-key` — Chrome worker signing key in production
+- `SecretRef` carries provider, secret ID, immutable version ID and purpose metadata;
+- `SecretValue` is opaque on string/repr surfaces and cannot be serialized;
+- `SecretResolver` defines the resolution boundary;
+- `SecretResolutionError` exposes typed safe failure codes.
 
-### Lane Scoping
+The already-shipped Cloud.ru implementation and pinned-version/rollback behavior are documented in [Cloud.ru Secret Management](../security/cloudru-secret-management.md). #755 owns generalization to all supported backends and migration of credential consumers.
 
-Secrets are scoped to lanes to prevent accidental cross-lane mixing:
+## What current platform validation proves
 
-- `alice/prod/*` — Production secrets, high-security requirements
-- `alice/test/*` — Test secrets, development-only values
+`alice_platform/config.py` rejects plaintext-like secret material and enforces reference/lane safety rules. In particular:
 
-The platform enforces: **Test lane cannot reference production secrets** (`alice/prod/*`).
+- PEM-looking values are rejected;
+- long base64-like values are rejected;
+- values inside the secrets section must use the `alice/` reference namespace;
+- the test lane may not reference `alice/prod/*`;
+- identical tracked secret references may not be shared across lanes.
 
-This prevents:
-- Accidentally using production credentials in tests
-- Leaking production secrets to developers with test-only access
-- Mixing test data with production systems
+Validation does **not** prove:
 
-## Production Secret Requirements
+- that Cloud.ru Secret Management contains the referenced secret;
+- that a version is active;
+- that runtime IAM can read it;
+- that a particular application consumer has migrated to `SecretResolver`;
+- that rotation, revocation or rollback has been exercised live.
 
-Production secrets must meet these requirements:
+For #755 acceptance, `SKIPPED` is not evidence. The target secret/reference/version path must explicitly PASS.
 
-1. **Strong randomness**: Generated with cryptographically secure random
-2. **Minimum length**: 32+ characters for symmetric keys, 2048+ bits for RSA
-3. **Regular rotation**: Changed on a schedule (quarterly minimum)
-4. **Access logging**: All fetches audited and logged
-5. **Encryption**: Stored encrypted at rest
-6. **Network security**: Fetched over authenticated, encrypted channels
+## Runtime plaintext rule
 
-## Test Secret Requirements
+Resolved plaintext may exist only immediately around an authorized backend/tool operation. It must not enter prompts, ordinary tool results, durable state, logs or ExecutionTrace.
 
-Test secrets can be simpler:
+There is no approved plaintext fallback when canonical resolution fails.
 
-1. **Uniqueness**: Different from production
-2. **Fixedness**: Deterministic (can be hardcoded test values)
-3. **Documentation**: Documented for developers
+## Bootstrap credentials
 
-Example test secret setup:
+Credentials required to reach a remote secret manager are bootstrap material. They must be minimized and least-privilege and cannot themselves depend on the same remote secret lookup. The Cloud.ru-specific bootstrap/read boundary is described in the security document linked above.
 
-```bash
-# Create test secrets
-vault kv put secret/alice/test/oauth-client-secret value="test-client-secret-12345678901234567890"
-vault kv put secret/alice/test/oauth-signing-key value="test-key-12345678901234567890123456"
-```
+## Rotation and migration
 
-## Validation Rules
+Rotation is explicit version switching, not an automatic quarterly job implemented by Alice Platform.
 
-The configuration validator checks:
+For each consumer, #755 requires:
 
-1. **Valid paths**: All secret refs match `alice/<lane>/<...>` pattern
-2. **Lane consistency**: Test lane doesn't reference `alice/prod/*`
-3. **No plaintext secrets**: No actual credential values in YAML
-4. **No secret patterns**: Rejects strings that look like secrets (base64, PEM keys, etc) outside the secrets section
-5. **Service references**: Only defined services can have secrets
+1. create/import the secret in an approved backend;
+2. persist only reference/version metadata;
+3. switch the consumer to the canonical resolver;
+4. verify success plus missing/revoked/unavailable failures;
+5. stop new legacy value writes;
+6. remove the legacy value path only after verified cutover.
 
-### Plaintext Detection
+Do not claim a consumer is migrated merely because its logical name appears in `config/alice/secrets.yaml`.
 
-The validator detects common secret patterns:
+## Current limitations
 
-- **Base64**: 32+ characters of base64 characters (`[A-Za-z0-9+/=]`)
-- **Hexadecimal**: 32+ characters of hex (`[A-Fa-f0-9]`)
-- **PEM keys**: Strings containing `-----BEGIN` or `-----END`
+The migration is incomplete. Current-master consumers still need inventory/cutover under #755, including supported provider credentials, GitHub OAuth secret paths, short-token authentication and other confirmed secret-bearing consumers.
 
-If found, the config is rejected with an error message.
+Platform #783 may provision permissions/references, but it does not own a competing secret backend. Durable state #776 stores secret reference/version metadata only.
 
-## Runtime Injection
+## Future work
 
-At deployment time, the system fetches actual secret values:
-
-```python
-# alice_platform/providers/secrets.py (future)
-def get_secret(path: str) -> str:
-    """Fetch secret value from external storage."""
-    # Fetches from vault/secrets manager
-    # Returns actual value (never logged)
-```
-
-Secrets are passed to containers as:
-- Environment variables (for small strings)
-- Mounted files (for larger values like keys)
-- Secrets in configuration (for structured secrets)
-
-## Audit and Compliance
-
-All secret access is logged with:
-- Timestamp
-- Service requesting the secret
-- Secret path (never the value)
-- User/system initiating the request
-- Result (success/failure)
-
-Production secret access is also:
-- Reviewed for anomalies
-- Rate-limited to prevent brute-force
-- Subject to additional approval for sensitive operations
-
-## Creating and Rotating Secrets
-
-### Creating a new secret
-
-1. Decide the path: `alice/<lane>/<service>/<name>`
-2. Generate a secure random value
-3. Store in secret storage with access controls
-4. Add reference to `config/alice/secrets.yaml`
-5. Update service configuration to read the secret
-6. Deploy the change
-
-### Rotating a secret
-
-1. Generate new secret value
-2. Create new version in secret storage
-3. Update the secret path (optional) or version reference
-4. Update config to reference new version
-5. Deploy the change
-6. Wait for old instances to drain
-7. Archive old secret (or delete after retention period)
-
-## Future Work
-
-- Automatic secret rotation based on schedule
-- Encryption key versioning and rotation
-- Support for multiple secret backends (Vault, AWS Secrets Manager, Azure Key Vault)
-- Secret scanning in CI/CD to catch accidental plaintext exposures
+- complete provider-neutral resolver adapters required by #755;
+- migrate supported consumers one at a time;
+- remove verified legacy durable secret-value writes;
+- add provider-backed acceptance evidence for reference/version resolution;
+- add rotation/revocation automation only after the explicit version-switch contract is proven.
