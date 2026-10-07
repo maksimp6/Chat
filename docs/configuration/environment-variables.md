@@ -14,7 +14,7 @@ Coverage: statically named environment reads in repository Python outside tests.
 | `ALICE_DATABASE_URL` | secret | SQL database connection URL |
 | `ALICE_DB_BACKEND` | compatibility | legacy database backend selector |
 | `ALICE_DB_PATH` | compatibility | legacy SQLite database path |
-| `ALICE_DEPARTMENTS_ADMIN_TOKEN` | secret | alice departments admin token |
+| `ALICE_DEPARTMENTS_ADMIN_TOKEN` | secret | backend credential required by mutating department endpoints via X-Department-Admin-Token |
 | `ALICE_DONATION_URL` | public | support/donation URL exposed by the application |
 | `ALICE_ENV_PUBLIC_BASE_URL` | public | public base URL for branch environments |
 | `ALICE_ENV_REPO_ROOT` | public | repository root used by branch environment manager |
@@ -48,12 +48,12 @@ Coverage: statically named environment reads in repository Python outside tests.
 | `ALICE_PROVIDER_CREDENTIAL_KEY` | secret | legacy provider credential encryption key |
 | `ALICE_QUOTA_ADMIN_TOKEN` | secret | provider quota administration credential |
 | `ALICE_QUOTA_REQUIRE_IDENTITY` | public | require trusted identity for provider quota enforcement |
-| `ALICE_RDC_PAIRING_FILE` | compatibility | alice rdc pairing file |
-| `ALICE_RDC_PROJECT_ID` | compatibility | alice rdc project id |
-| `ALICE_RDC_STATE_PATH` | compatibility | alice rdc state path |
+| `ALICE_RDC_PAIRING_FILE` | compatibility | path to the RDC pairing handoff JSON consumed by the redirect/session bridge |
+| `ALICE_RDC_PROJECT_ID` | compatibility | Cloud.ru project UUID bound to RDC persistent state and control permits |
+| `ALICE_RDC_STATE_PATH` | compatibility | mounted directory containing persistent RDC state and control-permit files |
 | `ALICE_REQUIRE_SHORT_TOKEN` | public | enable short-token authentication gate |
 | `ALICE_SESSION_ID` | public | runtime session context identifier |
-| `ALICE_SHELL_DB` | compatibility | alice shell db |
+| `ALICE_SHELL_DB` | compatibility | SQLite file selected by the legacy agent_shell CLI when --db is not provided |
 | `ALICE_SHORT_TOKEN` | secret | short-token bootstrap/auth credential |
 | `ALICE_SHORT_TOKEN_TTL_SECONDS` | public | short-token session lifetime in seconds |
 | `ALICE_SSH_KNOWN_HOSTS` | public | SSH known-hosts source/path |
