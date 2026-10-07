@@ -1,43 +1,24 @@
 name: Deploy Alice Dev worker
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "cloud/cloudru/container_apps_client.py"
-      - "cloud/cloudru/registry_client.py"
-      - "requirements-deploy.txt"
-      - ".python-version"
-      - "config/alice/alice-dev-delete-ids.txt"
-      - "deploy/remote-desktop-commander/config.json"
-      - "deploy/remote-desktop-commander/dependency-smoke.cjs"
-      - "deploy/remote-desktop-commander/dev-bootstrap.sh"
-      - "deploy/remote-desktop-commander/Dockerfile.mcp"
-      - "deploy/remote-desktop-commander/mcp-gateway.mjs"
-      - "deploy/remote-desktop-commander/mcp-gateway-origin.test.mjs"
-      - "deploy/remote-desktop-commander/request-origin.mjs"
-      - "deploy/remote-desktop-commander/credential-handoff.mjs"
-      - "deploy/remote-desktop-commander/credential-handoff.test.mjs"
-      - "deploy/remote-desktop-commander/oauth.mjs"
-      - "deploy/remote-desktop-commander/oauth.test.mjs"
-      - "deploy/remote-desktop-commander/oauth-discovery-smoke.mjs"
-      - "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs"
-      - "deploy/remote-desktop-commander/stdio-server.mjs"
-      - "deploy/remote-desktop-commander/mcp-gateway-live-smoke.mjs"
-      - "deploy/remote-desktop-commander/package.json"
-      - "deploy/remote-desktop-commander/package-lock.json"
-      - "scripts/cloudru_rdc_mcp_candidate.py"
-      - ".github/workflows/cloudru-rdc-mcp-candidate.yml"
+  workflow_dispatch:
+    inputs:
+      confirm_paid_deploy:
+        description: "Explicitly confirm paid Alice Dev deployment"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: alice-cloudru-alice-dev-${{ github.sha }}
+  group: alice-cloudru-alice-dev
   cancel-in-progress: true
 
 jobs:
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && github.run_attempt == '1' && vars.ALICE_DEV_DEPLOY_ENABLED == 'true' && inputs.confirm_paid_deploy == true }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 25
