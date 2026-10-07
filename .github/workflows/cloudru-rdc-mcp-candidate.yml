@@ -38,6 +38,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Owner stop: do not allocate a runner or expose deployment secrets (#939).
+    # Resume only through a separately approved lifecycle change.
+    if: ${{ false }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 25
