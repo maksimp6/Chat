@@ -56,3 +56,8 @@ Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит
 - **API**: предоставляет методы для читать/писать конфигурацию памяти (`load_memory_config`, `save_memory_config`)
 
 Для детального изучения миграционной стратегии см. [memory-db-v1-contract.md](memory-db-v1-contract.md) и [issue #776](https://github.com/maksimp6/Chat/issues/776).
+## Legacy extraction boundary
+
+`memory_extractor.py` пока не использует canonical model/provider pipeline и не пишет извлечённые факты в FileMemoryDB. Он напрямую читает `YANDEX_API_KEY` / `YANDEX_PROJECT_ID`, вызывает legacy Yandex Foundation Models completion endpoint и сохраняет `global_memory` в SQL.
+
+Поэтому этот модуль одновременно остаётся migration consumer для #433 (единый model path), #755 (Secret Store) и #776 (file-native durable memory). Наличие FileMemoryDB для ownership/identity не является доказательством миграции extracted memory.
