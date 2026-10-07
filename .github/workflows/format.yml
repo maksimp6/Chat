@@ -63,8 +63,10 @@ jobs:
           cache-dependency-path: package.json
       - name: Install formatter toolchain
         if: steps.guard.outputs.skip != 'true'
+        env:
+          DOCS_ONLY: ${{ steps.scope.outputs.docs_only }}
         run: |
-          if [ "${{ steps.scope.outputs.docs_only }}" != "true" ]; then
+          if [ "$DOCS_ONLY" != "true" ]; then
             python -m pip install -r requirements-dev.txt
           fi
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
