@@ -1,0 +1,116 @@
+name: Solution review evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      head_sha:
+        description: Exact pull request head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact pull request base SHA
+        required: true
+        type: string
+      outcome:
+        description: Material reviewer outcome
+        required: true
+        type: choice
+        options: [ACCEPTED, CHANGES_REQUESTED, BLOCKED]
+      reviewer_role:
+        description: Canonical reviewer role
+        required: true
+        type: choice
+        options: [team-lead, security-reviewer, process-governor]
+      reviewer_session:
+        description: Independent reviewer session identifier
+        required: true
+        type: string
+      implementation_role:
+        description: Implementation role
+        required: true
+        type: string
+      implementation_session:
+        description: Implementation session identifier
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  issue-evidence:
+    name: Issue solution review evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify exact pull request revisions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.head_sha }}
+          EXPECTED_BASE: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          actual_head="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+          actual_base="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .base.sha)"
+          test "$actual_head" = "$EXPECTED_HEAD"
+          test "$actual_base" = "$EXPECTED_BASE"
+
+      - name: Validate role and session separation
+        env:
+          REVIEWER_ROLE: ${{ inputs.reviewer_role }}
+          REVIEWER_SESSION: ${{ inputs.reviewer_session }}
+          IMPLEMENTATION_ROLE: ${{ inputs.implementation_role }}
+          IMPLEMENTATION_SESSION: ${{ inputs.implementation_session }}
+        run: |
+          set -euo pipefail
+          test -n "$REVIEWER_SESSION"
+          test -n "$IMPLEMENTATION_SESSION"
+          test "$REVIEWER_ROLE" != "$IMPLEMENTATION_ROLE"
+          test "$REVIEWER_SESSION" != "$IMPLEMENTATION_SESSION"
+
+      - name: Emit machine-readable evidence
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          OUTCOME: ${{ inputs.outcome }}
+          REVIEWER_ROLE: ${{ inputs.reviewer_role }}
+          REVIEWER_SESSION: ${{ inputs.reviewer_session }}
+          IMPLEMENTATION_ROLE: ${{ inputs.implementation_role }}
+          IMPLEMENTATION_SESSION: ${{ inputs.implementation_session }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          evidence = {
+              "schema_version": 1,
+              "task": f"pr:{os.environ['PR_NUMBER']}",
+              "outcome": os.environ["OUTCOME"],
+              "reviewed_head_sha": os.environ["HEAD_SHA"],
+              "reviewed_base_sha": os.environ["BASE_SHA"],
+              "reviewer_role": os.environ["REVIEWER_ROLE"],
+              "reviewer_session": os.environ["REVIEWER_SESSION"],
+              "implementation_role": os.environ["IMPLEMENTATION_ROLE"],
+              "implementation_session": os.environ["IMPLEMENTATION_SESSION"],
+              "provenance": f"github-actions:solution-review:{os.environ['GITHUB_RUN_ID']}",
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+          }
+          with open("solution-review.json", "w", encoding="utf-8") as handle:
+              json.dump(evidence, handle, sort_keys=True)
+              handle.write("\n")
+          PY
+
+      - name: Upload immutable run evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: solution-review-pr-${{ inputs.pr_number }}-${{ inputs.head_sha }}
+          path: solution-review.json
+          if-no-files-found: error
+          retention-days: 30
