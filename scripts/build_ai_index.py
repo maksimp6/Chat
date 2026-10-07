@@ -15,4 +15,11 @@ from repository_index.builder import main
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (ValueError, OSError):
+        print(
+            "Repository index failed: invalid input, unavailable revision, incompatible cache, limit or I/O error.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from None

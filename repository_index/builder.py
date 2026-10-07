@@ -649,7 +649,7 @@ def main() -> int:
         if args.previous_index
         else None
     )
-    stats = {} if args.revision is not None else None
+    stats: dict[str, int] | None = {} if args.revision is not None else None
     index = build_index(
         Path(args.root),
         revision=args.revision,
