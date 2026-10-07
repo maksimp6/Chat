@@ -49,7 +49,12 @@ def _forbidden_python_imports(path: Path):
         elif isinstance(node, ast.ImportFrom) and node.module:
             names = [node.module]
         for name in names:
-            if name == "tests" or name.startswith("tests.") or name == "docs" or name.startswith("docs."):
+            if (
+                name == "tests"
+                or name.startswith("tests.")
+                or name == "docs"
+                or name.startswith("docs.")
+            ):
                 forbidden.append(name)
     return forbidden
 
