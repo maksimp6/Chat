@@ -104,6 +104,15 @@ def test_invalid_paths_are_not_silently_skipped(path):
 
 
 @pytest.mark.parametrize("mode", [[], ["--null"]])
+def test_cli_classifies_stdin(monkeypatch, capsys, mode):
+    import io
+    import json
+
+    monkeypatch.setattr(routing.sys, "argv", ["ci_platform_changes.py", *mode])
+    separator = "\0" if mode else "\n"
+    monkeypatch.setattr(routing.sys, "stdin", io.StringIO("alice_platform/config.py" + separator))
+    assert routing.main() == 0
+    assert json.loads(capsys.readouterr().out)["infra"] is True
 
 
 def test_cli_all_is_conservative(monkeypatch, capsys):
@@ -115,6 +124,17 @@ def test_cli_all_is_conservative(monkeypatch, capsys):
 
 
 @pytest.mark.parametrize("infra_result, expected", [("success", 0), ("skipped", 1)])
+def test_cli_checks_actual_needed_job_results(monkeypatch, infra_result, expected):
+    import json
+
+    plan = routing.classify(["alice_platform/config.py"])
+    monkeypatch.setenv("CI_PLATFORM_PLAN", json.dumps({k: str(v).lower() for k, v in plan.items()}))
+    monkeypatch.setenv(
+        "CI_JOB_RESULTS",
+        json.dumps({k: {"result": v} for k, v in results(infra=infra_result).items()}),
+    )
+    monkeypatch.setattr(routing.sys, "argv", ["ci_platform_changes.py", "--verify"])
+    assert routing.main() == expected
 
 
 @pytest.mark.parametrize("plan, needs", [("{}", "{}"), ("[]", "{}"), ("null", "null")])
