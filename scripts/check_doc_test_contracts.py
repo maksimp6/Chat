@@ -34,11 +34,101 @@ def _load_test_facts(path: Path) -> dict[str, object] | None:
 
 
 def _paths(value: Any) -> list[str]:
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _contract_id(raw: dict[str, Any]) -> str | None:
+    value = raw.get("id")
+    return value if isinstance(value, str) and value else None
+
+
+def _validate_identity(
+    contract_id: str, status: object, seen: set[str]
+) -> list[str]:
+    errors: list[str] = []
+    if contract_id in seen:
+        errors.append(f"DUPLICATE_CONTRACT_ID {contract_id}")
+    seen.add(contract_id)
+    if status not in VALID_LIFECYCLES:
+        errors.append(f"INVALID_LIFECYCLE {contract_id} {status}")
+    return errors
+
+
+def _validate_paths(
+    root: Path, contract_id: str, documentation: object, implementation: list[str], tests: list[str]
+) -> list[str]:
+    tracked = [documentation] if isinstance(documentation, str) and documentation else []
+    tracked.extend(implementation)
+    tracked.extend(tests)
+    return [
+        f"MISSING_PATH {contract_id} {relative}"
+        for relative in tracked
+        if not (root / relative).is_file()
+    ]
+
+
+def _validate_shipped_mapping(
+    contract_id: str, status: object, documentation: object, tests: list[str]
+) -> list[str]:
+    if status not in SHIPPED_LIFECYCLES:
+        return []
+    errors: list[str] = []
+    if not tests:
+        errors.append(f"DOC_WITHOUT_TEST {contract_id}")
+    if tests and (not isinstance(documentation, str) or not documentation):
+        errors.append(f"TEST_WITHOUT_DOC {contract_id}")
+    return errors
+
+
+def _validate_facts(
+    root: Path,
+    contract_id: str,
+    status: object,
+    tests: list[str],
+    expected_facts: object,
+) -> list[str]:
+    if status not in SHIPPED_LIFECYCLES or not isinstance(expected_facts, dict):
+        return []
+    errors: list[str] = []
+    for test_path in tests:
+        path = root / test_path
+        if not path.is_file():
+            continue
+        actual = _load_test_facts(path)
+        if actual is None:
+            continue
+        errors.extend(
+            f"DOC_TEST_CONFLICT {contract_id} {key}"
+            for key, expected in expected_facts.items()
+            if key in actual and actual[key] != expected
+        )
+    return errors
+
+
+def _validate_contract(
+    root: Path, raw: object, seen: set[str]
+) -> list[str]:
+    if not isinstance(raw, dict):
+        return ["INVALID_CONTRACT <non-object>"]
+    contract_id = _contract_id(raw)
+    if contract_id is None:
+        return ["INVALID_CONTRACT_ID"]
+
+    status = raw.get("status")
+    documentation = raw.get("documentation")
+    implementation = _paths(raw.get("implementation"))
+    tests = _paths(raw.get("tests"))
+
+    errors = _validate_identity(contract_id, status, seen)
+    errors.extend(_validate_paths(root, contract_id, documentation, implementation, tests))
+    errors.extend(_validate_shipped_mapping(contract_id, status, documentation, tests))
+    errors.extend(_validate_facts(root, contract_id, status, tests, raw.get("facts")))
+    return errors
 
 
 def validate_contract_registry(root: Path, registry_path: Path) -> list[str]:
-    errors: list[str] = []
     try:
         payload = json.loads(registry_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -49,60 +139,9 @@ def validate_contract_registry(root: Path, registry_path: Path) -> list[str]:
         return ["INVALID_REGISTRY contracts"]
 
     seen: set[str] = set()
+    errors: list[str] = []
     for raw in contracts:
-        if not isinstance(raw, dict):
-            errors.append("INVALID_CONTRACT <non-object>")
-            continue
-
-        contract_id = raw.get("id")
-        if not isinstance(contract_id, str) or not contract_id:
-            errors.append("INVALID_CONTRACT_ID")
-            continue
-
-        if contract_id in seen:
-            errors.append(f"DUPLICATE_CONTRACT_ID {contract_id}")
-        seen.add(contract_id)
-
-        status = raw.get("status")
-        if status not in VALID_LIFECYCLES:
-            errors.append(f"INVALID_LIFECYCLE {contract_id} {status}")
-
-        documentation = raw.get("documentation")
-        implementation = _paths(raw.get("implementation"))
-        tests = _paths(raw.get("tests"))
-
-        tracked_paths: list[str] = []
-        if isinstance(documentation, str) and documentation:
-            tracked_paths.append(documentation)
-        tracked_paths.extend(implementation)
-        tracked_paths.extend(tests)
-        for relative in tracked_paths:
-            if not (root / relative).is_file():
-                errors.append(f"MISSING_PATH {contract_id} {relative}")
-
-        if status in SHIPPED_LIFECYCLES:
-            if not tests:
-                errors.append(f"DOC_WITHOUT_TEST {contract_id}")
-            if tests and (not isinstance(documentation, str) or not documentation):
-                errors.append(f"TEST_WITHOUT_DOC {contract_id}")
-
-        expected_facts = raw.get("facts")
-        if (
-            status in SHIPPED_LIFECYCLES
-            and isinstance(expected_facts, dict)
-            and expected_facts
-        ):
-            for test_path in tests:
-                path = root / test_path
-                if not path.is_file():
-                    continue
-                actual = _load_test_facts(path)
-                if actual is None:
-                    continue
-                for key, expected in expected_facts.items():
-                    if key in actual and actual[key] != expected:
-                        errors.append(f"DOC_TEST_CONFLICT {contract_id} {key}")
-
+        errors.extend(_validate_contract(root, raw, seen))
     return errors
 
 
