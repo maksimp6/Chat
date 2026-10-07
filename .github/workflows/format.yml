@@ -70,6 +70,12 @@ jobs:
             python -m pip install -r requirements-dev.txt
           fi
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Check changed documentation formatting
+        if: steps.guard.outputs.skip != 'true' && steps.scope.outputs.docs_only == 'true'
+        env:
+          BASE_SHA: ${{ steps.scope.outputs.base }}
+        run: bash scripts/format_changed_docs.sh check "$BASE_SHA" HEAD
+
       - name: Format sources
         if: steps.guard.outputs.skip != 'true'
         env:
