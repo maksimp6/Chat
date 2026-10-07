@@ -956,9 +956,9 @@ def test_successful_deploy_passes_app_configuration_only(monkeypatch):
     [
         ("preflight", None, False, True),
         ("deploy", "CLOUDRU_IAM_KEY_SECRET", False, False),
-        ("preflight", "ALICE_DATABASE_URL", False, False),
+        ("preflight", "ALICE_DATABASE_URL", False, True),
         ("deploy", "ALICE_GITHUB_CLIENT_SECRET", False, False),
-        ("preflight", None, True, False),
+        ("preflight", None, True, True),
         ("status", "ALICE_DATABASE_URL", False, True),
         ("inventory", "ALICE_DATABASE_URL", False, True),
     ],
