@@ -118,9 +118,7 @@ def _validate_scaling(service_name: str, service_config: Dict[str, Any]) -> None
             continue
         if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
             qualifier = "non-negative" if minimum == 0 else "positive"
-            raise ConfigError(
-                f"Service '{service_name}': {field} must be a {qualifier} integer"
-            )
+            raise ConfigError(f"Service '{service_name}': {field} must be a {qualifier} integer")
 
     if (
         isinstance(min_instances, int)
@@ -129,9 +127,7 @@ def _validate_scaling(service_name: str, service_config: Dict[str, Any]) -> None
         and not isinstance(max_instances, bool)
         and min_instances > max_instances
     ):
-        raise ConfigError(
-            f"Service '{service_name}': min_instances cannot exceed max_instances"
-        )
+        raise ConfigError(f"Service '{service_name}': min_instances cannot exceed max_instances")
 
 
 def _validate_schema(data: Dict[str, Any]) -> None:
