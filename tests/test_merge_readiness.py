@@ -29,7 +29,6 @@ def snapshot(**overrides):
         "snapshot_changed": False,
         "pr_state": "open",
         "merged": False,
-        "author_login": "implementation-author",
         "draft": False,
         "behind_by": 0,
         "required_checks": ["Application tests", "PostgreSQL integration"],
@@ -53,15 +52,18 @@ def snapshot(**overrides):
                 "conclusion": "skipped",
             },
         ],
-        "reviews": [
-            {
-                "state": "APPROVED",
-                "commit": {"oid": "abc123"},
-                "author": {"login": "solution-reviewer"},
-                "submittedAt": "2026-10-07T00:00:00Z",
-            }
-        ],
-        "reviews_truncated": False,
+        "solution_review": {
+            "schema_version": 1,
+            "task": "issue:123",
+            "outcome": "ACCEPTED",
+            "reviewed_head_sha": "abc123",
+            "reviewed_base_sha": "base123",
+            "reviewer_role": "team-lead",
+            "reviewer_session": "review-session-1",
+            "implementation_role": "backend-engineer",
+            "implementation_session": "implementation-session-1",
+            "provenance": "github-actions:solution-review",
+        },
         "review_threads": [{"isResolved": True}],
         "review_threads_truncated": False,
     }
@@ -492,99 +494,67 @@ def test_merge_readiness_newer_failed_aggregate_supersedes_success():
     assert any(b.get("check") == "CI required" for b in result["blockers"])
 
 
-def test_merge_readiness_rejects_quota_notice_as_independent_review_evidence():
-    value = platform_snapshot(
-        reviews=[
-            {
-                "state": "COMMENTED",
-                "commit": {"oid": "abc123"},
-                "author": {"login": "copilot-pull-request-reviewer"},
-                "submittedAt": "2026-10-07T00:00:00Z",
-                "body": "Unable to review: quota limit reached.",
-            }
-        ]
-    )
-    result = merge_readiness.evaluate_snapshot(value)
-    assert result["ready"] is False
-    assert blocker_codes(result) == {"independent_review_missing"}
-
-
-def test_merge_readiness_rejects_missing_independent_review():
-    result = merge_readiness.evaluate_snapshot(snapshot(reviews=[]))
+def test_merge_readiness_rejects_missing_solution_review_evidence():
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=None))
 
     assert result["ready"] is False
-    assert blocker_codes(result) == {"independent_review_missing"}
+    assert blocker_codes(result) == {"solution_review_missing"}
 
 
-def test_merge_readiness_rejects_author_self_approval():
-    result = merge_readiness.evaluate_snapshot(
-        snapshot(
-            reviews=[
-                {
-                    "state": "APPROVED",
-                    "commit": {"oid": "abc123"},
-                    "author": {"login": "implementation-author"},
-                    "submittedAt": "2026-10-07T00:00:00Z",
-                }
-            ]
-        )
-    )
+@pytest.mark.parametrize(
+    ("override", "expected"),
+    [
+        ({"outcome": "CHANGES_REQUESTED"}, "solution_review_changes_requested"),
+        ({"outcome": "BLOCKED"}, "solution_review_blocked"),
+        ({"outcome": "LGTM"}, "solution_review_invalid"),
+        ({"reviewed_head_sha": "old-head"}, "solution_review_stale"),
+        ({"reviewed_base_sha": "old-base"}, "solution_review_stale"),
+        ({"reviewer_role": "backend-engineer"}, "solution_review_not_independent"),
+        (
+            {"reviewer_session": "implementation-session-1"},
+            "solution_review_not_independent",
+        ),
+        ({"provenance": ""}, "solution_review_invalid"),
+        ({"task": ""}, "solution_review_invalid"),
+    ],
+)
+def test_merge_readiness_rejects_invalid_solution_review_evidence(override, expected):
+    evidence = dict(snapshot()["solution_review"])
+    evidence.update(override)
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=evidence))
 
     assert result["ready"] is False
-    assert blocker_codes(result) == {"independent_review_missing"}
+    assert blocker_codes(result) == {expected}
 
 
-def test_merge_readiness_rejects_stale_independent_approval():
-    result = merge_readiness.evaluate_snapshot(
-        snapshot(
-            reviews=[
-                {
-                    "state": "APPROVED",
-                    "commit": {"oid": "old-head"},
-                    "author": {"login": "solution-reviewer"},
-                    "submittedAt": "2026-10-07T00:00:00Z",
-                }
-            ]
-        )
+def test_merge_readiness_accepts_independent_role_session_on_same_github_owner():
+    evidence = dict(snapshot()["solution_review"])
+    evidence.update(
+        reviewer_role="team-lead",
+        reviewer_session="review-session-2",
+        implementation_role="backend-engineer",
+        implementation_session="implementation-session-1",
     )
 
-    assert result["ready"] is False
-    assert blocker_codes(result) == {"independent_review_stale"}
-
-
-def test_merge_readiness_rejects_current_changes_requested_after_approval():
-    result = merge_readiness.evaluate_snapshot(
-        snapshot(
-            reviews=[
-                {
-                    "state": "APPROVED",
-                    "commit": {"oid": "abc123"},
-                    "author": {"login": "solution-reviewer"},
-                    "submittedAt": "2026-10-07T00:00:00Z",
-                },
-                {
-                    "state": "CHANGES_REQUESTED",
-                    "commit": {"oid": "abc123"},
-                    "author": {"login": "solution-reviewer"},
-                    "submittedAt": "2026-10-07T00:01:00Z",
-                },
-            ]
-        )
-    )
-
-    assert result["ready"] is False
-    assert blocker_codes(result) == {"independent_review_changes_requested"}
-
-
-def test_merge_readiness_accepts_exact_head_independent_approval():
-    result = merge_readiness.evaluate_snapshot(snapshot())
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=evidence))
 
     assert result["ready"] is True
     assert result["blockers"] == []
 
 
-def test_merge_readiness_fails_closed_when_reviews_are_truncated():
-    result = merge_readiness.evaluate_snapshot(snapshot(reviews_truncated=True))
+def test_owner_github_identity_is_not_used_as_solution_review_independence():
+    value = snapshot(
+        solution_review=None,
+        reviews=[
+            {
+                "state": "APPROVED",
+                "commit": {"oid": "abc123"},
+                "author": {"login": "someone-else"},
+            }
+        ],
+    )
+
+    result = merge_readiness.evaluate_snapshot(value)
 
     assert result["ready"] is False
-    assert blocker_codes(result) == {"reviews_truncated"}
+    assert blocker_codes(result) == {"solution_review_missing"}
