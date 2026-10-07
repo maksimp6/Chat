@@ -441,8 +441,17 @@ jobs:
           echo "- Android direct contract tests: ${elapsed}s" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify debug APK
         run: |
-          test -s android/build/direct/alice-pro-direct.apk
-          sha256sum android/build/direct/alice-pro-direct.apk
+          set -euo pipefail
+          apk=android/build/direct/alice-pro-direct.apk
+          test -s "$apk"
+          size_bytes=$(stat -c%s "$apk")
+          size_kib=$(( (size_bytes + 1023) / 1024 ))
+          echo "- Android direct APK size: ${size_bytes} bytes (${size_kib} KiB), limit: 1048576 bytes" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$size_bytes" -gt 1048576 ]; then
+            echo "APK exceeds 1 MiB size budget: ${size_bytes} > 1048576" >&2
+            exit 1
+          fi
+          sha256sum "$apk"
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
