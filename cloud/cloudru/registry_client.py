@@ -219,10 +219,12 @@ class CloudRuRegistryClient:
                 if use.returncode != 0:
                     raise CloudProviderError("docker buildx builder unavailable", code="docker_error")
             driver = self._run(
-                ["docker", "buildx", "inspect", builder],
+                ["docker", "buildx", "ls", "--format", "{{.Name}}|{{.Driver}}"],
                 text=True, capture_output=True, check=False, env=env,
             )
-            if driver.returncode != 0 or "Driver: docker-container" not in (driver.stdout or ""):
+            expected = f"{builder}|docker-container"
+            rows = {(line or "").strip().rstrip("*").strip() for line in (driver.stdout or "").splitlines()}
+            if driver.returncode != 0 or expected not in rows:
                 raise CloudProviderError("docker-container buildx driver required", code="docker_error")
             ref = ImageRef(host, repository, tag)
             cache = ImageRef(host, repository, CACHE_TAG).tagged
