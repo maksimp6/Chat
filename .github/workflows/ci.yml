@@ -64,6 +64,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -74,6 +75,25 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Check naming, layout and reliability rules
         run: bash scripts/check_code_rules.sh
+      - name: Check changed function contracts
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed-function check: comparison base is unavailable" >&2
+            exit 2
+          fi
+          git fetch --no-tags --depth=1 origin "$base"
+          git rev-parse --verify "$base^{commit}"
+          python scripts/check_changed_types.py --base "$base" --head "$GITHUB_SHA"
 
   backend:
     name: Application tests

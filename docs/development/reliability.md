@@ -84,6 +84,30 @@ New modules are written fully typed: annotate every function, use precise
 container types (`dict[str, int]`, not `dict`) and avoid `Any` outside
 boundaries that parse external JSON.
 
+### Changed-function contract
+
+`scripts/check_changed_types.py` is a forward-only ratchet for production
+Python. It compares functions between a base revision and the candidate head:
+
+- new or changed functions require parameter and return annotations;
+- bare container/generic annotations are rejected;
+- `Any` may not leak through a production return type;
+- public top-level functions and methods require a concise docstring;
+- `# type: ignore` requires a narrow mypy error code plus an inline reason;
+- untouched legacy functions are not re-linted by this checker.
+
+The checker deliberately does not replace semantic type analysis. Optional
+narrowing, Protocol substitutability, callback/async compatibility and other
+type semantics remain authoritative in `mypy --strict`.
+
+Local focused command:
+
+```bash
+python scripts/check_changed_types.py --base <base-revision> --head HEAD
+```
+
+Pull-request CI runs the same checker in the existing **Code rules** job against\nthe explicit pull-request base SHA from the GitHub event. The job fetches and\nverifies that commit and fails closed when the comparison base is unavailable,\nso a multi-commit PR checks the full candidate delta without adding a new runner job.
+
 ## Where the rules run
 
 - **Locally:** `bash scripts/check_code_rules.sh` runs the naming, root-layout,
