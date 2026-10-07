@@ -17,7 +17,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
-- **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
+- **Transitional storage**: legacy SQLite/PostgreSQL consumers coexist with file-native Memory DB aggregates while #776 migrates durable state consumer-by-consumer.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-10-06, `master` includes Memory DB Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
+As of 2026-10-07, `master` includes Memory DB Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, capability-only secret delivery, the canonical provider-neutral Secret Store contract with a tested Cloud.ru resolver, and immutable code-index revision snapshots/AST reuse (#950). Secret Store consumer migration remains open under #755. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
 
 These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
 
@@ -75,7 +75,7 @@ Copy `.env.example` only for a fresh installation. Replace its placeholders and 
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL` only when selecting PostgreSQL.
+Legacy local consumers still default to SQLite and may select PostgreSQL with `ALICE_DATABASE_URL`. File-native Memory DB aggregates coexist during the #776 migration; choosing an SQL backend does not move already-migrated file-native state back into SQL.
 
 ### Android
 
