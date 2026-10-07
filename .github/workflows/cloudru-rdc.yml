@@ -6,6 +6,8 @@ on:
       - ".github/workflows/cloudru-rdc.yml"
       - "scripts/cloudru_rdc.py"
       - "deploy/remote-desktop-commander/**"
+      - "cloud/cloudru/registry_client.py"
+      - "tests/test_cloudru_container_deploy.py"
   workflow_dispatch:
     inputs:
       action:
