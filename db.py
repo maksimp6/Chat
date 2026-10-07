@@ -14,6 +14,20 @@ _MEMORY_DB = MemoryDatabase()
 _MEMORY_INITIALIZED = False
 
 
+def _convert_sqlite_timestamp(value: bytes) -> datetime:
+    """Parse SQLite TIMESTAMP columns, including timezone-aware values.
+
+    The stdlib default converter splits ``HH:MM:SS[.ffffff]`` itself and cannot
+    handle a UTC offset: ``12:34:45+00:00`` read back with zero microseconds
+    fails with ``ValueError: invalid literal for int() with base 10: b'45+00'``
+    (issue #545). ``datetime.fromisoformat`` accepts both naive and aware forms.
+    """
+    return datetime.fromisoformat(value.decode())
+
+
+sqlite3.register_converter("TIMESTAMP", _convert_sqlite_timestamp)
+
+
 def _runtime_db_path():
     data_root = current_runtime_data_root()
     if not data_root:
