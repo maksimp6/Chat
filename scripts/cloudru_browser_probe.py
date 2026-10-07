@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 from pathlib import Path
@@ -13,7 +12,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import tarfile
 import time
 from urllib.parse import quote, urlsplit
 from uuid import UUID
@@ -344,42 +342,19 @@ def prepare_registry(registry):
     print(json.dumps({"stage": "registry_ready", "registry_id": identifier}), flush=True)
 
 
-def export_source(root, sha, dest):
-    if os.environ.get("RDC_LANE") != "test":
-        _export_commit(sha, str(root), dest)
-        return
-    if not re.fullmatch(r"[0-9a-f]{40}", sha):
-        raise CloudProviderError("invalid test commit", code="validation_error")
-    archive = subprocess.run(
-        ["git", "-C", str(root), "archive", "--format=tar", sha], capture_output=True, check=False
-    )
-    if archive.returncode:
-        raise CloudProviderError("cannot export test commit", code="validation_error")
-    with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as stream:
-        stream.extractall(dest, filter="data")
-
-
 def build_image(root, sha):
     registry = CloudRuRegistryClient()
     with tempfile.TemporaryDirectory(prefix="rdc-probe-") as exported:
-        export_source(root, sha, exported)
+        _export_commit(sha, str(root), exported)
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "remote-desktop-commander"
-        base_image = os.environ.get("RDC_BASE_IMAGE", "").strip()
-        expected_prefix = f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:"
-        if not base_image.startswith(expected_prefix) or not re.fullmatch(
-            re.escape(expected_prefix) + r"[0-9a-f]{64}", base_image
-        ):
-            raise CloudProviderError("RDC_BASE_IMAGE must be an immutable owned image", code="validation_error")
         print('{"stage":"image_build_push"}', flush=True)
-        return registry.build_and_push_fast(
+        return registry.build_and_push(
             registry_name=REGISTRY,
             repository=REPOSITORY,
             tag=sha,
             context_dir=str(context),
             dockerfile=str(context / "Dockerfile"),
-            build_args={"RDC_BASE_IMAGE": base_image},
-            registry_cache=False,
         ).pinned
 
 
