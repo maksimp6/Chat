@@ -1,8 +1,6 @@
 # Cloud.ru Secret Management для секретов Alice Pro
 
-Статус: первый кодовый этап (issue #477, эпик #440). Адаптер и границы прав
-готовы; перенос реальных production-секретов и выдача прав в Cloud.ru IAM — в
-последующих узких PR, после ручной проверки владельцем.
+Статус: Cloud.ru adapter, pinned version refs/rollback и redaction foundation shipped. Исторические #477/#440 дали первый backend-specific этап; текущая canonical ownership — #755. Provider-neutral `SecretRef` / `SecretValue` / `SecretResolver` contract уже существует в `secret_store/core.py`, а consumer-by-consumer migration остаётся незавершённой.
 
 Источники (проверено 2026-09-29 МСК):
 
@@ -19,7 +17,13 @@
 `docs/cloudru-container-apps.md`. Проверить и при необходимости поправить
 пути/коды при первом реальном подключении.
 
-## Модель данных
+## Canonical и compatibility layers
+
+Canonical application contract — `secret_store/core.py`: typed `SecretRef(provider, secret_id, version_id, purpose)`, opaque non-serializable `SecretValue` и `SecretResolver`. Durable state должен хранить только reference/version metadata.
+
+`secret_management_refs` и helpers в `provider_credentials.py` — shipped Cloud.ru compatibility implementation, существовавшая до provider-neutral contract. Она остаётся рабочей и протестированной, но новые consumers должны ориентироваться на canonical resolver; legacy SQL metadata/value paths удаляются только после проверенного cutover по #755.
+
+## Cloud.ru version model
 
 Секрет в Cloud.ru Secret Management состоит из версий; версия после записи
 неизменяема, и несколько версий могут быть одновременно активны. Alice Pro не
@@ -160,18 +164,13 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
    локального plaintext. Эта замена — отдельный, следующий узкий PR по
    каждому назначению, не часть данного этапа.
 
-Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
-схему:
+Назначения (`purpose`), которые canonical #755 мигрирует на эту схему:
 
 - `alice_short_token` — короткий токен доступа (`short_token_auth.py`,
   `ALICE_SHORT_TOKEN`);
 - `github_oauth_client_id` / `github_oauth_client_secret` — GitHub OAuth
   (`identity/github_oauth.py`);
-- `provider_credential:yandex` / `provider_credential:cloudru` — ключи
-  провайдеров LLM, которые уже хранятся зашифрованными через
-  `provider_credentials.py`; Secret Management становится дополнительным
-  источником ссылки на закреплённую версию, а не заменяет существующую
-  таблицу `provider_credentials`;
+- `provider_credential:yandex` / `provider_credential:cloudru` — ключи провайдеров LLM, которые пока имеют legacy encrypted-value storage в `provider_credentials.py`; после verified resolver cutover #755 требует остановить legacy writes и удалить этот secret-value path, сохранив только допустимые non-secret/reference metadata;
 - `alice_database_url` — строка подключения к управляемому PostgreSQL
   (`ALICE_DATABASE_URL`), см. известное ограничение "App secrets are plain
   container env vars" в `docs/cloudru-container-apps.md`.
@@ -201,9 +200,7 @@ limitations") секреты Container Apps — обычные переменн�
    становятся версиями в Secret Management; Container Apps перестаёт быть
    местом, где они видны в открытом виде.
 
-Этот bootstrap-переход — не часть текущего этапа: сейчас подключён только
-адаптер и локальная граница ссылок, без переноса живых секретов и без выдачи
-прав в Cloud.ru IAM (см. "Out of scope" в issue #477).
+Bootstrap/cutover не считается завершённым только из-за наличия adapter/reference code. Для каждого consumer #755 требует явный target reference/version, успешное resolution evidence и проверку missing/revoked/unavailable; `SKIPPED` не является доказательством migration.
 
 ## Связанные материалы
 
@@ -211,4 +208,5 @@ limitations") секреты Container Apps — обычные переменн�
   (внутреннее шифрование, независимо от Cloud.ru).
 - `docs/cloudru-container-apps.md` — деплой и известные ограничения по
   секретам.
-- Issue: #477, #475, #440.
+- Historical implementation issues: #477, #475, #440.
+- Canonical current ownership: #755.
