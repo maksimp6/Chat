@@ -71,6 +71,10 @@ def discover_runtime_python(root: Path) -> list[Path]:
     )
 
 
+def _mechanical_purpose(key: str, purpose: str) -> bool:
+    return purpose.strip().lower() == key.lower().replace("_", " ")
+
+
 def validate_reference(discovered: set[str], reference: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     for key in sorted(discovered - set(reference)):
@@ -85,6 +89,8 @@ def validate_reference(discovered: set[str], reference: dict[str, Any]) -> list[
             errors.append(f"{key}: invalid class: {entry.get('class')}")
         if not isinstance(entry.get("purpose"), str) or not entry["purpose"].strip():
             errors.append(f"{key}: purpose is required")
+        elif _mechanical_purpose(key, entry["purpose"]):
+            errors.append(f"{key}: purpose must explain behavior, not repeat the variable name")
     return errors
 
 
