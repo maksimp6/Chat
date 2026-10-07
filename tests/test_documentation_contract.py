@@ -27,6 +27,7 @@ def test_documentation_catalog_rejects_invalid_metadata(tmp_path):
                 "status": "current",
                 "owner": "docs-engineer",
                 "source_of_truth": "code",
+                "canonical": True,
             }
         ]
     }
