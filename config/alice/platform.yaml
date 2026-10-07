@@ -25,5 +25,33 @@ services:
     repository: chrome-worker
     owner_id: "293531601"
 
+  alice:
+    type: alice
+    depends_on:
+      - oauth
+    scale: 0
+    resources:
+      cpu: "1"
+      memory: 1024Mi
+    repository: alice
 
+  alice-lab:
+    type: alice
+    depends_on:
+      - oauth
+    scale: 0
+    resources:
+      cpu: "1"
+      memory: 1024Mi
+    repository: alice
 
+  alice-browser:
+    type: chrome
+    depends_on:
+      - oauth
+    scale: 0
+    resources:
+      cpu: "2"
+      memory: 2048Mi
+    repository: chrome-worker
+    owner_id: "293531601"
