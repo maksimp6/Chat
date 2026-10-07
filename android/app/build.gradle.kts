@@ -24,7 +24,10 @@ android {
         versionCode = buildNumber
         versionName = resolvedVersionName
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // Production/release remains multi-ABI. The CI debug APK is installed on
+            // the current Android target, which is arm64, so avoid packaging a second
+            // Python runtime and native dependency set for x86_64 on every iteration.
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
