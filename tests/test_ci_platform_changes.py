@@ -47,7 +47,6 @@ def test_classification_covers_real_platform_inputs(paths, expected):
     assert {name for name in ALL if plan[name]} == expected
 
 
-
 @pytest.mark.parametrize(
     "paths",
     [
