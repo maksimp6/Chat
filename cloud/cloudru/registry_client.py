@@ -251,6 +251,7 @@ class CloudRuRegistryClient:
                 "build",
                 "--platform",
                 platform,
+                "--progress=plain",
             ]
             if registry_cache:
                 build_argv.extend(
@@ -288,12 +289,22 @@ class CloudRuRegistryClient:
                     )
                 except subprocess.TimeoutExpired as exc:
                     seconds = time.perf_counter() - started
+                    progress = []
+                    for raw in (exc.stdout, exc.stderr):
+                        if isinstance(raw, bytes):
+                            raw = raw.decode(errors="replace")
+                        if not isinstance(raw, str):
+                            continue
+                        for line in raw.splitlines():
+                            if re.match(r"^#\\d+(?:\\s|$)", line):
+                                progress.append(line[:300])
                     print(
                         json.dumps(
                             {
                                 "stage": "registry_build_push_fast",
                                 "seconds": seconds,
                                 "returncode": 124,
+                                "progress": progress[-40:],
                             }
                         ),
                         flush=True,
