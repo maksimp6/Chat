@@ -195,6 +195,34 @@ class CloudRuRegistryClient:
         with tempfile.TemporaryDirectory(prefix="alice-docker-") as docker_config:
             env = {**os.environ, "DOCKER_CONFIG": docker_config}
             host = self.docker_login(registry_name, env=env)
+            builder = "alice-registry-fast"
+            inspect = self._run(
+                ["docker", "buildx", "inspect", builder],
+                text=True, capture_output=True, check=False, env=env,
+            )
+            if inspect.returncode != 0:
+                create = self._run(
+                    ["docker", "buildx", "create", "--name", builder, "--driver", "docker-container", "--use"],
+                    text=True, capture_output=True, check=False, env=env,
+                )
+                if create.returncode != 0:
+                    raise CloudProviderError(
+                        f"docker buildx builder create failed: {(create.stderr or '').strip()[-500:]}",
+                        code="docker_error",
+                    )
+            else:
+                use = self._run(
+                    ["docker", "buildx", "use", builder],
+                    text=True, capture_output=True, check=False, env=env,
+                )
+                if use.returncode != 0:
+                    raise CloudProviderError("docker buildx builder unavailable", code="docker_error")
+            driver = self._run(
+                ["docker", "buildx", "inspect", builder],
+                text=True, capture_output=True, check=False, env=env,
+            )
+            if driver.returncode != 0 or "Driver: docker-container" not in (driver.stdout or ""):
+                raise CloudProviderError("docker-container buildx driver required", code="docker_error")
             ref = ImageRef(host, repository, tag)
             cache = ImageRef(host, repository, CACHE_TAG).tagged
             with tempfile.NamedTemporaryFile(prefix="buildx-metadata-", suffix=".json") as metadata:
