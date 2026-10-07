@@ -24,10 +24,7 @@ android {
         versionCode = buildNumber
         versionName = resolvedVersionName
         ndk {
-            // Production/release remains multi-ABI. The CI debug APK is installed on
-            // the current Android target, which is arm64, so avoid packaging a second
-            // Python runtime and native dependency set for x86_64 on every iteration.
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
 
@@ -63,6 +60,11 @@ android {
 
     buildTypes {
         getByName("debug") {
+            // Fast CI/dev APKs target the current phone architecture only.
+            ndk {
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
+            }
             val customDebug = signingConfigs.findByName("customDebug")
             if (customDebug != null) {
                 signingConfig = customDebug
