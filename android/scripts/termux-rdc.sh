@@ -12,6 +12,30 @@ PACKAGE_DIR="$RDC_HOME/package"
 mkdir -p "$RDC_HOME" "$RDC_STATE"
 chmod 700 "$RDC_HOME" "$RDC_STATE"
 
+restore_existing_state() {
+  local target="$RDC_STATE/device.json"
+  [[ -f "$target" ]] && return 0
+
+  local candidates=()
+  if [[ -n "${RDC_STATE_SOURCE:-}" ]]; then
+    candidates+=("$RDC_STATE_SOURCE")
+  fi
+  candidates+=(
+    "$HOME/alice-preview/services/remote-desktop-commander/state/.desktop-commander-device"
+    "$HOME/.alice-rdc/state/.desktop-commander-device"
+  )
+
+  local source
+  for source in "${candidates[@]}"; do
+    [[ -f "$source/device.json" ]] || continue
+    install -m 600 "$source/device.json" "$target"
+    printf 'Reused existing RDC session from %s\n' "$source"
+    return 0
+  done
+
+  return 1
+}
+
 rdc_pid() {
   if [[ -f "$PID_FILE" ]]; then
     local pid
@@ -50,6 +74,7 @@ start_rdc() {
   fi
 
   install_rdc
+  restore_existing_state || true
 
   local entry="$PACKAGE_DIR/node_modules/@wonderwhy-er/desktop-commander/dist/index.js"
   : >"$LOG_FILE"
@@ -72,7 +97,11 @@ start_rdc() {
 
   printf 'RDC started (pid %s)\n' "$pid"
   printf 'Log: %s\n' "$LOG_FILE"
-  printf 'First run: open logs to complete pairing.\n'
+  if [[ -f "$RDC_STATE/device.json" ]]; then
+    printf 'Saved RDC session found; reconnect should be automatic.\n'
+  else
+    printf 'No saved RDC session found on this phone. One-time pairing is required.\n'
+  fi
 }
 
 stop_rdc() {
