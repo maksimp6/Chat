@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from scripts.check_shell_env_reference import discover_external_shell_env
+import json
+from pathlib import Path
+
+from scripts.check_shell_env_reference import discover_external_shell_env, discover_repository_shell_env
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_discovers_reads_not_locally_assigned_variables():
@@ -29,3 +34,13 @@ name=value
 echo "$name" "$1" "$@" "$?" "$$"
 """
     assert discover_external_shell_env(script) == set()
+
+
+def test_shell_environment_inputs_are_in_canonical_reference():
+    reference = json.loads(
+        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(
+            encoding="utf-8"
+        )
+    ) if (ROOT / "docs" / "configuration" / "environment-variables.json").exists() else {}
+    missing = sorted(discover_repository_shell_env(ROOT) - set(reference))
+    assert missing == []
