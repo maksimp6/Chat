@@ -16,7 +16,6 @@ _CHECK_CONCLUSIONS = {
     "Platform changes": {"success"},
     "CI required": {"success"},
 }
-_MATERIAL_REVIEW_STATES = {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
 
 
 def _gh_json(args: list[str]) -> dict[str, Any]:
@@ -67,15 +66,6 @@ def collect_snapshot(
             nodes { isResolved }
             pageInfo { hasNextPage }
           }
-          reviews(first: 100) {
-            nodes {
-              state
-              submittedAt
-              commit { oid }
-              author { login }
-            }
-            pageInfo { hasNextPage }
-          }
         }
       }
     }
@@ -95,7 +85,6 @@ def collect_snapshot(
     )
     pull_review_data = thread_data["data"]["repository"]["pullRequest"]
     threads = pull_review_data["reviewThreads"]
-    reviews = pull_review_data["reviews"]
 
     final_pull = _gh_json([f"/repos/{repo}/pulls/{pr_number}"])
     final_head_sha = str(final_pull["head"]["sha"])
@@ -113,88 +102,82 @@ def collect_snapshot(
         "snapshot_changed": final_head_sha != head_sha or final_base_sha != base_sha,
         "pr_state": str(final_pull.get("state") or ""),
         "merged": bool(final_pull.get("merged")),
-        "author_login": str(final_pull.get("user", {}).get("login") or ""),
         "draft": bool(final_pull["draft"]),
         "behind_by": int(compare["behind_by"]),
         "check_runs": checks.get("check_runs", []),
         "required_checks": list(dict.fromkeys(required_checks or [])),
-        "reviews": reviews.get("nodes", []),
-        "reviews_truncated": bool(reviews.get("pageInfo", {}).get("hasNextPage")),
+        "solution_review": None,
         "review_threads": threads.get("nodes", []),
         "review_threads_truncated": bool(threads.get("pageInfo", {}).get("hasNextPage")),
     }
 
 
-def _review_author(review: dict[str, Any]) -> str:
-    author = review.get("author") or {}
-    return str(author.get("login") or "")
-
-
-def _review_commit(review: dict[str, Any]) -> str:
-    commit = review.get("commit") or {}
-    return str(commit.get("oid") or "")
-
-
-def _latest_material_reviews(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    author_login = str(snapshot.get("author_login") or "")
-    latest: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
-    for index, review in enumerate(snapshot.get("reviews", [])):
-        reviewer = _review_author(review)
-        state = str(review.get("state") or "")
-        if not reviewer or reviewer == author_login or state not in _MATERIAL_REVIEW_STATES:
-            continue
-        order = (str(review.get("submittedAt") or ""), index)
-        previous = latest.get(reviewer)
-        if previous is None or order > previous[0]:
-            latest[reviewer] = (order, review)
-    return [entry[1] for entry in latest.values()]
-
-
-def _independent_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
-    if snapshot.get("reviews_truncated"):
+def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    evidence = snapshot.get("solution_review")
+    if not isinstance(evidence, dict):
         return {
-            "code": "reviews_truncated",
-            "detail": "review result exceeded one page; readiness cannot be proven",
+            "code": "solution_review_missing",
+            "detail": "trusted solution-review evidence is missing",
         }
 
-    if not str(snapshot.get("author_login") or ""):
-        return {
-            "code": "independent_review_missing",
-            "detail": "pull request author identity is unavailable; independence cannot be proven",
-        }
-
-    current_head = str(snapshot["head_sha"])
-    latest_reviews = _latest_material_reviews(snapshot)
-    current_changes_requested = [
-        review
-        for review in latest_reviews
-        if str(review.get("state") or "") == "CHANGES_REQUESTED"
-        and _review_commit(review) == current_head
-    ]
-    if current_changes_requested:
-        return {
-            "code": "independent_review_changes_requested",
-            "detail": "an independent reviewer requested changes on the exact current head",
-        }
-
-    exact_head_approvals = [
-        review
-        for review in latest_reviews
-        if str(review.get("state") or "") == "APPROVED" and _review_commit(review) == current_head
-    ]
-    if exact_head_approvals:
-        return None
-
-    if any(str(review.get("state") or "") == "APPROVED" for review in latest_reviews):
-        return {
-            "code": "independent_review_stale",
-            "detail": "independent approval exists only for a non-current head",
-        }
-
-    return {
-        "code": "independent_review_missing",
-        "detail": "no independent APPROVED review exists for the exact current head",
+    required = {
+        "task",
+        "outcome",
+        "reviewed_head_sha",
+        "reviewed_base_sha",
+        "reviewer_role",
+        "reviewer_session",
+        "implementation_role",
+        "implementation_session",
+        "provenance",
     }
+    if any(not str(evidence.get(field) or "").strip() for field in required):
+        return {
+            "code": "solution_review_invalid",
+            "detail": "solution-review evidence is incomplete",
+        }
+    if evidence.get("schema_version") != 1:
+        return {
+            "code": "solution_review_invalid",
+            "detail": "solution-review evidence schema version is unsupported",
+        }
+
+    outcome = str(evidence["outcome"])
+    if outcome == "CHANGES_REQUESTED":
+        return {
+            "code": "solution_review_changes_requested",
+            "detail": "solution reviewer requested implementation changes",
+        }
+    if outcome == "BLOCKED":
+        return {
+            "code": "solution_review_blocked",
+            "detail": "solution review is blocked",
+        }
+    if outcome != "ACCEPTED":
+        return {
+            "code": "solution_review_invalid",
+            "detail": "solution-review outcome is not recognized",
+        }
+
+    if (
+        str(evidence["reviewed_head_sha"]) != str(snapshot["head_sha"])
+        or str(evidence["reviewed_base_sha"]) != str(snapshot["base_sha"])
+    ):
+        return {
+            "code": "solution_review_stale",
+            "detail": "solution review is not bound to the exact current head and base",
+        }
+
+    if (
+        str(evidence["reviewer_role"]) == str(evidence["implementation_role"])
+        or str(evidence["reviewer_session"]) == str(evidence["implementation_session"])
+    ):
+        return {
+            "code": "solution_review_not_independent",
+            "detail": "solution reviewer role and session must be independent from implementation",
+        }
+
+    return None
 
 
 def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -298,7 +281,7 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    review_blocker = _independent_review_blocker(snapshot)
+    review_blocker = _solution_review_blocker(snapshot)
     if review_blocker is not None:
         blockers.append(review_blocker)
 
