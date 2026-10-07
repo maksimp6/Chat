@@ -110,3 +110,106 @@ def test_estimate_exposes_cost_components():
     assert result["cpu_rub"] == Decimal("0.9455")
     assert result["memory_rub"] == Decimal("0.628483")
     assert result["estimated_rub"] == result["cpu_rub"] + result["memory_rub"]
+
+
+class TestRuntimeCostReconciliation:
+    def test_actual_missing_stays_unknown(self):
+        from cloud.cloudru.billing import reconcile_container_runtime_cost
+
+        result = reconcile_container_runtime_cost(
+            estimated_rub=Decimal("10.00"),
+            actual_rub=None,
+        )
+        assert result == {
+            "status": "unknown",
+            "estimated_rub": Decimal("10.00"),
+            "actual_rub": None,
+            "variance_rub": None,
+            "variance_percent": None,
+        }
+
+    def test_actual_and_estimate_report_variance(self):
+        from cloud.cloudru.billing import reconcile_container_runtime_cost
+
+        result = reconcile_container_runtime_cost(
+            estimated_rub=Decimal("10.00"),
+            actual_rub=Decimal("12.00"),
+        )
+        assert result["status"] == "measured"
+        assert result["variance_rub"] == Decimal("2.0000000")
+        assert result["variance_percent"] == Decimal("20.0000")
+
+    def test_zero_estimate_does_not_invent_percentage(self):
+        from cloud.cloudru.billing import reconcile_container_runtime_cost
+
+        result = reconcile_container_runtime_cost(
+            estimated_rub=Decimal("0"),
+            actual_rub=Decimal("1"),
+        )
+        assert result["status"] == "measured"
+        assert result["variance_rub"] == Decimal("1.0000000")
+        assert result["variance_percent"] is None
+
+    @pytest.mark.parametrize("field", ["estimated_rub", "actual_rub"])
+    def test_negative_reconciliation_cost_rejected(self, field):
+        from cloud.cloudru.billing import reconcile_container_runtime_cost
+
+        kwargs = {
+            "estimated_rub": Decimal("1"),
+            "actual_rub": Decimal("1"),
+        }
+        kwargs[field] = Decimal("-1")
+        with pytest.raises(ValueError, match=field):
+            reconcile_container_runtime_cost(**kwargs)
+
+
+class TestUnexpectedHotDetection:
+    def test_container_within_idle_budget_is_not_hot(self):
+        from cloud.cloudru.billing import detect_unexpected_hot
+
+        assert (
+            detect_unexpected_hot(
+                idle_seconds=120,
+                configured_idle_timeout_seconds=120,
+                running_instances=1,
+            )
+            is False
+        )
+
+    def test_container_past_idle_budget_is_hot(self):
+        from cloud.cloudru.billing import detect_unexpected_hot
+
+        assert (
+            detect_unexpected_hot(
+                idle_seconds=121,
+                configured_idle_timeout_seconds=120,
+                running_instances=1,
+            )
+            is True
+        )
+
+    def test_scaled_to_zero_is_never_reported_hot(self):
+        from cloud.cloudru.billing import detect_unexpected_hot
+
+        assert (
+            detect_unexpected_hot(
+                idle_seconds=3600,
+                configured_idle_timeout_seconds=120,
+                running_instances=0,
+            )
+            is False
+        )
+
+    @pytest.mark.parametrize(
+        ("idle_seconds", "timeout", "instances"),
+        [(-1, 120, 1), (0, 0, 1), (0, 120, -1)],
+    )
+    def test_invalid_hot_detection_inputs_fail_closed(self, idle_seconds, timeout, instances):
+        from cloud.cloudru.billing import detect_unexpected_hot
+
+        with pytest.raises(ValueError):
+            detect_unexpected_hot(
+                idle_seconds=idle_seconds,
+                configured_idle_timeout_seconds=timeout,
+                running_instances=instances,
+            )
