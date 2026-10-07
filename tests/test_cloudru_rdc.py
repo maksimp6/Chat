@@ -48,6 +48,11 @@ def apps_with(item=None):
         stop=Mock(),
         start=Mock(),
     )
+    apps.get = Mock(
+        side_effect=lambda name: next(
+            (entry for entry in apps.list() if entry.get("name") == name), None
+        )
+    )
     return apps
 
 
@@ -187,11 +192,19 @@ def test_proto_defaults_and_expanded_managed_volume_do_not_break_ownership():
         rdc.owned_record(apps_with(item), tenant=TENANT, identifier=DEVICE)
 
 
-def test_ambiguous_inventory_cannot_authorize_mutation():
+def test_lookup_by_name_rejects_a_different_container():
     apps = apps_with()
-    apps.list.return_value = [record(), record()]
+    apps.get = Mock(return_value={**record(), "name": "rdc-other"})
     with pytest.raises(CloudProviderError):
         rdc.owned_record(apps, tenant=TENANT)
+
+
+def test_lookup_never_lists_the_whole_project():
+    apps = apps_with()
+    apps.list.side_effect = AssertionError("project-wide list must not be called")
+    apps.get = Mock(return_value=None)
+    assert rdc.named_record(apps) is None
+    apps.get.assert_called_once_with(rdc.names(PROJECT)[0])
 
 
 @pytest.mark.parametrize(
@@ -1433,6 +1446,6 @@ def test_preflight_reports_failing_step_without_provider_values(failing, capsys)
     out = capsys.readouterr().out
     assert json.loads(out) == {
         "stage": "rdc_preflight_failed",
-        "step": "list_containers" if failing == "list" else "bucket_inventory",
+        "step": "find_container" if failing == "list" else "bucket_inventory",
     }
     assert "secret-provider-detail" not in out
