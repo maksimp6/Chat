@@ -31,6 +31,22 @@ def test_live_acceptance_runtime_windows_are_short_and_single_instance():
         assert service["idle_timeout_seconds"] == idle_seconds
 
 
+@pytest.mark.parametrize("max_rub", [Decimal("0"), Decimal("-0.01")])
+def test_budget_must_be_positive(max_rub):
+    from cloud.cloudru import live_budget
+
+    with pytest.raises(ValueError, match="max_rub"):
+        live_budget.LiveAcceptanceBudget(max_rub=max_rub, max_window_seconds=900)
+
+
+@pytest.mark.parametrize("window", [0, -1, True])
+def test_paid_window_must_be_positive_integer(window):
+    from cloud.cloudru import live_budget
+
+    with pytest.raises(ValueError, match="max_window_seconds"):
+        live_budget.LiveAcceptanceBudget(max_rub=Decimal("5"), max_window_seconds=window)
+
+
 def test_live_acceptance_budget_contract_is_fail_closed():
     from cloud.cloudru import live_budget
 
