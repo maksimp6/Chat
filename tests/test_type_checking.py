@@ -89,6 +89,7 @@ STRICT_CLEAN_FILES = {
     "printing3d/__init__.py",
     "provider_key_rotation.py",
     "repository_index/__init__.py",
+    "repository_index/builder.py",
     "repository_index/provenance.py",
     "rdc_connection/__init__.py",
     "reasoning_plan.py",

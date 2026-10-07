@@ -87,8 +87,9 @@ the immutable source link when available. Existing legacy-index behavior and
 retrieval ordering remain unchanged.
 
 Snapshot classification is shared by both consumers through `snapshot_revision()`.
-The validator lives in `repository_index/provenance.py`, so production retrieval
-does not import the CLI/index-builder module.
+The validator lives in `repository_index/provenance.py`; the builder implementation lives in
+`repository_index/builder.py`. `scripts/build_ai_index.py` is only the compatible direct-script
+entrypoint, so production retrieval does not import the CLI builder.
 Any snapshot-only field, including a null field or nested file/symbol source
 metadata, selects strict validation. An absent/null/unsupported schema, source
 kind, commit, repository or parser label cannot downgrade a snapshot to legacy.
