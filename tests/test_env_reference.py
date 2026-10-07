@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts.check_env_reference import discover_python_env, validate_reference
+import json
+
+from scripts.check_env_reference import discover_python_env, discover_runtime_python, validate_reference
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_discovers_static_python_environment_reads(tmp_path):
@@ -49,3 +53,13 @@ def test_reference_never_contains_secret_values():
     }
     errors = validate_reference(discovered, reference)
     assert errors == ["TOKEN: reference entry must not contain a value field"]
+
+
+def test_reference_matches_repository_runtime():
+    reference = json.loads(
+        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    discovered = discover_python_env(discover_runtime_python(ROOT))
+    assert validate_reference(discovered, reference) == []
