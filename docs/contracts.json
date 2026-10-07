@@ -36,8 +36,7 @@
         "session_manager.py"
       ],
       "tests": [
-        "tests/test_runtime_api.py",
-        "tests/test_session_profiles.py"
+        "tests/test_runtime_api.py"
       ]
     }
   ]
