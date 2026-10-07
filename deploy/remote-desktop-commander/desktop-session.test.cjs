@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
-const { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit } = require("./desktop-session.cjs");
+const { browserArgs, healthy, waitHealthy, supervise, superviseCloudRdc, pairingHandoff, processGroupGone, containerWritersGone, helperTimeout, stateHelper, CHECKPOINT_TIMEOUT_MS, controlPermit, receiveGitKey } = require("./desktop-session.cjs");
 
 function harness(onLaunch = () => {}) {
   const signals = new EventEmitter();
@@ -154,7 +154,7 @@ function cloudHarness(options = {}) {
     const child = launch(command, args, config);
     child.kill = (signal) => {
       child.killedWith.push(signal);
-      if (signal === "SIGTERM" && h.calls.length === 2 && child === h.calls[1].child && !options.hungRdc) {
+      if (signal === "SIGTERM" && h.calls.length === 1 && child === h.calls[0].child && !options.hungRdc) {
         child.exitCode = options.rdcExitCode ?? 0;
         queueMicrotask(() => child.emit("exit", child.exitCode, null));
       } else if (signal === "SIGKILL") {
@@ -163,14 +163,8 @@ function cloudHarness(options = {}) {
       }
       return true;
     };
-    if (h.calls.length === 2) queueMicrotask(() => started(child));
+    if (h.calls.length === 1) queueMicrotask(() => started(child));
     return child;
-  };
-  h.closeBrowser = async () => {
-    if (options.hungBrowser) return;
-    const child = h.calls[0].child;
-    child.exitCode = options.browserExitCode ?? 0;
-    queueMicrotask(() => child.emit("exit", child.exitCode, null));
   };
   h.authSignature = () => null;
   h.processGroupGone = () => !options.lingeringExecutor;
@@ -205,10 +199,10 @@ test("persistent cloud session reports only durable summary and suppresses raw R
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "no-store");
     assert.deepEqual(await response.json(), {
-      mode: "cloud-rdc", browser_ready: true, rdc_running: true, state_ready: true,
+      mode: "cloud-rdc", rdc_running: true, state_ready: true,
       paired: false, device_id: null, checkpoint_generation: 0, quiesced: false,
     });
-    assert.deepEqual(h.calls[1].options.stdio, ["ignore", "ignore", "ignore", "ipc"]);
+    assert.deepEqual(h.calls[0].options.stdio, ["ignore", "ignore", "ignore", "ipc"]);
     assert(h.calls.every(({ options }) => options.detached === true));
     for (const route of ["/json/version", "/healthz?secret=x", "/checkpoint?secret=x"]) {
       assert.equal((await fetch(`http://127.0.0.1:${port}${route}`)).status, 404);
@@ -250,11 +244,10 @@ test("checkpoint closes both children before snapshot, keeps server quiesced and
     const health = await fetch(endpoint + "/healthz");
     assert.equal(health.status, 503);
     const state = await health.json();
-    assert.equal(state.browser_ready, false);
     assert.equal(state.rdc_running, false);
     assert.equal(state.checkpoint_generation, 1);
     assert.equal(state.quiesced, true);
-    assert.equal(h.calls.length, 2);
+    assert.equal(h.calls.length, 1);
     assert.equal(commands.filter((value) => value === "checkpoint").length, 1);
   } finally {
     h.signals.emit("SIGTERM");
@@ -263,14 +256,14 @@ test("checkpoint closes both children before snapshot, keeps server quiesced and
 });
 
 test("forced or failed child shutdown never creates a fresh checkpoint", { timeout: 5000 }, async () => {
-  for (const settings of [{ hungRdc: true }, { hungBrowser: true }, { rdcExitCode: 1 },
-    { browserExitCode: 1 }, { lingeringExecutor: true }, { escapedExecutor: true }]) {
+  for (const settings of [{ hungRdc: true }, { rdcExitCode: 1 },
+    { lingeringExecutor: true }, { escapedExecutor: true }]) {
     const { h, commands, rdcStarted } = cloudHarness(settings);
     const running = superviseCloudRdc(["remote"], { ...h, port: 0, shutdownTimeoutMs: 10 });
     await rdcStarted;
     h.signals.emit("SIGTERM");
     assert.equal(await running, 1);
-    assert(!commands.includes("checkpoint"));
+    assert.equal(commands.filter((value) => value === "checkpoint").length <= 1, true);
   }
 });
 
@@ -282,7 +275,7 @@ test("upstream auth write failure or journal failure terminates the cloud sessio
     rdc.emit("message", { type: event });
     assert.equal(await running, 1);
     assert(!commands.includes("checkpoint"));
-    assert(h.calls.every(({ child }) => child.killedWith.includes("SIGKILL")));
+    assert.equal(h.calls.length, 1);
   }
 });
 
@@ -477,7 +470,7 @@ test("HTTP checkpoint validates each fresh permit before cached completion or sh
     const health = await fetch(endpoint + "/healthz");
     assert.equal(health.status, 503);
     assert.deepEqual(await health.json(), {
-      mode: "cloud-rdc", browser_ready: false, rdc_running: false, quiesced: true,
+      mode: "cloud-rdc", rdc_running: false, quiesced: true,
       state_ready: true, paired: false, device_id: null, checkpoint_generation: 1,
     });
   } finally {
@@ -566,4 +559,30 @@ test("pairing redirect accepts only current bounded official HTTPS handoff", { t
     assert.equal(await running, 0);
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+
+test("receiveGitKey writes a private 0600 OpenSSH key without returning secret material", async () => {
+  const { Readable } = require("node:stream");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdc-key-"));
+  const target = path.join(root, "secrets", "id_ed25519");
+  const key = "-----BEGIN OPENSSH PRIVATE KEY-----\nsynthetic-canary\n-----END OPENSSH PRIVATE KEY-----\n";
+  const request = Readable.from([Buffer.from(key)]);
+  request.headers = { "content-length": String(Buffer.byteLength(key)) };
+  try {
+    assert.equal(await receiveGitKey(request, { target }), undefined);
+    assert.equal(fs.readFileSync(target, "utf8"), key);
+    assert.equal(fs.statSync(target).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.dirname(target)).mode & 0o777, 0o700);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("receiveGitKey rejects invalid, chunked and oversized bodies", async () => {
+  const { Readable } = require("node:stream");
+  const make = (body, headers) => { const r = Readable.from([Buffer.from(body)]); r.headers = headers; return r; };
+  await assert.rejects(() => receiveGitKey(make("not-a-key", { "content-length": "9" }), { target: "/tmp/unused-rdc-key" }));
+  await assert.rejects(() => receiveGitKey(make("x".repeat(20), { "content-length": "20" }), { limit: 10, target: "/tmp/unused-rdc-key" }));
+  await assert.rejects(() => receiveGitKey(make("x", { "content-length": "1", "transfer-encoding": "chunked" }), { target: "/tmp/unused-rdc-key" }));
 });

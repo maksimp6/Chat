@@ -37,7 +37,6 @@ VOLUME = "rdc-state"
 MOUNT = "/rdc-state"
 HEALTH_KEYS = {
     "mode",
-    "browser_ready",
     "rdc_running",
     "state_ready",
     "paired",
@@ -94,14 +93,12 @@ def runtime_env(project):
     }
 
 
-def creation_body(project, image, *, profile="persistent"):
+def creation_body(project, image):
     if not isinstance(image, str) or not IMAGE_RE.fullmatch(image):
         fail("validation_error")
-    if profile not in {"persistent", "bootstrap"}:
-        fail("validation_error")
     name, bucket = names(project)
-    cpu = "0.5" if profile == "bootstrap" else "1"
-    memory = "512Mi" if profile == "bootstrap" else "4096Mi"
+    cpu = "0.1"
+    memory = "256Mi"
     spec = ContainerSpec(
         name=name,
         image=image,
@@ -238,8 +235,8 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             "port": type(container.get("containerPort")) is int
             and container["containerPort"] == 8080,
             "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
-            "cpu": resource_map.get("cpu") == "1",
-            "memory": resource_map.get("memory") == "4096Mi",
+            "cpu": resource_map.get("cpu") == "0.1",
+            "memory": resource_map.get("memory") == "256Mi",
             "scaling_types": type(scaling.get("minInstanceCount")) is int
             and type(scaling.get("maxInstanceCount")) is int,
             "scaling_min": scaling.get("minInstanceCount") == 1,
@@ -543,7 +540,7 @@ def health_summary(value):
         fail("invalid_response")
     if any(
         type(value.get(key)) is not bool
-        for key in ("browser_ready", "rdc_running", "state_ready", "paired", "quiesced")
+        for key in ("rdc_running", "state_ready", "paired", "quiesced")
     ):
         fail("invalid_response")
     generation = value.get("checkpoint_generation")
@@ -555,7 +552,7 @@ def health_summary(value):
     if value["paired"] and identifier is None:
         fail("invalid_response")
     if value["quiesced"] and (
-        not value["state_ready"] or value["browser_ready"] or value["rdc_running"] or generation < 1
+        not value["state_ready"] or value["rdc_running"] or generation < 1
     ):
         fail("invalid_response")
     return value
@@ -622,7 +619,7 @@ def wait_ready(
             if result is not None:
                 summary = health_summary(result)
                 if (allow_quiesced and summary["quiesced"]) or (
-                    summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]
+                    summary["rdc_running"] and summary["state_ready"]
                 ):
                     return record, summary
         sleep(min(2, max(0, deadline - time.monotonic())))
@@ -754,6 +751,7 @@ def deployment_summary(record, health):
         "pairing_url": application_origin(record) + "/rdc/pair",
         **health,
     }
+
 
 
 def install(apps, store, credentials, image, *, tenant, http_get=requests.get):
@@ -933,7 +931,7 @@ def checkpoint(
             if value is not None:
                 summary = health_summary(value)
                 if summary["quiesced"] or all(
-                    summary[key] for key in ("browser_ready", "rdc_running", "state_ready")
+                    summary[key] for key in ("rdc_running", "state_ready")
                 ):
                     before = summary
                     break
@@ -1311,6 +1309,9 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
         apps.client.timeout = previous_timeout
 
 
+
+
+
 def status(apps, *, tenant, http_get=requests.get):
     configured_tenant(tenant)
     record = owned_record(apps, tenant=tenant)
@@ -1509,7 +1510,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "install", "bootstrap_install", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "install", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1530,16 +1531,17 @@ def main():
     tenant = configured_tenant(args.tenant_id)
     store, credentials = storage_client(project, tenant)
     apps = CloudRuContainerAppsClient(project_id=project)
-    if args.action in ("preflight", "install", "bootstrap_install"):
+    if args.action in ("preflight", "install"):
         result = preflight(apps, store, credentials, tenant=tenant)
-        if args.action in ("install", "bootstrap_install"):
+        if args.action == "install":
             if result["container_exists"]:
                 fail("already_exists")
-            image = build_image(root, args.sha)
-            profile = "bootstrap" if args.action == "bootstrap_install" else "persistent"
-            creation_body(project, image, profile=profile)
-            print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
-            result = install(apps, store, credentials, image, tenant=tenant, profile=profile)
+            image = os.environ.get("ALICE_RDC_IMAGE", "")
+            if not image:
+                fail("validation_error")
+            creation_body(project, image)
+            print(json.dumps({"stage": "rdc_image_reused", "image": image}), flush=True)
+            result = install(apps, store, credentials, image, tenant=tenant)
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":

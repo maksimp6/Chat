@@ -3,6 +3,8 @@ services:
   commander:
     build:
       context: .
+      args:
+        RDC_BASE_IMAGE: ${RDC_BASE_IMAGE:-alice-rdc-base:ci}
     image: alice-remote-desktop-commander:0.2.52
     init: true
     restart: unless-stopped
