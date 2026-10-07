@@ -13,11 +13,11 @@ This document explains the platform structure and principles.
 The platform currently carries legacy control-plane names while the Container Apps runtime migrates to canonical user-facing service names.
 
 Canonical runtime services:
-- **alice** — production Alice Pro runtime, 1 vCPU / 1 GiB starting allocation, scale-to-zero candidate.
-- **alice-lab** — development/test Alice runtime, 1 vCPU / 1 GiB starting allocation, scale-to-zero candidate.
-- **alice-browser** — real Chromium/Playwright/MCP worker, 2 vCPU / 2 GiB starting allocation, scale-to-zero candidate.
+- **alice** — production Alice Pro runtime, 1 vCPU / 1 GiB, min 0 / max 1, 300 s idle timeout.
+- **alice-lab** — development/test Alice runtime, 1 vCPU / 1 GiB, min 0 / max 1, 120 s idle timeout.
+- **alice-browser** — real Chromium/Playwright/MCP worker, 2 vCPU / 2 GiB, min 0 / max 1, 120 s idle timeout.
 
-The existing **oauth** and **chrome** logical services remain during migration because current authentication/browser consumers still reference them. They must not be deleted or silently renamed until those consumers have migrated and live acceptance is proven.
+The existing **oauth** and **chrome** logical services remain during migration because current authentication/browser consumers still reference them. They must not be deleted or silently renamed until those consumers have migrated and live acceptance is proven. Runtime scaling is fail-closed in config: instance counts are non-negative/positive as appropriate, min cannot exceed max, and idle timeout must be a positive integer.
 
 Current control-plane services:
 
