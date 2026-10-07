@@ -461,3 +461,22 @@ def test_merge_readiness_quota_notice_is_not_a_model_review_prerequisite():
     result = merge_readiness.evaluate_snapshot(value)
     assert result["ready"] is False
     assert blocker_codes(result) == {"review_threads"}
+
+
+def test_rdc_changes_require_image_validation_check() -> None:
+    required = merge_readiness.required_checks_for_files(
+        ["CI required"],
+        [
+            {"filename": "deploy/remote-desktop-commander/Dockerfile"},
+            {"filename": "docs/README.md"},
+        ],
+    )
+    assert required == ["CI required", "validate-image"]
+
+
+def test_non_rdc_changes_do_not_require_image_validation_check() -> None:
+    required = merge_readiness.required_checks_for_files(
+        ["CI required"],
+        [{"filename": "docs/README.md"}],
+    )
+    assert required == ["CI required"]
