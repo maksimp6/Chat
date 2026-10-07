@@ -53,7 +53,7 @@ jobs:
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = push ]; then
-            python scripts/cloudru_rdc.py observe_raw --sha "$SOURCE_SHA"
+            python scripts/cloudru_rdc.py deploy --sha "$SOURCE_SHA"
           else
             python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
           fi
