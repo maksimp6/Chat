@@ -2,7 +2,7 @@
 
 ## Системные требования
 
-- Python: текущий backend CI использует 3.14; конфигурация Ruff ориентируется на 3.12.
+- Python 3.14 — repository-pinned development/CI runtime (`.python-version`, mypy и backend CI). Ruff `target-version = py312` — это lint/format compatibility target, а не обещание поддержки запуска Alice Pro на Python 3.12.
 - Git и доступ к зависимостям из `requirements.txt`.
 - Для ответов модели — доступ к Yandex AI Studio и настроенная запись провайдера.
 - SQLite используется по умолчанию; PostgreSQL подключается отдельно.
