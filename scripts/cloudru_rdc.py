@@ -97,8 +97,8 @@ def creation_body(project, image):
     if not isinstance(image, str) or not IMAGE_RE.fullmatch(image):
         fail("validation_error")
     name, bucket = names(project)
-    cpu = "0.2"
-    memory = "512Mi"
+    cpu = "0.1"
+    memory = "256Mi"
     spec = ContainerSpec(
         name=name,
         image=image,
@@ -235,8 +235,8 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             "port": type(container.get("containerPort")) is int
             and container["containerPort"] == 8080,
             "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
-            "cpu": resource_map.get("cpu") == "0.2",
-            "memory": resource_map.get("memory") == "512Mi",
+            "cpu": resource_map.get("cpu") == "0.1",
+            "memory": resource_map.get("memory") == "256Mi",
             "scaling_types": type(scaling.get("minInstanceCount")) is int
             and type(scaling.get("maxInstanceCount")) is int,
             "scaling_min": scaling.get("minInstanceCount") == 1,
@@ -1334,7 +1334,7 @@ def resize_working_minimum(apps, *, tenant, timeout=10, clock=time.monotonic, sl
     spec = ContainerSpec(
         name=current["name"],
         image=image,
-        cpu="0.2",
+        cpu="0.1",
         min_instances=1,
         max_instances=1,
         public=True,
@@ -1353,7 +1353,7 @@ def resize_working_minimum(apps, *, tenant, timeout=10, clock=time.monotonic, sl
         scaling = (observed.get("template") or {}).get("scaling") or {}
         state = str(observed.get("status", "")).lower()
         if (
-            resources == {"cpu": "0.2", "memory": "512Mi"}
+            resources == {"cpu": "0.1", "memory": "256Mi"}
             and scaling.get("minInstanceCount") == 1
             and scaling.get("maxInstanceCount") == 1
             and containers[0].get("image") == image
@@ -1366,8 +1366,8 @@ def resize_working_minimum(apps, *, tenant, timeout=10, clock=time.monotonic, sl
                 "status": "RDC_RESIZED",
                 "container_name": current["name"],
                 "container_id": identifier,
-                "cpu": "0.2",
-                "memory": "512Mi",
+                "cpu": "0.1",
+                "memory": "256Mi",
                 "deploy_elapsed_ms": elapsed_ms,
             }
         sleep(min(0.25, max(0, deadline - clock())))
