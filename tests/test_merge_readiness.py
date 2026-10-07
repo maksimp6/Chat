@@ -288,7 +288,7 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                                     }
                                 ],
                                 "pageInfo": {"hasNextPage": False},
-                            }
+                            },
                         }
                     }
                 }
@@ -364,7 +364,7 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                                     }
                                 ],
                                 "pageInfo": {"hasNextPage": False},
-                            }
+                            },
                         }
                     }
                 }
