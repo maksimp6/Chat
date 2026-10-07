@@ -389,78 +389,8 @@ jobs:
     name: Android debug APK
     needs: changes
     if: needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest
-    env:
-      ALICE_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/android/app/debug-signing.keystore
-      ALICE_DEBUG_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS }}
-      ALICE_DEBUG_STORE_PASSWORD: ${{ secrets.ANDROID_DEBUG_STORE_PASSWORD }}
-      ALICE_DEBUG_KEY_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEY_PASSWORD }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Java
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
-        with:
-          distribution: temurin
-          java-version: "25"
-      - name: Materialize stable debug keystore
-        env:
-          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          if [ -n "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
-            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$ALICE_DEBUG_KEYSTORE_PATH"
-            chmod 600 "$ALICE_DEBUG_KEYSTORE_PATH"
-            test -s "$ALICE_DEBUG_KEYSTORE_PATH"
-            keytool -list \
-              -keystore "$ALICE_DEBUG_KEYSTORE_PATH" \
-              -storepass "$ALICE_DEBUG_STORE_PASSWORD" \
-              -alias "$ALICE_DEBUG_KEY_ALIAS" >/dev/null
-            echo "Using repository-managed stable debug signing key."
-          else
-            echo "Stable debug signing secrets are not configured; using the ephemeral Gradle debug key."
-          fi
-      - name: Build direct debug APK
-        env:
-          ALICE_BUILD_NUMBER: ${{ github.run_number }}
-          ALICE_VERSION_NAME: 0.2.0-direct-${{ github.sha }}
-        run: |
-          set -euo pipefail
-          started=$SECONDS
-          bash android/scripts/build_direct.sh
-          elapsed=$((SECONDS - started))
-          echo "- Android direct APK build: ${elapsed}s (target: <=15s)" >> "$GITHUB_STEP_SUMMARY"
-      - name: Run Android direct-build contract tests
-        run: |
-          set -euo pipefail
-          started=$SECONDS
-          bash android/scripts/test_direct.sh
-          elapsed=$((SECONDS - started))
-          echo "- Android direct contract tests: ${elapsed}s" >> "$GITHUB_STEP_SUMMARY"
-      - name: Verify debug APK
-        run: |
-          set -euo pipefail
-          apk=android/build/direct/alice-pro-direct.apk
-          test -s "$apk"
-          size_bytes=$(stat -c%s "$apk")
-          size_kib=$(( (size_bytes + 1023) / 1024 ))
-          echo "- Android direct APK size: ${size_bytes} bytes (${size_kib} KiB), limit: 1048576 bytes" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$size_bytes" -gt 1048576 ]; then
-            echo "APK exceeds 1 MiB size budget: ${size_bytes} > 1048576" >&2
-            exit 1
-          fi
-          sha256sum "$apk"
-      - name: Upload debug APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: alice-pro-direct-apk-${{ github.run_number }}
-          path: android/build/direct/alice-pro-direct.apk
-          if-no-files-found: error
-          retention-days: 14
-          compression-level: 0
-
+    uses: ./.github/workflows/android-direct.yml
+    secrets: inherit
 
   required:
     name: CI required
