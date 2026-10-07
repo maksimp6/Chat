@@ -188,6 +188,7 @@ class CloudRuRegistryClient:
         platform: str = "linux/amd64",
         max_seconds: float = 15.0,
         build_args: dict[str, str] | None = None,
+        registry_cache: bool = True,
     ) -> ImageRef:
         """Build+push with BuildKit registry cache and no local cache-image transfer."""
         repository = validate_name(repository, "repository")
@@ -226,34 +227,57 @@ class CloudRuRegistryClient:
                 "build",
                 "--platform",
                 platform,
-                "--cache-from",
-                f"type=registry,ref={cache}",
-                "--cache-to",
-                f"type=registry,ref={cache},mode=max",
             ]
+            if registry_cache:
+                build_argv.extend(
+                    [
+                        "--cache-from",
+                        f"type=registry,ref={cache}",
+                        "--cache-to",
+                        f"type=registry,ref={cache},mode=max",
+                    ]
+                )
             for name, value in sorted((build_args or {}).items()):
                 if not name or not value or not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
                     raise CloudProviderError("build arg is invalid", code="validation_error")
                 build_argv.extend(["--build-arg", f"{name}={value}"])
             with tempfile.NamedTemporaryFile(prefix="buildx-metadata-", suffix=".json") as metadata:
                 started = time.perf_counter()
-                result = self._run(
-                    [
-                        *build_argv,
-                        "--metadata-file",
-                        metadata.name,
-                        "-f",
-                        dockerfile,
-                        "-t",
-                        ref.tagged,
-                        "--push",
-                        context_dir,
-                    ],
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    env=env,
-                )
+                try:
+                    result = self._run(
+                        [
+                            *build_argv,
+                            "--metadata-file",
+                            metadata.name,
+                            "-f",
+                            dockerfile,
+                            "-t",
+                            ref.tagged,
+                            "--push",
+                            context_dir,
+                        ],
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                        env=env,
+                        timeout=max_seconds,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    seconds = time.perf_counter() - started
+                    print(
+                        json.dumps(
+                            {
+                                "stage": "registry_build_push_fast",
+                                "seconds": seconds,
+                                "returncode": 124,
+                            }
+                        ),
+                        flush=True,
+                    )
+                    raise CloudProviderError(
+                        f"docker buildx exceeded {max_seconds}s budget",
+                        code="build_time_budget_exceeded",
+                    ) from exc
                 seconds = time.perf_counter() - started
                 print(
                     json.dumps(
