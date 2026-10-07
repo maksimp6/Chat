@@ -1,0 +1,1054 @@
+{
+  "schema_version": 1,
+  "generated_policy": "maintained manually; validated by scripts/check_docs.py",
+  "documents": [
+    {
+      "path": "docs/README.md",
+      "kind": "index",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/adr/README.md",
+      "kind": "index",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agent_gateway/cloudru-ai-agents.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/agent-observer.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/agent-shell.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/alice-github-agent.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/codex-pr-338-finish.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "agent-platform",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/agents/communication.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/departments.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/eds-runner.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/partner-relations.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/process-observation-and-governance.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/role-based-agent-office.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/runtime-dispatcher-contract.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/agents/system-prompts.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "agent-platform",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/API_DOCS.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/agents.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/chat.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/contracts.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/errors.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/api/printing3d.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/agent-context-cache.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/agent-gateway.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/agent-memory.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/agent-retrieval.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/agents.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/ai-execution-pipeline.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/branch-environments.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/browser-adapter-boundary.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/browser-capabilities.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/browser-self-testing.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/chatgpt-browser-tool.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/conversation-agent-routing.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/data-flow.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/error_trace_partial_output_tz.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/execution_trace.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/integration-coordination.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/local_tool_agent.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/mcp.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/reasoning.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/repository-layout.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/repository-revision-index.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/ssh_runtime.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/architecture/universal_tool_platform.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/backend/anonymous-user-bootstrap.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/backend/logging.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/backend/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/bare_sync.md",
+      "kind": "explanation",
+      "status": "retired",
+      "owner": "docs-engineer",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/branch-environments.md",
+      "kind": "explanation",
+      "status": "experimental",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/budget_controller.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/changelog.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "docs-engineer",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/ci/cache-experiment.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "docs-engineer",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/cloudru-container-apps.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/compute-energy-billing.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/database.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "storage code/tests and issue #776",
+      "canonical": true
+    },
+    {
+      "path": "docs/database/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "storage code/tests and issue #776",
+      "canonical": true
+    },
+    {
+      "path": "docs/development/alice-dev-oauth-acceptance.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/development/naming.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/development/platform-ci-routing.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/development/production-deploy-secrets.md",
+      "kind": "explanation",
+      "status": "planned",
+      "owner": "docs-engineer",
+      "source_of_truth": "canonical issue plus repository code/config as implemented",
+      "canonical": true
+    },
+    {
+      "path": "docs/development/reliability.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/development/sprint-workflow.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/development_workflow.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/documentation-standard.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/execution-trace-lifecycle.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/frontend/execution-surface.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "frontend",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/frontend/module-policy.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "frontend",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/frontend/module-standard.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "frontend",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/frontend/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "frontend",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/frontend/progressive-enhancement-audit.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "frontend",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/frontend/theme-assistant.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "frontend",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/integration/current-scope.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/integrations/catalog.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/integrations/chatgpt-bot-community.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/integrations/cloud-provider-foundation.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/integrations/cloudru-docs-mirror.md",
+      "kind": "reference",
+      "status": "planned",
+      "owner": "infra",
+      "source_of_truth": "canonical issue plus repository code/config as implemented",
+      "canonical": true
+    },
+    {
+      "path": "docs/integrations/cloudru-iam-wizard.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/integrations/cloudru-object-storage.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/mcp/architecture.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "mcp",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/mcp/chatgpt_apps.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "mcp",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/mcp/filesystem.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "mcp",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/mcp/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "mcp",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/mcp/printing3d-tools.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "mcp",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/mcp/tools.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "mcp",
+      "source_of_truth": "repository code and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/memory/memory-db-v1-contract.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "storage code/tests and issue #776",
+      "canonical": true
+    },
+    {
+      "path": "docs/memory/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "backend",
+      "source_of_truth": "storage code/tests and issue #776",
+      "canonical": true
+    },
+    {
+      "path": "docs/mirrors/README.md",
+      "kind": "index",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/models/model-discovery.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/notes/README.md",
+      "kind": "index",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/notes/cloudru/README.md",
+      "kind": "index",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/platform/architecture.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "config/alice, alice_platform code/tests, canonical platform issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/platform/deployment.md",
+      "kind": "runbook",
+      "status": "planned",
+      "owner": "infra",
+      "source_of_truth": "canonical issue plus repository code/config as implemented",
+      "canonical": true
+    },
+    {
+      "path": "docs/platform/domains.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "config/alice, alice_platform code/tests, canonical platform issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/platform/recovery.md",
+      "kind": "runbook",
+      "status": "planned",
+      "owner": "infra",
+      "source_of_truth": "canonical issue plus repository code/config as implemented",
+      "canonical": true
+    },
+    {
+      "path": "docs/platform/secrets.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "config/alice, alice_platform code/tests, canonical platform issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/platform/storage.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "config/alice, alice_platform code/tests, canonical platform issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/plugins.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/preview-deployments.md",
+      "kind": "runbook",
+      "status": "experimental",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/printing3d.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/production-deployment.md",
+      "kind": "runbook",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/provider-key-rotation.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/provider-quotas.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/release.md",
+      "kind": "runbook",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/rollback_workflow.md",
+      "kind": "runbook",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/runbooks/README.md",
+      "kind": "index",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/runtime/async-concurrency-contract.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/runtime/runtime-dispatcher-policy.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/runtime/ssh-runtime.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/runtime/threaded-environment-host.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "architecture",
+      "source_of_truth": "repository code/tests and canonical architecture issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/runtime_serverless.md",
+      "kind": "explanation",
+      "status": "experimental",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/security/cloudru-secret-management.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "security",
+      "source_of_truth": "security code/tests and canonical security issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/security/github-login.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "security",
+      "source_of_truth": "security code/tests and canonical security issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/security/key_manager.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "security",
+      "source_of_truth": "security code/tests and canonical security issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/security/overview.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "security",
+      "source_of_truth": "security code/tests and canonical security issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/security/path-traversal.md",
+      "kind": "reference",
+      "status": "current",
+      "owner": "security",
+      "source_of_truth": "security code/tests and canonical security issues",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/android-debug-signing.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/android-release-signing.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/cloudru-local-agent.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "infra",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/codex-environment.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/configuration.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/development.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/installation.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/setup/launch-smoke.md",
+      "kind": "how-to",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository entrypoints, config examples and tests",
+      "canonical": true
+    },
+    {
+      "path": "docs/tasks/execution-trace.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "docs-engineer",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/tasks/issue-417-cloudru-provider.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "infra",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/tracing-file-audit.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "docs-engineer",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/treasury-billing-followup.md",
+      "kind": "historical",
+      "status": "historical",
+      "owner": "docs-engineer",
+      "source_of_truth": "git history and referenced issues/PRs",
+      "canonical": false
+    },
+    {
+      "path": "docs/voice-assistant.md",
+      "kind": "explanation",
+      "status": "current",
+      "owner": "docs-engineer",
+      "source_of_truth": "repository code/config/tests and referenced canonical issues",
+      "canonical": true
+    }
+  ]
+}
