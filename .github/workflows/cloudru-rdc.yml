@@ -19,7 +19,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: alice-cloudru-persistent-rdc
+  group: alice-cloudru-persistent-rdc-${{ github.sha }}
   cancel-in-progress: false
 jobs:
   rdc:
@@ -53,7 +53,7 @@ jobs:
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = push ]; then
-            python scripts/cloudru_rdc.py status --sha "$SOURCE_SHA"
+            python scripts/cloudru_rdc.py observe --sha "$SOURCE_SHA"
           else
             python scripts/cloudru_rdc.py "$ACTION" --sha "$SOURCE_SHA"
           fi
