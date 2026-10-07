@@ -37,7 +37,6 @@ VOLUME = "rdc-state"
 MOUNT = "/rdc-state"
 HEALTH_KEYS = {
     "mode",
-    "browser_ready",
     "rdc_running",
     "state_ready",
     "paired",
@@ -541,7 +540,7 @@ def health_summary(value):
         fail("invalid_response")
     if any(
         type(value.get(key)) is not bool
-        for key in ("browser_ready", "rdc_running", "state_ready", "paired", "quiesced")
+        for key in ("rdc_running", "state_ready", "paired", "quiesced")
     ):
         fail("invalid_response")
     generation = value.get("checkpoint_generation")
@@ -553,7 +552,7 @@ def health_summary(value):
     if value["paired"] and identifier is None:
         fail("invalid_response")
     if value["quiesced"] and (
-        not value["state_ready"] or value["browser_ready"] or value["rdc_running"] or generation < 1
+        not value["state_ready"] or value["rdc_running"] or generation < 1
     ):
         fail("invalid_response")
     return value
@@ -620,7 +619,7 @@ def wait_ready(
             if result is not None:
                 summary = health_summary(result)
                 if (allow_quiesced and summary["quiesced"]) or (
-                    summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]
+                    summary["rdc_running"] and summary["state_ready"]
                 ):
                     return record, summary
         sleep(min(2, max(0, deadline - time.monotonic())))
@@ -947,7 +946,7 @@ def checkpoint(
             if value is not None:
                 summary = health_summary(value)
                 if summary["quiesced"] or all(
-                    summary[key] for key in ("browser_ready", "rdc_running", "state_ready")
+                    summary[key] for key in ("rdc_running", "state_ready")
                 ):
                     before = summary
                     break
