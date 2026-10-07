@@ -60,6 +60,5 @@ def test_runner_cache_timings_are_reported() -> None:
         'echo "- PostgreSQL dependency install: $((SECONDS - started))s" '
         '>> "$GITHUB_STEP_SUMMARY"' in workflow
     )
-    assert (
-        'echo "- Android test/build: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"' in workflow
-    )
+    assert "Android APK assemble:" in workflow
+    assert "Android unit tests after build:" in workflow
