@@ -66,6 +66,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Set up Node for documentation
         if: needs.changes.outputs.docs == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -76,9 +77,21 @@ jobs:
       - name: Install documentation formatter
         if: needs.changes.outputs.docs == 'true'
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
-      - name: Check documentation formatting
+      - name: Check changed documentation formatting
         if: needs.changes.outputs.docs == 'true'
-        run: bash scripts/format.sh docs-check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base="$PUSH_BEFORE_SHA"
+          if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE_SHA"; fi
+          test -n "$base"
+          git fetch --no-tags --depth=1 origin "$base"
+          git diff --no-renames --name-only -z "$base" "$GITHUB_SHA" |
+            python scripts/docs_changed.py |
+            xargs -0 ./node_modules/.bin/prettier --check --
       - name: Set up Python
         if: needs.changes.outputs.docs != 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
