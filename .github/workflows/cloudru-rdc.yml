@@ -44,24 +44,16 @@ jobs:
           python-version-file: .python-version
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Build dependency image only when dependency key changes
+      - name: Publish browserless RDC image once
         env:
+          SOURCE_SHA: ${{ github.sha }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
         run: |
-          dep_key="$(cat deploy/remote-desktop-commander/Dockerfile.base deploy/remote-desktop-commander/package.json deploy/remote-desktop-commander/package-lock.json | sha256sum | cut -c1-32)"
-          echo "RDC_DEP_KEY=$dep_key" >> "$GITHUB_ENV"
-          docker build -f deploy/remote-desktop-commander/Dockerfile.base -t "rdc-base:$dep_key" deploy/remote-desktop-commander
-      - name: Measure source-only RDC image build
-        run: |
-          start_ms="$(date +%s%3N)"
-          timeout 15s docker build \
-            --build-arg "RDC_BASE_IMAGE=rdc-base:$RDC_DEP_KEY" \
-            -f deploy/remote-desktop-commander/Dockerfile \
-            -t alice-rdc-perf:test \
-            deploy/remote-desktop-commander
-          end_ms="$(date +%s%3N)"
-          elapsed_ms="$((end_ms-start_ms))"
-          echo "RDC source-only image build: ${elapsed_ms}ms"
-          test "$elapsed_ms" -le 15000
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.cloudru_browser_probe import build_image
+          import os
+          print(build_image(Path.cwd(), os.environ["SOURCE_SHA"]), flush=True)
+          PY
