@@ -225,6 +225,9 @@ def main() -> int:
     args = parser.parse_args()
     if not len(args.sha) == 40 or any(ch not in "0123456789abcdef" for ch in args.sha):
         fail("validation_error")
+    # Owner stopped cloud spending on 2026-10-07; see issue #939.
+    # Resume only through a separately approved lifecycle change.
+    fail("owner_stopped")
     token = os.getenv("ALICE_SHORT_TOKEN", "")
     if not token:
         fail("auth_not_configured")
