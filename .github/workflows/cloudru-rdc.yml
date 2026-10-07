@@ -6,6 +6,8 @@ on:
       - ".github/workflows/cloudru-rdc.yml"
       - "scripts/cloudru_rdc.py"
       - "deploy/remote-desktop-commander/**"
+      - "scripts/cloudru_browser_probe.py"
+      - "cloud/cloudru/registry_client.py"
       - "cloud/cloudru/registry_client.py"
       - "tests/test_cloudru_container_deploy.py"
   workflow_dispatch:
@@ -50,6 +52,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ github.sha }}
           RDC_LANE: test
+          RDC_BASE_IMAGE: alice-rdc-probe.cr.cloud.ru/chromium-probe@sha256:f92bd58af749191733dcf0fee808be5ede654e8a6cdc5930375dbb65c7ce9294
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
