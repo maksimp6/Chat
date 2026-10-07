@@ -202,3 +202,11 @@ def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
     assert "compose down --remove-orphans" in commands
     assert "tag alice-remote-desktop-commander:rollback-" in commands
     assert commands.count("compose up -d --no-build") == 2
+
+
+def test_rdc_base_contains_runtime_dependencies_for_state_and_git_key_handoff() -> None:
+    base = (DEPLOY / "Dockerfile.base").read_text()
+
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
+    assert "python3-minimal" not in base
