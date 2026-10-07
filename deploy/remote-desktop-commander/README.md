@@ -90,17 +90,14 @@ The saved session is in `state/.desktop-commander-device/device.json`; upstream
 creates it with mode 0600. The container restarts and normally reuses the session.
 Only after `list_devices` reports this device online and a tool call succeeds
 should connection be reported complete. Currently only the user's offline `mint`
-device has been observed; Cloud.ru connectivity has not been verified.
 
 Stop with `docker compose stop` to retain state. Device revocation is performed
 in the official dashboard when requested. No automatic logout, deletion, or
 revocation is part of deployment.
 # Protected server pairing redirect
 
-## Cloud.ru compatibility probe
 
 The registry API contract is taken from the checksum-verified official
-[Terraform provider v2.1.3](https://github.com/cloud-ru/evo-terraform/releases/tag/v2.1.3)
 (`linux_amd64` SHA256 `41b14bbf195131364d58d3f5d33face1d7f151d6b4ca6175bf6b0f6b83ede5a7`).
 Its embedded protobuf descriptors use `/v1/registries` with `projectId`,
 `registries`/`nextPageToken` pagination, and an asynchronous creation operation.
@@ -115,9 +112,7 @@ Probe health and cleanup ownership use the complete project container inventory,
 matching the resource UUID, name, description and digest. This uses the list route
 already verified in the live project; incomplete ownership data stops cleanup with
 an explicit error. The stop operation remains the name-based v2 action documented
-by the [Container Apps client](https://github.com/Nick1994209/cloudru-containerapps-mcp/blob/1c5fab2028f13991c52338fee6c1ae9ad719073f/internal/application/cloudru/containerapps.go).
 
-The manual **Cloud.ru browser compatibility probe** workflow runs only from
 protected `master` using the existing production IAM pair. It exports that exact
 commit, builds the RDC image, pushes it to the dedicated private `alice-rdc-probe`
 registry, and creates a separate `rdc-<12-hex-sha>` Container App pinned by
@@ -131,11 +126,8 @@ Probe names are 16 characters and preserve the 12-character source identity.
 Container Apps sets `PORT` from `containerPort` and forbids overriding that
 environment variable. The probe keeps `containerPort: 8080` and sends only
 `ALICE_RDC_MODE` in its environment; the server already reads the platform port.
-See the official [runtime contract](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__runtime).
 Health verification accepts HTTPS application hosts under the current
-`*.containerapps.ru` domain and the older `*.containers.cloud.ru` domain, with no
 redirects or IAM headers. The current domain is documented in the official
-[deployment guide](https://cloud.ru/docs/tutorials-evolution/list/topics/container-apps__deploy-frontend-app).
 
 `ALICE_RDC_MODE=cloud-probe` starts only sandboxed Chromium and the synthetic
 rendering check. It never starts RDC, pairing or an authenticated browser session.
@@ -148,29 +140,22 @@ This probe does not establish persistent-session support. Container Apps permane
 volumes use Object Storage and disallow socket/symlink operations needed by a live
 Chromium profile. The probe uses disposable container storage. The existing
 Compose deployment continues to use its local persistent volume and private CDP.
-The Cloud.ru probe on reviewed commit `fdd3de4` passed sandboxed Chromium and
 synthetic rendering ([live run](https://github.com/maksimp6/Chat/actions/runs/37114179318)).
 It created `rdc-fdd3de412cb7`, UUID `94ae3a86-671f-40ae-9323-e81d3626135e`,
 and requested stop; a subsequent inventory confirmed one retained container.
 This evidence covers disposable browser execution, not persistent authentication.
 There is no privileged or `--no-sandbox` fallback.
 
-References: [volumes](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes)
-and [unsupported volume operations](https://cloud.ru/docs/container-apps-evolution/ug/topics/troubleshooting__bucket-size-exceeded).
 
-## Permanent Cloud.ru RDC
 
-The **Cloud.ru persistent Remote Desktop Commander** workflow operates one
 dedicated service: `rdc-<first 12 project UUID hex digits>`. It uses 1 vCPU,
 4 GiB, scale **1–1**, a private digest-pinned image, and disabled auto-deployment.
 Hot instances remain active between HTTP requests and incur continuous compute
-charges; see [scaling](https://cloud.ru/docs/container-apps-evolution/ug/topics/container__scaling).
 It never takes over the separate compatibility-probe record or the Alice app.
 
 Run `preflight`, then `install` from protected `master`. All lifecycle actions
 require the
 **Object Storage tenant ID from the same project**, supplied as the workflow
-input `storage_tenant_id` or existing variable `CLOUDRU_STORAGE_TENANT_ID`.
 The tenant ID is not a credential and cannot be replaced by the project ID.
 Ownership checks compare any returned managed-mount tenant ID with this exact
 configured tenant before operating on the service.
@@ -190,16 +175,13 @@ The same diagnostic budget permits one provider `systemLogs` request. At most
 truncation is reported explicitly. Only fixed reason codes, terms and counts are
 printed. This never calls the separate application `/logs` endpoint and does not
 authorize any lifecycle operation.
-Cloud.ru may add a global volume `readOnly` attribute. Ownership accepts it only
 when omitted or explicitly disabled (`false` as a boolean, or the exact strings
 `false`, `False`, `FALSE`); empty, null, numeric, enabled and unknown values are
 rejected. The mount must also remain writable. This preserves the documented
-[volume access rules](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__volumes).
 Existing production IAM signs S3 operations only in the reviewed runner.
 The application receives a managed `/rdc-state` bucket mount; IAM, S3 and SSH
 keys are not passed to RDC. The dedicated bucket name is
 `alice-rdc-state-<first 12 project UUID hex digits>`. Creation uses the documented
-[S3 API](https://cloud.ru/docs/s3e/ug/topics/api__createbucket); private ACL and an
 exact project/service ownership marker are verified before use. An existing
 unmarked or non-private bucket is rejected.
 
@@ -241,12 +223,9 @@ can lose browser/workspace changes since the last completed checkpoint; SIGTERM
 storage upload is best effort, because the provider does not publish a guaranteed
 grace period.
 
-Pairing is available at the reported `/rdc/pair` link behind Cloud.ru's native
-project/organization-role authorization. Log in to Cloud.ru, then approve the
 exact device in the official RDC account. The redirect accepts only the official
 HTTPS hosts and expires within ten minutes. This trusted audience includes users
 with project/organization access, not only the owner; see the official
-[invocation guide](https://cloud.ru/docs/container-apps-evolution/ug/topics/guides__container-invoke).
 Raw RDC output is discarded because upstream errors can include token arguments.
 The reported protected `/rdc/pair` application link can appear in Actions logs.
 The secret upstream verification URL/code, credentials and browser data never

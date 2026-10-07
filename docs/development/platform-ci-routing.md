@@ -7,7 +7,6 @@ CI определяет затронутые платформы по полно�
 
 ## Исполняемые проверки
 
-- `Infrastructure tests`: Cloud.ru, deployment и CI regression suites, без APK и
   PostgreSQL. Для infrastructure-only изменений действует changed-line coverage.
 - `MCP worker tests`: Node-тесты Chrome, identity provider и Alice Dev, включая
   OAuth и credential handoff. Выполняются отдельно от Python application suite.

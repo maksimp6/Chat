@@ -53,7 +53,6 @@ Do not adopt an image for a job when pull/startup loses to cached setup.
 Small repeated improvements count; a single faster trial does not prove a win.
 
 Chrome uses #763's existing `:buildcache` / `BUILDKIT_INLINE_CACHE` implementation.
-Use cloudru-chrome.yml workflow_dispatch with lane=test, never change production
 ancestry checks. Measure setup, Docker build, immutable push, cache refresh,
 container start/readiness, seed, restart, verify separately. Production timings
 are historical evidence, not permission to deploy production during experiments.

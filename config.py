@@ -18,12 +18,7 @@ load_dotenv(_ENV_FILE)
 # No provider API key belongs in application configuration.
 
 BASE_URL = os.getenv("YANDEX_BASE_URL", "https://ai.api.cloud.yandex.net/v1")
-CLOUDRU_BASE_URL = os.getenv(
-    "CLOUDRU_BASE_URL",
-    "https://foundation-models.api.cloud.ru/v1",
-)
 YANDEX_PROVIDER_KEY_ID = os.getenv("YANDEX_PROVIDER_KEY_ID")
-CLOUDRU_API_KEY_ID = os.getenv("CLOUDRU_API_KEY_ID")
 
 
 def get_donation_url():
@@ -186,9 +181,7 @@ AUDIO_TTS_PRICE_PER_SEC = 0.0203
 
 class Config:
     BASE_URL = BASE_URL
-    CLOUDRU_BASE_URL = CLOUDRU_BASE_URL
     YANDEX_PROVIDER_KEY_ID = YANDEX_PROVIDER_KEY_ID
-    CLOUDRU_API_KEY_ID = CLOUDRU_API_KEY_ID
     HOST = HOST
     PORT = PORT
 

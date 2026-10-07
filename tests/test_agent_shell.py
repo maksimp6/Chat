@@ -127,18 +127,6 @@ def test_fields_are_validated_and_stored_as_data_not_executed(store):
     assert sqlite3.connect(store.path).execute("select count(*) from tasks").fetchone()[0] == 1
 
 
-def test_first_task_reads_cloudru_status_through_the_read_only_check():
-    calls = []
-
-    def fake_run(names, env=None, factories=None):
-        calls.append(names)
-        return {"containers": {"ok": True, "data": [{"name": "chrome-test"}]}}
-
-    handlers = builtin.default_handlers(check_run=fake_run)
-    assert set(handlers) == {"cloudru_status", "alice_task"}
-    result = handlers["cloudru_status"]({})
-    assert calls == [["containers", "registries"]]
-    assert result["containers"]["data"][0]["name"] == "chrome-test"
 
 
 def test_cli_adds_runs_and_shows_a_task(tmp_path, capsys):
@@ -271,28 +259,6 @@ def test_cli_lists_approves_recovers_and_reports_an_empty_queue(tmp_path, capsys
     assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == []
 
 
-def test_cli_uses_the_built_in_handlers_by_default_and_runs_as_a_module(
-    tmp_path, capsys, monkeypatch
-):
-    import runpy
-    import sys
-    import types
-
-    db = str(tmp_path / "shell.sqlite3")
-    fake = types.ModuleType("scripts.cloudru_check")
-    fake.run = lambda names, **kwargs: {"names": names}
-    monkeypatch.setitem(sys.modules, "scripts.cloudru_check", fake)
-    cli.main(
-        ["--db", db, "add", "--role", "infra-engineer", "--title", "s", "--kind", "cloudru_status"]
-    )
-    capsys.readouterr()
-    assert cli.main(["--db", db, "run-next"]) == 0
-    assert capsys.readouterr().out.strip() == "1 done"
-    monkeypatch.setattr(sys, "argv", ["agent_shell", "--db", db, "list"])
-    monkeypatch.delitem(sys.modules, "agent_shell.__main__", raising=False)
-    with pytest.raises(SystemExit) as stopped:
-        runpy.run_module("agent_shell", run_name="__main__")
-    assert stopped.value.code == 0
 
 
 def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):

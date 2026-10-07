@@ -23,7 +23,6 @@ from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
 from runtime_migrations import init_runtime_tables
 from local_agent_gateway import local_agent_bp, init_local_agent_tables
-from cloudru_iam_routes import cloudru_iam_bp
 from provider_credentials_routes import provider_credentials_bp
 from provider_quota_routes import provider_quota_bp
 from partner_relations import (
@@ -103,7 +102,6 @@ app.register_blueprint(chatgpt_mcp_bp)
 app.register_blueprint(file_bp)
 app.register_blueprint(runtime_bp)
 app.register_blueprint(local_agent_bp)
-app.register_blueprint(cloudru_iam_bp)
 app.register_blueprint(provider_credentials_bp)
 app.register_blueprint(provider_quota_bp)
 app.register_blueprint(partner_relations_bp)

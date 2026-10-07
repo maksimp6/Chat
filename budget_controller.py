@@ -544,31 +544,6 @@ class CloudSpendStatus(str, Enum):
 
 
 @dataclass(frozen=True)
-class CloudBudgetLimits:
-    """Monthly cloud spend limit checked against provider billing data."""
-
-    monthly_limit: Optional[Decimal]
-    warn_ratio: Decimal = Decimal("0.80")
-    currency: str = "RUB"
-
-    def __post_init__(self) -> None:
-        if self.monthly_limit is not None:
-            object.__setattr__(self, "monthly_limit", _money(self.monthly_limit))
-        ratio = Decimal(str(self.warn_ratio))
-        if not Decimal("0") < ratio <= Decimal("1"):
-            raise InvalidOperation("warn_ratio must be in (0, 1]")
-        object.__setattr__(self, "warn_ratio", ratio)
-        object.__setattr__(self, "currency", self.currency.strip().upper())
-
-    @classmethod
-    def from_env(cls, env: Optional[Dict[str, str]] = None) -> "CloudBudgetLimits":
-        import os
-
-        source = os.environ if env is None else env
-        raw_limit = str(source.get("CLOUDRU_MONTHLY_BUDGET", "")).strip()
-        raw_ratio = str(source.get("CLOUDRU_BUDGET_WARN_RATIO", "")).strip() or "0.80"
-        currency = str(source.get("CLOUDRU_BILLING_CURRENCY", "")).strip() or "RUB"
-        return cls(_money(raw_limit) if raw_limit else None, Decimal(raw_ratio), currency)
 
 
 def evaluate_cloud_spend(spent: Any, limits: CloudBudgetLimits) -> Dict[str, Any]:

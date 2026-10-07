@@ -94,7 +94,6 @@ discovery
 
 API-ключи и другие credentials выдаются с минимально необходимыми правами, ограниченным сроком и возможностью отзыва. Хранение выполняется через менеджер криптографии/ключей Alice Pro или внешний secret manager.
 
-Никогда не передавайте GitHub, Cloud.ru или provider secrets непосредственно ChatGPT для выполнения задач.
 
 ## Правила поведения ChatGPT-агента
 
@@ -127,8 +126,5 @@ Alice Pro возвращает структурированный результ
 
 Добавление нового бота не должно требовать изменения ChatGPT prompt или переписывания существующих tool adapters. Добавляются Agent Card, capability metadata, provider auth configuration и policy. Gateway маршрутизирует вызов через общий контур.
 
-## Cloud.ru
 
-Cloud.ru AI Agents документирует A2A и Public API для управления агентами и MCP-серверами. В Alice Pro provider-specific API management остаётся на backend-контуре, а Android получает только нужные результаты.
 
-Документация Cloud.ru: https://cloud.ru/docs/ai-agents/ug/topics/concepts__protocols-a2a

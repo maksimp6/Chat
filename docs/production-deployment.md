@@ -115,9 +115,7 @@ For an immediate service stop, remove the `alice-production` container on the VP
 
 ## Backups and restore
 
-Production data lives in Cloud.ru Managed PostgreSQL once `ALICE_DATABASE_URL` points at it. Two layers protect it:
 
-1. **Managed backups.** In the Cloud.ru console, enable scheduled automatic backups for the cluster and keep point-in-time recovery on. This is the first choice for disaster recovery: restore the cluster (or a new cluster) to a moment before the incident, then point `ALICE_DATABASE_URL` at it.
 2. **Logical dumps.** `scripts/pg_backup.sh` makes a portable `pg_dump` archive that can be restored into any PostgreSQL, including a local one. Use it before risky migrations and for off-cluster copies.
 
 ```bash
@@ -143,15 +141,9 @@ Changing production data or `ALICE_DATABASE_URL` needs the owner's approval (see
 
 ## Cloud budget limits
 
-Alice reads real spend from the Cloud.ru billing API (`organization.api.cloud.ru`, method `consumption`) and compares it with a monthly limit.
 
 | Variable | Meaning |
 | --- | --- |
-| `CLOUDRU_BILLING_ENDPOINT` | `https://organization.api.cloud.ru` |
-| `CLOUDRU_BILLING_SUMMARY_PATH` | consumption method path, may include query parameters such as `customer_id` or dates |
-| `CLOUDRU_MONTHLY_BUDGET` | monthly limit; unset disables the guard. Production sets `10000` (RUB) in `deploy/production/server.sh` |
-| `CLOUDRU_BUDGET_WARN_RATIO` | warning threshold as a share of the limit, default `0.80` |
-| `CLOUDRU_BILLING_CURRENCY` | limit currency, default `RUB` |
 
 The service account needs the `platform.customer.expense-admin` role (or organization admin) to read consumption.
 
@@ -163,7 +155,6 @@ Behaviour:
 - The guard reads billing for the current month (`YYYY-MM`) at most once every 5 minutes per process; `cloud.budget.status` with `refresh: true` reads it immediately.
 - Warn, block and unknown results are recorded in the ExecutionTrace as `cloud_budget_<status>` events.
 
-For a hard stop that does not depend on Alice, also set a budget alert in the Cloud.ru console.
 
 ## Troubleshooting
 

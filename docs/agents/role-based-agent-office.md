@@ -20,7 +20,6 @@ This keeps prompts, permissions and expertise stable even when model vendors or 
 | Web UI/static JS | Frontend Engineer | GPT-5.4 mini |
 | Android | Android Engineer | GPT-5.4 mini |
 | Tests and CI diagnosis | Test Engineer | GPT-5.4 mini |
-| CI/CD/Cloud.ru/runners | Infra Engineer | GPT-5.4 mini |
 | Security review | Security Reviewer | GPT-5.4 mini |
 | Documentation | Docs Engineer | GPT-5.4 nano |
 | Merge/release preparation | Release Manager | GPT-5.4 mini |
@@ -86,7 +85,6 @@ machine or changing workflow permissions.
 
 For example, #709 required a local-launch smoke fix. Its authorized implementation
 scope, PR head, and passing CI supported a protected merge. The live Yandex
-chat/trace and Cloud.ru outcome remain separate verification items; do not mark
 those outcomes complete merely because the PR merged. A backend dispatch that
 cannot perform the required authorized GitHub operation through its available
 CLI, API, or connector is paused and either given an approved capability path or

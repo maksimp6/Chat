@@ -33,7 +33,6 @@ ROLE_SKILL_ALLOWLIST = {
         "github-ci-diagnosis",
         "issue-to-pr",
         "alice-runtime-debugging",
-        "cloudru-change",
         "security-review",
         "docs-sync",
         "release-readiness",
@@ -49,7 +48,6 @@ ROLE_SKILL_ALLOWLIST = {
     "test-engineer": {"github-ci-diagnosis", "issue-to-pr", "alice-runtime-debugging"},
     "infra-engineer": {
         "github-ci-diagnosis",
-        "cloudru-change",
         "security-review",
         "release-readiness",
         "issue-to-pr",
@@ -78,7 +76,6 @@ ROLE_SKILL_ALLOWLIST = {
         "github-ci-diagnosis",
         "issue-to-pr",
         "alice-runtime-debugging",
-        "cloudru-change",
         "security-review",
         "docs-sync",
         "release-readiness",

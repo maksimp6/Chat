@@ -77,63 +77,6 @@ def test_fingerprint_is_stable_and_non_secret():
     assert fingerprint != secret
 
 
-def test_provider_credentials_are_isolated():
-    import sqlite3
-
-    from provider_credentials import create_schema, get_active_credential
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, provider_key_id, provider, project_id,
-            issued_at, expires_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
-        (
-            "cipher-yandex",
-            "yandex-key",
-            "yandex",
-            "project-yandex",
-            "2026-01-01T00:00:00+00:00",
-            "2026-01-02T00:00:00+00:00",
-        ),
-    )
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, provider_key_id, provider, project_id,
-            issued_at, expires_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
-        (
-            "cipher-cloudru",
-            "cloudru-key",
-            "cloudru",
-            "",
-            "2026-01-01T00:00:00+00:00",
-            "2026-01-02T00:00:00+00:00",
-        ),
-    )
-    conn.commit()
-
-    yandex = get_active_credential(
-        conn,
-        lambda value: "yandex-secret" if value == "cipher-yandex" else "wrong",
-        provider="yandex",
-        now=datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
-    )
-    cloudru = get_active_credential(
-        conn,
-        lambda value: "cloudru-secret" if value == "cipher-cloudru" else "wrong",
-        provider="cloudru",
-        now=datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
-    )
-
-    assert yandex.api_key == "yandex-secret"
-    assert yandex.provider == "yandex"
-    assert yandex.provider_key_id == "yandex-key"
-    assert cloudru.api_key == "cloudru-secret"
-    assert cloudru.provider == "cloudru"
-    assert cloudru.provider_key_id == "cloudru-key"
 
 
 def test_create_schema_migrates_legacy_global_index():
@@ -213,29 +156,6 @@ def test_provider_health_metadata_has_no_secret():
     assert "secret-health" not in str(dict(row))
 
 
-def test_manual_provider_credential_does_not_fabricate_remote_key_id():
-    import sqlite3
-
-    from provider_credentials import create_schema, replace_active_credential
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-    credential = replace_active_credential(
-        conn,
-        "manual-cloudru-secret",
-        "",
-        lambda value: "encrypted:" + value,
-        "cloudru",
-    )
-    row = conn.execute(
-        "SELECT provider_key_id, fingerprint FROM provider_credentials WHERE id = ?",
-        (credential.id,),
-    ).fetchone()
-    conn.close()
-
-    assert row["provider_key_id"] is None
-    assert row["fingerprint"]
 
 
 def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):

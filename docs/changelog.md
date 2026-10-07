@@ -19,13 +19,10 @@
 
 ### Alice Dev worker: отдельный coding worker
 
-- Lightweight HTTP MCP worker переименован из RDC в Alice Dev как отдельный coding worker со своим lifecycle `cloudru-rdc-mcp-candidate.yml` ([#919](https://github.com/maksimp6/Chat/pull/919)).
-- Легаси `cloudru-rdc.yml` (persistent RDC) и `production-deploy.yml` сохранены без изменений; Alice Dev не заменяет ни persistent RDC, ни deployment приложения Alice.
 - Добавлен one-shot credential handoff: login/password передаются воркеру один раз через авторизованный endpoint и сохраняются в файл с правами 0600, повторная запись отклоняется ([#933](https://github.com/maksimp6/Chat/pull/933)).
 - Добавлена поддержка ChatGPT OAuth discovery и PKCE flow для Alice Dev ([#925](https://github.com/maksimp6/Chat/pull/925)).
 - Добавлены immutable workers на каждый commit и удаление выведенных воркеров по tombstone-списку ([#930](https://github.com/maksimp6/Chat/pull/930)).
 - Добавлена обработка tombstone deletion и in-place worker updates ([#928](https://github.com/maksimp6/Chat/pull/928), [#931](https://github.com/maksimp6/Chat/pull/931)).
-- Cloud.ru HTTP 499 recovery для Alice Dev lookup ([#923](https://github.com/maksimp6/Chat/pull/923)).
 
 **Статус**: Alice Dev worker реализован; живая верификация и approved cutover persistent RDC/production-deploy.yml остаются в roadmap. Resource-scoped ownership, решение о замене и acceptance criteria — в [#869](https://github.com/maksimp6/Chat/issues/869#issuecomment-6023949684).
 
@@ -43,7 +40,6 @@
 
 Это shipped-функционал, но live Alice Dev deployment verification всё ещё в progress.
 
-## 2026-09-29 — безопасность, CI, async runtime, Cloud.ru и repository development roles
 
 **Note**: Agent model settings (mini/Claude/mandatory-final-Codex) below are historical. Current [AGENTS.md](../AGENTS.md) specifies nano for routine work, excludes Claude execution from normal paths, and makes additional model review optional.
 
@@ -92,7 +88,6 @@ production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
 
 ### Безопасность и секреты
 
-- Добавлен backend-only адаптер Cloud.ru Secret Management и усилены границы хранения секретов:
   [#483](https://github.com/maksimp6/Chat/pull/483).
 - Удалено process-global удержание plaintext-секретов; lifecycle redaction registry очищается после finalization:
   [#493](https://github.com/maksimp6/Chat/pull/493).
@@ -141,9 +136,7 @@ production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
 - Добавлена детерминированная проверка AgentGateway timeout isolation: timed-out slow worker не блокирует fast sibling и не превращается в ложный `completed`:
   [#515](https://github.com/maksimp6/Chat/pull/515).
 
-### Cloud.ru и EDS
 
-- Добавлен комплект EDS/Cloud.ru skill/runbook:
   [#480](https://github.com/maksimp6/Chat/pull/480).
 - Container Apps client переведён на v2 read/list/PATCH contract, полную pagination и allowlist безопасных update fields:
   [#498](https://github.com/maksimp6/Chat/pull/498).
@@ -175,7 +168,6 @@ production queue, 3D asset workflow, marketplace/delivery, CRM/dashboard,
   Android toolchain и ссылки навигации.
 
 Этот раздел фиксирует изменения кода и документации, а не подтверждённый
-production-деплой. Переход на Cloud.ru отслеживается отдельно в
 [#440](https://github.com/maksimp6/Chat/issues/440).
 
 ## Ранее

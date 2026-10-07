@@ -21,12 +21,6 @@ from alice_platform.config import (
 )
 from alice_platform.health import generate_health_plan
 from alice_platform.planner import Action, ActionType, plan_actions
-from alice_platform.providers.cloudru import (
-    CloudProviderUnavailable,
-    create_container,
-    delete_container,
-    update_container,
-)
 from alice_platform.reconciler import reconcile
 
 
@@ -135,35 +129,3 @@ def test_health_and_planner_edge_branches():
     assert plan_actions("test", desired, {"containers": []}) == []
 
 
-def test_cloudru_provider_fails_closed_and_reconciler_all_action_types(capsys):
-    config = {"resources": {"cpu": "2", "memory": "1Gi", "gpu": "L4"}}
-    for operation in (
-        lambda: create_container("test", "svc", config),
-        lambda: update_container("test", "svc", config),
-        lambda: delete_container("test", "svc"),
-    ):
-        with pytest.raises(CloudProviderUnavailable):
-            operation()
-
-    actions = [
-        Action(ActionType.CREATE, "create", "test", description="new"),
-        Action(ActionType.UPDATE, "update", "test", description="change"),
-        Action(ActionType.DELETE, "delete", "test"),
-        Action(ActionType.REPORT_ORPHAN, "orphan", "test", description="old"),
-        Action(ActionType.CREATE, "pending", "production", needs_approval=True),
-    ]
-    cfg = {"services": {name: {} for name in ["create", "update", "delete", "pending"]}}
-    with (
-        patch("alice_platform.reconciler.create_container") as create,
-        patch("alice_platform.reconciler.update_container") as update,
-        patch("alice_platform.reconciler.delete_container") as delete,
-    ):
-        reconcile("test", actions[:4], cfg)
-        create.assert_called_once()
-        update.assert_called_once()
-        delete.assert_called_once()
-    out = capsys.readouterr().out
-    assert "[CREATE]" in out and "[UPDATE]" in out and "[DELETE]" in out and "[ORPHAN]" in out
-
-    reconcile("production", [actions[-1]], cfg)
-    assert "[PENDING]" in capsys.readouterr().out

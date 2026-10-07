@@ -22,7 +22,6 @@ SHARED_INPUTS = {
     "scripts/format.sh",
 }
 INFRA_TEST_PREFIXES = (
-    "tests/test_cloudru",
     "tests/test_ci_",
     "tests/test_platform",
     "tests/test_rdc",
@@ -84,7 +83,6 @@ def _path_platforms(path: str) -> set[str]:
         or path.startswith(
             (
                 "cloud/",
-                "scripts/cloudru_",
                 "scripts/ci_",
                 "alice_platform/",
                 "config/alice/",

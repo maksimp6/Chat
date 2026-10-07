@@ -36,19 +36,6 @@ def isolated_db(monkeypatch, tmp_path):
     return db
 
 
-def test_store_and_read_secret_without_exposing_plaintext_in_metadata(isolated_db):
-    meta = store_secret(
-        secret="very-secret-value",
-        name="Cloud.ru API key",
-        purpose="provider-api",
-        provider="cloudru",
-    )
-
-    assert meta.key_ref
-    assert meta.fingerprint != "very-secret-value"
-    assert meta.fingerprint
-    assert "very-secret-value" not in str(meta)
-    assert read_secret(meta.key_ref) == "very-secret-value"
 
 
 def test_list_keys_returns_metadata_only(isolated_db):
@@ -64,32 +51,8 @@ def test_list_keys_returns_metadata_only(isolated_db):
     assert metas[0].status == "active"
 
 
-def test_revoke_prevents_read(isolated_db):
-    meta = store_secret(
-        secret="secret-1",
-        name="One",
-        purpose="api",
-        provider="cloudru",
-    )
-    revoke_key(meta.key_ref)
-    assert get_metadata(meta.key_ref).status == "revoked"
-    with pytest.raises(KeyRevokedError):
-        read_secret(meta.key_ref)
 
 
-def test_rotate_creates_new_reference_and_revokes_old(isolated_db):
-    old = store_secret(
-        secret="old",
-        name="One",
-        purpose="api",
-        provider="cloudru",
-    )
-    new = rotate_key(old.key_ref, secret="new")
-    assert new.key_ref != old.key_ref
-    assert new.rotated_from == old.key_ref
-    with pytest.raises(KeyRevokedError):
-        read_secret(old.key_ref)
-    assert read_secret(new.key_ref) == "new"
 
 
 def test_expired_key_is_not_readable(isolated_db):

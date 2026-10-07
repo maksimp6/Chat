@@ -92,17 +92,13 @@ a successful sign-in resets the count. The counter is in memory, so a restart cl
 it. Rotating the token does not revoke grants that were already issued; they expire
 on their own or can be revoked.
 
-## Cloud.ru runtime state
 
-The Cloud.ru lane uses a separate Chrome container and state bucket; it does not
 replace the RDC container. The public endpoint is the container's own stable
 Container Apps origin (`https://<host>.containerapps.ru`), kept for as long as
 the container name `chrome-<project-prefix>` is unchanged. Evolution API Gateway
-is not used: it has no public management API, and `apigw.api.cloud.ru` returned
 NXDOMAIN from Google and Cloudflare DNS on 2026-10-04.
 
 Provider IAM authentication on the container ingress is disabled because ChatGPT
-cannot send a Cloud.ru IAM token. The worker itself is the access boundary:
 
 - Anonymous: `GET /healthz` and the protocol-required OAuth surface (protected
   resource and authorization server metadata, dynamic client registration,
@@ -132,17 +128,14 @@ recovery after container restart.
 
 ## Deployment
 
-The `Cloud.ru persistent Chrome MCP` workflow runs from reviewed `master` by manual
 dispatch or by an exact owner-only command on issue #409 (`/chrome preflight`,
 `/chrome deploy`, `/chrome status`, `/chrome restart`, `/chrome stop`). Runs are
 serialized; merging a pull request does not start it.
-It uses the production Cloud.ru IAM credentials and Object Storage tenant ID.
 Run `preflight` (read-only) before `deploy`.
 
 Deployment creates a private image registry/repository, a private state bucket
 and at most one 0.5 vCPU / 1 GiB Chrome replica. Container Apps only offers
 fixed CPU/memory pairs; Chrome measured about 340 MiB idle and 800 MiB on a heavy
-page, so this is the economical size. The service scales from zero: Cloud.ru
 stops the replica after 15 minutes without requests (the profile is saved on
 SIGTERM) and starts it on the next request, so the first call after idle waits
 for a cold start. The container is found by its fixed

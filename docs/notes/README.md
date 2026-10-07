@@ -34,7 +34,6 @@ live official docs при необходимости актуальной про
 ```text
 docs/notes/
 ├── README.md
-├── cloudru/
 ├── yandex-ai-studio/
 ├── openai/
 ├── github/

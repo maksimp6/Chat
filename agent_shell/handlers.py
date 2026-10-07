@@ -12,13 +12,6 @@ MAX_BODY = 8000
 
 
 def default_handlers(check_run=None, run_issue=None):
-    def cloudru_status(payload):
-        """Read-only: containers and registries in Cloud.ru (names, statuses, sizes)."""
-        run = check_run
-        if run is None:
-            from scripts.cloudru_check import run
-        return run(["containers", "registries"])
-
     def alice_task(payload):
         """Runs Alice headlessly on a task text with her sandboxed filesystem tools.
 
@@ -52,4 +45,4 @@ def default_handlers(check_run=None, run_issue=None):
             raise TaskFailed("needs_approval", result)
         return result
 
-    return {"cloudru_status": cloudru_status, "alice_task": alice_task}
+    return {"alice_task": alice_task}

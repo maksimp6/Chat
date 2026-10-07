@@ -13,8 +13,6 @@ yet start a model; handlers are plain Python functions registered by task kind.
   `unknown_kind`, `invalid_result`, `interrupted`, plus `invalid_payload`, `agent_failed`,
   `needs_approval` from handlers that raise `TaskFailed`), never the exception text, so a handler
   that touched a secret cannot leak it.
-- `agent_shell/handlers.py`: built-in task kinds. The first, `cloudru_status`, is read-only
-  and reuses `scripts/cloudru_check.py`.
 - `alice_task`: runs Alice headlessly (`alice_agent_runner.run_issue_task`) on a task text:
   `{"issue": 7, "title": "...", "body": "...", "model": "aliceai-llm"}` (model optional).
   Alice only has her sandboxed filesystem tools and never commits, pushes or runs commands.
@@ -27,8 +25,6 @@ yet start a model; handlers are plain Python functions registered by task kind.
 ## Try it
 
 ```bash
-python -m agent_shell add --role infra-engineer --title "Cloud.ru status" --kind cloudru_status
-python -m agent_shell run-next      # needs the Cloud.ru keys in the environment
 python -m agent_shell list
 python -m agent_shell show 1        # result and event trace
 ```

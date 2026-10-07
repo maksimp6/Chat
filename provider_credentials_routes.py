@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import logging
-import uuid
 
 from flask import Blueprint, jsonify, request
 
@@ -14,7 +13,6 @@ from config import config
 from credential_crypto import decrypt_secret, encrypt_secret
 from db import get_conn
 from provider_credentials import (
-    CLOUDRU,
     YANDEX,
     ProviderCredential,
     CredentialError,
@@ -24,11 +22,7 @@ from provider_credentials import (
     rotation_needed,
     fingerprint_key,
     record_health_check,
-    get_cloudru_iam_credentials,
-    save_cloudru_iam_credentials,
 )
-from cloudru_api_key_provider import CloudRuApiKeyProvider
-from cloudru_iam import CloudRuIamClient
 from trace_manager import traced_operation
 from yandex_api_key_provider import YandexApiKeyProvider
 from model_discovery import invalidate_model_discovery_cache
@@ -43,7 +37,6 @@ provider_credentials_bp = Blueprint(
     url_prefix="/api/provider-credentials",
 )
 
-CLOUDRU_DEFAULT_TTL = timedelta(days=1)
 
 
 def _authorized() -> bool:
@@ -95,14 +88,6 @@ def _guard():
     return None
 
 
-def _cloudru_ttl() -> timedelta:
-    try:
-        days = int(os.getenv("CLOUDRU_KEY_TTL_DAYS", "1"))
-    except ValueError as exc:
-        raise ValueError("CLOUDRU_KEY_TTL_DAYS must be an integer") from exc
-    if not 1 <= days <= 365:
-        raise ValueError("CLOUDRU_KEY_TTL_DAYS must be between 1 and 365")
-    return timedelta(days=days)
 
 
 def _provider_client(provider: str, project_id: str | None = None):
@@ -113,8 +98,6 @@ def _provider_client(provider: str, project_id: str | None = None):
             project_id=project_id.strip(),
             ai_endpoint=config.BASE_URL,
         )
-    if provider == CLOUDRU:
-        return CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL)
     raise ValueError(f"Unsupported provider: {provider}")
 
 
@@ -263,11 +246,11 @@ def provider_credentials_status_check():
         return guard
     data = request.get_json(silent=True) or {}
     requested = data.get("provider")
-    providers = [requested] if requested else [YANDEX, CLOUDRU]
+    providers = [requested] if requested else [YANDEX]
     results = {}
     try:
         for provider in providers:
-            if provider not in (YANDEX, CLOUDRU):
+            if provider != YANDEX:
                 return jsonify({"error": "unsupported_provider"}), 400
             results[provider] = _perform_health_check(provider)
     except Exception:
@@ -291,201 +274,9 @@ def provider_credentials_status():
         {
             "providers": [
                 _status_for(YANDEX),
-                _status_for(CLOUDRU),
             ]
         }
     )
-
-
-@provider_credentials_bp.post("/cloudru/service-accounts")
-@traced_operation("cloudru.service_accounts")
-def cloudru_service_accounts():
-    guard = _guard()
-    if guard:
-        return guard
-    payload = request.form.to_dict()
-
-    def pick(*names):
-        for name in names:
-            value = payload.get(name)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        return ""
-
-    key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
-    key_secret = pick(
-        "iam_key_secret",
-        "secret",
-        "keySecret",
-        "key_secret",
-        "accessKeySecret",
-        "access_key_secret",
-    )
-    if not key_id or not key_secret:
-        return jsonify({"error": "IAM JSON must contain Key ID and Key Secret"}), 400
-    expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
-    if expires_raw:
-        try:
-            if datetime.fromisoformat(expires_raw.replace("Z", "+00:00")) <= datetime.now(
-                timezone.utc
-            ):
-                return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
-        except ValueError:
-            return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
-
-    try:
-        accounts = CloudRuIamClient(key_id=key_id, key_secret=key_secret).list_service_accounts()
-        return jsonify(
-            {
-                "service_accounts": [
-                    {
-                        "id": str(item.get("id") or item.get("service_account_id") or ""),
-                        "name": str(item.get("name") or ""),
-                        "project_id": str(
-                            item.get("project_id") or item.get("target", {}).get("project_id") or ""
-                        ),
-                    }
-                    for item in accounts
-                ]
-            }
-        )
-    except Exception:
-        logger.exception("Cloud.ru service account discovery failed")
-        return jsonify(
-            {
-                "error": "cloudru_service_accounts_failed",
-                "detail": "Не удалось получить список service accounts",
-            }
-        ), 502
-
-
-@provider_credentials_bp.post("/cloudru/bootstrap")
-@traced_operation("cloudru.bootstrap")
-def bootstrap_cloudru():
-    guard = _guard()
-    if guard:
-        return guard
-
-    payload = request.form.to_dict()
-
-    def pick(*names):
-        for name in names:
-            value = payload.get(name)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        return ""
-
-    key_id = pick("iam_key_id", "keyId", "key_id", "accessKeyId", "access_key_id")
-    key_secret = pick(
-        "iam_key_secret",
-        "secret",
-        "keySecret",
-        "key_secret",
-        "accessKeySecret",
-        "access_key_secret",
-    )
-    project_id = request.form.get("project_id", "").strip() or pick("projectId", "project_id")
-    requested_sa_id = request.form.get("service_account_id", "").strip() or pick(
-        "serviceAccountId", "service_account_id"
-    )
-    if not key_id or not key_secret:
-        return jsonify({"error": "Cloud.ru IAM Key ID and Key Secret are required"}), 400
-    if not requested_sa_id:
-        return jsonify(
-            {
-                "error": "service_account_id_required",
-                "detail": "Create or select an existing Cloud.ru service account with a project role, then provide its UUID.",
-            }
-        ), 400
-    try:
-        service_account_id = str(uuid.UUID(requested_sa_id))
-    except (ValueError, AttributeError) as exc:
-        return jsonify(
-            {
-                "error": "invalid_service_account_id",
-                "detail": "Cloud.ru service_account_id must be a valid UUID.",
-            }
-        ), 400
-
-    iam_expires_raw = pick("expiresAt", "expires_at", "keyExpiresAt", "key_expires_at")
-    iam_expires_at = None
-    if iam_expires_raw:
-        try:
-            iam_expires_at = datetime.fromisoformat(iam_expires_raw.replace("Z", "+00:00"))
-            if iam_expires_at <= datetime.now(timezone.utc):
-                return jsonify({"error": "cloudru_iam_master_key_expired"}), 401
-        except ValueError:
-            return jsonify({"error": "invalid_cloudru_iam_master_key_expiry"}), 400
-
-    try:
-        # Static API keys are issued directly for an existing service account.
-        # Do not enumerate or auto-create accounts here: the Cloud.ru API documents
-        # API-key creation as a separate operation and requires the caller to have
-        # the appropriate project role.
-        management = CloudRuIamClient(key_id=key_id, key_secret=key_secret)
-        expires_at = datetime.now(timezone.utc) + _cloudru_ttl()
-        key = management.create_api_key(
-            service_account_id=service_account_id,
-            name="Alice Pro Foundation Models",
-            description="Managed by Alice Pro; rotated daily",
-            products=["foundation-models"],
-            expires_at=expires_at.isoformat().replace("+00:00", "Z"),
-        )
-        api_key_id = str(key.get("id") or key.get("key_id") or "")
-        api_secret = key.get("secret")
-        if not api_key_id or not isinstance(api_secret, str) or not api_secret:
-            return jsonify(
-                {"error": "Cloud.ru API-key creation did not return key ID and secret"}
-            ), 502
-
-        provider = CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL, iam_client=management)
-        provider.validate_key(api_secret)
-
-        conn = get_conn()
-        try:
-            save_cloudru_iam_credentials(
-                conn,
-                key_id=key_id,
-                key_secret=key_secret,
-                project_id=project_id,
-                service_account_id=service_account_id,
-                encrypt=encrypt_secret,
-            )
-            replace_active_credential(
-                conn,
-                api_secret,
-                project_id,
-                encrypt_secret,
-                CLOUDRU,
-                provider_key_id=api_key_id,
-                ttl=_cloudru_ttl(),
-            )
-            record_health_check(conn, CLOUDRU, status="connected", error=None)
-        finally:
-            conn.close()
-
-        return jsonify(
-            {
-                "provider": CLOUDRU,
-                "status": "connected",
-                "service_account_id": service_account_id,
-                "provider_key_id": api_key_id,
-                "rotation": {
-                    "supported": True,
-                    "ttl_days": int(_cloudru_ttl().total_seconds() / 86400),
-                },
-            }
-        )
-    except PermissionError:
-        return jsonify({"error": "Cloud.ru Foundation Models authorization failed"}), 401
-    except Exception:
-        logger.exception("Cloud.ru bootstrap failed")
-        return jsonify(
-            {
-                "error": "cloudru_bootstrap_failed",
-                "detail": "Не удалось завершить настройку Cloud.ru",
-            }
-        ), 502
 
 
 @provider_credentials_bp.put("")
@@ -506,10 +297,7 @@ def update_provider_credentials():
 
     yandex_api_key = data.get("yandex_api_key")
     yandex_project_id = data.get("yandex_project_id")
-    values = (
-        (YANDEX, yandex_api_key),
-        (CLOUDRU, data.get("cloudru_api_key")),
-    )
+    values = ((YANDEX, yandex_api_key),)
     supplied = [
         (provider, value.strip())
         for provider, value in values
@@ -534,7 +322,7 @@ def update_provider_credentials():
             }
         ), 400
     if not supplied:
-        return jsonify({"error": "Yandex Cloud API key or Cloud.ru API key is required"}), 400
+        return jsonify({"error": "Yandex Cloud API key is required"}), 400
     if any(len(value) > 4096 for _, value in supplied):
         return jsonify({"error": "API key is too long"}), 400
 
