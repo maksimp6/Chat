@@ -139,11 +139,13 @@ def creation_body(project, image):
 
 
 def named_record(apps):
+    # Look up only this service: one broken foreign container makes the
+    # project-wide list return HTTP 500 for everyone.
     name = names(apps.project_id)[0]
-    records = [item for item in apps.list(require_total=True) if item.get("name") == name]
-    if len(records) > 1:
+    record = apps.get(name)
+    if record is not None and record.get("name") != name:
         fail("invalid_response")
-    return records[0] if records else None
+    return record
 
 
 def same_form(value, expected):
@@ -761,7 +763,7 @@ def prepare_bucket(store, credentials, project):
 
 def preflight(apps, store, credentials, *, tenant):
     configured_tenant(tenant)
-    step = "list_containers"
+    step = "find_container"
     try:
         record = named_record(apps)
         if record is not None:
