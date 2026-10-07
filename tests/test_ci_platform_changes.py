@@ -47,6 +47,35 @@ def test_classification_covers_real_platform_inputs(paths, expected):
     assert {name for name, value in plan.items() if value} == expected
 
 
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ["README.md"],
+        ["docs/README.md"],
+        ["docs/architecture/runtime.md", "docs/operations/deploy.md"],
+        [".github/ISSUE_TEMPLATE/bug.md"],
+        [".agents/reviewer.md"],
+    ],
+)
+def test_docs_only_is_explicit(paths):
+    plan = routing.classify(paths)
+    assert plan["docs"] is True
+    assert not any(plan[name] for name in routing.PLATFORMS)
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ["README.md", "app.py"],
+        ["docs/README.md", ".github/workflows/ci.yml"],
+        ["docs/README.md", "scripts/format.sh"],
+    ],
+)
+def test_docs_mixed_with_runtime_or_ci_is_not_docs_only(paths):
+    assert routing.classify(paths)["docs"] is False
+
+
 def test_routing_unions_all_changed_paths():
     plan = routing.classify(["android/app/build.gradle.kts", "cloud/cloudru/client.py"])
     assert {name for name, value in plan.items() if value} == {"android", "infra"}
