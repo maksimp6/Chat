@@ -9,7 +9,7 @@ and reports ``total_cost=None`` instead of guessing when nothing matches.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Mapping
 
 _TOTAL_KEYS = ("total_cost", "total", "total_amount", "cost_total")
 _ROW_LIST_KEYS = ("items", "data", "consumption", "rows", "result")
@@ -93,6 +93,16 @@ def parse_consumption_total(payload: Any) -> dict[str, Any]:
     return {"total_cost": None, "currency": currency, "rows": 0}
 
 
+def _validated_decimal_fields(values: Mapping[str, Any]) -> dict[str, Decimal]:
+    normalized: dict[str, Decimal] = {}
+    for name, value in values.items():
+        amount = _decimal(value)
+        if amount is None or amount < 0:
+            raise ValueError(f"{name} must be a non-negative finite decimal")
+        normalized[name] = amount
+    return normalized
+
+
 def estimate_container_runtime_cost(
     *,
     active_seconds: int,
@@ -125,12 +135,7 @@ def estimate_container_runtime_cost(
         "vcpu_rub_per_hour": vcpu_rub_per_hour,
         "memory_rub_per_gb_hour": memory_rub_per_gb_hour,
     }
-    normalized: dict[str, Decimal] = {}
-    for name, value in decimal_fields.items():
-        amount = _decimal(value)
-        if amount is None or amount < 0:
-            raise ValueError(f"{name} must be a non-negative finite decimal")
-        normalized[name] = amount
+    normalized = _validated_decimal_fields(decimal_fields)
 
     billable_seconds = active_seconds + idle_seconds
     hours = Decimal(billable_seconds) / Decimal(3600)
