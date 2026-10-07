@@ -180,8 +180,7 @@ def _independent_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | No
     exact_head_approvals = [
         review
         for review in latest_reviews
-        if str(review.get("state") or "") == "APPROVED"
-        and _review_commit(review) == current_head
+        if str(review.get("state") or "") == "APPROVED" and _review_commit(review) == current_head
     ]
     if exact_head_approvals:
         return None
