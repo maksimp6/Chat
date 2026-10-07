@@ -11,7 +11,21 @@ from pathlib import Path
 from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
-_BARE_GENERICS = {"Callable", "dict", "frozenset", "list", "set", "tuple", "type"}
+_BARE_GENERICS = {
+    "Callable",
+    "Dict",
+    "FrozenSet",
+    "List",
+    "Set",
+    "Tuple",
+    "Type",
+    "dict",
+    "frozenset",
+    "list",
+    "set",
+    "tuple",
+    "type",
+}
 _EXCLUDED_PREFIXES = ("android/", "deploy/", "plugins/", "r/", "scripts/", "tests/")
 
 
@@ -214,6 +228,17 @@ def _docstring_violations(path: str, record: FunctionRecord) -> list[Violation]:
     ]
 
 
+def _valid_type_ignore_suffix(suffix: str) -> bool:
+    suffix = suffix.strip()
+    if not suffix.startswith("["):
+        return False
+    closing = suffix.find("]")
+    if closing <= 1:
+        return False
+    reason = suffix[closing + 1 :].strip()
+    return reason.startswith("#") and bool(reason[1:].strip())
+
+
 def _ignore_violations(
     path: str,
     record: FunctionRecord,
@@ -223,14 +248,14 @@ def _ignore_violations(
     for lineno in range(record.line, record.end_line + 1):
         line = source_lines[lineno - 1]
         marker = line.partition("# type: ignore")
-        if marker[1] and "[" not in marker[2]:
+        if marker[1] and not _valid_type_ignore_suffix(marker[2]):
             violations.append(
                 Violation(
                     path,
                     lineno,
                     record.qualname,
                     "type-ignore-policy",
-                    "type: ignore must name a narrow mypy error code",
+                    "type: ignore requires a narrow mypy code and inline reason",
                 )
             )
     return violations
