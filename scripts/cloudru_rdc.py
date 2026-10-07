@@ -753,21 +753,6 @@ def deployment_summary(record, health):
     }
 
 
-def deploy_existing(apps, *, tenant, timeout=10, clock=time.monotonic):
-    started = clock()
-    record = owned_record(apps, tenant=tenant)
-    if record is None:
-        fail("rdc_ownership_unconfirmed")
-    elapsed_ms = int((clock() - started) * 1000)
-    if elapsed_ms > timeout * 1000:
-        fail("rdc_readiness_timeout")
-    return {
-        "status": "RDC_DEPLOY_NOOP",
-        "container_name": record["name"],
-        "container_id": record["id"],
-        "deploy_elapsed_ms": elapsed_ms,
-    }
-
 
 def install(apps, store, credentials, image, *, tenant, http_get=requests.get):
     configured_tenant(tenant)
@@ -1324,89 +1309,7 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
         apps.client.timeout = previous_timeout
 
 
-def resize_working_minimum(apps, *, tenant, timeout=10, clock=time.monotonic, sleep=time.sleep):
-    configured_tenant(tenant)
-    current = owned_record(apps, tenant=tenant)
-    if current is None:
-        fail("rdc_ownership_unconfirmed")
-    identifier = current["id"]
-    image = current["template"]["containers"][0]["image"]
-    spec = ContainerSpec(
-        name=current["name"],
-        image=image,
-        cpu="0.1",
-        min_instances=1,
-        max_instances=1,
-        public=True,
-        description=DESCRIPTION,
-        env=runtime_env(apps.project_id),
-    )
-    started = clock()
-    apps.update_from_current(spec, current)
-    deadline = started + timeout
-    while clock() < deadline:
-        observed = apps.get(current["name"])
-        if not isinstance(observed, dict) or observed.get("id") != identifier:
-            fail("rdc_ownership_unconfirmed")
-        containers = (observed.get("template") or {}).get("containers") or []
-        resources = containers[0].get("resources") if len(containers) == 1 else None
-        scaling = (observed.get("template") or {}).get("scaling") or {}
-        state = str(observed.get("status", "")).lower()
-        if (
-            resources == {"cpu": "0.1", "memory": "256Mi"}
-            and scaling.get("minInstanceCount") == 1
-            and scaling.get("maxInstanceCount") == 1
-            and containers[0].get("image") == image
-            and state in {"running", "ready"}
-        ):
-            elapsed_ms = int((clock() - started) * 1000)
-            if elapsed_ms > timeout * 1000:
-                fail("rdc_readiness_timeout")
-            return {
-                "status": "RDC_RESIZED",
-                "container_name": current["name"],
-                "container_id": identifier,
-                "cpu": "0.1",
-                "memory": "256Mi",
-                "deploy_elapsed_ms": elapsed_ms,
-            }
-        sleep(min(0.25, max(0, deadline - clock())))
-    fail("rdc_readiness_timeout")
 
-
-def observe_provider_shape(apps):
-    record = named_record(apps)
-    if record is None:
-        return {"status": "RDC_ABSENT"}
-    containers = (record.get("template") or {}).get("containers") or []
-    resources = containers[0].get("resources") if len(containers) == 1 else {}
-    cpu = resources.get("cpu") if isinstance(resources, dict) else None
-    memory = resources.get("memory") if isinstance(resources, dict) else None
-    cpu_form = cpu if cpu in {"0.1", "0.2", "0.3", "0.5", "1"} else "other"
-    memory_form = memory if memory in {"256Mi", "512Mi", "768Mi", "1024Mi", "4096Mi"} else "other"
-    state = str(record.get("status", "")).lower()
-    known = {"running", "suspended", "pending", "created", "creating", "deploying", "starting", "stopping", "stopped", "failed", "error", "ready", "rejected", "deleted", "suspended_product"}
-    return {
-        "status": "RDC_PROVIDER_OBSERVED",
-        "resource_state": state if state in known else "other",
-        "cpu": cpu_form,
-        "memory": memory_form,
-    }
-
-
-def observe(apps, *, tenant):
-    configured_tenant(tenant)
-    record = owned_record(apps, tenant=tenant)
-    if record is None:
-        return {"status": "RDC_ABSENT"}
-    state = str(record.get("status", "")).lower()
-    known = {"running", "suspended", "pending", "created", "creating", "deploying", "starting", "stopping", "stopped", "failed", "error", "ready", "rejected", "deleted", "suspended_product"}
-    return {
-        "status": "RDC_OBSERVED",
-        "container_name": record["name"],
-        "container_id": record["id"],
-        "resource_state": state if state in known else "other",
-    }
 
 
 def status(apps, *, tenant, http_get=requests.get):
@@ -1607,7 +1510,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "build", "deploy", "install", "resize", "observe_raw", "observe", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "install", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1628,12 +1531,7 @@ def main():
     tenant = configured_tenant(args.tenant_id)
     store, credentials = storage_client(project, tenant)
     apps = CloudRuContainerAppsClient(project_id=project)
-    if args.action == "build":
-        image = build_image(root, args.sha)
-        result = {"status": "RDC_IMAGE_BUILT", "image": image}
-    elif args.action == "deploy":
-        result = deploy_existing(apps, tenant=tenant)
-    elif args.action in ("preflight", "install"):
+    if args.action in ("preflight", "install"):
         result = preflight(apps, store, credentials, tenant=tenant)
         if args.action == "install":
             if result["container_exists"]:
@@ -1647,12 +1545,6 @@ def main():
                 creation_body(project, image)
                 print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
             result = install(apps, store, credentials, image, tenant=tenant)
-    elif args.action == "resize":
-        result = resize_working_minimum(apps, tenant=tenant)
-    elif args.action == "observe_raw":
-        result = observe_provider_shape(apps)
-    elif args.action == "observe":
-        result = observe(apps, tenant=tenant)
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":
