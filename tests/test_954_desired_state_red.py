@@ -90,7 +90,9 @@ def test_scaling_contract_fails_closed(tmp_path, field, value):
     (config_dir / "platform.yaml").write_text(
         "services:\n  alice:\n"
         + "\n".join(
-            f"    {key}: {value!r}" for key, value in service.items() if key != "resources"
+            f"    {key}: {value!r}"
+            for key, value in service.items()
+            if key != "resources"
         )
         + "\n    resources:\n      cpu: '1'\n      memory: 1024Mi\n",
         encoding="utf-8",
