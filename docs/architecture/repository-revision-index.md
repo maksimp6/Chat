@@ -86,14 +86,16 @@ match; external labels cannot make a different snapshot current. Code hits expos
 the immutable source link when available. Existing legacy-index behavior and
 retrieval ordering remain unchanged.
 
-Snapshot classification is shared by both consumers through \`snapshot_revision()\`.
+Snapshot classification is shared by both consumers through `snapshot_revision()`.
+The validator lives in `repository_index/provenance.py`, so production retrieval
+does not import the CLI/index-builder module.
 Any snapshot-only field, including a null field or nested file/symbol source
 metadata, selects strict validation. An absent/null/unsupported schema, source
 kind, commit, repository or parser label cannot downgrade a snapshot to legacy.
 Schema versions must be integers, not booleans, floats or strings. The producer's
 nonempty parser label does not have to equal the consumer's Python runtime tag.
 
-\`query_affected()\` rejects invalid snapshot identity with \`ValueError\`; the CLI
+`query_affected()` rejects invalid snapshot identity with `ValueError`; the CLI
 exits with status 2 without replacing an existing output or echoing raw input.
 Retrieval excludes invalid code-index hits while leaving its other sources alone.
 A genuine legacy index has no snapshot metadata, including nested source markers;

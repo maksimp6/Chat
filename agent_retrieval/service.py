@@ -10,7 +10,7 @@ from typing import Any, Mapping
 
 from agent_context import CacheLookup
 from agent_memory import AgentMemoryStore, MemoryRecord
-from scripts.build_ai_index import snapshot_revision
+from repository_index.provenance import snapshot_revision
 
 from .models import RetrievalBundle, RetrievalHit, RetrievalQuery
 
