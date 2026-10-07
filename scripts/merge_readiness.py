@@ -112,6 +112,42 @@ def collect_snapshot(
     }
 
 
+def select_solution_review_evidence(
+    runs: list[dict[str, Any]],
+    artifacts_by_run: dict[int, list[dict[str, Any]]],
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+) -> dict[str, Any] | None:
+    """Select evidence issued by a successful exact-head solution-review run."""
+    expected_name = f"solution-review-pr-{pr_number}-{head_sha}"
+    candidates = sorted(runs, key=lambda item: int(item.get("id") or 0), reverse=True)
+    for run in candidates:
+        run_id = int(run.get("id") or 0)
+        if (
+            str(run.get("head_sha") or "") != head_sha
+            or str(run.get("status") or "") != "completed"
+            or str(run.get("conclusion") or "") != "success"
+        ):
+            continue
+        for artifact in artifacts_by_run.get(run_id, []):
+            if artifact.get("expired") or str(artifact.get("name") or "") != expected_name:
+                continue
+            evidence = artifact.get("evidence")
+            if not isinstance(evidence, dict):
+                continue
+            if (
+                evidence.get("schema_version") != 1
+                or str(evidence.get("task") or "") != f"pr:{pr_number}"
+                or str(evidence.get("reviewed_head_sha") or "") != head_sha
+                or str(evidence.get("reviewed_base_sha") or "") != base_sha
+                or int(evidence.get("workflow_run_id") or 0) != run_id
+            ):
+                continue
+            return evidence
+    return None
+
+
 def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
     evidence = snapshot.get("solution_review")
     if not isinstance(evidence, dict):
