@@ -8,6 +8,8 @@ from typing import Any, Protocol
 
 @dataclass(frozen=True)
 class CloudProviderError(RuntimeError):
+    """Safe infrastructure-provider failure."""
+
     message: str
     code: str = "cloud_error"
     http_status: int | None = None
@@ -18,6 +20,8 @@ class CloudProviderError(RuntimeError):
 
 
 class CloudProvider(Protocol):
+    """Control-plane contract implemented by Alice infrastructure backends."""
+
     name: str
 
     def capabilities(self) -> dict[str, Any]: ...
@@ -32,6 +36,15 @@ class CloudProvider(Protocol):
 
     def get_resource(
         self, *, resource_type: str, resource_id: str, service: str | None = None
+    ) -> dict[str, Any]: ...
+
+    def reconcile_container(
+        self,
+        *,
+        operation: str,
+        lane: str,
+        service: str,
+        config: dict[str, Any],
     ) -> dict[str, Any]: ...
 
     def compute(
