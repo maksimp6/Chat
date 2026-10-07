@@ -63,3 +63,9 @@ Wave 1 поэтапно переводит runtime с legacy SQL на FileMemory
 `memory_extractor.py` пока не использует canonical model/provider pipeline и не пишет извлечённые факты в FileMemoryDB. Он напрямую читает `YANDEX_API_KEY` / `YANDEX_PROJECT_ID`, вызывает legacy Yandex Foundation Models completion endpoint и сохраняет `global_memory` в SQL.
 
 Поэтому этот модуль одновременно остаётся migration consumer для #433 (единый model path), #755 (Secret Store) и #776 (file-native durable memory). Наличие FileMemoryDB для ownership/identity не является доказательством миграции extracted memory.
+
+## Backup evidence boundary
+
+`agent_memory.backup` уже реализует и тестирует локальный verified bundle: consistent read под DB lock, `alice.memory`, manifest с sequence/size/SHA-256, `COMMITTED` marker, checksum/sequence verification при restore и `copy_verified_backup()` только после restore-probe.
+
+Это **не** доказывает remote backup pipeline. В current module нет Cloud.ru S3/Yandex Disk/Google Drive upload, remote read-back verification, scheduler или retention job. Удалённые targets в `memory-db-v1-contract.md` остаются целевым #776 contract до появления provider-backed implementation/evidence.
