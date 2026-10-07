@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { evaluationResult, runLiveSmoke } from "./live-smoke.mjs";
+import { evaluationResult, runLiveSmoke } from "../../../deploy/chrome-worker/live-smoke.mjs";
 
 test("smoke evidence parses only the executed JSON result, never echoed source", () => {
   assert.deepEqual(evaluationResult({ content: [{ type: "text", text: '### Result\n{"storage":null}\n### Ran Playwright code\nconst marker="expected";' }] }), { storage: null });

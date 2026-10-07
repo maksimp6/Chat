@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { startGateway } from "./mcp-gateway.mjs";
+import { startGateway } from "../../../deploy/remote-desktop-commander/mcp-gateway.mjs";
 
 const PUBLIC = "https://alice-dev.example.invalid";
 

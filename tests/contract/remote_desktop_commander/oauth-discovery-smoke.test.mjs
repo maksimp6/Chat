@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
-import { verifyOAuthDiscovery } from "./oauth-discovery-smoke.mjs";
+import { verifyOAuthDiscovery } from "../../../deploy/remote-desktop-commander/oauth-discovery-smoke.mjs";
 
 const ORIGIN = "https://alice-dev.example.invalid";
 const RESOURCE_PATH = "/.well-known/oauth-protected-resource/mcp";
