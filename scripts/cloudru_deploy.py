@@ -323,11 +323,7 @@ def main(argv: list[str] | None = None) -> int:
                 yes=args.yes,
                 acceptance_created=args.acceptance_created,
                 acceptance_updated=args.acceptance_updated,
-                snapshot=(
-                    json.loads(Path(args.snapshot_json).read_text())
-                    if args.snapshot_json
-                    else None
-                ),
+                snapshot=(json.loads(Path(args.snapshot_json).read_text()) if args.snapshot_json else None),
             )
         )
     )
