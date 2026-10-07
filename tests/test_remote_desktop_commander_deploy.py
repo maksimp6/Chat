@@ -148,7 +148,10 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     job = workflow["jobs"]["validate-image"]
     assert job["runs-on"] == "ubuntu-latest"
     assert workflow["permissions"] == {"contents": "read"}
-    assert workflow["concurrency"]["group"] == "alice-rdc-validation-${{ github.event.pull_request.number }}"
+    assert (
+        workflow["concurrency"]["group"]
+        == "alice-rdc-validation-${{ github.event.pull_request.number }}"
+    )
     assert workflow["concurrency"]["cancel-in-progress"] is True
 
     assert "issue_comment:" not in source
