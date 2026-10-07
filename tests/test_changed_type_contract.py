@@ -86,7 +86,9 @@ def test_accepts_precisely_typed_contracts(source: str) -> None:
 def test_untouched_legacy_debt_does_not_block_clean_addition() -> None:
     checker = _load_checker()
     before = "def legacy(value):\n    return value\n"
-    after = before + '\n\ndef clean(value: str) -> str:\n    """Return value."""\n    return value\n'
+    after = (
+        before + '\n\ndef clean(value: str) -> str:\n    """Return value."""\n    return value\n'
+    )
     assert checker.check_changed_source("module.py", before, after) == []
 
 
