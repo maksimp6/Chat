@@ -30,6 +30,9 @@ services:
     depends_on:
       - oauth
     scale: 0
+    min_instances: 0
+    max_instances: 1
+    idle_timeout_seconds: 300
     resources:
       cpu: "1"
       memory: 1024Mi
@@ -40,6 +43,9 @@ services:
     depends_on:
       - oauth
     scale: 0
+    min_instances: 0
+    max_instances: 1
+    idle_timeout_seconds: 120
     resources:
       cpu: "1"
       memory: 1024Mi
@@ -50,6 +56,9 @@ services:
     depends_on:
       - oauth
     scale: 0
+    min_instances: 0
+    max_instances: 1
+    idle_timeout_seconds: 120
     resources:
       cpu: "2"
       memory: 2048Mi
