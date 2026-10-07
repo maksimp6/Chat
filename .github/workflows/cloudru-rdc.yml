@@ -47,6 +47,7 @@ jobs:
       - name: Publish browserless RDC image once
         env:
           SOURCE_SHA: ${{ github.sha }}
+          RDC_LANE: test
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
