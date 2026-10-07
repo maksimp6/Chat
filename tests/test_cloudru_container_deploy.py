@@ -1356,9 +1356,9 @@ def test_fast_registry_build_uses_docker_container_driver(tmp_path):
     def run(argv, **kwargs):
         calls.append(argv)
         if argv[:3] == ["docker", "buildx", "inspect"]:
-            if len([c for c in calls if c[:3] == ["docker", "buildx", "inspect"]]) == 1:
-                return SimpleNamespace(returncode=1, stdout="", stderr="missing")
-            return SimpleNamespace(returncode=0, stdout="Driver: docker-container\n", stderr="")
+            return SimpleNamespace(returncode=1, stdout="", stderr="missing")
+        if argv[:3] == ["docker", "buildx", "ls"]:
+            return SimpleNamespace(returncode=0, stdout="alice-registry-fast|docker-container\n", stderr="")
         if argv[:3] == ["docker", "buildx", "create"]:
             return SimpleNamespace(returncode=0, stdout="alice-registry-fast\n", stderr="")
         if argv[:3] == ["docker", "buildx", "build"]:
