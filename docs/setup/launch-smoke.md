@@ -58,9 +58,12 @@ For the real provider path, inject the two values through the environment. Do
 not put them in shell history, Issues, pull requests, screenshots or artifacts.
 
 ```bash
-export ALICE_LAUNCH_SMOKE_YANDEX_API_KEY='...'
-export ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID='...'
-python scripts/local_launch_smoke.py
+read -rsp 'Yandex API key: ' ALICE_LAUNCH_SMOKE_YANDEX_API_KEY; echo
+read -rp 'Yandex Project ID: ' ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID
+ALICE_LAUNCH_SMOKE_YANDEX_API_KEY="$ALICE_LAUNCH_SMOKE_YANDEX_API_KEY" \
+ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID="$ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID" \
+  python scripts/local_launch_smoke.py
+unset ALICE_LAUNCH_SMOKE_YANDEX_API_KEY ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID
 ```
 
 The script uses a temporary SQLite database by default. To inspect persistence
