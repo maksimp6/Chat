@@ -349,7 +349,7 @@ def build_image(root, sha):
         prepare_registry(registry)
         context = Path(exported) / "deploy" / "remote-desktop-commander"
         print('{"stage":"image_build_push"}', flush=True)
-        return registry.build_and_push(
+        return registry.build_and_push_fast(
             registry_name=REGISTRY,
             repository=REPOSITORY,
             tag=sha,
