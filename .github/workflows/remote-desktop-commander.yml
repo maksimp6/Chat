@@ -22,8 +22,9 @@ jobs:
         run: |
           node --test deploy/remote-desktop-commander/pairing-handoff.test.cjs
           node --test deploy/remote-desktop-commander/desktop-session.test.cjs
-          docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
-          docker compose -f deploy/remote-desktop-commander/compose.yaml build
+          docker build -f deploy/remote-desktop-commander/Dockerfile.base -t alice-rdc-base:ci deploy/remote-desktop-commander
+          RDC_BASE_IMAGE=alice-rdc-base:ci docker compose -f deploy/remote-desktop-commander/compose.yaml config --quiet
+          RDC_BASE_IMAGE=alice-rdc-base:ci docker compose -f deploy/remote-desktop-commander/compose.yaml build
       - name: Test Alice Dev OAuth and gateway contracts
         working-directory: deploy/remote-desktop-commander
         run: |
