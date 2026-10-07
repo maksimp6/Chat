@@ -97,6 +97,7 @@ class Clock:
 def test_permanent_app_requires_managed_private_state_and_native_authorization():
     body = rdc.creation_body(PROJECT, IMAGE)
     assert body["template"]["scaling"] == {"minInstanceCount": 1, "maxInstanceCount": 1}
+    assert body["template"]["containers"][0]["resources"] == {"cpu": "0.5", "memory": "1024Mi"}
     assert body["configuration"]["ingress"]["accessSettings"] == {"enableAuth": True}
     serialized = json.dumps(body)
     for forbidden in ("CLOUDRU_IAM_KEY", "SSH", '"PORT"', "privileged", "no-sandbox"):
