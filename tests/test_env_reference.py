@@ -70,9 +70,7 @@ def test_reference_matches_repository_runtime():
 
 def test_generated_markdown_matches_machine_reference():
     reference = json.loads(
-        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "docs" / "configuration" / "environment-variables.json").read_text(encoding="utf-8")
     )
     generated = (ROOT / "docs" / "configuration" / "environment-variables.md").read_text(
         encoding="utf-8"
