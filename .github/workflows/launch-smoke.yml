@@ -4,8 +4,7 @@ on:
   pull_request:
     paths-ignore:
       - "docs/**"
-      - "*.md"
-      - "**/*.md"
+      - "README.md"
       - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
     inputs:
