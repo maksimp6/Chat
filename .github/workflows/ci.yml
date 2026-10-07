@@ -4,6 +4,13 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Build one platform from the selected protected revision
+        type: choice
+        options: [android]
+        default: android
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,18 +42,23 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
+          MANUAL_PLATFORM: ${{ inputs.platform }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            python scripts/ci_platform_changes.py --platform "$MANUAL_PLATFORM" > /tmp/platforms.json
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
             base="$PR_BASE_SHA"
           else
             base="$PUSH_BEFORE_SHA"
           fi
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            python scripts/ci_platform_changes.py --all > /tmp/platforms.json
-          else
-            git fetch --no-tags --depth=1 origin "$base"
-            git diff --no-renames --name-only -z "$base" "$GITHUB_SHA" | python scripts/ci_platform_changes.py --null > /tmp/platforms.json
+          if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              python scripts/ci_platform_changes.py --all > /tmp/platforms.json
+            else
+              git fetch --no-tags --depth=1 origin "$base"
+              git diff --no-renames --name-only -z "$base" "$GITHUB_SHA" | python scripts/ci_platform_changes.py --null > /tmp/platforms.json
+            fi
           fi
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
