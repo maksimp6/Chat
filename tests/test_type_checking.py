@@ -88,6 +88,8 @@ STRICT_CLEAN_FILES = {
     "pricing_registry.py",
     "printing3d/__init__.py",
     "provider_key_rotation.py",
+    "repository_index/__init__.py",
+    "repository_index/provenance.py",
     "rdc_connection/__init__.py",
     "reasoning_plan.py",
     "responses_tool_loop.py",
