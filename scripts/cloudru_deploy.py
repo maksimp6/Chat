@@ -221,6 +221,7 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
         cpu=cfg["cpu"],
         min_instances=cfg["min_instances"],
         max_instances=cfg["max_instances"],
+        idle_timeout="60s",
         env={name: os.environ[name] for name in args.env},
     )
     result = apps.deploy_verified(spec, timeout_s=args.timeout)
