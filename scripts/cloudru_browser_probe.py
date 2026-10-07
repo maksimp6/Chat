@@ -379,6 +379,7 @@ def build_image(root, sha):
             context_dir=str(context),
             dockerfile=str(context / "Dockerfile"),
             build_args={"RDC_BASE_IMAGE": base_image},
+            registry_cache=False,
         ).pinned
 
 
