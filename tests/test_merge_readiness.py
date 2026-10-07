@@ -569,3 +569,13 @@ def test_select_solution_review_evidence_rejects_mismatched_payload():
         )
         is None
     )
+
+
+def test_solution_review_workflow_is_read_only_and_manual():
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/solution-review.yml").read_text(encoding="utf-8")
+    )
+    assert "workflow_dispatch" in workflow[True]
+    assert workflow["permissions"] == {"contents": "read", "pull-requests": "read"}
+    assert set(workflow[True]) == {"workflow_dispatch"}
+    assert "pull_request_target" not in workflow[True]
