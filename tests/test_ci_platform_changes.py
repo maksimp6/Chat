@@ -43,8 +43,8 @@ ROOT = Path(__file__).resolve().parents[1]
 )
 def test_classification_covers_real_platform_inputs(paths, expected):
     plan = routing.classify(paths)
-    assert set(plan) == ALL
-    assert {name for name, value in plan.items() if value} == expected
+    assert set(plan) == ALL | {"docs"}
+    assert {name for name in ALL if plan[name]} == expected
 
 
 
@@ -160,7 +160,8 @@ def test_workflow_has_real_independent_infra_and_mcp_jobs():
 
 @pytest.mark.parametrize("path", ["/outside.py", "../outside.py"])
 def test_invalid_paths_are_not_silently_skipped(path):
-    assert all(routing.classify([path]).values())
+    assert all(routing.classify([path])[name] for name in routing.PLATFORMS)
+    assert routing.classify([path])["docs"] is False
 
 
 @pytest.mark.parametrize("mode", [[], ["--null"]])
@@ -180,7 +181,9 @@ def test_cli_all_is_conservative(monkeypatch, capsys):
 
     monkeypatch.setattr(routing.sys, "argv", ["ci_platform_changes.py", "--all"])
     assert routing.main() == 0
-    assert all(json.loads(capsys.readouterr().out).values())
+    output = json.loads(capsys.readouterr().out)
+    assert all(output[name] for name in routing.PLATFORMS)
+    assert output["docs"] is False
 
 
 @pytest.mark.parametrize("infra_result, expected", [("success", 0), ("skipped", 1)])
