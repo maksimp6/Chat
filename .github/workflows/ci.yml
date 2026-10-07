@@ -433,12 +433,6 @@ jobs:
           else
             echo "Stable debug signing secrets are not configured; using the ephemeral Gradle debug key."
           fi
-      - name: Run Android unit tests
-        working-directory: android
-        run: |
-          started=$SECONDS
-          gradle --no-daemon --configuration-cache :app:testDebugUnitTest
-          echo "- Android unit tests: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Build debug APK
         working-directory: android
         run: |
@@ -451,6 +445,13 @@ jobs:
           elapsed=$((SECONDS - started))
           echo "- Android APK assemble: ${elapsed}s (target: <=15s)" >> "$GITHUB_STEP_SUMMARY"
           echo "ANDROID_APK_ASSEMBLE_SECONDS=${elapsed}" >> "$GITHUB_ENV"
+      - name: Run Android unit tests
+        working-directory: android
+        run: |
+          started=$SECONDS
+          gradle --no-daemon --configuration-cache :app:testDebugUnitTest
+          elapsed=$((SECONDS - started))
+          echo "- Android unit tests after build: ${elapsed}s" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify debug APK
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
