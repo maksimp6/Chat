@@ -101,7 +101,7 @@ def creation_body(project, image):
     spec = ContainerSpec(
         name=name,
         image=image,
-        cpu="1",
+        cpu="0.5",
         min_instances=1,
         max_instances=1,
         public=True,
@@ -233,8 +233,8 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             "port": type(container.get("containerPort")) is int
             and container["containerPort"] == 8080,
             "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
-            "cpu": resource_map.get("cpu") == "1",
-            "memory": resource_map.get("memory") == "4096Mi",
+            "cpu": resource_map.get("cpu") == "0.5",
+            "memory": resource_map.get("memory") == "1024Mi",
             "scaling_types": type(scaling.get("minInstanceCount")) is int
             and type(scaling.get("maxInstanceCount")) is int,
             "scaling_min": scaling.get("minInstanceCount") == 1,
