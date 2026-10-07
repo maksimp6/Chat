@@ -29,7 +29,7 @@ cp .env.example .env
 - Задайте собственное постоянное значение `ALICE_PROVIDER_CREDENTIAL_KEY`
   до сохранения ключей провайдера. Его нужно сохранять вместе с резервной
   копией конфигурации: смена значения делает зашифрованные записи нечитаемыми.
-  Для совместимости с Key Manager используйте ключ формата Fernet.
+  Для совместимости с текущим legacy Key Manager используйте ключ формата Fernet. Это compatibility requirement существующего encrypted SQL path, а не target Secret Store contract.
 - Уберите незаполненные примеры необязательных интеграций. Не используйте
   строки вида `<...>` в качестве настоящих ключей и токенов.
 
@@ -56,11 +56,11 @@ python app.py
 Оба поля обязательны вместе. Backend проверяет ключ у провайдера, затем
 сохраняет запись в `provider_credentials`.
 
-Текущий runtime получает API key и Project ID из активной записи БД.
+Текущий **web/provider runtime** получает API key и Project ID из активной записи БД.
 Одних `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` в окружении, несмотря на их
 наличие в шаблоне, для веб-чата недостаточно. Редактировать `config.py`
-для записи ключа не требуется. Yandex-запрос также требует настроенного
-`ALICE_PROVIDER_CREDENTIAL_KEY`.
+для записи ключа не требуется. Yandex web/provider request также требует настроенного
+`ALICE_PROVIDER_CREDENTIAL_KEY`. Отдельные legacy consumers пока отличаются: например, `memory_extractor.py` напрямую читает `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` из environment. Не используйте это исключение как новый configuration pattern; его convergence отслеживается #433/#755/#776.
 
 Для постоянной эксплуатации учитывайте срок записи ключа и отдельный worker
 ротации: [жизненный цикл ключей](../provider-key-rotation.md).
@@ -95,3 +95,7 @@ curl --fail --silent --show-error http://127.0.0.1:8080/healthz
 - [Android-сборка](../../android/README.md)
 - [MCP и его отдельная аутентификация](../mcp/chatgpt_apps.md)
 - [Production deployment](../production-deployment.md)
+
+## Authentication bootstrap boundary
+
+Если включён short-token gate, `short_token_auth.py` сейчас читает `ALICE_SHORT_TOKEN` из process environment и использует его для выдачи подписанной cookie-сессии/совместимого token-prefixed URL. Это working bootstrap/auth compatibility path. #755 должен либо мигрировать secret resolution этого consumer, либо явно классифицировать минимальный bootstrap material; наличие environment variable не делает его canonical secret storage.
