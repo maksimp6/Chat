@@ -456,9 +456,7 @@ class TestContainerAppsScalingContract:
         return service
 
     def test_valid_scale_to_zero_service_loads(self, tmp_path):
-        config_dir = make_minimal_config(
-            tmp_path, services={"alice": self._service()}
-        )
+        config_dir = make_minimal_config(tmp_path, services={"alice": self._service()})
         config = load_config(config_dir)
         assert config["services"]["alice"]["min_instances"] == 0
         assert config["services"]["alice"]["max_instances"] == 1
@@ -482,9 +480,7 @@ class TestContainerAppsScalingContract:
     def test_min_cannot_exceed_max(self, tmp_path):
         config_dir = make_minimal_config(
             tmp_path,
-            services={
-                "alice": self._service(min_instances=2, max_instances=1)
-            },
+            services={"alice": self._service(min_instances=2, max_instances=1)},
         )
         with pytest.raises(ConfigError, match="min_instances|max_instances|scal"):
             load_config(config_dir)
