@@ -177,6 +177,91 @@ class CloudRuRegistryClient:
             )
         return host
 
+    def build_and_push_fast(
+        self,
+        *,
+        registry_name: str,
+        repository: str,
+        tag: str,
+        context_dir: str = ".",
+        dockerfile: str = "Dockerfile",
+        platform: str = "linux/amd64",
+        max_seconds: float = 15.0,
+    ) -> ImageRef:
+        """Build+push with BuildKit registry cache and no local cache-image transfer."""
+        repository = validate_name(repository, "repository")
+        if not _TAG_RE.match(tag or ""):
+            raise CloudProviderError("tag is invalid", code="validation_error")
+        with tempfile.TemporaryDirectory(prefix="alice-docker-") as docker_config:
+            env = {**os.environ, "DOCKER_CONFIG": docker_config}
+            host = self.docker_login(registry_name, env=env)
+            ref = ImageRef(host, repository, tag)
+            cache = ImageRef(host, repository, CACHE_TAG).tagged
+            with tempfile.NamedTemporaryFile(prefix="buildx-metadata-", suffix=".json") as metadata:
+                started = time.perf_counter()
+                result = self._run(
+                    [
+                        "docker",
+                        "buildx",
+                        "build",
+                        "--platform",
+                        platform,
+                        "--cache-from",
+                        f"type=registry,ref={cache}",
+                        "--cache-to",
+                        f"type=registry,ref={cache},mode=max",
+                        "--metadata-file",
+                        metadata.name,
+                        "-f",
+                        dockerfile,
+                        "-t",
+                        ref.tagged,
+                        "--push",
+                        context_dir,
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    env=env,
+                )
+                seconds = time.perf_counter() - started
+                print(
+                    json.dumps(
+                        {
+                            "stage": "registry_build_push_fast",
+                            "seconds": seconds,
+                            "returncode": result.returncode,
+                        }
+                    ),
+                    flush=True,
+                )
+                if result.returncode != 0:
+                    raise CloudProviderError(
+                        f"docker buildx failed: {(result.stderr or '').strip()[-500:]}",
+                        code="docker_error",
+                    )
+                if seconds > max_seconds:
+                    raise CloudProviderError(
+                        f"docker buildx exceeded {max_seconds}s budget",
+                        code="build_time_budget_exceeded",
+                    )
+                try:
+                    metadata.seek(0)
+                    data = json.load(metadata)
+                except (OSError, ValueError, TypeError):
+                    data = {}
+                digest_value = data.get("containerimage.digest") if isinstance(data, dict) else None
+                if not isinstance(digest_value, str) or not _DIGEST_RE.fullmatch(digest_value):
+                    matches = _DIGEST_RE.findall((result.stdout or "") + "\n" + (result.stderr or ""))
+                    digest_value = matches[-1] if matches else None
+                if not digest_value:
+                    raise CloudProviderError(
+                        "docker buildx reported no image digest",
+                        code="docker_error",
+                    )
+                return ImageRef(host, repository, tag, digest_value)
+
+
     def build_and_push(
         self,
         *,
