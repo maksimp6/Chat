@@ -367,6 +367,10 @@
     "class": "secret",
     "purpose": "GitHub Actions/API credential"
   },
+  "HOME": {
+    "class": "public",
+    "purpose": "process home directory; Android embedded server uses it to derive app-local runtime paths"
+  },
   "HOST": {
     "class": "public",
     "purpose": "Flask bind host"
