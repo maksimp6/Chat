@@ -98,8 +98,8 @@ def creation_body(project, image):
     if not isinstance(image, str) or not IMAGE_RE.fullmatch(image):
         fail("validation_error")
     name, bucket = names(project)
-    cpu = "0.2"
-    memory = "512Mi"
+    cpu = "0.1"
+    memory = "256Mi"
     spec = ContainerSpec(
         name=name,
         image=image,
@@ -236,8 +236,8 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             "port": type(container.get("containerPort")) is int
             and container["containerPort"] == 8080,
             "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
-            "cpu": resource_map.get("cpu") == "0.2",
-            "memory": resource_map.get("memory") == "512Mi",
+            "cpu": resource_map.get("cpu") == "0.1",
+            "memory": resource_map.get("memory") == "256Mi",
             "scaling_types": type(scaling.get("minInstanceCount")) is int
             and type(scaling.get("maxInstanceCount")) is int,
             "scaling_min": scaling.get("minInstanceCount") == 1,
