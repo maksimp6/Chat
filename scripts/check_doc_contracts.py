@@ -50,17 +50,20 @@ def _validate_entry(root: Path, entry: dict[str, Any]) -> tuple[str | None, list
     return contract_id, errors
 
 
+def _duplicate_id_errors(contracts: list[dict[str, Any]]) -> list[str]:
+    ids = [entry.get("id") for entry in contracts if isinstance(entry.get("id"), str)]
+    return [
+        f"{contract_id}: duplicate contract id"
+        for contract_id in sorted(set(ids))
+        if ids.count(contract_id) > 1
+    ]
+
+
 def validate_contracts(root: Path, contracts: list[dict[str, Any]]) -> list[str]:
-    errors: list[str] = []
-    seen: set[str] = set()
+    errors = _duplicate_id_errors(contracts)
     for entry in contracts:
-        contract_id, entry_errors = _validate_entry(root, entry)
+        _contract_id, entry_errors = _validate_entry(root, entry)
         errors.extend(entry_errors)
-        if contract_id is None:
-            continue
-        if contract_id in seen:
-            errors.append(f"{contract_id}: duplicate contract id")
-        seen.add(contract_id)
     return errors
 
 
