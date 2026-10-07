@@ -156,7 +156,7 @@ jobs:
           Path("acceptance-before.json").write_text(json.dumps(previous))
           PY
           python scripts/cloudru_deploy.py inventory > before.json
-          python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" "${env_args[@]}" | tee deploy.json
+          python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" --acceptance-image-file acceptance-image "${env_args[@]}" | tee deploy.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -184,10 +184,24 @@ jobs:
             python scripts/cloudru_deploy.py cleanup --yes --acceptance-created
           elif [ -f acceptance-before.json ] && [ "$(cat acceptance-before.json)" != "null" ]; then
             python scripts/cloudru_deploy.py cleanup --yes --acceptance-updated --snapshot-json acceptance-before.json
+          elif [ -f acceptance-before.json ] && [ "$(cat acceptance-before.json)" = "null" ] && [ -f acceptance-image ]; then
+            python - <<'PY'
+          import argparse
+          from pathlib import Path
+          from scripts import cloudru_deploy
+
+          cloudru_deploy.cmd_cleanup_failed_create(
+              argparse.Namespace(
+                  yes=True,
+                  preexisting=False,
+                  expected_image=Path("acceptance-image").read_text(),
+              )
+          )
+          PY
           else
             echo "Cleanup no-op: no acceptance-owned mutation was proven."
           fi
-          rm -f acceptance-before.json acceptance-created before.json deploy.json
+          rm -f acceptance-before.json acceptance-created acceptance-image before.json deploy.json
 
       - name: Status
         if: inputs.action == 'status'

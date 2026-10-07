@@ -208,6 +208,8 @@ def cmd_deploy(args: argparse.Namespace) -> dict:
             context_dir=build_dir,
             dockerfile=os.path.join(build_dir, "Dockerfile"),
         )
+    if getattr(args, "acceptance_image_file", None):
+        Path(args.acceptance_image_file).write_text(image.pinned)
     spec = ContainerSpec(
         name=cfg["name"],
         image=image.pinned,
@@ -258,6 +260,29 @@ def _cleanup_from_cli(args: argparse.Namespace) -> dict[str, Any]:
             snapshot=snapshot,
         )
     )
+
+
+def cmd_cleanup_failed_create(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.yes:
+        raise CloudProviderError("pass --yes to cleanup acceptance", code="validation_error")
+    if args.preexisting:
+        raise CloudProviderError(
+            "failed-create cleanup cannot own a pre-existing container",
+            code="validation_error",
+        )
+    cfg = _settings()
+    apps = CloudRuContainerAppsClient()
+    current = apps.get(cfg["name"])
+    if current is None:
+        return {"status": "NOOP"}
+    containers = ((current.get("template") or {}).get("containers") or [])
+    current_image = containers[0].get("image") if containers else None
+    if not args.expected_image or current_image != args.expected_image:
+        raise CloudProviderError(
+            "cannot prove acceptance ownership of failed-create container",
+            code="validation_error",
+        )
+    return {"deleted": cfg["name"], "operation": apps.delete(cfg["name"])}
 
 
 def cmd_cleanup(args: argparse.Namespace) -> dict[str, Any]:
@@ -317,6 +342,7 @@ def main(argv: list[str] | None = None) -> int:
         help="pass this environment variable into the container (repeatable)",
     )
     deploy.add_argument("--timeout", type=float, default=600, help="seconds to wait for readiness")
+    deploy.add_argument("--acceptance-image-file")
     deploy.set_defaults(func=cmd_deploy)
 
     sub.add_parser("status", help="show service status").set_defaults(func=cmd_status)
