@@ -70,11 +70,36 @@ VALIDATION_FIELDS = frozenset(
 )
 
 
+REQUEST_ID_HEADERS = ("x-request-id", "x-trace-id", "x-correlation-id", "grpc-trace-id")
+REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._:-]{8,128}")
+DETAIL_TYPE_RE = re.compile(r"google\.rpc\.[A-Za-z]{1,40}")
+
+
+def provider_request_id(response: requests.Response | None) -> dict[str, str]:
+    """Opaque provider request ID for support tickets; never other header values."""
+    for header in REQUEST_ID_HEADERS if response is not None else ():
+        candidate = response.headers.get(header) if response is not None else None
+        if isinstance(candidate, str) and REQUEST_ID_RE.fullmatch(candidate):
+            return {"provider_request_id": candidate}
+    return {}
+
+
+def provider_detail_types(details: object) -> list[str]:
+    """Known google.rpc detail type names only, never detail contents."""
+    names = set()
+    for detail in details[:16] if isinstance(details, list) else []:
+        kind = detail.get("@type") if isinstance(detail, dict) else None
+        name = kind.rsplit("/", 1)[-1] if isinstance(kind, str) else ""
+        if DETAIL_TYPE_RE.fullmatch(name):
+            names.add(name)
+    return sorted(names)
+
+
 def probe_error_details(exc):
     """Fixed error identifiers only; never messages, URLs or provider values."""
     code = getattr(exc, "code", None)
     status = getattr(exc, "http_status", None)
-    result = {
+    result: dict[str, object] = {
         "error": code
         if isinstance(code, str) and code in PROBE_ERROR_CODES
         else "probe_internal_error",
@@ -83,6 +108,7 @@ def probe_error_details(exc):
     current = exc
     for _ in range(4):
         response = current.response if isinstance(current, requests.RequestException) else None
+        result.update(provider_request_id(response))
         if response is not None and len(response.content) <= 65536:
             try:
                 payload = response.json()
@@ -94,6 +120,8 @@ def probe_error_details(exc):
                     result["provider_status_code"] = provider_code
                 fields = set()
                 details = payload.get("details")
+                if provider_detail_types(details):
+                    result["provider_detail_types"] = provider_detail_types(details)
                 for detail in details[:16] if isinstance(details, list) else []:
                     if (
                         not isinstance(detail, dict)

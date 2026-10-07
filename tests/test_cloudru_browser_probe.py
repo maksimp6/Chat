@@ -267,6 +267,7 @@ def test_provider_diagnostics_only_emit_known_status_and_validation_fields():
         "error": "provider_http_error",
         "http_status": 400,
         "provider_status_code": 3,
+        "provider_detail_types": ["google.rpc.BadRequest"],
         "provider_validation_fields": ["template.containers[0].resources.cpu"],
     }
     assert "secret-canary" not in json.dumps(probe.probe_error_details(error))
@@ -669,3 +670,29 @@ def test_production_workflow_is_master_only_and_scopes_credentials():
         "CLOUDRU_IAM_KEY_ID",
         "CLOUDRU_IAM_KEY_SECRET",
     }
+
+
+def test_provider_diagnostics_report_request_id_and_detail_types_only():
+    error = provider_failure(
+        {
+            "code": 13,
+            "message": "secret-canary",
+            "details": [
+                {"@type": "type.googleapis.com/google.rpc.RequestInfo", "requestId": "secret-canary"},
+                {"@type": "secret canary"},
+            ],
+        }
+    )
+    error.__cause__.response.status_code = 500
+    error.__cause__.response.headers["X-Request-Id"] = "a1b2c3d4-0000-1111"
+    details = probe.probe_error_details(error)
+    assert details["provider_request_id"] == "a1b2c3d4-0000-1111"
+    assert details["provider_detail_types"] == ["google.rpc.RequestInfo"]
+    assert details["provider_status_code"] == 13
+    assert "secret-canary" not in json.dumps(details)
+
+
+def test_provider_request_id_rejects_unsafe_values():
+    error = provider_failure({"code": 13})
+    error.__cause__.response.headers["X-Request-Id"] = "secret canary <script>"
+    assert "provider_request_id" not in probe.probe_error_details(error)
