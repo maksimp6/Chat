@@ -380,7 +380,7 @@ def test_public_acceptance_workflows_run_regressions_and_have_time_limits():
         "requirements-deploy.txt",
         "config/alice/alice-dev-delete-ids.txt",
         "deploy/remote-desktop-commander/request-origin.mjs",
-        "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs",
+        "tests/contract/remote_desktop_commander/oauth-discovery-smoke.test.mjs",
         ".github/workflows/cloudru-rdc-mcp-candidate.yml",
     ):
         assert required in paths
