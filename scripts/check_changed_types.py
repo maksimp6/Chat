@@ -352,9 +352,7 @@ def _changed_python_paths(
 def _git_source(root: Path, ref: str, path: str) -> str:
     result = _git(root, "show", f"{ref}:{path}", check=False)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"cannot read {path!r} from {ref!r}: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"cannot read {path!r} from {ref!r}: {result.stderr.strip()}")
     return result.stdout
 
 
