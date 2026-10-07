@@ -31,9 +31,7 @@ def _tracked_like_files(root: Path):
             capture_output=True,
         )
         return [
-            root / relative.decode("utf-8")
-            for relative in result.stdout.split(b"\0")
-            if relative
+            root / relative.decode("utf-8") for relative in result.stdout.split(b"\0") if relative
         ]
     return [path for path in root.rglob("*") if path.is_file()]
 
