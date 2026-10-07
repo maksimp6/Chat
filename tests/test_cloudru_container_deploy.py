@@ -1344,3 +1344,36 @@ def test_failed_create_cleanup_is_noop_when_provider_has_no_container(monkeypatc
     )
     assert result["status"] == "NOOP"
     apps.delete.assert_not_called()
+
+
+def test_fast_registry_build_uses_docker_container_driver(tmp_path):
+    from cloud.cloudru.registry_client import CloudRuRegistryClient
+    from types import SimpleNamespace
+    import json
+
+    calls = []
+    digest = "sha256:" + "a" * 64
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if argv[:3] == ["docker", "buildx", "inspect"]:
+            if len([c for c in calls if c[:3] == ["docker", "buildx", "inspect"]]) == 1:
+                return SimpleNamespace(returncode=1, stdout="", stderr="missing")
+            return SimpleNamespace(returncode=0, stdout="Driver: docker-container\n", stderr="")
+        if argv[:3] == ["docker", "buildx", "create"]:
+            return SimpleNamespace(returncode=0, stdout="alice-registry-fast\n", stderr="")
+        if argv[:3] == ["docker", "buildx", "build"]:
+            metadata = argv[argv.index("--metadata-file") + 1]
+            with open(metadata, "w", encoding="utf-8") as handle:
+                json.dump({"containerimage.digest": digest}, handle)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    client = CloudRuRegistryClient.__new__(CloudRuRegistryClient)
+    client._run = run
+    client.docker_login = lambda registry_name, env=None: registry_name + ".cr.cloud.ru"
+    ref = client.build_and_push_fast(registry_name="alice-rdc-probe", repository="chromium-probe", tag="a" * 40, context_dir=str(tmp_path), dockerfile="Dockerfile")
+    assert ref.digest == digest
+    create = next(c for c in calls if c[:3] == ["docker", "buildx", "create"])
+    assert create[create.index("--driver") + 1] == "docker-container"
+    build = next(c for c in calls if c[:3] == ["docker", "buildx", "build"])
+    assert any(arg.startswith("type=registry,ref=") for arg in build if isinstance(arg, str))
