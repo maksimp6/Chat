@@ -11,8 +11,7 @@ def is_documentation_markdown(path: str) -> bool:
     if not path or path.startswith("/") or ".." in PurePosixPath(path).parts:
         return False
     return path.endswith(".md") and (
-        "/" not in path
-        or path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/"))
+        "/" not in path or path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/"))
     )
 
 
