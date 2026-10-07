@@ -26,7 +26,10 @@ def _load_checker():
     ("source", "expected_rule"),
     [
         ('def f(value: str):\n    """Return value."""\n    return value\n', "missing-return"),
-        ('def f(value) -> str:\n    """Return value."""\n    return str(value)\n', "missing-parameter"),
+        (
+            'def f(value) -> str:\n    """Return value."""\n    return str(value)\n',
+            "missing-parameter",
+        ),
         ('def f() -> dict:\n    """Return mapping."""\n    return {}\n', "unparameterized-generic"),
         (
             'from typing import Any\ndef f(value: Any) -> Any:\n    """Return value."""\n    return value\n',
@@ -44,7 +47,7 @@ def _load_checker():
             'from typing import List\ndef f() -> List:\n    """Return values."""\n    return []\n',
             "unparameterized-generic",
         ),
-        ('def f(value: str) -> str:\n    return value\n', "missing-docstring"),
+        ("def f(value: str) -> str:\n    return value\n", "missing-docstring"),
     ],
 )
 def test_rejects_new_function_contract_debt(source: str, expected_rule: str) -> None:
@@ -69,9 +72,9 @@ def test_rejects_new_function_contract_debt(source: str, expected_rule: str) -> 
         ),
         "def _helper(value: str) -> str:\n    return value\n",
         (
-            'def f(value: object) -> str:\n'
+            "def f(value: object) -> str:\n"
             '    """Read name."""\n'
-            '    return value.name  # type: ignore[attr-defined]  # validated adapter\n'
+            "    return value.name  # type: ignore[attr-defined]  # validated adapter\n"
         ),
     ],
 )
@@ -83,10 +86,7 @@ def test_accepts_precisely_typed_contracts(source: str) -> None:
 def test_untouched_legacy_debt_does_not_block_clean_addition() -> None:
     checker = _load_checker()
     before = "def legacy(value):\n    return value\n"
-    after = (
-        before
-        + '\n\ndef clean(value: str) -> str:\n    """Return value."""\n    return value\n'
-    )
+    after = before + '\n\ndef clean(value: str) -> str:\n    """Return value."""\n    return value\n'
     assert checker.check_changed_source("module.py", before, after) == []
 
 
