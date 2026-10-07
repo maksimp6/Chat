@@ -23,6 +23,7 @@ jobs:
       infra: ${{ steps.classify.outputs.infra }}
       database: ${{ steps.classify.outputs.database }}
       mcp: ${{ steps.classify.outputs.mcp }}
+      docs: ${{ steps.classify.outputs.docs }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,6 +58,7 @@ jobs:
 
   code-rules:
     name: Code rules
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -64,15 +66,31 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up Node for documentation
+        if: needs.changes.outputs.docs == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: package.json
+      - name: Install documentation formatter
+        if: needs.changes.outputs.docs == 'true'
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Check documentation formatting
+        if: needs.changes.outputs.docs == 'true'
+        run: bash scripts/format.sh docs-check
       - name: Set up Python
+        if: needs.changes.outputs.docs != 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements-dev.txt
       - name: Install pinned tooling
+        if: needs.changes.outputs.docs != 'true'
         run: pip install -r requirements-dev.txt
       - name: Check naming, layout and reliability rules
+        if: needs.changes.outputs.docs != 'true'
         run: bash scripts/check_code_rules.sh
 
   backend:
