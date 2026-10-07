@@ -60,7 +60,7 @@ jobs:
       (needs.code-rules.result == 'skipped' && inputs.action != 'deploy'))
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
       CLOUDRU_REGISTRY_NAME: ${{ vars.CLOUDRU_REGISTRY_NAME || 'alice-pro' }}
@@ -69,6 +69,8 @@ jobs:
       CLOUDRU_CONTAINER_CPU: ${{ vars.CLOUDRU_CONTAINER_CPU || '0.5' }}
       CLOUDRU_MIN_INSTANCES: ${{ vars.CLOUDRU_MIN_INSTANCES || '0' }}
       CLOUDRU_MAX_INSTANCES: ${{ vars.CLOUDRU_MAX_INSTANCES || '1' }}
+      ALICE_LIVE_MAX_RUB: "5"
+      ALICE_LIVE_MAX_WINDOW_SECONDS: "900"
     steps:
       - name: Check out ref
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,14 +90,13 @@ jobs:
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
           CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
-          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
           ALICE_GITHUB_CLIENT_ID: ${{ secrets.ALICE_GITHUB_CLIENT_ID }}
           ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ACTION: ${{ inputs.action }}
         run: |
           required=(CLOUDRU_IAM_KEY_ID CLOUDRU_IAM_KEY_SECRET CLOUDRU_PROJECT_ID)
           if [ "$ACTION" = deploy ] || [ "$ACTION" = preflight ]; then
-            required+=(ALICE_SHORT_TOKEN ALICE_DATABASE_URL ALICE_GITHUB_CLIENT_ID ALICE_GITHUB_CLIENT_SECRET)
+            required+=(ALICE_SHORT_TOKEN ALICE_GITHUB_CLIENT_ID ALICE_GITHUB_CLIENT_SECRET)
           fi
           missing=()
           for name in "${required[@]}"; do
@@ -104,12 +105,6 @@ jobs:
           if [ "${#missing[@]}" -gt 0 ]; then
             printf '::error::Missing deployment configuration: %s\n' "${missing[*]}"
             exit 1
-          fi
-          if [ "$ACTION" = deploy ] || [ "$ACTION" = preflight ]; then
-            case "$ALICE_DATABASE_URL" in
-              postgres://*|postgresql://*) ;;
-              *) echo '::error::ALICE_DATABASE_URL must select durable PostgreSQL'; exit 1 ;;
-            esac
           fi
           echo 'Configuration validated; no secret values displayed.'
       - name: Set up Python
@@ -128,25 +123,86 @@ jobs:
           ALICE_REQUIRE_SHORT_TOKEN: "1"
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
           ALICE_PROVIDER_CREDENTIAL_KEY: ${{ secrets.ALICE_PROVIDER_CREDENTIAL_KEY }}
-          ALICE_DATABASE_URL: ${{ secrets.ALICE_DATABASE_URL }}
           ALICE_GITHUB_CLIENT_ID: ${{ secrets.ALICE_GITHUB_CLIENT_ID }}
           ALICE_GITHUB_CLIENT_SECRET: ${{ secrets.ALICE_GITHUB_CLIENT_SECRET }}
           ALICE_GITHUB_ALLOWED_IDS: ${{ vars.ALICE_GITHUB_ALLOWED_IDS || '293531601' }}
         run: |
           # Pass only the app variables that are configured, by name; values never hit the log.
-          env_args=(--env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN --env ALICE_DATABASE_URL)
+          env_args=(--env ALICE_REQUIRE_SHORT_TOKEN --env ALICE_SHORT_TOKEN)
           env_args+=(--env ALICE_GITHUB_CLIENT_ID --env ALICE_GITHUB_CLIENT_SECRET --env ALICE_GITHUB_ALLOWED_IDS)
           for name in ALICE_PROVIDER_CREDENTIAL_KEY; do
             if [ -n "${!name}" ]; then env_args+=(--env "$name"); else unset "$name"; fi
           done
+          python - <<'PY'
+          from decimal import Decimal
+          import os
+          from cloud.cloudru.live_budget import LiveAcceptanceBudget
+
+          LiveAcceptanceBudget(
+              max_rub=Decimal(os.environ["ALICE_LIVE_MAX_RUB"]),
+              max_window_seconds=int(os.environ["ALICE_LIVE_MAX_WINDOW_SECONDS"]),
+          ).authorize(predicted_rub=Decimal(os.environ["ALICE_LIVE_MAX_RUB"]), elapsed_seconds=0)
+          PY
           set -o pipefail
-          python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" "${env_args[@]}" | tee deploy.json
+          umask 077
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from cloud.cloudru.container_apps_client import CloudRuContainerAppsClient
+
+          name = os.environ.get("CLOUDRU_CONTAINER_NAME", "alice-pro")
+          previous = CloudRuContainerAppsClient().get(name)
+          Path("acceptance-before.json").write_text(json.dumps(previous))
+          PY
+          python scripts/cloudru_deploy.py inventory > before.json
+          python scripts/cloudru_deploy.py deploy --tag "$(git rev-parse HEAD)" --acceptance-image-file acceptance-image "${env_args[@]}" | tee deploy.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          before = json.loads(Path("before.json").read_text())
+          deployed = json.loads(Path("deploy.json").read_text())
+          created = before.get("configured_container_exists") is False and deployed.get("action") == "create"
+          Path("acceptance-created").write_text("1" if created else "0")
+          PY
           {
             echo '### Cloud.ru deploy'
             echo '```json'
             cat deploy.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Cleanup acceptance deploy
+        if: always() && inputs.action == 'deploy'
+        env:
+          CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
+          CLOUDRU_IAM_KEY_SECRET: ${{ secrets.CLOUDRU_IAM_KEY_SECRET }}
+        run: |
+          created=0
+          [ -f acceptance-created ] && created="$(cat acceptance-created)"
+          if [ "$created" = 1 ]; then
+            python scripts/cloudru_deploy.py cleanup --yes --acceptance-created
+          elif [ -f acceptance-before.json ] && [ "$(cat acceptance-before.json)" != "null" ]; then
+            python scripts/cloudru_deploy.py cleanup --yes --acceptance-updated --snapshot-json acceptance-before.json
+          elif [ -f acceptance-before.json ] && [ "$(cat acceptance-before.json)" = "null" ] && [ -f acceptance-image ]; then
+            python - <<'PY'
+          import argparse
+          from pathlib import Path
+          from scripts import cloudru_deploy
+
+          cloudru_deploy.cmd_cleanup_failed_create(
+              argparse.Namespace(
+                  yes=True,
+                  preexisting=False,
+                  expected_image=Path("acceptance-image").read_text(),
+              )
+          )
+          PY
+          else
+            echo "Cleanup no-op: no acceptance-owned mutation was proven."
+          fi
+          rm -f acceptance-before.json acceptance-created acceptance-image before.json deploy.json
+
       - name: Status
         if: inputs.action == 'status'
         env:
