@@ -18,6 +18,12 @@ import tempfile
 from urllib.parse import quote
 from typing import Any
 
+# Direct execution puts scripts/ first; expose the checkout root for the shared
+# provenance contract without making production modules import scripts/.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from repository_index.provenance import SCHEMA_VERSION, SNAPSHOT_SCHEMA_VERSION, snapshot_revision
 
 PARSER_VERSION = f"python-ast-v1:{sys.implementation.cache_tag}"
