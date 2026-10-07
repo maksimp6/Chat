@@ -161,195 +161,21 @@ class CloudRuRegistryClient:
                 "CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET are required",
                 code="auth_not_configured",
             )
-        result = None
-        for attempt in range(2):
-            try:
-                result = self._run(
-                    ["docker", "login", host, "--username", self.iam_client.key_id, "--password-stdin"],
-                    input=self.iam_client.key_secret,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    env=env,
-                    timeout=5,
-                )
-            except subprocess.TimeoutExpired:
-                if attempt == 0:
-                    continue
-                raise CloudProviderError(
-                    f"docker login to {host} timed out",
-                    code="authorization_failed",
-                ) from None
-            if result.returncode == 0:
-                return host
-            stderr = (result.stderr or "").strip()
-            transient = any(token in stderr.lower() for token in ("eof", "connection reset", "tls handshake timeout"))
-            if attempt == 0 and transient:
-                continue
-            break
-        # Docker's stderr never contains the password, but keep it short anyway.
-        raise CloudProviderError(
-            f"docker login to {host} failed: {((result.stderr if result else '') or '').strip()[:300]}",
-            code="authorization_failed",
+        result = self._run(
+            ["docker", "login", host, "--username", self.iam_client.key_id, "--password-stdin"],
+            input=self.iam_client.key_secret,
+            text=True,
+            capture_output=True,
+            check=False,
+            env=env,
         )
-
-    def build_and_push_fast(
-        self,
-        *,
-        registry_name: str,
-        repository: str,
-        tag: str,
-        context_dir: str = ".",
-        dockerfile: str = "Dockerfile",
-        platform: str = "linux/amd64",
-        max_seconds: float = 15.0,
-        build_args: dict[str, str] | None = None,
-        registry_cache: bool = True,
-    ) -> ImageRef:
-        """Build+push with BuildKit registry cache and no local cache-image transfer."""
-        repository = validate_name(repository, "repository")
-        if not _TAG_RE.match(tag or ""):
-            raise CloudProviderError("tag is invalid", code="validation_error")
-        with tempfile.TemporaryDirectory(prefix="alice-docker-") as docker_config:
-            env = {**os.environ, "DOCKER_CONFIG": docker_config}
-            host = self.docker_login(registry_name, env=env)
-            if registry_cache:
-                builder = "alice-registry-fast"
-                inspect = self._run(
-                    ["docker", "buildx", "inspect", builder],
-                    text=True, capture_output=True, check=False, env=env,
-                )
-                if inspect.returncode != 0:
-                    create = self._run(
-                        ["docker", "buildx", "create", "--name", builder, "--driver", "docker-container", "--use"],
-                        text=True, capture_output=True, check=False, env=env,
-                    )
-                    if create.returncode != 0:
-                        raise CloudProviderError(
-                            f"docker buildx builder create failed: {(create.stderr or '').strip()[-500:]}",
-                            code="docker_error",
-                        )
-                else:
-                    use = self._run(
-                        ["docker", "buildx", "use", builder],
-                        text=True, capture_output=True, check=False, env=env,
-                    )
-                    if use.returncode != 0:
-                        raise CloudProviderError("docker buildx builder unavailable", code="docker_error")
-            else:
-                use = self._run(
-                    ["docker", "buildx", "use", "default"],
-                    text=True, capture_output=True, check=False, env=env,
-                )
-                if use.returncode != 0:
-                    raise CloudProviderError("default buildx builder unavailable", code="docker_error")
-            ref = ImageRef(host, repository, tag)
-            cache = ImageRef(host, repository, CACHE_TAG).tagged
-            build_argv = [
-                "docker",
-                "buildx",
-                "build",
-                "--platform",
-                platform,
-                "--progress=plain",
-            ]
-            if registry_cache:
-                build_argv.extend(
-                    [
-                        "--cache-from",
-                        f"type=registry,ref={cache}",
-                        "--cache-to",
-                        f"type=registry,ref={cache},mode=max",
-                    ]
-                )
-            for name, value in sorted((build_args or {}).items()):
-                if not name or not value or not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
-                    raise CloudProviderError("build arg is invalid", code="validation_error")
-                build_argv.extend(["--build-arg", f"{name}={value}"])
-            with tempfile.NamedTemporaryFile(prefix="buildx-metadata-", suffix=".json") as metadata:
-                started = time.perf_counter()
-                try:
-                    result = self._run(
-                        [
-                            *build_argv,
-                            "--metadata-file",
-                            metadata.name,
-                            "-f",
-                            dockerfile,
-                            "-t",
-                            ref.tagged,
-                            "--push",
-                            context_dir,
-                        ],
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                        env=env,
-                        timeout=max_seconds,
-                    )
-                except subprocess.TimeoutExpired as exc:
-                    seconds = time.perf_counter() - started
-                    progress = []
-                    for raw in (exc.stdout, exc.stderr):
-                        if isinstance(raw, bytes):
-                            raw = raw.decode(errors="replace")
-                        if not isinstance(raw, str):
-                            continue
-                        for line in raw.splitlines():
-                            if re.match(r"^#\\d+(?:\\s|$)", line):
-                                progress.append(line[:300])
-                    print(
-                        json.dumps(
-                            {
-                                "stage": "registry_build_push_fast",
-                                "seconds": seconds,
-                                "returncode": 124,
-                                "progress": progress[-40:],
-                            }
-                        ),
-                        flush=True,
-                    )
-                    raise CloudProviderError(
-                        f"docker buildx exceeded {max_seconds}s budget",
-                        code="build_time_budget_exceeded",
-                    ) from exc
-                seconds = time.perf_counter() - started
-                print(
-                    json.dumps(
-                        {
-                            "stage": "registry_build_push_fast",
-                            "seconds": seconds,
-                            "returncode": result.returncode,
-                        }
-                    ),
-                    flush=True,
-                )
-                if result.returncode != 0:
-                    raise CloudProviderError(
-                        f"docker buildx failed: {(result.stderr or '').strip()[-500:]}",
-                        code="docker_error",
-                    )
-                if seconds > max_seconds:
-                    raise CloudProviderError(
-                        f"docker buildx exceeded {max_seconds}s budget",
-                        code="build_time_budget_exceeded",
-                    )
-                try:
-                    metadata.seek(0)
-                    data = json.load(metadata)
-                except (OSError, ValueError, TypeError):
-                    data = {}
-                digest_value = data.get("containerimage.digest") if isinstance(data, dict) else None
-                if not isinstance(digest_value, str) or not _DIGEST_RE.fullmatch(digest_value):
-                    matches = _DIGEST_RE.findall((result.stdout or "") + "\n" + (result.stderr or ""))
-                    digest_value = matches[-1] if matches else None
-                if not digest_value:
-                    raise CloudProviderError(
-                        "docker buildx reported no image digest",
-                        code="docker_error",
-                    )
-                return ImageRef(host, repository, tag, digest_value)
-
+        if result.returncode != 0:
+            # Docker's stderr never contains the password, but keep it short anyway.
+            raise CloudProviderError(
+                f"docker login to {host} failed: {(result.stderr or '').strip()[:300]}",
+                code="authorization_failed",
+            )
+        return host
 
     def build_and_push(
         self,
