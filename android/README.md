@@ -1,121 +1,73 @@
-# Alice Pro Android wrapper
+# Alice Pro Android
 
-This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is staged into the Android Python source directory before packaging.
+Alice Pro Android is a minimal framework-only browser controller built directly with the Android SDK tools.
 
-## Build
+## Architecture
 
-CI stages the backend with `scripts/stage_python.py` using Python 3.13 and then builds the debug APK with Gradle 9.5.0 on Java 25. `android/build.gradle.kts` declares Android Gradle Plugin 9.2.1 and Chaquopy 17.0.0; the app uses SDK 37 and JVM toolchain 17. There is no checked-in Gradle wrapper, so these commands require an installed `gradle`. See [the CI workflow](../.github/workflows/ci.yml) for the build sequence.
+The Android app intentionally avoids Gradle, Kotlin, AndroidX, embedded Python, Chaquopy and bundled browser engines.
+
+Runtime:
+- Java + Android framework APIs
+- System WebView
+- loopback browser-control API on `127.0.0.1:8765`
+
+Build pipeline:
+1. `aapt2 compile/link`
+2. `javac`
+3. `d8`
+4. `zipalign`
+5. `apksigner`
+
+The single build entrypoint is:
 
 ```bash
-cd android
-python scripts/stage_python.py
-gradle :app:assembleDebug
+bash android/scripts/build_direct.sh
 ```
 
-To produce an updateable CI APK, pass a monotonically increasing build number:
-
-```bash
-gradle -PaliceBuildNumber=123 :app:assembleDebug
-```
-
-CI uses the GitHub Actions run number as the Android `versionCode`, so newer CI runs can be installed over older CI builds.
-
-The resulting APK is generated under:
+The signed APK is written to:
 
 ```text
-android/app/build/outputs/apk/debug/app-debug.apk
+android/build/direct/alice-pro-direct.apk
 ```
 
-## Runtime
+## CI budgets
 
-- Python starts inside the Android process through Chaquopy.
-- Flask listens on `127.0.0.1:5000`.
-- The WebView opens `http://127.0.0.1:5000` after the server becomes reachable.
-- The Yandex AI Studio API key is entered on first launch and stored in app-private preferences. It is not bundled into the APK.
-- SQLite and the local repository are stored below the Python `HOME` directory supplied by Android.
-- Desktop behavior remains unchanged because `ALICE_LOCAL_REPO_DIR` defaults to `/sdcard/repo` outside Android.
+The Android lane enforces:
+- direct APK build: **<= 15 seconds**
+- signed APK size: **<= 1 MiB (1,048,576 bytes)**
 
-## Diagnostics
+A regression above either budget fails CI.
 
-The Android shell provides a **Diagnostics** action in the web header. It opens a native log viewer backed by app-private JSONL logs.
+Android-only changes use the isolated `.github/workflows/android-direct.yml` lane and must not trigger unrelated backend, PostgreSQL, MCP or infrastructure suites.
 
-The logger records lifecycle, embedded-server, WebView and bridge events with levels `DEBUG`, `INFO`, `WARNING` and `ERROR`. Debug builds retain all levels; release builds retain only warnings and errors.
+## Browser control
 
-Diagnostic records are redacted before they reach logcat or disk. Common API keys, bearer tokens, cookies, passwords, JWTs and email addresses are removed. Logs are size-limited and rotated, and the UI supports level/time filtering, text search, event details, safe copy, export and clearing.
-
-The exported file is generated in app cache and shared through the existing `FileProvider`. It contains the already-redacted JSONL records rather than credentials or the Yandex API key.
-
-Android unit tests cover redaction and diagnostic query filtering:
-
-```bash
-cd android
-gradle :app:testDebugUnitTest
-```
-
-## System insets
-
-The Android WebView runs in edge-to-edge mode. Safe content padding is resolved centrally from three inset sources: system bars, display cutout and IME. The resolver takes the largest value for each edge, so a keyboard cannot reduce the navigation-bar safe area and a display cutout cannot be hidden by the system-bar inset.
-
-Insets are requested again when the activity resumes and when the window regains focus. This covers transitions that can change system-bar or IME visibility without recreating the activity.
-
-The resolver is unit-tested independently from Android rendering code. UI verification should cover devices with gesture and three-button navigation, display cutouts, portrait/landscape rotation and the on-screen keyboard.
-
-## CI APK updates
-
-The Android shell exposes an **Update APK** button in the header. In the updater you can choose a repository branch and then select one of the latest successful CI runs that produced the `alice-pro-debug-apk` artifact.
-
-The updater fetches public GitHub Actions metadata, validates the artifact SHA-256 digest, verifies package name and signing certificate, rejects APKs that are not newer than the installed build, and starts the Android package installer through a `FileProvider`.
-
-Artifact downloads use [nightly.link](https://nightly.link/) as an anonymous download proxy for GitHub Actions artifacts. GitHub's own artifact URLs are authentication-gated; nightly.link provides branch/run-specific links for public repositories. The source repository and selected workflow/run remain visible in the updater before installation.
-
-Automatic checking of the `master` branch is also performed periodically in the background. Development/CI builds still require explicit confirmation before installation.
-
-## Scope
-
-This is a native shell around the existing Flask/React application, not a second Android implementation of the backend. Future mobile-specific UI work should call the same HTTP endpoints and preserve the existing server behavior.
-
-
-## Controlled browser (no ADB)
-
-The Android APK now contains its own controllable browser in `BrowserTakeoverActivity`.
-While that screen is open, the app exposes a loopback-only HTTP API at
-`http://127.0.0.1:8765`. It does not require ADB, a browser extension, or an
-external browser server.
-
-Health/state:
+Open the controlled browser from the app, then use the loopback API:
 
 ```bash
 curl http://127.0.0.1:8765/health
 ```
 
-Open a page:
+Navigate:
 
 ```bash
-curl -s http://127.0.0.1:8765/command \
+curl -X POST http://127.0.0.1:8765/command \
   -H 'Content-Type: application/json' \
   -d '{"action":"navigate","url":"https://example.com"}'
 ```
 
-Read the visible page text:
+Read text:
 
 ```bash
-curl -s http://127.0.0.1:8765/command \
+curl -X POST http://127.0.0.1:8765/command \
   -H 'Content-Type: application/json' \
   -d '{"action":"text"}'
 ```
 
-Click and type by CSS selector:
+Supported commands are `navigate`, `back`, `forward`, `reload`, `text`, `html`, `click`, `type` and `eval`.
 
-```bash
-curl -s http://127.0.0.1:8765/command \
-  -H 'Content-Type: application/json' \
-  -d '{"action":"click","selector":"button[type=submit]"}'
+The control server binds only to loopback and exists only while the browser activity is alive.
 
-curl -s http://127.0.0.1:8765/command \
-  -H 'Content-Type: application/json' \
-  -d '{"action":"type","selector":"input[name=q]","text":"Alice Pro"}'
-```
+## Python functions
 
-Other actions are `back`, `forward`, `reload`, `html`, and `eval`.
-The API is intentionally available only on the device loopback interface and
-only while the controlled-browser activity is alive.
+Python runtime / local Cloud-Functions-like execution is a separate optional capability tracked in #1032. It must not be part of the normal APK build critical path or force browser-only changes to rebuild Python artifacts.
