@@ -4,8 +4,11 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import test from "node:test";
 import { evaluationResult, runLiveSmoke } from "../../../deploy/chrome-worker/live-smoke.mjs";
+
+const workerRequire = createRequire(new URL("../../../deploy/chrome-worker/package.json", import.meta.url));
 
 test("smoke evidence parses only the executed JSON result, never echoed source", () => {
   assert.deepEqual(evaluationResult({ content: [{ type: "text", text: '### Result\n{"storage":null}\n### Ran Playwright code\nconst marker="expected";' }] }), { storage: null });
@@ -21,8 +24,8 @@ test("smoke rejects unmodified non-hex markers before sending any requests", asy
 });
 
 test("live SDK seed and verify survive a cold profile restore and reject wrong/replayed markers", { skip: process.env.BROWSER_LIVE_SMOKE_TEST !== "1" }, async (t) => {
-  const { chromium } = await import("playwright-core");
-  const { createWorker } = await import("./server.mjs");
+  const { chromium } = await import(workerRequire.resolve("playwright-core"));
+  const { createWorker } = await import("../../../deploy/chrome-worker/server.mjs");
   const root = await mkdtemp(join(tmpdir(), "live-smoke-"));
   const durable = join(root, "durable");
   await mkdir(durable);

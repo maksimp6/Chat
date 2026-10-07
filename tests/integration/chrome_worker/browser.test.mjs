@@ -4,12 +4,17 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import test from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
 import { createWorker } from "../../../deploy/chrome-worker/server.mjs";
 import { createOAuth } from "../../../deploy/chrome-worker/oauth.mjs";
-import { chromium } from "playwright-core";
+
+const workerRequire = createRequire(new URL("../../../deploy/chrome-worker/package.json", import.meta.url));
+const { Client } = await import(workerRequire.resolve("@modelcontextprotocol/sdk/client/index.js"));
+const { StreamableHTTPClientTransport } = await import(workerRequire.resolve("@modelcontextprotocol/sdk/client/streamableHttp.js"));
+const { chromium } = await import(workerRequire.resolve("playwright-core"));
+
 
 async function fixture(t) {
   const profileDir = await mkdtemp(join(tmpdir(), "playwright-mcp-test-"));
