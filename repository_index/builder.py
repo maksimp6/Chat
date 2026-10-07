@@ -272,7 +272,7 @@ def _snapshot_tree(
         raise ValueError("revision is not an available Git commit") from None
     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha):
         raise ValueError("invalid resolved revision")
-    files = []
+    files: list[dict[str, Any]] = []
     skipped = {}
     total = 0
     for record in _git(root, "ls-tree", "--full-tree", "-r", "-l", "-z", sha).split(b"\0"):
@@ -446,7 +446,7 @@ def build_index(
         if previous.get(item["path"], {}).get("git_blob_oid") == item["oid"]
     }
     blobs = _snapshot_blobs(root, [item for item in tree if item["path"] not in reusable])
-    files = []
+    files: list[dict[str, Any]] = []
     for item in tree:
         path = item["path"]
         if path in reusable:
