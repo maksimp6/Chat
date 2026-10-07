@@ -73,3 +73,49 @@ Automatic checking of the `master` branch is also performed periodically in the 
 ## Scope
 
 This is a native shell around the existing Flask/React application, not a second Android implementation of the backend. Future mobile-specific UI work should call the same HTTP endpoints and preserve the existing server behavior.
+
+
+## Controlled browser (no ADB)
+
+The Android APK now contains its own controllable browser in `BrowserTakeoverActivity`.
+While that screen is open, the app exposes a loopback-only HTTP API at
+`http://127.0.0.1:8765`. It does not require ADB, a browser extension, or an
+external browser server.
+
+Health/state:
+
+```bash
+curl http://127.0.0.1:8765/health
+```
+
+Open a page:
+
+```bash
+curl -s http://127.0.0.1:8765/command \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"navigate","url":"https://example.com"}'
+```
+
+Read the visible page text:
+
+```bash
+curl -s http://127.0.0.1:8765/command \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"text"}'
+```
+
+Click and type by CSS selector:
+
+```bash
+curl -s http://127.0.0.1:8765/command \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"click","selector":"button[type=submit]"}'
+
+curl -s http://127.0.0.1:8765/command \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"type","selector":"input[name=q]","text":"Alice Pro"}'
+```
+
+Other actions are `back`, `forward`, `reload`, `html`, and `eval`.
+The API is intentionally available only on the device loopback interface and
+only while the controlled-browser activity is alive.
