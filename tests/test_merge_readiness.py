@@ -29,6 +29,7 @@ def snapshot(**overrides):
         "snapshot_changed": False,
         "pr_state": "open",
         "merged": False,
+        "author_login": "implementation-author",
         "draft": False,
         "behind_by": 0,
         "required_checks": ["Application tests", "PostgreSQL integration"],
@@ -52,6 +53,15 @@ def snapshot(**overrides):
                 "conclusion": "skipped",
             },
         ],
+        "reviews": [
+            {
+                "state": "APPROVED",
+                "commit": {"oid": "abc123"},
+                "author": {"login": "solution-reviewer"},
+                "submittedAt": "2026-10-07T00:00:00Z",
+            }
+        ],
+        "reviews_truncated": False,
         "review_threads": [{"isResolved": True}],
         "review_threads_truncated": False,
     }
@@ -228,6 +238,7 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                 "state": "open",
                 "merged": False,
                 "draft": False,
+                "user": {"login": "implementation-author"},
             },
             {
                 "head": {"sha": "head-1"},
@@ -235,6 +246,7 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                 "state": "open",
                 "merged": False,
                 "draft": False,
+                "user": {"login": "implementation-author"},
             },
         ]
     )
@@ -265,6 +277,17 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                             "reviewThreads": {
                                 "nodes": [{"isResolved": True}],
                                 "pageInfo": {"hasNextPage": True},
+                            },
+                            "reviews": {
+                                "nodes": [
+                                    {
+                                        "state": "APPROVED",
+                                        "commit": {"oid": "head-1"},
+                                        "author": {"login": "solution-reviewer"},
+                                        "submittedAt": "2026-10-07T00:00:00Z",
+                                    }
+                                ],
+                                "pageInfo": {"hasNextPage": False},
                             }
                         }
                     }
@@ -283,6 +306,10 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
     assert result["head_sha"] == "head-1"
     assert result["base_sha"] == "base-1"
     assert result["snapshot_changed"] is False
+    assert result["author_login"] == "implementation-author"
+    assert result["reviews"][0]["state"] == "APPROVED"
+    assert result["reviews"][0]["commit"]["oid"] == "head-1"
+    assert result["reviews_truncated"] is False
     assert result["review_threads_truncated"] is True
     assert any("/compare/master...head-1" in " ".join(call) for call in calls)
     assert any("/commits/head-1/check-runs?per_page=100" in " ".join(call) for call in calls)
@@ -297,6 +324,7 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                 "state": "open",
                 "merged": False,
                 "draft": False,
+                "user": {"login": "implementation-author"},
             },
             {
                 "head": {"sha": "head-2"},
@@ -304,6 +332,7 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                 "state": "open",
                 "merged": False,
                 "draft": False,
+                "user": {"login": "implementation-author"},
             },
         ]
     )
@@ -323,6 +352,17 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
                         "pullRequest": {
                             "reviewThreads": {
                                 "nodes": [],
+                                "pageInfo": {"hasNextPage": False},
+                            },
+                            "reviews": {
+                                "nodes": [
+                                    {
+                                        "state": "APPROVED",
+                                        "commit": {"oid": "head-1"},
+                                        "author": {"login": "solution-reviewer"},
+                                        "submittedAt": "2026-10-07T00:00:00Z",
+                                    }
+                                ],
                                 "pageInfo": {"hasNextPage": False},
                             }
                         }
@@ -452,12 +492,99 @@ def test_merge_readiness_newer_failed_aggregate_supersedes_success():
     assert any(b.get("check") == "CI required" for b in result["blockers"])
 
 
-def test_merge_readiness_quota_notice_is_not_a_model_review_prerequisite():
+def test_merge_readiness_rejects_quota_notice_as_independent_review_evidence():
     value = platform_snapshot(
-        reviews=[{"user": {"login": "Copilot"}, "body": "Unable to review: quota limit reached."}]
+        reviews=[
+            {
+                "state": "COMMENTED",
+                "commit": {"oid": "abc123"},
+                "author": {"login": "copilot-pull-request-reviewer"},
+                "submittedAt": "2026-10-07T00:00:00Z",
+                "body": "Unable to review: quota limit reached.",
+            }
+        ]
     )
-    assert merge_readiness.evaluate_snapshot(value)["ready"] is True
-    value["review_threads"] = [{"isResolved": False}]
     result = merge_readiness.evaluate_snapshot(value)
     assert result["ready"] is False
-    assert blocker_codes(result) == {"review_threads"}
+    assert blocker_codes(result) == {"independent_review_missing"}
+
+
+def test_merge_readiness_rejects_missing_independent_review():
+    result = merge_readiness.evaluate_snapshot(snapshot(reviews=[]))
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"independent_review_missing"}
+
+
+def test_merge_readiness_rejects_author_self_approval():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            reviews=[
+                {
+                    "state": "APPROVED",
+                    "commit": {"oid": "abc123"},
+                    "author": {"login": "implementation-author"},
+                    "submittedAt": "2026-10-07T00:00:00Z",
+                }
+            ]
+        )
+    )
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"independent_review_missing"}
+
+
+def test_merge_readiness_rejects_stale_independent_approval():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            reviews=[
+                {
+                    "state": "APPROVED",
+                    "commit": {"oid": "old-head"},
+                    "author": {"login": "solution-reviewer"},
+                    "submittedAt": "2026-10-07T00:00:00Z",
+                }
+            ]
+        )
+    )
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"independent_review_stale"}
+
+
+def test_merge_readiness_rejects_current_changes_requested_after_approval():
+    result = merge_readiness.evaluate_snapshot(
+        snapshot(
+            reviews=[
+                {
+                    "state": "APPROVED",
+                    "commit": {"oid": "abc123"},
+                    "author": {"login": "solution-reviewer"},
+                    "submittedAt": "2026-10-07T00:00:00Z",
+                },
+                {
+                    "state": "CHANGES_REQUESTED",
+                    "commit": {"oid": "abc123"},
+                    "author": {"login": "solution-reviewer"},
+                    "submittedAt": "2026-10-07T00:01:00Z",
+                },
+            ]
+        )
+    )
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"independent_review_changes_requested"}
+
+
+def test_merge_readiness_accepts_exact_head_independent_approval():
+    result = merge_readiness.evaluate_snapshot(snapshot())
+
+    assert result["ready"] is True
+    assert result["blockers"] == []
+
+
+def test_merge_readiness_fails_closed_when_reviews_are_truncated():
+    result = merge_readiness.evaluate_snapshot(snapshot(reviews_truncated=True))
+
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"reviews_truncated"}
