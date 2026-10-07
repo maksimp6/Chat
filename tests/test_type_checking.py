@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 MYPY_ERROR_BASELINE = {
     "arg-type": 55,
-    "assignment": 52,
+    "assignment": 51,
     "attr-defined": 48,
     "call-arg": 2,
     "call-overload": 2,
