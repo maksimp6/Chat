@@ -161,21 +161,37 @@ class CloudRuRegistryClient:
                 "CLOUDRU_IAM_KEY_ID and CLOUDRU_IAM_KEY_SECRET are required",
                 code="auth_not_configured",
             )
-        result = self._run(
-            ["docker", "login", host, "--username", self.iam_client.key_id, "--password-stdin"],
-            input=self.iam_client.key_secret,
-            text=True,
-            capture_output=True,
-            check=False,
-            env=env,
+        result = None
+        for attempt in range(2):
+            try:
+                result = self._run(
+                    ["docker", "login", host, "--username", self.iam_client.key_id, "--password-stdin"],
+                    input=self.iam_client.key_secret,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    env=env,
+                    timeout=5,
+                )
+            except subprocess.TimeoutExpired:
+                if attempt == 0:
+                    continue
+                raise CloudProviderError(
+                    f"docker login to {host} timed out",
+                    code="authorization_failed",
+                ) from None
+            if result.returncode == 0:
+                return host
+            stderr = (result.stderr or "").strip()
+            transient = any(token in stderr.lower() for token in ("eof", "connection reset", "tls handshake timeout"))
+            if attempt == 0 and transient:
+                continue
+            break
+        # Docker's stderr never contains the password, but keep it short anyway.
+        raise CloudProviderError(
+            f"docker login to {host} failed: {((result.stderr if result else '') or '').strip()[:300]}",
+            code="authorization_failed",
         )
-        if result.returncode != 0:
-            # Docker's stderr never contains the password, but keep it short anyway.
-            raise CloudProviderError(
-                f"docker login to {host} failed: {(result.stderr or '').strip()[:300]}",
-                code="authorization_failed",
-            )
-        return host
 
     def build_and_push_fast(
         self,
