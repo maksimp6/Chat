@@ -48,3 +48,30 @@ def test_ci_runs_diff_placement_gate_before_general_code_rules():
     assert "git diff --find-renames --name-status -z" in workflow
     assert "python scripts/check_architecture_paths.py" in workflow
     assert "ARCH_PATH_VIOLATION <diff>: base SHA unavailable" in workflow
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "new_runtime_helper.py",
+        "agent_runner.py",
+        "invocation_api.py",
+        "browser_adapters.py",
+        "filesystem_mcp_tools.py",
+    ],
+)
+def test_existing_root_package_boundaries_reject_new_or_resurrected_modules(path):
+    with pytest.raises(ValueError, match=rf"ARCH_PATH_VIOLATION.*{path}"):
+        architecture.validate_changes([architecture.Change("A", path)])
+
+
+@pytest.mark.parametrize("path", ["app.py", "config.py", "invocation/api.py", "browser/adapters.py"])
+def test_existing_canonical_locations_are_allowed(path):
+    architecture.validate_changes([architecture.Change("A", path)])
+
+
+def test_git_name_status_parser_preserves_rename_destination():
+    changes = architecture.parse_name_status_z("R100\0old.py\0docs/runtime.py\0")
+    assert changes == [architecture.Change("R", "docs/runtime.py", old_path="old.py")]
+    with pytest.raises(ValueError, match=r"ARCH_PATH_VIOLATION.*docs/runtime.py"):
+        architecture.validate_changes(changes)
