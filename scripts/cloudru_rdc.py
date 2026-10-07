@@ -551,9 +551,7 @@ def health_summary(value):
         project_uuid(identifier)
     if value["paired"] and identifier is None:
         fail("invalid_response")
-    if value["quiesced"] and (
-        not value["state_ready"] or value["rdc_running"] or generation < 1
-    ):
+    if value["quiesced"] and (not value["state_ready"] or value["rdc_running"] or generation < 1):
         fail("invalid_response")
     return value
 
@@ -751,7 +749,6 @@ def deployment_summary(record, health):
         "pairing_url": application_origin(record) + "/rdc/pair",
         **health,
     }
-
 
 
 def install(apps, store, credentials, image, *, tenant, http_get=requests.get):
@@ -1307,9 +1304,6 @@ def revision_diagnostics(apps, record, *, clock=time.monotonic):
         )
     finally:
         apps.client.timeout = previous_timeout
-
-
-
 
 
 def status(apps, *, tenant, http_get=requests.get):

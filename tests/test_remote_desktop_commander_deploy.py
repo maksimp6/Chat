@@ -148,6 +148,11 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     job = workflow["jobs"]["validate-image"]
     assert job["runs-on"] == "ubuntu-latest"
     assert workflow["permissions"] == {"contents": "read"}
+    assert (
+        workflow["concurrency"]["group"]
+        == "alice-remote-desktop-commander-validation-${{ github.event.pull_request.number }}"
+    )
+    assert workflow["concurrency"]["cancel-in-progress"] is True
 
     assert "issue_comment:" not in source
     assert "workflow_dispatch:" not in source
@@ -157,6 +162,8 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     assert "/rdc status" not in source
     assert "environment: production" not in source
     assert "StrictHostKeyChecking=yes" not in source
+    assert "--browser-smoke-test" not in source
+    assert "ALICE_RDC_MODE=cloud-probe" not in source
 
     scripts = "\n".join(step.get("run", "") for step in job["steps"])
     assert "docker compose logs" not in scripts
@@ -180,7 +187,10 @@ def test_image_uses_frozen_dependency_graph():
     assert "FROM ${RDC_BASE_IMAGE}" in dockerfile
     assert "npm ci --omit=dev --ignore-scripts" in base
     assert "npm install" not in base
-    assert "python3-minimal" in base
+    for required in ("git", "openssh-client", "ripgrep", "python3", "python3-pip", "python3-venv"):
+        assert required in base
+    assert "chromium" not in base
+    assert "fonts-liberation" not in base
 
 
 def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
