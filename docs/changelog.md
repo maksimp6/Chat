@@ -33,7 +33,7 @@
 
 - Добавлена capability-only agent secret delivery без хранения plaintext в memory ([#897](https://github.com/maksimp6/Chat/pull/897)).
 - Добавлен file import и ephemeral materialization для secrets ([#895](https://github.com/maksimp6/Chat/pull/895)).
-- Secrets infrastructure (#872–#874) из previous month теперь полностью интегрирована в password-manager lifecycle.
+- Базовые pieces secrets infrastructure (#872–#874) интегрированы; consumer-by-consumer migration к canonical Secret Store #755 остаётся незавершённой.
 
 ### CI и platform routing
 
