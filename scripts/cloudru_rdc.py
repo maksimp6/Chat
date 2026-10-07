@@ -1646,12 +1646,15 @@ def main():
         if args.action == "install":
             if result["container_exists"]:
                 fail("already_exists")
-            image = os.environ.get("ALICE_RDC_IMAGE", "")
-            if not image:
-                fail("validation_error")
+            image = os.environ.get("ALICE_RDC_IMAGE", "") or build_image(root, args.sha)
             creation_body(project, image)
-            print(json.dumps({"stage": "rdc_image_reused", "image": image}), flush=True)
+            print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
+            started = time.monotonic()
             result = install(apps, store, credentials, image, tenant=tenant)
+            print(
+                json.dumps({"stage": "rdc_ready", "seconds": round(time.monotonic() - started, 1)}),
+                flush=True,
+            )
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":
