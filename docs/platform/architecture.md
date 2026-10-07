@@ -10,7 +10,16 @@ This document explains the platform structure and principles.
 
 ## Core Services
 
-The platform manages three core services:
+The platform currently carries legacy control-plane names while the Container Apps runtime migrates to canonical user-facing service names.
+
+Canonical runtime services:
+- **alice** — production Alice Pro runtime, 1 vCPU / 1 GiB starting allocation, scale-to-zero candidate.
+- **alice-lab** — development/test Alice runtime, 1 vCPU / 1 GiB starting allocation, scale-to-zero candidate.
+- **alice-browser** — real Chromium/Playwright/MCP worker, 2 vCPU / 2 GiB starting allocation, scale-to-zero candidate.
+
+The existing **oauth** and **chrome** logical services remain during migration because current authentication/browser consumers still reference them. They must not be deleted or silently renamed until those consumers have migrated and live acceptance is proven.
+
+Current control-plane services:
 
 ### OAuth
 - **Purpose**: OAuth 2.0 identity provider for Alice
@@ -20,7 +29,7 @@ The platform manages three core services:
 - **Dependencies**: None
 - **Sign-in method**: `github` (production), `passphrase` (test)
 
-### Chrome Worker
+### Chrome Worker (legacy logical name during migration)
 - **Purpose**: Browser automation and control for Alice Chat
 - **Configuration**: `platform.yaml`, `domains.yaml`, `storage.yaml`
 - **Persistent storage**: `/chrome-state` volume
