@@ -76,7 +76,24 @@ jobs:
       - name: Check naming, layout and reliability rules
         run: bash scripts/check_code_rules.sh
       - name: Check changed function contracts
-        run: python scripts/check_changed_types.py --base HEAD^ --head HEAD
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed-function check: comparison base is unavailable" >&2
+            exit 2
+          fi
+          git fetch --no-tags --depth=1 origin "$base"
+          git rev-parse --verify "$base^{commit}"
+          python scripts/check_changed_types.py --base "$base" --head "$GITHUB_SHA"
 
   backend:
     name: Application tests
