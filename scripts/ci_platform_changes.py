@@ -10,6 +10,7 @@ import sys
 from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
+OUTPUTS = (*PLATFORMS, "docs")
 JOBS = ("backend", "postgres", "android", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
@@ -97,6 +98,10 @@ def _path_platforms(path: str) -> set[str]:
     return _runtime_platforms(path)
 
 
+def _is_docs_path(path: str) -> bool:
+    return path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md")
+
+
 def classify(paths: list[str]) -> dict[str, bool]:
     """Unknown inputs select every suite rather than silently dropping tests."""
     selected: set[str] = set() if paths else set(PLATFORMS)
@@ -104,12 +109,14 @@ def classify(paths: list[str]) -> dict[str, bool]:
         selected.update(_path_platforms(path))
     if "web" in selected:
         selected.update(("backend", "android", "database", "mcp"))
-    return {platform: platform in selected for platform in PLATFORMS}
+    result = {platform: platform in selected for platform in PLATFORMS}
+    result["docs"] = bool(paths) and all(_is_docs_path(path) for path in paths)
+    return result
 
 
 def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> None:
     """A selected suite must succeed; only unselected suites may be skipped."""
-    if set(plan) != set(PLATFORMS) or any(type(value) is not bool for value in plan.values()):
+    if set(plan) != set(OUTPUTS) or any(type(value) is not bool for value in plan.values()):
         raise ValueError("invalid platform plan")
     if plan["web"] and not all(plan[key] for key in ("backend", "android", "database", "mcp")):
         raise ValueError("incomplete web dependency plan")
@@ -128,7 +135,7 @@ def verify_environment() -> None:
     needs = json.loads(os.environ["CI_JOB_RESULTS"])
     if (
         not isinstance(raw, dict)
-        or set(raw) != set(PLATFORMS)
+        or set(raw) != set(OUTPUTS)
         or any(value not in ("true", "false") for value in raw.values())
         or not isinstance(needs, dict)
     ):
@@ -150,7 +157,7 @@ def main() -> int:
             verify_environment()
             print("All selected platform suites passed")
         elif mode == ["--all"]:
-            print(json.dumps(dict.fromkeys(PLATFORMS, True), sort_keys=True))
+            print(json.dumps({**dict.fromkeys(PLATFORMS, True), "docs": False}, sort_keys=True))
         elif mode in ([], ["--null"]):
             data = sys.stdin.read()
             paths = data.split("\0") if mode else data.splitlines()
