@@ -13,7 +13,8 @@ import { createOAuth } from "../../../deploy/chrome-worker/oauth.mjs";
 const workerRequire = createRequire(new URL("../../../deploy/chrome-worker/package.json", import.meta.url));
 const { Client } = await import(workerRequire.resolve("@modelcontextprotocol/sdk/client/index.js"));
 const { StreamableHTTPClientTransport } = await import(workerRequire.resolve("@modelcontextprotocol/sdk/client/streamableHttp.js"));
-const { chromium } = await import(workerRequire.resolve("playwright-core"));
+const playwrightCore = await import(workerRequire.resolve("playwright-core"));
+const { chromium } = playwrightCore.default ?? playwrightCore;
 
 
 async function fixture(t) {

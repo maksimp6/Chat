@@ -24,7 +24,8 @@ test("smoke rejects unmodified non-hex markers before sending any requests", asy
 });
 
 test("live SDK seed and verify survive a cold profile restore and reject wrong/replayed markers", { skip: process.env.BROWSER_LIVE_SMOKE_TEST !== "1" }, async (t) => {
-  const { chromium } = await import(workerRequire.resolve("playwright-core"));
+  const playwrightCore = await import(workerRequire.resolve("playwright-core"));
+  const { chromium } = playwrightCore.default ?? playwrightCore;
   const { createWorker } = await import("../../../deploy/chrome-worker/server.mjs");
   const root = await mkdtemp(join(tmpdir(), "live-smoke-"));
   const durable = join(root, "durable");
