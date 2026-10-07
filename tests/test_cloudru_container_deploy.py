@@ -1280,3 +1280,67 @@ def test_acceptance_cleanup_fails_closed_without_snapshot(monkeypatch):
         )
     apps.delete.assert_not_called()
     apps.restore.assert_not_called()
+
+
+def test_failed_create_cleanup_deletes_only_matching_acceptance_image(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {
+        "name": "alice-pro",
+        "template": {"containers": [{"image": "registry/alice@sha256:acceptance"}]},
+    }
+    apps.delete.return_value = {"done": True}
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_cleanup_failed_create(
+        argparse.Namespace(
+            yes=True,
+            preexisting=False,
+            expected_image="registry/alice@sha256:acceptance",
+        )
+    )
+    assert result["deleted"] == "alice-pro"
+    apps.delete.assert_called_once_with("alice-pro")
+
+
+def test_failed_create_cleanup_refuses_unknown_or_foreign_image(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = {
+        "name": "alice-pro",
+        "template": {"containers": [{"image": "registry/alice@sha256:foreign"}]},
+    }
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    with pytest.raises(CloudProviderError, match="ownership"):
+        script.cmd_cleanup_failed_create(
+            argparse.Namespace(
+                yes=True,
+                preexisting=False,
+                expected_image="registry/alice@sha256:acceptance",
+            )
+        )
+    apps.delete.assert_not_called()
+
+
+def test_failed_create_cleanup_is_noop_when_provider_has_no_container(monkeypatch):
+    import argparse
+
+    script = _deploy_script()
+    apps = Mock()
+    apps.get.return_value = None
+    monkeypatch.setattr(script, "CloudRuContainerAppsClient", lambda: apps)
+
+    result = script.cmd_cleanup_failed_create(
+        argparse.Namespace(
+            yes=True,
+            preexisting=False,
+            expected_image="registry/alice@sha256:acceptance",
+        )
+    )
+    assert result["status"] == "NOOP"
+    apps.delete.assert_not_called()
