@@ -1,18 +1,7 @@
-FROM node:22-bookworm-slim
+ARG RDC_BASE_IMAGE
+FROM ${RDC_BASE_IMAGE}
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 update \
-    && apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-      python3-minimal \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /workspace /rdc-state /home/node/.desktop-commander-device /home/node/.claude-server-commander \
-    && chown -R node:node /workspace /rdc-state /home/node
-
-COPY package.json package-lock.json dependency-smoke.cjs /opt/desktop-commander/
-RUN cd /opt/desktop-commander \
-    && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
-    && node node_modules/@wonderwhy-er/desktop-commander/dist/index.js remote --help \
-    && node dependency-smoke.cjs
 COPY config.json /opt/desktop-commander/config.example.json
 COPY entrypoint.sh /usr/local/bin/alice-desktop-commander
 COPY dev-bootstrap.sh /usr/local/bin/alice-rdc-dev-bootstrap
