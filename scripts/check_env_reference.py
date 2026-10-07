@@ -98,6 +98,8 @@ def render_markdown(reference: dict[str, Any]) -> str:
         "",
         "Generated from `environment-variables.json`. Values and secret material are intentionally excluded.",
         "",
+        "Coverage: statically named environment reads in repository Python outside tests and `android/`. Dynamic names, shell/JavaScript/Kotlin and Android Python are follow-up surfaces, not silently assumed covered.",
+        "",
         "| Variable | Class | Purpose |",
         "| --- | --- | --- |",
     ]
