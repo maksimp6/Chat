@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+import yaml
 
 from alice_platform.config import ConfigError, load_config
 
@@ -88,13 +89,7 @@ def test_scaling_contract_fails_closed(tmp_path, field, value):
     config_dir.mkdir()
     service = _service(**{field: value})
     (config_dir / "platform.yaml").write_text(
-        "services:\n  alice:\n"
-        + "\n".join(
-            f"    {key}: {value!r}"
-            for key, value in service.items()
-            if key != "resources"
-        )
-        + "\n    resources:\n      cpu: '1'\n      memory: 1024Mi\n",
+        yaml.safe_dump({"services": {"alice": service}}),
         encoding="utf-8",
     )
     with pytest.raises(ConfigError):
