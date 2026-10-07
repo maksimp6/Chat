@@ -41,6 +41,6 @@
 - [Cloud.ru Secret Management](security/cloudru-secret-management.md) — адаптер и границы прав для секретов Alice Pro
 - [Журнал изменений](changelog.md) — история релизов и изменений
 - [Синхронизация с bare-репозиторием](bare_sync.md) — процесс зеркалирования изменений в `local_bare`
-- [Работа с памятью](memory/overview.md) — управление данными в оперативной памяти
+- [Работа с памятью](memory/overview.md) — переход от legacy SQL к durable file-native Memory DB
 
 - [Структура репозитория](architecture/repository-layout.md) — правила размещения модулей и план очистки корня
