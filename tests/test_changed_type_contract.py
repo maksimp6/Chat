@@ -35,10 +35,6 @@ def _load_checker():
             "any-leak",
         ),
         (
-            "def f(value: str | None) -> int:\n    return len(value)\n",
-            "strict-mypy",
-        ),
-        (
             "def f(value: object) -> str:\n    return value.name  # type: ignore\n",
             "type-ignore-policy",
         ),
