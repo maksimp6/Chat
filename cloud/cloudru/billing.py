@@ -134,8 +134,13 @@ def estimate_container_runtime_cost(
 
     billable_seconds = active_seconds + idle_seconds
     hours = Decimal(billable_seconds) / Decimal(3600)
-    cpu_rub = hours * normalized["vcpu"] * normalized["vcpu_rub_per_hour"]
-    memory_rub = hours * normalized["memory_gb"] * normalized["memory_rub_per_gb_hour"]
+    quantum = Decimal("0.0000001")
+    cpu_rub = (
+        hours * normalized["vcpu"] * normalized["vcpu_rub_per_hour"]
+    ).quantize(quantum)
+    memory_rub = (
+        hours * normalized["memory_gb"] * normalized["memory_rub_per_gb_hour"]
+    ).quantize(quantum)
 
     return {
         "status": "estimated",
@@ -145,6 +150,6 @@ def estimate_container_runtime_cost(
         "cold_starts": cold_starts,
         "cpu_rub": cpu_rub,
         "memory_rub": memory_rub,
-        "estimated_rub": cpu_rub + memory_rub,
+        "estimated_rub": (cpu_rub + memory_rub).quantize(quantum),
         "free_tier_applied": False,
     }
