@@ -6,6 +6,7 @@ Tests may inspect production sources; contract tests may inspect docs/config.
 
 import ast
 from pathlib import Path
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,6 +23,18 @@ EXCLUDED_TOP_LEVEL = {
 
 
 def _tracked_like_files(root: Path):
+    """Return Git-tracked files for a checkout; synthetic fixtures use all files."""
+    if (root / ".git").exists():
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            check=True,
+            capture_output=True,
+        )
+        return [
+            root / relative.decode("utf-8")
+            for relative in result.stdout.split(b"\0")
+            if relative
+        ]
     return [path for path in root.rglob("*") if path.is_file()]
 
 
@@ -77,6 +90,17 @@ def architecture_violations(root: Path):
 
 def test_repository_respects_architecture_boundaries():
     assert architecture_violations(ROOT) == []
+
+
+def test_repository_guard_ignores_untracked_build_output(tmp_path):
+    subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
+    source = tmp_path / "alice.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "alice.py"], check=True)
+    generated = tmp_path / "build" / "generated.test.mjs"
+    generated.parent.mkdir()
+    generated.write_text("export {};", encoding="utf-8")
+    assert architecture_violations(tmp_path) == []
 
 
 def test_guard_rejects_test_file_in_production_tree(tmp_path):
