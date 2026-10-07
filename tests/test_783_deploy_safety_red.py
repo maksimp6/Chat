@@ -49,3 +49,14 @@ def test_deploy_cli_uses_short_acceptance_idle_window():
 def test_deploy_cli_keeps_single_instance_fail_closed():
     text = DEPLOY.read_text(encoding="utf-8")
     assert 'CLOUDRU_MAX_INSTANCES", "1"' in text
+
+
+def test_workflow_cleanup_covers_failed_create_before_deploy_json():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    deploy_at = text.index("python scripts/cloudru_deploy.py deploy")
+    cleanup_at = text.index("name: Cleanup acceptance deploy")
+    assert "--acceptance-image-file acceptance-image" in text[deploy_at:cleanup_at]
+    assert 'if: always() && inputs.action == \'deploy\'' in text[cleanup_at:]
+    assert "acceptance-before.json" in text[cleanup_at:]
+    assert "acceptance-image" in text[cleanup_at:]
+    assert "cmd_cleanup_failed_create" in text[cleanup_at:]
