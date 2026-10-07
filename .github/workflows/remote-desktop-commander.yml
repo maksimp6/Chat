@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: alice-remote-desktop-commander-validation
+  group: alice-rdc-validation-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
   validate-image:
