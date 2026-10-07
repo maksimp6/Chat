@@ -214,3 +214,31 @@ def test_incomplete_web_plan_cannot_hide_dependencies():
         routing.validate_results(
             plan, results(backend="success", android="success", postgres="success")
         )
+
+
+def test_docs_formatter_selector_ignores_unchanged_legacy_docs(monkeypatch, capsys):
+    import io
+
+    from scripts import docs_changed
+
+    changed = "docs/new.md\0app.py\0"
+    monkeypatch.setattr(docs_changed.sys, "stdin", io.StringIO(changed))
+    assert docs_changed.main() == 0
+    assert capsys.readouterr().out == "docs/new.md\0"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["README.md", "docs/a.md", ".github/ISSUE_TEMPLATE/a.md", ".agents/a.md"],
+)
+def test_docs_formatter_selector_accepts_supported_markdown(path):
+    from scripts.docs_changed import is_documentation_markdown
+
+    assert is_documentation_markdown(path)
+
+
+@pytest.mark.parametrize("path", ["app.py", "static/readme.md", "../docs/a.md", "/docs/a.md"])
+def test_docs_formatter_selector_rejects_non_docs_or_unsafe_paths(path):
+    from scripts.docs_changed import is_documentation_markdown
+
+    assert not is_documentation_markdown(path)
