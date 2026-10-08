@@ -1,6 +1,6 @@
 # Storage Configuration
 
-Alice Platform manages persistent storage for services that require it. This document explains storage configuration and backup policies.
+Alice Platform validates desired-state storage configuration for services that require it. This document describes the configuration contract. Snapshot scheduling, provider-backed backup/restore and recovery commands are not implemented by the current `alice_platform` CLI and must not be treated as available operations.
 
 ## Storage Concepts
 
@@ -29,7 +29,7 @@ storage:
 
 ### Backup Policy
 
-Storage can be backed up automatically based on policy:
+`backup_policy` and `retention_days` are desired-state fields. The current platform code does not yet provision or schedule snapshots from them. Intended policy values are:
 
 - **daily**: Snapshot created daily at 2 AM UTC
 - **weekly**: Snapshot created weekly (Sundays at 2 AM UTC)
@@ -76,14 +76,9 @@ Storage configuration is validated for:
 
 ## Recovery
 
-In case of data loss, recover storage from the most recent snapshot:
+Provider-backed snapshot restore is planned but is not exposed by the current `alice_platform` CLI. Do not run or document synthetic `recovery list-snapshots` / `recovery restore` commands as operational evidence.
 
-```bash
-python -m alice_platform recovery list-snapshots --storage chrome-state
-python -m alice_platform recovery restore --storage chrome-state --snapshot 2024-10-01
-```
-
-See `docs/platform/recovery.md` for detailed recovery procedures.
+See `docs/platform/recovery.md` for the current recovery boundary and planned procedures.
 
 ## Cost Optimization
 
