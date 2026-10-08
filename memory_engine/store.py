@@ -224,6 +224,24 @@ class _JournalEngine:
         """Return one committed value without exposing the internal namespace."""
         return self.get("values", name)
 
+    @contextmanager
+    def value_transaction(self) -> Iterator["_ValueTransaction"]:
+        """Own one serialized name/value transaction and its durable commit."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed:
+                raise StoreError("recovery required")
+            if self._active_transaction:
+                raise StoreError("nested transactions are not supported")
+            self._active_transaction = True
+            transaction = _ValueTransaction(deepcopy(self._state.get("values", {})))
+            try:
+                yield transaction
+                self._commit_changes(transaction._pending_changes())
+            finally:
+                transaction._closed = True
+                self._active_transaction = False
+
     def committed_values(self) -> dict[str, Any]:
         """Return a copy of committed names for a serialized transaction."""
         self._ensure_open()
@@ -426,18 +444,11 @@ class MemoryStore:
 
     @contextmanager
     def transaction(self) -> Iterator["_ValueTransaction"]:
-        """Serialize an atomic read-modify-write operation."""
-        with self._engine.value_guard():
-            if self._pending:
-                raise StoreError("transaction requires an idle store")
-            with self._engine.transaction() as tx:
-                wrapper = _ValueTransaction(self._engine.committed_values())
-                try:
-                    yield wrapper
-                    for change in wrapper._pending_changes():
-                        tx.set(change["namespace"], change["key"], change["value"])
-                finally:
-                    wrapper._closed = True
+        """Delegate atomic read-modify-write to the single transaction owner."""
+        if self._pending:
+            raise StoreError("transaction requires an idle store")
+        with self._engine.value_transaction() as transaction:
+            yield transaction
 
     def backup(self, destination: str | Path) -> None:
         """Back up only confirmed journal state."""
