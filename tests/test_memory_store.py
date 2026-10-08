@@ -73,3 +73,24 @@ def test_mutable_read_cannot_change_store(tmp_path):
         copy = db.get("items", "a")
         copy["x"].append(2)
         assert db.get("items", "a") == {"x": [1]}
+
+
+def test_transaction_handle_is_closed_after_commit(tmp_path):
+    with MemoryStore(tmp_path / "alice.memory") as db:
+        with db.transaction() as tx:
+            tx.set("items", "a", 1)
+        with pytest.raises(StoreError, match="transaction is closed"):
+            tx.set("items", "b", 2)
+        with pytest.raises(StoreError, match="transaction is closed"):
+            tx.get("items", "a")
+        assert db.get("items", "b") is None
+
+
+def test_nested_transaction_is_rejected(tmp_path):
+    with MemoryStore(tmp_path / "alice.memory") as db:
+        with db.transaction() as outer:
+            with pytest.raises(StoreError, match="nested transactions"):
+                with db.transaction():
+                    pass
+            outer.set("items", "ok", 1)
+        assert db.get("items", "ok") == 1
