@@ -48,13 +48,9 @@ def test_public_store_does_not_override_incompatible_legacy_api():
     source = (ROOT / "store.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     public = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
     )
-    inherited = {
-        base.id for base in public.bases if isinstance(base, ast.Name)
-    }
+    inherited = {base.id for base in public.bases if isinstance(base, ast.Name)}
     assert "_JournalEngine" not in inherited, (
         "Public MemoryStore must not inherit journal internals; "
         "use composition or a compatible storage engine"
