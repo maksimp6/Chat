@@ -9,7 +9,7 @@
     "test:browser": "BROWSER_LIVE_SMOKE_TEST=1 node --test browser.test.mjs live-smoke.test.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@playwright/mcp": "0.0.83",
     "playwright-core": "1.64.0-alpha-1790635538000"
   }
