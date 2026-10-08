@@ -299,3 +299,13 @@ def test_committed_sequence_matches_replayed_journal(tmp_path):
     with MemoryStore(path) as reopened:
         assert reopened.last_commit == confirmed
         assert reopened.get("counter") == 2
+
+
+def test_close_is_idempotent(tmp_path):
+    """Repeated close must not fail after the writer lock is released."""
+    store = MemoryStore(tmp_path / "idempotent.memory")
+    store.set("temporary", 1)
+    store.close()
+    store.close()
+    with MemoryStore(tmp_path / "idempotent.memory") as reopened:
+        assert reopened.get("temporary") is None
