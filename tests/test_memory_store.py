@@ -2,7 +2,7 @@
 import multiprocessing
 import pytest
 
-from memory_store import MemoryStore, StoreError
+from memory_engine import MemoryStore, StoreError
 
 
 def _attempt_second_writer(path, result):
@@ -146,7 +146,7 @@ def test_delta_transaction_delete_and_replay(tmp_path):
  
 def test_commit_does_not_copy_complete_ram_state(tmp_path, monkeypatch):
     """Untouched values must never be copied or diffed just to commit a new key."""
-    import memory_store as memory_module
+    import memory_engine.store as memory_module
     from copy import deepcopy as original_deepcopy
 
     with MemoryStore(tmp_path / "alice.memory") as db:
@@ -186,7 +186,7 @@ def test_invalid_json_value_does_not_poison_writer(tmp_path):
 
 def test_failed_fsync_does_not_acknowledge_or_publish(tmp_path, monkeypatch):
     """A failed sync has an uncertain disk outcome: block further writes."""
-    import memory_store as memory_module
+    import memory_engine.store as memory_module
 
     path = tmp_path / "alice.memory"
     with MemoryStore(path) as db:
