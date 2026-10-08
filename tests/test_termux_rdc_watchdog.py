@@ -50,5 +50,33 @@ class WatchdogTests(unittest.TestCase):
             self.assertEqual(hook.read_bytes(), contents)
 
 
+    def test_missing_agent_triggers_start_without_touching_real_rdc(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            fake_bin = home / "bin"
+            fake_bin.mkdir()
+            launcher = home / "fake-launcher.sh"
+            marker = home / "started"
+            launcher.write_text('#!/bin/bash\necho "$1" >> "$MARKER"\n')
+            sleeper = fake_bin / "sleep"
+            sleeper.write_text('#!/bin/sh\nexit 17\n')
+            sleeper.chmod(0o755)
+            env = dict(
+                os.environ,
+                HOME=tmp,
+                RDC_HOME=str(home / "rdc"),
+                RDC_SCRIPT=str(launcher),
+                RDC_WATCHDOG_INTERVAL="10",
+                RDC_WATCHDOG_BACKOFF="30",
+                MARKER=str(marker),
+                PATH=str(fake_bin) + os.pathsep + os.environ["PATH"],
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "termux-rdc-watchdog.sh")],
+                env=env, capture_output=True, text=True, timeout=5,
+            )
+            self.assertEqual(result.returncode, 17)
+            self.assertEqual(marker.read_text().splitlines(), ["start"])
+
 if __name__ == "__main__":
     unittest.main()
