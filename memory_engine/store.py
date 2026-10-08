@@ -60,6 +60,26 @@ class DatabaseInfoContract(Protocol):
         ...
 
 
+_database_info_provider: DatabaseInfoContract | None = None
+
+
+def bind_database_info(provider: DatabaseInfoContract | None) -> None:
+    """Register the already-owned database instance for tool diagnostics."""
+    global _database_info_provider
+    _database_info_provider = provider
+
+
+def database_info() -> DatabaseInfo | None:
+    """Read a typed fact without opening storage or replaying journal files."""
+    provider = _database_info_provider
+    if provider is None:
+        return None
+    try:
+        return provider.info()
+    except StoreError:
+        return None
+
+
 @dataclass(frozen=True)
 class Commit:
     """Confirmed journal position and chained SHA-256 digest."""
