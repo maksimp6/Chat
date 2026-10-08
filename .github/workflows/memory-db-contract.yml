@@ -38,10 +38,14 @@ jobs:
           python-version: "3.14"
       - name: Install only test runner
         run: python -m pip install pytest==9.1.1
-      - name: Verify standalone package build and install
+      - name: Build wheel through Make and measure wall time
         run: |
-          python -m pip install --no-deps ./memory-db-package
+          /usr/bin/time -f "MEMORY_DB_BUILD_WALL_SECONDS=%e" make -C memory-db-package build
+          ls -lh memory-db-package/dist/*.whl
+      - name: Install built wheel outside source directory
+        run: |
+          python -m pip install --no-deps memory-db-package/dist/*.whl
           cd /tmp
           python -c "from memory_engine import MemoryStore; print(MemoryStore.__name__)"
-      - name: RED first, then require GREEN
-        run: python -m pytest -q tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py
+      - name: Run standalone tests through Make and measure wall time
+        run: /usr/bin/time -f "MEMORY_DB_TEST_WALL_SECONDS=%e" make -C memory-db-package test
