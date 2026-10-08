@@ -52,6 +52,7 @@ class MemoryStore:
         self._sequence = 0
         self._digest = "0" * 64
         self._failed = False
+        self._active_transaction = False
         try:
             self._replay()
         except BaseException:
@@ -126,9 +127,16 @@ class MemoryStore:
         with self._lock:
             if self._failed:
                 raise StoreError("recovery required")
+            if self._active_transaction:
+                raise StoreError("nested transactions are not supported")
+            self._active_transaction = True
             transaction = Transaction(deepcopy(self._state))
-            yield transaction
-            self._commit(transaction._state)
+            try:
+                yield transaction
+                self._commit(transaction._state)
+            finally:
+                transaction._closed = True
+                self._active_transaction = False
 
     def close(self) -> None:
         if not self._lock_file.closed:
@@ -147,12 +155,20 @@ class Transaction:
 
     def __init__(self, state: dict[str, dict[str, Any]]) -> None:
         self._state = state
+        self._closed = False
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise StoreError("transaction is closed")
 
     def get(self, namespace: str, key: str) -> Any | None:
+        self._ensure_open()
         return deepcopy(self._state.get(namespace, {}).get(key))
 
     def set(self, namespace: str, key: str, value: Any) -> None:
+        self._ensure_open()
         self._state.setdefault(namespace, {})[key] = deepcopy(value)
 
     def delete(self, namespace: str, key: str) -> None:
+        self._ensure_open()
         self._state.get(namespace, {}).pop(key, None)
