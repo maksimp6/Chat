@@ -17,7 +17,8 @@ def test_engine_does_not_import_alice_modules():
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.append(node.module)
         assert not any(
-            name == "db" or name.startswith(("agent_shell", "tool_providers", "flask", "mcp_storage"))
+            name == "db"
+            or name.startswith(("agent_shell", "tool_providers", "flask", "mcp_storage"))
             for name in imported
         ), source_file.name
 
@@ -28,7 +29,8 @@ def test_engine_has_no_global_database_provider():
     tree = ast.parse(source)
     forbidden = {"bind_database_info", "database_info", "_database_info_provider"}
     definitions = {
-        node.name for node in ast.walk(tree)
+        node.name
+        for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     assignments = {
@@ -46,7 +48,8 @@ def test_public_store_does_not_override_incompatible_legacy_api():
     source = (ROOT / "store.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     public = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
     )
     inherited = {
@@ -67,7 +70,8 @@ def test_public_contract_requires_annotated_parameters_and_returns():
         if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
     )
     methods = {
-        node.name: node for node in public.body
+        node.name: node
+        for node in public.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     for name in ("get", "set", "commit"):
