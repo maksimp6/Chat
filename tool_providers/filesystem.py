@@ -302,49 +302,19 @@ def python_ast_outline(args: dict) -> dict:
 
 
 def memory_inspect(args: dict) -> dict:
-    """Inspect bounded journal metadata, never stored keys or values.
+    """Return the current Memory DB commit through a typed service contract.
 
-    Reject inspection while a writer owns the database. No SQL interpreter,
-    arbitrary namespace reads, or user-controlled journal file paths.
+    The caller cannot choose a file, namespace or stored value. The runtime
+    must explicitly bind the authoritative service; this tool never opens DBs.
     """
-    import fcntl
-    from pathlib import Path
+    if args:
+        return {"error": "Unsupported arguments"}
+    from memory_engine.service import database_info
 
-    from memory_engine import MemoryStore, StoreError
-
-    # Read-only diagnostics are intentionally restricted to the configured
-    # runtime database, not an arbitrary path supplied by a tool caller.
-    if set(args) - {"limit"}:
-        return {"error": "Only metadata inspection is supported"}
-    if "limit" in args:
-        return {"error": "Record enumeration is not supported"}
-    from db import memory_file_path
-
-    journal = Path(memory_file_path())
-    if not journal.is_file():
-        return {"error": "Memory DB journal not found"}
-    if journal.stat().st_size > 8 * 1024 * 1024:
-        return {"error": "Journal exceeds inspection size limit"}
-    lock_path = journal.with_name(journal.name + ".lock")
-    if not lock_path.exists():
-        return {"error": "Writer lock file is missing"}
-    try:
-        with lock_path.open("rb") as lock:
-            try:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
-            except BlockingIOError:
-                return {"error": "Database writer active; inspection deferred"}
-            try:
-                # Recheck under the lock to avoid racing with a writer.
-                if journal.stat().st_size > 8 * 1024 * 1024:
-                    return {"error": "Journal exceeds inspection size limit"}
-                _state, sequence, digest = MemoryStore._inspect_log(journal)
-            finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        return {"success": True, "sequence": sequence, "digest": digest}
-    except (StoreError, OSError, ValueError, TypeError):
-        # Never leak filesystem paths or raw journal content through errors.
-        return {"error": "Memory DB inspection unavailable"}
+    info = database_info()
+    if info is None:
+        return {"error": "Database information unavailable"}
+    return {"last_commit": info.last_commit}
 
 
 def calculate_hash(args: dict) -> dict:
