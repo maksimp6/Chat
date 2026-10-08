@@ -1,0 +1,121 @@
+name: Solution review evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+      head_sha:
+        description: Exact pull request head SHA
+        required: true
+        type: string
+      base_sha:
+        description: Exact pull request base SHA
+        required: true
+        type: string
+      signed_report_b64:
+        description: Base64-encoded canonical JSON report signed by reviewer service
+        required: true
+        type: string
+      report_hmac_sha256:
+        description: HMAC-SHA256 hex signature from independent reviewer service
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  issue-evidence:
+    if: github.ref == 'refs/heads/master'
+    name: Issue solution review evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify exact pull request revisions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.head_sha }}
+          EXPECTED_BASE: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          actual_head="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+          actual_base="$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .base.sha)"
+          test "$actual_head" = "$EXPECTED_HEAD"
+          test "$actual_base" = "$EXPECTED_BASE"
+
+      - name: Verify independent signed review and emit evidence
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          SIGNED_REPORT_B64: ${{ inputs.signed_report_b64 }}
+          REPORT_HMAC_SHA256: ${{ inputs.report_hmac_sha256 }}
+          REVIEW_SIGNING_KEY: ${{ secrets.REVIEW_SIGNING_KEY }}
+        run: |
+          python - <<'PY'
+          import base64
+          import hashlib
+          import hmac
+          import json
+          import os
+          import re
+
+          key = os.environ.get("REVIEW_SIGNING_KEY", "")
+          assert len(key) >= 32, "review signing secret not configured"
+          encoded = os.environ["SIGNED_REPORT_B64"]
+          assert len(encoded) <= 60000, "report too large"
+          raw = base64.b64decode(encoded, validate=True)
+          assert len(raw) <= 45000, "report too large"
+          report = json.loads(raw)
+          assert isinstance(report, dict)
+          assert json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() == raw, "report must be canonical JSON"
+          signature = os.environ["REPORT_HMAC_SHA256"]
+          assert re.fullmatch(r"[0-9a-f]{64}", signature)
+          expected = hmac.new(key.encode(), raw, hashlib.sha256).hexdigest()
+          assert hmac.compare_digest(expected, signature), "independent review signature invalid"
+          assert report.get("schema_version") == 2
+          assert report.get("task") == f"pr:{os.environ['PR_NUMBER']}"
+          assert report.get("reviewed_head_sha") == os.environ["HEAD_SHA"]
+          assert report.get("reviewed_base_sha") == os.environ["BASE_SHA"]
+          assert report.get("outcome") in {"ACCEPTED", "CHANGES_REQUESTED", "BLOCKED"}
+          assert report.get("reviewer_role") in {"team-lead", "security-reviewer", "process-governor"}
+          assert report.get("reviewer_role") != report.get("implementation_role")
+          assert report.get("reviewer_session") and report.get("implementation_session")
+          assert report["reviewer_session"] != report["implementation_session"]
+          assert isinstance(report.get("reviewed_files"), list) and report["reviewed_files"]
+          assert isinstance(report.get("rationale"), str) and report["rationale"].strip()
+          assert isinstance(report.get("risk_assessment"), str) and report["risk_assessment"].strip()
+          assert isinstance(report.get("findings"), list)
+          assert re.fullmatch(r"[0-9a-f]{64}", str(report.get("review_nonce", "")))
+          assert report.get("outcome") == "ACCEPTED", "review not accepted"
+          evidence = {
+              **{name: report[name] for name in (
+                  "task", "outcome", "reviewed_head_sha", "reviewed_base_sha",
+                  "reviewer_role", "reviewer_session", "implementation_role",
+                  "implementation_session",
+              )},
+              "schema_version": 2,
+              "verification": "hmac-sha256-verified",
+              "review_report_sha256": hashlib.sha256(raw).hexdigest(),
+              "review_report": report,
+              "provenance": f"github-actions:solution-review:{os.environ['GITHUB_RUN_ID']}",
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "runner_sha": os.environ["GITHUB_SHA"],
+          }
+          with open("solution-review.json", "w", encoding="utf-8") as handle:
+              json.dump(evidence, handle, sort_keys=True)
+              handle.write("\n")
+          PY
+
+      - name: Upload immutable run evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: solution-review-pr-${{ inputs.pr_number }}-${{ inputs.head_sha }}
+          path: solution-review.json
+          if-no-files-found: error
+          retention-days: 30
