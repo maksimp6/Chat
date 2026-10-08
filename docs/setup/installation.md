@@ -53,10 +53,9 @@ python app.py
 
 В локальном интерфейсе откройте «Провайдеры», введите **Yandex Cloud API key**
 и **Yandex Cloud Project ID**, затем нажмите «Подключить».
-Оба поля обязательны вместе. Backend проверяет ключ у провайдера, затем
-сохраняет запись в `provider_credentials`.
+Оба поля обязательны вместе. Backend проверяет ключ у провайдера, затем сохраняет запись в legacy `provider_credentials`. Этот путь пока является рабочим compatibility consumer; canonical Secret Store migration для него отслеживается в #755.
 
-Текущий runtime получает API key и Project ID из активной записи БД.
+Текущий web runtime до миграции этого consumer получает API key и Project ID из активной legacy записи БД.
 Одних `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` в окружении, несмотря на их
 наличие в шаблоне, для веб-чата недостаточно. Редактировать `config.py`
 для записи ключа не требуется. Yandex-запрос также требует настроенного
