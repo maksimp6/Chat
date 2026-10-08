@@ -3,7 +3,7 @@
 - C-style позиционированное чтение файлов (fseek + fread) для мгновенного чтения хвостов логов
 - Безопасную атомарную запись файлов с проверкой синтаксиса (py_compile) и автобэкапом
 - Анализ структуры кода через AST (ast.parse): классы, методы, функции, импорты
-- Инспекцию локальных баз данных SQLite (sqlite3)
+- Инспекцию файловой Memory DB (проверка журнала без SQL)
 - Вычисление контрольных сумм (hashlib: sha256, md5, sha1)
 - Работу с архивами (zipfile: сжатие и безопасная распаковка с защитой от Zip Slip)
 - Сетевые HTTP-запросы без внешних зависимостей (urllib.request)
@@ -21,7 +21,6 @@ import shutil
 import difflib
 import hashlib
 import zipfile
-import sqlite3
 import logging
 import tempfile
 import platform
@@ -302,47 +301,43 @@ def python_ast_outline(args: dict) -> dict:
         return {"error": f"Ошибка AST-анализа: {str(e)}"}
 
 
-def sqlite_query(args: dict) -> dict:
-    """Выполнение безопасного запроса к локальной базе данных SQLite."""
-    db_name = args.get("db_path", "alice_pro.db")
-    query = args.get("query")
-    if not query:
-        return {"error": "Параметр 'query' обязателен"}
+def memory_inspect(args: dict) -> dict:
+    """Read-only verified inspection of a local Memory DB journal.
 
-    limit = int(args.get("limit", 50))
+    No SQL interpreter or mutation path is exposed through filesystem tools.
+    Concurrent/incomplete journal frames fail closed instead of returning data.
+    """
+    from pathlib import Path
+
+    from memory_engine import MemoryStore, StoreError
+
+    db_name = args.get("db_path", "alice.memory")
+    namespace = args.get("namespace")
+    if not isinstance(namespace, str) or not namespace:
+        return {"error": "Параметр 'namespace' обязателен"}
     try:
+        limit = int(args.get("limit", 50))
+        if not 1 <= limit <= 1000:
+            return {"error": "Лимит должен быть от 1 до 1000"}
         abs_db = _get_abs_path(db_name)
         if not os.path.isfile(abs_db):
             return {"error": f"База данных '{db_name}' не найдена"}
-
-        conn = sqlite3.connect(abs_db, timeout=5)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-
-        cur.execute(query)
-        if cur.description:
-            columns = [col[0] for col in cur.description]
-            rows = cur.fetchmany(limit)
-            results = [dict(zip(columns, row)) for row in rows]
-            conn.close()
-            return {
-                "success": True,
-                "db_path": db_name,
-                "columns": columns,
-                "count": len(results),
-                "rows": results,
-            }
-        else:
-            conn.commit()
-            changes = conn.total_changes
-            conn.close()
-            return {
-                "success": True,
-                "db_path": db_name,
-                "message": f"Запрос выполнен. Изменено строк: {changes}",
-            }
-    except Exception as e:
-        return {"error": f"Ошибка выполнения SQLite: {str(e)}"}
+        state, sequence, digest = MemoryStore._inspect_log(Path(abs_db))
+        rows = [
+            {"key": key, "value": value}
+            for key, value in sorted(state.get(namespace, {}).items())[:limit]
+        ]
+        return {
+            "success": True,
+            "db_path": db_name,
+            "namespace": namespace,
+            "sequence": sequence,
+            "digest": digest,
+            "count": len(rows),
+            "rows": rows,
+        }
+    except (StoreError, OSError, ValueError, TypeError) as exc:
+        return {"error": f"Ошибка чтения Memory DB: {exc}"}
 
 
 def calculate_hash(args: dict) -> dict:
@@ -776,23 +771,17 @@ TOOL_REGISTRY = {
         },
         "requires_approval": False,
     },
-    "sqlite_query": {
-        "func": sqlite_query,
-        "description": "Выполнение SQL-запроса к локальной базе данных SQLite (alice_pro.db или mcp_servers.db).",
+    "memory_inspect": {
+        "func": memory_inspect,
+        "description": "Проверенное чтение namespace из журнала Memory DB без SQL и без изменения данных.",
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "SQL запрос для выполнения"},
-                "db_path": {
-                    "type": "string",
-                    "description": "Имя файла БД (по умолчанию alice_pro.db)",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Лимит возвращаемых строк (по умолчанию 50)",
-                },
+                "namespace": {"type": "string", "description": "Пространство ключей"},
+                "db_path": {"type": "string", "description": "Путь к файлу alice.memory"},
+                "limit": {"type": "integer", "description": "Максимум 1000 записей"},
             },
-            "required": ["query"],
+            "required": ["namespace"],
         },
         "requires_approval": False,
     },
