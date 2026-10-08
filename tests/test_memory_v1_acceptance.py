@@ -309,3 +309,28 @@ def test_close_is_idempotent(tmp_path):
     store.close()
     with MemoryStore(tmp_path / "idempotent.memory") as reopened:
         assert reopened.get("temporary") is None
+
+
+def test_value_transaction_rollback_on_exception(tmp_path):
+    """One failed transaction must not publish staged values."""
+    path = tmp_path / "rollback.memory"
+    with MemoryStore(path) as store:
+        store.set("counter", 0)
+        store.commit()
+        with pytest.raises(ValueError):
+            with store.transaction() as tx:
+                tx.set("counter", 1)
+                raise ValueError("abort")
+        assert store.get("counter") == 0
+        assert store.last_commit.sequence == 1
+    with MemoryStore(path) as reopened:
+        assert reopened.get("counter") == 0
+
+
+def test_value_transaction_cannot_be_nested(tmp_path):
+    """Only one serialized transaction can own the journal at a time."""
+    with MemoryStore(tmp_path / "nested.memory") as store:
+        with store.transaction():
+            with pytest.raises(StoreError):
+                with store.transaction():
+                    pass
