@@ -334,3 +334,43 @@ def test_value_transaction_cannot_be_nested(tmp_path):
             with pytest.raises(StoreError):
                 with store.transaction():
                     pass
+
+
+def test_none_is_reserved_for_missing_name(tmp_path):
+    """Reject ambiguous stored None without modifying staged or durable state."""
+    path = tmp_path / "none.memory"
+    with MemoryStore(path) as store:
+        with pytest.raises(StoreError, match="None"):
+            store.set("empty", None)
+        with pytest.raises(StoreError, match="None"):
+            with store.transaction() as transaction:
+                transaction.set("empty", None)
+        assert store.commit() == 0
+        assert store.get("empty") is None
+    with MemoryStore(path) as reopened:
+        assert reopened.get("empty") is None
+
+
+def test_complete_frame_after_uncertain_fsync_replays_on_reopen(tmp_path, monkeypatch):
+    """A complete hash-valid frame can be recovered despite missing fsync ACK."""
+    path = tmp_path / "uncertain.memory"
+    with MemoryStore(path) as store:
+        store.set("stable", 1)
+        assert store.commit() == 1
+        store.set("maybe", 2)
+        original_fsync = os.fsync
+        def uncertain_fsync(_fd):
+            raise OSError("acknowledgement lost after write")
+        monkeypatch.setattr(os, "fsync", uncertain_fsync)
+        try:
+            with pytest.raises(StoreError, match="recovery required"):
+                store.commit()
+        finally:
+            monkeypatch.setattr(os, "fsync", original_fsync)
+        assert store.last_commit.sequence == 1
+        with pytest.raises(StoreError):
+            store.commit()
+    with MemoryStore(path) as recovered:
+        assert recovered.last_commit.sequence == 2
+        assert recovered.get("stable") == 1
+        assert recovered.get("maybe") == 2
