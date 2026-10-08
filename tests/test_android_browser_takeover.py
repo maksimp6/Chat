@@ -1,26 +1,26 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTIVITY = ROOT / "android/app/src/main/java/com/alicepro/mobile/BrowserTakeoverActivity.kt"
-MANIFEST = ROOT / "android/app/src/main/AndroidManifest.xml"
-MAIN = ROOT / "android/app/src/main/java/com/alicepro/mobile/MainActivity.kt"
+BROWSER = ROOT / "android/direct/src/com/alicepro/mobile/BrowserActivity.java"
+MANIFEST = ROOT / "android/direct/AndroidManifest.xml"
+MAIN = ROOT / "android/direct/src/com/alicepro/mobile/MainActivity.java"
 
 
-def test_android_takeover_uses_dedicated_webview_and_https_origin():
-    source = ACTIVITY.read_text()
-    assert 'const val TAKEOVER_HOST = "chrome-22706bfa6066.containerapps.ru"' in source
-    assert 'const val TAKEOVER_URL = "https://$TAKEOVER_HOST/browser/v1/takeover"' in source
-    assert "WebView(this)" in source
-    assert "setAcceptThirdPartyCookies(webView, false)" in source
-    assert 'target.scheme == "https" && target.host == TAKEOVER_HOST' in source
-    assert "SOFT_INPUT_ADJUST_RESIZE" in source
+def test_android_controller_uses_system_webview_and_loopback_api():
+    source = BROWSER.read_text(encoding="utf-8")
+    assert "new WebView(this)" in source
+    assert 'CONTROL_HOST = "127.0.0.1"' in source
+    assert "CONTROL_PORT = 8765" in source
+    assert "new ServerSocket(" in source
+    for action in ("navigate", "back", "forward", "reload", "text", "html", "click", "type", "eval"):
+        assert f'"{action}"' in source
 
 
-def test_android_takeover_has_internal_bridge_and_deep_link():
-    manifest = MANIFEST.read_text()
-    main = MAIN.read_text()
-    assert 'android:name=".BrowserTakeoverActivity"' in manifest
+def test_android_controller_has_deep_link_and_framework_launcher():
+    manifest = MANIFEST.read_text(encoding="utf-8")
+    main = MAIN.read_text(encoding="utf-8")
+    assert 'android:name=".BrowserActivity"' in manifest
     assert 'android:scheme="alicepro"' in manifest
     assert 'android:host="browser"' in manifest
-    assert "fun openBrowserTakeover()" in main
-    assert "BrowserTakeoverActivity::class.java" in main
+    assert "BrowserActivity.class" in main
+    assert "androidx" not in main.lower()

@@ -2,29 +2,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Versions with Android wheels in Chaquopy's repository (https://chaquo.com/pypi-13.1/).
-CHAQUOPY_NATIVE_WHEELS = {"cryptography": {"42.0.8"}}
+
+def test_android_has_one_direct_sdk_build_path():
+    android = ROOT / "android"
+    build = (android / "scripts" / "build_direct.sh").read_text(encoding="utf-8")
+
+    assert "aapt2" in build
+    assert "javac" in build
+    assert "d8" in build
+    assert "zipalign" in build
+    assert "apksigner" in build
+
+    assert not (android / "build.gradle.kts").exists()
+    assert not (android / "settings.gradle.kts").exists()
+    assert not (android / "gradle.properties").exists()
+    assert not (android / "app").exists()
+    assert not (android / "requirements.txt").exists()
 
 
-def _pins(path: Path) -> dict[str, str]:
-    pins = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.split("#", 1)[0].strip()
-        if "==" in line:
-            name, version = line.split("==", 1)
-            pins[name.strip().lower()] = version.strip()
-    return pins
+def test_android_direct_runtime_is_framework_only():
+    direct = ROOT / "android" / "direct"
+    text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in direct.rglob("*")
+        if path.is_file()
+    ).lower()
 
-
-def test_android_native_pins_have_chaquopy_wheels():
-    pins = _pins(ROOT / "android" / "requirements.txt")
-    for package, versions in CHAQUOPY_NATIVE_WHEELS.items():
-        assert pins.get(package) in versions, (
-            f"android/requirements.txt pins {package}=={pins.get(package)}, "
-            f"but Chaquopy only provides {sorted(versions)}"
-        )
-
-
-def test_gradle_installs_android_requirements_file():
-    gradle = (ROOT / "android" / "app" / "build.gradle.kts").read_text(encoding="utf-8")
-    assert 'install("-r", "../requirements.txt")' in gradle
+    assert "androidx" not in text
+    assert "chaquopy" not in text
+    assert "kotlin" not in text
+    assert "python" not in text
