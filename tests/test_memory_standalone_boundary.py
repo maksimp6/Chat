@@ -39,3 +39,38 @@ def test_engine_has_no_global_database_provider():
         if isinstance(target, ast.Name)
     }
     assert not (forbidden & (definitions | assignments))
+
+
+def test_public_store_does_not_override_incompatible_legacy_api():
+    """A name/value store must not inherit namespace/key method signatures."""
+    source = (ROOT / "store.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    public = next(
+        node for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "VersionedMemoryStore"
+    )
+    inherited = {
+        base.id for base in public.bases if isinstance(base, ast.Name)
+    }
+    assert "MemoryStore" not in inherited, (
+        "VersionedMemoryStore overrides incompatible legacy get/set signatures; "
+        "use composition or a compatible storage engine"
+    )
+
+
+def test_public_contract_requires_annotated_parameters_and_returns():
+    """Enforce typing at API boundaries, not on inferred local variables."""
+    source = (ROOT / "store.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    public = next(
+        node for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "VersionedMemoryStore"
+    )
+    methods = {
+        node.name: node for node in public.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    for name in ("get", "set", "commit"):
+        method = methods[name]
+        assert method.returns is not None, name
+        assert all(arg.annotation is not None for arg in method.args.args[1:]), name
