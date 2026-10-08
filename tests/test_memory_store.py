@@ -111,3 +111,34 @@ def test_direct_mutation_cannot_overwrite_active_transaction(tmp_path):
     with MemoryStore(path) as reopened:
         assert reopened.get("items", "transaction") == 1
         assert reopened.get("items", "direct") is None
+
+
+def test_journal_records_only_changed_values(tmp_path):
+    import json
+    path = tmp_path / "alice.memory"
+    with MemoryStore(path) as db:
+        db.set("items", "large", "x" * 10000)
+        db.set("items", "small", "ok")
+    frames = [json.loads(line) for line in path.read_text().splitlines()]
+    assert len(frames) == 2
+    assert frames[0]["payload"]["changes"][0]["key"] == "large"
+    assert frames[1]["payload"]["changes"] == [
+        {"op": "set", "namespace": "items", "key": "small", "value": "ok"}
+    ]
+    assert "x" * 10000 not in path.read_text().splitlines()[1]
+    with MemoryStore(path) as reopened:
+        assert reopened.get("items", "large") == "x" * 10000
+        assert reopened.get("items", "small") == "ok"
+
+
+def test_delta_transaction_delete_and_replay(tmp_path):
+    path = tmp_path / "alice.memory"
+    with MemoryStore(path) as db:
+        db.set("items", "remove", 1)
+        with db.transaction() as tx:
+            tx.delete("items", "remove")
+            tx.set("items", "keep", {"value": 2})
+        assert db.last_commit.sequence == 2
+    with MemoryStore(path) as reopened:
+        assert reopened.get("items", "remove") is None
+        assert reopened.get("items", "keep") == {"value": 2}
