@@ -80,7 +80,14 @@ class MemoryStore:
                 digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
                 if record["digest"] != digest or payload["seq"] != self._sequence + 1:
                     raise ValueError("commit chain mismatch")
-                self._state = payload["state"]
+                for change in payload["changes"]:
+                    namespace, key = change["namespace"], change["key"]
+                    if change["op"] == "set":
+                        self._state.setdefault(namespace, {})[key] = change["value"]
+                    elif change["op"] == "delete":
+                        self._state.get(namespace, {}).pop(key, None)
+                    else:
+                        raise ValueError("invalid journal operation")
                 self._sequence = payload["seq"]
                 self._digest = digest
             except (ValueError, KeyError, TypeError, UnicodeError) as exc:
@@ -93,7 +100,16 @@ class MemoryStore:
     def _commit(self, next_state: dict[str, dict[str, Any]]) -> None:
         if self._failed:
             raise StoreError("recovery required")
-        payload = {"seq": self._sequence + 1, "state": next_state}
+        changes = []
+        for namespace in sorted(set(self._state) | set(next_state)):
+            before = self._state.get(namespace, {})
+            after = next_state.get(namespace, {})
+            for key in sorted(set(before) | set(after)):
+                if key not in after:
+                    changes.append({"op": "delete", "namespace": namespace, "key": key})
+                elif key not in before or before[key] != after[key]:
+                    changes.append({"op": "set", "namespace": namespace, "key": key, "value": after[key]})
+        payload = {"seq": self._sequence + 1, "changes": changes}
         try:
             encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
             digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
