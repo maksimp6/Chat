@@ -1,225 +1,74 @@
 # Deployment Guide
 
-Alice Platform automates deployment of services from configuration. This document explains the deployment process, approval gates, and how to verify deployments.
+Status: **desired-state and validation contract; not an implemented deployment CLI**.
 
-## Deployment Overview
+Alice Platform currently validates `config/alice/` and generates a configured health-check plan. The public CLI does not expose `plan`, `deploy`, `status`, `logs`, `reconcile`, or `recovery` commands. Tests intentionally reject unobserved mutation commands. Production deployment remains owned by the repository's focused deployment workflows/runbooks and the open ownership decision in #869; this document must not invent a parallel deployment path.
 
-Deployments follow this process:
+## Current supported commands
 
-1. **Configuration committed** to git (config/alice/*.yaml)
-2. **Validation** runs in CI (all rules checked)
-3. **Planning** calculates needed changes
-4. **Approval** required for production changes
-5. **Execution** applies changes to infrastructure
-6. **Verification** ensures services are healthy
-
-## CI Validation
-
-Every commit triggers automatic validation:
+### Validate desired state
 
 ```bash
-# Runs in CI (`.github/workflows/ci.yml`)
 python -m alice_platform validate
-
-# Checks:
-# - Schema: valid YAML, required fields present
-# - Semantics: no cycles, valid references
-# - Secrets: no plaintext credentials
-# - Policies: production=github, test!=prod_secrets, etc.
 ```
 
-If validation fails, the PR cannot merge.
+This loads the canonical YAML files and enforces the validation implemented in `alice_platform/config.py`: schema/top-level fields, service dependencies, secret-pattern rules, service/domain references, HTTPS in production, and lane invariants.
 
-## Deployment Planning
-
-To see what changes will be deployed:
+### Generate the health plan
 
 ```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
-```
-
-Example output:
-
-```
-Plan for production:
-  1. [create] oauth: Create oauth 🔒 needs approval
-  2. [update] chrome: Update chrome scale from 1 to 2 🔒 needs approval
-  3. [report_orphan] agent-shell: Orphaned container: agent-shell
-```
-
-### Action Types
-
-- **CREATE**: Deploy new service (requires approval in production)
-- **UPDATE**: Change service configuration (requires approval in production)
-- **DELETE**: Remove service (not done automatically, manual only)
-- **REPORT_ORPHAN**: Service exists in reality but not in desired config (investigate)
-
-## Approval Gate
-
-Production changes require explicit approval before execution:
-
-### For Manual Deployments
-
-```bash
-python -m alice_platform deploy --lane production
-# Prompts for approval before applying changes
-```
-
-### For CI/CD Pipeline
-
-Set approval in environment:
-
-```bash
-# GitHub Actions workflow
-- name: Deploy production
-  if: github.ref == 'refs/heads/master'
-  env:
-    ALICE_APPROVE: ${{ secrets.ALICE_APPROVE }}
-  run: python -m alice_platform deploy --lane production
-```
-
-The `ALICE_APPROVE` token is issued by:
-- Manual approval via GitHub
-- Automated approval system (if configured)
-- Deployment service (with restricted permissions)
-
-## Test Lane Deployment
-
-Test lane requires no approval:
-
-```bash
-python -m alice_platform deploy --lane test
-```
-
-Changes are applied immediately after planning.
-
-## Deployment Verification
-
-After deployment, verify services are healthy:
-
-```bash
-# Check service status
-python -m alice_platform status production
-
-# Run health checks
 python -m alice_platform health production
-
-# View recent logs
-python -m alice_platform logs oauth --lane production --tail 100
+python -m alice_platform health test
 ```
 
-Expected output after successful deployment:
+This prints configured service endpoints and expected sign-in methods. It does **not** contact the endpoints and is not live deployment evidence.
 
-```
-oauth: RUNNING (healthy, 1 replica)
-  Endpoint: https://oauth.maxxxpavlov.online
-  Health check: PASSED (response 200)
-  Uptime: 2 minutes
+## Current core desired state
 
-chrome: RUNNING (healthy, 2 replicas)
-  Endpoint: https://chrome.maxxxpavlov.online
-  Health check: PASSED (response 200)
-  Uptime: 1 minute
+The canonical core services are:
 
-agent-shell: RUNNING (healthy, 1 replica)
-  Endpoint: https://agent-shell.maxxxpavlov.online
-  Health check: PASSED (response 200)
-  Uptime: 2 minutes
-```
+- `oauth`;
+- `chrome`.
 
-## Rollback
+`agent-shell` is intentionally excluded from the current core platform contract.
 
-If deployment causes failures, rollback to previous configuration:
+## Deployment boundary
+
+The intended lifecycle is:
+
+`observe → plan → approve where required → apply → verify → repair/status`
+
+That full provider-backed lifecycle is not exposed by the current `alice_platform` CLI. #783 owns the convergence proof. Until implementation and tests land:
+
+- do not document synthetic `alice_platform deploy/plan/status/logs/recovery` commands;
+- do not infer Cloud.ru mutations from a successful config validation;
+- do not infer live health from the generated health plan;
+- do not invent approval tokens such as `ALICE_APPROVE`;
+- do not claim automatic test/production deployment merely because a lane YAML file changed.
+
+## Change inspection
+
+Git can safely inspect desired-state history:
 
 ```bash
-python -m alice_platform recovery rollback-config --lane production
+git log --oneline -- config/alice/
+git show <commit>:config/alice/platform.yaml
+git diff <old> <new> -- config/alice/
 ```
 
-This reverts to the last deployed configuration.
+These commands inspect configuration only. They do not apply infrastructure changes.
 
-## Change Tracking
+## Production operations
 
-All deployments are tracked in git commit history:
+Use the focused, verified production workflow/runbook that owns the target resource. The SSH-vs-RDC production ownership question is tracked by #869 and must not be resolved implicitly here.
 
-```bash
-# View deployment history
-git log --oneline config/alice/
+Any production mutation still requires the repository's normal approval, exact-head CI and live post-deploy verification rules.
 
-# See what changed in a deployment
-git show abc1234:config/alice/platform.yaml
+## Future platform work
 
-# Compare two versions
-git diff abc1234 def5678 config/alice/
-```
-
-## Deployment Checklist
-
-Before deploying to production:
-
-- [ ] All CI checks pass (validation, tests, linting)
-- [ ] Configuration is reviewed and approved
-- [ ] Health checks defined for all services
-- [ ] Secrets are created and accessible
-- [ ] Backups are recent and verified
-- [ ] Runbook for rollback is available
-- [ ] Monitoring and alerts are configured
-
-## Environment-Specific Deployment
-
-### Deploying Only to Test
-
-Make changes in `test.yaml` only:
-
-```bash
-git checkout -b add-test-feature
-# Edit config/alice/test.yaml
-python -m alice_platform validate
-python -m alice_platform plan test
-git commit -m "Add test feature"
-git push
-# Merge PR → automatic test deployment
-```
-
-### Deploying to Both Lanes
-
-Make changes that affect both lanes:
-
-```bash
-# Edit config/alice/platform.yaml (affects both lanes)
-# Or edit both production.yaml and test.yaml
-
-python -m alice_platform plan test
-python -m alice_platform plan production
-# Review plans, ensure consistency
-```
-
-## Disaster Recovery Deployment
-
-If deploying from backups:
-
-1. Stop current deployment
-2. Restore configuration from git tag
-3. Restore storage from snapshots
-4. Apply configuration changes
-5. Verify all services healthy
-
-```bash
-# Restore from known-good commit
-git checkout tags/v1.0.0 -- config/alice/
-
-# Restore storage
-python -m alice_platform recovery restore --storage chrome-state --snapshot 2024-10-01
-
-# Deploy restored config
-python -m alice_platform deploy --lane production --approve
-```
-
-## Future Work
-
-- Gradual rollout (canary deployments)
-- Automated health check integration
-- Blue/green deployments for zero-downtime updates
-- Integration with external approval systems (Slack, email)
-- Automatic rollback on health check failures
-- Metrics-based deployment validation
+- provider-backed observation;
+- deterministic drift planning;
+- bounded approved reconciliation;
+- live health verification;
+- provider-backed recovery and rollback evidence;
+- full convergence proof for #783.
