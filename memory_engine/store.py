@@ -327,7 +327,18 @@ class _JournalEngine:
                 raise StoreError("backup integrity mismatch")
             try:
                 if destination_must_be_new:
-                    os.link(temporary, destination)
+                    # Exclusive creation prevents overwriting another backup.
+                    # The destination is visible while being copied; remove our
+                    # incomplete copy if writing or syncing fails.
+                    with destination.open("xb") as published:
+                        try:
+                            with temporary.open("rb") as verified:
+                                shutil.copyfileobj(verified, published)
+                            published.flush()
+                            os.fsync(published.fileno())
+                        except BaseException:
+                            destination.unlink(missing_ok=True)
+                            raise
                 else:
                     os.replace(temporary, destination)
             except FileExistsError as exc:

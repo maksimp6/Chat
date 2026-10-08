@@ -298,21 +298,46 @@ def test_backup_never_overwrites_existing_artifact(tmp_path):
 
 def test_backup_destination_creation_race_does_not_overwrite(tmp_path, monkeypatch):
     """An atomic no-overwrite publish must preserve a concurrent artifact."""
-    import memory_engine.store as module
+    from pathlib import Path
 
     archive = tmp_path / "shared.backup"
     with MemoryStore(tmp_path / "original.memory") as db:
         db.set("items", "a", 1)
-        original_link = module.os.link
+        original_open = Path.open
 
-        def competing_link(source, destination):
-            archive.write_bytes(b"another backup")
-            return original_link(source, destination)
+        def competing_open(path, mode="r", *args, **kwargs):
+            if path == archive and mode == "xb":
+                archive.write_bytes(b"another backup")
+            return original_open(path, mode, *args, **kwargs)
 
-        monkeypatch.setattr(module.os, "link", competing_link)
+        monkeypatch.setattr(Path, "open", competing_open)
         with pytest.raises(StoreError, match="created concurrently"):
             db.backup(archive)
     assert archive.read_bytes() == b"another backup"
+
+
+def test_backup_copy_failure_removes_incomplete_destination(tmp_path, monkeypatch):
+    """Failed publication must not leave a partial backup under its final name."""
+    import shutil
+
+    archive = tmp_path / "partial.backup"
+    with MemoryStore(tmp_path / "source.memory") as db:
+        db.set("items", "a", 1)
+        original_copy = shutil.copyfileobj
+        calls = 0
+
+        def failing_copy(source, target, *args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                target.write(b"partial")
+                raise OSError("simulated copy failure")
+            return original_copy(source, target, *args, **kwargs)
+
+        monkeypatch.setattr(shutil, "copyfileobj", failing_copy)
+        with pytest.raises(OSError, match="simulated copy failure"):
+            db.backup(archive)
+    assert not archive.exists()
 
 
 @pytest.mark.parametrize(
