@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import sys
@@ -538,11 +539,30 @@ def test_owner_github_identity_is_not_used_as_solution_review_independence():
 
 
 
+def signed_test_evidence(run_id=3):
+    value = dict(snapshot()["solution_review"], workflow_run_id=run_id, runner_sha="master-sha")
+    report = dict(value["review_report"])
+    report.update({
+        "task": value["task"],
+        "reviewed_head_sha": value["reviewed_head_sha"],
+        "reviewed_base_sha": value["reviewed_base_sha"],
+        "reviewer_role": value["reviewer_role"],
+        "reviewer_session": value["reviewer_session"],
+        "implementation_role": value["implementation_role"],
+        "implementation_session": value["implementation_session"],
+    })
+    value["review_report"] = report
+    value["review_report_sha256"] = hashlib.sha256(
+        json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+    return value
+
+
 def test_select_solution_review_evidence_accepts_only_exact_successful_run():
     runs = [
-        {"id": 1, "head_sha": "old-master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"},
-        {"id": 2, "head_sha": "master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "failure"},
-        {"id": 3, "head_sha": "master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"},
+        {"id": 1, "head_sha": "old-master-sha", "path": ".github/workflows/solution-review.yml", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"},
+        {"id": 2, "head_sha": "master-sha", "path": ".github/workflows/solution-review.yml", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "failure"},
+        {"id": 3, "head_sha": "master-sha", "path": ".github/workflows/solution-review.yml", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"},
     ]
     artifacts = {
         3: [
@@ -550,7 +570,7 @@ def test_select_solution_review_evidence_accepts_only_exact_successful_run():
                 "id": 88,
                 "name": "solution-review-pr-123-abc123",
                 "expired": False,
-                "evidence": dict(snapshot()["solution_review"], workflow_run_id=3),
+                "evidence": signed_test_evidence(3),
             }
         ]
     }
@@ -563,8 +583,8 @@ def test_select_solution_review_evidence_accepts_only_exact_successful_run():
 
 
 def test_select_solution_review_evidence_rejects_mismatched_payload():
-    run = {"id": 3, "head_sha": "master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"}
-    bad = dict(snapshot()["solution_review"], task="pr:999", workflow_run_id=3)
+    run = {"id": 3, "head_sha": "master-sha", "path": ".github/workflows/solution-review.yml", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"}
+    bad = dict(signed_test_evidence(3), task="pr:999")
 
     assert (
         merge_readiness.select_solution_review_evidence(
@@ -589,8 +609,8 @@ def test_solution_review_workflow_is_read_only_and_manual():
 
 def test_dispatch_from_master_accepts_distinct_reviewed_pr_head():
     run = {"id": 500, "event": "workflow_dispatch", "head_branch": "master",
-           "head_sha": "master-commit", "status": "completed", "conclusion": "success"}
-    report = dict(snapshot()["solution_review"], workflow_run_id=500)
+           "head_sha": "master-sha", "path": ".github/workflows/solution-review.yml", "status": "completed", "conclusion": "success"}
+    report = signed_test_evidence(500)
     artifact = {"id": 44, "name": "solution-review-pr-123-abc123",
                 "expired": False, "evidence": report}
     assert merge_readiness.select_solution_review_evidence(
@@ -601,8 +621,8 @@ def test_dispatch_from_master_accepts_distinct_reviewed_pr_head():
 @pytest.mark.parametrize("revision", ["head", "base"])
 def test_signed_evidence_cannot_be_reused_after_revision_change(revision):
     run = {"id": 500, "event": "workflow_dispatch", "head_branch": "master",
-           "head_sha": "master-commit", "status": "completed", "conclusion": "success"}
-    evidence = dict(snapshot()["solution_review"], workflow_run_id=500)
+           "head_sha": "master-sha", "path": ".github/workflows/solution-review.yml", "status": "completed", "conclusion": "success"}
+    evidence = signed_test_evidence(500)
     artifact = {"id": 44, "name": "solution-review-pr-123-abc123",
                 "expired": False, "evidence": evidence}
     head = "next-head" if revision == "head" else "abc123"
@@ -622,8 +642,8 @@ def test_unconfirmed_accepted_is_rejected():
 
 def test_review_run_from_feature_branch_not_trusted():
     run = {"id": 500, "event": "workflow_dispatch", "head_branch": "feature",
-           "head_sha": "abc123", "status": "completed", "conclusion": "success"}
-    evidence = dict(snapshot()["solution_review"], workflow_run_id=500)
+           "head_sha": "abc123", "path": ".github/workflows/solution-review.yml", "status": "completed", "conclusion": "success"}
+    evidence = signed_test_evidence(500)
     artifact = {"id": 44, "name": "solution-review-pr-123-abc123",
                 "expired": False, "evidence": evidence}
     assert merge_readiness.select_solution_review_evidence(
