@@ -15,23 +15,40 @@ import json
 import os
 from pathlib import Path
 from threading import RLock
-from typing import Any, Iterator, Protocol
+from typing import Any, Iterator, Protocol, TypeVar
+
+
+ValueT = TypeVar("ValueT")
 
 
 class StoreError(RuntimeError):
     """Persistence, integrity, or ownership failure."""
 
 
-class Store(Protocol):
-    """Typed application boundary; never expose mutable internal state."""
+class Store(Protocol[ValueT]):
+    """Typed repository boundary for one value type, independent of disk storage.
 
-    def get(self, namespace: str, key: str) -> Any | None: ...
-    def set(self, namespace: str, key: str, value: Any) -> None: ...
-    def delete(self, namespace: str, key: str) -> None: ...
+    Implementations return copy-safe values and must acknowledge mutations only
+    after their configured durability barrier succeeds.
+    """
+
+    def get(self, namespace: str, key: str) -> ValueT | None:
+        """Return a committed value or None for a missing key."""
+        ...
+
+    def set(self, namespace: str, key: str, value: ValueT) -> None:
+        """Persist the typed value before reporting success."""
+        ...
+
+    def delete(self, namespace: str, key: str) -> None:
+        """Persist a key deletion before reporting success."""
+        ...
 
 
 @dataclass(frozen=True)
 class Commit:
+    """Confirmed journal position and chained SHA-256 digest."""
+
     sequence: int
     digest: str
 
@@ -50,11 +67,11 @@ class MemoryStore:
             self._lock_file.close()
             raise StoreError("database already has a writer") from exc
         self._state: dict[str, dict[str, Any]] = {}
-        self._sequence = 0
-        self._digest = "0" * 64
-        self._failed = False
-        self._closed = False
-        self._active_transaction = False
+        self._sequence: int = 0
+        self._digest: str = "0" * 64
+        self._failed: bool = False
+        self._closed: bool = False
+        self._active_transaction: bool = False
         try:
             self._replay()
         except BaseException:
@@ -79,6 +96,15 @@ class MemoryStore:
         digest = "0" * 64
         if not path.exists():
             return state, sequence, digest
+        raw = path.read_bytes()
+        frames = raw.split(b"\\n")
+        if frames[-1]:
+            raise StoreError("incomplete journal tail; recovery required")
+        for frame in frames[:-1]:
+            state, sequence, digest = MemoryStore._apply_verified_frame(
+                frame, state, sequence, digest
+            )
+        return state, sequence, digest
 
     @staticmethod
     def _apply_verified_frame(
@@ -121,6 +147,7 @@ class MemoryStore:
         self._state, self._sequence, self._digest = self._inspect_log(self.path)
 
     def get(self, namespace: str, key: str) -> Any | None:
+        """Return a deep copy of the last confirmed value from RAM."""
         with self._lock:
             self._ensure_open()
             return deepcopy(self._state.get(namespace, {}).get(key))
@@ -192,6 +219,7 @@ class MemoryStore:
         self._digest = digest
 
     def set(self, namespace: str, key: str, value: Any) -> None:
+        """Synchronous durable write; reject direct writes inside a transaction."""
         with self._lock:
             self._ensure_open()
             if self._active_transaction:
@@ -201,6 +229,7 @@ class MemoryStore:
             )
 
     def delete(self, namespace: str, key: str) -> None:
+        """Synchronously record a deletion, including of an absent key."""
         with self._lock:
             self._ensure_open()
             if self._active_transaction:
@@ -209,6 +238,7 @@ class MemoryStore:
 
     @contextmanager
     def transaction(self) -> Iterator["Transaction"]:
+        """Commit staged changes together on success; discard on exception."""
         with self._lock:
             self._ensure_open()
             if self._failed:
@@ -306,6 +336,7 @@ class MemoryStore:
             self._digest = digest
 
     def close(self) -> None:
+        """Release the exclusive writer lock when no transaction is active."""
         with self._lock:
             if self._active_transaction:
                 raise StoreError("cannot close during active transaction")
@@ -335,6 +366,7 @@ class Transaction:
             raise StoreError("transaction is closed")
 
     def get(self, namespace: str, key: str) -> Any | None:
+        """Read a staged value, falling back to committed state."""
         self._ensure_open()
         pending = self._changes.get((namespace, key))
         if pending is not None:
@@ -342,6 +374,7 @@ class Transaction:
         return deepcopy(self._committed.get(namespace, {}).get(key))
 
     def set(self, namespace: str, key: str, value: Any) -> None:
+        """Stage a copy of the value without publishing it."""
         self._ensure_open()
         self._changes[(namespace, key)] = {
             "op": "set",
@@ -351,6 +384,7 @@ class Transaction:
         }
 
     def delete(self, namespace: str, key: str) -> None:
+        """Stage a key deletion without changing committed RAM state."""
         self._ensure_open()
         self._changes[(namespace, key)] = {"op": "delete", "namespace": namespace, "key": key}
 
