@@ -88,6 +88,7 @@ STRICT_CLEAN_FILES = {
     "pricing_registry.py",
     "printing3d/__init__.py",
     "provider_key_rotation.py",
+    "cloud/cloudru/live_budget.py",
     "repository_index/__init__.py",
     "repository_index/provenance.py",
     "rdc_connection/__init__.py",

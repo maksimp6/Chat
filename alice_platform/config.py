@@ -103,47 +103,72 @@ def _validate_no_cycles(services: Dict[str, Dict[str, Any]]) -> None:
                 raise ConfigError(f"Circular dependency detected involving service '{node}'")
 
 
+def _validate_scaling(service_name: str, service_config: Dict[str, Any]) -> None:
+    """Validate bounded Container Apps scaling fields."""
+    min_instances = service_config.get("min_instances")
+    max_instances = service_config.get("max_instances")
+    idle_timeout = service_config.get("idle_timeout_seconds")
+
+    for field, value, minimum in (
+        ("min_instances", min_instances, 0),
+        ("max_instances", max_instances, 1),
+        ("idle_timeout_seconds", idle_timeout, 1),
+    ):
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            qualifier = "non-negative" if minimum == 0 else "positive"
+            raise ConfigError(f"Service '{service_name}': {field} must be a {qualifier} integer")
+
+    if (
+        isinstance(min_instances, int)
+        and not isinstance(min_instances, bool)
+        and isinstance(max_instances, int)
+        and not isinstance(max_instances, bool)
+        and min_instances > max_instances
+    ):
+        raise ConfigError(f"Service '{service_name}': min_instances cannot exceed max_instances")
+
+
 def _validate_schema(data: Dict[str, Any]) -> None:
     """Validate config against schema rules."""
-    # Check for unknown fields at top level
     allowed_keys = {"services", "lanes", "domains", "storage", "secrets", "schema"}
-    for key in data.keys():
+    for key in data:
         if key not in allowed_keys:
             raise ConfigError(f"Unknown field at top level: '{key}'")
 
-    # Validate services structure
     services = data.get("services", {})
     if not isinstance(services, dict):
         raise ConfigError("'services' must be a dictionary")
 
+    allowed_service_fields = {
+        "type",
+        "depends_on",
+        "scale",
+        "resources",
+        "configuration",
+        "client_id",
+        "client_secret",
+        "signing_key",
+        "redirect_uris",
+        "scopes",
+        "owner_id",
+        "secret_ref",
+        "repository",
+        "billing",
+        "min_instances",
+        "max_instances",
+        "idle_timeout_seconds",
+    }
     for service_name, service_config in services.items():
         if not isinstance(service_config, dict):
             raise ConfigError(f"Service '{service_name}' config must be a dictionary")
-
-        # Check required fields
         if "type" not in service_config:
             raise ConfigError(f"Service '{service_name}' missing required field 'type'")
-
-        # Check unknown fields in service - be permissive for service-specific config
-        allowed_service_fields = {
-            "type",
-            "depends_on",
-            "scale",
-            "resources",
-            "configuration",
-            "client_id",
-            "client_secret",
-            "signing_key",
-            "redirect_uris",
-            "scopes",
-            "owner_id",
-            "secret_ref",
-            "repository",
-            "billing",
-        }
-        for key in service_config.keys():
+        for key in service_config:
             if key not in allowed_service_fields and not key.startswith("_"):
                 raise ConfigError(f"Unknown field in service '{service_name}': '{key}'")
+        _validate_scaling(service_name, service_config)
 
 
 def validate_no_cycles(services: Dict[str, Dict[str, Any]]) -> None:
