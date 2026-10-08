@@ -302,19 +302,10 @@ def python_ast_outline(args: dict) -> dict:
 
 
 def memory_inspect(args: dict) -> dict:
-    """Return the current Memory DB commit through a typed service contract.
-
-    The caller cannot choose a file, namespace or stored value. The runtime
-    must explicitly bind the authoritative service; this tool never opens DBs.
-    """
+    """Legacy tool entrypoint; no implicit global database owner is allowed."""
     if args:
         return {"error": "Unsupported arguments"}
-    from memory_engine.store import database_info
-
-    info = database_info()
-    if info is None:
-        return {"error": "Database information unavailable"}
-    return {"last_commit": info.last_commit}
+    return {"error": "Database instance must be supplied by its client"}
 
 
 def calculate_hash(args: dict) -> dict:
