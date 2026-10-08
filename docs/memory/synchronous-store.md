@@ -96,44 +96,19 @@ it passes, the full functional, crash/recovery and integration tests still
 have to run. The existing PostgreSQL job must be removed only after the
 SQL-free cutover is implemented and replacement coverage is established.
 
-## Typed database information contract
+## Standalone ownership boundary
 
-`DatabaseInfo(last_commit: int | None)` is a minimal immutable fact, not a
-health-state enum. `DatabaseInfoContract.info()` defines the interface.
-The already-owned `MemoryStore` provides the in-RAM last acknowledged
-sequence without replaying the journal. The runtime explicitly registers
-its authoritative instance with `bind_database_info()`; until then the
-diagnostic tool returns unavailable. No second DB instance is created.
+The client creates and closes its own `MemoryStore(path)` instance.
+The library does not register or expose a process-global database provider.
+`DatabaseInfo` and `DatabaseInfoContract` are passive typed metadata
+contracts only; there is no global `bind_database_info` or `database_info`
+function in the engine.
 
-`memory_inspect` accepts no arguments, calls the typed contract, and returns
-only `last_commit`. It does not handle paths, locks, journal size, recovery,
-keys or values. The current runtime still needs to bind its authoritative
-MemoryStore during application startup; otherwise the tool is intentionally
-unavailable. The sequence is a fact about the last acknowledged commit, not
-proof of disk health or future write availability.
-
-Tests in `tests/test_memory_inspect_tool.py` verify the public response,
-argument rejection, missing/closed owner, and that the tool does not replay
-the journal. Exact-head CI must verify these changes before acceptance.
-
-## Explicit commit API implementation (2026-10-08)
-
-The public `memory_engine.MemoryStore` now uses the **client-owned**
-`get(name)`, `set(name, value)`, `commit()` API. `set` stages a deep
-copy; `get` reads the staged value first; `commit` persists all staged
-changes in one journal record and returns the confirmed sequence. An empty
-commit returns the previous sequence. Closing without commit discards staging.
-
-The original namespaced engine is temporarily exported as
-`LegacyMemoryStore` for its existing durability regression tests. It is
-not the desired public v1 interface and must be retired after compatibility
-and integration work. This wrapper approach still needs independent
-performance and failure-injection verification; it is **not** accepted merely
-because code was committed.
-
-The task-claim transaction is serialized through the existing instance
-lock; a successful claim is counted only after transaction exit/commit.
-Two processes cannot own the same journal writer simultaneously.
+The legacy Alice `memory_inspect` tool now fails closed until the Alice
+client explicitly supplies a database instance. It does not open files or
+discover database paths itself. This Alice-specific tool is not part of the
+standalone library acceptance criteria. No diagnostic behavior is claimed
+available yet.
 
 ## Acceptance checklist
 
