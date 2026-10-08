@@ -101,7 +101,9 @@ export function createOAuth(options = {}) {
   } else {
     state = { version: 1, signingKey: random(), clients: {}, pending: {}, codes: {}, access: {}, refresh: {} };
   }
-  let durability = Promise.resolve();
+  let healthy = true;
+  let committed = structuredClone(state);
+  let operations = Promise.resolve();
   let registrations = [];
   function prune() {
     for (const collection of ["pending", "codes", "access", "refresh"]) {
@@ -111,25 +113,32 @@ export function createOAuth(options = {}) {
     // once their owner has actually authorized them, as ChatGPT reuses that client ID.
     for (const [key, client] of Object.entries(state.clients)) if (client.provisional_expires && client.provisional_expires <= now()) delete state.clients[key];
   }
-  function save({ checkpoint = true } = {}) {
-    // Serialize local replacement for every state mutation. Credential endpoints also
-    // wait for the remote checkpoint; redirect-only authorization may checkpoint in
-    // the background so a slow archive cannot strand the browser before redirect.
-    durability = durability.catch(() => {}).then(async () => {
+  async function save() {
+    try {
       prune();
       const temporary = `${stateFile}.tmp`;
       writeFileSync(temporary, JSON.stringify(state), { mode: 0o600 });
       chmodSync(temporary, 0o600);
       renameSync(temporary, stateFile);
-      if (checkpoint) await options.onPersist?.();
-      else Promise.resolve(options.onPersist?.()).catch(() => {});
-    });
-    return durability;
+      await options.onPersist?.();
+      committed = structuredClone(state);
+    } catch {
+      // Never keep serving uncertain access/refresh/revocation state after a
+      // failed checkpoint. Only verified recovery in a new runtime can resume.
+      healthy = false;
+      throw new Error("oauth_persistence_failed");
+    }
+  }
+  function serialized(operation) {
+    const result = operations.then(operation);
+    operations = result.catch(() => {});
+    return result;
   }
   const sign = (value) => `${value}.${createHmac("sha256", state.signingKey).update(value).digest("base64url")}`;
   const cookie = (transaction, clear = false) => `${COOKIE}=${clear ? "" : sign(transaction)}; ${cookieFlags}Max-Age=${clear ? 0 : 600}`;
   const ownerCookie = (value, clear = false) => `${OWNER_COOKIE}=${clear ? "" : sign(value)}; HttpOnly; SameSite=Strict; Path=/; ${origin.startsWith("https:") ? "Secure; " : ""}Max-Age=${clear ? 0 : 600}`;
   function ownerAuthorize(request) {
+    if (!healthy) return false;
     const supplied = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).find((part) => part.startsWith(`${OWNER_COOKIE}=`))?.slice(OWNER_COOKIE.length + 1);
     if (typeof supplied !== "string") return false;
     const dot = supplied.lastIndexOf(".");
@@ -148,6 +157,7 @@ export function createOAuth(options = {}) {
     }
     failures.length = 0;
     const expires = now() + 600;
+    await save();
     response.writeHead(303, { location: "/", "cache-control": "no-store", "set-cookie": ownerCookie(String(expires)) });
     response.end();
   }
@@ -172,9 +182,10 @@ export function createOAuth(options = {}) {
   };
 
   function authorize(request) {
+    if (!healthy) return false;
     const header = request.headers.authorization;
     if (typeof header !== "string" || !header.startsWith("Bearer ") || header.length > 4096) return false;
-    const token = state.access[digest(header.slice(7))];
+    const token = committed.access[digest(header.slice(7))];
     return Boolean(token && token.expires > now() && token.owner === ownerId && token.resource === resource && includesScope(token.scope, SCOPE));
   }
 
@@ -256,7 +267,7 @@ export function createOAuth(options = {}) {
     delete state.clients[pending.client_id].provisional_expires;
     const authorizationCode = random();
     state.codes[digest(authorizationCode)] = { client: pending.client_id, redirect: pending.redirect_uri, challenge: pending.code_challenge, resource, owner: ownerId, scope: pending.scope ?? SCOPE, expires: now() + 300, used: false };
-    await save({ checkpoint: false });
+    await save();
     const target = new URL(pending.redirect_uri);
     target.searchParams.set("iss", issuer);
     if (pending.state) target.searchParams.set("state", pending.state);
@@ -299,12 +310,13 @@ export function createOAuth(options = {}) {
     json(response, 200, {});
   }
 
-  async function handle(request, response, suppliedUrl) {
+  async function handleRequest(request, response, suppliedUrl) {
     const url = suppliedUrl instanceof URL ? suppliedUrl : new URL(request.url, origin);
     const path = url.pathname;
     const resourcePaths = ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"];
     const issuerPaths = ["/.well-known/oauth-authorization-server", "/.well-known/oauth-authorization-server/oauth"];
     if (!path.startsWith(`${OAUTH_PATH}/`) && !resourcePaths.includes(path) && !issuerPaths.includes(path)) return false;
+    if (!healthy) { json(response, 503, { error: "oauth_unavailable" }); return true; }
     try {
       prune();
       if (request.method === "GET" && resourcePaths.includes(path)) json(response, 200, { resource, authorization_servers: [issuer], scopes_supported: SUPPORTED_SCOPES, bearer_methods_supported: ["header"] });
@@ -322,10 +334,14 @@ export function createOAuth(options = {}) {
         const code = /^[a-z0-9_:A-Z]{1,80}$/.test(error?.message ?? "") ? error.message : "unexpected";
         process.stderr.write(`${JSON.stringify({ event: "oauth_failed", path, error: code })}\n`);
       }
-      json(response, error.message === "invalid_request" || error instanceof SyntaxError ? 400 : 500, { error: error.message === "invalid_request" || error instanceof SyntaxError ? "invalid_request" : "oauth_unavailable" });
+      json(response, !healthy ? 503 : error.message === "invalid_request" || error instanceof SyntaxError ? 400 : 500, { error: error.message === "invalid_request" || error instanceof SyntaxError ? "invalid_request" : "oauth_unavailable" });
     }
     return true;
   }
 
-  return { enabled, handle, authorize, ownerAuthorize, ownerSession, challenge, metadata };
+  const handle = (...args) => serialized(() => handleRequest(...args));
+  return { enabled, handle, authorize, ownerAuthorize,
+    ownerSession: (...args) => serialized(() => ownerSession(...args)),
+    challenge, metadata, available: () => healthy };
+
 }

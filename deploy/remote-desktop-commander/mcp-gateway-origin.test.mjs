@@ -56,3 +56,44 @@ for (const headers of [
     await health.text();
   });
 }
+
+test("durable restore failure prevents upstream and HTTP readiness", async (t) => {
+  const opts = await options(t);
+  let connected = false;
+  opts.upstream.connect = async () => { connected = true; };
+  opts.oauthStateStore = { enabled: true, restore: async () => { throw new Error("oauth_state_unavailable"); } };
+  await assert.rejects(async () => {
+    const gateway = await startGateway(opts);
+    await gateway.close();
+  }, /oauth_state_unavailable/);
+  assert.equal(connected, false);
+});
+
+test("gateway connects durable saves and withdraws readiness after a checkpoint failure", async (t) => {
+  const opts = await options(t);
+  let restored = false;
+  let persisted = false;
+  opts.oauthStateStore = {
+    enabled: true,
+    restore: async () => { restored = true; },
+    persist: async () => { persisted = true; throw new Error("oauth_state_unavailable"); },
+  };
+  opts.upstream.connect = async () => { assert.equal(restored, true); };
+  const gateway = await startGateway(opts);
+  t.after(() => gateway.close());
+  const local = `http://127.0.0.1:${gateway.server.address().port}`;
+  const registration = await fetch(`${local}/oauth/register`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ redirect_uris: ["https://chatgpt.com/connector_platform_oauth_redirect"] }),
+  });
+  assert.equal(registration.status, 503);
+  await registration.text();
+  assert.equal(persisted, true);
+  assert.equal((await fetch(`${local}/healthz`)).status, 503);
+});
+
+
+test("required durability cannot silently fall back to ephemeral local mode", async (t) => {
+  const opts = { ...await options(t), requireDurability: true };
+  await assert.rejects(startGateway(opts), /oauth_state_not_configured/);
+});
