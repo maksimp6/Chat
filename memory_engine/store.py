@@ -225,7 +225,7 @@ class _JournalEngine:
         return self.get("values", name)
 
     @contextmanager
-    def value_transaction(self) -> Iterator["_ValueTransaction"]:
+    def value_transaction(self, pending: dict[str, Any]) -> Iterator["_ValueTransaction"]:
         """Own one serialized name/value transaction and its durable commit."""
         with self._lock:
             self._ensure_open()
@@ -233,6 +233,8 @@ class _JournalEngine:
                 raise StoreError("recovery required")
             if self._active_transaction:
                 raise StoreError("nested transactions are not supported")
+            if pending:
+                raise StoreError("transaction requires an idle store")
             self._active_transaction = True
             transaction = _ValueTransaction(deepcopy(self._state.get("values", {})))
             try:
@@ -241,11 +243,6 @@ class _JournalEngine:
             finally:
                 transaction._closed = True
                 self._active_transaction = False
-
-    def committed_values(self) -> dict[str, Any]:
-        """Return a copy of committed names for a serialized transaction."""
-        self._ensure_open()
-        return deepcopy(self._state.get("values", {}))
 
     def commit_values(self, values: dict[str, Any]) -> int:
         """Own journal record encoding and durable publication for named values."""
@@ -440,9 +437,7 @@ class MemoryStore:
     @contextmanager
     def transaction(self) -> Iterator["_ValueTransaction"]:
         """Delegate atomic read-modify-write to the single transaction owner."""
-        if self._pending:
-            raise StoreError("transaction requires an idle store")
-        with self._engine.value_transaction() as transaction:
+        with self._engine.value_transaction(self._pending) as transaction:
             yield transaction
 
     def backup(self, destination: str | Path) -> None:
