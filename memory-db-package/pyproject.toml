@@ -22,5 +22,4 @@ Repository = "https://github.com/maksimp6/Chat"
 Issues = "https://github.com/maksimp6/Chat/issues"
 
 [tool.setuptools]
-package-dir = {"" = ".."}
 packages = ["memory_engine"]
