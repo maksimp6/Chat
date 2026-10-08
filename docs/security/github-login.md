@@ -33,11 +33,9 @@ clears both cookies. With the gate on, a browser opening a gated page sees a
 | `ALICE_GITHUB_REDIRECT_URI` | Registered callback, default `https://maxxxpavlov.ru/auth/github/callback` in production |
 | `ALICE_GITHUB_ALLOWED_IDS` | Comma-separated numeric GitHub account ids allowed while the gate is on (ids, because logins can be renamed and reassigned) |
 
-Production reads the client id and secret from the repository secrets
-`ALICE_GITHUB_CLIENT_ID` and `ALICE_GITHUB_CLIENT_SECRET`, and the allowlist from
-the repository variable `ALICE_GITHUB_ALLOWED_IDS` (default `293531601`, the
-account id of `maksimp6`). They
-reach the server over the deploy SSH session's stdin, like `ALICE_SHORT_TOKEN`.
+The current legacy `production-deploy.yml` path reads the client id and secret from repository environment secrets `ALICE_GITHUB_CLIENT_ID` and `ALICE_GITHUB_CLIENT_SECRET`, and the allowlist from `ALICE_GITHUB_ALLOWED_IDS`. That workflow passes the values to the server over the deploy SSH session's stdin together with `ALICE_SHORT_TOKEN`.
+
+This paragraph documents current compatibility behavior, **not the target credential architecture**. Deployment ownership/cutover remains open under #869, while canonical secret resolution and consumer migration belong to #755. Do not add new consumers that depend on repository-secret → SSH-stdin delivery merely because this legacy path still works. A future cutover must preserve the runtime environment contract expected by `identity/github_oauth.py` or migrate that consumer explicitly.
 
 The OAuth App must use the homepage `https://maxxxpavlov.ru` and the callback
 `https://maxxxpavlov.ru/auth/github/callback`. Visitors on `maxxxpavlov.online`
@@ -50,3 +48,13 @@ linked; the GitHub account gets the `.ru` browser's anonymous user or a new one.
 - Signing in issues a new token for the user, which signs out that user's
   other browsers (the anonymous bootstrap behaves the same way).
 - Preview deployments under `/preview/...` are not wired for GitHub sign-in.
+
+
+## Migration and acceptance boundary
+
+The application code currently reads GitHub OAuth configuration from runtime environment variables. Where those values come from is a deployment/secret-management concern.
+
+- Current SSH production delivery remains valid until #869 selects and verifies a replacement.
+- #755 owns migration of secret-bearing consumers to canonical Secret Store resolution.
+- Repository configuration, local OAuth tests, or a successful deploy do not by themselves prove the public GitHub sign-in flow; production acceptance must exercise redirect → callback → account lookup → Alice session on the exact deployed revision.
+- The GitHub access token received during OAuth remains one-use runtime data and must not be persisted as part of Secret Store migration.
