@@ -97,32 +97,54 @@ class MemoryStore:
         with self._lock:
             return deepcopy(self._state.get(namespace, {}).get(key))
 
-    def _commit(self, next_state: dict[str, dict[str, Any]]) -> None:
+
+    def _commit_changes(self, changes: list[dict[str, Any]]) -> None:
+        """Persist one delta record before publishing changes to committed RAM."""
         if self._failed:
             raise StoreError("recovery required")
-        changes = []
-        for namespace in sorted(set(self._state) | set(next_state)):
-            before = self._state.get(namespace, {})
-            after = next_state.get(namespace, {})
-            for key in sorted(set(before) | set(after)):
-                if key not in after:
-                    changes.append({"op": "delete", "namespace": namespace, "key": key})
-                elif key not in before or before[key] != after[key]:
-                    changes.append({"op": "set", "namespace": namespace, "key": key, "value": after[key]})
+        if not changes:
+            return
+        for change in changes:
+            if not isinstance(change["namespace"], str) or not isinstance(change["key"], str):
+                raise StoreError("namespace and key must be strings")
         payload = {"seq": self._sequence + 1, "changes": changes}
         try:
-            encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            encoded = json.dumps(
+                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
             digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
-            frame = json.dumps({"payload": payload, "digest": digest}, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
+            frame = json.dumps(
+                {"payload": payload, "digest": digest},
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8") + b"\n"
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise StoreError("unsupported JSON value") from exc
+
+        creating_file = not self.path.exists()
+        try:
             with self.path.open("ab", buffering=0) as stream:
                 written = stream.write(frame)
                 if written != len(frame):
                     raise OSError("short journal write")
                 os.fsync(stream.fileno())
-        except (OSError, TypeError, ValueError) as exc:
+            if creating_file:
+                directory = os.open(str(self.path.parent), os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+        except OSError as exc:
             self._failed = True
             raise StoreError("commit failed; recovery required") from exc
-        self._state = next_state
+
+        for change in changes:
+            namespace, key = change["namespace"], change["key"]
+            if change["op"] == "set":
+                self._state.setdefault(namespace, {})[key] = change["value"]
+            else:
+                self._state.get(namespace, {}).pop(key, None)
         self._sequence += 1
         self._digest = digest
 
@@ -130,17 +152,15 @@ class MemoryStore:
         with self._lock:
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
-            candidate = deepcopy(self._state)
-            candidate.setdefault(namespace, {})[key] = deepcopy(value)
-            self._commit(candidate)
+            self._commit_changes([
+                {"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}
+            ])
 
     def delete(self, namespace: str, key: str) -> None:
         with self._lock:
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
-            candidate = deepcopy(self._state)
-            candidate.get(namespace, {}).pop(key, None)
-            self._commit(candidate)
+            self._commit_changes([{"op": "delete", "namespace": namespace, "key": key}])
 
     @contextmanager
     def transaction(self) -> Iterator["Transaction"]:
@@ -150,10 +170,10 @@ class MemoryStore:
             if self._active_transaction:
                 raise StoreError("nested transactions are not supported")
             self._active_transaction = True
-            transaction = Transaction(deepcopy(self._state))
+            transaction = Transaction(self._state)
             try:
                 yield transaction
-                self._commit(transaction._state)
+                self._commit_changes(transaction._pending_changes())
             finally:
                 transaction._closed = True
                 self._active_transaction = False
@@ -171,10 +191,11 @@ class MemoryStore:
 
 
 class Transaction:
-    """Isolated working copy, published only after a durable commit."""
+    """Staged changes overlay committed RAM until one synchronous commit."""
 
-    def __init__(self, state: dict[str, dict[str, Any]]) -> None:
-        self._state = state
+    def __init__(self, committed: dict[str, dict[str, Any]]) -> None:
+        self._committed = committed
+        self._changes: dict[tuple[str, str], dict[str, Any]] = {}
         self._closed = False
 
     def _ensure_open(self) -> None:
@@ -183,12 +204,23 @@ class Transaction:
 
     def get(self, namespace: str, key: str) -> Any | None:
         self._ensure_open()
-        return deepcopy(self._state.get(namespace, {}).get(key))
+        pending = self._changes.get((namespace, key))
+        if pending is not None:
+            return deepcopy(pending["value"]) if pending["op"] == "set" else None
+        return deepcopy(self._committed.get(namespace, {}).get(key))
 
     def set(self, namespace: str, key: str, value: Any) -> None:
         self._ensure_open()
-        self._state.setdefault(namespace, {})[key] = deepcopy(value)
+        self._changes[(namespace, key)] = {
+            "op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)
+        }
 
     def delete(self, namespace: str, key: str) -> None:
         self._ensure_open()
-        self._state.get(namespace, {}).pop(key, None)
+        self._changes[(namespace, key)] = {
+            "op": "delete", "namespace": namespace, "key": key
+        }
+
+    def _pending_changes(self) -> list[dict[str, Any]]:
+        self._ensure_open()
+        return [self._changes[key] for key in sorted(self._changes)]
