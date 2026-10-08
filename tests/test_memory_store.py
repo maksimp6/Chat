@@ -293,3 +293,22 @@ def test_backup_never_overwrites_existing_artifact(tmp_path):
         with pytest.raises(StoreError, match="backup destination must be new"):
             source.backup(target_path)
     assert target_path.read_bytes() == b"external artifact"
+
+
+def test_backup_destination_creation_race_does_not_overwrite(tmp_path, monkeypatch):
+    """An atomic no-overwrite publish must preserve a concurrent artifact."""
+    import memory_engine.store as module
+
+    archive = tmp_path / "shared.backup"
+    with MemoryStore(tmp_path / "original.memory") as db:
+        db.set("items", "a", 1)
+        original_link = module.os.link
+
+        def competing_link(source, destination):
+            archive.write_bytes(b"another backup")
+            return original_link(source, destination)
+
+        monkeypatch.setattr(module.os, "link", competing_link)
+        with pytest.raises(StoreError, match="created concurrently"):
+            db.backup(archive)
+    assert archive.read_bytes() == b"another backup"

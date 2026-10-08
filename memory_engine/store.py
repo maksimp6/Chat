@@ -221,6 +221,8 @@ class MemoryStore:
         destination: Path,
         expected_state: dict[str, dict[str, Any]],
         expected_commit: Commit,
+        *,
+        destination_must_be_new: bool = False,
     ) -> None:
         """Copy to a same-directory temp file, validate, then atomically publish."""
         import shutil
@@ -239,7 +241,13 @@ class MemoryStore:
             actual_state, sequence, digest = MemoryStore._inspect_log(temporary)
             if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
                 raise StoreError("backup integrity mismatch")
-            os.replace(temporary, destination)
+            try:
+                if destination_must_be_new:
+                    os.link(temporary, destination)
+                else:
+                    os.replace(temporary, destination)
+            except FileExistsError as exc:
+                raise StoreError("backup destination was created concurrently") from exc
             directory = os.open(str(destination.parent), os.O_RDONLY)
             try:
                 os.fsync(directory)
@@ -257,7 +265,10 @@ class MemoryStore:
             target = Path(destination)
             if target.resolve() == self.path.resolve() or target.exists():
                 raise StoreError("backup destination must be new")
-            self._copy_verified_file(self.path, target, self._state, self.last_commit)
+            self._copy_verified_file(
+                self.path, target, self._state, self.last_commit,
+                destination_must_be_new=True,
+            )
 
     def restore(self, source: str | Path) -> None:
         """Restore a verified backup into a brand-new or empty store only."""
@@ -274,9 +285,7 @@ class MemoryStore:
             if not origin.exists():
                 raise StoreError("backup source does not exist")
             try:
-                self._copy_verified_file(
-                    origin, self.path, state, Commit(sequence, digest)
-                )
+                self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
