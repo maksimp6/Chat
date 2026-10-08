@@ -42,9 +42,15 @@ corruption but is **not** a blockchain or a substitute for independent backups.
 
 ## Not yet implemented / release blockers
 
-The engine currently lacks atomic backup/restore, bounded checkpoints, automatic
-validated recovery, precise typed domain records, Trace integration and replica
-acknowledgement. SQL consumers still use their legacy paths. Future two-service
+The engine includes verified journal backup (new destination only) and atomic
+restore into a new/empty store. Backup copies the complete journal, not a compacted
+snapshot; it must not be confused with independent replicated storage. Backup data
+is validated against the current committed digest before publication. Restore
+validates the source and preserves its sequence/hash chain without overwriting an
+existing database.
+
+The engine still lacks bounded checkpoints, automatic validated recovery, precise
+typed domain records, Trace integration and replica acknowledgement. SQL consumers still use their legacy paths. Future two-service
 RAM mirroring must fit behind the same typed contract and must never permit
 independent writes from an isolated replica.
 
