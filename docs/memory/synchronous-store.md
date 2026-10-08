@@ -116,6 +116,25 @@ Tests in `tests/test_memory_inspect_tool.py` verify the public response,
 argument rejection, missing/closed owner, and that the tool does not replay
 the journal. Exact-head CI must verify these changes before acceptance.
 
+## Explicit commit API implementation (2026-10-08)
+
+The public `memory_engine.MemoryStore` now uses the **client-owned**
+`get(name)`, `set(name, value)`, `commit()` API. `set` stages a deep
+copy; `get` reads the staged value first; `commit` persists all staged
+changes in one journal record and returns the confirmed sequence. An empty
+commit returns the previous sequence. Closing without commit discards staging.
+
+The original namespaced engine is temporarily exported as
+`LegacyMemoryStore` for its existing durability regression tests. It is
+not the desired public v1 interface and must be retired after compatibility
+and integration work. This wrapper approach still needs independent
+performance and failure-injection verification; it is **not** accepted merely
+because code was committed.
+
+The task-claim transaction is serialized through the existing instance
+lock; a successful claim is counted only after transaction exit/commit.
+Two processes cannot own the same journal writer simultaneously.
+
 ## Acceptance checklist
 
 1. Fix replay so a newly created store survives close/reopen in a **fresh process**; corrupt committed entries must fail closed.
