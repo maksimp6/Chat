@@ -1,6 +1,6 @@
 # Менеджер криптографии и ключей
 
-`key_manager.py` — единая граница управления секретами Alice Pro. Он хранит секреты в зашифрованном виде, а приложения работают с непрозрачным `key_ref`.
+`key_manager.py` — shipped legacy/local encryption boundary Alice Pro. Он хранит секреты в зашифрованном виде и выдаёт `key_ref`, но **не является единственной или канонической Secret Store архитектурой**. Provider-neutral target contract находится в `secret_store/core.py` (`SecretRef`, `SecretValue`, `SecretResolver`) и мигрируется consumer-by-consumer в #755.
 
 ## Хранилище
 
@@ -29,3 +29,9 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 Release signing keystore, Cloud.ru API keys, OAuth credentials и другие секреты должны использовать этот слой или внешний secret manager. Сам encryption key менеджера также является секретом и должен храниться только вне репозитория.
 
 Для секретов, которыми управляет Cloud.ru Secret Management (внешнее хранилище с неизменяемыми версиями), см. [docs/security/cloudru-secret-management.md](cloudru-secret-management.md) — там описана отдельная граница: локально хранится только ссылка на закреплённую версию, а не сам секрет.
+
+## Current coexistence
+
+На current master одновременно существуют несколько secret-bearing механизмов: legacy `key_manager.py`, encrypted SQL `provider_credentials.py`, прямые environment consumers и canonical `secret_store/` resolver foundation. Это migration state, а не четыре равноправных целевых архитектуры.
+
+Новый consumer должен использовать canonical Secret Store boundary. Legacy слой сохраняется только пока конкретный runtime consumer не прошёл verified cutover; после этого его старый durable plaintext/encrypted-value path удаляется отдельно.

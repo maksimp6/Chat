@@ -1,8 +1,6 @@
 # Provider API-key lifecycle and rotation
 
-Alice Pro keeps one backend-owned runtime API key per provider. The credential
-store is provider-aware, encrypted at rest, and never exposes plaintext keys
-through metadata, traces, logs, or frontend responses.
+The current web/provider compatibility path keeps one backend-owned runtime API key per provider in `provider_credentials`. The store is provider-aware and encrypted at rest. This is shipped behavior, but it is not the final Secret Store architecture: #755 owns consumer-by-consumer migration to the provider-neutral `SecretRef` / `SecretResolver` boundary.
 
 ## Providers
 
@@ -113,3 +111,11 @@ Fernet-key format.
 ## Administration endpoint security
 
 The provider-credential API is administrative. Set `ALICE_PROVIDER_CREDENTIALS_TOKEN` for explicit Bearer-token authorization. When Alice Pro short-token authentication is enabled, the existing authenticated short-token session is reused. Remote requests are rejected when neither mechanism is configured.
+
+## Migration boundary
+
+`provider_credentials.py` still persists encrypted provider secret values and Cloud.ru IAM bootstrap material in SQL. Its `secret_management_refs` table stores references only, but the presence of those refs does not mean the provider credential consumer has migrated to the canonical Secret Store.
+
+For #755 acceptance, migrate each supported provider consumer to the canonical resolver, verify success plus missing/revoked/unavailable/version-switch behavior, then remove the corresponding legacy durable secret-value write. Do not delete the compatibility store before that cutover is proven.
+
+The standalone `memory_extractor.py` path is a separate legacy Yandex consumer: it reads `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` directly from environment and calls the legacy Foundation Models completion endpoint rather than the canonical Responses/provider pipeline. Its convergence belongs jointly to #433 (model path), #755 (secret resolution), and #776 (memory persistence).
