@@ -96,20 +96,25 @@ it passes, the full functional, crash/recovery and integration tests still
 have to run. The existing PostgreSQL job must be removed only after the
 SQL-free cutover is implemented and replacement coverage is established.
 
-## Filesystem tool migration slice
+## Typed database information contract
 
-The former SQL tool is replaced with `memory_inspect`. **Security-first
-contract:** no caller-supplied path or namespace, no keys or values, and no
-record enumeration. The tool returns only the journal sequence and chained
-digest, and only for the configured runtime journal. Inspection is refused
-while a writer holds its exclusive lock, if the lock file is missing, if the
-journal exceeds 8 MiB, or if integrity verification fails. Errors do not
-include raw paths or stored content. This intentionally does **not** provide
-live inspection under active writes; that requires a future bounded snapshot.
+`DatabaseInfo(last_commit: int | None)` is a minimal immutable fact, not a
+health-state enum. `DatabaseInfoContract.info()` defines the interface.
+The already-owned `MemoryStore` provides the in-RAM last acknowledged
+sequence without replaying the journal. The runtime explicitly registers
+its authoritative instance with `bind_database_info()`; until then the
+diagnostic tool returns unavailable. No second DB instance is created.
 
-Focused regressions live in `tests/test_memory_inspect_tool.py`. Full CI
-remains blocked by the SQL-free RED-first gate until remaining SQL consumers
-are removed. The inspector has no SQL execution capability.
+`memory_inspect` accepts no arguments, calls the typed contract, and returns
+only `last_commit`. It does not handle paths, locks, journal size, recovery,
+keys or values. The current runtime still needs to bind its authoritative
+MemoryStore during application startup; otherwise the tool is intentionally
+unavailable. The sequence is a fact about the last acknowledged commit, not
+proof of disk health or future write availability.
+
+Tests in `tests/test_memory_inspect_tool.py` verify the public response,
+argument rejection, missing/closed owner, and that the tool does not replay
+the journal. Exact-head CI must verify these changes before acceptance.
 
 ## Acceptance checklist
 
