@@ -106,4 +106,7 @@ class DurableMemoryDatabase(MemoryDatabase):
                 raise DatabaseError("restore requires an empty instance")
             candidate = DurableMemoryDatabase(source)
             self._loaded = candidate._loaded
-            self._durable_barrier()
+            # Restore the verified snapshot without replacing it with empty tables.
+            from shutil import copyfile
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source, self.path)
