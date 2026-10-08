@@ -79,6 +79,23 @@ Standalone Format, Security checks, CodeQL and Local launch smoke succeeded on t
 
 **Remaining:** bounded replay/checkpoints, proved crash/torn-tail/ENOSPC recovery, health/read-only and uncertain-commit handling, runtime domain validation, Trace, mirrored fsync policy, and measurements at meaningful dataset sizes. The public generic type contract is a static promise; `MemoryStore` currently accepts `Any` values and does not yet validate each domain schema. Supported runtime SQL consumers, legacy packages and PostgreSQL CI remain present. Some `tests/test_memory_*desired_state.py` checks intentionally fail until replacement of SQL and the old backend switch; do not weaken those tests simply to turn CI green.
 
+## SQL-free CI fail-first gate
+
+The CI workflow runs a lightweight **SQL absence (fail first)** preflight before
+starting the expensive Application tests and PostgreSQL integration jobs when
+the backend/database platform is selected. It executes the existing SQL-free
+runtime and retired-backend-switch desired-state tests with `pytest -x`.
+
+While SQL is still present, this job is **expected to fail**. Its failure must
+prevent both heavy jobs from starting, and the aggregate `CI required` check
+must fail as well. Never mark these tests xfail/skip, delete them, or relax
+checks just to make CI green. Non-database platforms remain independent.
+
+The preflight verifies absence of SQL, **not** correctness of Memory DB; after
+it passes, the full functional, crash/recovery and integration tests still
+have to run. The existing PostgreSQL job must be removed only after the
+SQL-free cutover is implemented and replacement coverage is established.
+
 ## Acceptance checklist
 
 1. Fix replay so a newly created store survives close/reopen in a **fresh process**; corrupt committed entries must fail closed.
