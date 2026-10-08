@@ -60,6 +60,8 @@ class MemoryStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        # Keep the lock in a separate stable file: replacing journal files must not
+        # silently release ownership of the single-writer role.
         self._lock_file = self.path.with_name(self.path.name + ".lock").open("a+b")
         try:
             fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -98,6 +100,8 @@ class MemoryStore:
             return state, sequence, digest
         raw = path.read_bytes()
         frames = raw.split(b"\n")
+        # A trailing partial frame may be an ambiguous commit after a crash.
+        # Never truncate or accept it automatically: require verified recovery.
         if frames[-1]:
             raise StoreError("incomplete journal tail; recovery required")
         for frame in frames[:-1]:
@@ -124,6 +128,8 @@ class MemoryStore:
             encoded = json.dumps(
                 payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
             ).encode()
+            # Chain each frame to the previous confirmed digest so replay detects
+            # reordered, missing, or modified records (not malicious rewrites).
             next_digest = hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest()
             if record["digest"] != next_digest or payload["seq"] != sequence + 1:
                 raise ValueError("commit chain mismatch")
@@ -186,6 +192,7 @@ class MemoryStore:
             with self.path.open("ab", buffering=0) as stream:
                 if stream.write(frame) != len(frame):
                     raise OSError("short journal write")
+                # Do not acknowledge a commit before its journal bytes are synced.
                 os.fsync(stream.fileno())
             if first_write:
                 directory = os.open(str(self.path.parent), os.O_RDONLY)
@@ -194,6 +201,8 @@ class MemoryStore:
                 finally:
                     os.close(directory)
         except OSError as exc:
+            # A failed fsync may still have written bytes: the disk outcome is
+            # uncertain, so block future writes instead of claiming rollback.
             self._failed = True
             raise StoreError("commit failed; recovery required") from exc
 
@@ -214,6 +223,7 @@ class MemoryStore:
             return
         frame, digest = self._encode_frame(changes)
         self._append_frame(frame)
+        # Publish only confirmed changes to the RAM view seen by readers.
         self._apply_changes(changes)
         self._sequence += 1
         self._digest = digest
@@ -246,6 +256,8 @@ class MemoryStore:
             if self._active_transaction:
                 raise StoreError("nested transactions are not supported")
             self._active_transaction = True
+            # Transaction writes stay in a private overlay; a successful exit
+            # appends one record, while an exception discards staged changes.
             transaction = Transaction(self._state)
             try:
                 yield transaction
@@ -271,6 +283,8 @@ class MemoryStore:
         fd, temp_name = tempfile.mkstemp(prefix=".alice-copy-", dir=destination.parent)
         temporary = Path(temp_name)
         try:
+            # Build and fsync the copy before publishing the destination path.
+            # The authoritative source remains unchanged on copy failure.
             with os.fdopen(fd, "wb") as output:
                 if source.exists():
                     with source.open("rb") as existing:
