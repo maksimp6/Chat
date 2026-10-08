@@ -3,6 +3,7 @@
 One process owns a store. File locking prevents concurrent process writers.
 No SQL, background flush, or unsafe pickle deserialization.
 """
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -83,7 +84,9 @@ class MemoryStore:
             try:
                 record = json.loads(frame)
                 payload = record["payload"]
-                encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+                encoded = json.dumps(
+                    payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode()
                 digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
                 if record["digest"] != digest or payload["seq"] != self._sequence + 1:
                     raise ValueError("commit chain mismatch")
@@ -105,7 +108,6 @@ class MemoryStore:
             self._ensure_open()
             return deepcopy(self._state.get(namespace, {}).get(key))
 
-
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
         for change in changes:
             if not isinstance(change["namespace"], str) or not isinstance(change["key"], str):
@@ -113,15 +115,23 @@ class MemoryStore:
         payload = {"seq": self._sequence + 1, "changes": changes}
         try:
             encoded = json.dumps(
-                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
                 allow_nan=False,
             ).encode("utf-8")
             digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
-            frame = json.dumps(
-                {"payload": payload, "digest": digest},
-                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                allow_nan=False,
-            ).encode("utf-8") + b"\n"
+            frame = (
+                json.dumps(
+                    {"payload": payload, "digest": digest},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ).encode("utf-8")
+                + b"\n"
+            )
             return frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
             raise StoreError("unsupported JSON value") from exc
@@ -169,9 +179,9 @@ class MemoryStore:
             self._ensure_open()
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
-            self._commit_changes([
-                {"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}
-            ])
+            self._commit_changes(
+                [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
+            )
 
     def delete(self, namespace: str, key: str) -> None:
         with self._lock:
@@ -236,14 +246,15 @@ class Transaction:
     def set(self, namespace: str, key: str, value: Any) -> None:
         self._ensure_open()
         self._changes[(namespace, key)] = {
-            "op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)
+            "op": "set",
+            "namespace": namespace,
+            "key": key,
+            "value": deepcopy(value),
         }
 
     def delete(self, namespace: str, key: str) -> None:
         self._ensure_open()
-        self._changes[(namespace, key)] = {
-            "op": "delete", "namespace": namespace, "key": key
-        }
+        self._changes[(namespace, key)] = {"op": "delete", "namespace": namespace, "key": key}
 
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
