@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   issue-evidence:
+    if: github.ref == 'refs/heads/master'
     name: Issue solution review evidence
     runs-on: ubuntu-latest
     timeout-minutes: 5
