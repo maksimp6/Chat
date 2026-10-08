@@ -168,7 +168,8 @@ def collect_solution_review_evidence(
         run_id = int(run.get("id") or 0)
         if (
             not run_id
-            or str(run.get("head_sha") or "") != head_sha
+            or str(run.get("event") or "") != "workflow_dispatch"
+            or str(run.get("head_branch") or "") != "master"
             or str(run.get("status") or "") != "completed"
             or str(run.get("conclusion") or "") != "success"
         ):
@@ -223,6 +224,9 @@ def select_solution_review_evidence(
                 or str(evidence.get("reviewed_head_sha") or "") != head_sha
                 or str(evidence.get("reviewed_base_sha") or "") != base_sha
                 or int(evidence.get("workflow_run_id") or 0) != run_id
+                or evidence.get("verification") != "hmac-sha256-verified"
+                or evidence.get("review_report_sha256") is None
+                or not isinstance(evidence.get("review_report"), dict)
             ):
                 continue
             return evidence
@@ -247,6 +251,8 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
         "implementation_role",
         "implementation_session",
         "provenance",
+        "review_report_sha256",
+        "verification",
     }
     if any(not str(evidence.get(field) or "").strip() for field in required):
         return {
@@ -258,6 +264,18 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
             "code": "solution_review_invalid",
             "detail": "solution-review evidence schema version is unsupported",
         }
+
+    report = evidence.get("review_report")
+    if (
+        evidence.get("verification") != "hmac-sha256-verified"
+        or not isinstance(report, dict)
+        or report.get("outcome") != evidence.get("outcome")
+        or not isinstance(report.get("reviewed_files"), list)
+        or not report["reviewed_files"]
+        or not str(report.get("rationale") or "").strip()
+        or not str(report.get("risk_assessment") or "").strip()
+    ):
+        return {"code": "solution_review_invalid", "detail": "authenticated substantive review report is missing"}
 
     outcome = str(evidence["outcome"])
     if outcome == "CHANGES_REQUESTED":
