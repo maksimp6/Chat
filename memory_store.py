@@ -112,12 +112,16 @@ class MemoryStore:
 
     def set(self, namespace: str, key: str, value: Any) -> None:
         with self._lock:
+            if self._active_transaction:
+                raise StoreError("direct mutation during transaction is forbidden")
             candidate = deepcopy(self._state)
             candidate.setdefault(namespace, {})[key] = deepcopy(value)
             self._commit(candidate)
 
     def delete(self, namespace: str, key: str) -> None:
         with self._lock:
+            if self._active_transaction:
+                raise StoreError("direct mutation during transaction is forbidden")
             candidate = deepcopy(self._state)
             candidate.get(namespace, {}).pop(key, None)
             self._commit(candidate)
