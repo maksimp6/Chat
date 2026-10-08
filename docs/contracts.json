@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "contracts": [
+    {
+      "id": "agents.departments",
+      "status": "current",
+      "doc": "docs/agents/departments.md",
+      "implementation": [
+        "departments.py",
+        "session_manager.py"
+      ],
+      "tests": [
+        "tests/test_departments.py"
+      ]
+    },
+    {
+      "id": "auth.github-oauth",
+      "status": "current",
+      "doc": "docs/security/github-login.md",
+      "implementation": [
+        "identity/github_oauth.py",
+        "user_identity.py",
+        "short_token_auth.py"
+      ],
+      "tests": [
+        "tests/test_github_oauth.py"
+      ]
+    },
+    {
+      "id": "runtime.reusable-sessions",
+      "status": "current",
+      "doc": "docs/runtime_serverless.md",
+      "implementation": [
+        "runtime_api.py",
+        "session_profiles.py",
+        "session_manager.py"
+      ],
+      "tests": [
+        "tests/test_runtime_api.py"
+      ]
+    },
+    {
+      "id": "security.secret-store-resolver",
+      "status": "current",
+      "doc": "docs/security/cloudru-secret-management.md",
+      "implementation": [
+        "secret_store/core.py",
+        "secret_store/cloudru.py"
+      ],
+      "tests": [
+        "tests/test_secret_store.py"
+      ]
+    },
+    {
+      "id": "storage.memory-backup-bundle",
+      "status": "current",
+      "doc": "docs/memory/memory-db-v1-contract.md",
+      "implementation": [
+        "agent_memory/backup.py",
+        "agent_memory/db.py"
+      ],
+      "tests": [
+        "tests/test_memory_backup.py"
+      ]
+    }
+  ]
+}
