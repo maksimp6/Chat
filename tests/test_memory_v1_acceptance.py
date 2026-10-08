@@ -272,3 +272,30 @@ def test_failed_commit_keeps_last_confirmed_version(tmp_path, monkeypatch):
             store.commit()
     # A failed fsync leaves an ambiguous disk outcome. No automatic recovery
     # or silent truncation is permitted; a separate recovery test must prove it.
+
+
+def test_close_rejected_during_transaction_keeps_staging(tmp_path):
+    """A rejected close must not silently discard staged data."""
+    path = tmp_path / "close.memory"
+    with MemoryStore(path) as store:
+        store.set("pending", "keep")
+        with pytest.raises(StoreError):
+            with store._engine.transaction():
+                store.close()
+        assert store.get("pending") == "keep"
+        assert store.commit() == 1
+    with MemoryStore(path) as reopened:
+        assert reopened.get("pending") == "keep"
+
+
+def test_committed_sequence_matches_replayed_journal(tmp_path):
+    """The acknowledged sequence must equal the journal's recovered sequence."""
+    path = tmp_path / "sequence.memory"
+    with MemoryStore(path) as store:
+        for index in range(3):
+            store.set("counter", index)
+            assert store.commit() == index + 1
+        confirmed = store.last_commit
+    with MemoryStore(path) as reopened:
+        assert reopened.last_commit == confirmed
+        assert reopened.get("counter") == 2
