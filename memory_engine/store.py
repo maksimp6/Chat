@@ -61,12 +61,6 @@ class _JournalEngine:
         if self._closed:
             raise StoreError("database is closed")
 
-    def info(self) -> DatabaseInfo:
-        """Return confirmed in-memory sequence without reading the journal."""
-        with self._lock:
-            self._ensure_open()
-            return DatabaseInfo(last_commit=self._sequence)
-
     @property
     def last_commit(self) -> Commit:
         with self._lock:
