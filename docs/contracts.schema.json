@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Alice Pro documentation-test contract registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contracts"],
+  "properties": {
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "documentation", "implementation", "tests", "facts"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["current", "experimental", "planned", "historical", "retired"]},
+          "documentation": {"type": "string"},
+          "implementation": {"type": "array", "items": {"type": "string"}},
+          "tests": {"type": "array", "items": {"type": "string"}},
+          "facts": {"type": "object"}
+        }
+      }
+    }
+  }
+}
