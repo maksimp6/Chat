@@ -227,12 +227,46 @@ export function createOAuth(options = {}) {
     state.pending[digest(transaction)] = { ...params, expires: now() + 600, started: false };
     await save();
     const redirectOrigin = new URL(params.redirect_uri).origin;
+    const styleNonce = random();
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "set-cookie": cookie(transaction),
-      "content-security-policy": `default-src 'none'; form-action 'self' ${redirectOrigin}; frame-ancestors 'none'; base-uri 'none'`,
+      "content-security-policy": `default-src 'none'; style-src 'nonce-${styleNonce}'; form-action 'self' ${redirectOrigin}; frame-ancestors 'none'; base-uri 'none'`,
       "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
     });
-    response.end(`<!doctype html><html lang="ru"><meta charset="utf-8"><title>Подключить Chrome к ChatGPT</title><h1>Доступ к вашему браузеру</h1><p>Приложение: ${escape(client.client_name)}.</p><p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p><p>Подключение разрешит управление Chrome и доступ к сайтам вашего сохранённого профиля. Введите short token владельца.</p><form method="post" action="${OAUTH_PATH}/authorize"><input type="hidden" name="transaction" value="${transaction}"><input type="password" name="password" autocomplete="current-password" required><button type="submit">Разрешить</button></form></html>`);
+    response.end(`<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подключить Chrome к ChatGPT</title>
+<style nonce="${styleNonce}">
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: #eef0f2; color: #20252b; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 30rem; margin: 0 auto; padding: 24px; background: #f9fafb; border: 1px solid #c8cdd2; border-radius: 16px; overflow-wrap: anywhere; }
+  h1 { margin: 0 0 16px; font-size: 1.5rem; line-height: 1.25; }
+  p { margin: 0 0 16px; }
+  label { display: block; margin-bottom: 8px; font-weight: 600; }
+  input[type="password"], button { width: 100%; min-width: 0; min-height: 48px; padding: 12px; border: 1px solid #707780; border-radius: 8px; font: inherit; }
+  input[type="password"] { background: #fff; color: #20252b; }
+  button { margin-top: 16px; background: #303b46; color: #fff; font-weight: 600; cursor: pointer; }
+  input:focus-visible, button:focus-visible { outline: 3px solid #2264a5; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Доступ к твоему браузеру</h1>
+<p>Приложение: <strong>${escape(client.client_name)}</strong>.</p>
+<p>Адрес возврата: ${escape(new URL(params.redirect_uri).origin)}.</p>
+<p id="access-notice">Подключение разрешит управление облачным Chrome и доступ к сайтам его сохранённого профиля. Введи код доступа владельца только на этой странице, не в чате.</p>
+<form method="post" action="${OAUTH_PATH}/authorize">
+<input type="hidden" name="transaction" value="${transaction}">
+<label for="owner-token">Код доступа владельца</label>
+<input id="owner-token" type="password" name="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" aria-describedby="access-notice" required>
+<button type="submit">Разрешить</button>
+</form>
+</main>
+</body>
+</html>`);
   }
 
   // Wrong short tokens seen recently, in memory only. Registration is anonymous, so

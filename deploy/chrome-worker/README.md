@@ -92,6 +92,38 @@ a successful sign-in resets the count. The counter is in memory, so a restart cl
 it. Rotating the token does not revoke grants that were already issued; they expire
 on their own or can be revoked.
 
+### Mobile consent regression
+
+The consent page uses the device viewport, a labelled password field, touch targets
+of at least 48 CSS pixels, wrapping client metadata and nonce-protected styles.
+Browser zoom remains enabled. The password is never reflected into the HTML.
+This changes presentation only: client registration, callback allowlists, PKCE,
+cookie binding, scopes and token lifetimes are unchanged.
+
+`npm run test:browser --prefix deploy/chrome-worker` includes the mobile consent
+regression at 320x640, 393x873 and 844x393. It checks layout, an actual touch submit,
+the cross-origin callback, PKCE token exchange and bearer authorization in a real
+Chromium browser. All owner credentials are synthetic and the provider is bound
+to loopback. The test intercepts every request hop through Chromium Fetch,
+including redirects, fulfills a synthetic ChatGPT callback and rejects other
+external requests. It verifies the callback page and rejects console errors;
+an external error page at the right URL cannot count as success.
+
+For the focused check, point `CHROME_EXECUTABLE_PATH` to an installed executable:
+
+```bash
+CHROME_EXECUTABLE_PATH=/usr/bin/chromium BROWSER_LIVE_SMOKE_TEST=1 \
+  node --test deploy/chrome-worker/mobile-oauth.browser.test.mjs
+```
+
+Set `MOBILE_OAUTH_SCREENSHOT_DIR` to an optional local artifact directory to save
+screenshots before any credential is entered. These are synthetic mobile browser
+checks, not native ChatGPT Android acceptance. A saved plugin release and a passing
+layout test do not prove that ChatGPT can discover authenticated tools. Native
+acceptance still requires an owner-approved rollout, the host connection flow,
+and an actual harmless browser tool call from ChatGPT Android. An `invalid_client`
+error must be investigated separately; changing viewport markup cannot fix it.
+
 ## Cloud.ru runtime state
 
 The Cloud.ru lane uses a separate Chrome container and state bucket; it does not
