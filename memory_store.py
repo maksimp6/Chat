@@ -52,6 +52,7 @@ class MemoryStore:
         self._sequence = 0
         self._digest = "0" * 64
         self._failed = False
+        self._closed = False
         self._active_transaction = False
         try:
             self._replay()
@@ -59,9 +60,15 @@ class MemoryStore:
             self.close()
             raise
 
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise StoreError("database is closed")
+
     @property
     def last_commit(self) -> Commit:
-        return Commit(self._sequence, self._digest)
+        with self._lock:
+            self._ensure_open()
+            return Commit(self._sequence, self._digest)
 
     def _replay(self) -> None:
         if not self.path.exists():
@@ -95,11 +102,13 @@ class MemoryStore:
 
     def get(self, namespace: str, key: str) -> Any | None:
         with self._lock:
+            self._ensure_open()
             return deepcopy(self._state.get(namespace, {}).get(key))
 
 
     def _commit_changes(self, changes: list[dict[str, Any]]) -> None:
         """Persist one delta record before publishing changes to committed RAM."""
+        self._ensure_open()
         if self._failed:
             raise StoreError("recovery required")
         if not changes:
@@ -150,6 +159,7 @@ class MemoryStore:
 
     def set(self, namespace: str, key: str, value: Any) -> None:
         with self._lock:
+            self._ensure_open()
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
             self._commit_changes([
@@ -158,6 +168,7 @@ class MemoryStore:
 
     def delete(self, namespace: str, key: str) -> None:
         with self._lock:
+            self._ensure_open()
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
             self._commit_changes([{"op": "delete", "namespace": namespace, "key": key}])
@@ -165,6 +176,7 @@ class MemoryStore:
     @contextmanager
     def transaction(self) -> Iterator["Transaction"]:
         with self._lock:
+            self._ensure_open()
             if self._failed:
                 raise StoreError("recovery required")
             if self._active_transaction:
@@ -179,9 +191,14 @@ class MemoryStore:
                 self._active_transaction = False
 
     def close(self) -> None:
-        if not self._lock_file.closed:
-            fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
-            self._lock_file.close()
+        with self._lock:
+            if self._active_transaction:
+                raise StoreError("cannot close during active transaction")
+            if not self._closed:
+                if not self._lock_file.closed:
+                    fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
+                    self._lock_file.close()
+                self._closed = True
 
     def __enter__(self) -> "MemoryStore":
         return self
