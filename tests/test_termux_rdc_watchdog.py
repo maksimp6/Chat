@@ -1,9 +1,10 @@
 """Offline safety tests for Android RDC watchdog."""
-from pathlib import Path
+
 import os
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "android" / "scripts"
 
@@ -31,7 +32,9 @@ class WatchdogTests(unittest.TestCase):
             env = dict(os.environ, HOME=tmp)
             result = subprocess.run(
                 ["bash", str(ROOT / "install-rdc-watchdog.sh")],
-                env=env, capture_output=True, text=True,
+                env=env,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 3)
             self.assertEqual(original.read_text(), "keep")
@@ -49,7 +52,6 @@ class WatchdogTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0)
             self.assertEqual(hook.read_bytes(), contents)
 
-
     def test_missing_agent_triggers_start_without_touching_real_rdc(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
@@ -59,7 +61,7 @@ class WatchdogTests(unittest.TestCase):
             marker = home / "started"
             launcher.write_text('#!/bin/bash\necho "$1" >> "$MARKER"\n')
             sleeper = fake_bin / "sleep"
-            sleeper.write_text('#!/bin/sh\nexit 17\n')
+            sleeper.write_text("#!/bin/sh\nexit 17\n")
             sleeper.chmod(0o755)
             env = dict(
                 os.environ,
@@ -73,10 +75,14 @@ class WatchdogTests(unittest.TestCase):
             )
             result = subprocess.run(
                 ["bash", str(ROOT / "termux-rdc-watchdog.sh")],
-                env=env, capture_output=True, text=True, timeout=5,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             self.assertEqual(result.returncode, 17)
             self.assertEqual(marker.read_text().splitlines(), ["start"])
+
 
 if __name__ == "__main__":
     unittest.main()
