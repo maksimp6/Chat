@@ -84,6 +84,8 @@ STRICT_CLEAN_FILES = {
     "local_tool_agent.py",
     "mcp_server/runtime_bridge.py",
     "mcp_trace.py",
+    "memory_engine/__init__.py",
+    "memory_engine/store.py",
     "plugin_manager.py",
     "pricing_registry.py",
     "printing3d/__init__.py",
