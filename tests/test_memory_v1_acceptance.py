@@ -359,8 +359,10 @@ def test_complete_frame_after_uncertain_fsync_replays_on_reopen(tmp_path, monkey
         assert store.commit() == 1
         store.set("maybe", 2)
         original_fsync = os.fsync
+
         def uncertain_fsync(_fd):
             raise OSError("acknowledgement lost after write")
+
         monkeypatch.setattr(os, "fsync", uncertain_fsync)
         try:
             with pytest.raises(StoreError, match="recovery required"):
