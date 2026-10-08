@@ -402,13 +402,7 @@ class _JournalEngine:
 
 
 class MemoryStore:
-    """Client-owned name/value facade over the durable journal engine.
-
-    Composition keeps the legacy namespaced engine out of the public
-    get/set/commit type contract without changing its durability barrier.
-    """
-
-    _NAMESPACE = "values"
+    """Client-owned name/value API with explicit durable journal commits."""
 
     def __init__(self, path: str | Path) -> None:
         self._engine = _JournalEngine(path)
@@ -430,7 +424,6 @@ class MemoryStore:
         """Stage a copy without acknowledging a durable write."""
         with self._engine.value_guard():
             self._engine.ensure_value_writable()
-
             if not isinstance(name, str) or not name:
                 raise StoreError("name must be a nonempty string")
             self._pending[name] = deepcopy(value)
