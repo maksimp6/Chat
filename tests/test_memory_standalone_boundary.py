@@ -62,8 +62,7 @@ def test_public_contract_requires_annotated_parameters_and_returns():
     source = (ROOT / "store.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     public = next(
-        node for node in tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
     )
     methods = {
         node.name: node
