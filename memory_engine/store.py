@@ -46,6 +46,21 @@ class Store(Protocol[ValueT]):
 
 
 @dataclass(frozen=True)
+class DatabaseInfo:
+    """Public diagnostic fact: last acknowledged commit, or unknown."""
+
+    last_commit: int | None
+
+
+class DatabaseInfoContract(Protocol):
+    """Expose committed metadata without revealing stored values."""
+
+    def info(self) -> DatabaseInfo:
+        """Return the last acknowledged sequence without disk I/O."""
+        ...
+
+
+@dataclass(frozen=True)
 class Commit:
     """Confirmed journal position and chained SHA-256 digest."""
 
@@ -83,6 +98,12 @@ class MemoryStore:
     def _ensure_open(self) -> None:
         if self._closed:
             raise StoreError("database is closed")
+
+    def info(self) -> DatabaseInfo:
+        """Return confirmed in-memory sequence without reading the journal."""
+        with self._lock:
+            self._ensure_open()
+            return DatabaseInfo(last_commit=self._sequence)
 
     @property
     def last_commit(self) -> Commit:
