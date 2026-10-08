@@ -98,16 +98,18 @@ SQL-free cutover is implemented and replacement coverage is established.
 
 ## Filesystem tool migration slice
 
-The former `sqlite_query` tool in `tool_providers/filesystem.py` has been
-replaced by `memory_inspect`, a read-only verified journal inspector. Its
-contract accepts `namespace`, optional `db_path` (default `alice.memory`),
-and `limit` (1–1000). It returns bounded sorted `key/value` records plus
-commit sequence and digest, or a fail-closed error if the journal is damaged.
-It **does not accept SQL**, mutate stored data, or run a SQL engine. This is a
-breaking tool-name and parameter change; callers must be updated before
-functional acceptance. It does not by itself remove SQL from the rest of Alice.
-Tests: `tests/test_memory_inspect_tool.py` (read-only, invalid arguments,
-corrupt-tail rejection). Exact-head CI still needs verification.
+The former SQL tool is replaced with `memory_inspect`. **Security-first
+contract:** no caller-supplied path or namespace, no keys or values, and no
+record enumeration. The tool returns only the journal sequence and chained
+digest, and only for the configured runtime journal. Inspection is refused
+while a writer holds its exclusive lock, if the lock file is missing, if the
+journal exceeds 8 MiB, or if integrity verification fails. Errors do not
+include raw paths or stored content. This intentionally does **not** provide
+live inspection under active writes; that requires a future bounded snapshot.
+
+Focused regressions live in `tests/test_memory_inspect_tool.py`. Full CI
+remains blocked by the SQL-free RED-first gate until remaining SQL consumers
+are removed. The inspector has no SQL execution capability.
 
 ## Acceptance checklist
 
