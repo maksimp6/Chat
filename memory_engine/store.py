@@ -75,13 +75,13 @@ class _JournalEngine:
         digest = "0" * 64
         if not path.exists():
             return state, sequence, digest
-        raw = path.read_bytes()
-        frames = raw.split(b"\n")
+        journal_bytes = path.read_bytes()
+        journal_frames = journal_bytes.split(b"\n")
         # A trailing partial frame may be an ambiguous commit after a crash.
         # Never truncate or accept it automatically: require verified recovery.
-        if frames[-1]:
+        if journal_frames[-1]:
             raise StoreError("incomplete journal tail; recovery required")
-        for frame in frames[:-1]:
+        for frame in journal_frames[:-1]:
             state, sequence, digest = _JournalEngine._apply_verified_frame(
                 frame, state, sequence, digest
             )
@@ -102,12 +102,12 @@ class _JournalEngine:
             payload = record["payload"]
             if not isinstance(payload, dict) or not isinstance(payload.get("changes"), list):
                 raise ValueError("invalid journal payload")
-            encoded = json.dumps(
+            serialized_payload = json.dumps(
                 payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
             ).encode()
             # Chain each frame to the previous confirmed digest so replay detects
             # reordered, missing, or modified records (not malicious rewrites).
-            next_digest = hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest()
+            next_digest = hashlib.sha256(bytes.fromhex(digest) + serialized_payload).hexdigest()
             if record["digest"] != next_digest or payload["seq"] != sequence + 1:
                 raise ValueError("commit chain mismatch")
             for change in payload["changes"]:
@@ -141,15 +141,15 @@ class _JournalEngine:
                 raise StoreError("namespace and key must be strings")
         payload = {"seq": self._sequence + 1, "changes": changes}
         try:
-            encoded = json.dumps(
+            serialized_payload = json.dumps(
                 payload,
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
                 allow_nan=False,
             ).encode("utf-8")
-            digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
-            frame = (
+            digest = hashlib.sha256(bytes.fromhex(self._digest) + serialized_payload).hexdigest()
+            journal_frame = (
                 json.dumps(
                     {"payload": payload, "digest": digest},
                     sort_keys=True,
@@ -159,15 +159,15 @@ class _JournalEngine:
                 ).encode("utf-8")
                 + b"\n"
             )
-            return frame, digest
+            return journal_frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
             raise StoreError("unsupported JSON value") from exc
 
-    def _append_frame(self, frame: bytes) -> None:
+    def _append_frame(self, journal_frame: bytes) -> None:
         first_write = not self.path.exists()
         try:
             with self.path.open("ab", buffering=0) as stream:
-                if stream.write(frame) != len(frame):
+                if stream.write(journal_frame) != len(journal_frame):
                     raise OSError("short journal write")
                 # Do not acknowledge a commit before its journal bytes are synced.
                 os.fsync(stream.fileno())
@@ -198,8 +198,8 @@ class _JournalEngine:
             raise StoreError("recovery required")
         if not changes:
             return
-        frame, digest = self._encode_frame(changes)
-        self._append_frame(frame)
+        journal_frame, digest = self._encode_frame(changes)
+        self._append_frame(journal_frame)
         # Publish only confirmed changes to the RAM view seen by readers.
         self._apply_changes(changes)
         self._sequence += 1
