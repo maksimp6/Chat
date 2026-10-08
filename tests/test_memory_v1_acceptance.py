@@ -231,3 +231,44 @@ def test_two_threads_cannot_claim_same_queued_record(tmp_path):
         assert not errors
         assert len(claimed) == 1
         assert store.get("tasks/1")["owner"] == claimed[0]
+
+
+def test_backup_contains_only_committed_state(tmp_path):
+    """Staged values are not silently included in an exported backup."""
+    path = tmp_path / "source.memory"
+    backup = tmp_path / "backup.memory"
+    with MemoryStore(path) as store:
+        store.set("saved", 1)
+        store.commit()
+        store.set("staged", 2)
+        store.backup(backup)
+    with MemoryStore(backup) as restored:
+        assert restored.get("saved") == 1
+        assert restored.get("staged") is None
+
+
+def test_failed_commit_keeps_last_confirmed_version(tmp_path, monkeypatch):
+    """A failed durable barrier must not acknowledge a new commit."""
+    path = tmp_path / "failure.memory"
+    with MemoryStore(path) as store:
+        store.set("stable", 1)
+        assert store.commit() == 1
+        store.set("new", 2)
+        original_fsync = os.fsync
+
+        def fail_fsync(_fd):
+            raise OSError("simulated fsync failure")
+
+        monkeypatch.setattr(os, "fsync", fail_fsync)
+        try:
+            with pytest.raises(StoreError):
+                store.commit()
+        finally:
+            monkeypatch.setattr(os, "fsync", original_fsync)
+        assert store.last_commit.sequence == 1
+        with pytest.raises(StoreError):
+            store.set("later", 3)
+        with pytest.raises(StoreError):
+            store.commit()
+    # A failed fsync leaves an ambiguous disk outcome. No automatic recovery
+    # or silent truncation is permitted; a separate recovery test must prove it.
