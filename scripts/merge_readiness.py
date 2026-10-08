@@ -189,6 +189,44 @@ def collect_solution_review_evidence(
     )
 
 
+def _valid_review_payload(
+    evidence: dict[str, Any],
+    pr_number: int,
+    head_sha: str,
+    base_sha: str,
+    run: dict[str, Any],
+) -> bool:
+    """Validate artifact consistency with the authenticated Actions run."""
+    import hashlib
+
+    report = evidence.get("review_report")
+    if not isinstance(report, dict):
+        return False
+    canonical = json.dumps(
+        report, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    if hashlib.sha256(canonical).hexdigest() != evidence.get("review_report_sha256"):
+        return False
+    if run.get("path") != ".github/workflows/solution-review.yml":
+        return False
+    if str(evidence.get("runner_sha") or "") != str(run.get("head_sha") or ""):
+        return False
+    for field, value in (
+        ("task", f"pr:{pr_number}"),
+        ("reviewed_head_sha", head_sha),
+        ("reviewed_base_sha", base_sha),
+    ):
+        if report.get(field) != value or evidence.get(field) != value:
+            return False
+    for field in (
+        "outcome", "reviewer_role", "reviewer_session",
+        "implementation_role", "implementation_session",
+    ):
+        if report.get(field) != evidence.get(field):
+            return False
+    return True
+
+
 def select_solution_review_evidence(
     runs: list[dict[str, Any]],
     artifacts_by_run: dict[int, list[dict[str, Any]]],
@@ -202,7 +240,8 @@ def select_solution_review_evidence(
     for run in candidates:
         run_id = int(run.get("id") or 0)
         if (
-            str(run.get("head_sha") or "") != head_sha
+            str(run.get("event") or "") != "workflow_dispatch"
+            or str(run.get("head_branch") or "") != "master"
             or str(run.get("status") or "") != "completed"
             or str(run.get("conclusion") or "") != "success"
         ):
@@ -220,8 +259,7 @@ def select_solution_review_evidence(
                 or str(evidence.get("reviewed_base_sha") or "") != base_sha
                 or int(evidence.get("workflow_run_id") or 0) != run_id
                 or evidence.get("verification") != "hmac-sha256-verified"
-                or evidence.get("review_report_sha256") is None
-                or not isinstance(evidence.get("review_report"), dict)
+                or not _valid_review_payload(evidence, pr_number, head_sha, base_sha, run)
             ):
                 continue
             return evidence
