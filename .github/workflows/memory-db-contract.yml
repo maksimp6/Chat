@@ -53,5 +53,3 @@ jobs:
           python -c "from memory_engine import MemoryStore; print(MemoryStore.__name__)"
       - name: Run standalone tests through Make and measure wall time
         run: /usr/bin/time -f "MEMORY_DB_TEST_WALL_SECONDS=%e" make -C memory-db-package test
-      - name: A/B fast test path
-        run: /usr/bin/time -f "MEMORY_DB_TEST_FAST_WALL_SECONDS=%e" make -C memory-db-package bench-test
