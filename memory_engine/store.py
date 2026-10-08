@@ -408,6 +408,100 @@ class MemoryStore:
         self.close()
 
 
+class VersionedMemoryStore(MemoryStore):
+    """Public name/value API with explicit durable commit.
+
+    Reuses the verified journal and single-writer lock. Staging remains private
+    to the instance; a failed commit does not acknowledge staged changes.
+    """
+
+    _NAMESPACE = "values"
+
+    def __init__(self, path: str | Path) -> None:
+        super().__init__(path)
+        self._pending: dict[str, Any] = {}
+
+    def get(self, name: str) -> Any | None:
+        """Return a staged value first, otherwise the last committed value."""
+        with self._lock:
+            self._ensure_open()
+            if name in self._pending:
+                return deepcopy(self._pending[name])
+            return deepcopy(self._state.get(self._NAMESPACE, {}).get(name))
+
+    def set(self, name: str, value: Any) -> None:
+        """Stage a value without acknowledging or persisting a commit."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed:
+                raise StoreError("recovery required")
+            if self._active_transaction:
+                raise StoreError("direct mutation during transaction is forbidden")
+            if not isinstance(name, str) or not name:
+                raise StoreError("name must be a nonempty string")
+            self._pending[name] = deepcopy(value)
+
+    def commit(self) -> int:
+        """Atomically persist all staged names, returning confirmed sequence."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed:
+                raise StoreError("recovery required")
+            if self._active_transaction:
+                raise StoreError("cannot commit during transaction")
+            changes = [
+                {"op": "set", "namespace": self._NAMESPACE, "key": name, "value": value}
+                for name, value in sorted(self._pending.items())
+            ]
+            self._commit_changes(changes)
+            self._pending.clear()
+            return self._sequence
+
+    @contextmanager
+    def transaction(self) -> Iterator["VersionedTransaction"]:
+        """Serialize a read-modify-write operation and commit at successful exit."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed or self._active_transaction or self._pending:
+                raise StoreError("transaction requires an idle store")
+            self._active_transaction = True
+            tx = VersionedTransaction(self._state.get(self._NAMESPACE, {}))
+            try:
+                yield tx
+                self._commit_changes(tx._pending_changes())
+            finally:
+                tx._closed = True
+                self._active_transaction = False
+
+
+class VersionedTransaction:
+    """Private overlay for one atomic name/value transaction."""
+
+    def __init__(self, committed: dict[str, Any]) -> None:
+        self._committed = committed
+        self._pending: dict[str, Any] = {}
+        self._closed = False
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise StoreError("transaction is closed")
+
+    def get(self, name: str) -> Any | None:
+        self._ensure_open()
+        return deepcopy(self._pending[name] if name in self._pending else self._committed.get(name))
+
+    def set(self, name: str, value: Any) -> None:
+        self._ensure_open()
+        self._pending[name] = deepcopy(value)
+
+    def _pending_changes(self) -> list[dict[str, Any]]:
+        self._ensure_open()
+        return [
+            {"op": "set", "namespace": "values", "key": name, "value": value}
+            for name, value in sorted(self._pending.items())
+        ]
+
+
 class Transaction:
     """Staged changes overlay committed RAM until one synchronous commit."""
 
