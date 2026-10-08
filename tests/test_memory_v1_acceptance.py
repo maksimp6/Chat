@@ -406,3 +406,46 @@ def test_transaction_checks_pending_after_acquiring_engine_lock(tmp_path):
         assert errors == ["transaction requires an idle store"]
         assert store.get("pending") == "must-not-be-ignored"
         assert store.commit() == 1
+
+
+@pytest.mark.parametrize("invalid_name", ["", None, 42])
+def test_invalid_name_is_rejected_before_staging(tmp_path, invalid_name):
+    """Names are nonempty strings; invalid names must never enter the journal."""
+    with MemoryStore(tmp_path / "invalid-name.memory") as store:
+        with pytest.raises(StoreError, match="name must be a nonempty string"):
+            store.set(invalid_name, "value")
+        assert store.commit() == 0
+
+
+def test_transaction_object_rejects_use_after_exit(tmp_path):
+    """A completed transaction must not accept late reads or writes."""
+    with MemoryStore(tmp_path / "expired-tx.memory") as store:
+        with store.transaction() as transaction:
+            transaction.set("record", "confirmed")
+        with pytest.raises(StoreError, match="transaction is closed"):
+            transaction.get("record")
+        with pytest.raises(StoreError, match="transaction is closed"):
+            transaction.set("record", "late")
+        assert store.get("record") == "confirmed"
+
+
+def test_restore_rejects_missing_backup_and_live_path(tmp_path):
+    """Restoring a missing file or the live journal must not change state."""
+    path = tmp_path / "restore-target.memory"
+    with MemoryStore(path) as store:
+        with pytest.raises(StoreError, match="backup source does not exist"):
+            store.restore(tmp_path / "absent.memory")
+        with pytest.raises(StoreError, match="live database path"):
+            store.restore(path)
+        assert store.commit() == 0
+
+
+def test_transaction_rejects_uncommitted_staging(tmp_path):
+    """An atomic transaction cannot silently mix with staged direct writes."""
+    with MemoryStore(tmp_path / "staged-tx.memory") as store:
+        store.set("pending", 1)
+        with pytest.raises(StoreError, match="transaction requires an idle store"):
+            with store.transaction():
+                pass
+        assert store.get("pending") == 1
+        assert store.commit() == 1
