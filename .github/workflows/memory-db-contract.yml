@@ -10,6 +10,7 @@ on:
       - "tests/test_memory_store.py"
       - "tests/test_memory_standalone_boundary.py"
       - "tests/test_memory_makefile.py"
+      - "tests/test_memory_package_sync.py"
       - ".github/workflows/memory-db-contract.yml"
   push:
     branches:
@@ -21,6 +22,7 @@ on:
       - "tests/test_memory_store.py"
       - "tests/test_memory_standalone_boundary.py"
       - "tests/test_memory_makefile.py"
+      - "tests/test_memory_package_sync.py"
       - ".github/workflows/memory-db-contract.yml"
 
 permissions:
