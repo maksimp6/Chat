@@ -219,7 +219,7 @@ def select_solution_review_evidence(
             if not isinstance(evidence, dict):
                 continue
             if (
-                evidence.get("schema_version") != 1
+                evidence.get("schema_version") != 2
                 or str(evidence.get("task") or "") != f"pr:{pr_number}"
                 or str(evidence.get("reviewed_head_sha") or "") != head_sha
                 or str(evidence.get("reviewed_base_sha") or "") != base_sha
@@ -259,7 +259,7 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
             "code": "solution_review_invalid",
             "detail": "solution-review evidence is incomplete",
         }
-    if evidence.get("schema_version") != 1:
+    if evidence.get("schema_version") != 2:
         return {
             "code": "solution_review_invalid",
             "detail": "solution-review evidence schema version is unsupported",
