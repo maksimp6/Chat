@@ -309,7 +309,7 @@ def memory_inspect(args: dict) -> dict:
     """
     if args:
         return {"error": "Unsupported arguments"}
-    from memory_engine.service import database_info
+    from memory_engine.store import database_info
 
     info = database_info()
     if info is None:
