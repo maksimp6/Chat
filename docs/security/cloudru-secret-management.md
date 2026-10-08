@@ -1,8 +1,6 @@
 # Cloud.ru Secret Management для секретов Alice Pro
 
-Статус: первый кодовый этап (issue #477, эпик #440). Адаптер и границы прав
-готовы; перенос реальных production-секретов и выдача прав в Cloud.ru IAM — в
-последующих узких PR, после ручной проверки владельцем.
+Статус: Cloud.ru adapter и legacy SQL-backed reference helpers shipped; canonical provider-neutral Secret Store contract теперь принадлежит #755. Миграция consumers и live Cloud.ru acceptance не завершены.
 
 Источники (проверено 2026-09-29 МСК):
 
@@ -19,13 +17,11 @@
 `docs/cloudru-container-apps.md`. Проверить и при необходимости поправить
 пути/коды при первом реальном подключении.
 
-## Модель данных
+## Canonical contract и legacy reference store
 
-Секрет в Cloud.ru Secret Management состоит из версий; версия после записи
-неизменяема, и несколько версий могут быть одновременно активны. Alice Pro не
-меняет эту модель. Вместо этого приложение хранит локально только **ссылку**:
-какую версию оно сейчас считает действующей для каждого назначения
-(`purpose`).
+Provider-neutral runtime contract находится в `secret_store/core.py`: `SecretRef` фиксирует provider/secret/version/purpose metadata, `SecretValue` не раскрывается через str/repr/serialization, а `SecretResolver` задаёт resolution boundary.
+
+Cloud.ru Secret Management использует versioned secrets. Существующая таблица `secret_management_refs` и helpers в `provider_credentials.py` появились раньше canonical #755 и **остаются рабочим legacy compatibility path**. Они не являются целевой универсальной Secret Store архитектурой и не должны копироваться для новых providers/consumers.
 
 Таблица `secret_management_refs` (`provider_credentials.py`):
 
@@ -160,8 +156,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
    локального plaintext. Эта замена — отдельный, следующий узкий PR по
    каждому назначению, не часть данного этапа.
 
-Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
-схему:
+Назначения (`purpose`), которые требуют consumer-by-consumer migration/verification под #755:
 
 - `alice_short_token` — короткий токен доступа (`short_token_auth.py`,
   `ALICE_SHORT_TOKEN`);
@@ -212,3 +207,10 @@ limitations") секреты Container Apps — обычные переменн�
 - `docs/cloudru-container-apps.md` — деплой и известные ограничения по
   секретам.
 - Issue: #477, #475, #440.
+
+
+## Compatibility status
+
+`set_secret_management_ref`, `rollback_secret_management_ref` и `resolve_secret_management_value` остаются тестируемыми compatibility API. Их наличие не делает SQL-таблицу canonical. Новый код должен использовать provider-neutral contract #755, а не создавать ещё одну purpose→secret SQL-таблицу.
+
+Для migration evidence пропущенной live-проверки недостаточно: выбранный provider/secret/version path должен успешно разрешаться, а missing/revoked/unavailable cases — безопасно падать до удаления legacy consumer.
