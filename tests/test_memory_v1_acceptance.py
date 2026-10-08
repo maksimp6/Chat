@@ -213,8 +213,12 @@ def test_two_threads_cannot_claim_same_queued_record(tmp_path):
                 with store.transaction() as tx:
                     task = tx.get("tasks/1")
                     if task["status"] == "queued":
-                        tx.set("tasks/1", {"status": "running"})
-                        claimed.append(1)
+                        tx.set("tasks/1", {"status": "running", "owner": threading.get_ident()})
+                        won = True
+                    else:
+                        won = False
+                if won:
+                    claimed.append(threading.get_ident())
             except Exception as exc:
                 errors.append(exc)
 
@@ -225,4 +229,5 @@ def test_two_threads_cannot_claim_same_queued_record(tmp_path):
             thread.join(timeout=10)
         assert not any(thread.is_alive() for thread in threads)
         assert not errors
-        assert claimed == [1]
+        assert len(claimed) == 1
+        assert store.get("tasks/1")["owner"] == claimed[0]
