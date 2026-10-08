@@ -30,7 +30,7 @@ export async function verifyOAuthDiscovery(publicUrl, options = {}) {
           redirect: "manual",
           signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(requestTimeoutMs, remaining)))),
         });
-        report({ stage: path, attempt, status: response.status });
+        report({ stage: path, method: init.method ?? "GET", attempt, status: response.status });
         if ([502, 503, 504].includes(response.status)) {
           await response.body?.cancel();
         } else {
@@ -52,7 +52,7 @@ export async function verifyOAuthDiscovery(publicUrl, options = {}) {
         }
       } catch (error) {
         if (error instanceof DiscoveryFailure) throw error;
-        report({ stage: path, attempt, status: null, error: "transport_or_timeout" });
+        report({ stage: path, method: init.method ?? "GET", attempt, status: null, error: "transport_or_timeout" });
       }
       const remainingAfter = deadline - performance.now();
       requireEvidence(remainingAfter > 0, `deadline_exceeded:${path}`);
@@ -61,18 +61,29 @@ export async function verifyOAuthDiscovery(publicUrl, options = {}) {
     throw new DiscoveryFailure(`attempt_limit_exceeded:${path}`);
   }
 
+  // Start on the MCP endpoint itself, not a /healthz pre-warm shortcut.
+  const resourcePath = "/.well-known/oauth-protected-resource/mcp";
+  for (const method of ["GET", "HEAD", "POST"]) {
+    const init = {
+      method,
+      headers: { accept: "application/json, text/event-stream" },
+    };
+    if (method === "POST") {
+      init.headers["content-type"] = "application/json";
+      init.headers["mcp-protocol-version"] = "2025-06-18";
+      init.body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {
+        protocolVersion: "2025-06-18", capabilities: {},
+        clientInfo: { name: "alice-dev-discovery-smoke", version: "1.0" },
+      } });
+    }
+    const mcp = await request("/mcp", 401, init, false);
+    const metadataUrl = (mcp.response.headers.get("www-authenticate") ?? "")
+      .match(/resource_metadata="([^"]+)"/)?.[1];
+    // Never follow discovery to an unexpected origin, even without credentials.
+    requireEvidence(metadataUrl === origin + resourcePath, "invalid_resource_metadata_challenge");
+  }
   const health = await request("/healthz", 200);
   requireEvidence(health.data?.status === "ok" && health.data?.mode === "mcp-gateway", "invalid_health");
-  const mcp = await request("/mcp", 401, {
-    method: "POST",
-    headers: { "content-type": "application/json", "mcp-protocol-version": "2025-06-18" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
-  }, false);
-  const metadataUrl = (mcp.response.headers.get("www-authenticate") ?? "")
-    .match(/resource_metadata="([^"]+)"/)?.[1];
-  // Do not follow discovery to an unexpected origin, even without credentials.
-  const resourcePath = "/.well-known/oauth-protected-resource/mcp";
-  requireEvidence(metadataUrl === origin + resourcePath, "invalid_resource_metadata_challenge");
   const { data: resource } = await request(resourcePath, 200);
   const issuer = `${origin}/oauth`;
   requireEvidence(resource?.resource === `${origin}/mcp` &&
