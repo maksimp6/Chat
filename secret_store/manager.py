@@ -102,6 +102,26 @@ class SecretManager:
         self._record(alias, secret_purpose, "create", True)
         return entry
 
+    def create_or_rotate(
+        self,
+        alias: str,
+        value: SecretValue,
+        *,
+        secret_purpose: str,
+        allowed_purposes: frozenset[str],
+    ) -> SecretAlias:
+        entry = self._store.get(alias)
+        if entry is None:
+            return self.create(
+                alias,
+                value,
+                secret_purpose=secret_purpose,
+                allowed_purposes=allowed_purposes,
+            )
+        if entry.ref.purpose != secret_purpose or entry.allowed_purposes != allowed_purposes:
+            raise SecretAliasError("secret alias policy mismatch")
+        return self.rotate(alias, value)
+
     def rotate(self, alias: str, value: SecretValue) -> SecretAlias:
         admin = self._require_admin()
         entry = self._store.get(alias)

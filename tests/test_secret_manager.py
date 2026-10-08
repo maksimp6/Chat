@@ -180,3 +180,67 @@ def test_delete_missing_alias_fails_closed():
 
     with pytest.raises(SecretAliasError, match="not found"):
         manager.delete("missing")
+
+
+def test_create_or_rotate_creates_then_rotates_without_changing_policy():
+    admin = FakeSecretAdminBackend()
+    manager = SecretManager(InMemorySecretAliasStore(), FakeSecretResolver(), admin)
+
+    first = manager.create_or_rotate(
+        "github",
+        SecretValue("old-secret"),
+        secret_purpose="github",
+        allowed_purposes=frozenset({"browser.password"}),
+    )
+    second = manager.create_or_rotate(
+        "github",
+        SecretValue("new-secret"),
+        secret_purpose="github",
+        allowed_purposes=frozenset({"browser.password"}),
+    )
+
+    assert first.alias == second.alias == "github"
+    assert first.ref.secret_id == second.ref.secret_id
+    assert first.ref.version_id == "v1"
+    assert second.ref.version_id == "v2"
+    assert second.allowed_purposes == frozenset({"browser.password"})
+    assert admin.resolve_for_test(first.ref) == "old-secret"
+    assert admin.resolve_for_test(second.ref) == "new-secret"
+
+
+def test_create_or_rotate_rejects_secret_purpose_drift():
+    admin = FakeSecretAdminBackend()
+    manager = SecretManager(InMemorySecretAliasStore(), FakeSecretResolver(), admin)
+    manager.create_or_rotate(
+        "github",
+        SecretValue("old-secret"),
+        secret_purpose="github",
+        allowed_purposes=frozenset({"browser.password"}),
+    )
+
+    with pytest.raises(SecretAliasError, match="policy mismatch"):
+        manager.create_or_rotate(
+            "github",
+            SecretValue("new-secret"),
+            secret_purpose="ssh",
+            allowed_purposes=frozenset({"browser.password"}),
+        )
+
+
+def test_create_or_rotate_rejects_acl_drift():
+    admin = FakeSecretAdminBackend()
+    manager = SecretManager(InMemorySecretAliasStore(), FakeSecretResolver(), admin)
+    manager.create_or_rotate(
+        "github",
+        SecretValue("old-secret"),
+        secret_purpose="github",
+        allowed_purposes=frozenset({"browser.password"}),
+    )
+
+    with pytest.raises(SecretAliasError, match="policy mismatch"):
+        manager.create_or_rotate(
+            "github",
+            SecretValue("new-secret"),
+            secret_purpose="github",
+            allowed_purposes=frozenset({"browser.password", "rdc.git"}),
+        )
