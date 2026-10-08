@@ -97,7 +97,7 @@ class MemoryStore:
         if not path.exists():
             return state, sequence, digest
         raw = path.read_bytes()
-        frames = raw.split(b"\\n")
+        frames = raw.split(b"\n")
         if frames[-1]:
             raise StoreError("incomplete journal tail; recovery required")
         for frame in frames[:-1]:
