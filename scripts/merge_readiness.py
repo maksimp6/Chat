@@ -124,18 +124,13 @@ def _download_solution_review_artifact(repo: str, artifact_id: int) -> dict[str,
     """Download one bounded Actions artifact and parse solution-review.json."""
     with tempfile.TemporaryDirectory() as temp_dir:
         archive = Path(temp_dir) / "artifact.zip"
-        subprocess.run(
-            [
-                "gh",
-                "api",
-                f"/repos/{repo}/actions/artifacts/{artifact_id}/zip",
-                "--output",
-                str(archive),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        with archive.open("wb") as output:
+            subprocess.run(
+                ["gh", "api", f"/repos/{repo}/actions/artifacts/{artifact_id}/zip"],
+                check=True,
+                stdout=output,
+                stderr=subprocess.PIPE,
+            )
         if archive.stat().st_size > 1_000_000:
             return None
         with zipfile.ZipFile(archive) as bundle:
