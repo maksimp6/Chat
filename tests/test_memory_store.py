@@ -94,3 +94,20 @@ def test_nested_transaction_is_rejected(tmp_path):
                     pass
             outer.set("items", "ok", 1)
         assert db.get("items", "ok") == 1
+
+
+def test_direct_mutation_cannot_overwrite_active_transaction(tmp_path):
+    path = tmp_path / "alice.memory"
+    with MemoryStore(path) as db:
+        with db.transaction() as tx:
+            tx.set("items", "transaction", 1)
+            with pytest.raises(StoreError, match="direct mutation during transaction"):
+                db.set("items", "direct", 2)
+            with pytest.raises(StoreError, match="direct mutation during transaction"):
+                db.delete("items", "transaction")
+        assert db.last_commit.sequence == 1
+        assert db.get("items", "transaction") == 1
+        assert db.get("items", "direct") is None
+    with MemoryStore(path) as reopened:
+        assert reopened.get("items", "transaction") == 1
+        assert reopened.get("items", "direct") is None
