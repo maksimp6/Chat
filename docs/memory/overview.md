@@ -29,11 +29,13 @@
 
 ## Миграция (issue #776)
 
-Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит SQL хранилище дurable engine для:
-- пользовательской идентичности (`user_identity.py`)
-- владения разговорами (`conversation_ownership.py`)
-- сессий и профилей (`session_manager.py`)
-- истории сообщений и памяти (`memory_manager.py`, `memory_extractor.py`)
+Wave 1 поэтапно переводит runtime с legacy SQL на FileMemoryDB. Уже переведены:
+- пользовательская идентичность и GitHub account mapping (`user_identity.py`);
+- владение разговорами (`conversation_ownership.py`).
+
+Следующие потребители ещё остаются на legacy SQL и требуют отдельных проверяемых срезов:
+- сессии и профили (`session_manager.py`);
+- история сообщений и извлечённая память (`memory_manager.py`, `memory_extractor.py`).
 
 Миграция требует:
 1. Доказательства crash recovery и integrity на новом engine
@@ -56,3 +58,14 @@ Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит
 - **API**: предоставляет методы для читать/писать конфигурацию памяти (`load_memory_config`, `save_memory_config`)
 
 Для детального изучения миграционной стратегии см. [memory-db-v1-contract.md](memory-db-v1-contract.md) и [issue #776](https://github.com/maksimp6/Chat/issues/776).
+## Legacy extraction boundary
+
+`memory_extractor.py` пока не использует canonical model/provider pipeline и не пишет извлечённые факты в FileMemoryDB. Он напрямую читает `YANDEX_API_KEY` / `YANDEX_PROJECT_ID`, вызывает legacy Yandex Foundation Models completion endpoint и сохраняет `global_memory` в SQL.
+
+Поэтому этот модуль одновременно остаётся migration consumer для #433 (единый model path), #755 (Secret Store) и #776 (file-native durable memory). Наличие FileMemoryDB для ownership/identity не является доказательством миграции extracted memory.
+
+## Backup evidence boundary
+
+`agent_memory.backup` уже реализует и тестирует локальный verified bundle: consistent read под DB lock, `alice.memory`, manifest с sequence/size/SHA-256, `COMMITTED` marker, checksum/sequence verification при restore и `copy_verified_backup()` только после restore-probe.
+
+Это **не** доказывает remote backup pipeline. В current module нет Cloud.ru S3/Yandex Disk/Google Drive upload, remote read-back verification, scheduler или retention job. Удалённые targets в `memory-db-v1-contract.md` остаются целевым #776 contract до появления provider-backed implementation/evidence.

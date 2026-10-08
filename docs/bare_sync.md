@@ -1,35 +1,9 @@
-# Синхронизация с bare-репозиторием local_bare
+# local_bare synchronization — retired
 
-## Устройство репозитория
+Status: **retired**.
 
-`local_bare` — это bare-репозиторий, расположенный по пути `/sdcard/repo/bare`. Он не имеет рабочей директории и предназначен исключительно для хранения истории изменений Git.
+The former Android/Termux workflow mirrored Git history to a local bare repository at `/sdcard/repo/bare` using the `local_bare` remote. This workflow is no longer used and is not part of the current Alice Pro development, backup, deployment, or recovery contract.
 
-В нём содержатся все ветки и коммиты из основного репозитория `alice_pro`, а также метаданные Git, необходимые для отслеживания изменений.
+This file is retained only so old links explain what happened to that workflow. Do not configure `local_bare` or depend on `/sdcard/repo/bare` for current repository safety.
 
-## Процесс зеркалирования изменений
-
-1. **Добавление remote**. В основном репозитории `alice_pro` подключается remote с именем `local_bare`, указывающий на `/sdcard/repo/bare`:
-   ```bash
-   git remote add local_bare /sdcard/repo/bare
-   ```
-
-2. **Фиксация изменений**. В `alice_pro` вносятся и фиксируются изменения с помощью `git commit`.
-
-3. **Отправка изменений**. Изменения отправляются в `local_bare` через `git push`:
-   ```bash
-   git push local_bare master
-   ```
-
-4. **Автоматическое обновление**. Поскольку `local_bare` является bare-репозиторием, он автоматически принимает и хранит все полученные изменения без необходимости дополнительных действий.
-
-## Преимущества использования bare-репозитория
-
-- **Централизованное хранение истории**. Все изменения собираются в одном месте.
-- **Отсутствие конфликтов с рабочей директорией**. Bare-репозиторий не имеет рабочей директории, что исключает конфликты при одновременных операциях.
-- **Эффективность**. Хранит только метаданные Git и историю изменений, экономя место.
-
-Этот механизм обеспечивает надёжное зеркалирование изменений из `alice_pro` в `local_bare` и служит основой для резервного копирования и синхронизации между различными окружениями.
-
-## Связь с общей архитектурой
-
-Процесс синхронизации подробно описан в разделе [Архитектура системы](architecture/overview.md). Дополнительные сведения о механизме работы с репозиториями можно найти в документации по [Настройка Git-окружения](setup/git_setup.md).
+Current repository changes use the protected GitHub workflow described in [development_workflow.md](development_workflow.md). Durable application state and recovery are separate from Git history and belong to their canonical storage/platform contracts.
