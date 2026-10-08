@@ -96,6 +96,19 @@ it passes, the full functional, crash/recovery and integration tests still
 have to run. The existing PostgreSQL job must be removed only after the
 SQL-free cutover is implemented and replacement coverage is established.
 
+## Filesystem tool migration slice
+
+The former `sqlite_query` tool in `tool_providers/filesystem.py` has been
+replaced by `memory_inspect`, a read-only verified journal inspector. Its
+contract accepts `namespace`, optional `db_path` (default `alice.memory`),
+and `limit` (1–1000). It returns bounded sorted `key/value` records plus
+commit sequence and digest, or a fail-closed error if the journal is damaged.
+It **does not accept SQL**, mutate stored data, or run a SQL engine. This is a
+breaking tool-name and parameter change; callers must be updated before
+functional acceptance. It does not by itself remove SQL from the rest of Alice.
+Tests: `tests/test_memory_inspect_tool.py` (read-only, invalid arguments,
+corrupt-tail rejection). Exact-head CI still needs verification.
+
 ## Acceptance checklist
 
 1. Fix replay so a newly created store survives close/reopen in a **fresh process**; corrupt committed entries must fail closed.
