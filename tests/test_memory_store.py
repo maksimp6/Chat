@@ -3,7 +3,8 @@
 import multiprocessing
 import pytest
 
-from memory_engine import LegacyMemoryStore as MemoryStore, StoreError
+from memory_engine import StoreError
+from memory_engine.store import _JournalEngine as MemoryStore
 
 
 def _attempt_second_writer(path, result):
