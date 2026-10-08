@@ -388,70 +388,94 @@ class MemoryStore:
         self.close()
 
 
-class VersionedMemoryStore(MemoryStore):
-    """Public name/value API with explicit durable commit.
+class VersionedMemoryStore:
+    """Client-owned name/value facade over the durable journal engine.
 
-    Reuses the verified journal and single-writer lock. Staging remains private
-    to the instance; a failed commit does not acknowledge staged changes.
+    Composition keeps the legacy namespaced engine out of the public
+    get/set/commit type contract without changing its durability barrier.
     """
 
     _NAMESPACE = "values"
 
     def __init__(self, path: str | Path) -> None:
-        super().__init__(path)
+        self._engine = MemoryStore(path)
         self._pending: dict[str, Any] = {}
 
+    @property
+    def last_commit(self) -> Commit:
+        """Return the last acknowledged durable journal position."""
+        return self._engine.last_commit
+
     def get(self, name: str) -> Any | None:
-        """Return a staged value first, otherwise the last committed value."""
-        with self._lock:
-            self._ensure_open()
+        """Read staged data first; otherwise return a copy of committed data."""
+        with self._engine._lock:
+            self._engine._ensure_open()
             if name in self._pending:
                 return deepcopy(self._pending[name])
-            return deepcopy(self._state.get(self._NAMESPACE, {}).get(name))
+            return self._engine.get(self._NAMESPACE, name)
 
     def set(self, name: str, value: Any) -> None:
-        """Stage a value without acknowledging or persisting a commit."""
-        with self._lock:
-            self._ensure_open()
-            if self._failed:
+        """Stage a copy without acknowledging a durable write."""
+        with self._engine._lock:
+            self._engine._ensure_open()
+            if self._engine._failed:
                 raise StoreError("recovery required")
-            if self._active_transaction:
+            if self._engine._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
             if not isinstance(name, str) or not name:
                 raise StoreError("name must be a nonempty string")
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
-        """Atomically persist all staged names, returning confirmed sequence."""
-        with self._lock:
-            self._ensure_open()
-            if self._failed:
+        """Atomically persist staged names and return the confirmed sequence."""
+        with self._engine._lock:
+            self._engine._ensure_open()
+            if self._engine._failed:
                 raise StoreError("recovery required")
-            if self._active_transaction:
+            if self._engine._active_transaction:
                 raise StoreError("cannot commit during transaction")
             changes = [
                 {"op": "set", "namespace": self._NAMESPACE, "key": name, "value": value}
                 for name, value in sorted(self._pending.items())
             ]
-            self._commit_changes(changes)
+            self._engine._commit_changes(changes)
             self._pending.clear()
-            return self._sequence
+            return self._engine.last_commit.sequence
 
     @contextmanager
     def transaction(self) -> Iterator["VersionedTransaction"]:
-        """Serialize a read-modify-write operation and commit at successful exit."""
-        with self._lock:
-            self._ensure_open()
-            if self._failed or self._active_transaction or self._pending:
+        """Serialize an atomic read-modify-write operation."""
+        with self._engine._lock:
+            if self._pending:
                 raise StoreError("transaction requires an idle store")
-            self._active_transaction = True
-            tx = VersionedTransaction(self._state.get(self._NAMESPACE, {}))
-            try:
-                yield tx
-                self._commit_changes(tx._pending_changes())
-            finally:
-                tx._closed = True
-                self._active_transaction = False
+            with self._engine.transaction() as tx:
+                wrapper = VersionedTransaction(self._engine._state.get(self._NAMESPACE, {}))
+                try:
+                    yield wrapper
+                    for change in wrapper._pending_changes():
+                        tx.set(change["namespace"], change["key"], change["value"])
+                finally:
+                    wrapper._closed = True
+
+    def backup(self, destination: str | Path) -> None:
+        """Back up only confirmed journal state."""
+        self._engine.backup(destination)
+
+    def restore(self, source: str | Path) -> None:
+        """Restore a verified backup into an empty store."""
+        self._engine.restore(source)
+
+    def close(self) -> None:
+        """Discard staging and release the single-writer lock."""
+        with self._engine._lock:
+            self._pending.clear()
+            self._engine.close()
+
+    def __enter__(self) -> "VersionedMemoryStore":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
 
 
 class VersionedTransaction:
