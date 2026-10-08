@@ -87,7 +87,11 @@ class MemoryStore:
         for frame in frames:
             try:
                 record = json.loads(frame)
+                if not isinstance(record, dict):
+                    raise ValueError("invalid journal frame")
                 payload = record["payload"]
+                if not isinstance(payload, dict) or not isinstance(payload.get("changes"), list):
+                    raise ValueError("invalid journal payload")
                 encoded = json.dumps(
                     payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
                 ).encode()
@@ -95,7 +99,11 @@ class MemoryStore:
                 if record["digest"] != next_digest or payload["seq"] != sequence + 1:
                     raise ValueError("commit chain mismatch")
                 for change in payload["changes"]:
+                    if not isinstance(change, dict):
+                        raise ValueError("invalid journal change")
                     namespace, key = change["namespace"], change["key"]
+                    if not isinstance(namespace, str) or not isinstance(key, str):
+                        raise ValueError("invalid journal key")
                     if change["op"] == "set":
                         state.setdefault(namespace, {})[key] = change["value"]
                     elif change["op"] == "delete":
@@ -104,7 +112,7 @@ class MemoryStore:
                         raise ValueError("invalid journal operation")
                 sequence = payload["seq"]
                 digest = next_digest
-            except (ValueError, KeyError, TypeError, UnicodeError) as exc:
+            except (ValueError, KeyError, TypeError, UnicodeError, AttributeError) as exc:
                 raise StoreError("corrupt committed journal") from exc
         return state, sequence, digest
 
