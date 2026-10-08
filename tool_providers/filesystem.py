@@ -302,42 +302,49 @@ def python_ast_outline(args: dict) -> dict:
 
 
 def memory_inspect(args: dict) -> dict:
-    """Read-only verified inspection of a local Memory DB journal.
+    """Inspect bounded journal metadata, never stored keys or values.
 
-    No SQL interpreter or mutation path is exposed through filesystem tools.
-    Concurrent/incomplete journal frames fail closed instead of returning data.
+    Reject inspection while a writer owns the database. No SQL interpreter,
+    arbitrary namespace reads, or user-controlled journal file paths.
     """
+    import fcntl
     from pathlib import Path
 
     from memory_engine import MemoryStore, StoreError
 
-    db_name = args.get("db_path", "alice.memory")
-    namespace = args.get("namespace")
-    if not isinstance(namespace, str) or not namespace:
-        return {"error": "Параметр 'namespace' обязателен"}
+    # Read-only diagnostics are intentionally restricted to the configured
+    # runtime database, not an arbitrary path supplied by a tool caller.
+    if set(args) - {"limit"}:
+        return {"error": "Only metadata inspection is supported"}
+    if "limit" in args:
+        return {"error": "Record enumeration is not supported"}
+    from db import memory_file_path
+
+    journal = Path(memory_file_path())
+    if not journal.is_file():
+        return {"error": "Memory DB journal not found"}
+    if journal.stat().st_size > 8 * 1024 * 1024:
+        return {"error": "Journal exceeds inspection size limit"}
+    lock_path = journal.with_name(journal.name + ".lock")
+    if not lock_path.exists():
+        return {"error": "Writer lock file is missing"}
     try:
-        limit = int(args.get("limit", 50))
-        if not 1 <= limit <= 1000:
-            return {"error": "Лимит должен быть от 1 до 1000"}
-        abs_db = _get_abs_path(db_name)
-        if not os.path.isfile(abs_db):
-            return {"error": f"База данных '{db_name}' не найдена"}
-        state, sequence, digest = MemoryStore._inspect_log(Path(abs_db))
-        rows = [
-            {"key": key, "value": value}
-            for key, value in sorted(state.get(namespace, {}).items())[:limit]
-        ]
-        return {
-            "success": True,
-            "db_path": db_name,
-            "namespace": namespace,
-            "sequence": sequence,
-            "digest": digest,
-            "count": len(rows),
-            "rows": rows,
-        }
-    except (StoreError, OSError, ValueError, TypeError) as exc:
-        return {"error": f"Ошибка чтения Memory DB: {exc}"}
+        with lock_path.open("rb") as lock:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return {"error": "Database writer active; inspection deferred"}
+            try:
+                # Recheck under the lock to avoid racing with a writer.
+                if journal.stat().st_size > 8 * 1024 * 1024:
+                    return {"error": "Journal exceeds inspection size limit"}
+                _state, sequence, digest = MemoryStore._inspect_log(journal)
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        return {"success": True, "sequence": sequence, "digest": digest}
+    except (StoreError, OSError, ValueError, TypeError):
+        # Never leak filesystem paths or raw journal content through errors.
+        return {"error": "Memory DB inspection unavailable"}
 
 
 def calculate_hash(args: dict) -> dict:
@@ -773,16 +780,8 @@ TOOL_REGISTRY = {
     },
     "memory_inspect": {
         "func": memory_inspect,
-        "description": "Проверенное чтение namespace из журнала Memory DB без SQL и без изменения данных.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "namespace": {"type": "string", "description": "Пространство ключей"},
-                "db_path": {"type": "string", "description": "Путь к файлу alice.memory"},
-                "limit": {"type": "integer", "description": "Максимум 1000 записей"},
-            },
-            "required": ["namespace"],
-        },
+        "description": "Безопасная проверка метаданных Memory DB без ключей и значений.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         "requires_approval": False,
     },
     "calculate_hash": {
