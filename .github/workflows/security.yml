@@ -36,9 +36,11 @@ jobs:
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+      # Keep the full action SHA pinned and its comment at the exact release tag.
+      # Do not use a floating # v4/# latest label: Zizmor checks tag-to-SHA parity.
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-results.sarif
           category: trivy
