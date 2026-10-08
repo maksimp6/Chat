@@ -35,6 +35,19 @@ android/app/build/outputs/apk/debug/app-debug.apk
 - SQLite and the local repository are stored below the Python `HOME` directory supplied by Android.
 - Desktop behavior remains unchanged because `ALICE_LOCAL_REPO_DIR` defaults to `/sdcard/repo` outside Android.
 
+## First run
+
+The first-launch dialog has two runtime modes:
+
+1. **Embedded Alice Pro** — enter a Yandex AI Studio API key. The app stores it in app-private preferences, starts the embedded Python/Flask server on `127.0.0.1:5000`, bootstraps an owner identity through `POST /api/users/bootstrap`, installs the returned local identity cookie, and opens the WebView.
+2. **Local agent** — choose **Local agent** and enter the HTTPS gateway URL, bootstrap token and Agent ID. The phone does not start the public Alice web server in this mode; it registers an outbound Local Tool Agent and polls the configured gateway.
+
+The two modes are mutually selected in preferences: choosing Local agent removes the stored Yandex API key, while starting embedded Alice clears the local-agent mode flag.
+
+The current embedded Android bootstrap passes the stored Yandex key to `android_server.py`, which exposes it to the embedded process as `YANDEX_API_KEY`. This is Android compatibility behavior and is not evidence that the general web/provider credential path or canonical Secret Store migration is complete.
+
+No microphone permission is declared by the native Android manifest today. The web voice feature therefore must not be documented as a proven native Android microphone flow until device acceptance covers the actual WebView/media permission path.
+
 ## Diagnostics
 
 The Android shell provides a **Diagnostics** action in the web header. It opens a native log viewer backed by app-private JSONL logs.
@@ -69,6 +82,8 @@ The updater fetches public GitHub Actions metadata, validates the artifact SHA-2
 Artifact downloads use [nightly.link](https://nightly.link/) as an anonymous download proxy for GitHub Actions artifacts. GitHub's own artifact URLs are authentication-gated; nightly.link provides branch/run-specific links for public repositories. The source repository and selected workflow/run remain visible in the updater before installation.
 
 Automatic checking of the `master` branch is also performed periodically in the background. Development/CI builds still require explicit confirmation before installation.
+
+Android also requires per-app permission to install packages from this source. The manifest declares `REQUEST_INSTALL_PACKAGES`, but that declaration does not grant the user-controlled permission. If Android blocks the installer, the updater opens the system **Install unknown apps** settings for Alice Pro; enable it there, return to Alice Pro, and retry the update. APK verification (package name, signing certificate and monotonically newer versionCode) still runs before the installer is opened.
 
 ## Scope
 
