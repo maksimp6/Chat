@@ -2,89 +2,88 @@
 
 ## Высокоуровневая схема
 
+```text
+User / Android / external client
+              |
+              v
+       Flask HTTP / MCP
+              |
+              v
+       InvocationContext
+        /      |       \
+       v       v        v
+ Yandex     Universal   RuntimeDispatcher
+ Responses  ToolExecutor      |
+              |               v
+              v          ExecutionTrace
+        MCP / local tools      |
+                              v
+                        billing/evidence
 ```
-Пользователь
-  │
-  ▼
-Браузер
-  │
-  ▼
-Flask / app.py
-  │
-  ├──────────────► SQLite / db.py
-  │
-  ├──────────────► Yandex AI Studio
-  │               │
-  │               ▼
-  │          AI Responses API
-  │
-  ├──────────────► MCP
-  │               │
-  │               ├── filesystem
-  │               ├── git
-  │               └── другие инструменты
-  │
-  └──────────────► Files / Vector Stores
-```
+
+Transport не определяет отдельную архитектуру исполнения: web, CLI и MCP должны сходиться к общим owner/runtime, tool/policy и trace boundaries.
 
 ## Основные компоненты
 
-### 1. Веб‑интерфейс (static/)
-* `chat.js` — обработка чата и Markdown;
-* `core.js` — основная логика фронтенда;
-* `sidebar.js` — боковая панель;
-* `models.js` — работа с моделями;
-* `voice.js` — голосовые функции;
-* `style.css` — стили.
+### Web UI
 
-### 2. Бэкенд (Flask)
-* `app.py` — главный файл приложения;
-* `db.py` — работа с SQLite;
-* `config.py` — конфигурация;
-* `logger.py` — система логирования;
-* `file_routes.py` — маршруты работы с файлами;
-* `mcp_routes.py` — маршруты MCP.
+Основной UI — repository-local HTML/JavaScript/CSS из `templates/` и `static/`. Android использует WebView-путь. Frontend не хранит provider secrets и не создаёт отдельный model/tool runtime.
 
-### 3. MCP‑инструменты
-* `tool_providers/filesystem.py` — работа с файловой системой;
-* `tool_providers/git.py` — Git‑операции;
-* `tool_providers/profiler.py` — профайлинг;
-* `archiver.py` — архивация;
-* `file_manager.py` — управление файлами.
+### Backend
 
-### 4. AI‑адаптеры и агенты
-* `cli_agent.py` — CLI/Termux‑адаптер к каноническому backend runtime;
-* `alice_agent_runner.py` — GitHub issue adapter;
-* `local_tool_agent.py` — Android/local tool adapter;
-* Yandex AI Studio подключается через общий provider/Responses pipeline, а не напрямую из интерфейсных адаптеров.
+`app.py` собирает Flask application. Route modules принимают HTTP-запросы, но provider/tool execution должен сохранять общий Invocation/Trace lifecycle.
 
-### 5. Система хранения
-* **SQLite** (`db.py`) — основное хранилище данных;
-* файловая система — векторные хранилища и файлы.
+### Model/provider pipeline
 
-## Взаимодействие компонентов
+Yandex AI Studio Responses API — основной model provider path. Interface adapters не должны обходить canonical provider pipeline прямыми model calls.
 
-1. **Пользовательский запрос**:
-   * браузер загружает статические файлы из `static/`;
-   * `chat.js` отправляет запрос на `app.py`.
+### Tools и MCP
 
-2. **Обработка на бэкенде**:
-   * `app.py` маршрутизирует запрос;
-   * при необходимости обращается к Yandex AI Studio;
-   * использует MCP‑инструменты для файловых операций.
+MCP и local tools сходятся к Universal Tool Registry / UniversalToolExecutor. Approval-required операции не становятся разрешёнными из-за другого транспорта.
 
-3. **Хранение данных**:
-   * структурированные данные — в SQLite (`db.py`);
-   * файлы и векторные данные — в файловой системе.
+### Runtime scope и evidence
 
-4. **Логирование**:
-   * все действия записываются в соответствующие лог‑файлы (`logs/`).
+RuntimeDispatcher сохраняет owner/runtime isolation. ExecutionTrace фиксирует provider/tool lifecycle, timing, errors и billing correlation. Обычные текстовые логи могут помогать диагностике, но не являются заменой canonical execution evidence.
+
+## Storage
+
+Storage сейчас переходный:
+
+- legacy SQLite/PostgreSQL остаются у ещё не мигрированных consumers;
+- FileMemoryDB уже является authoritative для отдельных durable aggregates;
+- миграция consumer-by-consumer принадлежит #776.
+
+Поэтому ни «SQLite — единственное основное хранилище», ни «SQL полностью удалён» не описывают текущий master корректно.
+
+Secret values не принадлежат application storage. Их canonical boundary — #755.
+
+## Agents
+
+Агенты являются специализированными ролями/исполнителями поверх общих runtime boundaries. Они не должны создавать параллельные базы, authorization layers, tool executors или tracing systems. Подробности: [agents overview](../agents/overview.md).
+
+## Platform и production
+
+`config/alice/` — desired state, `alice_platform/` — platform contract. Успешная config validation не доказывает Cloud.ru deployment. Provider-backed convergence принадлежит #783.
+
+Аналогично наличие OAuth/MCP/browser кода и локальных тестов не доказывает production interoperability; для внешних поверхностей требуется отдельное live acceptance evidence.
 
 ## Технологический стек
 
-* **Бэкенд**: Python, Flask;
-* **База данных**: SQLite;
-* **Фронтенд**: HTML, JavaScript, CSS (без React/Vite в основной версии);
-* **AI**: Yandex AI Studio;
-* **MCP**: собственные инструменты на Python;
-* **Логирование**: `logger.py` с ротацией файлов.
+- Backend: Python, Flask.
+- Frontend: HTML, JavaScript, CSS; Android WebView client.
+- AI: Yandex AI Studio Responses API.
+- Tools: Universal tool execution поверх MCP/local providers.
+- Storage: переходный legacy SQL + file-native Memory DB.
+- Observability/evidence: InvocationContext + ExecutionTrace, дополненные специализированными логами/CI evidence.
+- Infrastructure: Cloud.ru integrations и config-driven Alice Platform, с fail-closed separation между desired state и live provider evidence.
+
+## Связанные документы
+
+- [Backend](../backend/overview.md)
+- [Database/storage](../database/overview.md)
+- [Memory](../memory/overview.md)
+- [MCP](../mcp/overview.md)
+- [Agents](../agents/overview.md)
+- [Platform](../platform/architecture.md)
+- [Security](../security/overview.md)
+- [Execution Trace lifecycle](../execution-trace-lifecycle.md)
