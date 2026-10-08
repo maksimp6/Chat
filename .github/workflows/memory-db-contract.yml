@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "memory_engine/**"
+      - "memory-db-package/**"
       - "tests/test_memory_explicit_commit_contract.py"
       - "tests/test_memory_v1_acceptance.py"
       - "tests/test_memory_store.py"
@@ -37,5 +38,10 @@ jobs:
           python-version: "3.14"
       - name: Install only test runner
         run: python -m pip install pytest==9.1.1
+      - name: Verify standalone package build and install
+        run: |
+          python -m pip install --no-deps ./memory-db-package
+          cd /tmp
+          python -c "from memory_engine import MemoryStore; print(MemoryStore.__name__)"
       - name: RED first, then require GREEN
         run: python -m pytest -q tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py
