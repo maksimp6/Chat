@@ -1,20 +1,35 @@
-# Synchronous Memory Store — implementation slice
+# Synchronous Memory Store — implementation status
 
-**Status:** development only (PR #1041). This is not the default Alice Pro database,
-does not retire SQL, and is not production-accepted.
+> **Development only — PR #1042 / Issue #776. NOT ACCEPTED / NOT DEPLOYED.**
+> Not the default Alice Pro database; SQL remains in the application.
+> This document describes reviewed code and evidence, not claimed production readiness.
 
-## Responsibility boundary
+## Goals and agreed architecture
 
-- `memory_engine.Store` describes the Python get/set/delete contract.
-- `MemoryStore` owns committed in-process RAM state and one exclusive POSIX file lock.
-- `Transaction` stages only changed keys. It does not copy the whole database or expose
-  internal mutable values to callers.
-- The journal owns durability; a successful commit is returned **after** the journal
-  append and `fsync`. A newly created journal also fsyncs its containing directory.
-- Read operations return copies of committed values. Uncommitted values are visible
-  through the owning transaction handle only.
+Alice Pro targets one simple **file-native, in-process Python Memory DB**:
+- private RAM dictionary for hot **committed** state and fast reads;
+- typed application contracts rather than SQL or direct dictionary mutations;
+- one writer, atomic transactions, compact append-only changes and **synchronous fsync before acknowledgement**;
+- corruption detection, restart recovery and independent, restorable backups;
+- a future **two-service RAM mirror for data integrity**, not two independent applications.
 
-## Example
+The second service and network replication are **not implemented here**. Under the future mirror contract, loss of a service must not permit isolated writes. Existing legacy SQL backups remain untouched and **will not be imported**. No Cloud.ru dependency.
+
+## Code and responsibility map
+
+| Component | Code present | What is not yet proven |
+| --- | --- | --- |
+| `memory_engine/__init__.py` | Exports `Store`, `MemoryStore`, `Transaction`, `Commit` and `StoreError` | No domain-specific records |
+| `Store` protocol | `get/set/delete` API | Uses `Any`, not yet strict per-domain typing |
+| `MemoryStore` | Private RAM `dict`, copy-safe reads, process-level POSIX file lock | Not integrated into `db.py`/application |
+| `Transaction` | Staged changed keys, rollback on exception, one journal commit; rejects nested or closed use | Crash/fault proof incomplete |
+| Journal | Delta JSON records, monotonic sequence, chained SHA-256, fsync before ACK | No format epoch, bounded replay, checkpoints or mirror |
+| `backup()`/`restore()` | Copy/verify/publish code exists | **Not functioning reliably while journal replay is broken** |
+| Tests | Functional tests plus desired-state RED contracts | No exact-head GREEN for entire function |
+
+Business features (Chat, Treasury, MCP) must use typed contracts and never reach into the private RAM dict or storage files. Future replica confirmation belongs behind the durability boundary. Trace must be a sanitized non-blocking observer, not part of commit success.
+
+## Example of the proposed API
 
 ```python
 from memory_engine import MemoryStore
@@ -27,32 +42,45 @@ with MemoryStore("/path/to/alice.memory") as store:
     assert store.get("settings", "language") == "ru"
 ```
 
-One transaction produces at most one append-only delta record. Each record carries
-a monotonic sequence and chained SHA-256 digest. This detects accidental journal
-corruption but is **not** a blockchain or a substitute for independent backups.
+This is an API example, **not a statement that persistence has passed acceptance tests**.
 
-## Failure behavior
+## Current blocking defects and evidence
 
-- Unsupported JSON values fail validation before journal mutation.
-- A failed or ambiguous append/fsync does **not** acknowledge success; subsequent writes
-  require recovery. The last confirmed RAM view remains visible during that process.
-- A torn tail or corrupted committed frame makes startup fail closed rather than
-  silently discarding possibly confirmed data.
-- The writer file lock is local-host coordination, not a distributed consensus system.
+**P0 — journal replay broken for existing files.** At PR #1042 head `14f5e723`, `MemoryStore._inspect_log()` returns an empty state for an absent path but falls through without processing or returning the journal for an existing file. `_replay()` expects a three-item tuple; backup verification also uses `_inspect_log()`. Therefore **reopen and Backup/Restore must not be described as working** until code and regression tests prove it.
 
-## Not yet implemented / release blockers
+**P0 — exact-head CI failed.** [CI run 37761699150](https://github.com/maksimp6/Chat/actions/runs/37761699150) on `14f5e7230d78f5af607609b31465a9d5b3814fea`:
+- Code rules: `mypy --strict` return-code ratchet increased to 2 from allowed 1.
+- Application tests: format check failed on `tests/test_memory_store.py:320`, so the full suite did not run.
+- PostgreSQL integration: failed; the job needs detailed failure attribution.
+- CI required: failed because mandatory selected checks were unsuccessful.
 
-The engine includes verified journal backup (new destination only) and atomic
-restore into a new/empty store. Backup copies the complete journal, not a compacted
-snapshot; it must not be confused with independent replicated storage. Backup data
-is validated against the current committed digest before publication. Restore
-validates the source and preserves its sequence/hash chain without overwriting an
-existing database.
+Standalone Format, Security checks, CodeQL and Local launch smoke succeeded on this SHA, **which does not override CI failure**. Focused Memory DB tests on that exact head are not verified GREEN.
 
-The engine still lacks bounded checkpoints, automatic validated recovery, precise
-typed domain records, Trace integration and replica acknowledgement. SQL consumers still use their legacy paths. Future two-service
-RAM mirroring must fit behind the same typed contract and must never permit
-independent writes from an isolated replica.
+**Remaining:** bounded replay/checkpoints, proved crash/torn-tail/ENOSPC recovery, health/read-only and uncertain-commit handling, strict domain typing, Trace, mirrored fsync policy, and measurements at meaningful dataset sizes. Supported runtime SQL consumers, legacy packages and PostgreSQL CI remain present. Some `tests/test_memory_*desired_state.py` checks intentionally fail until replacement of SQL and the old backend switch; do not weaken those tests simply to turn CI green.
 
-Do not declare the implementation accepted until crash/fault-injection tests,
-format/type checks, exact-head CI and functional verification are complete.
+## Acceptance checklist
+
+1. Fix replay so a newly created store survives close/reopen in a **fresh process**; corrupt committed entries must fail closed.
+2. Prove transaction isolation, one writer, no visibility or success acknowledgement before durable commit.
+3. Prove verified backup to a new path, restore into isolated empty store, and further writes after restore. Reject corruption without damaging prior state.
+4. Fault-inject fsync errors, ENOSPC, torn writes and crashes; distinguish ambiguous commits from successful ones.
+5. Measure p50/p95/p99 RAM reads and sync writes plus recovery duration and journal size for representative workloads.
+6. Replace supported SQL consumers with typed interfaces. Only then remove SQL dependencies, old switch, and PostgreSQL CI when substitute tests pass; do **not** import old backups.
+7. Require exact-head code rules, format, tests, CI and security checks, with code + tests + this documentation reviewed as one feature.
+8. Owner functional acceptance WORKS / DOES NOT WORK remains separate from explicit merge authorization; no mandatory GitHub APPROVED policy, while any live branch protections still apply.
+
+## Dependencies and immediate work
+
+- **Depends on:** durable replay, failure-atomic commit/recovery proof and the subsequent replacement of SQL consumers.
+- **Cannot yet:** deploy as Alice Pro's authoritative database, remove SQL, declare backup/restart reliable, or merge PR #1042.
+- **Can do now:** repair replay, correct CI type/format failures, run focused regressions and crash tests **without Phone RDC**.
+- **Deferred, not blocking v1 engine:** second-service mirror and automated task scheduler.
+
+## References
+
+- [Functional PR #1042](https://github.com/maksimp6/Chat/pull/1042)
+- [Memory DB design Issue #776](https://github.com/maksimp6/Chat/issues/776)
+- [Superseded source PR #1041](https://github.com/maksimp6/Chat/pull/1041)
+- [Observed exact-head CI run](https://github.com/maksimp6/Chat/actions/runs/37761699150)
+
+*Status snapshot: 2026-10-08. Refresh evidence when the branch HEAD changes.*
