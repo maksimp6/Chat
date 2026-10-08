@@ -1,3 +1,42 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maksimp6-alice-pro"
+version = "0.1.0.dev0"
+description = "Self-hosted Alice Pro AI assistant"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+authors = [{name = "Alice Pro contributors"}]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+  "flask>=3.1.3",
+  "requests>=2.34.2",
+  "websockets>=17.1",
+  "python-dotenv>=1.2.3",
+  "cryptography==50.0.1",
+  "PyYAML>=6.0",
+  "jsonschema>=4.26.0",
+]
+
+[project.urls]
+Repository = "https://github.com/maksimp6/Chat"
+Issues = "https://github.com/maksimp6/Chat/issues"
+
+[project.scripts]
+alice-pro = "alice_pro.__main__:main"
+
+[tool.setuptools]
+include-package-data = false
+packages = ["alice_pro"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
