@@ -1,0 +1,450 @@
+{
+  "ALICE_AGENT_MODEL": {
+    "class": "public",
+    "purpose": "agent execution model override"
+  },
+  "ALICE_BASE_URL": {
+    "class": "public",
+    "purpose": "Alice service base URL used by clients/tools"
+  },
+  "ALICE_CLI_TITLE": {
+    "class": "public",
+    "purpose": "CLI display title"
+  },
+  "ALICE_CLOUD_PROVIDER": {
+    "class": "public",
+    "purpose": "selected cloud-provider adapter"
+  },
+  "ALICE_CONVERSATION_ID": {
+    "class": "public",
+    "purpose": "conversation context identifier for CLI/runtime"
+  },
+  "ALICE_DATABASE_URL": {
+    "class": "secret",
+    "purpose": "SQL database connection URL"
+  },
+  "ALICE_DB_BACKEND": {
+    "class": "compatibility",
+    "purpose": "legacy database backend selector"
+  },
+  "ALICE_DB_PATH": {
+    "class": "compatibility",
+    "purpose": "legacy SQLite database path"
+  },
+  "ALICE_DEPARTMENTS_ADMIN_TOKEN": {
+    "class": "secret",
+    "purpose": "backend credential required by mutating department endpoints via X-Department-Admin-Token"
+  },
+  "ALICE_DONATION_URL": {
+    "class": "public",
+    "purpose": "support/donation URL exposed by the application"
+  },
+  "ALICE_ENV_PUBLIC_BASE_URL": {
+    "class": "public",
+    "purpose": "public base URL for branch environments"
+  },
+  "ALICE_ENV_REPO_ROOT": {
+    "class": "public",
+    "purpose": "repository root used by branch environment manager"
+  },
+  "ALICE_ENV_RUNTIME_ROOT": {
+    "class": "public",
+    "purpose": "runtime workspace root for branch environments"
+  },
+  "ALICE_GITHUB_ALLOWED_IDS": {
+    "class": "public",
+    "purpose": "allowlist of GitHub account IDs"
+  },
+  "ALICE_GITHUB_CLIENT_ID": {
+    "class": "public",
+    "purpose": "GitHub OAuth client identifier"
+  },
+  "ALICE_GITHUB_CLIENT_SECRET": {
+    "class": "secret",
+    "purpose": "GitHub OAuth client secret"
+  },
+  "ALICE_GITHUB_REDIRECT_URI": {
+    "class": "public",
+    "purpose": "GitHub OAuth callback URI"
+  },
+  "ALICE_KEY_MANAGER_KEY": {
+    "class": "secret",
+    "purpose": "legacy Key Manager encryption key"
+  },
+  "ALICE_LAUNCH_SMOKE_YANDEX_API_KEY": {
+    "class": "secret",
+    "purpose": "Yandex credential used only by live launch smoke"
+  },
+  "ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID": {
+    "class": "ci-only",
+    "purpose": "Yandex project used only by live launch smoke"
+  },
+  "ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN": {
+    "class": "secret",
+    "purpose": "Local Tool Agent registration bootstrap credential"
+  },
+  "ALICE_LOCAL_REPO_DIR": {
+    "class": "compatibility",
+    "purpose": "legacy/local-files repository directory"
+  },
+  "ALICE_MCP_ALLOW_ANONYMOUS": {
+    "class": "public",
+    "purpose": "compatibility switch allowing anonymous MCP access"
+  },
+  "ALICE_MCP_BEARER_TOKEN": {
+    "class": "secret",
+    "purpose": "MCP bearer credential"
+  },
+  "ALICE_MCP_INTROSPECTION_CLIENT_ID": {
+    "class": "public",
+    "purpose": "OAuth introspection client identifier"
+  },
+  "ALICE_MCP_INTROSPECTION_CLIENT_SECRET": {
+    "class": "secret",
+    "purpose": "OAuth introspection client secret"
+  },
+  "ALICE_MCP_INTROSPECTION_TIMEOUT": {
+    "class": "public",
+    "purpose": "OAuth introspection timeout in seconds"
+  },
+  "ALICE_MCP_INTROSPECTION_URL": {
+    "class": "public",
+    "purpose": "OAuth token introspection endpoint"
+  },
+  "ALICE_MCP_OAUTH_ISSUER": {
+    "class": "public",
+    "purpose": "MCP OAuth issuer URL"
+  },
+  "ALICE_MCP_OAUTH_SCOPE": {
+    "class": "public",
+    "purpose": "MCP OAuth scope"
+  },
+  "ALICE_MCP_PUBLIC_URL": {
+    "class": "public",
+    "purpose": "public MCP resource URL"
+  },
+  "ALICE_MCP_USER_ID": {
+    "class": "public",
+    "purpose": "MCP user identity override"
+  },
+  "ALICE_MEMORY_PATH": {
+    "class": "public",
+    "purpose": "file-native Memory DB path"
+  },
+  "ALICE_MODEL": {
+    "class": "public",
+    "purpose": "default Alice model"
+  },
+  "ALICE_OWNER_ID": {
+    "class": "public",
+    "purpose": "owner identity identifier"
+  },
+  "ALICE_PLUGIN_DIR": {
+    "class": "public",
+    "purpose": "plugin discovery directory"
+  },
+  "ALICE_PREVIEW_BASE_PATH": {
+    "class": "public",
+    "purpose": "preview deployment URL prefix"
+  },
+  "ALICE_PROJECT_ROOT": {
+    "class": "public",
+    "purpose": "Alice repository/project root"
+  },
+  "ALICE_PROVIDER_CREDENTIALS_TOKEN": {
+    "class": "secret",
+    "purpose": "provider-credential administration credential"
+  },
+  "ALICE_PROVIDER_CREDENTIAL_KEY": {
+    "class": "secret",
+    "purpose": "legacy provider credential encryption key"
+  },
+  "ALICE_QUOTA_ADMIN_TOKEN": {
+    "class": "secret",
+    "purpose": "provider quota administration credential"
+  },
+  "ALICE_QUOTA_REQUIRE_IDENTITY": {
+    "class": "public",
+    "purpose": "require trusted identity for provider quota enforcement"
+  },
+  "ALICE_RDC_PAIRING_FILE": {
+    "class": "compatibility",
+    "purpose": "path to the RDC pairing handoff JSON consumed by the redirect/session bridge"
+  },
+  "ALICE_RDC_PROJECT_ID": {
+    "class": "compatibility",
+    "purpose": "Cloud.ru project UUID bound to RDC persistent state and control permits"
+  },
+  "ALICE_RDC_STATE_PATH": {
+    "class": "compatibility",
+    "purpose": "mounted directory containing persistent RDC state and control-permit files"
+  },
+  "ALICE_REQUIRE_SHORT_TOKEN": {
+    "class": "public",
+    "purpose": "enable short-token authentication gate"
+  },
+  "ALICE_SESSION_ID": {
+    "class": "public",
+    "purpose": "runtime session context identifier"
+  },
+  "ALICE_SHELL_DB": {
+    "class": "compatibility",
+    "purpose": "SQLite file selected by the legacy agent_shell CLI when --db is not provided"
+  },
+  "ALICE_SHORT_TOKEN": {
+    "class": "secret",
+    "purpose": "short-token bootstrap/auth credential"
+  },
+  "ALICE_SHORT_TOKEN_TTL_SECONDS": {
+    "class": "public",
+    "purpose": "short-token session lifetime in seconds"
+  },
+  "ALICE_SSH_KNOWN_HOSTS": {
+    "class": "public",
+    "purpose": "SSH known-hosts source/path"
+  },
+  "ALICE_SSH_TARGETS_JSON": {
+    "class": "public",
+    "purpose": "SSH target configuration JSON"
+  },
+  "ALICE_STATIC_VERSION": {
+    "class": "public",
+    "purpose": "static asset cache/version identifier"
+  },
+  "ALICE_VERSION": {
+    "class": "public",
+    "purpose": "Alice application version"
+  },
+  "ALICE_VOICE_CHAT_MODEL": {
+    "class": "public",
+    "purpose": "model used for voice chat stage"
+  },
+  "CI_JOB_RESULTS": {
+    "class": "ci-only",
+    "purpose": "serialized GitHub Actions job results for CI verification"
+  },
+  "CI_PLATFORM_PLAN": {
+    "class": "ci-only",
+    "purpose": "serialized platform selection plan for CI verification"
+  },
+  "CLOUDRU_API_KEY": {
+    "class": "secret",
+    "purpose": "Cloud.ru API credential"
+  },
+  "CLOUDRU_API_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "Cloud.ru API key identifier/reference"
+  },
+  "CLOUDRU_BACKUP_PATH": {
+    "class": "public",
+    "purpose": "Cloud.ru backup API path override"
+  },
+  "CLOUDRU_BASE_URL": {
+    "class": "public",
+    "purpose": "Cloud.ru API base URL"
+  },
+  "CLOUDRU_BILLING_CURRENCY": {
+    "class": "public",
+    "purpose": "currency used by Cloud.ru billing adapter"
+  },
+  "CLOUDRU_BILLING_SUMMARY_PATH": {
+    "class": "public",
+    "purpose": "Cloud.ru billing summary API path override"
+  },
+  "CLOUDRU_COMPUTE_ACTION_PATH": {
+    "class": "public",
+    "purpose": "Cloud.ru compute action API path override"
+  },
+  "CLOUDRU_CONTAINER_CPU": {
+    "class": "public",
+    "purpose": "Container Apps CPU allocation"
+  },
+  "CLOUDRU_CONTAINER_NAME": {
+    "class": "public",
+    "purpose": "Container Apps application/container name"
+  },
+  "CLOUDRU_IAM_ENDPOINT": {
+    "class": "public",
+    "purpose": "Cloud.ru IAM API endpoint"
+  },
+  "CLOUDRU_IAM_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "Cloud.ru IAM key identifier/reference"
+  },
+  "CLOUDRU_IAM_KEY_SECRET": {
+    "class": "secret",
+    "purpose": "Cloud.ru IAM key secret"
+  },
+  "CLOUDRU_IAM_WIZARD_ENABLED": {
+    "class": "public",
+    "purpose": "enable Cloud.ru IAM setup wizard"
+  },
+  "CLOUDRU_IAM_WIZARD_TOKEN": {
+    "class": "secret",
+    "purpose": "authorization credential for Cloud.ru IAM wizard"
+  },
+  "CLOUDRU_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "legacy alias for Cloud.ru IAM key identifier"
+  },
+  "CLOUDRU_KEY_SECRET": {
+    "class": "secret",
+    "purpose": "legacy alias for Cloud.ru IAM key secret"
+  },
+  "CLOUDRU_KEY_TTL_DAYS": {
+    "class": "public",
+    "purpose": "lifetime for rotated Cloud.ru provider keys"
+  },
+  "CLOUDRU_MAX_INSTANCES": {
+    "class": "public",
+    "purpose": "Container Apps maximum instance count"
+  },
+  "CLOUDRU_MIN_INSTANCES": {
+    "class": "public",
+    "purpose": "Container Apps minimum instance count"
+  },
+  "CLOUDRU_OBSERVABILITY_LOGS_PATH": {
+    "class": "public",
+    "purpose": "Cloud.ru logs API path override"
+  },
+  "CLOUDRU_OBSERVABILITY_METRICS_PATH": {
+    "class": "public",
+    "purpose": "Cloud.ru metrics API path override"
+  },
+  "CLOUDRU_PROJECT_ID": {
+    "class": "public",
+    "purpose": "Cloud.ru project identifier"
+  },
+  "CLOUDRU_REGISTRY_DOMAIN": {
+    "class": "public",
+    "purpose": "Cloud.ru container registry domain"
+  },
+  "CLOUDRU_REGISTRY_NAME": {
+    "class": "public",
+    "purpose": "Cloud.ru registry name"
+  },
+  "CLOUDRU_REPOSITORY_NAME": {
+    "class": "public",
+    "purpose": "Cloud.ru container repository name"
+  },
+  "CLOUDRU_SECRET_MANAGEMENT_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "IAM key identifier used by Secret Management adapter"
+  },
+  "CLOUDRU_SECRET_MANAGEMENT_KEY_SECRET": {
+    "class": "secret",
+    "purpose": "IAM key secret used by Secret Management adapter"
+  },
+  "CLOUDRU_STORAGE_TENANT_ID": {
+    "class": "public",
+    "purpose": "Cloud.ru Object Storage tenant identifier"
+  },
+  "EDS_API_KEY": {
+    "class": "secret",
+    "purpose": "EDS API credential"
+  },
+  "EDS_PROJECT_ID": {
+    "class": "public",
+    "purpose": "EDS project identifier"
+  },
+  "FLASK_DEBUG": {
+    "class": "public",
+    "purpose": "Flask debug-mode switch"
+  },
+  "GH_TOKEN": {
+    "class": "secret",
+    "purpose": "GitHub CLI/API credential"
+  },
+  "GITHUB_REPOSITORY": {
+    "class": "ci-only",
+    "purpose": "GitHub Actions repository identifier"
+  },
+  "GITHUB_STEP_SUMMARY": {
+    "class": "ci-only",
+    "purpose": "GitHub Actions step-summary file path"
+  },
+  "GITHUB_TOKEN": {
+    "class": "secret",
+    "purpose": "GitHub Actions/API credential"
+  },
+  "HOME": {
+    "class": "public",
+    "purpose": "process home directory; Android embedded server uses it to derive app-local runtime paths"
+  },
+  "HOST": {
+    "class": "public",
+    "purpose": "Flask bind host"
+  },
+  "IDP_ALLOWED_RESOURCES": {
+    "class": "public",
+    "purpose": "OAuth IDP allowed resource list"
+  },
+  "IDP_PUBLIC_URL": {
+    "class": "public",
+    "purpose": "OAuth IDP public URL"
+  },
+  "MERGE_REQUIRED_CHECKS": {
+    "class": "ci-only",
+    "purpose": "required check-name override used by merge readiness"
+  },
+  "MODEL_DISCOVERY_TIMEOUT_SECONDS": {
+    "class": "public",
+    "purpose": "model discovery HTTP timeout"
+  },
+  "MODEL_DISCOVERY_TTL_SECONDS": {
+    "class": "public",
+    "purpose": "model discovery cache lifetime"
+  },
+  "PORT": {
+    "class": "public",
+    "purpose": "Flask bind port"
+  },
+  "PR_NUMBER": {
+    "class": "ci-only",
+    "purpose": "pull request number used by CI/deployment tooling"
+  },
+  "YANDEX_AI_ENDPOINT": {
+    "class": "public",
+    "purpose": "Yandex AI API endpoint"
+  },
+  "YANDEX_API_KEY": {
+    "class": "secret",
+    "purpose": "legacy/direct Yandex API credential"
+  },
+  "YANDEX_API_KEY_SCOPES": {
+    "class": "public",
+    "purpose": "requested scopes for Yandex API keys"
+  },
+  "YANDEX_BASE_URL": {
+    "class": "public",
+    "purpose": "Yandex API base URL"
+  },
+  "YANDEX_FOLDER_ID": {
+    "class": "public",
+    "purpose": "Yandex folder identifier"
+  },
+  "YANDEX_IAM_ENDPOINT": {
+    "class": "public",
+    "purpose": "Yandex IAM API endpoint"
+  },
+  "YANDEX_IAM_TOKEN": {
+    "class": "secret",
+    "purpose": "Yandex IAM bearer credential"
+  },
+  "YANDEX_PROJECT_ID": {
+    "class": "compatibility",
+    "purpose": "legacy Yandex project/folder identifier"
+  },
+  "YANDEX_PROVIDER_KEY_ID": {
+    "class": "secret-reference",
+    "purpose": "Yandex provider key identifier/reference"
+  },
+  "YANDEX_SERVICE_ACCOUNT_ID": {
+    "class": "public",
+    "purpose": "Yandex service-account identifier"
+  },
+  "YC_API_KEY": {
+    "class": "secret",
+    "purpose": "legacy Yandex API key alias"
+  }
+}
