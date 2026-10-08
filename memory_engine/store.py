@@ -266,7 +266,10 @@ class MemoryStore:
             if target.resolve() == self.path.resolve() or target.exists():
                 raise StoreError("backup destination must be new")
             self._copy_verified_file(
-                self.path, target, self._state, self.last_commit,
+                self.path,
+                target,
+                self._state,
+                self.last_commit,
                 destination_must_be_new=True,
             )
 
