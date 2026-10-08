@@ -491,9 +491,10 @@ class _ValueTransaction:
         self._pending[name] = deepcopy(value)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
+        """Return a journal-ready snapshot without exposing mutable staging."""
         self._ensure_open()
         return [
-            {"op": "set", "namespace": "values", "key": name, "value": value}
+            {"op": "set", "namespace": "values", "key": name, "value": deepcopy(value)}
             for name, value in sorted(self._pending.items())
         ]
 
