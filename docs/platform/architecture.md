@@ -43,7 +43,7 @@ A **lane** is a deployment environment with its own configuration, secrets, and 
 - **Sign-in**: `passphrase` (development only)
 - **Secrets**: Test-scoped only (`alice/test/*`)
 - **Domain protocol**: HTTPS preferred, HTTP allowed
-- **Resources**: Minimal (0.1 CPU, 256MB memory per service)
+- **Resources**: Minimal (0.1 CPU, 256MB memory per service; RDC: 0.2 CPU, 512Mi)
 - **Approval**: No approval required for changes
 - **Purpose**: Development, testing, validation of changes
 
