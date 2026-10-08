@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/maksimp6/Chat/blob/master/contracts/memory/v1.schema.json",
+  "title": "Alice Memory DB Protocol v1",
+  "description": "Versioned transport-independent request/response envelope. Validation is required at external boundaries.",
+  "$defs": {
+    "value": {
+      "description": "JSON value; domain-specific constraints are validated by a separate schema."
+    },
+    "request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "id",
+            "operation",
+            "key"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "operation": {
+              "const": "get"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "id",
+            "operation",
+            "key",
+            "value"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "operation": {
+              "const": "set"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "value": {
+              "$ref": "#/$defs/value"
+            }
+          }
+        }
+      ]
+    },
+    "response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "id",
+            "ok",
+            "found"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "ok": {
+              "const": true
+            },
+            "found": {
+              "const": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "id",
+            "ok",
+            "found",
+            "value"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "ok": {
+              "const": true
+            },
+            "found": {
+              "const": true
+            },
+            "value": {
+              "$ref": "#/$defs/value"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "id",
+            "ok",
+            "commit_sequence"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "ok": {
+              "const": true
+            },
+            "commit_sequence": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "id",
+            "ok",
+            "error"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code"
+              ],
+              "properties": {
+                "code": {
+                  "enum": [
+                    "INVALID_REQUEST",
+                    "UNSUPPORTED_VERSION",
+                    "NOT_AVAILABLE",
+                    "WRITE_FAILED",
+                    "INTERNAL"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
+  ]
+}

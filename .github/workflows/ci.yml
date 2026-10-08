@@ -75,9 +75,29 @@ jobs:
       - name: Check naming, layout and reliability rules
         run: bash scripts/check_code_rules.sh
 
+  sql-absence:
+    name: SQL absence (fail first)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.database == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Install minimal pytest runner
+        run: python -m pip install pytest==9.1.1
+      - name: Verify SQL-free runtime and retired backend switch first
+        run: python -m pytest -q -x tests/test_memory_sql_absence_desired_state.py tests/test_memory_backend_switch_retirement.py
+
   backend:
     name: Application tests
-    needs: changes
+    needs: [changes, sql-absence]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     env:
@@ -328,7 +348,7 @@ jobs:
 
   postgres:
     name: PostgreSQL integration
-    needs: changes
+    needs: [changes, sql-absence]
     if: needs.changes.outputs.database == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     env:
@@ -456,7 +476,7 @@ jobs:
   required:
     name: CI required
     if: always()
-    needs: [changes, code-rules, backend, postgres, android, infra, mcp]
+    needs: [changes, sql-absence, code-rules, backend, postgres, android, infra, mcp]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

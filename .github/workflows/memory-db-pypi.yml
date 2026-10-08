@@ -1,0 +1,73 @@
+name: Memory DB PyPI candidate
+
+on:
+  pull_request:
+    paths:
+      - "memory_engine/**"
+      - "memory-db-package/**"
+      - ".github/workflows/memory-db-pypi.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Validate Memory DB distributions (no publish)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Install packaging validators
+        run: python -m pip install build twine
+      - name: Build wheel and sdist
+        run: python -m build memory-db-package --outdir dist
+      - name: Rebuild wheel from isolated sdist
+        run: |
+          mkdir -p /tmp/memory-sdist-source /tmp/memory-sdist-wheels
+          tar -xzf dist/*.tar.gz -C /tmp/memory-sdist-source
+          python -m pip wheel --no-deps --wheel-dir /tmp/memory-sdist-wheels /tmp/memory-sdist-source/*
+          test "$(find /tmp/memory-sdist-wheels -name '*.whl' | wc -l)" -eq 1
+      - name: Validate metadata
+        run: python -m twine check dist/*
+      - name: Audit both archive manifests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          import zipfile
+          files = list(Path("dist").iterdir())
+          assert len([f for f in files if f.suffix == ".whl"]) == 1
+          assert len([f for f in files if f.name.endswith(".tar.gz")]) == 1
+          for file in files:
+              if file.suffix == ".whl":
+                  with zipfile.ZipFile(file) as archive:
+                      names = archive.namelist()
+              else:
+                  with tarfile.open(file, "r:gz") as archive:
+                      names = archive.getnames()
+              assert any(name.endswith("memory_engine/store.py") for name in names)
+              assert not any(name.endswith((".env", ".pem", ".key", ".sqlite", ".db", ".memory")) for name in names)
+          PY
+      - name: Clean wheel install and public API smoke
+        run: |
+          python -m venv /tmp/memory-db-venv
+          /tmp/memory-db-venv/bin/pip install --no-deps dist/*.whl
+          cd /tmp
+          /tmp/memory-db-venv/bin/python - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from memory_engine import MemoryStore
+          with TemporaryDirectory() as folder:
+              path = Path(folder) / "test.memory"
+              with MemoryStore(path) as db:
+                  db.set("name", "value")
+                  assert db.commit() == 1
+              with MemoryStore(path) as db:
+                  assert db.get("name") == "value"
+          PY

@@ -54,7 +54,7 @@ def test_routing_unions_all_changed_paths():
 
 def results(**overrides):
     value = dict.fromkeys(["backend", "postgres", "android", "infra", "mcp"], "skipped")
-    value.update({"changes": "success", "code-rules": "success"})
+    value.update({"changes": "success", "code-rules": "success", "sql-absence": "skipped"})
     value.update(overrides)
     return value
 
@@ -102,7 +102,9 @@ def test_malformed_plan_fails_closed():
 def test_web_dependency_requires_postgres_and_mcp():
     plan = routing.classify(["static/app.js"])
     with pytest.raises(ValueError, match="postgres|mcp"):
-        routing.validate_results(plan, results(backend="success", android="success"))
+        routing.validate_results(
+            plan, results(backend="success", android="success", **{"sql-absence": "success"})
+        )
 
 
 def test_router_tests_are_part_of_always_run_code_rules():
@@ -112,8 +114,12 @@ def test_router_tests_are_part_of_always_run_code_rules():
 def test_workflow_has_real_independent_infra_and_mcp_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     jobs = workflow["jobs"]
-    for job in ("backend", "postgres", "android", "infra", "mcp"):
+    for job in ("android", "infra", "mcp"):
         assert jobs[job]["needs"] == "changes"
+    for job in ("backend", "postgres"):
+        assert jobs[job]["needs"] == ["changes", "sql-absence"]
+    assert jobs["sql-absence"]["needs"] == "changes"
+    assert "sql-absence" in jobs["required"]["needs"]
     assert "infra" in jobs["required"]["needs"]
     assert "mcp" in jobs["required"]["needs"]
     infra = "\n".join(step.get("run", "") for step in jobs["infra"]["steps"])
@@ -127,6 +133,25 @@ def test_workflow_has_real_independent_infra_and_mcp_jobs():
     assert "oauth.test.mjs" in mcp
     required = "\n".join(step.get("run", "") for step in jobs["required"]["steps"])
     assert "--verify" in required
+
+
+def test_sql_absence_preflight_fails_before_heavy_backend_jobs():
+    plan = routing.classify(["db.py"])
+    with pytest.raises(ValueError, match="SQL-absence"):
+        routing.validate_results(plan, results(backend="skipped", postgres="skipped"))
+
+
+def test_sql_absence_preflight_is_not_required_for_infra_only():
+    plan = routing.classify(["cloud/cloudru/client.py"])
+    routing.validate_results(plan, results(infra="success"))
+
+
+def test_sql_absence_preflight_must_be_successful_for_database():
+    plan = routing.classify(["db.py"])
+    with pytest.raises(ValueError, match="SQL-absence"):
+        routing.validate_results(
+            plan, results(backend="success", postgres="success", **{"sql-absence": "failure"})
+        )
 
 
 @pytest.mark.parametrize("path", ["/outside.py", "../outside.py"])

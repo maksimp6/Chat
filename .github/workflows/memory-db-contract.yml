@@ -1,0 +1,55 @@
+name: Memory DB standalone contract
+
+on:
+  pull_request:
+    paths:
+      - "memory_engine/**"
+      - "memory-db-package/**"
+      - "tests/test_memory_explicit_commit_contract.py"
+      - "tests/test_memory_v1_acceptance.py"
+      - "tests/test_memory_store.py"
+      - "tests/test_memory_standalone_boundary.py"
+      - "tests/test_memory_makefile.py"
+      - "tests/test_memory_package_sync.py"
+      - ".github/workflows/memory-db-contract.yml"
+  push:
+    branches:
+      - "feature/memory-db-sync-clean-776"
+    paths:
+      - "memory_engine/**"
+      - "tests/test_memory_explicit_commit_contract.py"
+      - "tests/test_memory_v1_acceptance.py"
+      - "tests/test_memory_store.py"
+      - "tests/test_memory_standalone_boundary.py"
+      - "tests/test_memory_makefile.py"
+      - "tests/test_memory_package_sync.py"
+      - ".github/workflows/memory-db-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Memory DB contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Install only test runner
+        run: python -m pip install pytest==9.1.1
+      - name: Build wheel through Make and measure wall time
+        run: |
+          /usr/bin/time -f "MEMORY_DB_BUILD_WALL_SECONDS=%e" make -C memory-db-package build
+          ls -lh memory-db-package/dist/*.whl
+      - name: Install built wheel outside source directory
+        run: |
+          python -m pip install --no-deps memory-db-package/dist/*.whl
+          cd /tmp
+          python -c "from memory_engine import MemoryStore; print(MemoryStore.__name__)"
+      - name: Run standalone tests through Make and measure wall time
+        run: /usr/bin/time -f "MEMORY_DB_TEST_WALL_SECONDS=%e" make -C memory-db-package test

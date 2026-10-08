@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alice-memory-db"
+version = "0.1.0.dev0"
+description = "Standalone synchronous RAM-backed key/value database"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "Alice Pro contributors"}]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/maksimp6/Chat"
+Issues = "https://github.com/maksimp6/Chat/issues"
+
+[tool.setuptools]
+packages = ["memory_engine"]

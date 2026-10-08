@@ -116,6 +116,10 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
     for job in ("changes", "code-rules"):
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
+    sql_gate_required = plan["backend"] or plan["database"]
+    sql_gate_allowed = {"success"} if sql_gate_required else {"success", "skipped"}
+    if results.get("sql-absence") not in sql_gate_allowed:
+        raise ValueError("SQL-absence preflight failed or was skipped for a selected platform")
     for job in JOBS:
         required = plan["database"] if job == "postgres" else plan[job]
         allowed = {"success"} if required else {"success", "skipped"}
@@ -135,7 +139,7 @@ def verify_environment() -> None:
         raise ValueError("invalid platform plan/results")
     plan = {key: value == "true" for key, value in raw.items()}
     results = {}
-    for job in ("changes", "code-rules", *JOBS):
+    for job in ("changes", "sql-absence", "code-rules", *JOBS):
         record = needs.get(job)
         if not isinstance(record, dict) or not isinstance(record.get("result"), str):
             raise ValueError(f"missing job result: {job}")
