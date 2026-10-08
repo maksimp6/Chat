@@ -1,4 +1,5 @@
 """Functional tests for synchronous MemoryStore, independent of SQL."""
+
 import multiprocessing
 import pytest
 
@@ -115,6 +116,7 @@ def test_direct_mutation_cannot_overwrite_active_transaction(tmp_path):
 
 def test_journal_records_only_changed_values(tmp_path):
     import json
+
     path = tmp_path / "alice.memory"
     with MemoryStore(path) as db:
         db.set("items", "large", "x" * 10000)
@@ -143,7 +145,7 @@ def test_delta_transaction_delete_and_replay(tmp_path):
         assert reopened.get("items", "remove") is None
         assert reopened.get("items", "keep") == {"value": 2}
 
- 
+
 def test_commit_does_not_copy_complete_ram_state(tmp_path, monkeypatch):
     """Untouched values must never be copied or diffed just to commit a new key."""
     import memory_engine.store as memory_module
