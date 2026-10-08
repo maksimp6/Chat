@@ -68,10 +68,9 @@ class MemoryStore:
         raw = self.path.read_bytes()
         frames = raw.split(b"\n")
         if frames[-1]:
-            # Unacknowledged, incomplete tail: never interpret as committed.
-            frames.pop()
-        else:
-            frames.pop()
+            # Fail closed: never append behind an ambiguous torn frame.
+            raise StoreError("incomplete journal tail; recovery required")
+        frames.pop()
         for frame in frames:
             try:
                 record = json.loads(frame)
