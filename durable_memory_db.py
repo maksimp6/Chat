@@ -26,8 +26,8 @@ class DurableMemoryDatabase(MemoryDatabase):
             raw = self.path.read_bytes()
             if raw:
                 # A partial trailing record after a complete newline is ignored.
-                records = raw.split(b"\\n")
-                complete = records[:-1] if not raw.endswith(b"\\n") else records[:-1]
+                records = raw.split(b"\n")
+                complete = records[:-1] if not raw.endswith(b"\n") else records[:-1]
                 if not complete:
                     raise DatabaseError("no complete durable snapshot")
                 frame = json.loads(complete[-1])
@@ -51,7 +51,7 @@ class DurableMemoryDatabase(MemoryDatabase):
         frame = json.dumps(
             {"payload": payload, "sha256": hashlib.sha256(payload.encode()).hexdigest()},
             ensure_ascii=False, separators=(",", ":"),
-        ).encode() + b"\\n"
+        ).encode() + b"\n"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fd, temp = tempfile.mkstemp(prefix=".alice-", dir=self.path.parent)
         try:
