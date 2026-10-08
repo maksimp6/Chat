@@ -109,7 +109,7 @@ jobs:
           }
           with open("solution-review.json", "w", encoding="utf-8") as handle:
               json.dump(evidence, handle, sort_keys=True)
-              handle.write("\\n")
+              handle.write("\n")
           PY
 
       - name: Upload immutable run evidence
