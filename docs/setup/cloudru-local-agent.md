@@ -6,14 +6,14 @@
 
 Минимальные переменные:
 
-\`\`\`env
+```env
 HOST=0.0.0.0
 PORT=8080
 ALICE_MCP_PUBLIC_URL=https://<public-host>
 ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
-\`\`\`
+```
 
-Для MCP production используйте внешний OAuth resource-server, как описано в \`docs/mcp/chatgpt_apps.md\`.
+Для MCP production используйте внешний OAuth resource-server, как описано в `docs/mcp/chatgpt_apps.md`.
 
 ## Телефон
 
@@ -27,9 +27,9 @@ ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN=<long-random-secret>
 
 Серверный diagnostic endpoint:
 
-\`\`\`text
+```text
 GET /api/local-agents/health
 Authorization: Bearer <bootstrap-token>
-\`\`\`
+```
 
 Endpoint не выдаёт runtime tokens и требует bootstrap token.
