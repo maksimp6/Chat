@@ -42,29 +42,37 @@ def test_uncommitted_changes_are_not_recovered(tmp_path):
 
 
 def test_two_workers_cannot_claim_same_task(tmp_path):
-    """A read-modify-write claim must be serialized across worker threads."""
+    """Only a durably committed claim counts as a successful claim."""
     import threading
 
-    path = tmp_path / "tasks.memory"
-    with MemoryStore(path) as db:
+    with MemoryStore(tmp_path / "tasks.memory") as db:
         db.set("tasks/1", {"status": "queued"})
         db.commit()
-
-        claimed = []
+        claimed: list[int] = []
+        errors: list[Exception] = []
         barrier = threading.Barrier(2)
 
-        def worker():
-            barrier.wait()
-            # The contract must provide an atomic read/modify/commit boundary.
-            with db.transaction() as tx:
-                task = tx.get("tasks/1")
-                if task["status"] == "queued":
-                    tx.set("tasks/1", {"status": "running"})
-                    claimed.append(1)
+        def worker(worker_id: int) -> None:
+            try:
+                barrier.wait(timeout=5)
+                won = False
+                with db.transaction() as tx:
+                    task = tx.get("tasks/1")
+                    if task["status"] == "queued":
+                        tx.set("tasks/1", {"status": "running", "owner": worker_id})
+                        won = True
+                # The transaction context has exited: commit must have succeeded.
+                if won:
+                    claimed.append(worker_id)
+            except Exception as exc:
+                errors.append(exc)
 
-        threads = [threading.Thread(target=worker) for _ in range(2)]
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(2)]
         for thread in threads:
             thread.start()
         for thread in threads:
-            thread.join()
-        assert claimed == [1]
+            thread.join(timeout=10)
+        assert all(not thread.is_alive() for thread in threads)
+        assert not errors
+        assert len(claimed) == 1
+        assert db.get("tasks/1")["owner"] == claimed[0]
