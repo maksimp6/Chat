@@ -272,6 +272,8 @@ def test_collect_snapshot_uses_exact_head_and_propagates_thread_truncation(monke
                     }
                 ]
             }
+        if "/actions/workflows/solution-review.yml/runs" in joined:
+            return {"workflow_runs": []}
         if args and args[0] == "graphql":
             return {
                 "data": {
@@ -331,6 +333,8 @@ def test_collect_snapshot_marks_changed_head_or_base(monkeypatch):
             return {"behind_by": 0}
         if "/commits/head-1/check-runs?per_page=100" in joined:
             return {"check_runs": []}
+        if "/actions/workflows/solution-review.yml/runs" in joined:
+            return {"workflow_runs": []}
         if args and args[0] == "graphql":
             return {
                 "data": {
