@@ -1,225 +1,95 @@
-# Deployment Guide
+# Alice Platform deployment boundary
 
-Alice Platform automates deployment of services from configuration. This document explains the deployment process, approval gates, and how to verify deployments.
+Status: **planned provider-backed contract; not an implemented deployment CLI**.
 
-## Deployment Overview
+Alice Platform currently validates desired-state configuration and can generate a
+configured health-check plan. It does not currently expose provider-backed
+`plan`, `deploy`, `status`, `logs`, or `recovery` commands.
 
-Deployments follow this process:
+Issue #783 owns convergence from validated desired state to real Cloud.ru
+observation and bounded mutation.
 
-1. **Configuration committed** to git (config/alice/*.yaml)
-2. **Validation** runs in CI (all rules checked)
-3. **Planning** calculates needed changes
-4. **Approval** required for production changes
-5. **Execution** applies changes to infrastructure
-6. **Verification** ensures services are healthy
+## Commands that exist
 
-## CI Validation
-
-Every commit triggers automatic validation:
+From the repository root:
 
 ```bash
-# Runs in CI (`.github/workflows/ci.yml`)
 python -m alice_platform validate
-
-# Checks:
-# - Schema: valid YAML, required fields present
-# - Semantics: no cycles, valid references
-# - Secrets: no plaintext credentials
-# - Policies: production=github, test!=prod_secrets, etc.
-```
-
-If validation fails, the PR cannot merge.
-
-## Deployment Planning
-
-To see what changes will be deployed:
-
-```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
-```
-
-Example output:
-
-```
-Plan for production:
-  1. [create] oauth: Create oauth 🔒 needs approval
-  2. [update] chrome: Update chrome scale from 1 to 2 🔒 needs approval
-  3. [report_orphan] agent-shell: Orphaned container: agent-shell
-```
-
-### Action Types
-
-- **CREATE**: Deploy new service (requires approval in production)
-- **UPDATE**: Change service configuration (requires approval in production)
-- **DELETE**: Remove service (not done automatically, manual only)
-- **REPORT_ORPHAN**: Service exists in reality but not in desired config (investigate)
-
-## Approval Gate
-
-Production changes require explicit approval before execution:
-
-### For Manual Deployments
-
-```bash
-python -m alice_platform deploy --lane production
-# Prompts for approval before applying changes
-```
-
-### For CI/CD Pipeline
-
-Set approval in environment:
-
-```bash
-# GitHub Actions workflow
-- name: Deploy production
-  if: github.ref == 'refs/heads/master'
-  env:
-    ALICE_APPROVE: ${{ secrets.ALICE_APPROVE }}
-  run: python -m alice_platform deploy --lane production
-```
-
-The `ALICE_APPROVE` token is issued by:
-- Manual approval via GitHub
-- Automated approval system (if configured)
-- Deployment service (with restricted permissions)
-
-## Test Lane Deployment
-
-Test lane requires no approval:
-
-```bash
-python -m alice_platform deploy --lane test
-```
-
-Changes are applied immediately after planning.
-
-## Deployment Verification
-
-After deployment, verify services are healthy:
-
-```bash
-# Check service status
-python -m alice_platform status production
-
-# Run health checks
+python -m alice_platform health test
 python -m alice_platform health production
-
-# View recent logs
-python -m alice_platform logs oauth --lane production --tail 100
 ```
 
-Expected output after successful deployment:
+`validate` checks the configuration contract. `health` generates the configured
+service endpoints/authentication expectations. Neither command proves that a
+Cloud.ru resource exists or that a deployment is healthy.
 
-```
-oauth: RUNNING (healthy, 1 replica)
-  Endpoint: https://oauth.maxxxpavlov.online
-  Health check: PASSED (response 200)
-  Uptime: 2 minutes
+## Commands that do not exist
 
-chrome: RUNNING (healthy, 2 replicas)
-  Endpoint: https://chrome.maxxxpavlov.online
-  Health check: PASSED (response 200)
-  Uptime: 1 minute
+Do not use the following historical examples as operational instructions or
+acceptance evidence:
 
-agent-shell: RUNNING (healthy, 1 replica)
-  Endpoint: https://agent-shell.maxxxpavlov.online
-  Health check: PASSED (response 200)
-  Uptime: 2 minutes
+```text
+python -m alice_platform plan ...
+python -m alice_platform deploy ...
+python -m alice_platform status ...
+python -m alice_platform logs ...
+python -m alice_platform recovery ...
 ```
 
-## Rollback
+They remain design vocabulary only until implementation and deterministic tests
+land.
 
-If deployment causes failures, rollback to previous configuration:
+## Target deployment lifecycle
 
-```bash
-python -m alice_platform recovery rollback-config --lane production
-```
+A future provider-backed platform deployment must prove this sequence:
 
-This reverts to the last deployed configuration.
+1. **Observe** owned Cloud.ru resources with sanitized evidence.
+2. **Plan** deterministic drift from `config/alice/`.
+3. **Approve** every consequential production mutation.
+4. **Apply** only the bounded approved changes.
+5. **Verify** exact resource identity, revision/image/config and health.
+6. **Recover/rollback** when verification fails.
+7. **Record evidence** without secret values.
+8. Fail closed as `UNKNOWN` / `BLOCKED` when ownership or provider state
+   cannot be proven.
 
-## Change Tracking
+A configuration diff is not an infrastructure plan until it includes observed
+provider state.
 
-All deployments are tracked in git commit history:
+## Current deployment-specific runbooks
 
-```bash
-# View deployment history
-git log --oneline config/alice/
+Use the implementation-specific documentation for paths that actually exist:
 
-# See what changed in a deployment
-git show abc1234:config/alice/platform.yaml
+- [Cloud.ru Container Apps baseline](../cloudru-container-apps.md) — shipped
+  client/workflow contract with deterministic tests; live Cloud.ru validation is
+  still explicitly pending.
+- [VPS production deployment](../production-deployment.md) — legacy/current
+  SSH/VPS workflow while deployment ownership/cutover remains open under #869.
+- [Host-managed preview validation](../preview-deployments.md) — environment
+  gateway validation path with its own enablement/dependency boundaries.
 
-# Compare two versions
-git diff abc1234 def5678 config/alice/
-```
+Do not infer that one of these paths is the universal Alice Platform reconciler.
 
-## Deployment Checklist
+## Approval and safety
 
-Before deploying to production:
+Production mutations require explicit owner approval. Secret values must resolve
+through their approved runtime/deployment boundary and must not appear in plans,
+logs, PRs or ExecutionTrace.
 
-- [ ] All CI checks pass (validation, tests, linting)
-- [ ] Configuration is reviewed and approved
-- [ ] Health checks defined for all services
-- [ ] Secrets are created and accessible
-- [ ] Backups are recent and verified
-- [ ] Runbook for rollback is available
-- [ ] Monitoring and alerts are configured
+For rollback governance, see [Auditable Rollback Workflow](../rollback_workflow.md).
+For the planned platform recovery contract, see [Recovery Procedures](recovery.md).
 
-## Environment-Specific Deployment
+## Acceptance for #783
 
-### Deploying Only to Test
+The platform deployment layer becomes current only when tests and provider-backed
+evidence demonstrate:
 
-Make changes in `test.yaml` only:
+- sanitized observed state;
+- deterministic drift;
+- approval enforcement;
+- bounded idempotent apply;
+- exact post-apply verification;
+- rollback/recovery behavior;
+- cost/billing evidence where provisioning can create spend.
 
-```bash
-git checkout -b add-test-feature
-# Edit config/alice/test.yaml
-python -m alice_platform validate
-python -m alice_platform plan test
-git commit -m "Add test feature"
-git push
-# Merge PR → automatic test deployment
-```
-
-### Deploying to Both Lanes
-
-Make changes that affect both lanes:
-
-```bash
-# Edit config/alice/platform.yaml (affects both lanes)
-# Or edit both production.yaml and test.yaml
-
-python -m alice_platform plan test
-python -m alice_platform plan production
-# Review plans, ensure consistency
-```
-
-## Disaster Recovery Deployment
-
-If deploying from backups:
-
-1. Stop current deployment
-2. Restore configuration from git tag
-3. Restore storage from snapshots
-4. Apply configuration changes
-5. Verify all services healthy
-
-```bash
-# Restore from known-good commit
-git checkout tags/v1.0.0 -- config/alice/
-
-# Restore storage
-python -m alice_platform recovery restore --storage chrome-state --snapshot 2024-10-01
-
-# Deploy restored config
-python -m alice_platform deploy --lane production --approve
-```
-
-## Future Work
-
-- Gradual rollout (canary deployments)
-- Automated health check integration
-- Blue/green deployments for zero-downtime updates
-- Integration with external approval systems (Slack, email)
-- Automatic rollback on health check failures
-- Metrics-based deployment validation
+Until then, this page intentionally contains no synthetic deploy command.
