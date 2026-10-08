@@ -18,9 +18,7 @@ def _runtime_python_files():
     """Scan tracked first-party production Python, not tests or tooling."""
     import subprocess
 
-    paths = subprocess.check_output(
-        ["git", "ls-files", "*.py"], cwd=ROOT, text=True
-    ).splitlines()
+    paths = subprocess.check_output(["git", "ls-files", "*.py"], cwd=ROOT, text=True).splitlines()
     for name in paths:
         path = Path(name)
         if path.parts[0] in {"tests", "scripts", "docs", "tools", "examples"}:
