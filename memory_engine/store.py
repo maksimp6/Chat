@@ -205,6 +205,30 @@ class _JournalEngine:
         self._sequence += 1
         self._digest = digest
 
+    @contextmanager
+    def value_guard(self) -> Iterator[None]:
+        """Synchronize public value operations and reject closed instances."""
+        with self._lock:
+            self._ensure_open()
+            yield
+
+    def ensure_value_writable(self) -> None:
+        """Reject staging while the journal is failed or a transaction is active."""
+        self._ensure_open()
+        if self._failed:
+            raise StoreError("recovery required")
+        if self._active_transaction:
+            raise StoreError("direct mutation during transaction is forbidden")
+
+    def committed_value(self, name: str) -> Any | None:
+        """Return one committed value without exposing the internal namespace."""
+        return self.get("values", name)
+
+    def committed_values(self) -> dict[str, Any]:
+        """Return a copy of committed names for a serialized transaction."""
+        self._ensure_open()
+        return deepcopy(self._state.get("values", {}))
+
     def commit_values(self, values: dict[str, Any]) -> int:
         """Own journal record encoding and durable publication for named values."""
         with self._lock:
@@ -379,27 +403,23 @@ class MemoryStore:
 
     def get(self, name: str) -> Any | None:
         """Read staged data first; otherwise return a copy of committed data."""
-        with self._engine._lock:
-            self._engine._ensure_open()
+        with self._engine.value_guard():
             if name in self._pending:
                 return deepcopy(self._pending[name])
-            return self._engine.get(self._NAMESPACE, name)
+            return self._engine.committed_value(name)
 
     def set(self, name: str, value: Any) -> None:
         """Stage a copy without acknowledging a durable write."""
-        with self._engine._lock:
-            self._engine._ensure_open()
-            if self._engine._failed:
-                raise StoreError("recovery required")
-            if self._engine._active_transaction:
-                raise StoreError("direct mutation during transaction is forbidden")
+        with self._engine.value_guard():
+            self._engine.ensure_value_writable()
+
             if not isinstance(name, str) or not name:
                 raise StoreError("name must be a nonempty string")
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
         """Durably publish staged names, then clear acknowledged staging."""
-        with self._engine._lock:
+        with self._engine.value_guard():
             sequence = self._engine.commit_values(self._pending)
             self._pending.clear()
             return sequence
@@ -407,11 +427,11 @@ class MemoryStore:
     @contextmanager
     def transaction(self) -> Iterator["_ValueTransaction"]:
         """Serialize an atomic read-modify-write operation."""
-        with self._engine._lock:
+        with self._engine.value_guard():
             if self._pending:
                 raise StoreError("transaction requires an idle store")
             with self._engine.transaction() as tx:
-                wrapper = _ValueTransaction(self._engine._state.get(self._NAMESPACE, {}))
+                wrapper = _ValueTransaction(self._engine.committed_values())
                 try:
                     yield wrapper
                     for change in wrapper._pending_changes():
@@ -429,7 +449,7 @@ class MemoryStore:
 
     def close(self) -> None:
         """Discard staging and release the single-writer lock."""
-        with self._engine._lock:
+        with self._engine.value_guard():
             self._engine.close()
             self._pending.clear()
 
