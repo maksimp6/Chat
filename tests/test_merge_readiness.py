@@ -53,8 +53,8 @@ def snapshot(**overrides):
             },
         ],
         "solution_review": {
-            "schema_version": 1,
-            "task": "issue:123",
+            "schema_version": 2,
+            "task": "pr:123",
             "outcome": "ACCEPTED",
             "reviewed_head_sha": "abc123",
             "reviewed_base_sha": "base123",
@@ -63,6 +63,9 @@ def snapshot(**overrides):
             "implementation_role": "backend-engineer",
             "implementation_session": "implementation-session-1",
             "provenance": "github-actions:solution-review",
+            "verification": "hmac-sha256-verified",
+            "review_report_sha256": "a" * 64,
+            "review_report": {"outcome": "ACCEPTED", "reviewed_files": ["scripts/merge_readiness.py"], "rationale": "Detailed review", "risk_assessment": "No residual critical risk"},
         },
         "review_threads": [{"isResolved": True}],
         "review_threads_truncated": False,
@@ -533,9 +536,9 @@ def test_owner_github_identity_is_not_used_as_solution_review_independence():
 
 def test_select_solution_review_evidence_accepts_only_exact_successful_run():
     runs = [
-        {"id": 1, "head_sha": "old", "status": "completed", "conclusion": "success"},
-        {"id": 2, "head_sha": "abc123", "status": "completed", "conclusion": "failure"},
-        {"id": 3, "head_sha": "abc123", "status": "completed", "conclusion": "success"},
+        {"id": 1, "head_sha": "old-master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"},
+        {"id": 2, "head_sha": "master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "failure"},
+        {"id": 3, "head_sha": "master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"},
     ]
     artifacts = {
         3: [
@@ -556,7 +559,7 @@ def test_select_solution_review_evidence_accepts_only_exact_successful_run():
 
 
 def test_select_solution_review_evidence_rejects_mismatched_payload():
-    run = {"id": 3, "head_sha": "abc123", "status": "completed", "conclusion": "success"}
+    run = {"id": 3, "head_sha": "master-sha", "event": "workflow_dispatch", "head_branch": "master", "status": "completed", "conclusion": "success"}
     bad = dict(snapshot()["solution_review"], task="pr:999", workflow_run_id=3)
 
     assert (
@@ -579,3 +582,46 @@ def test_solution_review_workflow_is_read_only_and_manual():
     assert workflow["permissions"] == {"contents": "read", "pull-requests": "read"}
     assert set(workflow[True]) == {"workflow_dispatch"}
     assert "pull_request_target" not in workflow[True]
+
+def test_dispatch_from_master_accepts_distinct_reviewed_pr_head():
+    run = {"id": 500, "event": "workflow_dispatch", "head_branch": "master",
+           "head_sha": "master-commit", "status": "completed", "conclusion": "success"}
+    report = dict(snapshot()["solution_review"], workflow_run_id=500)
+    artifact = {"id": 44, "name": "solution-review-pr-123-abc123",
+                "expired": False, "evidence": report}
+    assert merge_readiness.select_solution_review_evidence(
+        [run], {500: [artifact]}, 123, "abc123", "base123"
+    ) == report
+
+
+@pytest.mark.parametrize("revision", ["head", "base"])
+def test_signed_evidence_cannot_be_reused_after_revision_change(revision):
+    run = {"id": 500, "event": "workflow_dispatch", "head_branch": "master",
+           "head_sha": "master-commit", "status": "completed", "conclusion": "success"}
+    evidence = dict(snapshot()["solution_review"], workflow_run_id=500)
+    artifact = {"id": 44, "name": "solution-review-pr-123-abc123",
+                "expired": False, "evidence": evidence}
+    head = "next-head" if revision == "head" else "abc123"
+    base = "next-base" if revision == "base" else "base123"
+    assert merge_readiness.select_solution_review_evidence(
+        [run], {500: [artifact]}, 123, head, base
+    ) is None
+
+
+def test_unconfirmed_accepted_is_rejected():
+    value = dict(snapshot()["solution_review"])
+    value.pop("verification")
+    value["outcome"] = "ACCEPTED"
+    result = merge_readiness.evaluate_snapshot(snapshot(solution_review=value))
+    assert "solution_review_invalid" in blocker_codes(result)
+
+
+def test_review_run_from_feature_branch_not_trusted():
+    run = {"id": 500, "event": "workflow_dispatch", "head_branch": "feature",
+           "head_sha": "abc123", "status": "completed", "conclusion": "success"}
+    evidence = dict(snapshot()["solution_review"], workflow_run_id=500)
+    artifact = {"id": 44, "name": "solution-review-pr-123-abc123",
+                "expired": False, "evidence": evidence}
+    assert merge_readiness.select_solution_review_evidence(
+        [run], {500: [artifact]}, 123, "abc123", "base123"
+    ) is None
