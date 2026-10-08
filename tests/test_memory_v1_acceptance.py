@@ -376,3 +376,33 @@ def test_complete_frame_after_uncertain_fsync_replays_on_reopen(tmp_path, monkey
         assert recovered.last_commit.sequence == 2
         assert recovered.get("stable") == 1
         assert recovered.get("maybe") == 2
+
+
+def test_transaction_checks_pending_after_acquiring_engine_lock(tmp_path):
+    """A concurrent staged write must prevent transaction start."""
+    path = tmp_path / "transaction-race.memory"
+    with MemoryStore(path) as store:
+        started = threading.Event()
+        completed = threading.Event()
+        errors = []
+
+        def contender():
+            started.set()
+            try:
+                with store.transaction():
+                    pass
+            except StoreError as exc:
+                errors.append(str(exc))
+            finally:
+                completed.set()
+
+        with store._engine.value_guard():
+            thread = threading.Thread(target=contender)
+            thread.start()
+            assert started.wait(timeout=5)
+            store.set("pending", "must-not-be-ignored")
+        assert completed.wait(timeout=5)
+        thread.join(timeout=5)
+        assert errors == ["transaction requires an idle store"]
+        assert store.get("pending") == "must-not-be-ignored"
+        assert store.commit() == 1
