@@ -448,10 +448,9 @@ class MemoryStore:
         self._engine.restore(source)
 
     def close(self) -> None:
-        """Discard staging and release the single-writer lock."""
-        with self._engine.value_guard():
-            self._engine.close()
-            self._pending.clear()
+        """Release the writer and discard staging only after successful close."""
+        self._engine.close()
+        self._pending.clear()
 
     def __enter__(self) -> "MemoryStore":
         return self
