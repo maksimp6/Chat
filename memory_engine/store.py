@@ -426,6 +426,8 @@ class MemoryStore:
             self._engine.ensure_value_writable()
             if not isinstance(name, str) or not name:
                 raise StoreError("name must be a nonempty string")
+            if value is None:
+                raise StoreError("None is reserved for missing names")
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
@@ -481,6 +483,8 @@ class _ValueTransaction:
 
     def set(self, name: str, value: Any) -> None:
         self._ensure_open()
+        if value is None:
+            raise StoreError("None is reserved for missing names")
         self._pending[name] = deepcopy(value)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
