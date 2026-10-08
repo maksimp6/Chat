@@ -1,19 +1,15 @@
-"""Regression for snapshot frame delimiter in the experimental durable store."""
+"""Regression for newline-framed synchronous Memory DB journal."""
 
-from durable_memory_db import DurableMemoryDatabase
-from memory_db import Column
+from memory_engine import MemoryStore
 
 
-def test_snapshot_is_newline_delimited_and_reopens(tmp_path):
+def test_journal_frame_is_newline_delimited_and_reopens(tmp_path):
     path = tmp_path / "alice.memory"
-    db = DurableMemoryDatabase(path)
-    db.create_table("items", [Column("id", str, nullable=False, unique=True)])
-    db.insert("items", id="saved")
-
+    with MemoryStore(path) as db:
+        db.set("items", "id", "saved")
     raw = path.read_bytes()
     assert raw.endswith(b"\n")
+    assert raw.count(b"\n") == 1
     assert b"\\n" not in raw[-2:]
-
-    reopened = DurableMemoryDatabase(path)
-    reopened.create_table("items", [Column("id", str, nullable=False, unique=True)])
-    assert reopened.select("items") == [{"id": "saved"}]
+    with MemoryStore(path) as reopened:
+        assert reopened.get("items", "id") == "saved"
