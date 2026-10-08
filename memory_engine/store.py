@@ -15,49 +15,11 @@ import json
 import os
 from pathlib import Path
 from threading import RLock
-from typing import Any, Iterator, Protocol, TypeVar
-
-
-ValueT = TypeVar("ValueT")
+from typing import Any, Iterator
 
 
 class StoreError(RuntimeError):
     """Persistence, integrity, or ownership failure."""
-
-
-class Store(Protocol[ValueT]):
-    """Typed repository boundary for one value type, independent of disk storage.
-
-    Implementations return copy-safe values and must acknowledge mutations only
-    after their configured durability barrier succeeds.
-    """
-
-    def get(self, namespace: str, key: str) -> ValueT | None:
-        """Return a committed value or None for a missing key."""
-        ...
-
-    def set(self, namespace: str, key: str, value: ValueT) -> None:
-        """Persist the typed value before reporting success."""
-        ...
-
-    def delete(self, namespace: str, key: str) -> None:
-        """Persist a key deletion before reporting success."""
-        ...
-
-
-@dataclass(frozen=True)
-class DatabaseInfo:
-    """Public diagnostic fact: last acknowledged commit, or unknown."""
-
-    last_commit: int | None
-
-
-class DatabaseInfoContract(Protocol):
-    """Expose committed metadata without revealing stored values."""
-
-    def info(self) -> DatabaseInfo:
-        """Return the last acknowledged sequence without disk I/O."""
-        ...
 
 
 @dataclass(frozen=True)
@@ -68,7 +30,7 @@ class Commit:
     digest: str
 
 
-class MemoryStore:
+class _JournalEngine:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
     def __init__(self, path: str | Path) -> None:
@@ -126,7 +88,7 @@ class MemoryStore:
         if frames[-1]:
             raise StoreError("incomplete journal tail; recovery required")
         for frame in frames[:-1]:
-            state, sequence, digest = MemoryStore._apply_verified_frame(
+            state, sequence, digest = _JournalEngine._apply_verified_frame(
                 frame, state, sequence, digest
             )
         return state, sequence, digest
@@ -268,7 +230,7 @@ class MemoryStore:
             self._commit_changes([{"op": "delete", "namespace": namespace, "key": key}])
 
     @contextmanager
-    def transaction(self) -> Iterator["Transaction"]:
+    def transaction(self) -> Iterator["_JournalTransaction"]:
         """Commit staged changes together on success; discard on exception."""
         with self._lock:
             self._ensure_open()
@@ -279,7 +241,7 @@ class MemoryStore:
             self._active_transaction = True
             # Transaction writes stay in a private overlay; a successful exit
             # appends one record, while an exception discards staged changes.
-            transaction = Transaction(self._state)
+            transaction = _JournalTransaction(self._state)
             try:
                 yield transaction
                 self._commit_changes(transaction._pending_changes())
@@ -312,7 +274,7 @@ class MemoryStore:
                         shutil.copyfileobj(existing, output)
                 output.flush()
                 os.fsync(output.fileno())
-            actual_state, sequence, digest = MemoryStore._inspect_log(temporary)
+            actual_state, sequence, digest = _JournalEngine._inspect_log(temporary)
             if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
                 raise StoreError("backup integrity mismatch")
             try:
@@ -381,14 +343,14 @@ class MemoryStore:
                     self._lock_file.close()
                 self._closed = True
 
-    def __enter__(self) -> "MemoryStore":
+    def __enter__(self) -> "_JournalEngine":
         return self
 
     def __exit__(self, *_args: object) -> None:
         self.close()
 
 
-class VersionedMemoryStore:
+class MemoryStore:
     """Client-owned name/value facade over the durable journal engine.
 
     Composition keeps the legacy namespaced engine out of the public
@@ -398,7 +360,7 @@ class VersionedMemoryStore:
     _NAMESPACE = "values"
 
     def __init__(self, path: str | Path) -> None:
-        self._engine = MemoryStore(path)
+        self._engine = _JournalEngine(path)
         self._pending: dict[str, Any] = {}
 
     @property
@@ -443,13 +405,13 @@ class VersionedMemoryStore:
             return self._engine.last_commit.sequence
 
     @contextmanager
-    def transaction(self) -> Iterator["VersionedTransaction"]:
+    def transaction(self) -> Iterator["_ValueTransaction"]:
         """Serialize an atomic read-modify-write operation."""
         with self._engine._lock:
             if self._pending:
                 raise StoreError("transaction requires an idle store")
             with self._engine.transaction() as tx:
-                wrapper = VersionedTransaction(self._engine._state.get(self._NAMESPACE, {}))
+                wrapper = _ValueTransaction(self._engine._state.get(self._NAMESPACE, {}))
                 try:
                     yield wrapper
                     for change in wrapper._pending_changes():
@@ -471,14 +433,14 @@ class VersionedMemoryStore:
             self._pending.clear()
             self._engine.close()
 
-    def __enter__(self) -> "VersionedMemoryStore":
+    def __enter__(self) -> "MemoryStore":
         return self
 
     def __exit__(self, *_args: object) -> None:
         self.close()
 
 
-class VersionedTransaction:
+class _ValueTransaction:
     """Private overlay for one atomic name/value transaction."""
 
     def __init__(self, committed: dict[str, Any]) -> None:
@@ -506,7 +468,7 @@ class VersionedTransaction:
         ]
 
 
-class Transaction:
+class _JournalTransaction:
     """Staged changes overlay committed RAM until one synchronous commit."""
 
     def __init__(self, committed: dict[str, dict[str, Any]]) -> None:
