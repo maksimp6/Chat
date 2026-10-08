@@ -9,3 +9,5 @@ Public API: `MemoryStore(path)`, `get(name)`, `set(name, value)`, `commit()`, `c
 The public exports are `MemoryStore`, `Commit`, and `StoreError`. Internal journal classes are not public APIs.
 
 This task excludes Alice integration, PyPI, Make and performance optimization.
+
+Missing names return `None`; storing `None` is rejected to avoid ambiguity. After an uncertain fsync failure, the current instance refuses further writes. Reopening validates the complete hash-chained journal: a complete valid frame is replayed, while a partial or corrupt frame fails closed. A failed fsync is never acknowledged as a successful commit.
