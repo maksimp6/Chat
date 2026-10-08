@@ -148,6 +148,11 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     job = workflow["jobs"]["validate-image"]
     assert job["runs-on"] == "ubuntu-latest"
     assert workflow["permissions"] == {"contents": "read"}
+    assert (
+        workflow["concurrency"]["group"]
+        == "alice-rdc-validation-${{ github.event.pull_request.number }}"
+    )
+    assert workflow["concurrency"]["cancel-in-progress"] is True
 
     assert "issue_comment:" not in source
     assert "workflow_dispatch:" not in source
@@ -162,6 +167,16 @@ def test_legacy_workflow_is_validation_only_and_has_no_deploy_credentials():
     assert "docker compose logs" not in scripts
     assert "device.json" not in scripts
     assert "${{ secrets." not in scripts
+    assert "timeout 15s" in scripts
+    assert "Dockerfile.base" not in scripts
+    assert "docker build" not in scripts
+    assert "docker compose" in scripts
+    assert "desktop-session.test.cjs" in scripts
+    assert "pairing-handoff.test.cjs" in scripts
+    assert "Alice Dev" not in source
+    assert "oauth" not in scripts.lower()
+    assert "browser-smoke-test" not in scripts
+    assert "chromium" not in scripts.lower()
 
 
 def test_image_uses_frozen_dependency_graph():
@@ -174,10 +189,14 @@ def test_image_uses_frozen_dependency_graph():
     assert package["overrides"] == {"sharp": "0.35.4", "exceljs": {"uuid": "11.1.1"}}
     assert lock["packages"][""]["dependencies"] == package["dependencies"]
     assert lock["packages"]["node_modules/@wonderwhy-er/desktop-commander"]["version"] == "0.2.52"
-    dockerfile = (DEPLOY / "Dockerfile").read_text()
-    assert "npm ci --omit=dev --ignore-scripts" in dockerfile
-    assert "npm install" not in dockerfile
-    assert "chromium fonts-liberation" in dockerfile
+    base = (DEPLOY / "Dockerfile").read_text()
+    assert "RDC_BASE_IMAGE" not in base
+    assert not (DEPLOY / "Dockerfile.base").exists()
+    assert "npm ci --omit=dev --ignore-scripts" in base
+    assert "npm install" not in base
+    assert "python3-minimal" not in base
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
 
 
 def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
@@ -199,3 +218,26 @@ def test_failed_browser_readiness_restores_previous_compose_and_image(tmp_path):
     assert "compose down --remove-orphans" in commands
     assert "tag alice-remote-desktop-commander:rollback-" in commands
     assert commands.count("compose up -d --no-build") == 2
+
+
+def test_rdc_base_contains_runtime_dependencies_for_state_and_git_key_handoff() -> None:
+    base = (DEPLOY / "Dockerfile").read_text()
+
+    for package in ("git", "openssh-client", "python3"):
+        assert package in base
+    assert "python3-minimal" not in base
+
+
+def test_git_uses_only_delivered_key_and_pinned_github_host_keys() -> None:
+    entrypoint = (DEPLOY / "entrypoint.sh").read_text()
+    assert "-i /home/node/.alice-secrets/rdc.git.ssh" in entrypoint
+    assert "IdentitiesOnly=yes" in entrypoint
+    assert "StrictHostKeyChecking=yes" in entrypoint
+    assert "UserKnownHostsFile=/opt/desktop-commander/github_known_hosts" in entrypoint
+    hosts = (DEPLOY / "github_known_hosts").read_text().splitlines()
+    assert (
+        "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+        in hosts
+    )
+    assert all(line.startswith("github.com ") for line in hosts)
+    assert "github_known_hosts" in (DEPLOY / "Dockerfile").read_text()
