@@ -312,3 +312,11 @@ def test_backup_destination_creation_race_does_not_overwrite(tmp_path, monkeypat
         with pytest.raises(StoreError, match="created concurrently"):
             db.backup(archive)
     assert archive.read_bytes() == b"another backup"
+
+
+@pytest.mark.parametrize("malformed", [b'[]\\n', b'{"payload":[],"digest":"x"}\\n', b'{"payload":{"seq":1,"changes":[null]},"digest":"x"}\\n'])
+def test_malformed_journal_fails_closed(tmp_path, malformed):
+    path = tmp_path / "alice.memory"
+    path.write_bytes(malformed.replace(b"\\\\n", b"\\n"))
+    with pytest.raises(StoreError, match="corrupt committed journal"):
+        MemoryStore(path)
