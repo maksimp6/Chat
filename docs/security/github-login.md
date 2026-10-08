@@ -33,11 +33,9 @@ clears both cookies. With the gate on, a browser opening a gated page sees a
 | `ALICE_GITHUB_REDIRECT_URI` | Registered callback, default `https://maxxxpavlov.ru/auth/github/callback` in production |
 | `ALICE_GITHUB_ALLOWED_IDS` | Comma-separated numeric GitHub account ids allowed while the gate is on (ids, because logins can be renamed and reassigned) |
 
-Production reads the client id and secret from the repository secrets
-`ALICE_GITHUB_CLIENT_ID` and `ALICE_GITHUB_CLIENT_SECRET`, and the allowlist from
-the repository variable `ALICE_GITHUB_ALLOWED_IDS` (default `293531601`, the
-account id of `maksimp6`). They
-reach the server over the deploy SSH session's stdin, like `ALICE_SHORT_TOKEN`.
+The current legacy `production-deploy.yml` path reads the client id and secret from GitHub repository/environment secrets `ALICE_GITHUB_CLIENT_ID` and `ALICE_GITHUB_CLIENT_SECRET`, and the allowlist from `ALICE_GITHUB_ALLOWED_IDS`. That workflow passes the values to `deploy/production/server.sh` over the existing SSH stdin handoff, and the application currently consumes them as runtime environment variables.
+
+This is a **working compatibility deployment path**, not the target secret architecture. Production deployment ownership/cutover is tracked by #869, and canonical secret resolution/migration by #755. New deployment paths must not copy this mechanism merely because the legacy workflow still uses it. The GitHub OAuth consumer should move to the canonical Secret Store boundary through an explicit tested cutover; until then, removing these environment variables would break the current login implementation.
 
 The OAuth App must use the homepage `https://maxxxpavlov.ru` and the callback
 `https://maxxxpavlov.ru/auth/github/callback`. Visitors on `maxxxpavlov.online`
@@ -50,3 +48,10 @@ linked; the GitHub account gets the `.ru` browser's anonymous user or a new one.
 - Signing in issues a new token for the user, which signs out that user's
   other browsers (the anonymous bootstrap behaves the same way).
 - Preview deployments under `/preview/...` are not wired for GitHub sign-in.
+
+
+## Migration boundary
+
+Current code reads `ALICE_GITHUB_CLIENT_ID` and `ALICE_GITHUB_CLIENT_SECRET` from the process environment. A future #755 migration must preserve the OAuth behavior while changing only the credential-resolution boundary.
+
+Acceptance for that cutover must prove at least: configured login, missing/revoked secret failure, callback/code exchange, allowlist behavior, no secret leakage, and rollback to a known-good secret version. A successful SSH deploy alone is not evidence that the OAuth secret consumer has migrated.
