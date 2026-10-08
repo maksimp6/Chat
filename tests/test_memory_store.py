@@ -233,3 +233,63 @@ def test_original_mapping_remains_immutable_until_commit(tmp_path):
             tx.set("items", "a", {"nested": [3]})
             assert db.get("items", "a") == {"nested": [1]}
         assert db.get("items", "a") == {"nested": [3]}
+
+
+def test_backup_restore_preserves_chain_and_accepts_new_writes(tmp_path):
+    source = tmp_path / "original.memory"
+    artifact = tmp_path / "original.backup"
+    destination = tmp_path / "new.memory"
+    with MemoryStore(source) as db:
+        db.set("items", "a", {"value": 1})
+        db.set("items", "b", {"value": 2})
+        expected = db.last_commit
+        db.backup(artifact)
+    with MemoryStore(destination) as restored:
+        restored.restore(artifact)
+        assert restored.last_commit == expected
+        assert restored.get("items", "a") == {"value": 1}
+        restored.set("items", "c", {"value": 3})
+        assert restored.last_commit.sequence == 3
+    with MemoryStore(destination) as reopened:
+        assert reopened.get("items", "c") == {"value": 3}
+
+
+def test_corrupted_backup_rejected_without_touching_empty_target(tmp_path):
+    backup = tmp_path / "archive.backup"
+    with MemoryStore(tmp_path / "source.memory") as db:
+        db.set("items", "secret", "safe")
+        db.backup(backup)
+    raw = backup.read_bytes()
+    backup.write_bytes(raw.replace(b"safe", b"evil"))
+    dest = tmp_path / "restored.memory"
+    with MemoryStore(dest) as target:
+        with pytest.raises(StoreError, match="corrupt committed journal"):
+            target.restore(backup)
+        assert target.last_commit.sequence == 0
+        assert target.get("items", "secret") is None
+    assert not dest.exists()
+
+
+def test_restore_never_overwrites_existing_commits(tmp_path):
+    backup = tmp_path / "previous.backup"
+    with MemoryStore(tmp_path / "source.memory") as source:
+        source.set("items", "a", 1)
+        source.backup(backup)
+    destination = tmp_path / "existing.memory"
+    with MemoryStore(destination) as target:
+        target.set("items", "keep", 2)
+        with pytest.raises(StoreError, match="restore destination is not empty"):
+            target.restore(backup)
+    with MemoryStore(destination) as target:
+        assert target.get("items", "keep") == 2
+        assert target.get("items", "a") is None
+
+
+def test_backup_never_overwrites_existing_artifact(tmp_path):
+    target_path = tmp_path / "saved.backup"
+    target_path.write_bytes(b"external artifact")
+    with MemoryStore(tmp_path / "source.memory") as source:
+        source.set("items", "a", 1)
+        with pytest.raises(StoreError, match="backup destination must be new"):
+            source.backup(target_path)
+    assert target_path.read_bytes() == b"external artifact"

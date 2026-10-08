@@ -71,13 +71,17 @@ class MemoryStore:
             self._ensure_open()
             return Commit(self._sequence, self._digest)
 
-    def _replay(self) -> None:
-        if not self.path.exists():
-            return
-        raw = self.path.read_bytes()
+    @staticmethod
+    def _inspect_log(path: Path) -> tuple[dict[str, dict[str, Any]], int, str]:
+        """Verify journal integrity without changing the live instance."""
+        state: dict[str, dict[str, Any]] = {}
+        sequence = 0
+        digest = "0" * 64
+        if not path.exists():
+            return state, sequence, digest
+        raw = path.read_bytes()
         frames = raw.split(b"\n")
         if frames[-1]:
-            # Fail closed: never append behind an ambiguous torn frame.
             raise StoreError("incomplete journal tail; recovery required")
         frames.pop()
         for frame in frames:
@@ -87,21 +91,25 @@ class MemoryStore:
                 encoded = json.dumps(
                     payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
                 ).encode()
-                digest = hashlib.sha256(bytes.fromhex(self._digest) + encoded).hexdigest()
-                if record["digest"] != digest or payload["seq"] != self._sequence + 1:
+                next_digest = hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest()
+                if record["digest"] != next_digest or payload["seq"] != sequence + 1:
                     raise ValueError("commit chain mismatch")
                 for change in payload["changes"]:
                     namespace, key = change["namespace"], change["key"]
                     if change["op"] == "set":
-                        self._state.setdefault(namespace, {})[key] = change["value"]
+                        state.setdefault(namespace, {})[key] = change["value"]
                     elif change["op"] == "delete":
-                        self._state.get(namespace, {}).pop(key, None)
+                        state.get(namespace, {}).pop(key, None)
                     else:
                         raise ValueError("invalid journal operation")
-                self._sequence = payload["seq"]
-                self._digest = digest
+                sequence = payload["seq"]
+                digest = next_digest
             except (ValueError, KeyError, TypeError, UnicodeError) as exc:
                 raise StoreError("corrupt committed journal") from exc
+        return state, sequence, digest
+
+    def _replay(self) -> None:
+        self._state, self._sequence, self._digest = self._inspect_log(self.path)
 
     def get(self, namespace: str, key: str) -> Any | None:
         with self._lock:
@@ -206,6 +214,75 @@ class MemoryStore:
             finally:
                 transaction._closed = True
                 self._active_transaction = False
+
+    @staticmethod
+    def _copy_verified_file(
+        source: Path,
+        destination: Path,
+        expected_state: dict[str, dict[str, Any]],
+        expected_commit: Commit,
+    ) -> None:
+        """Copy to a same-directory temp file, validate, then atomically publish."""
+        import shutil
+        import tempfile
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        fd, temp_name = tempfile.mkstemp(prefix=".alice-copy-", dir=destination.parent)
+        temporary = Path(temp_name)
+        try:
+            with os.fdopen(fd, "wb") as output:
+                if source.exists():
+                    with source.open("rb") as existing:
+                        shutil.copyfileobj(existing, output)
+                output.flush()
+                os.fsync(output.fileno())
+            actual_state, sequence, digest = MemoryStore._inspect_log(temporary)
+            if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
+                raise StoreError("backup integrity mismatch")
+            os.replace(temporary, destination)
+            directory = os.open(str(destination.parent), os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def backup(self, destination: str | Path) -> None:
+        """Create a verified, fsynced backup without overwriting another artifact."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed or self._active_transaction:
+                raise StoreError("backup requires a healthy committed state")
+            target = Path(destination)
+            if target.resolve() == self.path.resolve() or target.exists():
+                raise StoreError("backup destination must be new")
+            self._copy_verified_file(self.path, target, self._state, self.last_commit)
+
+    def restore(self, source: str | Path) -> None:
+        """Restore a verified backup into a brand-new or empty store only."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed or self._active_transaction:
+                raise StoreError("restore requires a healthy idle store")
+            if self._sequence or self._state or (self.path.exists() and self.path.stat().st_size):
+                raise StoreError("restore destination is not empty")
+            origin = Path(source)
+            if origin.resolve() == self.path.resolve():
+                raise StoreError("cannot restore from the live database path")
+            state, sequence, digest = self._inspect_log(origin)
+            if not origin.exists():
+                raise StoreError("backup source does not exist")
+            try:
+                self._copy_verified_file(
+                    origin, self.path, state, Commit(sequence, digest)
+                )
+            except OSError as exc:
+                self._failed = True
+                raise StoreError("restore failed; recovery required") from exc
+            self._state = state
+            self._sequence = sequence
+            self._digest = digest
 
     def close(self) -> None:
         with self._lock:
