@@ -1,10 +1,4 @@
-"""RED-first checks for Alice's installable module and wheel contents.
-
-The package name `alice_pro` is the intended canonical module for #1050.
-These tests deliberately fail until packaging and module entrypoints exist.
-"""
-
-from __future__ import annotations
+"""RED-first Alice module build, file manifest and import-boundary checks."""
 
 import ast
 import os
@@ -13,24 +7,28 @@ import subprocess
 import sys
 import zipfile
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
-MODULE = "alice_pro"
+PACKAGE = ROOT / "alice_pro"
+MAX_FILE_BYTES = 4096
+MAX_FILE_LINES = 80
 
 
-def test_package_files_and_metadata_exist() -> None:
-    """An installable module needs a package and explicit build metadata."""
-    assert (ROOT / MODULE / "__init__.py").is_file()
-    assert (ROOT / MODULE / "__main__.py").is_file()
-    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "[build-system]" in text
-    assert "[project]" in text
+def test_contract_test_file_stays_small():
+    """Keep this contract readable in full without splitting responsibilities."""
+    source = Path(__file__).read_bytes()
+    assert len(source) <= MAX_FILE_BYTES
+    assert len(source.splitlines()) <= MAX_FILE_LINES
 
 
-def test_entrypoint_has_main_guard() -> None:
-    """Importing the package must not launch Alice as a side effect."""
-    tree = ast.parse((ROOT / MODULE / "__main__.py").read_text(encoding="utf-8"))
+def test_package_layout_and_metadata():
+    assert (PACKAGE / "__init__.py").is_file()
+    assert (PACKAGE / "__main__.py").is_file()
+    metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "[build-system]" in metadata and "[project]" in metadata
+
+
+def test_entrypoint_is_guarded():
+    tree = ast.parse((PACKAGE / "__main__.py").read_text(encoding="utf-8"))
     assert any(
         isinstance(node, ast.If)
         and isinstance(node.test, ast.Compare)
@@ -40,34 +38,29 @@ def test_entrypoint_has_main_guard() -> None:
     )
 
 
-def test_wheel_contains_module_and_entrypoint(tmp_path: Path) -> None:
-    """Build the actual wheel and inspect its file list, not just exit status."""
-    build = subprocess.run(
-        [sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-build-isolation",
-         "--wheel-dir", str(tmp_path), str(ROOT)],
+def test_wheel_manifest(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "wheel", "--no-deps",
+         "--no-build-isolation", "--wheel-dir", str(tmp_path), str(ROOT)],
         capture_output=True, text=True, timeout=45, check=False,
     )
-    assert build.returncode == 0, build.stderr
+    assert result.returncode == 0, result.stderr
     wheels = list(tmp_path.glob("*.whl"))
     assert len(wheels) == 1
     with zipfile.ZipFile(wheels[0]) as wheel:
-        files = set(wheel.namelist())
-        assert f"{MODULE}/__init__.py" in files
-        assert f"{MODULE}/__main__.py" in files
-        assert any(name.endswith(".dist-info/METADATA") for name in files)
-        assert any(name.endswith(".dist-info/entry_points.txt") for name in files)
-        assert not any(
-            name.endswith((".db", ".sqlite", ".sqlite3", ".env", ".pem", ".key"))
-            for name in files
-        )
+        names = set(wheel.namelist())
+    assert {"alice_pro/__init__.py", "alice_pro/__main__.py"} <= names
+    assert any(n.endswith(".dist-info/METADATA") for n in names)
+    assert any(n.endswith(".dist-info/entry_points.txt") for n in names)
+    assert not any(n.endswith((".db", ".sqlite", ".sqlite3", ".env", ".pem", ".key"))
+                   for n in names)
 
 
-def test_module_launches_outside_repo(tmp_path: Path) -> None:
-    """Installed Alice must not depend on the repository working directory."""
+def test_module_help_outside_repo(tmp_path):
     env = dict(os.environ)
     env.pop("PYTHONPATH", None)
     result = subprocess.run(
-        [sys.executable, "-m", MODULE, "--help"],
+        [sys.executable, "-m", "alice_pro", "--help"],
         cwd=tmp_path, env=env, capture_output=True, text=True,
         timeout=15, check=False,
     )
@@ -75,12 +68,11 @@ def test_module_launches_outside_repo(tmp_path: Path) -> None:
     assert result.stdout.strip()
 
 
-def test_package_source_does_not_import_private_memory_engine(tmp_path: Path) -> None:
-    """Alice should use the public Memory DB API, not storage internals."""
-    package = ROOT / MODULE
-    assert package.is_dir()
-    for file in package.rglob("*.py"):
-        tree = ast.parse(file.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                assert node.module != "memory_engine.store", str(file)
+def test_no_private_memory_imports():
+    assert PACKAGE.is_dir()
+    for source in PACKAGE.rglob("*.py"):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        assert all(
+            node.module != "memory_engine.store"
+            for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+        )
