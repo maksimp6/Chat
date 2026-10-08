@@ -205,6 +205,21 @@ class _JournalEngine:
         self._sequence += 1
         self._digest = digest
 
+    def commit_values(self, values: dict[str, Any]) -> int:
+        """Own journal record encoding and durable publication for named values."""
+        with self._lock:
+            self._ensure_open()
+            if self._failed:
+                raise StoreError("recovery required")
+            if self._active_transaction:
+                raise StoreError("cannot commit during transaction")
+            changes = [
+                {"op": "set", "namespace": "values", "key": name, "value": value}
+                for name, value in sorted(values.items())
+            ]
+            self._commit_changes(changes)
+            return self._sequence
+
     def set(self, namespace: str, key: str, value: Any) -> None:
         """Synchronous durable write; reject direct writes inside a transaction."""
         with self._lock:
@@ -383,20 +398,11 @@ class MemoryStore:
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
-        """Atomically persist staged names and return the confirmed sequence."""
+        """Durably publish staged names, then clear acknowledged staging."""
         with self._engine._lock:
-            self._engine._ensure_open()
-            if self._engine._failed:
-                raise StoreError("recovery required")
-            if self._engine._active_transaction:
-                raise StoreError("cannot commit during transaction")
-            changes = [
-                {"op": "set", "namespace": self._NAMESPACE, "key": name, "value": value}
-                for name, value in sorted(self._pending.items())
-            ]
-            self._engine._commit_changes(changes)
+            sequence = self._engine.commit_values(self._pending)
             self._pending.clear()
-            return self._engine.last_commit.sequence
+            return sequence
 
     @contextmanager
     def transaction(self) -> Iterator["_ValueTransaction"]:
