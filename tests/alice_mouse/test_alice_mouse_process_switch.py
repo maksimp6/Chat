@@ -45,7 +45,7 @@ class ProcessSwitchTests(unittest.TestCase):
         )
 
     def _write_program(self, dest, role, *, crash=False):
-        binary = Path.home() / "alice_mouse_test_fixture"
+        binary = Path(__file__).with_name("alice_mouse_test_fixture")
         assert binary.is_file(), "build test fixture first"
         import shlex
         # Executable shell trampoline uses exec, preserving real PID/signals.
@@ -53,7 +53,7 @@ class ProcessSwitchTests(unittest.TestCase):
         args = [str(binary), str(self.events), role]
         if crash:
             args.append("crash")
-        dest.write_text("#!/system/bin/sh\nexec " + " ".join(shlex.quote(x) for x in args) + "\n")
+        dest.write_text("#!" + ("/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh") + "\nexec " + " ".join(shlex.quote(x) for x in args) + "\n")
         dest.chmod(0o700)
 
     def _wait_for(self, marker, timeout):
