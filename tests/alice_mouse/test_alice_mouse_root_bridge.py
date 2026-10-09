@@ -35,15 +35,16 @@ class RootBrokerTests(unittest.TestCase):
             run.side_effect = TimeoutError()
             self.assertFalse(focus_is_safe())
     def test_private_dir_validated(self):
-        with self.assertRaises(PermissionError):
-            ensure_private_dir(0)
-        with mock.patch("alice_mouse_root_bridge.TERMUX_DIR", pathlib.Path.home()):
-            # Home may be shared; use an isolated private directory instead.
-            import tempfile
-            with tempfile.TemporaryDirectory() as tmp:
-                private = pathlib.Path(tmp)
-                private.chmod(0o700)
-                with mock.patch("alice_mouse_root_bridge.TERMUX_DIR", private):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            private = pathlib.Path(tmp)
+            private.chmod(0o700)
+            with mock.patch("alice_mouse_root_bridge.TERMUX_DIR", private):
+                with self.assertRaises(PermissionError):
+                    ensure_private_dir(0)
+                ensure_private_dir(os.getuid())
+                private.chmod(0o755)
+                with self.assertRaises(PermissionError):
                     ensure_private_dir(os.getuid())
     def test_role_gate_viewer_denied_before_root(self):
         bridge=MouseBridge("/nonexistent/alice-mouse.sock",{"com.yandex.browser"})
