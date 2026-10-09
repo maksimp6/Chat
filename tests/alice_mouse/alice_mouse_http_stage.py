@@ -38,5 +38,3 @@ class MouseHandler(BaseHTTPRequestHandler):
             return self.reply(401, {"error": "unauthorized"})
         result = self.bridge.handle(role, body, self.foreground)
         return self.reply(200 if result["ok"] else 403, result)
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
