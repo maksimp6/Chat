@@ -1,14 +1,17 @@
 """Dry-run transactional supervisor; no device input or process termination."""
+
 from dataclasses import dataclass
 from enum import Enum
 
+
 class Phase(str, Enum):
-    LEGACY="legacy"
-    QUIESCE="quiesce"
-    START_NEW="start_new"
-    VERIFY="verify"
-    NEW="new"
-    ROLLBACK="rollback"
+    LEGACY = "legacy"
+    QUIESCE = "quiesce"
+    START_NEW = "start_new"
+    VERIFY = "verify"
+    NEW = "new"
+    ROLLBACK = "rollback"
+
 
 @dataclass
 class Supervisor:
@@ -27,7 +30,11 @@ class Supervisor:
             self.phase = Phase.VERIFY
         elif event == "healthy" and self.phase == Phase.VERIFY:
             self.phase = Phase.NEW
-        elif event in ("timeout","failed") and self.phase in (Phase.QUIESCE,Phase.START_NEW,Phase.VERIFY):
+        elif event in ("timeout", "failed") and self.phase in (
+            Phase.QUIESCE,
+            Phase.START_NEW,
+            Phase.VERIFY,
+        ):
             self.phase = Phase.ROLLBACK
             self.new_alive = False
         elif event == "legacy_restored" and self.phase == Phase.ROLLBACK and not self.new_alive:
