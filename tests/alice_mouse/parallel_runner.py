@@ -9,6 +9,7 @@ import concurrent.futures
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 GROUPS = (
     ("process", ("test_alice_mouse_process_switch",)),
@@ -27,6 +28,7 @@ def run_group(group: tuple[str, tuple[str, ...]]) -> tuple[str, float, int, str]
     started = time.perf_counter()
     result = subprocess.run(
         [sys.executable, "-m", "unittest", "-q", *modules],
+        cwd=Path(__file__).resolve().parent,
         capture_output=True, text=True, timeout=35, check=False,
     )
     return name, time.perf_counter() - started, result.returncode, result.stderr
