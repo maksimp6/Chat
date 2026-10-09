@@ -10,8 +10,8 @@ from pathlib import Path
 
 from alice_mouse_process_switch import alive, digest
 
-HOME = Path.home()
-SH = "/system/bin/sh"
+HOME = Path(__file__).resolve().parent
+SH = "/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh"
 BOOT = str(HOME / "alice_mouse_watchdog_v2.sh")
 
 class CrashRecoveryTests(unittest.TestCase):
