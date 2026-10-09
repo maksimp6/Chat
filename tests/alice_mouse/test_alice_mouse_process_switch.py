@@ -2,15 +2,12 @@ import fcntl
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
 
-from alice_mouse_process_switch import (
-    ProcessSwitch, SwitchConfig, SwitchError, alive, digest
-)
+from alice_mouse_process_switch import ProcessSwitch, SwitchConfig, SwitchError, alive, digest
 
 
 class ProcessSwitchTests(unittest.TestCase):
@@ -26,8 +23,10 @@ class ProcessSwitchTests(unittest.TestCase):
         self._write_program(self.candidate, "CANDIDATE")
         shutil.copy2(self.original, self.target)
         self.initial = subprocess.Popen(
-            [str(self.target), "serve"], start_new_session=True,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            [str(self.target), "serve"],
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         self.addCleanup(self._stop_all)
@@ -36,8 +35,10 @@ class ProcessSwitchTests(unittest.TestCase):
         self.extra_pids = []
         self._wait_for("ORIGINAL", 1)
         self.cfg = SwitchConfig(
-            target=self.target, candidate=self.candidate,
-            backup=self.original, old_pid=self.initial.pid,
+            target=self.target,
+            candidate=self.candidate,
+            backup=self.original,
+            old_pid=self.initial.pid,
             lock=self.base / "transaction.lock",
             journal=self.base / "journal",
             pending=self.base / "cutover.pending",
@@ -48,12 +49,19 @@ class ProcessSwitchTests(unittest.TestCase):
         binary = Path(__file__).with_name("alice_mouse_test_fixture")
         assert binary.is_file(), "build test fixture first"
         import shlex
+
         # Executable shell trampoline uses exec, preserving real PID/signals.
         # Role/event passed as literal quoted args, never via user input.
         args = [str(binary), str(self.events), role]
         if crash:
             args.append("crash")
-        dest.write_text("#!" + ("/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh") + "\nexec " + " ".join(shlex.quote(x) for x in args) + "\n")
+        dest.write_text(
+            "#!"
+            + ("/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh")
+            + "\nexec "
+            + " ".join(shlex.quote(x) for x in args)
+            + "\n"
+        )
         dest.chmod(0o700)
 
     def _wait_for(self, marker, timeout):
@@ -127,6 +135,7 @@ class ProcessSwitchTests(unittest.TestCase):
         guarded = self.base / "guarded"
         self._write_program(guarded, "GUARDED")
         from dataclasses import replace
+
         self.cfg = replace(self.cfg, rollback_binary=guarded)
         switch = self._switch()
         with self.assertRaisesRegex(SwitchError, "fault_after_stop"):
@@ -156,6 +165,7 @@ class ProcessSwitchTests(unittest.TestCase):
 
     def test_external_mouse_blocks_rollback_and_duplicate_start(self):
         from dataclasses import replace
+
         self.cfg = replace(self.cfg, timeout=0.06)
         switch = ProcessSwitch(self.cfg, external_mouse_active=lambda: True)
         self.instances.append(switch)
@@ -168,6 +178,7 @@ class ProcessSwitchTests(unittest.TestCase):
 
     def test_real_timeout_waits_and_fails_closed(self):
         from dataclasses import replace
+
         self.cfg = replace(self.cfg, timeout=0.35)
         switch = ProcessSwitch(self.cfg, external_mouse_active=lambda: True)
         self.instances.append(switch)
