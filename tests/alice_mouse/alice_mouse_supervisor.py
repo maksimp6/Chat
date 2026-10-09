@@ -38,5 +38,3 @@ class Supervisor:
         if self.legacy_alive and self.new_alive:
             raise AssertionError("two_mice")
         return self.phase
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
