@@ -26,7 +26,7 @@ def device() -> str:
         raise RuntimeError(f"Expected one authorized device, found {len(rows)}")
     return rows[0]
 
-def execute(args: argparse.Namespace) -> dict:
+def execute(args: argparse.Namespace) -> dict[str, object]:
     """Perform one bounded Android operation; never claim UI verification for taps."""
     serial = device()
     prefix = ("-s", serial)
