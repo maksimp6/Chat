@@ -2,8 +2,8 @@ import os
 import socket
 import struct
 import tempfile
-import threading
 import unittest
+
 
 class UnixPeerTests(unittest.TestCase):
     def test_peer_credentials(self):
@@ -40,6 +40,7 @@ class UnixPeerTests(unittest.TestCase):
                 self.assertEqual(server.family, socket.AF_UNIX)
             finally:
                 server.close()
+
 
 if __name__ == "__main__":
     unittest.main()
