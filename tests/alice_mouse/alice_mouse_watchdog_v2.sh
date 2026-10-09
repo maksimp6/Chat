@@ -66,5 +66,3 @@ else
         sleep 3
     done) >/dev/null 2>&1 &
 fi
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
