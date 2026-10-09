@@ -3,6 +3,7 @@
 This module does NOT install or modify Magisk by itself. A separate
 watchdog/boot coordination gate is mandatory for real mouse cutover.
 """
+
 from __future__ import annotations
 
 import fcntl
@@ -12,9 +13,9 @@ import shutil
 import signal
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 
 class SwitchError(RuntimeError):
@@ -111,8 +112,12 @@ class ProcessSwitch:
     use for production until a cooperative boot watcher is installed.
     """
 
-    def __init__(self, cfg: SwitchConfig, health: Callable[[int], bool] | None = None,
-                 external_mouse_active: Callable[[], bool] | None = None):
+    def __init__(
+        self,
+        cfg: SwitchConfig,
+        health: Callable[[int], bool] | None = None,
+        external_mouse_active: Callable[[], bool] | None = None,
+    ):
         self.cfg = cfg
         self.health = health or alive
         self.external_mouse_active = external_mouse_active or alice_mouse_device_active
