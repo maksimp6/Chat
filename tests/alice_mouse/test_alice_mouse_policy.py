@@ -24,5 +24,3 @@ class PolicyTests(unittest.TestCase):
   for bad in ({"action":"text","x":0,"y":0},{"action":"click","x":True,"y":0},{"action":"click","x":501,"y":0},{"action":"scroll","x":1,"y":1},{"action":"click","x":0,"y":0,"token":"x"},"click",{}):
    self.assertIsNone(parse_mouse_command(bad))
 if __name__=="__main__": unittest.main()
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
