@@ -36,5 +36,3 @@ def parse_mouse_command(command):
     if action == "scroll" and y != 0:
         return None
     return action, x, y
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
