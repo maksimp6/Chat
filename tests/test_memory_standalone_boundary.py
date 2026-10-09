@@ -73,3 +73,21 @@ def test_public_contract_requires_annotated_parameters_and_returns():
         method = methods[name]
         assert method.returns is not None, name
         assert all(arg.annotation is not None for arg in method.args.args[1:]), name
+
+
+
+def test_legacy_namespaced_transaction_api_is_removed():
+    """RED: v1 must not retain a second namespaced transaction implementation."""
+    tree = ast.parse((ROOT / "store.py").read_text(encoding="utf-8"))
+    classes = {
+        node.name: node for node in tree.body if isinstance(node, ast.ClassDef)
+    }
+    assert "_JournalTransaction" not in classes, (
+        "Remove the redundant legacy transaction class after migrating its tests"
+    )
+    engine = classes["_JournalEngine"]
+    methods = {
+        node.name for node in engine.body if isinstance(node, ast.FunctionDef)
+    }
+    assert "transaction" not in methods, "Use the single value_transaction owner"
+    assert "delete" not in methods, "Remove legacy namespaced delete after migration"
