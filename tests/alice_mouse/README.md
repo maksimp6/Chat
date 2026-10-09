@@ -1,9 +1,6 @@
 # Alice Mouse test acceleration — Issue #650
 
-This is an **incomplete staging slice**. The parallel runner and C fixture are
-committed here for review, but the 12 Alice Mouse test modules and supporting
-runtime modules are currently only available on the Redmi 9. The runner must
-**not** be added as a required CI check until those dependencies are ported.
+The 12 isolated test modules, supporting code and C fixture are now staged in this PR. An optional CI workflow compiles the fixture and runs the suite. This does not verify live Magisk, reboot recovery, or production input safety.
 
 ## Observed Redmi 9 results
 
@@ -20,9 +17,7 @@ this branch**. CI timing and p95 require a larger sample and exact-head runs.
 
 ## Safety and prerequisites
 
-1. Port the 12 test modules, the production-independent support modules, and
-   the C fixture compilation step from Redmi 9 into a reviewed, reproducible
-   test tree. Avoid embedding device secrets, tokens, or private paths.
+1. Independently review the ported modules and confirm no private tokens or paths have leaked.
 2. Preserve real timeout, SIGTERM, crash, rollback and recovery tests. Do not
    replace every real timing test with mocks merely to satisfy a duration target.
 3. Ensure separate workers have isolated temporary directories, sockets,
@@ -34,5 +29,5 @@ this branch**. CI timing and p95 require a larger sample and exact-head runs.
 5. Never run these tests against live Magisk or `/dev/uinput`. Keep production
    RDC and Mouse Daemon untouched.
 
-**Status:** Draft / BLOCKED until dependencies, CI and independent review pass.
+**Status:** Draft / BLOCKED until exact-head CI, repository format checks and independent review pass.
 No merge authorization.
