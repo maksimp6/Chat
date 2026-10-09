@@ -7,10 +7,12 @@ ROLE_ACTIONS = {
 }
 MOUSE_ACTIONS = frozenset(("move", "click", "scroll"))
 
+
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
     reason: str
+
 
 def authorize(role, action, *, foreground, allowed_apps, sensitive=False, confirmed=False):
     if type(role) is not str or type(action) is not str:
@@ -22,6 +24,7 @@ def authorize(role, action, *, foreground, allowed_apps, sensitive=False, confir
     if action in MOUSE_ACTIONS and sensitive and not confirmed:
         return Decision(False, "confirmation_required")
     return Decision(True, "allowed")
+
 
 def parse_mouse_command(command):
     if type(command) is not dict or set(command) != {"action", "x", "y"}:
