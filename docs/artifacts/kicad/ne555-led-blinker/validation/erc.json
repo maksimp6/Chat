@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schemas.kicad.org/erc.v1.json",
+  "coordinate_units": "mm",
+  "date": "2026-10-09T15:21:30-0400",
+  "kicad_version": "9.0.2",
+  "sheets": [
+    {
+      "path": "/",
+      "uuid_path": "/d56a7691-2e10-4dd4-8258-2926fb2d44f1",
+      "violations": []
+    }
+  ],
+  "source": "NE555_LED_Blinker.kicad_sch"
+}

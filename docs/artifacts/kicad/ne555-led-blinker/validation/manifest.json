@@ -1,0 +1,19 @@
+{
+  "kicad_version": "9.0.2",
+  "inputs_sha256": {
+    "NE555_LED_Blinker.kicad_sch": "3657610aef8e7d68285528cc907c8cc3460439c4a023cb2d5d63e5d4ad55c855",
+    "NE555_LED_Blinker.kicad_pro": "4c5164d9f24fad5d4892c4fc25a077ff59fbffdc04ba7c4b0faa4f321fb90ef1"
+  },
+  "outputs_sha256": {
+    "netlist.xml": "58393b95723d83cfefd47405190af004332b642c7397885453e1bb3fc58a1e1b",
+    "erc.json": "05d09c7af581801e53b9112379ae209ee397f212957059927be6891e7d7f82c7"
+  },
+  "timing_nominal": {
+    "high_s": 0.5406548008367573,
+    "low_s": 0.4713400827807628,
+    "period_s": 1.01199488361752,
+    "frequency_hz": 0.988147288280112,
+    "duty_high": 0.5342465753424658
+  },
+  "timing_method": "ideal RC calculation using ln(2); not SPICE or physical measurement"
+}
