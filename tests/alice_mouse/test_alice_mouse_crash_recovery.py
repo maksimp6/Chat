@@ -1,10 +1,10 @@
 """Process-crash recovery using real subprocesses and real filesystem."""
+
 import os
 import signal
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from pathlib import Path
 
@@ -13,6 +13,7 @@ from alice_mouse_process_switch import alive, digest
 HOME = Path(__file__).resolve().parent
 SH = "/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh"
 BOOT = str(HOME / "alice_mouse_watchdog_v2.sh")
+
 
 class CrashRecoveryTests(unittest.TestCase):
     def setUp(self):
@@ -27,20 +28,18 @@ class CrashRecoveryTests(unittest.TestCase):
         self._program(self.candidate)
         self.target.write_bytes(self.backup.read_bytes())
         self.target.chmod(0o700)
-        self.old = subprocess.Popen([str(self.target), "serve"],
-                                    stdin=subprocess.DEVNULL,
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL,
-                                    start_new_session=True)
+        self.old = subprocess.Popen(
+            [str(self.target), "serve"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
         self.new_pids = []
         self.addCleanup(self._cleanup)
 
     def _program(self, file):
-        file.write_text(
-            f"#!{sys.executable}\n"
-            "import time\n"
-            "while True: time.sleep(0.05)\n"
-        )
+        file.write_text(f"#!{sys.executable}\nimport time\nwhile True: time.sleep(0.05)\n")
         file.chmod(0o700)
 
     def _cleanup(self):
@@ -75,8 +74,12 @@ class CrashRecoveryTests(unittest.TestCase):
             + "Crash(cfg,external_mouse_active=lambda: False).run()\n"
         )
         p = subprocess.run(
-            [sys.executable, "-c", code], cwd=HOME,
-            capture_output=True, text=True, timeout=4,
+            [sys.executable, "-c", code],
+            cwd=HOME,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=4,
         )
         return p.returncode
 
@@ -84,18 +87,21 @@ class CrashRecoveryTests(unittest.TestCase):
         env = os.environ.copy()
         env["ALICE_MOUSE_TEST_MODE"] = "1"
         env["ALICE_MOUSE_ROOT"] = str(self.dir)
-        return subprocess.run([SH, BOOT], env=env, capture_output=True,
-                              text=True, timeout=3)
+        return subprocess.run(
+            [SH, BOOT], env=env, check=False, capture_output=True, text=True, timeout=3
+        )
 
     def recover_simulated_next_boot(self):
         pending = self.dir / "cutover.pending"
         self.assertTrue(pending.exists())
-        self.assertNotEqual(self.boot_once().returncode, 0,
-                            "same-boot watchdog must leave fresh transaction alone")
+        self.assertNotEqual(
+            self.boot_once().returncode, 0, "same-boot watchdog must leave fresh transaction alone"
+        )
         pending.write_text("another-boot-id\n")
         (self.dir / "synthetic_active").touch()
-        self.assertNotEqual(self.boot_once().returncode, 0,
-                            "never restore while old mouse is active")
+        self.assertNotEqual(
+            self.boot_once().returncode, 0, "never restore while old mouse is active"
+        )
         self.assertTrue(pending.exists())
         if alive(self.old.pid):
             os.kill(self.old.pid, signal.SIGTERM)
@@ -107,7 +113,9 @@ class CrashRecoveryTests(unittest.TestCase):
         self.assertEqual(digest(self.target), digest(self.backup))
 
     def test_supervisor_crashes_after_install(self):
-        self.candidate.write_bytes(b"#!"+sys.executable.encode()+b"\nimport time\nwhile True: time.sleep(0.05)\n# v2\n")
+        self.candidate.write_bytes(
+            b"#!" + sys.executable.encode() + b"\nimport time\nwhile True: time.sleep(0.05)\n# v2\n"
+        )
         self.candidate.chmod(0o700)
         self.assertEqual(self._run_crash("before_stop"), 77)
         self.assertTrue(alive(self.old.pid))
@@ -115,12 +123,15 @@ class CrashRecoveryTests(unittest.TestCase):
         self.recover_simulated_next_boot()
 
     def test_supervisor_crashes_after_old_stopped(self):
-        self.candidate.write_bytes(b"#!"+sys.executable.encode()+b"\nimport time\nwhile True: time.sleep(0.05)\n# v2\n")
+        self.candidate.write_bytes(
+            b"#!" + sys.executable.encode() + b"\nimport time\nwhile True: time.sleep(0.05)\n# v2\n"
+        )
         self.candidate.chmod(0o700)
         self.assertEqual(self._run_crash("before_spawn"), 78)
         self.assertFalse(alive(self.old.pid))
         self.assertEqual((self.dir / "journal").read_text().strip(), "OLD_STOPPED")
         self.recover_simulated_next_boot()
+
 
 if __name__ == "__main__":
     unittest.main()
