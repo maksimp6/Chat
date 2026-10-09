@@ -1,8 +1,11 @@
 """Unprivileged policy gate for mouse requests.
 No root, no input device and no network server.
 """
+
 import socket
+
 from alice_mouse_policy import authorize, parse_mouse_command
+
 
 class MouseBridge:
     def __init__(self, socket_path, allowed_apps):
@@ -14,9 +17,14 @@ class MouseBridge:
         if parsed is None:
             return {"ok": False, "error": "invalid_command"}
         action, x, y = parsed
-        decision = authorize(role, action, foreground=foreground,
-                             allowed_apps=self.allowed_apps,
-                             sensitive=sensitive, confirmed=confirmed)
+        decision = authorize(
+            role,
+            action,
+            foreground=foreground,
+            allowed_apps=self.allowed_apps,
+            sensitive=sensitive,
+            confirmed=confirmed,
+        )
         if not decision.allowed:
             return {"ok": False, "error": decision.reason}
         try:
@@ -27,4 +35,7 @@ class MouseBridge:
                 response = sock.recv(16)
         except (OSError, TimeoutError):
             return {"ok": False, "error": "bridge_unavailable"}
-        return {"ok": response == b"OK\n", "error": None if response == b"OK\n" else "device_denied"}
+        return {
+            "ok": response == b"OK\n",
+            "error": None if response == b"OK\n" else "device_denied",
+        }
