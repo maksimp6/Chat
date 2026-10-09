@@ -3,6 +3,7 @@
 Requires the Alice Mouse test modules and compiled C fixture to be installed
 in the test environment. No production mouse or Magisk access is performed.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -15,10 +16,24 @@ GROUPS = (
     ("process", ("test_alice_mouse_process_switch",)),
     ("crash", ("test_alice_mouse_crash_recovery",)),
     ("http", ("test_alice_mouse_http_stage", "test_alice_mouse_e2e_synthetic")),
-    ("policy", ("test_alice_mouse_root_bridge", "test_alice_mouse_supervisor",
-                "test_alice_mouse_policy", "test_alice_mouse_broker")),
-    ("socket", ("test_alice_mouse_boot_recovery", "test_alice_mouse_shared_lock",
-                "test_alice_mouse_socket", "test_alice_mouse_bridge")),
+    (
+        "policy",
+        (
+            "test_alice_mouse_root_bridge",
+            "test_alice_mouse_supervisor",
+            "test_alice_mouse_policy",
+            "test_alice_mouse_broker",
+        ),
+    ),
+    (
+        "socket",
+        (
+            "test_alice_mouse_boot_recovery",
+            "test_alice_mouse_shared_lock",
+            "test_alice_mouse_socket",
+            "test_alice_mouse_bridge",
+        ),
+    ),
 )
 EXPECTED_TESTS = 52
 
@@ -29,7 +44,10 @@ def run_group(group: tuple[str, tuple[str, ...]]) -> tuple[str, float, int, str]
     result = subprocess.run(
         [sys.executable, "-m", "unittest", "-q", *modules],
         cwd=Path(__file__).resolve().parent,
-        capture_output=True, text=True, timeout=35, check=False,
+        capture_output=True,
+        text=True,
+        timeout=35,
+        check=False,
     )
     return name, time.perf_counter() - started, result.returncode, result.stderr
 
