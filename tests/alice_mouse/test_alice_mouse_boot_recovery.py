@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = str(Path.home() / "alice_mouse_watchdog_v2.sh")
+SCRIPT = str(Path(__file__).with_name("alice_mouse_watchdog_v2.sh"))
 
 
 class BootRecoveryTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class BootRecoveryTests(unittest.TestCase):
     def run_once(self):
         env = os.environ.copy()
         env.update(ALICE_MOUSE_TEST_MODE="1", ALICE_MOUSE_ROOT=str(self.root))
-        return subprocess.run(["/system/bin/sh", SCRIPT],
+        return subprocess.run(["/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh", SCRIPT],
                               env=env, capture_output=True, text=True,
                               timeout=3)
 
