@@ -28,5 +28,3 @@ class MouseBridge:
         except (OSError, TimeoutError):
             return {"ok": False, "error": "bridge_unavailable"}
         return {"ok": response == b"OK\n", "error": None if response == b"OK\n" else "device_denied"}
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
