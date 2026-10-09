@@ -43,5 +43,3 @@ class UnixPeerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
