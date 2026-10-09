@@ -1,0 +1,22 @@
+test_all_nominal_component_values (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_all_nominal_component_values) ... ok
+test_all_pins_connected_with_no_extra_nets_or_shorts (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_all_pins_connected_with_no_extra_nets_or_shorts) ... ok
+test_component_inventory_symbols_and_polarity (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_component_inventory_symbols_and_polarity) ... ok
+test_evidence_matches_editable_source_project_and_outputs (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_evidence_matches_editable_source_project_and_outputs) ... ok
+test_led_current_and_resistor_power_upper_bounds (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_led_current_and_resistor_power_upper_bounds) ... ok
+test_led_series_resistor_and_orientation (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_led_series_resistor_and_orientation) ... ok
+test_negative_mutation_detects_changed_resistor_value (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_negative_mutation_detects_changed_resistor_value) ... ok
+test_negative_mutation_detects_disconnected_reset_pin (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_negative_mutation_detects_disconnected_reset_pin) ... ok
+test_negative_mutation_detects_reversed_led (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_negative_mutation_detects_reversed_led) ... ok
+test_nominal_frequency_high_low_and_duty (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_nominal_frequency_high_low_and_duty) ... ok
+test_recorded_erc_has_no_violations_including_exclusions (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_recorded_erc_has_no_violations_including_exclusions) ... ok
+test_supply_reset_ground_and_bypass (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_supply_reset_ground_and_bypass) ... ok
+test_timing_discharge_and_control_nets (tests.test_kicad_ne555_demo.ArchivedCircuitTests.test_timing_discharge_and_control_nets) ... ok
+test_live_erc_zero_errors_warnings_and_exclusions (tests.test_kicad_ne555_demo.LiveKiCadTests.test_live_erc_zero_errors_warnings_and_exclusions) ... ok
+test_live_mutation_detects_r2_value_change (tests.test_kicad_ne555_demo.LiveKiCadTests.test_live_mutation_detects_r2_value_change) ... ok
+test_live_mutation_detects_reset_supply_disconnection (tests.test_kicad_ne555_demo.LiveKiCadTests.test_live_mutation_detects_reset_supply_disconnection) ... ok
+test_live_netlist_matches_archived_electrical_data (tests.test_kicad_ne555_demo.LiveKiCadTests.test_live_netlist_matches_archived_electrical_data) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 1.302s
+
+OK
