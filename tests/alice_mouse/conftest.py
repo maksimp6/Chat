@@ -4,6 +4,7 @@ The dedicated unittest workflow builds this fixture explicitly. Generic
 application and PostgreSQL pytest jobs also collect these tests, so they
 must have the same prerequisite instead of failing during setUp.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -27,8 +28,15 @@ def alice_mouse_c_fixture(request: pytest.FixtureRequest) -> None:
         return
     subprocess.run(
         [
-            "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-O2",
-            str(SOURCE), "-o", str(BINARY),
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-O2",
+            str(SOURCE),
+            "-o",
+            str(BINARY),
         ],
         check=True,
         timeout=30,
