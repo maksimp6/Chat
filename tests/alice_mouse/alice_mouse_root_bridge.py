@@ -4,6 +4,7 @@ One root process owns a unix socket in Termux private directory. It validates
 SO_PEERCRED against the exact Termux app UID and forwards only bounded move/click.
 No shell execution of user input, no HTTP listener and no text injection.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -14,8 +15,6 @@ import socket
 import stat
 import struct
 import subprocess
-import sys
-import time
 from pathlib import Path
 
 TERMUX_DIR = Path("/data/data/com.termux/files/home/.alice-rdc")
@@ -41,20 +40,19 @@ def focus_is_safe() -> bool:
     try:
         result = subprocess.run(
             ["/system/bin/dumpsys", "window"],
-            capture_output=True, timeout=2, text=True, check=True,
+            capture_output=True,
+            timeout=2,
+            text=True,
+            check=True,
         )
-        line = next(
-            (line for line in result.stdout.splitlines()
-             if "mCurrentFocus=" in line), ""
-        )
+        line = next((line for line in result.stdout.splitlines() if "mCurrentFocus=" in line), "")
         return EXPECTED_BROWSER + "/" in line
     except (OSError, subprocess.SubprocessError):
         return False
 
 
 def identity(peer: socket.socket) -> tuple[int, int, int]:
-    raw = peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
-                          struct.calcsize("3i"))
+    raw = peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
     return struct.unpack("3i", raw)
 
 
@@ -108,7 +106,7 @@ def run(uid: int, *, path: Path = SOCKET_PATH, one_shot: bool = False) -> None:
         while not stop:
             try:
                 peer, _ = server.accept()
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except InterruptedError:
                 continue
@@ -120,7 +118,9 @@ def run(uid: int, *, path: Path = SOCKET_PATH, one_shot: bool = False) -> None:
                         peer.sendall(b"DENIED wrong_uid\n")
                         continue
                     payload = peer.recv(MAX_REQUEST + 1)
-                    answer = dispatch(payload) if len(payload) <= MAX_REQUEST else b"DENIED too_long\n"
+                    answer = (
+                        dispatch(payload) if len(payload) <= MAX_REQUEST else b"DENIED too_long\n"
+                    )
                     peer.sendall(answer)
                 except (OSError, TimeoutError):
                     pass
