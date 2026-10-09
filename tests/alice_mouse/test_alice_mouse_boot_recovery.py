@@ -23,9 +23,14 @@ class BootRecoveryTests(unittest.TestCase):
     def run_once(self):
         env = os.environ.copy()
         env.update(ALICE_MOUSE_TEST_MODE="1", ALICE_MOUSE_ROOT=str(self.root))
-        return subprocess.run(["/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh", SCRIPT],
-                              env=env, capture_output=True, text=True,
-                              timeout=3)
+        return subprocess.run(
+            ["/system/bin/sh" if Path("/system/bin/sh").exists() else "/bin/sh", SCRIPT],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
 
     def test_recovers_stale_pending(self):
         result = self.run_once()
@@ -57,6 +62,7 @@ class BootRecoveryTests(unittest.TestCase):
 
     def test_current_boot_stale_recovers(self):
         import time
+
         boot_id = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
         self.pending.write_text(boot_id + "\n")
         old = time.time() - 61
