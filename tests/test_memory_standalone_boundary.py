@@ -91,3 +91,20 @@ def test_legacy_namespaced_transaction_api_is_removed():
     }
     assert "transaction" not in methods, "Use the single value_transaction owner"
     assert "delete" not in methods, "Remove legacy namespaced delete after migration"
+
+
+
+def test_public_contract_replaces_legacy_namespaced_operations():
+    """Ensure essential legacy behaviors are exercised through public v1 tests."""
+    acceptance = (ROOT.parent / "tests" / "test_memory_v1_acceptance.py").read_text(
+        encoding="utf-8"
+    )
+    required = (
+        "test_value_transaction_rollback_on_exception",
+        "test_value_transaction_cannot_be_nested",
+        "test_two_threads_cannot_claim_same_queued_record",
+        "test_complete_frame_after_uncertain_fsync_replays_on_reopen",
+        "test_backup_restore_and_subsequent_commit",
+    )
+    for test_name in required:
+        assert f"def {test_name}(" in acceptance, test_name
