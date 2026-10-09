@@ -226,5 +226,3 @@ class ProcessSwitch:
                     journal_write(cfg.journal, "MANUAL_RECOVERY_REQUIRED")
                     raise
                 raise
-
-[executed on device: localhost (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
