@@ -1,0 +1,20 @@
+{"id":"synthetic-001","source":"sms","category":"bank_transaction","text":"Покупка на [AMOUNT] в [MERCHANT]. Остаток [BALANCE].","synthetic":true,"language":"ru"}
+{"id":"synthetic-002","source":"sms","category":"bank_transfer","text":"Перевод на [BANK] выполнен. Сумма [AMOUNT].","synthetic":true,"language":"ru"}
+{"id":"synthetic-003","source":"sms","category":"bank_transfer","text":"Запрос на перевод [AMOUNT] ожидает подтверждения.","synthetic":true,"language":"ru"}
+{"id":"synthetic-004","source":"sms","category":"otp","text":"Код подтверждения: [OTP_REDACTED]. Никому его не сообщайте.","synthetic":true,"language":"ru"}
+{"id":"synthetic-005","source":"sms","category":"otp","text":"Для входа используйте [OTP_REDACTED].","synthetic":true,"language":"ru"}
+{"id":"synthetic-006","source":"sms","category":"delivery","text":"Заказ [ORDER_ID] прибыл в пункт выдачи [PICKUP_POINT].","synthetic":true,"language":"ru"}
+{"id":"synthetic-007","source":"sms","category":"delivery","text":"Курьер доставит заказ в интервале [TIME_WINDOW].","synthetic":true,"language":"ru"}
+{"id":"synthetic-008","source":"sms","category":"retail_offer","text":"Активирована акция: скидка [DISCOUNT] на категорию [CATEGORY].","synthetic":true,"language":"ru"}
+{"id":"synthetic-009","source":"sms","category":"retail_offer","text":"Начислены бонусы [POINTS] за покупку.","synthetic":true,"language":"ru"}
+{"id":"synthetic-010","source":"sms","category":"retail_offer","text":"Срок действия предложения заканчивается [DATE].","synthetic":true,"language":"ru"}
+{"id":"synthetic-011","source":"sms","category":"spam","text":"Получите приз по ссылке [URL_REDACTED].","synthetic":true,"language":"ru"}
+{"id":"synthetic-012","source":"sms","category":"spam","text":"Вам одобрен заём. Подробности: [URL_REDACTED].","synthetic":true,"language":"ru"}
+{"id":"synthetic-013","source":"notification","category":"system","text":"Доступно обновление приложения [APP].","synthetic":true,"language":"ru"}
+{"id":"synthetic-014","source":"notification","category":"system","text":"Заряд аккумулятора ниже [PERCENT].","synthetic":true,"language":"ru"}
+{"id":"synthetic-015","source":"notification","category":"security","text":"Обнаружена попытка входа с устройства [DEVICE_REDACTED].","synthetic":true,"language":"ru"}
+{"id":"synthetic-016","source":"notification","category":"security","text":"Приложение запрашивает доступ к [PERMISSION].","synthetic":true,"language":"ru"}
+{"id":"synthetic-017","source":"notification","category":"messaging","text":"Новое сообщение от [SENDER_REDACTED].","synthetic":true,"language":"ru"}
+{"id":"synthetic-018","source":"notification","category":"retail_offer","text":"Персональное предложение: [DISCOUNT] на [CATEGORY].","synthetic":true,"language":"ru"}
+{"id":"synthetic-019","source":"notification","category":"bank_transaction","text":"Оплата [AMOUNT] успешно выполнена.","synthetic":true,"language":"ru"}
+{"id":"synthetic-020","source":"notification","category":"delivery","text":"Заказ готов к получению в [PICKUP_POINT].","synthetic":true,"language":"ru"}
