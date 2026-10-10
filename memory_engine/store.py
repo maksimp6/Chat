@@ -364,12 +364,6 @@ class _JournalEngine:
                     self._lock_file.close()
                 self._closed = True
 
-    def __enter__(self) -> "_JournalEngine":
-        return self
-
-    def __exit__(self, *_args: object) -> None:
-        self.close()
-
 
 class MemoryStore:
     """Client-owned name/value API with explicit durable journal commits."""
