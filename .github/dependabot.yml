@@ -1,3 +1,9 @@
+# Dependency update policy: docs/development/dependency-updates.md
+#
+# Version updates: minor and patch releases of one ecosystem arrive as one
+# grouped PR per directory; every major release gets its own PR.
+# Security updates are not grouped here and ignore the cooldown and the
+# open-pull-requests-limit, so they stay separate and visible.
 version: 2
 
 updates:
@@ -9,15 +15,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
-    labels: [dependencies]
+    labels: [dependencies, python]
     commit-message:
       prefix: "chore(deps)"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
     groups:
-      python-minor:
-        update-types: [minor]
+      python-minor-patch:
+        update-types: [minor, patch]
 
   - package-ecosystem: gradle
     directory: "/android"
@@ -30,25 +33,57 @@ updates:
     labels: [dependencies, android]
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      android-minor-patch:
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
     labels: [dependencies, github_actions]
     commit-message:
       prefix: "ci(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
 
   - package-ecosystem: docker
-    directory: "/"
+    directories:
+      - "/"
+      - "/deploy/chrome-worker"
+      - "/deploy/oauth-idp"
+      - "/deploy/remote-desktop-commander"
     schedule:
       interval: weekly
+      day: monday
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
     labels: [dependencies]
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/deploy/chrome-worker"
+      - "/deploy/remote-desktop-commander"
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    labels: [dependencies, javascript]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
