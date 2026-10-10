@@ -22,3 +22,7 @@ This is an isolated Integration & QA-owned test slice, **not a combined driver i
 ## Independent review fix: C-owned fixture ABI
 
 The signed-to-C test no longer casts an arbitrary Python `ctypes.create_string_buffer(1024)` to `alice_keyboard*`. `keyboard_fixture.c` now owns allocation/alignment and the exact C struct size via `calloc(sizeof(alice_keyboard_fixture))`; Python holds only an opaque pointer with declared ctypes signatures and explicit free. Combined Security+Keyboard temporary fixture: **4/4 integration tests PASS** on Redmi 9. Still not a production FFI boundary or physical root E2E.
+
+## Review fix: exception-safe C fixture and explicit ABI
+
+`test_signed_c_keyboard.py` now registers C close/free immediately after allocation using `ExitStack`, before identity/session setup and socket startup; a successfully started endpoint is stopped before C fixture cleanup. The fixture function signatures explicitly declare `c_int` return types and `None` for free. Combined local checkout rerun: **4/4 PASS**. Fault-injection specifically during authority setup is still recommended before calling this independently reviewed.
