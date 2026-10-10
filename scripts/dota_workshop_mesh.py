@@ -3,15 +3,16 @@
 A minimal, deterministic geometry-only stage for the Dota 2 Workshop pipeline.
 Unsupported geometry is rejected rather than silently approximated.
 """
+
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
 import hashlib
 import json
 import math
-from pathlib import Path
 import struct
+from collections import Counter, defaultdict
+from pathlib import Path
 
 
 class MeshError(ValueError):
@@ -84,18 +85,14 @@ def select_mesh(doc: dict, binary: bytes, name: str) -> tuple[list, list]:
     if primitive.get("mode", 4) != 4:
         raise MeshError("Non-triangle mesh")
     points = accessor(doc, binary, primitive["attributes"]["POSITION"])
-    indices = [
-        index[0] for index in accessor(doc, binary, primitive["indices"])
-    ]
+    indices = [index[0] for index in accessor(doc, binary, primitive["indices"])]
     if not points or len(indices) % 3:
         raise MeshError("Empty mesh or invalid triangle indices")
     if any(not all(math.isfinite(v) for v in point) for point in points):
         raise MeshError("Non-finite vertex coordinates")
     if any(index < 0 or index >= len(points) for index in indices):
         raise MeshError("Triangle refers to missing vertex")
-    return points, [
-        tuple(indices[k : k + 3]) for k in range(0, len(indices), 3)
-    ]
+    return points, [tuple(indices[k : k + 3]) for k in range(0, len(indices), 3)]
 
 
 def weld(points: list, faces: list, digits: int) -> tuple[list, list]:
@@ -122,11 +119,13 @@ def topology(faces: list) -> tuple[dict, list]:
     boundary = [pairs[0] for pairs in directed.values() if len(pairs) == 1]
     extra = sum(len(pairs) > 2 for pairs in directed.values())
     winding = sum(
-        len(pairs) == 2 and pairs[0] == pairs[1]
-        for pairs in directed.values()
+        len(pairs) == 2 and pairs[0] == pairs[1] for pairs in directed.values()
     )
-    return {"open_edges": len(boundary), "nonmanifold_edges": extra,
-            "winding_conflicts": winding}, boundary
+    return {
+        "open_edges": len(boundary),
+        "nonmanifold_edges": extra,
+        "winding_conflicts": winding,
+    }, boundary
 
 
 def boundary_loops(boundary: list) -> list[list[int]]:
@@ -158,6 +157,7 @@ def boundary_loops(boundary: list) -> list[list[int]]:
 def cap_loop(points: list, original_direction: list[int]) -> list:
     # Reverse the existing directed boundary for consistently oriented caps.
     loop = list(reversed(original_direction))
+
     # Choose the projection with the largest actual polygon area.
     # Narrow slits can have two large but almost collinear dimensions.
     def projection(pair):
@@ -168,15 +168,14 @@ def cap_loop(points: list, original_direction: list[int]) -> list:
             for k in range(len(coords))
         )
         return coords, area
+
     options = [projection(pair) for pair in ((0, 1), (0, 2), (1, 2))]
     flat, signed = max(options, key=lambda value: abs(value[1]))
 
     def cross(a, b, c):
         x, y = flat[a], flat[b]
         z = flat[c]
-        return (y[0] - x[0]) * (z[1] - x[1]) - (
-            y[1] - x[1]
-        ) * (z[0] - x[0])
+        return (y[0] - x[0]) * (z[1] - x[1]) - (y[1] - x[1]) * (z[0] - x[0])
 
     signed = sum(
         flat[i][0] * flat[(i + 1) % len(flat)][1]
@@ -202,7 +201,8 @@ def cap_loop(points: list, original_direction: list[int]) -> list:
                 sign * cross(a, b, v) >= -1e-12
                 and sign * cross(b, c, v) >= -1e-12
                 and sign * cross(c, a, v) >= -1e-12
-                for v in remaining if v not in (a, b, c)
+                for v in remaining
+                if v not in (a, b, c)
             ):
                 continue
             triangles.append((loop[a], loop[b], loop[c]))
@@ -217,8 +217,8 @@ def cap_loop(points: list, original_direction: list[int]) -> list:
                 for axis in range(3)
             )
             if any(
-                sum((points[loop[k]][axis] - center[axis]) ** 2
-                    for axis in range(3)) < 1e-16
+                sum((points[loop[k]][axis] - center[axis]) ** 2 for axis in range(3))
+                < 1e-16
                 for k in range(len(loop))
             ):
                 raise MeshError("Boundary fan would contain degenerate faces")
@@ -248,11 +248,13 @@ def closed_mesh(points: list, faces: list) -> tuple[list, int]:
 
 def components(faces: list) -> int:
     parents: dict[int, int] = {}
+
     def root(i):
         parents.setdefault(i, i)
         if parents[i] != i:
             parents[i] = root(parents[i])
         return parents[i]
+
     for a, b, c in faces:
         parents[root(b)] = root(a)
         parents[root(c)] = root(a)
@@ -276,10 +278,7 @@ def physical_mesh(
     if min(extent) <= 0 or longest_mm <= 0:
         raise MeshError("Invalid geometry scale")
     factor = longest_mm / max(extent)
-    scaled = [
-        tuple((p[i] - minimum[i]) * factor for i in range(3))
-        for p in oriented
-    ]
+    scaled = [tuple((p[i] - minimum[i]) * factor for i in range(3)) for p in oriented]
     return scaled, [e * factor for e in extent]
 
 
@@ -296,6 +295,7 @@ def export_ascii_stl(path: Path, points: list, faces: list):
         if length < 1e-9:
             raise MeshError("Degenerate physical triangle")
         return tuple(x / length for x in n)
+
     with path.open("w", encoding="ascii") as f:
         f.write("solid dota_ember_spirit_weapon\n")
         for a, b, c in faces:
@@ -309,9 +309,15 @@ def export_ascii_stl(path: Path, points: list, faces: list):
         f.write("endsolid dota_ember_spirit_weapon\n")
 
 
-def convert(glb: Path, name: str, stl: Path, report: Path,
-            length_mm: float = 110, digits: int = 4,
-            orientation: str = "weapon"):
+def convert(
+    glb: Path,
+    name: str,
+    stl: Path,
+    report: Path,
+    length_mm: float = 110,
+    digits: int = 4,
+    orientation: str = "weapon",
+):
     doc, binary = read_glb(glb)
     source, tris = select_mesh(doc, binary, name)
     verts, faces = weld(source, tris, digits)
@@ -357,11 +363,16 @@ def main():
     parser.add_argument("--stl", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--length-mm", type=float, default=110)
-    parser.add_argument("--orientation", choices=("head", "weapon"),
-                        default="weapon")
+    parser.add_argument("--orientation", choices=("head", "weapon"), default="weapon")
     args = parser.parse_args()
-    data = convert(args.glb, args.mesh, args.stl, args.report,
-                   args.length_mm, orientation=args.orientation)
+    data = convert(
+        args.glb,
+        args.mesh,
+        args.stl,
+        args.report,
+        args.length_mm,
+        orientation=args.orientation,
+    )
     print(json.dumps(data, indent=2))
 
 
