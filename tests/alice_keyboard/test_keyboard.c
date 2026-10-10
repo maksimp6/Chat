@@ -69,4 +69,27 @@ static void syn_fault(void){
     assert(!alice_keyboard_close(&k));
     puts("failed-SYN recovery: PASS");
 }
-int main(void){basic();lease();failure();stuck();syn_fault();return 0;}
+static void autonomous_watchdog_contract(void){
+    mock m={0};alice_keyboard k;
+    assert(!alice_keyboard_init(&k,&m,emit,clock_fn));
+    assert(!alice_keyboard_down(&k,KEY_LEFTCTRL));
+    m.now=ALICE_KEY_LEASE_MS+30000;
+    /* RED: without external tick() call, the driver must release a held key. */
+    assert(k.held_count==0 && m.up>=1);
+    puts("autonomous-watchdog: PASS");
+}
+static void failed_release_requires_device_teardown(void){
+    mock m={0};alice_keyboard k;
+    assert(!alice_keyboard_init(&k,&m,emit,clock_fn));
+    assert(!alice_keyboard_down(&k,KEY_A));
+    m.fail_up=1;
+    assert(alice_keyboard_close(&k)==-EIO);
+    /* RED: failure must trigger a kernel-device teardown fallback. */
+    assert(k.held_count==0);
+    puts("device-teardown-on-release-failure: PASS");
+}
+int main(int argc,char **argv){
+    if(argc>1 && strcmp(argv[1],"red-watchdog")==0){autonomous_watchdog_contract();return 0;}
+    if(argc>1 && strcmp(argv[1],"red-teardown")==0){failed_release_requires_device_teardown();return 0;}
+    basic();lease();failure();stuck();syn_fault();return 0;
+}
