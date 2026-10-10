@@ -225,7 +225,17 @@ class ProtectedVerifier:
                 data["seq"]<=self.seq):
                 raise GrantError("expired, revoked or replayed session")
             self.seq=data["seq"]
-            return bool(self.dispatch(data["action"],data["payload"]))
+            try:
+                accepted=self.dispatch(data["action"],data["payload"])
+            except Exception as exc:
+                # Physical dispatch may have partially executed. Revoke this
+                # session so no further input is permitted after a fault.
+                self.revoke()
+                raise GrantError("input backend failed; session revoked") from exc
+            if accepted is not True:
+                self.revoke()
+                raise GrantError("input backend denied; session revoked")
+            return True
 
     def revoke(self) -> None:
         with self.lock:

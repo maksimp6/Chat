@@ -49,3 +49,7 @@ The server now opens its parent directory with `O_DIRECTORY|O_NOFOLLOW`, retains
 ## Server worker startup fault (2026-10-10)
 
 An injected `threading.Thread.start()` failure previously left a bound socket and an unstarted thread, causing cleanup errors. Startup now closes the socket, removes only the owned inode, releases the pinned parent descriptor and resets instance state. The test also verifies a subsequent clean start. 71 isolated Python tests pass. This does not replace the pending cross-UID/SELinux and root E2E.
+
+## Fail-closed backend dispatch (staging)
+
+A signed packet that reaches a failing physical backend is no longer treated as a recoverable success. An exception or explicit rejection revokes the verifier session, denies the command, and prevents further commands on that session. Isolated tests inject both backend exceptions and false returns, verifying that the Unix server remains alive but denies subsequent grants. This is **not** proof of physical KEY_UP: the privileged driver still needs its own watchdog and UI_DEV_DESTROY fallback.
