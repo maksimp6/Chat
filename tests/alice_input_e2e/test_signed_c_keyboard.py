@@ -22,7 +22,8 @@ C_HEADER = C_DRIVER.with_name("keyboard.h")
 SECURITY = ROOT / "alice_mouse/security/grants.py"
 
 
-def test_signed_socket_to_c_keyboard_chord_and_fault():
+@pytest.mark.parametrize("inject_auth_failure", [False, True])
+def test_signed_socket_to_c_keyboard_chord_and_fault(monkeypatch, inject_auth_failure):
     assert C_DRIVER.is_file() and C_HEADER.is_file() and SECURITY.is_file(), (
         "Requires both #1090 and #1091 in integration checkout"
     )
@@ -73,6 +74,8 @@ def test_signed_socket_to_c_keyboard_chord_and_fault():
         lib.alice_fixture_close.restype = ctypes.c_int
         lib.alice_fixture_free.argtypes = [ctypes.c_void_p]
         lib.alice_fixture_free.restype = None
+        for counter in ("alice_fixture_live_count", "alice_fixture_close_count", "alice_fixture_free_count"):
+            getattr(lib, counter).restype = ctypes.c_int
         keyboard = lib.alice_fixture_new(None, emit, clock)
         assert keyboard, "C fixture allocation failed"
 
@@ -82,43 +85,55 @@ def test_signed_socket_to_c_keyboard_chord_and_fault():
             principal = AuthenticatedPrincipal("owner", "redmi9", "controller")
             authority = SessionAuthority("owner", "redmi9",
                                          identity_verifier=lambda p: p is principal)
-            authority.authorize(principal)
-            key = secrets.token_bytes(32)
-            signer = TrustedSigner(authority, key)
+            if inject_auth_failure:
+                def fail_authorization(_principal):
+                    raise RuntimeError("injected authority authorization failure")
+                monkeypatch.setattr(authority, "authorize", fail_authorization)
+                with pytest.raises(RuntimeError, match="injected authority authorization failure"):
+                    authority.authorize(principal)
+                assert lib.alice_fixture_live_count() == 1
+            else:
+                authority.authorize(principal)
+                key = secrets.token_bytes(32)
+                signer = TrustedSigner(authority, key)
 
-            def dispatch(action, payload):
-                code = payload["key"]
-                if action == "key_down":
-                    return lib.alice_fixture_down(keyboard, code) == 0
-                if action == "key_up":
-                    return lib.alice_fixture_up(keyboard, code) == 0
-                return False
+                def dispatch(action, payload):
+                    code = payload["key"]
+                    if action == "key_down":
+                        return lib.alice_fixture_down(keyboard, code) == 0
+                    if action == "key_up":
+                        return lib.alice_fixture_up(keyboard, code) == 0
+                    return False
 
-            verifier = ProtectedVerifier(key, "owner", "redmi9", dispatch=dispatch)
-            verifier.provision(authority, principal)
-            endpoint = SignedInputSocket(root / "input.sock", verifier,
-                                         peer_uid=os.getuid())
-            endpoint.start()
-            stack.callback(endpoint.stop)
-            def send(packet):
-                with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
-                    client.settimeout(2)
-                    client.connect(str(endpoint.path))
-                    client.sendall(packet)
-                    return client.recv(64)
-            assert send(b"key_down 30") == b"DENIED\n"
-            for action, code in [
-                ("key_down", 29), ("key_down", 30),
-                ("key_up", 30), ("key_up", 29),
-            ]:
-                packet = signer.sign(principal, InputGrant(action, {"key": code}))
-                assert send(packet) == b"OK\n"
-            assert [e for e in events if e[0] == 1] == [
-                (1, 29, 1), (1, 30, 1), (1, 30, 0), (1, 29, 0)
-            ]
-            fail_up[0] = True
-            assert send(signer.sign(principal, InputGrant(
-                "key_down", {"key": 30}))) == b"OK\n"
-            assert send(signer.sign(principal, InputGrant(
-                "key_up", {"key": 30}))) == b"DENIED\n"
-            assert verifier.session is None
+                verifier = ProtectedVerifier(key, "owner", "redmi9", dispatch=dispatch)
+                verifier.provision(authority, principal)
+                endpoint = SignedInputSocket(root / "input.sock", verifier,
+                                             peer_uid=os.getuid())
+                endpoint.start()
+                stack.callback(endpoint.stop)
+                def send(packet):
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
+                        client.settimeout(2)
+                        client.connect(str(endpoint.path))
+                        client.sendall(packet)
+                        return client.recv(64)
+                assert send(b"key_down 30") == b"DENIED\n"
+                for action, code in [
+                    ("key_down", 29), ("key_down", 30),
+                    ("key_up", 30), ("key_up", 29),
+                ]:
+                    packet = signer.sign(principal, InputGrant(action, {"key": code}))
+                    assert send(packet) == b"OK\n"
+                assert [e for e in events if e[0] == 1] == [
+                    (1, 29, 1), (1, 30, 1), (1, 30, 0), (1, 29, 0)
+                ]
+                fail_up[0] = True
+                assert send(signer.sign(principal, InputGrant(
+                    "key_down", {"key": 30}))) == b"OK\n"
+                assert send(signer.sign(principal, InputGrant(
+                    "key_up", {"key": 30}))) == b"DENIED\n"
+                assert verifier.session is None
+
+        assert lib.alice_fixture_live_count() == 0
+        assert lib.alice_fixture_close_count() == 1
+        assert lib.alice_fixture_free_count() == 1

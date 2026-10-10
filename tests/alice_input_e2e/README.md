@@ -34,3 +34,7 @@ The signed-to-C test no longer casts an arbitrary Python `ctypes.create_string_b
 ## Real C allocation / injected authorization failure
 
 `test_real_fixture_fault.py` compiles the C fixture with test-only live/close/free counters, allocates a real `alice_keyboard_fixture` via C, then injects an authorization exception while Python `ExitStack` is active. It verifies exactly one C close, exactly one free and zero live allocations. Combined local Security+Keyboard checkout: **7/7 integration tests PASS** on Redmi 9. The exception is injected at the Python authorization boundary; no real Live Server login, root process or physical input occurs.
+
+## Authorization-path fault injection
+
+The main signed-to-C keyboard integration test now has a parametrized branch that monkeypatches the real `SessionAuthority.authorize()` call to throw after the C fixture is allocated. Test-only C counters verify that `ExitStack` performs exactly one close/free and leaves zero live fixtures. Combined temporary checkout: **8/8 PASS** on Redmi 9. No physical uinput or cross-UID root service was touched.
