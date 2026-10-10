@@ -46,8 +46,8 @@ class SignedInputSocket:
         try:
             server.settimeout(0.1)
             server.bind(str(self.path))
-            os.chmod(self.path,0o600)
             self._inode=self.path.lstat().st_ino
+            os.chmod(self.path,0o600)
             server.listen(4)
         except Exception:
             server.close()
