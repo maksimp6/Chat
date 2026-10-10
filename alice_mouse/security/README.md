@@ -21,3 +21,9 @@ Root-side action-specific payload validation now rejects unknown fields, invalid
 ## Identity verifier contract (GREEN local, still not deployed)
 
 `SessionAuthority` now fails closed unless a **trusted Live Server-provided** `identity_verifier` callback positively authenticates the controller identity. Matching public `AuthenticatedPrincipal` fields alone is insufficient. The callback is an integration boundary, not a standalone authentication system: a caller controlling authority construction or callback can bypass it. Production must instantiate it only inside the trusted server with verified login/session context and protect root key handoff independently. Test fixture uses object identity solely to prove same-field forgery is rejected.
+
+## Isolated Unix transport (2026-10-10)
+
+`SignedInputSocket` is a lab-only Unix `SOCK_SEQPACKET` boundary: it refuses pre-existing socket paths, requires an owned private directory, restricts the socket to mode 0600, checks Linux `SO_PEERCRED` UID and accepts only bounded signed grants through `ProtectedVerifier`. It has no sign/provision endpoint, no plaintext fallback, no uinput access, and cleans up only its own socket inode. Eight socket tests plus existing security tests pass locally.
+
+**Not a production root trust boundary:** these tests run under the Termux UID. A real root-owned immutable deployment, credential/key handoff, trusted Live Server authentication, action-level confirmation, crash/restart E2E, independent review and rollback remain blocking. Do not replace the live root bridge with this code yet.
