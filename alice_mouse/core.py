@@ -147,6 +147,29 @@ class MouseModule:
         self.held=set()
         self.deadline_ns=None
         self.active=False
+        self._lease_timer=None
+        self._lease_generation=0
+
+    def _cancel_lease_timer(self):
+        self._lease_generation+=1
+        timer=self._lease_timer
+        self._lease_timer=None
+        if timer is not None:timer.cancel()
+
+    def _arm_lease_timer(self):
+        self._cancel_lease_timer()
+        generation=self._lease_generation
+        timer=threading.Timer(1.5,self._lease_expired,args=(generation,))
+        timer.daemon=True
+        self._lease_timer=timer
+        timer.start()
+
+    def _lease_expired(self,generation):
+        with self.lock:
+            if generation!=self._lease_generation or not self.held:return
+            try:self._release()
+            except MouseError:pass  # fail closed: active=False; no further input
+            finally:self.hide()
 
     def start(self,*,authorized:bool,key:bytes)->str:
         if authorized is not True or type(key) is not bytes or len(key)!=32:
@@ -225,24 +248,31 @@ class MouseModule:
                 # Track BEFORE writing; partial writes remain releasable.
                 self.held.add(cmd.button)
                 self.deadline_ns=self.clock()+1_500_000_000
+                self._arm_lease_timer()
                 self.backend.emit("down",button=cmd.button)
             elif cmd.action=="up":
                 if cmd.button not in self.held:
                     raise MouseError("button is not held")
                 self.backend.emit("up",button=cmd.button)
                 self.held.remove(cmd.button)
-                if not self.held:self.deadline_ns=None
+                if not self.held:
+                    self.deadline_ns=None
+                    self._cancel_lease_timer()
             elif cmd.action=="click":
                 self.backend.emit("move",cmd.x,cmd.y)
                 self.held.add(1)
+                self._arm_lease_timer()
                 self.backend.emit("down",button=1)
                 self.backend.emit("up",button=1)
                 self.held.remove(1)
+                self._cancel_lease_timer()
             elif cmd.action=="right":
                 self.held.add(2)
+                self._arm_lease_timer()
                 self.backend.emit("down",button=2)
                 self.backend.emit("up",button=2)
                 self.held.remove(2)
+                self._cancel_lease_timer()
             elif cmd.action=="scroll":
                 self.backend.emit("scroll",cmd.x,0)
             else:
@@ -264,7 +294,9 @@ class MouseModule:
             try:self.backend.emit("up",button=button)
             except Exception:failed=True
             else:self.held.discard(button)
-        if not self.held:self.deadline_ns=None
+        if not self.held:
+            self.deadline_ns=None
+            self._cancel_lease_timer()
         if failed:
             self.active=False
             raise MouseError("physical release failed; service locked")
@@ -274,6 +306,7 @@ class MouseModule:
             self.active=False
             try:self._release()
             finally:
+                self._cancel_lease_timer()
                 self.hide()
                 self.key=None
                 self.epoch=self.session=None

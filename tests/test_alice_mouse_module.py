@@ -167,3 +167,31 @@ def test_no_implicit_admin_from_role_payload(mouse):
     original["grant"]["role"]="admin"
     with pytest.raises(MouseError):m.dispatch(json.dumps(original).encode())
     assert not b.events
+
+
+def test_autonomous_button_release_without_tick():
+    import threading
+    import time
+    backend = RecordingBackend()
+    released = threading.Event()
+    original_emit = backend.emit
+    def observe(action, x=0, y=0, button=1):
+        original_emit(action,x,y,button)
+        if action == 'up': released.set()
+    backend.emit = observe
+    m = MouseModule(backend, focus_ok=lambda:True)
+    m.start(authorized=True,key=secrets.token_bytes(32))
+    m.dispatch(m.issue(Command('down'),authorized=True))
+    assert released.wait(2.5), 'held button must release without tick()'
+    assert not m.held
+    m.close()
+
+
+def test_close_cancels_autonomous_release():
+    backend=RecordingBackend()
+    m=MouseModule(backend,focus_ok=lambda:True)
+    m.start(authorized=True,key=secrets.token_bytes(32))
+    m.dispatch(m.issue(Command('down'),authorized=True))
+    m.close()
+    assert [event[0] for event in backend.events] == ['down','up']
+    assert m._lease_timer is None
