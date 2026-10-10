@@ -8,12 +8,14 @@
 #include <linux/uinput.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <pthread.h>
 
 #define ALICE_KEY_MAX_HELD 16
 #define ALICE_KEY_LEASE_MS 1500
 
 typedef int (*alice_key_emit_fn)(void *, unsigned short, unsigned short, int);
 typedef int64_t (*alice_key_clock_fn)(void *);
+typedef int (*alice_key_destroy_fn)(void *);
 
 typedef struct {
     void *ctx;
@@ -23,6 +25,8 @@ typedef struct {
     size_t held_count;
     int64_t deadline_ms;
     int faulted;
+    alice_key_destroy_fn destroy;
+    int destroyed;
 } alice_keyboard;
 
 int alice_keyboard_init(alice_keyboard *kb, void *ctx,
@@ -33,4 +37,17 @@ int alice_keyboard_release_all(alice_keyboard *kb);
 int alice_keyboard_tick(alice_keyboard *kb);
 int alice_keyboard_close(alice_keyboard *kb);
 int alice_keyboard_allowed(unsigned short key);
+void alice_keyboard_set_destroy(alice_keyboard *kb, alice_key_destroy_fn destroy);
+/* Daemon-owned runner. Never expose this as an unauthenticated endpoint. */
+typedef struct {
+    alice_keyboard *keyboard;
+    pthread_t worker;
+    pthread_mutex_t mutex;
+    int running;
+    int started;
+} alice_keyboard_runner;
+int alice_keyboard_runner_start(alice_keyboard_runner *r, alice_keyboard *kb);
+int alice_keyboard_runner_down(alice_keyboard_runner *r, unsigned short key);
+int alice_keyboard_runner_up(alice_keyboard_runner *r, unsigned short key);
+int alice_keyboard_runner_stop(alice_keyboard_runner *r);
 #endif

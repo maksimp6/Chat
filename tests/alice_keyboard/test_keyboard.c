@@ -4,8 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-typedef struct {int64_t now;int down;int up;int syn;int fail_down;int fail_up;int fail_syn;int destroy_calls;} mock;
-static int64_t clock_fn(void *p){return ((mock*)p)->now;}
+#include <time.h>
+typedef struct {int64_t now;int down;int up;int syn;int fail_down;int fail_up;int fail_syn;int destroy_calls;int real_clock;} mock;
+static int64_t clock_fn(void *p){
+    mock *m=p;
+    if(!m->real_clock)return m->now;
+    struct timespec ts;clock_gettime(CLOCK_MONOTONIC,&ts);
+    return (int64_t)ts.tv_sec*1000+ts.tv_nsec/1000000;
+}
+static int destroy_fn(void *p){((mock*)p)->destroy_calls++;return 0;}
 static int emit(void *p,unsigned short type,unsigned short code,int value){
     mock *m=p;
     if(type==EV_SYN){m->syn++;return m->fail_syn?-1:0;}
@@ -73,17 +80,22 @@ static void syn_fault(void){
 static void autonomous_watchdog_contract(void){
     mock m={0};alice_keyboard k;
     assert(!alice_keyboard_init(&k,&m,emit,clock_fn));
-    assert(!alice_keyboard_down(&k,KEY_LEFTCTRL));
+    m.real_clock=1;
+    alice_keyboard_runner runner;
+    assert(!alice_keyboard_runner_start(&runner,&k));
+    assert(!alice_keyboard_runner_down(&runner,KEY_LEFTCTRL));
     /* RED: wait for an actual autonomous worker, never call tick().
      * The test must observe a KEY_UP, not merely a changed mock clock. */
     usleep((ALICE_KEY_LEASE_MS+300)*1000);
-    assert(m.up>=1);
+    assert(m.up>=1 && k.held_count==0);
+    assert(!alice_keyboard_runner_stop(&runner));
     puts("autonomous-watchdog: PASS");
 }
 static void failed_release_requires_device_teardown(void){
     mock m={0};alice_keyboard k;
     assert(!alice_keyboard_init(&k,&m,emit,clock_fn));
     assert(!alice_keyboard_down(&k,KEY_A));
+    alice_keyboard_set_destroy(&k,destroy_fn);
     m.fail_up=1;
     assert(alice_keyboard_close(&k)==-EIO);
     /* RED: the driver must invoke an injected destroy-device callback.
