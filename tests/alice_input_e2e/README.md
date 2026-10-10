@@ -26,3 +26,7 @@ The signed-to-C test no longer casts an arbitrary Python `ctypes.create_string_b
 ## Review fix: exception-safe C fixture and explicit ABI
 
 `test_signed_c_keyboard.py` now registers C close/free immediately after allocation using `ExitStack`, before identity/session setup and socket startup; a successfully started endpoint is stopped before C fixture cleanup. The fixture function signatures explicitly declare `c_int` return types and `None` for free. Combined local checkout rerun: **4/4 PASS**. Fault-injection specifically during authority setup is still recommended before calling this independently reviewed.
+
+## Setup failure cleanup contract
+
+`test_fixture_failure_cleanup.py` verifies the source registers C fixture close/free callbacks before authorization and exercises actual `ExitStack` exception unwinding with fake close/free callbacks. This is a **contract-level test**, not injected failure through the compiled C fixture. Combined checkout: 6 tests PASS. A genuine injected authorization failure with instrumented C fixture destruction remains to be added before final acceptance.
