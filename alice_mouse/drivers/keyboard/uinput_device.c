@@ -45,6 +45,13 @@ fail:
 int alice_uinput_emit_bound(void *ctx,unsigned short type,unsigned short code,int value){
     alice_uinput_emitter *e=ctx;
     if(!e || !e->device || !e->device->created || !e->ops)return -EIO;
+    /* Defense in depth: the raw adapter must never emit unregistered keys,
+     * unrelated event classes or arbitrary repeat values. */
+    if(type==EV_KEY){
+        if(!alice_keyboard_allowed(code) || (value!=0 && value!=1))return -EINVAL;
+    }else if(type==EV_SYN){
+        if(code!=SYN_REPORT || value!=0)return -EINVAL;
+    }else return -EINVAL;
     struct input_event event={0};
     event.type=type;event.code=code;event.value=value;
     ssize_t n=e->ops->write_device(e->ops->ctx,e->device->fd,&event,sizeof(event));

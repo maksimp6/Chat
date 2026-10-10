@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-typedef struct {int opens,closes,creates,destroys,keys,setup,events,writes,fail_at,ioctls;} mock;
+typedef struct {int opens,closes,creates,destroys,keys,setup,events,writes,fail_at,ioctls,partial_write;} mock;
 static int open_fn(void *ctx){mock *m=ctx;m->opens++;return 47;}
 static int ioctl_fn(void *ctx,int fd,unsigned long req,void *arg){
     mock *m=ctx;assert(fd==47);
@@ -22,7 +22,7 @@ static ssize_t write_fn(void *ctx,int fd,const void *p,size_t n){
     const struct input_event *ev=p;
     assert(ev->type==EV_KEY || ev->type==EV_SYN);
     m->writes++;
-    return (ssize_t)n;
+    return m->partial_write?(ssize_t)n-1:(ssize_t)n;
 }
 static int close_fn(void *ctx,int fd){mock *m=ctx;assert(fd==47);m->closes++;return 0;}
 static alice_uinput_ops ops(mock *m){return (alice_uinput_ops){open_fn,ioctl_fn,write_fn,close_fn,m};}
@@ -56,4 +56,23 @@ static void double_destroy(void){
     assert(m.destroys==1 && m.closes==1);
     puts("idempotent-destroy: PASS");
 }
-int main(void){lifecycle();failed_create();double_destroy();return 0;}
+static void unsafe_direct_events(void){
+    mock m={0};alice_uinput_device d={0};alice_uinput_ops o=ops(&m);
+    assert(!alice_uinput_create(&d,&o));
+    alice_uinput_emitter e={&d,&o};
+    assert(alice_uinput_emit_bound(&e,EV_KEY,KEY_POWER,1)==-EINVAL);
+    assert(alice_uinput_emit_bound(&e,EV_REL,REL_X,1)==-EINVAL);
+    assert(alice_uinput_emit_bound(&e,EV_KEY,KEY_A,2)==-EINVAL);
+    assert(m.writes==0);
+    assert(!alice_uinput_destroy(&d,&o));
+    puts("reject-unsafe-raw-events: PASS");
+}
+static void partial_write(void){
+    mock m={0};alice_uinput_device d={0};alice_uinput_ops o=ops(&m);
+    assert(!alice_uinput_create(&d,&o));
+    alice_uinput_emitter e={&d,&o};m.partial_write=1;
+    assert(alice_uinput_emit_bound(&e,EV_KEY,KEY_A,1)==-EIO);
+    assert(!alice_uinput_destroy(&d,&o));
+    puts("reject-partial-event-write: PASS");
+}
+int main(void){lifecycle();failed_create();double_destroy();unsafe_direct_events();partial_write();return 0;}
