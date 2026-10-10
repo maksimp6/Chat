@@ -115,3 +115,10 @@ Browser capability использует action-level approval:
 
 - [3D Printing Business](../printing3d.md)
 - [3D HTTP API](../api/printing3d.md)
+
+## CAD/editor local tools
+
+Редактируемые сцены и экспорт STL предоставляет новый [локальный 3D Model Editor](model-editor.md)
+(инструменты `model.create`, `model.addcube`, `model.addcylinder`, `model.edit`,
+`model.inspect`, `model.export`). Они используют категорию `3d`, но не запускают
+печать. Принтер и слайсер — отдельная стадия #1096.

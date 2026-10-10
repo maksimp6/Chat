@@ -189,6 +189,14 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки 3D Printing: {e}")
 
         try:
+            from model_editor.tools import MODEL_EDITOR_TOOLS
+
+            for name, cfg in MODEL_EDITOR_TOOLS.items():
+                self._register("3d", name, cfg)
+        except Exception as e:
+            logger.error(f"[REGISTRY] Ошибка загрузки Model Editor: {e}")
+
+        try:
             from cloud.tools import CLOUD_TOOLS
 
             for name, cfg in CLOUD_TOOLS.items():
