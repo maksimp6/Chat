@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -37,7 +38,6 @@ VOLUME = "rdc-state"
 MOUNT = "/rdc-state"
 HEALTH_KEYS = {
     "mode",
-    "browser_ready",
     "rdc_running",
     "state_ready",
     "paired",
@@ -49,6 +49,8 @@ IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") 
 CONTROL_HEADER = "X-Alice-Rdc-Control"
 CONTROL_FILE = "control-permit.json"
 CHECKPOINT_BUDGET = 300
+SECRET_ALIAS = "rdc.git.ssh"
+SECRET_MAX_BYTES = 16 * 1024
 
 
 def fail(code):
@@ -94,14 +96,12 @@ def runtime_env(project):
     }
 
 
-def creation_body(project, image, *, profile="persistent"):
+def creation_body(project, image):
     if not isinstance(image, str) or not IMAGE_RE.fullmatch(image):
         fail("validation_error")
-    if profile not in {"persistent", "bootstrap"}:
-        fail("validation_error")
     name, bucket = names(project)
-    cpu = "0.5" if profile == "bootstrap" else "1"
-    memory = "512Mi" if profile == "bootstrap" else "4096Mi"
+    cpu = "0.2"
+    memory = "512Mi"
     spec = ContainerSpec(
         name=name,
         image=image,
@@ -139,11 +139,13 @@ def creation_body(project, image, *, profile="persistent"):
 
 
 def named_record(apps):
+    # Look up only this service: one broken foreign container makes the
+    # project-wide list return HTTP 500 for everyone.
     name = names(apps.project_id)[0]
-    records = [item for item in apps.list(require_total=True) if item.get("name") == name]
-    if len(records) > 1:
+    record = apps.get(name)
+    if record is not None and record.get("name") != name:
         fail("invalid_response")
-    return records[0] if records else None
+    return record
 
 
 def same_form(value, expected):
@@ -238,8 +240,8 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
             "port": type(container.get("containerPort")) is int
             and container["containerPort"] == 8080,
             "resource_keys": isinstance(resources, dict) and set(resources) == {"cpu", "memory"},
-            "cpu": resource_map.get("cpu") == "1",
-            "memory": resource_map.get("memory") == "4096Mi",
+            "cpu": resource_map.get("cpu") == "0.2",
+            "memory": resource_map.get("memory") == "512Mi",
             "scaling_types": type(scaling.get("minInstanceCount")) is int
             and type(scaling.get("maxInstanceCount")) is int,
             "scaling_min": scaling.get("minInstanceCount") == 1,
@@ -257,20 +259,18 @@ def owned_record(apps, *, tenant, identifier=None, image=None):
                         "cpu_form": safe_form(
                             resource_map.get("cpu"),
                             (
-                                ("one_string", "1"),
-                                ("one_number", 1),
-                                ("one_float", 1.0),
-                                ("one_decimal_string", "1.0"),
-                                ("thousand_millicores", "1000m"),
+                                ("tenth_string", "0.2"),
+                                ("tenth_number", 0.2),
+                                ("millicores", "200m"),
                             ),
                         ),
                         "memory_form": safe_form(
                             resource_map.get("memory"),
                             (
-                                ("4096_mib", "4096Mi"),
-                                ("4_gib", "4Gi"),
-                                ("bytes_number", 4294967296),
-                                ("bytes_string", "4294967296"),
+                                ("512_mib", "512Mi"),
+                                ("half_gib", "0.5Gi"),
+                                ("bytes_number", 536870912),
+                                ("bytes_string", "536870912"),
                             ),
                         ),
                         "gpu_form": safe_form(
@@ -454,28 +454,60 @@ def json_object(body):
     return result
 
 
-def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
-    if (path, method) not in {("/healthz", "GET"), ("/checkpoint", "POST")}:
+def test_call(
+    apps,
+    path,
+    method="GET",
+    *,
+    nonce=None,
+    timeout=None,
+    body_bytes=None,
+    alias=None,
+):
+    allowed = {("/healthz", "GET"), ("/checkpoint", "POST"), ("/rdc/secrets", "POST")}
+    if (path, method) not in allowed:
         fail("validation_error")
-    if path == "/checkpoint":
+    if path in {"/checkpoint", "/rdc/secrets"}:
         if not isinstance(nonce, str) or not re.fullmatch("[0-9a-f]{64}", nonce):
             fail("validation_error")
     elif nonce is not None:
         fail("validation_error")
+    if path == "/rdc/secrets":
+        if (
+            alias != SECRET_ALIAS
+            or not isinstance(body_bytes, bytes)
+            or not 0 < len(body_bytes) <= SECRET_MAX_BYTES
+        ):
+            fail("validation_error")
+    elif body_bytes is not None or alias is not None:
+        fail("validation_error")
     name = names(apps.project_id)[0]
-    body = {"name": name, "projectId": apps.project_id, "method": method.lower(), "path": path}
+    request = {"name": name, "projectId": apps.project_id, "method": method.lower(), "path": path}
     if nonce is not None:
-        body["headers"] = {CONTROL_HEADER: nonce}
+        request["headers"] = {CONTROL_HEADER: nonce}
+    if path == "/rdc/secrets":
+        request["headers"].update(
+            {
+                "Content-Type": "application/octet-stream",
+                "X-Alice-Secret-Alias": alias,
+            }
+        )
+        request["body"] = base64.b64encode(body_bytes).decode("ascii")
+        request["isBase64Encoded"] = True
     previous_timeout = apps.client.timeout
     try:
         if timeout is not None:
             if timeout <= 0:
-                fail("rdc_checkpoint_unconfirmed")
+                fail(
+                    "rdc_secret_import_unconfirmed"
+                    if path == "/rdc/secrets"
+                    else "rdc_checkpoint_unconfirmed"
+                )
             apps.client.timeout = timeout
         deadline = time.monotonic() + apps.client.timeout
         try:
             payload = apps.client.request(
-                "container_apps", "POST", f"/v2/containers/{name}:testCall", json_body=body
+                "container_apps", "POST", f"/v2/containers/{name}:testCall", json_body=request
             )
         except CloudProviderError as exc:
             if (
@@ -502,35 +534,40 @@ def test_call(apps, path, method="GET", *, nonce=None, timeout=None):
     finally:
         apps.client.timeout = previous_timeout
     status = payload.get("statusCode")
-    body = payload.get("body", "")
+    response_body = payload.get("body", "")
     if (
         type(status) is not int
         or not 100 <= status <= 599
-        or not isinstance(body, str)
-        or len(body) > 8192
+        or not isinstance(response_body, str)
+        or len(response_body) > 8192
         or payload.get("isBase64Encoded", False) is not False
     ):
         fail("invalid_response")
     if status in (404, 502, 504) or (status == 503 and path != "/healthz"):
         return None
-    if status == 403 and path == "/checkpoint":
-        if json_object(body) != {"status": "control_denied"}:
+    if status == 403 and path in {"/checkpoint", "/rdc/secrets"}:
+        if json_object(response_body) != {"status": "control_denied"}:
             fail("invalid_response")
         fail("rdc_control_unconfirmed")
     if status == 503 and path == "/healthz":
-        # The proxy may answer before Node is listening. Only a claimed runtime
-        # health object can prove a completed, closed checkpoint.
         try:
-            candidate = json.loads(body)
+            candidate = json.loads(response_body)
         except (ValueError, RecursionError):
             return None
         if not isinstance(candidate, dict) or candidate.get("mode") != "cloud-rdc":
             return None
-        summary = health_summary(json_object(body))
+        summary = health_summary(json_object(response_body))
         return summary if summary["quiesced"] else None
+    if path == "/rdc/secrets":
+        if status != 201:
+            fail("rdc_secret_import_unconfirmed")
+        result = json_object(response_body)
+        if result != {"status": "secret_imported", "alias": SECRET_ALIAS}:
+            fail("invalid_response")
+        return result
     if status != 200:
         fail("rdc_runtime_failed")
-    result = json_object(body)
+    result = json_object(response_body)
     if path == "/healthz":
         health_summary(result)
         if result["quiesced"]:
@@ -543,7 +580,7 @@ def health_summary(value):
         fail("invalid_response")
     if any(
         type(value.get(key)) is not bool
-        for key in ("browser_ready", "rdc_running", "state_ready", "paired", "quiesced")
+        for key in ("rdc_running", "state_ready", "paired", "quiesced")
     ):
         fail("invalid_response")
     generation = value.get("checkpoint_generation")
@@ -554,9 +591,7 @@ def health_summary(value):
         project_uuid(identifier)
     if value["paired"] and identifier is None:
         fail("invalid_response")
-    if value["quiesced"] and (
-        not value["state_ready"] or value["browser_ready"] or value["rdc_running"] or generation < 1
-    ):
+    if value["quiesced"] and (not value["state_ready"] or value["rdc_running"] or generation < 1):
         fail("invalid_response")
     return value
 
@@ -622,7 +657,7 @@ def wait_ready(
             if result is not None:
                 summary = health_summary(result)
                 if (allow_quiesced and summary["quiesced"]) or (
-                    summary["browser_ready"] and summary["rdc_running"] and summary["state_ready"]
+                    summary["rdc_running"] and summary["state_ready"]
                 ):
                     return record, summary
         sleep(min(2, max(0, deadline - time.monotonic())))
@@ -728,10 +763,17 @@ def prepare_bucket(store, credentials, project):
 
 def preflight(apps, store, credentials, *, tenant):
     configured_tenant(tenant)
-    record = named_record(apps)
-    if record is not None:
-        owned_record(apps, tenant=tenant)
-    exists = bucket_inventory(store, credentials, apps.project_id)
+    step = "find_container"
+    try:
+        record = named_record(apps)
+        if record is not None:
+            step = "verify_container"
+            owned_record(apps, tenant=tenant)
+        step = "bucket_inventory"
+        exists = bucket_inventory(store, credentials, apps.project_id)
+    except CloudProviderError:
+        print(json.dumps({"stage": "rdc_preflight_failed", "step": step}), flush=True)
+        raise
     return {
         "status": "PREFLIGHT_PASSED",
         "container_exists": record is not None,
@@ -841,18 +883,43 @@ def cap_timeouts(apps, store, deadline, clock):
     store._timeout = min(store._timeout, budget)
 
 
-def issue_control_permit(apps, store, credentials, deadline, *, clock, sleep):
+def issue_control_permit(
+    apps,
+    store,
+    credentials,
+    deadline,
+    *,
+    clock,
+    sleep,
+    action="checkpoint",
+    alias=None,
+    body_sha256=None,
+):
+    if action not in {"checkpoint", "secret_import"}:
+        fail("validation_error")
+    if action == "secret_import":
+        if (
+            alias != SECRET_ALIAS
+            or not isinstance(body_sha256, str)
+            or not re.fullmatch("[0-9a-f]{64}", body_sha256)
+        ):
+            fail("validation_error")
+    elif alias is not None or body_sha256 is not None:
+        fail("validation_error")
     nonce = secrets.token_hex(32)
     issued = int(time.time())
     permit = {
         "schema": 1,
-        "action": "checkpoint",
+        "action": action,
         "project_id": project_uuid(apps.project_id),
         "container_name": names(apps.project_id)[0],
         "issued_at": issued,
         "expires_at": issued + 300,
         "sha256": hashlib.sha256(nonce.encode("ascii")).hexdigest(),
     }
+    if action == "secret_import":
+        permit["alias"] = alias
+        permit["body_sha256"] = body_sha256
     content = (json.dumps(permit, sort_keys=True, separators=(",", ":")) + "\n").encode("ascii")
     cap_timeouts(apps, store, deadline, clock)
     store.upload(CONTROL_FILE, content, credentials=credentials)
@@ -869,6 +936,51 @@ def issue_control_permit(apps, store, credentials, deadline, *, clock, sleep):
             return nonce
         sleep(min(1, visibility_deadline - clock()))
     fail("rdc_control_unconfirmed")
+
+
+def import_runtime_secret(
+    apps,
+    store,
+    credentials,
+    secret,
+    *,
+    timeout=60,
+    clock=time.monotonic,
+    sleep=time.sleep,
+):
+    if (
+        not isinstance(secret, bytes)
+        or not 0 < len(secret) <= SECRET_MAX_BYTES
+        or not 0 < timeout <= 60
+    ):
+        fail("validation_error")
+    deadline = clock() + timeout
+    require_owned_bucket(store, credentials, apps.project_id)
+    digest = hashlib.sha256(secret).hexdigest()
+    nonce = issue_control_permit(
+        apps,
+        store,
+        credentials,
+        deadline,
+        clock=clock,
+        sleep=sleep,
+        action="secret_import",
+        alias=SECRET_ALIAS,
+        body_sha256=digest,
+    )
+    remaining_timeout = remaining(deadline, clock)
+    result = test_call(
+        apps,
+        "/rdc/secrets",
+        "POST",
+        nonce=nonce,
+        timeout=remaining_timeout,
+        body_bytes=secret,
+        alias=SECRET_ALIAS,
+    )
+    if result != {"status": "secret_imported", "alias": SECRET_ALIAS}:
+        fail("rdc_secret_import_unconfirmed")
+    return result
 
 
 def transient_runtime_error(exc):
@@ -933,7 +1045,7 @@ def checkpoint(
             if value is not None:
                 summary = health_summary(value)
                 if summary["quiesced"] or all(
-                    summary[key] for key in ("browser_ready", "rdc_running", "state_ready")
+                    summary[key] for key in ("rdc_running", "state_ready")
                 ):
                     before = summary
                     break
@@ -1408,6 +1520,7 @@ RDC_ERROR_CODES = {
     "rdc_storage_unavailable",
     "rdc_not_suspended",
     "rdc_control_unconfirmed",
+    "rdc_secret_import_unconfirmed",
 }
 
 
@@ -1509,7 +1622,7 @@ def safe_error(exc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("preflight", "install", "bootstrap_install", "status", "start", "restart", "stop")
+        "action", choices=("preflight", "install", "status", "start", "restart", "stop")
     )
     parser.add_argument("--sha", required=True)
     parser.add_argument("--tenant-id", default=os.environ.get("CLOUDRU_STORAGE_TENANT_ID", ""))
@@ -1530,16 +1643,20 @@ def main():
     tenant = configured_tenant(args.tenant_id)
     store, credentials = storage_client(project, tenant)
     apps = CloudRuContainerAppsClient(project_id=project)
-    if args.action in ("preflight", "install", "bootstrap_install"):
+    if args.action in ("preflight", "install"):
         result = preflight(apps, store, credentials, tenant=tenant)
-        if args.action in ("install", "bootstrap_install"):
+        if args.action == "install":
             if result["container_exists"]:
                 fail("already_exists")
-            image = build_image(root, args.sha)
-            profile = "bootstrap" if args.action == "bootstrap_install" else "persistent"
-            creation_body(project, image, profile=profile)
+            image = os.environ.get("ALICE_RDC_IMAGE", "") or build_image(root, args.sha)
+            creation_body(project, image)
             print(json.dumps({"stage": "rdc_image_ready", "image": image}), flush=True)
-            result = install(apps, store, credentials, image, tenant=tenant, profile=profile)
+            started = time.monotonic()
+            result = install(apps, store, credentials, image, tenant=tenant)
+            print(
+                json.dumps({"stage": "rdc_ready", "seconds": round(time.monotonic() - started, 1)}),
+                flush=True,
+            )
     elif args.action == "status":
         result = status(apps, tenant=tenant)
     elif args.action == "restart":

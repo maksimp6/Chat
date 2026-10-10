@@ -5,10 +5,14 @@ on:
       action:
         description: One persistent RDC service; install starts device pairing
         type: choice
-        options: [preflight, bootstrap_install, install, status, start, restart, stop]
+        options: [preflight, install, status, start, restart, stop]
         default: preflight
       storage_tenant_id:
         description: Object Storage tenant ID (not a secret); required for all actions unless configured
+        type: string
+        required: false
+      image:
+        description: Prebuilt immutable image digest reference; required for install, no build runs in this workflow
         type: string
         required: false
 permissions:
@@ -41,6 +45,7 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
+          ALICE_RDC_IMAGE: ${{ inputs.image }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
