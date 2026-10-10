@@ -46,7 +46,7 @@ class ProcessSwitchTests(unittest.TestCase):
         )
 
     def _write_program(self, dest, role, *, crash=False):
-        binary = Path(__file__).with_name("alice_mouse_test_fixture")
+        binary = Path(os.environ.get("ALICE_MOUSE_TEST_FIXTURE", str(Path(__file__).with_name("alice_mouse_test_fixture"))))
         assert binary.is_file(), "build test fixture first"
         import shlex
 
