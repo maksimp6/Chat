@@ -280,7 +280,7 @@ def test_close_rejected_during_transaction_keeps_staging(tmp_path):
     with MemoryStore(path) as store:
         store.set("pending", "keep")
         with pytest.raises(StoreError):
-            with store._engine.transaction():
+            with store.transaction():
                 store.close()
         assert store.get("pending") == "keep"
         assert store.commit() == 1
