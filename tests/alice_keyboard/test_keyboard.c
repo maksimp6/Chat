@@ -3,7 +3,8 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-typedef struct {int64_t now;int down;int up;int syn;int fail_down;int fail_up;int fail_syn;} mock;
+#include <unistd.h>
+typedef struct {int64_t now;int down;int up;int syn;int fail_down;int fail_up;int fail_syn;int destroy_calls;} mock;
 static int64_t clock_fn(void *p){return ((mock*)p)->now;}
 static int emit(void *p,unsigned short type,unsigned short code,int value){
     mock *m=p;
@@ -73,9 +74,10 @@ static void autonomous_watchdog_contract(void){
     mock m={0};alice_keyboard k;
     assert(!alice_keyboard_init(&k,&m,emit,clock_fn));
     assert(!alice_keyboard_down(&k,KEY_LEFTCTRL));
-    m.now=ALICE_KEY_LEASE_MS+30000;
-    /* RED: without external tick() call, the driver must release a held key. */
-    assert(k.held_count==0 && m.up>=1);
+    /* RED: wait for an actual autonomous worker, never call tick().
+     * The test must observe a KEY_UP, not merely a changed mock clock. */
+    usleep((ALICE_KEY_LEASE_MS+300)*1000);
+    assert(m.up>=1);
     puts("autonomous-watchdog: PASS");
 }
 static void failed_release_requires_device_teardown(void){
@@ -84,8 +86,9 @@ static void failed_release_requires_device_teardown(void){
     assert(!alice_keyboard_down(&k,KEY_A));
     m.fail_up=1;
     assert(alice_keyboard_close(&k)==-EIO);
-    /* RED: failure must trigger a kernel-device teardown fallback. */
-    assert(k.held_count==0);
+    /* RED: the driver must invoke an injected destroy-device callback.
+     * The current API has no such callback, so this stays RED. */
+    assert(m.destroy_calls==1);
     puts("device-teardown-on-release-failure: PASS");
 }
 int main(int argc,char **argv){
