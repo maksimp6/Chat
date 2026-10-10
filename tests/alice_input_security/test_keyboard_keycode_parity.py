@@ -11,3 +11,8 @@ def test_system_volume_and_power_keys_never_authorized(key):
 def test_physical_keyboard_supported_keys_authorized(key):
     _validate_action_payload('key_down',{'key':key})
     _validate_action_payload('key_up',{'key':key})
+
+@pytest.mark.parametrize('key',range(69,87))
+def test_supported_numeric_keypad_keys_authorized(key):
+    _validate_action_payload('key_down',{'key':key})
+    _validate_action_payload('key_up',{'key':key})

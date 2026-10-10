@@ -77,3 +77,7 @@ Three isolated integration tests exercise signed keyboard down/up and Ctrl+A cho
 ## Keyboard keycode parity (2026-10-10)
 
 RED contract detected five keycode policy mismatches against the staged C keyboard driver: Python previously permitted KEY_MUTE (113), KEY_VOLUMEDOWN (114) and KEY_VOLUMEUP (115), but the C driver rejects them; Python omitted supported F11 (87) and F12 (88). Updated Python verifier's allowed set and added negative/positive parity tests. 95 Python tests PASS locally. This is a focused policy alignment, not a complete generated cross-language contract or physical E2E.
+
+## Complete C/Python keycode parity probe
+
+Compiled the staged C `alice_keyboard_allowed()` on Redmi 9 and enumerated keycodes 0..255, then compared with Python `_validate_action_payload('key_down', {'key':code})`. Found 18 C-only codes (69..86), all in the C driver's accepted keyboard keycode set. Added RED tests and aligned Python's set. The two 0..255 sets now each contain 100 allowed codes; 113 Python tests PASS. A permanent parity check in the eventual combined integration checkout remains required to catch future C/Python drift.

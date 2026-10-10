@@ -147,7 +147,7 @@ def _validate_action_payload(action: str, payload: dict) -> None:
         allowed.update(range(2,14))
         allowed.update(range(16,28))
         allowed.update(range(30,54))
-        allowed.update(range(59,69))
+        allowed.update(range(59,87))
         if set(payload)!={"key"} or type(payload["key"]) is not int or payload["key"] not in allowed:
             raise GrantError("invalid key")
     elif action=="open":
