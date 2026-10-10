@@ -14,3 +14,7 @@ This is an isolated Integration & QA-owned test slice, **not a combined driver i
 ## Autonomous C watchdog gate
 
 `test_c_watchdog_bridge.py` compiles the real staged C keyboard runner, calls `runner_down(KEY_A)`, stalls the client without `tick()`/`key_up()`, and asserts exactly one `KEY_UP` was observed before shutdown. On current `develop` it fails because #1091 is not integrated; on an isolated checkout containing Keyboard head `810738c`, **1 PASS** on Redmi 9. It uses a mocked event callback, not an actual `/dev/uinput` device. It does not establish crash survival, root isolation or SELinux cross-UID access.
+
+## uinput teardown on partial KEY_UP write
+
+`test_uinput_teardown.py` compiles the real Keyboard #1091 `keyboard.c` and `uinput_device.c` against a mocked syscall table. It injects a short `EV_KEY KEY_UP` write and checks fail-closed driver state, one `UI_DEV_DESTROY`, one `close`, no subsequent key events and idempotent repeated destroy. Isolated Keyboard head `810738c`: **1 PASS** on Redmi 9. This is a mocked syscall test only; real kernel device registration, crash/restart behavior and root-owned signed verifier E2E remain unverified.
