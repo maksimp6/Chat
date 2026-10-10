@@ -289,3 +289,117 @@ def test_unexpected_release_exception_keeps_fail_closed(mouse):
     assert m.active is False
     assert m.held == {1}
     assert hidden
+
+
+@pytest.mark.parametrize(
+    "action,x,y,button,encoded",
+    [
+        ("down", 0, 0, 1, b"down 1 0\n"),
+        ("up", 0, 0, 2, b"up 2 0\n"),
+        ("right", 0, 0, 2, b"right 0 0\n"),
+        ("scroll", 3, 0, 1, b"scroll 3 0\n"),
+        ("move", 8, -3, 1, b"move 8 -3\n"),
+    ],
+)
+def test_opt_in_socket_backend_uses_fake_only(monkeypatch, tmp_path, action, x, y, button, encoded):
+    import alice_mouse.core as module
+
+    calls = []
+
+    class FakeSocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def settimeout(self, timeout):
+            calls.append(("timeout", timeout))
+
+        def connect(self, path):
+            calls.append(("connect", path))
+
+        def sendall(self, data):
+            calls.append(("send", data))
+
+        def recv(self, _size):
+            return b"OK\n"
+
+    monkeypatch.setattr(module.socket, "socket", lambda *_args: FakeSocket())
+    destination = tmp_path / "never-opened.sock"
+    RootSocketBackend(destination, enabled=True).emit(action, x, y, button)
+    assert ("connect", str(destination)) in calls
+    assert ("send", encoded) in calls
+    assert ("timeout", 1) in calls
+
+
+def test_fake_socket_backend_denial_fails_closed(monkeypatch, tmp_path):
+    import alice_mouse.core as module
+
+    class DeniedSocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def settimeout(self, _timeout):
+            pass
+
+        def connect(self, _path):
+            pass
+
+        def sendall(self, _data):
+            pass
+
+        def recv(self, _size):
+            return b"DENIED\n"
+
+    monkeypatch.setattr(module.socket, "socket", lambda *_args: DeniedSocket())
+    with pytest.raises(MouseError, match="device rejected command"):
+        RootSocketBackend(tmp_path / "fake.sock", enabled=True).emit("move", 1, 2)
+
+
+def test_bad_geometry_cannot_change_cursor(mouse):
+    m, *_ = mouse
+    with pytest.raises(MouseError, match="invalid display geometry"):
+        m.resize(10, 1080, 0)
+    with pytest.raises(MouseError, match="invalid display geometry"):
+        m.resize(1080, 2340, True)
+    m.close()
+
+
+def test_old_timer_generation_cannot_release_active_drag(mouse):
+    m, backend, *_ = mouse
+    run(m, "down")
+    m._lease_expired(m._lease_generation - 1)
+    assert m.held == {1}
+    assert [event[0] for event in backend.events] == ["down"]
+    m.close()
+
+
+def test_signer_without_key_and_packet_size_gate(mouse, monkeypatch):
+    import alice_mouse.core as module
+
+    m, backend, *_ = mouse
+    m.key = None
+    with pytest.raises(MouseError, match="no signing key"):
+        m.issue(Command("move", 1), authorized=True)
+    m.key = secrets.token_bytes(32)
+    monkeypatch.setattr(module, "MAX_PACKET", 1)
+    with pytest.raises(MouseError, match="packet too large"):
+        m.issue(Command("move", 1), authorized=True)
+    assert backend.events == []
+    m.close()
+
+
+def test_unheld_up_and_duplicate_down_release_safely(mouse):
+    m, backend, *_ = mouse
+    with pytest.raises(MouseError, match="button is not held"):
+        run(m, "up")
+    run(m, "down")
+    with pytest.raises(MouseError, match="button already held"):
+        run(m, "down")
+    assert [event[0] for event in backend.events] == ["down", "up"]
+    assert not m.held
+    m.close()
