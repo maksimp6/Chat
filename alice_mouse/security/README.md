@@ -27,3 +27,9 @@ Root-side action-specific payload validation now rejects unknown fields, invalid
 `SignedInputSocket` is a lab-only Unix `SOCK_SEQPACKET` boundary: it refuses pre-existing socket paths, requires an owned private directory, restricts the socket to mode 0600, checks Linux `SO_PEERCRED` UID and accepts only bounded signed grants through `ProtectedVerifier`. It has no sign/provision endpoint, no plaintext fallback, no uinput access, and cleans up only its own socket inode. Eight socket tests plus existing security tests pass locally.
 
 **Not a production root trust boundary:** these tests run under the Termux UID. A real root-owned immutable deployment, credential/key handoff, trusted Live Server authentication, action-level confirmation, crash/restart E2E, independent review and rollback remain blocking. Do not replace the live root bridge with this code yet.
+
+## Optional shared-group socket policy (staging)
+
+For a future root-owned verifier and separate Live Server UID, `SignedInputSocket(..., shared_gid=GID)` checks a service-owned directory with **exact mode 0710** and matching group GID, then applies socket mode **0660** with that group. The group may traverse the directory and connect to the socket but cannot write to the directory. The server still enforces the explicit `peer_uid` through `SO_PEERCRED`, validates HMAC/session/sequence and rejects unsigned packets. Existing private 0700/0600 mode remains the default.
+
+This is a filesystem/Unix-socket policy design only. It does **not** prove Android SELinux policy, cross-UID kernel permissions, or root-owned service deployment. Group membership and directory ownership must be provisioned by a trusted installer, not request data. Do not make a world-writable socket or change SELinux to permissive. Physical dispatch remains disconnected until independent root E2E.

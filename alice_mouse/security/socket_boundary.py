@@ -19,27 +19,36 @@ class SocketBoundaryError(RuntimeError):
     pass
 
 
-def _check_directory(directory: Path) -> None:
+def _check_directory(directory: Path, *, shared_gid: int | None = None) -> None:
     info=directory.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode & 0o077:
-        raise SocketBoundaryError("socket directory must be private and owned by service")
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid():
+        raise SocketBoundaryError("socket directory must be owned by service")
+    if shared_gid is None:
+        if stat.S_IMODE(info.st_mode) != 0o700:
+            raise SocketBoundaryError("private socket directory must be 0700")
+    elif (type(shared_gid) is not int or shared_gid < 0 or
+          info.st_gid != shared_gid or stat.S_IMODE(info.st_mode) != 0o710):
+        raise SocketBoundaryError("shared socket directory must be owned and 0710")
 
 
 class SignedInputSocket:
     """One packet per connection, SO_PEERCRED checked before verification."""
-    def __init__(self,path:Path,verifier:ProtectedVerifier,*,peer_uid:int):
+    def __init__(self,path:Path,verifier:ProtectedVerifier,*,peer_uid:int,shared_gid:int | None=None):
         if type(peer_uid) is not int or peer_uid<0:
             raise SocketBoundaryError("peer UID required")
         self.path=Path(path)
         self.verifier=verifier
+        if shared_gid is not None and (type(shared_gid) is not int or shared_gid < 0):
+            raise SocketBoundaryError("invalid shared group")
         self.peer_uid=peer_uid
+        self.shared_gid=shared_gid
         self._sock=None
         self._stop=threading.Event()
         self._thread=None
         self._inode=None
 
     def start(self) -> None:
-        _check_directory(self.path.parent)
+        _check_directory(self.path.parent,shared_gid=self.shared_gid)
         if self.path.exists() or self.path.is_symlink():
             raise SocketBoundaryError("refusing to replace existing socket")
         server=socket.socket(socket.AF_UNIX,socket.SOCK_SEQPACKET)
@@ -47,7 +56,9 @@ class SignedInputSocket:
             server.settimeout(0.1)
             server.bind(str(self.path))
             self._inode=self.path.lstat().st_ino
-            os.chmod(self.path,0o600)
+            if self.shared_gid is not None:
+                os.chown(self.path,-1,self.shared_gid)
+            os.chmod(self.path,0o660 if self.shared_gid is not None else 0o600)
             server.listen(4)
         except Exception:
             server.close()
