@@ -37,3 +37,7 @@ This is a filesystem/Unix-socket policy design only. It does **not** prove Andro
 ## Socket lifecycle RED/GREEN tests
 
 Four additional cases cover restart serving a second signed grant, injected group-mode chown/listen failures and a parent-directory replacement during validation. Local result: 67 Python tests pass. Restart now resets the stop event. Parent inode/device are compared before/after policy validation and after bind. **These pathname checks narrow but do not eliminate TOCTOU**: production still requires descriptor-relative operations/pinned directory and adversarial cross-UID/SELinux testing. No root deployment authorized.
+
+## Descriptor-pinned socket cleanup (staging)
+
+The server now opens its parent directory with `O_DIRECTORY|O_NOFOLLOW`, retains that descriptor across the socket lifecycle, and uses descriptor-relative `stat`/`unlink` plus socket inode verification for cleanup. Tests cover a renamed parent with a foreign replacement path, and a second `start()` while the first server is live. **Remaining risk:** `socket.bind()` and `chown`/`chmod` still use pathnames, so this is not a complete TOCTOU elimination. Cross-UID and SELinux-Enforcing physical tests are still mandatory before deployment.

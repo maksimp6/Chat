@@ -46,16 +46,29 @@ class SignedInputSocket:
         self._stop=threading.Event()
         self._thread=None
         self._inode=None
+        self._parent_fd=None
 
     def start(self) -> None:
         # Capture directory identity before policy validation and recheck after.
-        parent_identity=self.path.parent.lstat()
-        _check_directory(self.path.parent,shared_gid=self.shared_gid)
+        if self._sock is not None:
+            raise SocketBoundaryError("server already started")
+        if self.path.name in ("", ".", ".."):
+            raise SocketBoundaryError("invalid socket basename")
+        parent_fd=os.open(self.path.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC)
+        parent_identity=os.fstat(parent_fd)
+        try:
+            _check_directory(self.path.parent,shared_gid=self.shared_gid)
+        except Exception:
+            os.close(parent_fd)
+            raise
         checked_parent=self.path.parent.lstat()
         if (checked_parent.st_dev,checked_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
+            os.close(parent_fd)
             raise SocketBoundaryError("socket parent replaced during validation")
         if self.path.exists() or self.path.is_symlink():
+            os.close(parent_fd)
             raise SocketBoundaryError("refusing to replace existing socket")
+        self._parent_fd=parent_fd
         server=socket.socket(socket.AF_UNIX,socket.SOCK_SEQPACKET)
         try:
             server.settimeout(0.1)
@@ -63,7 +76,7 @@ class SignedInputSocket:
             current_parent=self.path.parent.lstat()
             if (current_parent.st_dev,current_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
                 raise SocketBoundaryError("socket parent replaced during bind")
-            self._inode=self.path.lstat().st_ino
+            self._inode=os.stat(self.path.name,dir_fd=parent_fd,follow_symlinks=False).st_ino
             if self.shared_gid is not None:
                 os.chown(self.path,-1,self.shared_gid)
             os.chmod(self.path,0o660 if self.shared_gid is not None else 0o600)
@@ -71,6 +84,7 @@ class SignedInputSocket:
         except Exception:
             server.close()
             self._unlink_owned()
+            self._close_parent()
             raise
         self._stop.clear()
         self._sock=server
@@ -78,12 +92,20 @@ class SignedInputSocket:
         self._thread.start()
 
     def _unlink_owned(self):
+        if self._parent_fd is None or self._inode is None:
+            return
         try:
-            info=self.path.lstat()
+            info=os.stat(self.path.name,dir_fd=self._parent_fd,follow_symlinks=False)
             if stat.S_ISSOCK(info.st_mode) and info.st_ino==self._inode:
-                self.path.unlink()
+                os.unlink(self.path.name,dir_fd=self._parent_fd)
         except FileNotFoundError:
             pass
+
+    def _close_parent(self):
+        if self._parent_fd is not None:
+            os.close(self._parent_fd)
+            self._parent_fd=None
+        self._inode=None
 
     def _run(self):
         while not self._stop.is_set():
@@ -120,5 +142,6 @@ class SignedInputSocket:
             if self._thread.is_alive():
                 raise SocketBoundaryError("server did not stop")
         self._unlink_owned()
+        self._close_parent()
         self._sock=None
         self._thread=None

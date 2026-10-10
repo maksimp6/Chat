@@ -64,3 +64,31 @@ def test_directory_swap_before_bind_is_rejected(harness,monkeypatch):
                 item.unlink()
             directory.rmdir()
         moved.rename(directory)
+
+
+def test_stop_after_parent_replacement_never_unlinks_foreign_socket(harness):
+    directory,_,_,_,_,endpoint,_=harness
+    endpoint.start()
+    moved=directory.parent/(directory.name+'-held')
+    directory.rename(moved)
+    directory.mkdir(mode=0o700)
+    foreign=directory/'input.sock'
+    foreign.write_text('foreign marker')
+    try:
+        endpoint.stop()
+        assert foreign.read_text()=='foreign marker'
+        assert not (moved/'input.sock').exists()
+    finally:
+        foreign.unlink()
+        directory.rmdir()
+        moved.rename(directory)
+
+
+def test_second_start_rejected_without_losing_live_server(harness):
+    directory,principal,_,signer,_,endpoint,calls=harness
+    endpoint.start()
+    with pytest.raises(SocketBoundaryError):
+        endpoint.start()
+    packet=signer.sign(principal,InputGrant('move',{'x':4,'y':2}))
+    assert send(endpoint.path,packet)==b'OK\n'
+    assert calls==[('move',{'x':4,'y':2})]
