@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -126,6 +127,55 @@ def test_resolve_after_rollback_uses_restored_version(isolated_db):
         resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
         == "rolled-back-value"
     )
+
+
+def test_rollback_round_trips_whole_second_aware_timestamps(isolated_db):
+    """Regression for issue #545: deterministic, no wall-clock dependency.
+
+    A timezone-aware ``updated_at`` with zero microseconds is stored as
+    ``...03:04:45+00:00``; the stdlib SQLite converter used to fail reading it
+    back with ``invalid literal for int() with base 10: b'45+00'``.
+    """
+    first = datetime(2026, 1, 2, 3, 4, 45, tzinfo=UTC)
+    second = datetime(2026, 1, 2, 3, 5, 45, tzinfo=UTC)
+    restored = datetime(2026, 1, 2, 3, 6, 45, tzinfo=UTC)
+
+    assert (
+        set_secret_management_ref(
+            isolated_db, "alice_short_token", "secret-1", "v1", now=first
+        ).updated_at
+        == first
+    )
+    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v2", now=second)
+    ref = rollback_secret_management_ref(isolated_db, "alice_short_token", now=restored)
+
+    assert ref.pinned_version_id == "v1"
+    assert ref.updated_at == restored
+    client = FakeSecretManagementClient({("secret-1", "v1"): "rolled-back-value"})
+    assert (
+        resolve_secret_management_value(isolated_db, "alice_short_token", client=client)
+        == "rolled-back-value"
+    )
+
+
+def test_sqlite_timestamp_converter_reads_naive_and_aware_values(isolated_db):
+    isolated_db.execute("CREATE TABLE ts_probe (value TIMESTAMP)")
+    isolated_db.executemany(
+        "INSERT INTO ts_probe (value) VALUES (?)",
+        [
+            ("2026-01-02 03:04:45",),
+            ("2026-01-02 03:04:45.5",),
+            ("2026-01-02 03:04:45+00:00",),
+            ("2026-01-02 03:04:45.123456+03:00",),
+        ],
+    )
+    values = [row[0] for row in isolated_db.execute("SELECT value FROM ts_probe").fetchall()]
+    assert values == [
+        datetime.fromisoformat("2026-01-02T03:04:45"),
+        datetime.fromisoformat("2026-01-02T03:04:45.500000"),
+        datetime(2026, 1, 2, 3, 4, 45, tzinfo=UTC),
+        datetime.fromisoformat("2026-01-02 03:04:45.123456+03:00"),
+    ]
 
 
 def test_ref_table_only_ever_stores_identifiers_not_a_value_column(isolated_db):
