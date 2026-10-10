@@ -33,3 +33,7 @@ Root-side action-specific payload validation now rejects unknown fields, invalid
 For a future root-owned verifier and separate Live Server UID, `SignedInputSocket(..., shared_gid=GID)` checks a service-owned directory with **exact mode 0710** and matching group GID, then applies socket mode **0660** with that group. The group may traverse the directory and connect to the socket but cannot write to the directory. The server still enforces the explicit `peer_uid` through `SO_PEERCRED`, validates HMAC/session/sequence and rejects unsigned packets. Existing private 0700/0600 mode remains the default.
 
 This is a filesystem/Unix-socket policy design only. It does **not** prove Android SELinux policy, cross-UID kernel permissions, or root-owned service deployment. Group membership and directory ownership must be provisioned by a trusted installer, not request data. Do not make a world-writable socket or change SELinux to permissive. Physical dispatch remains disconnected until independent root E2E.
+
+## Socket lifecycle RED/GREEN tests
+
+Four additional cases cover restart serving a second signed grant, injected group-mode chown/listen failures and a parent-directory replacement during validation. Local result: 67 Python tests pass. Restart now resets the stop event. Parent inode/device are compared before/after policy validation and after bind. **These pathname checks narrow but do not eliminate TOCTOU**: production still requires descriptor-relative operations/pinned directory and adversarial cross-UID/SELinux testing. No root deployment authorized.

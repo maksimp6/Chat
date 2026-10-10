@@ -48,13 +48,21 @@ class SignedInputSocket:
         self._inode=None
 
     def start(self) -> None:
+        # Capture directory identity before policy validation and recheck after.
+        parent_identity=self.path.parent.lstat()
         _check_directory(self.path.parent,shared_gid=self.shared_gid)
+        checked_parent=self.path.parent.lstat()
+        if (checked_parent.st_dev,checked_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
+            raise SocketBoundaryError("socket parent replaced during validation")
         if self.path.exists() or self.path.is_symlink():
             raise SocketBoundaryError("refusing to replace existing socket")
         server=socket.socket(socket.AF_UNIX,socket.SOCK_SEQPACKET)
         try:
             server.settimeout(0.1)
             server.bind(str(self.path))
+            current_parent=self.path.parent.lstat()
+            if (current_parent.st_dev,current_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
+                raise SocketBoundaryError("socket parent replaced during bind")
             self._inode=self.path.lstat().st_ino
             if self.shared_gid is not None:
                 os.chown(self.path,-1,self.shared_gid)
@@ -64,6 +72,7 @@ class SignedInputSocket:
             server.close()
             self._unlink_owned()
             raise
+        self._stop.clear()
         self._sock=server
         self._thread=threading.Thread(target=self._run,daemon=True)
         self._thread.start()
