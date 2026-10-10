@@ -40,16 +40,14 @@ def test_signed_socket_to_c_keyboard_chord_and_fault():
         subprocess.run(
             [compiler, "-shared", "-fPIC", "-std=gnu11", "-pthread",
              "-Wall", "-Wextra", "-Werror", "-I", str(C_HEADER.parent),
-             str(C_DRIVER), "-o", str(library)],
+             str(C_DRIVER), str(Path(__file__).with_name("keyboard_fixture.c")),
+             "-o", str(library)],
             check=True, capture_output=True, text=True, timeout=30,
         )
         lib = ctypes.CDLL(str(library))
         emit_t = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p,
                                   ctypes.c_ushort, ctypes.c_ushort, ctypes.c_int)
         clock_t = ctypes.CFUNCTYPE(ctypes.c_int64, ctypes.c_void_p)
-        # C struct storage is deliberately overallocated and aligned.
-        storage = ctypes.create_string_buffer(1024)
-        keyboard = ctypes.cast(storage, ctypes.c_void_p)
         events = []
         fail_up = [False]
 
@@ -64,12 +62,14 @@ def test_signed_socket_to_c_keyboard_chord_and_fault():
         def clock(_ctx):
             return time.monotonic_ns() // 1_000_000
 
-        lib.alice_keyboard_init.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
-                                            emit_t, clock_t]
-        lib.alice_keyboard_down.argtypes = [ctypes.c_void_p, ctypes.c_ushort]
-        lib.alice_keyboard_up.argtypes = [ctypes.c_void_p, ctypes.c_ushort]
-        lib.alice_keyboard_close.argtypes = [ctypes.c_void_p]
-        assert lib.alice_keyboard_init(keyboard, None, emit, clock) == 0
+        lib.alice_fixture_new.argtypes = [ctypes.c_void_p, emit_t, clock_t]
+        lib.alice_fixture_new.restype = ctypes.c_void_p
+        lib.alice_fixture_down.argtypes = [ctypes.c_void_p, ctypes.c_ushort]
+        lib.alice_fixture_up.argtypes = [ctypes.c_void_p, ctypes.c_ushort]
+        lib.alice_fixture_close.argtypes = [ctypes.c_void_p]
+        lib.alice_fixture_free.argtypes = [ctypes.c_void_p]
+        keyboard = lib.alice_fixture_new(None, emit, clock)
+        assert keyboard, "C fixture allocation failed"
 
         principal = AuthenticatedPrincipal("owner", "redmi9", "controller")
         authority = SessionAuthority("owner", "redmi9",
@@ -81,9 +81,9 @@ def test_signed_socket_to_c_keyboard_chord_and_fault():
         def dispatch(action, payload):
             code = payload["key"]
             if action == "key_down":
-                return lib.alice_keyboard_down(keyboard, code) == 0
+                return lib.alice_fixture_down(keyboard, code) == 0
             if action == "key_up":
-                return lib.alice_keyboard_up(keyboard, code) == 0
+                return lib.alice_fixture_up(keyboard, code) == 0
             return False
 
         verifier = ProtectedVerifier(key, "owner", "redmi9", dispatch=dispatch)
@@ -117,4 +117,7 @@ def test_signed_socket_to_c_keyboard_chord_and_fault():
         finally:
             endpoint.stop()
             fail_up[0] = False
-            assert lib.alice_keyboard_close(keyboard) == 0
+            try:
+                assert lib.alice_fixture_close(keyboard) == 0
+            finally:
+                lib.alice_fixture_free(keyboard)

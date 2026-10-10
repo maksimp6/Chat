@@ -18,3 +18,7 @@ This is an isolated Integration & QA-owned test slice, **not a combined driver i
 ## uinput teardown on partial KEY_UP write
 
 `test_uinput_teardown.py` compiles the real Keyboard #1091 `keyboard.c` and `uinput_device.c` against a mocked syscall table. It injects a short `EV_KEY KEY_UP` write and checks fail-closed driver state, one `UI_DEV_DESTROY`, one `close`, no subsequent key events and idempotent repeated destroy. Isolated Keyboard head `810738c`: **1 PASS** on Redmi 9. This is a mocked syscall test only; real kernel device registration, crash/restart behavior and root-owned signed verifier E2E remain unverified.
+
+## Independent review fix: C-owned fixture ABI
+
+The signed-to-C test no longer casts an arbitrary Python `ctypes.create_string_buffer(1024)` to `alice_keyboard*`. `keyboard_fixture.c` now owns allocation/alignment and the exact C struct size via `calloc(sizeof(alice_keyboard_fixture))`; Python holds only an opaque pointer with declared ctypes signatures and explicit free. Combined Security+Keyboard temporary fixture: **4/4 integration tests PASS** on Redmi 9. Still not a production FFI boundary or physical root E2E.
