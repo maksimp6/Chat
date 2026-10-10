@@ -27,17 +27,28 @@ def test_forged_controller_fields_cannot_issue():
     ("text",{"text":"hello","extra":"unexpected"}),
     ("click",{"x":True,"y":0}),
 ])
-def test_root_verifier_rejects_signed_invalid_action_payload(action,payload):
+def test_root_verifier_rejects_signed_invalid_action_payload(action,payload,monkeypatch):
     key=secrets.token_bytes(32)
     principal=AuthenticatedPrincipal("owner-a","redmi9","controller")
     authority=SessionAuthority("owner-a","redmi9")
-    authority.authorize(principal)
+    # Test-only trusted fixture: bypass the *separate* auth defect so that
+    # every payload case reaches the verifier after valid HMAC verification.
+    monkeypatch.setattr(authority, "active", lambda _principal: True)
+    authority.session = secrets.token_hex(16)
+    authority.epoch = secrets.token_hex(16)
+    authority.lease_until = authority.clock() + 10_000_000_000
     signer=TrustedSigner(authority,key)
     dispatched=[]
     verifier=ProtectedVerifier(key,"owner-a","redmi9",
         dispatch=lambda a,p:dispatched.append((a,p)) or True)
     verifier.provision(authority,principal)
     packet=signer.sign(principal,InputGrant(action,payload))
+    called = []
+    original_accept = verifier.accept
+    def observed_accept(value):
+        called.append(True)
+        return original_accept(value)
     with pytest.raises(GrantError):
-        verifier.accept(packet)
+        observed_accept(packet)
+    assert called == [True], "test must reach root verifier"
     assert not dispatched
