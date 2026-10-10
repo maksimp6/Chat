@@ -187,7 +187,8 @@ class _JournalEngine:
             if not isinstance(payload, dict) or not isinstance(payload.get("changes"), list):
                 raise ValueError("invalid journal payload")
             serialized_payload = json.dumps(
-                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                allow_nan=False,
             ).encode()
             # Chain each frame to the previous confirmed digest so replay detects
             # reordered, missing, or modified records (not malicious rewrites).
@@ -207,6 +208,8 @@ class _JournalEngine:
                 if op not in ("set", "delete"):
                     raise ValueError("invalid journal operation")
                 value = change["value"] if op == "set" else None
+                if op == "set":
+                    _validate_value_shape(value)
                 validated.append((op, namespace, key, value))
             for op, namespace, key, value in validated:
                 if op == "set":
@@ -214,7 +217,8 @@ class _JournalEngine:
                 else:
                     state.get(namespace, {}).pop(key, None)
             return state, payload["seq"], next_digest
-        except (ValueError, KeyError, TypeError, UnicodeError, AttributeError) as exc:
+        except (ValueError, KeyError, TypeError, UnicodeError, AttributeError,
+                RecursionError, StoreError) as exc:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:

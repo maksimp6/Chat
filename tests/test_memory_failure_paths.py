@@ -320,3 +320,33 @@ def test_large_json_string_chunking_keeps_commit_valid(tmp_path):
         assert store.commit() == 1
     with MemoryStore(path) as store:
         assert store.get("large") == "Ж" * 40000
+
+
+@pytest.mark.parametrize("invalid_value", ["deep", "nonfinite"])
+def test_replay_rejects_invalid_value_in_valid_digest_frame(tmp_path, invalid_value):
+    """A frame with a correct hash cannot bypass write-time value limits."""
+    import hashlib
+
+    value = "leaf"
+    if invalid_value == "deep":
+        for _ in range(66):
+            value = [value]
+    else:
+        value = float("nan")
+    payload = {
+        "seq": 1,
+        "changes": [
+            {"namespace": "values", "key": "unsafe", "op": "set", "value": value}
+        ],
+    }
+    raw = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    digest = hashlib.sha256(bytes(32) + raw).hexdigest()
+    frame = json.dumps({"payload": payload, "digest": digest}) + "\n"
+    path = tmp_path / "invalid-value.memory"
+    path.write_text(frame, encoding="utf-8")
+    before = path.read_bytes()
+    with pytest.raises(StoreError, match="corrupt committed journal"):
+        MemoryStore(path)
+    assert path.read_bytes() == before
