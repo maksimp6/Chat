@@ -36,3 +36,5 @@ def test_stop_revokes_before_waiting_for_slow_dispatch(harness):
     worker.join(3)
     assert not stopper.is_alive()
     assert not errors
+    assert responses == [b"DENIED\n"], "in-flight command must never ACK after shutdown"
+    assert verifier.session is None
