@@ -65,3 +65,7 @@ A new RED test showed that the authority's lease could be valid before `Protecte
 ## Shutdown epoch fencing
 
 After a verifier shutdown, re-provisioning the **same epoch** is rejected even if the old authority lease is still valid. A new authority authorization rotates epoch/session before re-provisioning. RED test reproduced stale-session resurrection, then 77 security tests passed. The shutdown flag is set without waiting for a slow backend dispatch lock. This is an isolated in-process contract, not a root-owned authentication guarantee.
+
+## Shutdown/provision interleaving (2026-10-10)
+
+A deterministic concurrency RED test demonstrated that an in-flight `provision()` could clear the shutdown event after `request_shutdown()` set it. The verifier now tracks a shutdown generation and refuses to complete provisioning if shutdown occurred during the clear operation. Local 78-test suite passes. **This is not a formal concurrency proof**: production still needs a single root-owned lifecycle state machine with verified atomic transitions, cross-process credentials and independent physical teardown.
