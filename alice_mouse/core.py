@@ -231,7 +231,18 @@ class MouseModule:
                 raise MouseError("invalid grant") from exc
             # Advance replay position before any device effect, including failure.
             self.seq=grant["seq"]
-            if not self.focus_ok():
+            try:
+                # Only a definitive trusted foreground signal authorizes input.
+                focused = self.focus_ok()
+            except Exception as exc:
+                # A failing foreground inspector cannot retain a drag lease.
+                self.active = False
+                try:
+                    self._release()
+                finally:
+                    self.hide()
+                raise MouseError("foreground verification failed; session revoked") from exc
+            if focused is not True:
                 self._release()
                 self.hide()
                 raise MouseError("unsafe foreground")

@@ -195,3 +195,32 @@ def test_close_cancels_autonomous_release():
     m.close()
     assert [event[0] for event in backend.events] == ['down','up']
     assert m._lease_timer is None
+
+
+def test_focus_probe_failure_releases_button_and_revokes_controller(mouse):
+    m, backend, _, _, hidden, _ = mouse
+    run(m, "down", button=1)
+
+    def failing_probe():
+        raise RuntimeError("foreground inspector unavailable")
+
+    m.focus_ok = failing_probe
+    try:
+        with pytest.raises(MouseError, match="foreground"):
+            run(m, "move", x=5)
+        assert [event[0] for event in backend.events] == ["down", "up"]
+        assert not m.held
+        assert m.active is False
+        assert hidden
+    finally:
+        m.close()
+
+
+def test_focus_probe_truthy_nonbool_must_not_authorize_input(mouse):
+    m, backend, _, _, hidden, _ = mouse
+    m.focus_ok = lambda: 1
+    with pytest.raises(MouseError, match="unsafe foreground"):
+        run(m, "move", x=5)
+    assert backend.events == []
+    assert hidden
+    m.close()
