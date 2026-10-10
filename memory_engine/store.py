@@ -236,7 +236,7 @@ class _JournalEngine:
             if pending:
                 raise StoreError("transaction requires an idle store")
             self._active_transaction = True
-            transaction = _ValueTransaction(deepcopy(self._state.get("values", {})))
+            transaction = _ValueTransaction(self._state.get("values", {}))
             try:
                 yield transaction
                 self._commit_changes(transaction._pending_changes())
@@ -258,44 +258,6 @@ class _JournalEngine:
             ]
             self._commit_changes(changes)
             return self._sequence
-
-    def set(self, namespace: str, key: str, value: Any) -> None:
-        """Synchronous durable write; reject direct writes inside a transaction."""
-        with self._lock:
-            self._ensure_open()
-            if self._active_transaction:
-                raise StoreError("direct mutation during transaction is forbidden")
-            self._commit_changes(
-                [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
-            )
-
-    def delete(self, namespace: str, key: str) -> None:
-        """Synchronously record a deletion, including of an absent key."""
-        with self._lock:
-            self._ensure_open()
-            if self._active_transaction:
-                raise StoreError("direct mutation during transaction is forbidden")
-            self._commit_changes([{"op": "delete", "namespace": namespace, "key": key}])
-
-    @contextmanager
-    def transaction(self) -> Iterator["_JournalTransaction"]:
-        """Commit staged changes together on success; discard on exception."""
-        with self._lock:
-            self._ensure_open()
-            if self._failed:
-                raise StoreError("recovery required")
-            if self._active_transaction:
-                raise StoreError("nested transactions are not supported")
-            self._active_transaction = True
-            # Transaction writes stay in a private overlay; a successful exit
-            # appends one record, while an exception discards staged changes.
-            transaction = _JournalTransaction(self._state)
-            try:
-                yield transaction
-                self._commit_changes(transaction._pending_changes())
-            finally:
-                transaction._closed = True
-                self._active_transaction = False
 
     @staticmethod
     def _copy_verified_file(
@@ -500,43 +462,3 @@ class _ValueTransaction:
             {"op": "set", "namespace": "values", "key": name, "value": deepcopy(value)}
             for name, value in sorted(self._pending.items())
         ]
-
-
-class _JournalTransaction:
-    """Staged changes overlay committed RAM until one synchronous commit."""
-
-    def __init__(self, committed: dict[str, dict[str, Any]]) -> None:
-        self._committed = committed
-        self._changes: dict[tuple[str, str], dict[str, Any]] = {}
-        self._closed = False
-
-    def _ensure_open(self) -> None:
-        if self._closed:
-            raise StoreError("transaction is closed")
-
-    def get(self, namespace: str, key: str) -> Any | None:
-        """Read a staged value, falling back to committed state."""
-        self._ensure_open()
-        pending = self._changes.get((namespace, key))
-        if pending is not None:
-            return deepcopy(pending["value"]) if pending["op"] == "set" else None
-        return deepcopy(self._committed.get(namespace, {}).get(key))
-
-    def set(self, namespace: str, key: str, value: Any) -> None:
-        """Stage a copy of the value without publishing it."""
-        self._ensure_open()
-        self._changes[(namespace, key)] = {
-            "op": "set",
-            "namespace": namespace,
-            "key": key,
-            "value": deepcopy(value),
-        }
-
-    def delete(self, namespace: str, key: str) -> None:
-        """Stage a key deletion without changing committed RAM state."""
-        self._ensure_open()
-        self._changes[(namespace, key)] = {"op": "delete", "namespace": namespace, "key": key}
-
-    def _pending_changes(self) -> list[dict[str, Any]]:
-        self._ensure_open()
-        return [self._changes[key] for key in sorted(self._changes)]
