@@ -182,6 +182,7 @@ class ProtectedVerifier:
         self.lease_until=0
         self.seq=0
         self.shutdown_requested=threading.Event()
+        self._last_shutdown_epoch=None
 
     def provision(self, authority: SessionAuthority, principal: AuthenticatedPrincipal) -> None:
         """Lab-only direct handoff; production requires authenticated root channel."""
@@ -192,6 +193,9 @@ class ProtectedVerifier:
             # acquisition of the two locks. Never provision stale identity.
             if not authority.active(principal):
                 raise GrantError("controller lease changed during provisioning")
+            if (self.shutdown_requested.is_set() and
+                    authority.epoch == self._last_shutdown_epoch):
+                raise GrantError("fresh epoch required after shutdown")
             self.shutdown_requested.clear()
             self.epoch,self.session=authority.epoch,authority.session
             self.lease_until=authority.lease_until
@@ -250,6 +254,8 @@ class ProtectedVerifier:
 
     def request_shutdown(self) -> None:
         # Does not wait for an in-flight backend callback to finish.
+        # Never wait for self.lock: a physical dispatch may hold it.
+        self._last_shutdown_epoch=self.epoch
         self.shutdown_requested.set()
 
     def revoke(self) -> None:

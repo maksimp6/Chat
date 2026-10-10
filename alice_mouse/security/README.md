@@ -61,3 +61,7 @@ Stopping the Unix server now marks the verifier shutdown immediately, prevents n
 ## Provisioning lease TOCTOU (2026-10-10)
 
 A new RED test showed that the authority's lease could be valid before `ProtectedVerifier.provision()` acquires its locks and invalid by the time session state is copied. Provisioning now rechecks `authority.active(principal)` while holding both locks. Two focused cases cover revoked authorization between checks and an expired lease; the 76-test security suite passes. Root-owned credential handoff and cross-UID E2E are still pending.
+
+## Shutdown epoch fencing
+
+After a verifier shutdown, re-provisioning the **same epoch** is rejected even if the old authority lease is still valid. A new authority authorization rotates epoch/session before re-provisioning. RED test reproduced stale-session resurrection, then 77 security tests passed. The shutdown flag is set without waiting for a slow backend dispatch lock. This is an isolated in-process contract, not a root-owned authentication guarantee.
