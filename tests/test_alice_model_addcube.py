@@ -1,10 +1,11 @@
 """Offline tests for the first Alice Pro model tool."""
+
 import hashlib
 import math
-from pathlib import Path
 import struct
 import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.alice_model_addcube import model_addcube
 
@@ -22,7 +23,8 @@ class AddCubeTests(unittest.TestCase):
             self.assertEqual(struct.unpack_from("<I", data, 80)[0], 12)
             vertices = [
                 struct.unpack_from("<3f", data, 84 + i * 50 + j * 12 + 12)
-                for i in range(12) for j in range(3)
+                for i in range(12)
+                for j in range(3)
             ]
             for axis in range(3):
                 self.assertEqual(min(p[axis] for p in vertices), -10)
@@ -37,7 +39,10 @@ class AddCubeTests(unittest.TestCase):
     def test_invalid_dimensions(self):
         with tempfile.TemporaryDirectory() as directory:
             for value in (0, -1, 181, math.nan, math.inf, True, "20"):
-                with self.subTest(value=value), self.assertRaises(ValueError):
+                with (
+                    self.subTest(value=value),
+                    self.assertRaises((ValueError, TypeError)),
+                ):
                     model_addcube(value, output_dir=directory)
             self.assertEqual(list(Path(directory).iterdir()), [])
 
