@@ -10,3 +10,7 @@ This is an isolated Integration & QA-owned test slice, **not a combined driver i
 ## Signed socket -> real C keyboard state machine
 
 `test_signed_c_keyboard.py` builds the actual C keyboard core as a temporary shared library and exercises signed Unix socket commands through Python verifier to C `alice_keyboard_down/up`, recording `EV_KEY` and `SYN_REPORT` via a mock emitter. It verifies Ctrl+A chord order, unsigned rejection and backend `KEY_UP` failure revocation. Temporary combined fixture from Security `5a48775` and Keyboard `810738c`: 1 PASS on Redmi 9. **Not physical E2E:** no `/dev/uinput` device, root process, different UID, Android InputReader or independent C watchdog. `ctypes` storage is a test-only ABI harness; no production FFI contract is implied.
+
+## Autonomous C watchdog gate
+
+`test_c_watchdog_bridge.py` compiles the real staged C keyboard runner, calls `runner_down(KEY_A)`, stalls the client without `tick()`/`key_up()`, and asserts exactly one `KEY_UP` was observed before shutdown. On current `develop` it fails because #1091 is not integrated; on an isolated checkout containing Keyboard head `810738c`, **1 PASS** on Redmi 9. It uses a mocked event callback, not an actual `/dev/uinput` device. It does not establish crash survival, root isolation or SELinux cross-UID access.
