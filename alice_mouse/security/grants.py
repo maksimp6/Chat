@@ -118,6 +118,43 @@ class TrustedSigner:
             return packet
 
 
+def _validate_action_payload(action: str, payload: dict) -> None:
+    """Root-side, fail-closed v1 action schema; no shell or client-selected role."""
+    import re
+    if type(payload) is not dict:
+        raise GrantError("invalid payload")
+    if action in ("move", "click"):
+        if set(payload)!={"x","y"} or any(type(payload[k]) is not int or not -500<=payload[k]<=500 for k in ("x","y")):
+            raise GrantError("invalid coordinates")
+    elif action in ("right", "down", "up"):
+        if set(payload)!={"button"} or type(payload["button"]) is not int or payload["button"] not in (1,2):
+            raise GrantError("invalid button")
+    elif action=="scroll":
+        if set(payload)!={"delta"} or type(payload["delta"]) is not int or not -20<=payload["delta"]<=20:
+            raise GrantError("invalid scroll")
+    elif action in ("key_down","key_up"):
+        # Restricted safe subset of evdev keycodes, excluding power/system keys.
+        allowed={1,14,15,28,57,97,100,102,103,104,105,106,107,108,109,110,111,113,114,115,
+                 29,42,54,56,125,126}
+        allowed.update(range(2,14))
+        allowed.update(range(16,28))
+        allowed.update(range(30,54))
+        allowed.update(range(59,69))
+        if set(payload)!={"key"} or type(payload["key"]) is not int or payload["key"] not in allowed:
+            raise GrantError("invalid key")
+    elif action=="open":
+        if set(payload)!={"package"} or type(payload["package"]) is not str or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+",payload["package"]):
+            raise GrantError("invalid package")
+    elif action=="text":
+        if set(payload)!={"text"} or type(payload["text"]) is not str or not 0<len(payload["text"])<=256 or any(ord(c)<32 and c not in "\n\t" for c in payload["text"]):
+            raise GrantError("invalid text")
+    elif action in ("home","back","recents"):
+        if payload:
+            raise GrantError("unexpected payload")
+    else:
+        raise GrantError("unsupported action")
+
+
 class ProtectedVerifier:
     """Privileged-side verification; callback is the sole physical dispatch.
 
@@ -168,6 +205,7 @@ class ProtectedVerifier:
                 data["action"] not in ACTIONS or type(data["payload"]) is not dict or
                 len(_canonical(data["payload"]))>512):
                 raise ValueError()
+            _validate_action_payload(data["action"],data["payload"])
             age=self.clock()-data["issued"]
             if not 0<=age<=TTL_NS:
                 raise ValueError()

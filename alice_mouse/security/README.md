@@ -13,3 +13,7 @@ Refs #1085 and #650. This module defines owner/device-bound signed grants shared
 Run `python -m pytest -q tests/alice_input_security/test_grants.py`.
 
 No SELinux changes, no root cutover and no merge until independent review and exact-head CI.
+
+## RED→GREEN progress (2026-10-10)
+
+Root-side action-specific payload validation now rejects unknown fields, invalid coordinates, forbidden power keys, invalid package names and unsafe text fields. 6 of 7 security RED tests are now GREEN; **forged controller identity is intentionally still RED** until authenticated Live Server identity issuance is designed and verified. Do not equate the public dataclass `AuthenticatedPrincipal` with proof of login. Physical dispatch remains disconnected.
