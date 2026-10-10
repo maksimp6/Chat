@@ -5,7 +5,7 @@ import struct
 import tempfile
 import unittest
 
-from dota_workshop_mesh import (
+from scripts.dota_workshop_mesh import (
     MeshError, boundary_loops, closed_mesh, components, convert,
     physical_mesh, read_glb, topology, weld,
 )
@@ -122,7 +122,7 @@ class MeshPipelineTests(unittest.TestCase):
             path = Path(temp) / "valid.glb"
             path.write_bytes(fixture_glb())
             doc, binary = read_glb(path)
-            from dota_workshop_mesh import select_mesh
+            from scripts.dota_workshop_mesh import select_mesh
             with self.assertRaises(MeshError):
                 select_mesh(doc, binary, "not-here")
 
