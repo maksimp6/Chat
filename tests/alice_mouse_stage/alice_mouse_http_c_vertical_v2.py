@@ -3,6 +3,7 @@
 This never touches the installed Live Server, root broker or /dev/uinput.
 The private parent-child pipe is not a public session issuance endpoint.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -70,8 +71,19 @@ class CVerifier:
             raise PermissionError("missing authenticated session")
         issued = time.monotonic_ns() // 1_000_000
         raw = struct.pack(
-            GRANT_FORMAT, GRANT_MAGIC, self.epoch, seq, self.session_id,
-            2, action, button, 0, x, y, issued, secrets.token_bytes(16)
+            GRANT_FORMAT,
+            GRANT_MAGIC,
+            self.epoch,
+            seq,
+            self.session_id,
+            2,
+            action,
+            button,
+            0,
+            x,
+            y,
+            issued,
+            secrets.token_bytes(16),
         )
         return (raw + hmac.digest(self.key, raw, "sha256")).hex()
 
@@ -110,7 +122,9 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError):
             return self.reply(400, "invalid_json")
         authorization = self.headers.get("Authorization", "")
-        if not isinstance(data, dict) or not self.server.roles.authorize_command(authorization, data):
+        if not isinstance(data, dict) or not self.server.roles.authorize_command(
+            authorization, data
+        ):
             return self.reply(403, "denied")
         if self.path == "/mouse/start":
             if data:
@@ -124,7 +138,12 @@ class Handler(BaseHTTPRequestHandler):
         if any(type(data[k]) is not int for k in data):
             return self.reply(400, "invalid_type")
         action, seq, x, y, button = (data[k] for k in ("action", "seq", "x", "y", "button"))
-        if action not in (1, 2, 3) or seq < 1 or button not in (1, 2) or not (-500 <= x <= 500 and -500 <= y <= 500):
+        if (
+            action not in (1, 2, 3)
+            or seq < 1
+            or button not in (1, 2)
+            or not (-500 <= x <= 500 and -500 <= y <= 500)
+        ):
             return self.reply(400, "invalid_value")
         if self.server.c.session_id is None:
             return self.reply(403, "session_not_started")

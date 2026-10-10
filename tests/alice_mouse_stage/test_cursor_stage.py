@@ -1,4 +1,5 @@
 """Stage-only cursor tests, including authenticated HTTP->C->visual sink."""
+
 import http.client
 import importlib.util
 import json
@@ -23,7 +24,8 @@ class CursorStageTests(unittest.TestCase):
         self.shown = []
         self.hidden = []
         self.cursor = CursorPreviewAdapter(
-            2340, 1080,
+            2340,
+            1080,
             show=lambda x, y: self.shown.append((x, y)),
             hide=lambda: self.hidden.append("hide"),
         )
@@ -37,8 +39,14 @@ class CursorStageTests(unittest.TestCase):
         self.assertEqual(self.shown[-1], (2339, 1079))
 
     def test_unsigned_or_invalid_event_never_drawn(self):
-        for raw in ("move 50 50", "EVENT 1 1 501 1", "EVENT 1 1 1 1\nmove 20 20",
-                    "EVENT 1 3 4 5", "EVENT 1 1 4 5; whoami", ""):
+        for raw in (
+            "move 50 50",
+            "EVENT 1 1 501 1",
+            "EVENT 1 1 1 1\nmove 20 20",
+            "EVENT 1 3 4 5",
+            "EVENT 1 1 4 5; whoami",
+            "",
+        ):
             with self.subTest(raw=raw):
                 self.assertFalse(self.cursor.consume(raw))
         self.assertEqual(self.shown, [])
@@ -72,14 +80,32 @@ class CursorStageTests(unittest.TestCase):
         pet = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(pet)
         commands = []
-        with patch.object(pet, "adb", side_effect=lambda *a: commands.append(a) or "OK"), \
-             patch("sys.argv", ["pet.py", "cursor_preview", "--x", "123", "--y", "456"]):
+        with (
+            patch.object(pet, "adb", side_effect=lambda *a: commands.append(a) or "OK"),
+            patch("sys.argv", ["pet.py", "cursor_preview", "--x", "123", "--y", "456"]),
+        ):
             self.assertEqual(pet.main(), 0)
-        self.assertEqual(commands, [
-            ("shell", "am", "start", "-n", "org.alice.pet/.PetActivity",
-             "--es", "pet_action", "cursor_preview", "--ei", "x", "123",
-             "--ei", "y", "456")
-        ])
+        self.assertEqual(
+            commands,
+            [
+                (
+                    "shell",
+                    "am",
+                    "start",
+                    "-n",
+                    "org.alice.pet/.PetActivity",
+                    "--es",
+                    "pet_action",
+                    "cursor_preview",
+                    "--ei",
+                    "x",
+                    "123",
+                    "--ei",
+                    "y",
+                    "456",
+                )
+            ],
+        )
 
 
 class AuthenticatedPreviewE2E(unittest.TestCase):
@@ -92,20 +118,24 @@ class AuthenticatedPreviewE2E(unittest.TestCase):
             secret.chmod(0o600)
             verifier = CVerifier()
             server = Server(viewer, secret, verifier)
-            worker = threading.Thread(target=server.serve_forever,
-                                      kwargs={"poll_interval": 0.01})
+            worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
             worker.start()
             shown = []
-            visual = CursorPreviewAdapter(2340, 1080,
-                                           show=lambda x, y: shown.append((x, y)),
-                                           hide=lambda: None)
+            visual = CursorPreviewAdapter(
+                2340, 1080, show=lambda x, y: shown.append((x, y)), hide=lambda: None
+            )
 
             def request(token, route, data):
                 conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=2)
-                conn.request("POST", route, json.dumps(data), {
-                    "Authorization": "Bearer " + token,
-                    "Content-Type": "application/json",
-                })
+                conn.request(
+                    "POST",
+                    route,
+                    json.dumps(data),
+                    {
+                        "Authorization": "Bearer " + token,
+                        "Content-Type": "application/json",
+                    },
+                )
                 response = conn.getresponse()
                 result = response.status, json.loads(response.read())["result"]
                 conn.close()

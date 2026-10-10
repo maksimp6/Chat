@@ -4,6 +4,7 @@ This module cannot inject touch/mouse events. Only the authenticated HTTP->C
 verifier should invoke consume() with its accepted event. Renderer callbacks
 must remain unprivileged visual-only operations.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,10 +22,15 @@ class PreviewState:
 
 
 class CursorPreviewAdapter:
-    def __init__(self, width: int, height: int,
-                 show: Callable[[int, int], None],
-                 hide: Callable[[], None]):
-        if type(width) is not int or type(height) is not int or not 48 <= width <= 8192 or not 48 <= height <= 8192:
+    def __init__(
+        self, width: int, height: int, show: Callable[[int, int], None], hide: Callable[[], None]
+    ):
+        if (
+            type(width) is not int
+            or type(height) is not int
+            or not 48 <= width <= 8192
+            or not 48 <= height <= 8192
+        ):
             raise ValueError("invalid display size")
         self.width, self.height = width, height
         self.show, self.hide = show, hide
@@ -55,9 +61,14 @@ class CursorPreviewAdapter:
         return True
 
     def display_changed(self, width: int, height: int, rotation: int) -> bool:
-        if (type(width) is not int or type(height) is not int or
-                type(rotation) is not int or not 48 <= width <= 8192 or
-                not 48 <= height <= 8192 or rotation not in (0, 1, 2, 3)):
+        if (
+            type(width) is not int
+            or type(height) is not int
+            or type(rotation) is not int
+            or not 48 <= width <= 8192
+            or not 48 <= height <= 8192
+            or rotation not in (0, 1, 2, 3)
+        ):
             return False
         if (width, height, rotation) != (self.width, self.height, self.last_rotation):
             self.hide()

@@ -21,8 +21,9 @@ class VerticalHTTPCTest(unittest.TestCase):
         self.controller_path = controller_path
         self.c = CVerifier()
         self.server = Server(self.viewer, controller_path, self.c)
-        self.thread = threading.Thread(target=self.server.serve_forever,
-                                       kwargs={"poll_interval": 0.01})
+        self.thread = threading.Thread(
+            target=self.server.serve_forever, kwargs={"poll_interval": 0.01}
+        )
         self.thread.start()
         self.addCleanup(self.cleanup)
 
@@ -34,11 +35,13 @@ class VerticalHTTPCTest(unittest.TestCase):
         self.c.close()
 
     def post(self, token, endpoint, body):
-        conn = http.client.HTTPConnection("127.0.0.1",
-                                          self.server.server_port, timeout=2)
-        conn.request("POST", endpoint, json.dumps(body),
-                     {"Authorization": "Bearer " + token,
-                      "Content-Type": "application/json"})
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=2)
+        conn.request(
+            "POST",
+            endpoint,
+            json.dumps(body),
+            {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+        )
         result = conn.getresponse()
         status, payload = result.status, json.loads(result.read())
         conn.close()
@@ -91,8 +94,9 @@ class VerticalHTTPCTest(unittest.TestCase):
 
     def test_out_of_range_denied(self):
         self.begin()
-        self.assertEqual(self.post(self.controller, "/mouse/command",
-                                   {**self.action(), "x": 501})[0], 400)
+        self.assertEqual(
+            self.post(self.controller, "/mouse/command", {**self.action(), "x": 501})[0], 400
+        )
 
     def test_verifier_exit_fails_closed(self):
         self.begin()
@@ -119,6 +123,7 @@ class VerticalHTTPCTest(unittest.TestCase):
     def test_unknown_session_even_with_valid_mac(self):
         import struct
         import hmac
+
         self.begin()
         original = bytearray.fromhex(self.c.build_grant(1, 1, 8, -2, 1))
         struct.pack_into("<Q", original, 12, self.c.session_id ^ 1)
@@ -129,22 +134,31 @@ class VerticalHTTPCTest(unittest.TestCase):
     def test_expired_grant_even_when_signed(self):
         import struct
         import hmac
+
         self.begin()
         original = bytearray.fromhex(self.c.build_grant(1, 1, 8, -2, 1))
         issued_offset = struct.calcsize("<IIIQBBBBhh")
-        struct.pack_into("<Q", original, issued_offset,
-                         struct.unpack_from("<Q", original, issued_offset)[0] - 1000)
+        struct.pack_into(
+            "<Q",
+            original,
+            issued_offset,
+            struct.unpack_from("<Q", original, issued_offset)[0] - 1000,
+        )
         raw = bytes(original[:-32])
         new = (raw + hmac.digest(self.c.key, raw, "sha256")).hex()
         self.assertEqual(self.c.call("VERIFY " + new), "DENIED")
 
     def test_parallel_same_sequence_one_accept(self):
         import concurrent.futures
+
         self.begin()
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as workers:
-            results = list(workers.map(
-                lambda _: self.post(self.controller, "/mouse/command", self.action())[0],
-                range(6)))
+            results = list(
+                workers.map(
+                    lambda _: self.post(self.controller, "/mouse/command", self.action())[0],
+                    range(6),
+                )
+            )
         self.assertEqual(results.count(200), 1)
         self.assertEqual(results.count(403), 5)
 
