@@ -69,3 +69,7 @@ After a verifier shutdown, re-provisioning the **same epoch** is rejected even i
 ## Shutdown/provision interleaving (2026-10-10)
 
 A deterministic concurrency RED test demonstrated that an in-flight `provision()` could clear the shutdown event after `request_shutdown()` set it. The verifier now tracks a shutdown generation and refuses to complete provisioning if shutdown occurred during the clear operation. Local 78-test suite passes. **This is not a formal concurrency proof**: production still needs a single root-owned lifecycle state machine with verified atomic transitions, cross-process credentials and independent physical teardown.
+
+## Keyboard protocol integration fixture
+
+Three isolated integration tests exercise signed keyboard down/up and Ctrl+A chord over the real Unix SOCK_SEQPACKET transport, reject unsigned/replayed/KEY_POWER events, and inject a partially failing backend. The failure test intentionally demonstrates that Python session revocation cannot release a physically held key; root C watchdog and UI_DEV_DESTROY remain mandatory. The backend is mocked: no /dev/uinput, root UID, Android InputReader or cross-UID connection is exercised. 81 total security tests pass locally.
