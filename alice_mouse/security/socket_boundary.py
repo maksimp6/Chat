@@ -91,7 +91,16 @@ class SignedInputSocket:
         self._stop.clear()
         self._sock=server
         self._thread=threading.Thread(target=self._run,daemon=True)
-        self._thread.start()
+        try:
+            self._thread.start()
+        except Exception:
+            self._stop.set()
+            server.close()
+            self._unlink_owned()
+            self._close_parent()
+            self._sock=None
+            self._thread=None
+            raise
 
     def _unlink_owned(self):
         if self._parent_fd is None or self._inode is None:

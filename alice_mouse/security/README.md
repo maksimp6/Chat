@@ -45,3 +45,7 @@ The server now opens its parent directory with `O_DIRECTORY|O_NOFOLLOW`, retains
 ## Pinned-directory permission operations
 
 `chown` and `chmod` now operate on the socket basename relative to the previously pinned parent directory FD (`dir_fd`, no symlink following), rather than re-resolving the full pathname. AF_UNIX socket descriptors do not refer to the socket filesystem inode, so `fchmod` on the listening socket FD cannot set the socket file's permissions. Local 69-test suite passes. The initial `bind(path)` remains pathname-based; cross-UID and adversarial mount/rename E2E are still release blockers.
+
+## Server worker startup fault (2026-10-10)
+
+An injected `threading.Thread.start()` failure previously left a bound socket and an unstarted thread, causing cleanup errors. Startup now closes the socket, removes only the owned inode, releases the pinned parent descriptor and resets instance state. The test also verifies a subsequent clean start. 71 isolated Python tests pass. This does not replace the pending cross-UID/SELinux and root E2E.
