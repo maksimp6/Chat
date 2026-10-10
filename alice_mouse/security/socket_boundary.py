@@ -77,9 +77,11 @@ class SignedInputSocket:
             if (current_parent.st_dev,current_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
                 raise SocketBoundaryError("socket parent replaced during bind")
             self._inode=os.stat(self.path.name,dir_fd=parent_fd,follow_symlinks=False).st_ino
+            # AF_UNIX socket FD is NOT the filesystem inode on Linux.
+            # Use dirfd-relative operations under the pinned, service-owned parent.
             if self.shared_gid is not None:
-                os.chown(self.path,-1,self.shared_gid)
-            os.chmod(self.path,0o660 if self.shared_gid is not None else 0o600)
+                os.chown(self.path.name,-1,self.shared_gid,dir_fd=parent_fd,follow_symlinks=False)
+            os.chmod(self.path.name,0o660 if self.shared_gid is not None else 0o600,dir_fd=parent_fd,follow_symlinks=False)
             server.listen(4)
         except Exception:
             server.close()

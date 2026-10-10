@@ -24,10 +24,10 @@ def test_group_setup_failure_removes_own_socket(harness,monkeypatch,failure):
                                peer_uid=os.getuid(),shared_gid=os.getgid())
     if failure=="chown":
         original=module.os.chown
-        def fail(path,uid,gid):
-            if str(path)==str(endpoint.path):
+        def fail(path,uid,gid,**kwargs):
+            if str(path) in (str(endpoint.path),endpoint.path.name):
                 raise PermissionError("injected chown failure")
-            return original(path,uid,gid)
+            return original(path,uid,gid,**kwargs)
         monkeypatch.setattr(module.os,"chown",fail)
     else:
         original=module.socket.socket

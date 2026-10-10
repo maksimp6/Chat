@@ -6,10 +6,10 @@ def test_chmod_failure_unlinks_owned_socket(harness,monkeypatch):
     import alice_mouse.security.socket_boundary as module
     _,_,_,_,_,endpoint,_=harness
     original=module.os.chmod
-    def fail(path,mode):
-        if str(path)==str(endpoint.path):
+    def fail(path,mode,**kwargs):
+        if str(path) in (str(endpoint.path),endpoint.path.name):
             raise PermissionError("injected chmod failure")
-        return original(path,mode)
+        return original(path,mode,**kwargs)
     monkeypatch.setattr(module.os,"chmod",fail)
     with pytest.raises(PermissionError):
         endpoint.start()

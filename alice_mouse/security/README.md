@@ -41,3 +41,7 @@ Four additional cases cover restart serving a second signed grant, injected grou
 ## Descriptor-pinned socket cleanup (staging)
 
 The server now opens its parent directory with `O_DIRECTORY|O_NOFOLLOW`, retains that descriptor across the socket lifecycle, and uses descriptor-relative `stat`/`unlink` plus socket inode verification for cleanup. Tests cover a renamed parent with a foreign replacement path, and a second `start()` while the first server is live. **Remaining risk:** `socket.bind()` and `chown`/`chmod` still use pathnames, so this is not a complete TOCTOU elimination. Cross-UID and SELinux-Enforcing physical tests are still mandatory before deployment.
+
+## Pinned-directory permission operations
+
+`chown` and `chmod` now operate on the socket basename relative to the previously pinned parent directory FD (`dir_fd`, no symlink following), rather than re-resolving the full pathname. AF_UNIX socket descriptors do not refer to the socket filesystem inode, so `fchmod` on the listening socket FD cannot set the socket file's permissions. Local 69-test suite passes. The initial `bind(path)` remains pathname-based; cross-UID and adversarial mount/rename E2E are still release blockers.
