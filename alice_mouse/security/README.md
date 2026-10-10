@@ -57,3 +57,7 @@ A signed packet that reaches a failing physical backend is no longer treated as 
 ## Shutdown/in-flight dispatch contract
 
 Stopping the Unix server now marks the verifier shutdown immediately, prevents new grants and revokes the session after its worker finishes. A slow already-running backend callback cannot be interrupted safely by Python; after it returns the verifier denies success if shutdown was requested. Restart requires a newly authorized session and explicit verifier provisioning. Isolated race test and 74 total Python tests pass. This does not replace the C driver watchdog or kernel uinput cleanup on process death.
+
+## Provisioning lease TOCTOU (2026-10-10)
+
+A new RED test showed that the authority's lease could be valid before `ProtectedVerifier.provision()` acquires its locks and invalid by the time session state is copied. Provisioning now rechecks `authority.active(principal)` while holding both locks. Two focused cases cover revoked authorization between checks and an expired lease; the 76-test security suite passes. Root-owned credential handoff and cross-UID E2E are still pending.

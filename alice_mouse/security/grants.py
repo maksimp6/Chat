@@ -188,6 +188,10 @@ class ProtectedVerifier:
         if not authority.active(principal):
             raise GrantError("cannot provision unauthenticated session")
         with self.lock, authority.lock:
+            # The owner lease may be revoked between the first check and
+            # acquisition of the two locks. Never provision stale identity.
+            if not authority.active(principal):
+                raise GrantError("controller lease changed during provisioning")
             self.shutdown_requested.clear()
             self.epoch,self.session=authority.epoch,authority.session
             self.lease_until=authority.lease_until
