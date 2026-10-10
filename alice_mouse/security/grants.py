@@ -142,8 +142,8 @@ def _validate_action_payload(action: str, payload: dict) -> None:
             raise GrantError("invalid scroll")
     elif action in ("key_down","key_up"):
         # Restricted safe subset of evdev keycodes, excluding power/system keys.
-        allowed={1,14,15,28,57,97,100,102,103,104,105,106,107,108,109,110,111,113,114,115,
-                 29,42,54,56,125,126}
+        allowed={1,14,15,28,57,97,100,102,103,104,105,106,107,108,109,110,111,
+                 29,42,54,56,87,88,125,126}
         allowed.update(range(2,14))
         allowed.update(range(16,28))
         allowed.update(range(30,54))

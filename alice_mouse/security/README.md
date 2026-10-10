@@ -73,3 +73,7 @@ A deterministic concurrency RED test demonstrated that an in-flight `provision()
 ## Keyboard protocol integration fixture
 
 Three isolated integration tests exercise signed keyboard down/up and Ctrl+A chord over the real Unix SOCK_SEQPACKET transport, reject unsigned/replayed/KEY_POWER events, and inject a partially failing backend. The failure test intentionally demonstrates that Python session revocation cannot release a physically held key; root C watchdog and UI_DEV_DESTROY remain mandatory. The backend is mocked: no /dev/uinput, root UID, Android InputReader or cross-UID connection is exercised. 81 total security tests pass locally.
+
+## Keyboard keycode parity (2026-10-10)
+
+RED contract detected five keycode policy mismatches against the staged C keyboard driver: Python previously permitted KEY_MUTE (113), KEY_VOLUMEDOWN (114) and KEY_VOLUMEUP (115), but the C driver rejects them; Python omitted supported F11 (87) and F12 (88). Updated Python verifier's allowed set and added negative/positive parity tests. 95 Python tests PASS locally. This is a focused policy alignment, not a complete generated cross-language contract or physical E2E.
