@@ -2,13 +2,14 @@
 
 A geometry engine MVP: no printer calls, network, or arbitrary code execution.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import math
-from pathlib import Path
 import struct
+from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -26,24 +27,34 @@ def model_addcube(size_mm: float = 20.0, *, output_dir: str | Path) -> CubeResul
     an untrusted agent. This is *not* a printer upload or print-start action.
     """
     if isinstance(size_mm, bool) or not isinstance(size_mm, (int, float)):
-        raise ValueError("size_mm must be a number")
+        raise TypeError("size_mm must be a number")
     size_mm = float(size_mm)
     if not math.isfinite(size_mm) or not 0.4 <= size_mm <= 180:
         raise ValueError("size_mm must be finite and within 0.4..180")
     half = size_mm / 2
     vertices = [
-        (-half, -half, -half), (half, -half, -half),
-        (half, half, -half), (-half, half, -half),
-        (-half, -half, half), (half, -half, half),
-        (half, half, half), (-half, half, half),
+        (-half, -half, -half),
+        (half, -half, -half),
+        (half, half, -half),
+        (-half, half, -half),
+        (-half, -half, half),
+        (half, -half, half),
+        (half, half, half),
+        (-half, half, half),
     ]
     faces = [
-        (0, 2, 1), (0, 3, 2),
-        (4, 5, 6), (4, 6, 7),
-        (0, 1, 5), (0, 5, 4),
-        (1, 2, 6), (1, 6, 5),
-        (2, 3, 7), (2, 7, 6),
-        (3, 0, 4), (3, 4, 7),
+        (0, 2, 1),
+        (0, 3, 2),
+        (4, 5, 6),
+        (4, 6, 7),
+        (0, 1, 5),
+        (0, 5, 4),
+        (1, 2, 6),
+        (1, 6, 5),
+        (2, 3, 7),
+        (2, 7, 6),
+        (3, 0, 4),
+        (3, 4, 7),
     ]
     body = bytearray(b"Alice Pro model.addcube".ljust(80, b" "))
     body.extend(struct.pack("<I", len(faces)))
@@ -65,5 +76,5 @@ def model_addcube(size_mm: float = 20.0, *, output_dir: str | Path) -> CubeResul
     path = directory / ("alice_cube_" + str(size_mm).replace(".", "_") + "mm.stl")
     path.write_bytes(body)
     if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-        raise IOError("STL verification failed")
+        raise OSError("STL verification failed")
     return CubeResult(size_mm, len(faces), digest, str(path))
