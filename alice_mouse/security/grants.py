@@ -46,11 +46,15 @@ class InputGrant:
 
 class SessionAuthority:
     """One controller lease per device; only authenticated owner may issue."""
-    def __init__(self, owner: str, device: str, *, clock: Callable[[],int] | None=None):
+    def __init__(self, owner: str, device: str, *, clock: Callable[[],int] | None=None,
+                 identity_verifier: Callable[[AuthenticatedPrincipal],bool] | None=None):
         if not owner or not device:
             raise GrantError("owner/device required")
         self.owner,self.device=owner,device
         self.clock=clock or time.monotonic_ns
+        # Fail closed without a trusted, server-supplied identity decision.
+        # The public principal dataclass is metadata, NOT proof of login.
+        self._identity_verifier=identity_verifier
         self.lock=threading.RLock()
         self.epoch=secrets.token_hex(16)
         self.session=None
@@ -59,6 +63,8 @@ class SessionAuthority:
     def authorize(self, principal: AuthenticatedPrincipal, lease_ns: int=10_000_000_000) -> str:
         if (type(principal) is not AuthenticatedPrincipal or
             (principal.owner,principal.device,principal.role)!=(self.owner,self.device,"controller") or
+            self._identity_verifier is None or
+            self._identity_verifier(principal) is not True or
             type(lease_ns) is not int or not 0<lease_ns<=60_000_000_000):
             raise GrantError("controller authorization required")
         with self.lock:
@@ -71,6 +77,8 @@ class SessionAuthority:
         with self.lock:
             return (type(principal) is AuthenticatedPrincipal and
                     (principal.owner,principal.device,principal.role)==(self.owner,self.device,"controller") and
+                    self._identity_verifier is not None and
+                    self._identity_verifier(principal) is True and
                     self.session is not None and self.clock()<self.lease_until)
 
     def revoke(self) -> None:

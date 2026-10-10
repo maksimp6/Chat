@@ -17,3 +17,7 @@ No SELinux changes, no root cutover and no merge until independent review and ex
 ## RED→GREEN progress (2026-10-10)
 
 Root-side action-specific payload validation now rejects unknown fields, invalid coordinates, forbidden power keys, invalid package names and unsafe text fields. 6 of 7 security RED tests are now GREEN; **forged controller identity is intentionally still RED** until authenticated Live Server identity issuance is designed and verified. Do not equate the public dataclass `AuthenticatedPrincipal` with proof of login. Physical dispatch remains disconnected.
+
+## Identity verifier contract (GREEN local, still not deployed)
+
+`SessionAuthority` now fails closed unless a **trusted Live Server-provided** `identity_verifier` callback positively authenticates the controller identity. Matching public `AuthenticatedPrincipal` fields alone is insufficient. The callback is an integration boundary, not a standalone authentication system: a caller controlling authority construction or callback can bypass it. Production must instantiate it only inside the trusted server with verified login/session context and protect root key handoff independently. Test fixture uses object identity solely to prove same-field forgery is rejected.

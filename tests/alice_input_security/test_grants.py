@@ -15,7 +15,8 @@ def context():
     now=[1_000_000_000]
     clock=lambda:now[0]
     owner=AuthenticatedPrincipal("owner-a","redmi9","controller")
-    authority=SessionAuthority("owner-a","redmi9",clock=clock)
+    authority=SessionAuthority("owner-a","redmi9",clock=clock,
+        identity_verifier=lambda candidate:candidate is owner)
     authority.authorize(owner)
     key=secrets.token_bytes(32)
     events=[]

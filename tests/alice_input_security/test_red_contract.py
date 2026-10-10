@@ -52,3 +52,22 @@ def test_root_verifier_rejects_signed_invalid_action_payload(action,payload,monk
         observed_accept(packet)
     assert called == [True], "test must reach root verifier"
     assert not dispatched
+
+
+def test_equal_principal_fields_are_not_identity_proof():
+    trusted=AuthenticatedPrincipal('owner-a','redmi9','controller')
+    forged=AuthenticatedPrincipal('owner-a','redmi9','controller')
+    authority=SessionAuthority('owner-a','redmi9',
+        identity_verifier=lambda candidate:candidate is trusted)
+    with pytest.raises(GrantError):authority.authorize(forged)
+    authority.authorize(trusted)
+    signer=TrustedSigner(authority,secrets.token_bytes(32))
+    with pytest.raises(GrantError):signer.sign(forged,InputGrant('move',{'x':1,'y':1}))
+    assert signer.sign(trusted,InputGrant('move',{'x':1,'y':1}))
+
+
+def test_no_identity_verifier_fails_closed():
+    principal=AuthenticatedPrincipal('owner-a','redmi9','controller')
+    authority=SessionAuthority('owner-a','redmi9')
+    with pytest.raises(GrantError):authority.authorize(principal)
+    assert not authority.active(principal)
