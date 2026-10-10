@@ -51,6 +51,8 @@ STRICT_CLEAN_FILES = {
     "agent_shell/__init__.py",
     "agent_skills/__init__.py",
     "agent_skills/registry.py",
+    "alice_mouse/__init__.py",
+    "alice_mouse/core.py",
     "alice_platform/__init__.py",
     "alice_platform/health.py",
     "alice_platform/planner.py",
