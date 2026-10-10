@@ -201,6 +201,15 @@ class MouseModule:
                 raise MouseError("packet too large")
             return packet
 
+    def _fail_foreground(self, *, revoke: bool) -> None:
+        """Release physical input before hiding the preview on focus failure."""
+        if revoke:
+            self.active = False
+        try:
+            self._release()
+        finally:
+            self.hide()
+
     def dispatch(self,packet:bytes)->tuple[int,int]:
         with self.lock:
             if not self.active or type(packet) is not bytes or not 0<len(packet)<=MAX_PACKET:
@@ -236,15 +245,10 @@ class MouseModule:
                 focused = self.focus_ok()
             except Exception as exc:
                 # A failing foreground inspector cannot retain a drag lease.
-                self.active = False
-                try:
-                    self._release()
-                finally:
-                    self.hide()
+                self._fail_foreground(revoke=True)
                 raise MouseError("foreground verification failed; session revoked") from exc
             if focused is not True:
-                self._release()
-                self.hide()
+                self._fail_foreground(revoke=False)
                 raise MouseError("unsafe foreground")
             self._apply(cmd)
             point=self.cursor.update(cmd)
