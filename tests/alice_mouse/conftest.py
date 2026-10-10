@@ -49,6 +49,7 @@ def build_fixture(directory: Path) -> Path:
 def alice_mouse_c_fixture(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> None:
     """Build only for jobs collecting process-switch tests; never share binaries."""
     if not any(Path(item.path).name == "test_alice_mouse_process_switch.py" for item in request.session.items):
+        yield
         return
     output = tmp_path_factory.mktemp("alice-mouse-fixture")
     build_fixture(output)
