@@ -193,7 +193,7 @@ class ToolRegistry:
 
             for name, cfg in MODEL_EDITOR_TOOLS.items():
                 self._register("3d", name, cfg)
-        except Exception as e:
+        except ImportError as e:
             logger.error(f"[REGISTRY] Ошибка загрузки Model Editor: {e}")
 
         try:

@@ -44,8 +44,8 @@ class ModelStore:
             raise ValueError("model_id must be a UUID")  # noqa: TRY004 - validation
         try:
             return str(uuid.UUID(value))
-        except (ValueError, AttributeError):
-            raise ValueError("model_id must be a UUID")
+        except (ValueError, AttributeError) as exc:
+            raise ValueError("model_id must be a UUID") from exc
 
     @staticmethod
     def _revision(value: object) -> str:
