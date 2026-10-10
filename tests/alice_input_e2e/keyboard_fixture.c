@@ -6,6 +6,9 @@
 typedef struct {
     alice_keyboard keyboard;
 } alice_keyboard_fixture;
+static int fixture_allocations=0;
+static int fixture_closes=0;
+static int fixture_frees=0;
 
 alice_keyboard_fixture *alice_fixture_new(void *ctx,
         alice_key_emit_fn emit, alice_key_clock_fn clock) {
@@ -15,6 +18,7 @@ alice_keyboard_fixture *alice_fixture_new(void *ctx,
         free(fixture);
         return NULL;
     }
+    fixture_allocations++;
     return fixture;
 }
 
@@ -30,9 +34,16 @@ int alice_fixture_up(alice_keyboard_fixture *fixture,unsigned short key) {
 
 int alice_fixture_close(alice_keyboard_fixture *fixture) {
     if(!fixture)return -EINVAL;
+    fixture_closes++;
     return alice_keyboard_close(&fixture->keyboard);
 }
 
 void alice_fixture_free(alice_keyboard_fixture *fixture) {
+    if(fixture)fixture_frees++;
     free(fixture);
 }
+
+/* Test-only lifecycle counters, not part of the production keyboard API. */
+int alice_fixture_live_count(void){return fixture_allocations-fixture_frees;}
+int alice_fixture_close_count(void){return fixture_closes;}
+int alice_fixture_free_count(void){return fixture_frees;}

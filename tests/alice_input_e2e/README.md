@@ -30,3 +30,7 @@ The signed-to-C test no longer casts an arbitrary Python `ctypes.create_string_b
 ## Setup failure cleanup contract
 
 `test_fixture_failure_cleanup.py` verifies the source registers C fixture close/free callbacks before authorization and exercises actual `ExitStack` exception unwinding with fake close/free callbacks. This is a **contract-level test**, not injected failure through the compiled C fixture. Combined checkout: 6 tests PASS. A genuine injected authorization failure with instrumented C fixture destruction remains to be added before final acceptance.
+
+## Real C allocation / injected authorization failure
+
+`test_real_fixture_fault.py` compiles the C fixture with test-only live/close/free counters, allocates a real `alice_keyboard_fixture` via C, then injects an authorization exception while Python `ExitStack` is active. It verifies exactly one C close, exactly one free and zero live allocations. Combined local Security+Keyboard checkout: **7/7 integration tests PASS** on Redmi 9. The exception is injected at the Python authorization boundary; no real Live Server login, root process or physical input occurs.
