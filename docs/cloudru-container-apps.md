@@ -28,7 +28,7 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
 2. In GitHub, use the existing `production` environment (so the configured short
    token is reused) with:
    - secrets `CLOUDRU_IAM_KEY_ID`, `CLOUDRU_IAM_KEY_SECRET`, `ALICE_SHORT_TOKEN`,
-     `ALICE_DATABASE_URL`, `ALICE_GITHUB_CLIENT_ID`, `ALICE_GITHUB_CLIENT_SECRET`,
+     `ALICE_GITHUB_CLIENT_ID`, `ALICE_GITHUB_CLIENT_SECRET`,
      and optionally `ALICE_PROVIDER_CREDENTIAL_KEY`; repository-level OAuth
      secrets are inherited, so do not duplicate them;
    - variable `CLOUDRU_PROJECT_ID`, and optionally `CLOUDRU_REGISTRY_NAME`,
@@ -36,15 +36,23 @@ the service-account key pair and ignore `CLOUDRU_API_KEY` (Foundation Models).
      `CLOUDRU_MIN_INSTANCES`, `CLOUDRU_MAX_INSTANCES`, `ALICE_GITHUB_ALLOWED_IDS`
      (defaults to the owner's immutable GitHub ID `293531601`).
 
-For Codex Cloud, keep the existing `CLOUDRU_KEY_ID` as an environment variable and `CLOUDRU_KEY_SECRET` as a secret in the `Chat` environment. The setup and maintenance scripts normalize those names into a mode-600 cache outside the checkout; `scripts/cloudru_deploy.py` reads that cache after Codex removes setup secrets from the agent phase. Set `CLOUDRU_PROJECT_ID` as an environment variable. Never commit the cache or put `ALICE_DATABASE_URL` in an issue, log, or repository file.
+For Codex Cloud, keep the existing `CLOUDRU_KEY_ID` as an environment variable and `CLOUDRU_KEY_SECRET` as a secret in the `Chat` environment. The setup and maintenance scripts normalize those names into a mode-600 cache outside the checkout; `scripts/cloudru_deploy.py` reads that cache after Codex removes setup secrets from the agent phase. Set `CLOUDRU_PROJECT_ID` as an environment variable. Never commit the cache or put a secret value in an issue, log, or repository file.
 
 3. Run **Cloud.ru Container Apps deployment** with `action: preflight`. It
    reports all missing configuration names without printing values, installing
    dependencies, or contacting Cloud.ru. Then run `action: estimate`, verify the
    live project tariff and planned resources, and run `action: deploy`.
 
-The deploy action performs the build, push, rollout and health check automatically.
-It requires PostgreSQL and forwards the existing GitHub-login configuration.
+The deploy action is a bounded paid acceptance run, not a lasting deployment
+([#1002](https://github.com/maksimp6/Chat/pull/1002)). Before any Cloud.ru
+mutation it authorizes a budget of 5 RUB within a 900-second window, the job is
+limited to 15 minutes, the service gets a 60-second idle timeout, and at most one
+instance by default. It builds, pushes, rolls out and checks health, then a
+cleanup step runs under `always()`: a service created by this run is deleted, a
+pre-existing service is restored from the configuration captured before the
+run, and nothing is touched when no acceptance-owned change is proven. The
+workflow forwards the GitHub-login configuration but no longer passes
+`ALICE_DATABASE_URL`, so the acceptance revision uses the container's SQLite.
 The application image installs `requirements-postgres.txt` as well as the main
 requirements. A successful preflight checks configuration only; it does not
 prove connectivity, IAM permissions, database readiness or a live deployment.
@@ -113,10 +121,10 @@ The first request after idle pays a cold start.
 
 ## Known limitations
 
-- **Postgres is mandatory for this deployment.** SQLite lives in the container
-  filesystem and is lost whenever the instance sleeps or a new revision starts.
-  Store `ALICE_DATABASE_URL` (Cloud.ru Managed PostgreSQL) as a secret; the
-  deploy requires and passes it through and the existing Postgres backend takes over.
+- **No durable database in acceptance runs.** The workflow does not pass
+  `ALICE_DATABASE_URL` ([#1002](https://github.com/maksimp6/Chat/pull/1002)), so
+  data lives in the container's SQLite and is lost when the instance sleeps, a
+  new revision starts, or cleanup removes or restores the service.
 - **In-process state is lost on sleep.** Branch environment runtimes (git
   worktrees under `.alice-environments`), voice sessions, and uploaded files
   live in the container. Keep `CLOUDRU_MAX_INSTANCES=1` until they move to
