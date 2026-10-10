@@ -53,3 +53,7 @@ An injected `threading.Thread.start()` failure previously left a bound socket an
 ## Fail-closed backend dispatch (staging)
 
 A signed packet that reaches a failing physical backend is no longer treated as a recoverable success. An exception or explicit rejection revokes the verifier session, denies the command, and prevents further commands on that session. Isolated tests inject both backend exceptions and false returns, verifying that the Unix server remains alive but denies subsequent grants. This is **not** proof of physical KEY_UP: the privileged driver still needs its own watchdog and UI_DEV_DESTROY fallback.
+
+## Shutdown/in-flight dispatch contract
+
+Stopping the Unix server now marks the verifier shutdown immediately, prevents new grants and revokes the session after its worker finishes. A slow already-running backend callback cannot be interrupted safely by Python; after it returns the verifier denies success if shutdown was requested. Restart requires a newly authorized session and explicit verifier provisioning. Isolated race test and 74 total Python tests pass. This does not replace the C driver watchdog or kernel uinput cleanup on process death.

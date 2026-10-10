@@ -181,17 +181,21 @@ class ProtectedVerifier:
         self.session=None
         self.lease_until=0
         self.seq=0
+        self.shutdown_requested=threading.Event()
 
     def provision(self, authority: SessionAuthority, principal: AuthenticatedPrincipal) -> None:
         """Lab-only direct handoff; production requires authenticated root channel."""
         if not authority.active(principal):
             raise GrantError("cannot provision unauthenticated session")
         with self.lock, authority.lock:
+            self.shutdown_requested.clear()
             self.epoch,self.session=authority.epoch,authority.session
             self.lease_until=authority.lease_until
             self.seq=0
 
     def accept(self, packet: bytes) -> bool:
+        if self.shutdown_requested.is_set():
+            raise GrantError("verifier shut down")
         if type(packet) is not bytes or not 0<len(packet)<=MAX_PACKET:
             raise GrantError("invalid packet")
         try:
@@ -220,7 +224,7 @@ class ProtectedVerifier:
         except (ValueError,TypeError,KeyError,OverflowError,UnicodeError) as exc:
             raise GrantError("invalid signed grant") from exc
         with self.lock:
-            if (self.session is None or self.clock()>=self.lease_until or
+            if (self.shutdown_requested.is_set() or self.session is None or self.clock()>=self.lease_until or
                 data["session"]!=self.session or data["epoch"]!=self.epoch or
                 data["seq"]<=self.seq):
                 raise GrantError("expired, revoked or replayed session")
@@ -232,10 +236,17 @@ class ProtectedVerifier:
                 # session so no further input is permitted after a fault.
                 self.revoke()
                 raise GrantError("input backend failed; session revoked") from exc
+            if self.shutdown_requested.is_set():
+                self.revoke()
+                raise GrantError("verifier shut down during dispatch")
             if accepted is not True:
                 self.revoke()
                 raise GrantError("input backend denied; session revoked")
             return True
+
+    def request_shutdown(self) -> None:
+        # Does not wait for an in-flight backend callback to finish.
+        self.shutdown_requested.set()
 
     def revoke(self) -> None:
         with self.lock:

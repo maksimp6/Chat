@@ -145,6 +145,7 @@ class SignedInputSocket:
                     except OSError:pass
 
     def stop(self):
+        self.verifier.request_shutdown()
         self._stop.set()
         if self._sock is not None:
             self._sock.close()
@@ -152,6 +153,7 @@ class SignedInputSocket:
             self._thread.join(timeout=2)
             if self._thread.is_alive():
                 raise SocketBoundaryError("server did not stop")
+        self.verifier.revoke()
         self._unlink_owned()
         self._close_parent()
         self._sock=None

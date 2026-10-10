@@ -6,9 +6,11 @@ from test_socket_boundary import harness, send
 
 
 def test_restart_serves_second_session(harness):
-    _,principal,_,signer,_,endpoint,calls=harness
+    _,principal,authority,signer,verifier,endpoint,calls=harness
     endpoint.start()
     endpoint.stop()
+    authority.authorize(principal)
+    verifier.provision(authority,principal)
     endpoint.start()
     packet=signer.sign(principal,InputGrant("move",{"x":3,"y":4}))
     assert send(endpoint.path,packet)==b"OK\n"
