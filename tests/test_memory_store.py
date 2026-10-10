@@ -3,6 +3,7 @@
 Old private namespace/key APIs are intentionally not tested: the supported
 contract is get(name), set(name, value), commit(), transaction(), backup(), restore().
 """
+
 import json
 import multiprocessing
 
@@ -158,9 +159,7 @@ def test_delta_transaction_overwrite_and_replay(tmp_path):
         assert reopened.get("replace") == {"value": 2}
         assert reopened.get("keep") == {"value": 3}
     frames = [json.loads(line) for line in path.read_text().splitlines()]
-    assert [change["key"] for change in frames[-1]["payload"]["changes"]] == [
-        "keep", "replace"
-    ]
+    assert [change["key"] for change in frames[-1]["payload"]["changes"]] == ["keep", "replace"]
 
 
 def test_commit_does_not_copy_complete_ram_state(tmp_path, monkeypatch):
