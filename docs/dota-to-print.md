@@ -64,7 +64,7 @@ npm install --no-audit --no-fund fbx2gltf@0.9.7-p1
 ./node_modules/fbx2gltf/bin/Linux/FBX2glTF \
   --binary --input ember_spirit_econ.fbx --output ember_spirit.glb
 
-python3 /path/to/Chat/dota_workshop_mesh.py \
+python3 /path/to/Chat/scripts/dota_workshop_mesh.py \
   --glb ember_spirit.glb \
   --mesh ember_spirit_head --orientation head \
   --length-mm 60 \
@@ -110,7 +110,7 @@ Review applicable permission terms before sharing or selling physical models.
 ## Offline tests
 
 \`\`\`sh
-python3 -m unittest -v tests/test_dota_workshop_mesh.py
+python3 -m unittest discover -s tests -p 'test_dota_workshop_mesh.py' -v
 \`\`\`
 
 In the cloud RDC scratch environment seven focused tests passed. Full
