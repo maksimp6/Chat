@@ -197,3 +197,51 @@ def test_invalid_later_operation_does_not_mutate_input_state():
     with pytest.raises(StoreError, match="corrupt committed journal"):
         _JournalStore._apply_verified_frame(frame, state, 0, "0" * 64)
     assert state == {"values": {"stable": {"version": 1}}}
+
+
+def test_symlink_journal_cannot_modify_target(tmp_path):
+    target = tmp_path / "target.memory"
+    with MemoryStore(target) as store:
+        store.set("safe", 1)
+        store.commit()
+    before = target.read_bytes()
+    link = tmp_path / "linked.memory"
+    link.symlink_to(target)
+    with pytest.raises(StoreError):
+        MemoryStore(link)
+    assert target.read_bytes() == before
+
+
+def test_symlink_lock_file_is_rejected(tmp_path):
+    path = tmp_path / "safe.memory"
+    victim = tmp_path / "victim"
+    victim.write_text("unchanged")
+    path.with_name(path.name + ".lock").symlink_to(victim)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(path)
+    assert victim.read_text() == "unchanged"
+
+
+def test_symlink_parent_directory_is_rejected(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = tmp_path / "alias"
+    link.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(link / "journal.memory")
+    assert not (outside / "journal.memory").exists()
+
+
+def test_replaced_journal_path_cannot_redirect_append(tmp_path):
+    path = tmp_path / "journal.memory"
+    victim = tmp_path / "victim.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", 1)
+        store.commit()
+        victim.write_bytes(b"untouched")
+        path.unlink()
+        path.symlink_to(victim)
+        store.set("attack", 2)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+        assert victim.read_bytes() == b"untouched"
