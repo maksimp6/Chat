@@ -15,6 +15,8 @@ TEST_MODULE = "tests.test_ci_fast_contracts"
 
 
 def main() -> int:
+    # Script invocation adds scripts/ to sys.path, not the repository root.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     started = perf_counter()
     suite = unittest.defaultTestLoader.loadTestsFromName(TEST_MODULE)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
