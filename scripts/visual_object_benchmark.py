@@ -146,31 +146,51 @@ def _private_response(predictions_dir: Path, case: dict) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _draw_objects(draw, objects: list[dict], *, offset: int, width: int, height: int, color: str):
+    for obj in objects:
+        x0, y0, x1, y1 = obj["bbox"]
+        bounds = (
+            round(x0 * width) + offset,
+            round(y0 * height) + 32,
+            round(x1 * width) + offset,
+            round(y1 * height) + 32,
+        )
+        draw.rectangle(bounds, outline=color, width=3)
+        draw.text(
+            (bounds[0] + 3, bounds[1] + 3),
+            obj["label"],
+            fill=color,
+            stroke_width=1,
+            stroke_fill="#1b2530",
+        )
+
+
 def _save_overlay(
     image: bytes,
     case: dict,
     prediction: dict | None,
     path: Path,
+    backend: str,
 ) -> None:
     from PIL import Image, ImageDraw
 
     with Image.open(io.BytesIO(image)) as original:
-        canvas = original.convert("RGB")
+        sample = original.convert("RGB")
+    width, height = sample.size
+    canvas = Image.new("RGB", (width * 2, height + 32), "#17202b")
+    canvas.paste(sample, (0, 32))
+    canvas.paste(sample, (width, 32))
     draw = ImageDraw.Draw(canvas)
-    for kind, objects, color in (
-        ("GT", case["objects"], "#00b67a"),
-        ("PRED", prediction.get("objects", []) if prediction else [], "#f59e0b"),
-    ):
-        for obj in objects:
-            x0, y0, x1, y1 = obj["bbox"]
-            bounds = (
-                round(x0 * canvas.width),
-                round(y0 * canvas.height),
-                round(x1 * canvas.width),
-                round(y1 * canvas.height),
-            )
-            draw.rectangle(bounds, outline=color, width=3)
-            draw.text((bounds[0] + 3, bounds[1] + 3), kind + " " + obj["label"], fill=color)
+    mode = {
+        "none": "MODEL NOT RUN",
+        "offline_responses": "SUPPLIED RESPONSE (NOT MODEL)",
+        "loopback": "LOOPBACK MODEL RESPONSE",
+    }[backend]
+    draw.text((8, 9), "EXPECTED OBJECTS", fill="#00d18a")
+    draw.text((width + 8, 9), mode, fill="#ffb346")
+    _draw_objects(draw, case["objects"], offset=0, width=width, height=height, color="#00b67a")
+    predicted = prediction.get("objects", []) if prediction else []
+    _draw_objects(draw, predicted, offset=width, width=width, height=height, color="#f59e0b")
     path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(path, format="PNG")
 
@@ -253,7 +273,9 @@ def run_benchmark(
             except (ValueError, KeyError, TypeError) as exc:
                 entry.update(status="blocked", reason="invalid_prediction_" + type(exc).__name__)
                 prediction = None
-        _save_overlay(cropped, case, prediction, output_root / "overlays" / (case["id"] + ".png"))
+        _save_overlay(
+            cropped, case, prediction, output_root / "overlays" / (case["id"] + ".png"), backend
+        )
         results.append(entry)
     report = _summary(cases, results, backend)
     output_root.mkdir(parents=True, exist_ok=True)

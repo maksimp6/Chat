@@ -167,7 +167,12 @@ class VisualBenchmarkTests(unittest.TestCase):
         self.assertEqual(report["status"], "REVIEW_PENDING")
         self.assertEqual(report["total"]["tp"], 1)
         self.assertEqual(report["backend"], "offline_responses")
-        self.assertTrue((self.root / "output/overlays/sample.png").is_file())
+        overlay = self.root / "output/overlays/sample.png"
+        self.assertTrue(overlay.is_file())
+        from PIL import Image
+
+        with Image.open(overlay) as image:
+            self.assertEqual(image.size, (32, 48))
 
     @unittest.skipUnless(HAS_PILLOW, "Pillow is optional for image E2E")
     def test_missing_model_inference_is_blocked_not_passed(self):

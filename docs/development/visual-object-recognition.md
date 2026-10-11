@@ -34,8 +34,9 @@ photos. Missing, tampered, symlinked or excessively large inputs fail closed.
 Pillow 12.3.0 is used for isolated crops and PNG overlays.
 Without a predictor, expect BLOCKED / model_not_invoked and null precision
 and recall. The command creates report.json and overlays/*.png:
-green boxes are proposed ground truth; amber boxes are actual predictions.
-Do not count these overlays as model inference.
+the left panel shows proposed ground truth (green) and the right panel shows
+predictor output (amber). Each panel names the source: no model, supplied
+response, or loopback endpoint. Do not count these overlays as inference.
 
 ## Real model E2E (requires an available implementation)
 
