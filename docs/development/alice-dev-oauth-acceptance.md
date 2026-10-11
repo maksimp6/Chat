@@ -74,6 +74,15 @@ mutation that is still awaiting persistence. A failed checkpoint poisons that
 runtime: OAuth and health return 503 until a new runtime recovers verified state.
 Errors contain fixed codes, not tokens, cookies, filesystem paths or snapshot data.
 
+Routing and network intake happen before mutation queue admission. OAuth POST
+bodies are limited to 16 KiB and a 10-second total intake deadline; aborted or
+timed-out uploads cannot hold the durable queue. An intake timeout returns a fixed
+400 error and closes the connection. Discovery and non-OAuth routing bypass the
+queue, while state changes revalidate current state after admission and still
+await verified persistence. Disconnected requests waiting for admission are
+discarded before mutation. This intake deadline is separate from the storage
+operation deadline below.
+
 The mount contains `owner.json`, `intent.json`, `commit.json` and two bounded
 `state-N.json` slots. Every write is closed and read back, with size/SHA-256 checks.
 Only the disposable local cache uses rename. A mismatched intent/commit, corrupt

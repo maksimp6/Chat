@@ -10,6 +10,7 @@ import test from "node:test";
 // Keep durability/restart regressions in the existing CI and image test entrypoint.
 import "./oauth-state.test.mjs";
 import "./oauth-restart.test.mjs";
+import "./oauth-intake.test.mjs";
 import { createOAuth } from "./oauth.mjs";
 
 const PUBLIC = "https://alice-dev.example.test";
@@ -72,7 +73,7 @@ test("Alice Dev advertises ChatGPT-compatible OAuth discovery", async (t) => {
   assert.deepEqual(metadata.code_challenge_methods_supported, ["S256"]);
 });
 
-test("DCR, PKCE consent, code exchange and refresh work end to end", async (t) => {
+test("DCR, PKCE consent and concurrent refresh preserve replay revocation", async (t) => {
   const { oauth, request, form } = await fixture(t);
   const registration = await request("/oauth/register", {
     method: "POST",
@@ -140,7 +141,18 @@ test("DCR, PKCE consent, code exchange and refresh work end to end", async (t) =
     refresh_token: issued.refresh_token,
   });
   assert.equal(refresh.status, 200);
-  assert.ok((await refresh.json()).access_token);
+  const renewed = await refresh.json();
+  assert.ok(renewed.access_token);
+  const concurrent = await Promise.all([1, 2].map(() => form("/oauth/token", {
+    grant_type: "refresh_token", client_id: client.client_id, resource: RESOURCE,
+    refresh_token: renewed.refresh_token,
+  })));
+  assert.deepEqual(concurrent.map((response) => response.status).sort(), [200, 400]);
+  const winner = await concurrent.find((response) => response.status === 200).json();
+  assert.deepEqual(await concurrent.find((response) => response.status === 400).json(), { error: "invalid_grant" });
+  for (const token of [issued.access_token, renewed.access_token, winner.access_token]) {
+    assert.equal(oauth.authorize({ headers: { authorization: `Bearer ${token}` } }), false);
+  }
 });
 
 
