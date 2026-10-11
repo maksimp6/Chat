@@ -54,7 +54,7 @@ def test_routing_unions_all_changed_paths():
 
 def results(**overrides):
     value = dict.fromkeys(["backend", "postgres", "android", "infra", "mcp"], "skipped")
-    value.update({"changes": "success", "code-rules": "success"})
+    value.update({"changes": "success", "code-rules": "success", "fast-tests": "success"})
     value.update(overrides)
     return value
 
@@ -77,7 +77,7 @@ def test_successful_selected_platform_accepts_unselected_skips():
     routing.validate_results(plan, results(infra="success"))
 
 
-@pytest.mark.parametrize("job", ["changes", "code-rules"])
+@pytest.mark.parametrize("job", ["changes", "code-rules", "fast-tests"])
 def test_router_or_code_rules_failure_cannot_pass(job):
     plan = routing.classify(["docs/README.md"])
     with pytest.raises(ValueError, match=job):

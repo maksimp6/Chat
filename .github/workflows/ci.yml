@@ -75,6 +75,23 @@ jobs:
       - name: Check naming, layout and reliability rules
         run: bash scripts/check_code_rules.sh
 
+  fast-tests:
+    name: Fast isolated contracts (2s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Verify isolated contracts (no third-party dependencies)
+        run: python scripts/run_fast_contracts.py
+
+
   backend:
     name: Application tests
     needs: changes
@@ -456,7 +473,7 @@ jobs:
   required:
     name: CI required
     if: always()
-    needs: [changes, code-rules, backend, postgres, android, infra, mcp]
+    needs: [changes, code-rules, fast-tests, backend, postgres, android, infra, mcp]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

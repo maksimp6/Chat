@@ -11,6 +11,7 @@ from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
 JOBS = ("backend", "postgres", "android", "infra", "mcp")
+ALWAYS_JOBS = ("changes", "code-rules", "fast-tests")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
@@ -113,7 +114,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
         raise ValueError("invalid platform plan")
     if plan["web"] and not all(plan[key] for key in ("backend", "android", "database", "mcp")):
         raise ValueError("incomplete web dependency plan")
-    for job in ("changes", "code-rules"):
+    for job in ALWAYS_JOBS:
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
     for job in JOBS:
@@ -135,7 +136,7 @@ def verify_environment() -> None:
         raise ValueError("invalid platform plan/results")
     plan = {key: value == "true" for key, value in raw.items()}
     results = {}
-    for job in ("changes", "code-rules", *JOBS):
+    for job in (*ALWAYS_JOBS, *JOBS):
         record = needs.get(job)
         if not isinstance(record, dict) or not isinstance(record.get("result"), str):
             raise ValueError(f"missing job result: {job}")
