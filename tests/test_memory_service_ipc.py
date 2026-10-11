@@ -193,9 +193,7 @@ def test_ipc_dos_capacity_is_bounded(tmp_path, monkeypatch):
                 futures = []
                 for server, _client in pairs:
                     assert slots.acquire(blocking=False)
-                    futures.append(
-                        pool.submit(service._serve_one, server, store, 12345, slots)
-                    )
+                    futures.append(pool.submit(service._serve_one, server, store, 12345, slots))
                 entered.wait(timeout=5)
                 assert not slots.acquire(blocking=False)
                 release.set()
