@@ -78,7 +78,7 @@ def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
         raise RuntimeError("trusted mode must be enabled before service startup")
     if socket_path.exists() or socket_path.is_symlink():
         raise RuntimeError("socket path already exists")
-    with MemoryStore(database) as store:
+    with MemoryStore(database, trusted=True) as store:
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             listener.bind(str(socket_path))
