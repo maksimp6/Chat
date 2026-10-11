@@ -13,10 +13,11 @@ import re
 import socket
 import ssl
 import tempfile
+from collections.abc import Callable
 from contextlib import suppress
 from ftplib import FTP, FTP_TLS, Error
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 HEX64 = re.compile(r"^[a-f0-9]{64}$")
 SAFE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,150}$")

@@ -13,13 +13,14 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 MAX_VIDEO_BYTES = 10 * 1024 * 1024 * 1024
 MIN_FREE_RESERVE = 512 * 1024 * 1024
-VALID_VIDEO = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,150}\.(mp4|avi|mkv)$", re.I)
+VALID_VIDEO = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,150}\.(mp4|avi|mkv)$", re.IGNORECASE)
 JOB_ID = re.compile(r"^[a-f0-9]{32}$")
 FOLDER_ID = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 
@@ -93,9 +94,8 @@ class VideoArchive:
             return self._verify(existing, proof, remote_name)
 
         limit, usage = self.drive.quota()
-        if limit is not None:
-            if usage is None or limit - usage < proof.bytes + MIN_FREE_RESERVE:
-                raise ArchiveError("Google Drive quota is too low; local video preserved")
+        if limit is not None and (usage is None or limit - usage < proof.bytes + MIN_FREE_RESERVE):
+            raise ArchiveError("Google Drive quota is too low; local video preserved")
         remote = self.drive.upload(video, proof, self.folder_id)
         return self._verify(remote, proof, remote_name)
 
@@ -172,7 +172,7 @@ class GoogleDriveResumableClient:
                 raise ArchiveError("Drive API rejected request: HTTP " + str(error.code)) from None
         except ArchiveError:
             raise
-        except (OSError, ValueError, urllib.error.URLError) as exc:
+        except (OSError, ValueError, urllib.error.URLError):
             raise ArchiveError("Drive network or OAuth provider unavailable") from None
 
     def quota(self) -> tuple[int | None, int | None]:

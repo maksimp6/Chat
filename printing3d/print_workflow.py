@@ -15,8 +15,9 @@ import re
 import tempfile
 import time
 import uuid
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, Mapping, Protocol, cast
+from typing import Any, Protocol, cast
 
 SHA = re.compile(r"^[a-f0-9]{64}$")
 JOB_ID = re.compile(r"^[a-f0-9]{32}$")

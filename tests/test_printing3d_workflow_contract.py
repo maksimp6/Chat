@@ -13,7 +13,6 @@ from printing3d.ftps_storage import PrinterStorage, PrinterTransferError
 from printing3d.print_workflow import FileJobStore, PrintGateError, PrintWorkflow
 from printing3d.video_archive import ArchiveError, GoogleDriveResumableClient, VideoArchive
 
-
 SHA = "a" * 64
 REPORT = "b" * 64
 FILENAME = "Alice_test_PETG_A1mini.gcode.3mf"
