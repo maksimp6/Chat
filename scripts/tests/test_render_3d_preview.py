@@ -327,9 +327,11 @@ def test_preview_workflows_keep_comment_token_out_of_untrusted_pr_code():
     root = Path(__file__).resolve().parents[2]
     trusted = (root / ".github/workflows/3d-pr-previews.yml").read_text()
     tests = (root / ".github/workflows/3d-render-tests.yml").read_text()
-    assert "workflow_run:" in trusted
+    assert "schedule:" in trusted
+    assert "cron:" in trusted
+    assert "workflow_dispatch:" in trusted
+    assert "workflow_run:" not in trusted
     assert "pull_request_target:" not in trusted
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in trusted
     assert ("ref: $" + "{{ github.event.repository.default_branch }}") in trusted
     assert "persist-credentials: false" in trusted
     assert "contents: write" in trusted and "issues: write" in trusted
@@ -446,3 +448,77 @@ def test_matching_workflow_event_permits_only_own_pr(monkeypatch):
     )
     assert publication.run(api, 1118, expected_head=api.head) == "created"
     assert len(saved) == 1
+
+
+def test_schedule_scans_only_same_repo_prs_and_deduplicates(monkeypatch):
+    """One cron scan may publish images; repeated scans cannot flood comments."""
+    api = StubGitHub()
+    base = api.json
+    scan_calls = []
+
+    def with_catalog(method, path, body=None):
+        if method == "GET" and path.endswith(
+            "/pulls?state=open&sort=updated&direction=desc&per_page=100"
+        ):
+            scan_calls.append(1)
+            return [
+                {"number": 1118, "head": {"repo": {"full_name": api.repo}}},
+                {"number": 1119, "head": {"repo": {"full_name": "fork/untrusted"}}},
+            ]
+        return base(method, path, body)
+
+    api.json = with_catalog
+    published = []
+    monkeypatch.setattr(
+        publication,
+        "publish_images",
+        lambda _api, images: published.append(images) or "a" * 40,
+    )
+    assert publication.scan_open_prs(api) == "scan_checked=1 preview_comments_changed=1"
+    assert len(api.comments) == 1
+    assert publication.scan_open_prs(api) == "scan_checked=1 preview_comments_changed=0"
+    assert len(api.comments) == 1
+    assert len(published) == 1
+    assert len(scan_calls) == 2
+
+
+def test_schedule_fails_closed_on_unreadable_pr_catalog():
+    api = StubGitHub()
+
+    def invalid_catalog(method, path, body=None):
+        if path.endswith("/pulls?state=open&sort=updated&direction=desc&per_page=100"):
+            return {"error": "unexpected"}
+        raise AssertionError((method, path))
+
+    api.json = invalid_catalog
+    with pytest.raises(publication.PublishError, match="invalid open-PR"):
+        publication.scan_open_prs(api)
+
+
+def test_schedule_rejects_partial_failure_instead_of_faking_success():
+    api = StubGitHub()
+    original = api.json
+
+    def with_catalog(method, path, body=None):
+        if path.endswith("/pulls?state=open&sort=updated&direction=desc&per_page=100"):
+            return [{"number": 1118, "head": {"repo": {"full_name": api.repo}}}]
+        if path.endswith("/git/blobs/" + api.change[0]["sha"]):
+            return {"encoding": "not-supported", "size": 4}
+        return original(method, path, body)
+
+    api.json = with_catalog
+    with pytest.raises(publication.PublishError, match="preview publication"):
+        publication.scan_open_prs(api)
+    assert not api.comments
+
+
+def test_schedule_ignores_pr_which_is_not_in_same_repo():
+    api = StubGitHub()
+
+    def catalog(method, path, body=None):
+        if path.endswith("/pulls?state=open&sort=updated&direction=desc&per_page=100"):
+            return [{"number": 1118, "head": {"repo": {"full_name": "not/ours"}}}]
+        raise AssertionError("Should never inspect a fork on this scheduled scan")
+
+    api.json = catalog
+    assert publication.scan_open_prs(api) == "scan_checked=0 preview_comments_changed=0"

@@ -239,7 +239,7 @@ def render_report(api: Github, pr_number: int, sha: str, models: list[dict]) -> 
         try:
             mesh = load_mesh(_blob(api, source_sha), filename)
             png = render_preview(mesh)
-        except (PreviewError, PublishError) as exc:
+        except PreviewError as exc:
             # A misleading image is worse than an explicit unavailable result.
             images.append((path, None, str(exc), None))
             continue
@@ -336,22 +336,63 @@ def run(
     return upsert_comment(api, pr_number, render_report(api, pr_number, head_sha, models))
 
 
+def scan_open_prs(api: Github) -> str:
+    """Bounded periodic scan; trusted default workflow, no PR event tokens."""
+    prs = api.json(
+        "GET",
+        api.prefix + "/pulls?state=open&sort=updated&direction=desc&per_page=100",
+    )
+    if not isinstance(prs, list):
+        raise PublishError("invalid open-PR catalog")
+    if len(prs) > 100:
+        raise PublishError("open-PR catalog exceeds bound")
+    checked = 0
+    changed = 0
+    blocked: list[int] = []
+    for item in prs:
+        if not isinstance(item, dict):
+            raise PublishError("invalid open-PR entry")
+        owner = (item.get("head") or {}).get("repo") or {}
+        if owner.get("full_name") != api.repo:
+            continue
+        pr_num = item.get("number")
+        if type(pr_num) is not int or not 1 <= pr_num <= 1_000_000_000:
+            raise PublishError("invalid open PR number")
+        checked += 1
+        try:
+            result = run(api, pr_num)
+        except PublishError:
+            blocked.append(pr_num)
+            continue
+        if result in ("created", "updated"):
+            changed += 1
+    if blocked:
+        raise PublishError(f"{len(blocked)} preview publication(s) failed; first PR #{blocked[0]}")
+    return f"scan_checked={checked} preview_comments_changed={changed}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Trusted GitHub PR 3D preview publisher")
     parser.add_argument("--repo", required=True)
-    parser.add_argument("--pr", required=True, type=int)
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--pr", type=int)
+    selection.add_argument("--scan-open", action="store_true")
     parser.add_argument(
         "--refresh", action="store_true", help="rebuild previews even on unchanged PR head"
     )
-    parser.add_argument("--expected-head", default=None, help="reject a stale workflow_run event")
+    parser.add_argument("--expected-head", default=None, help="reject a stale manual PR head")
     options = parser.parse_args()
     try:
-        result = run(
-            Github(options.repo, os.environ.get("GH_TOKEN", "")),
-            options.pr,
-            refresh=options.refresh,
-            expected_head=options.expected_head,
-        )
+        api = Github(options.repo, os.environ.get("GH_TOKEN", ""))
+        if options.scan_open:
+            result = scan_open_prs(api)
+        else:
+            result = run(
+                api,
+                options.pr,
+                refresh=options.refresh,
+                expected_head=options.expected_head,
+            )
     except (PublishError, PreviewError) as exc:
         print("PREVIEW_BLOCKED:", str(exc)[:200], file=sys.stderr)
         return 2

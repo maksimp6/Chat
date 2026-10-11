@@ -6,8 +6,9 @@ Issue: [#1118](https://github.com/maksimp6/Chat/issues/1118). This is a review v
 
 Place licensed, approved **STL** or genuine geometry-bearing **3MF** files in
 `printing3d/models/` (one or two simple subdirectories are supported).
-Open or update a same-repository pull request. GitHub Actions
-`3D previews in PR comments` automatically:
+Open or update a same-repository PR. The trusted GitHub Actions
+`3D previews in PR comments` checks the latest 100 open PRs every
+15 minutes (best-effort, not a guaranteed exact-minute schedule):
 
 1. Uses **trusted code from the repository default branch**, never checks out
    the PR branch or executes PR G-code/commands.
@@ -22,7 +23,7 @@ Open or update a same-repository pull request. GitHub Actions
 5. Commits **only rendered PNGs** to the separate `alice-3d-previews` branch
    (not `develop` or `master`), referenced by immutable commit SHA.
 6. Creates or updates **one GitHub Actions bot PR comment**, including the
-   inline image, originating SHA, face count and bounds. Repeated events on the
+   inline image, originating SHA, face count and bounds. Repeated scheduled checks of the
    same PR head do **not** write another image commit or duplicate the comment.
 
 Test the publisher contract by running
@@ -37,15 +38,18 @@ regenerated image, but still updates the same bot comment.
 ## Safety and release status
 
 The PR must be in the **same repository**. Forked PRs are ignored.
-The **unprivileged** `pull_request` / `3D render contract` test workflow has
-only read permission. When it succeeds, a separate trusted `workflow_run`
-publisher starts with only the repository's default-branch code. It **never**
-executes or checks out code from the PR or loads its Actions artifacts:
-changed model **blobs are re-fetched by Git SHA** and parsed as bounded data.
-`GITHUB_TOKEN` is exposed only in the publisher step, never to untrusted
-models, using `contents:write`, `issues:write`, `pull-requests:read` permissions.
-A stale `workflow_run` head SHA is rejected rather than posting outdated PNGs.
-No third-party upload host or user-owned access key is used.
+The **unprivileged** pull_request contract test workflow has only
+read permission. An independent **trusted scheduled workflow** (or an
+explicit manual workflow_dispatch) runs from the repository default branch
+every 15 minutes. Neither pull_request_target nor workflow_run is used.
+The publisher **never** checks out or executes pull-request code or downloads
+untrusted workflow artifacts; it retrieves model blobs by exact Git SHA,
+validates them as data, and posts only rendered PNGs.
+GITHUB_TOKEN is exposed only in the trusted publisher, with contents:write,
+issues:write, and pull-requests:read permissions. Same-repo PRs only.
+Manual dispatch can specify an expected head to reject stale instructions.
+No third-party upload host, owner token or printer authorization is needed.
+The latest-100-open-PR bound means older PRs may need manual dispatch.
 
 The renderer does **not** infer whether a mesh is watertight, printable,
 dimensionally correct, safe for a child, safe for a machine, or a functional
@@ -59,7 +63,7 @@ A Bambu `.gcode.3mf` can contain a sliced G-code plate but **no embedded
 must fail closed and report preview unavailable, rather than synthesizing
 geometry or silently parsing/executing G-code.
 
-**Activation:** this trusted event workflow cannot run automatically from
+**Activation:** this trusted scheduled workflow cannot run automatically from
 an unmerged PR. It becomes active **only after** code passes its separate
 CI/review and the workflow is merged to the repository's default branch
 (currently `master`). No merge is performed by the render publisher.
