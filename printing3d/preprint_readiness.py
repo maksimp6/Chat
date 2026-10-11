@@ -1,11 +1,21 @@
 """Evidence-only pre-print decision; never connects to or starts a printer."""
 
+from pathlib import Path
+from typing import Any
+
 from .gcode_audit import audit_passport
 from .model_preflight import verify_inventory_sources
 from .quality_capability import assess_quality
 
 
-def prepare_print(manifest, root, passport, job_path=None, capability=None, observed=None):
+def prepare_print(
+    manifest: dict[str, Any],
+    root: str | Path,
+    passport: dict[str, Any],
+    job_path: str | Path | None = None,
+    capability: dict[str, Any] | None = None,
+    observed: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Produce an auditable fail-closed pre-print checklist for a model."""
     inventory = {m["id"]: m for m in manifest["models"]}
     model_id = passport["id"]

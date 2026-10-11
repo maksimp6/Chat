@@ -1,9 +1,12 @@
 """Evidence-based functional quality assessment, not slicer-success inference."""
 
 from math import isfinite
+from typing import Any
 
 
-def assess_quality(passport, capability, measurements=None):
+def assess_quality(
+    passport: dict[str, Any], capability: dict[str, Any], measurements: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Compare purpose and tolerances against measured printer/material capability.
 
     Unknown capability cannot become PASS. A process profile is not metrology.

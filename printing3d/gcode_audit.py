@@ -6,6 +6,7 @@ import math
 import re
 import zipfile
 from pathlib import Path
+from typing import Any
 
 REQUIRED = {
     "Metadata/plate_1.gcode",
@@ -16,7 +17,7 @@ REQUIRED = {
 MOVE = re.compile(r"(?<!\w)([XYZ])([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?=\s|$)")
 
 
-def _verify_motion_bounds(command, bed):
+def _verify_motion_bounds(command: str, bed: list[int]) -> None:
     for axis, raw in MOVE.findall(command):
         value = float(raw)
         if not math.isfinite(value):
@@ -27,8 +28,8 @@ def _verify_motion_bounds(command, bed):
             raise ValueError("Z outside printer height")
 
 
-def _verify_toolpaths(gcode, bed):
-    count, extrusion, heaters = 0, 0, set()
+def _verify_toolpaths(gcode: str, bed: list[int]) -> tuple[int, int]:
+    count, extrusion, heaters = 0, 0, set[str]()
     for line in gcode.splitlines():
         command = line.split(";", 1)[0].strip()
         if not command:
@@ -48,7 +49,7 @@ def _verify_toolpaths(gcode, bed):
     return count, extrusion
 
 
-def audit_job(path, passport):
+def audit_job(path: str | Path, passport: dict[str, Any]) -> dict[str, Any]:
     """Validate archive, actual commands, material, machine and build boundaries.
 
     An audit is not a firmware-open or physical-fit acceptance test.
@@ -95,7 +96,7 @@ def audit_job(path, passport):
     }
 
 
-def audit_passport(passport, job_path=None):
+def audit_passport(passport: dict[str, Any], job_path: str | Path | None = None) -> dict[str, Any]:
     if not passport.get("id") or passport.get("schema_version") != 1:
         raise ValueError("invalid model passport")
     if not passport.get("source_sha256") or not re.fullmatch(
@@ -115,7 +116,9 @@ def audit_passport(passport, job_path=None):
     return result
 
 
-def verify_target_printer(passport, observed, job_sha256=None):
+def verify_target_printer(
+    passport: dict[str, Any], observed: dict[str, Any], job_sha256: str | None = None
+) -> dict[str, Any]:
     """Fail closed until this exact device, firmware, readback and UI are proven.
 
     Observations must come from independent printer-side evidence; caller-supplied

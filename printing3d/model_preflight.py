@@ -5,11 +5,12 @@ import math
 import struct
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 
-def _read_mesh_bounds_and_edges(data):
+def _read_mesh_bounds_and_edges(data: bytes) -> tuple[list[float], list[float], list[float]]:
     # Merge exact shared vertex coordinates for manifold-edge checks.
-    points = {}
+    points: dict[tuple[float, float, float], int] = {}
     edges = Counter()
     xs, ys, zs = [], [], []
     for offset in range(84, len(data), 50):
@@ -32,7 +33,9 @@ def _read_mesh_bounds_and_edges(data):
     return xs, ys, zs
 
 
-def validate_stl(path, record, bed=(180, 180, 180)):
+def validate_stl(
+    path: str | Path, record: dict[str, Any], bed: tuple[int, int, int] = (180, 180, 180)
+) -> dict[str, Any]:
     """Validate original binary STL, indexed topology and per-part dimensions."""
     path = Path(path)
     data = path.read_bytes()
@@ -58,9 +61,11 @@ def validate_stl(path, record, bed=(180, 180, 180)):
     }
 
 
-def verify_inventory_sources(manifest, root):
+def verify_inventory_sources(
+    manifest: dict[str, Any], root: str | Path
+) -> dict[str, list[dict[str, Any]]]:
     """All source models, including alternatives and gauges, must pass."""
-    results = {}
+    results: dict[str, list[dict[str, Any]]] = {}
     for model in manifest["models"]:
         verified = []
         for member in model["members_manifest"]:
@@ -73,7 +78,9 @@ def verify_inventory_sources(manifest, root):
     return results
 
 
-def require_upload_preflight(passport, source_evidence, gcode_evidence):
+def require_upload_preflight(
+    passport: dict[str, Any], source_evidence: list[dict[str, Any]], gcode_evidence: dict[str, Any]
+) -> dict[str, Any]:
     """Fail closed for missing evidence; do not equate static checks with fit."""
     if not source_evidence or not gcode_evidence:
         raise ValueError("source and sliced G-code verification required")
