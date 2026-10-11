@@ -6,6 +6,7 @@
 - A one-shot camera frame showed the physical clip on the build plate, with no evident spaghetti. Camera cannot prove pivot tolerance, strength or proper operation.
 - After removal, the owner reported it **broke while snapping/closing**. The supplied photo shows the detached curved lever and small pivot/hinge features on the remaining body. The fracture plane, exact cause and whether the user was releasing a fused print-in-place joint or closing the mechanism are uncertain.
 - **Verdict:** printer job completed; product functional test `functional_failed`. Do not mark this item delivered/accepted or automatically repeat the print.
+- **Exact printer-staged sliced file inspected read-only over FTPS:** 494,265 bytes; SHA-256 `2712e9d64f4d744589ba416bf7842f48f3920eb4a7ecd50f66b9a6bb5c5d1433`. The A1 mini project configuration confirms `wall_loops = 2`, PLA, 0.4 mm nozzle, 0.2 mm layer height, 15% infill and no supports. Two walls are below the source author's >=5-wall recommendation and are a plausible contributor to weak hinge strength, but do not prove the precise failure mode.
 
 ## Source and possible corrective trial
 

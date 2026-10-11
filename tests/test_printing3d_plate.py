@@ -373,3 +373,32 @@ def test_printer_maintenance_commands_never_pass_preflight(tmp_path, command):
     gcode = b"M190 S60\nM109 S220\nG1 X2 E.1\n" + command + b"\n"
     path = build_3mf(tmp_path, gcode=gcode)
     assert "prohibited" in plate.inspect_path(path)["reason"]
+
+
+@pytest.mark.parametrize("wall_count", ["2", "5", 5])
+def test_slicer_wall_loops_reported_for_mechanical_review(tmp_path, wall_count):
+    """A valid 3MF can still lack the author's recommended pivot strength."""
+    artifact = build_3mf(
+        tmp_path,
+        name="clip.gcode.3mf",
+        settings={**SETTINGS, "wall_loops": wall_count},
+    )
+    result = plate.inspect_path(artifact)
+    assert result["status"] == "ready_for_review"
+    assert result["wall_loops"] == int(wall_count)
+
+
+def test_omitted_slicer_wall_loops_remains_unknown(tmp_path):
+    result = plate.inspect_path(build_3mf(tmp_path))
+    assert result["status"] == "ready_for_review"
+    assert result["wall_loops"] is None
+
+
+@pytest.mark.parametrize("bad_value", ["invalid", "0", "-2", [], True])
+def test_invalid_slicer_wall_count_blocks_preflight(tmp_path, bad_value):
+    artifact = build_3mf(
+        tmp_path,
+        name="clip.gcode.3mf",
+        settings={**SETTINGS, "wall_loops": bad_value},
+    )
+    assert "slicer wall count" in plate.inspect_path(artifact)["reason"]

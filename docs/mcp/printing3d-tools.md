@@ -151,3 +151,7 @@ A1 mini observation is read-only: when an authorized RDC device is connected,
 use MQTT telemetry plus one-shot JPEG frames. Never print camera codes,
 printer credentials or serials. Stop/start/pause and hardware changes require
 explicit separate approval.
+
+## Slicer wall loops from real 3MF
+
+The read-only preflight reports `wall_loops` parsed from the existing printer/slicer 3MF project, or `null` when absent. An unknown wall count is not invented, and no single wall threshold is imposed on all models: compare it with the specific author's design requirements. For the print-in-place Cam Lock Bag Clip by squinn, the actual printer job reported 2 walls while the author recommends at least 5, a likely contributing factor to the reported hinge fracture. Machine completion does not establish mechanical acceptance.

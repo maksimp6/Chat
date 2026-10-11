@@ -74,7 +74,21 @@ def _preflight_members(archive: ZipFile) -> dict[str, object]:
     return names
 
 
-def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, float]:
+def _validated_wall_loops(value: object) -> int | None:
+    if value is None:
+        return None
+    if type(value) is int:
+        count = value
+    elif type(value) is str and value.isdecimal():
+        count = int(value)
+    else:
+        raise PlateError("invalid slicer wall count")
+    if not 1 <= count <= 64:
+        raise PlateError("invalid slicer wall count")
+    return count
+
+
+def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, float, int | None]:
     if CONFIG_NAME not in names or MODEL_NAME not in names:
         raise PlateError("missing 3MF model or project configuration")
     info = archive.getinfo(CONFIG_NAME)
@@ -98,7 +112,7 @@ def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, flo
         raise PlateError("invalid nozzle diameter") from exc
     if not math.isfinite(diameter) or diameter != 0.4:
         raise PlateError("nozzle mismatch: this profile requires 0.4 mm")
-    return materials[0], diameter
+    return materials[0], diameter, _validated_wall_loops(settings.get("wall_loops"))
 
 
 def _parse_temperature(command: bytes, material: str) -> tuple[str, float] | None:
@@ -228,7 +242,7 @@ def inspect_archive(stream: BinaryIO, filename: str) -> dict[str, object]:
                 }
             if not filename.endswith(".gcode.3mf"):
                 raise PlateError("sliced print must be named .gcode.3mf")
-            material, nozzle = _configuration(archive, names)
+            material, nozzle, wall_loops = _configuration(archive, names)
             result = _gcode(archive, names, material)
     except (PlateError, BadZipFile, LargeZipFile, OSError, EOFError, RuntimeError) as exc:
         return {"status": "blocked", "filename": filename, "reason": str(exc)}
@@ -239,6 +253,7 @@ def inspect_archive(stream: BinaryIO, filename: str) -> dict[str, object]:
         "printer": "Bambu Lab A1 mini",
         "material": material,
         "nozzle_mm": nozzle,
+        "wall_loops": wall_loops,
         **result,
         "warning": (
             "Archive checks do not prove mesh geometry, mechanical fit, material on spool, "
