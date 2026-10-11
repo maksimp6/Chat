@@ -45,45 +45,50 @@ def receive(conn: socket.socket) -> dict[str, object]:
     return value
 
 
+def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> None:
+    """Bound each peer to one request and a short receive/send deadline."""
+    conn.settimeout(2.0)
+    if peer_uid(conn) != allowed_uid:
+        return
+    try:
+        request = receive(conn)
+        op = request.get("op")
+        key = request.get("key")
+        if op == "get" and isinstance(key, str):
+            result = {"ok": True, "value": store.get(key)}
+        elif op == "set" and isinstance(key, str):
+            store.set(key, request.get("value"))
+            result = {"ok": True, "sequence": store.commit()}
+        elif op == "info":
+            result = {"ok": True, "sequence": store.info().last_commit}
+        else:
+            result = {"ok": False, "error": "invalid operation"}
+        response = (json.dumps(result, separators=(",", ":")) + "\\n").encode()
+        if len(response) > MAX_RESPONSE:
+            return
+        conn.sendall(response)
+    except (ValueError, TypeError, KeyError, OSError, TimeoutError):
+        return
+
+
 def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
     if os.geteuid() == 0 or allowed_uid == os.geteuid():
         raise RuntimeError("service requires distinct non-root service and client UIDs")
     if os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") != "1":
         raise RuntimeError("trusted mode must be enabled before service startup")
-    # The trusted root is provisioned by an administrator, never by the client.
     if socket_path.exists() or socket_path.is_symlink():
         raise RuntimeError("socket path already exists")
     with MemoryStore(database) as store:
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             listener.bind(str(socket_path))
-            # Clients use SO_PEERCRED authorization, not the socket mode.
+            # Peer credentials authorize requests, DAC permits client connections.
             os.chmod(socket_path, 0o666)
             listener.listen(8)
             while True:
                 conn, _ = listener.accept()
                 with conn:
-                    if peer_uid(conn) != allowed_uid:
-                        continue
-                    try:
-                        request = receive(conn)
-                        op = request.get("op")
-                        key = request.get("key")
-                        if op == "get" and isinstance(key, str):
-                            result = {"ok": True, "value": store.get(key)}
-                        elif op == "set" and isinstance(key, str):
-                            # The service owns the commit and acknowledgement.
-                            store.set(key, request.get("value"))
-                            result = {"ok": True, "sequence": store.commit()}
-                        elif op == "info":
-                            result = {"ok": True, "sequence": store.info().last_commit}
-                        else:
-                            result = {"ok": False, "error": "invalid operation"}
-                    except (ValueError, TypeError, KeyError):
-                        result = {"ok": False, "error": "invalid request"}
-                    response = (json.dumps(result, separators=(",", ":")) + "\n").encode()
-                    if len(response) <= MAX_RESPONSE:
-                        conn.sendall(response)
+                    handle_client(conn, store, allowed_uid)
         finally:
             listener.close()
             socket_path.unlink(missing_ok=True)
