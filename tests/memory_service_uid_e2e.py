@@ -17,7 +17,10 @@ def request(path: Path, payload: dict[str, object]) -> dict[str, object] | None:
         conn.settimeout(2)
         conn.connect(str(path))
         conn.sendall((json.dumps(payload) + "\n").encode())
-        data = conn.recv(4096)
+        try:
+            data = conn.recv(4096)
+        except ConnectionResetError:
+            return None
     return json.loads(data) if data else None
 
 
