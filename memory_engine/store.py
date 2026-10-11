@@ -188,19 +188,29 @@ class _JournalStore:
                 or payload["seq"] != sequence + 1
             ):
                 raise ValueError("commit chain mismatch")
+            # Validate the entire frame before mutating caller-owned state.
+            # A malformed later operation must not publish earlier changes.
+            validated: list[tuple[str, str, str, Any]] = []
             for change in payload["changes"]:
                 if not isinstance(change, dict):
                     raise ValueError("invalid journal change")
                 namespace, key = change["namespace"], change["key"]
                 if not isinstance(namespace, str) or not isinstance(key, str):
                     raise ValueError("invalid journal key")
-                if change["op"] == "set":
-                    _validate_value(change["value"])
-                    state.setdefault(namespace, {})[key] = change["value"]
-                elif change["op"] == "delete":
-                    state.get(namespace, {}).pop(key, None)
+                operation = change["op"]
+                if operation == "set":
+                    value = change["value"]
+                    _validate_value(value)
+                    validated.append((operation, namespace, key, value))
+                elif operation == "delete":
+                    validated.append((operation, namespace, key, None))
                 else:
                     raise ValueError("invalid journal operation")
+            for operation, namespace, key, value in validated:
+                if operation == "set":
+                    state.setdefault(namespace, {})[key] = value
+                else:
+                    state.get(namespace, {}).pop(key, None)
             return state, payload["seq"], next_digest
         except (ValueError, KeyError, TypeError, UnicodeError, AttributeError, StoreError) as exc:
             raise StoreError("corrupt committed journal") from exc
