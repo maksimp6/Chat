@@ -21,7 +21,16 @@ FROZEN_SHA256: dict[str, str] = {
     "tests/test_ci_fast_contracts.py": "c14e53f452c9532a8c5ff6390c0347fb3f0b5fb4e520f29c18ad8c8a9f031ca3",
     "tests/test_memory_fast_core_contracts.py": "6144f7d2d104ef93c2908335e991b7edcde5bf9c85c0b40f21aec9a3b1e1c3eb",
     "scripts/run_fast_contracts.py": "5cdb4b2ff663b2982ceffcb843dfb914f2376c3e252a7f1c7a151c786364e389",
+    "scripts/run_fast_contracts_trusted.py": "045edfab9baf099cfc1416b9684e5ccc08740951e9035d779c709dd728656bcf",
+    "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests/test_ci_memory_trusted_runner.py": "94fa8ccbc59baf91d8001d630eb1ee48235ffb950f565d161b5f6dfc791719a1",
+    "tests/test_ci_develop_workflows.py": "0c56f55f87111f83d14e5e602b03dfb5117d4ce4d0988cc23556e7d16402d4e5",
+    "tests/test_ci_platform_changes.py": "b5c46dd508ca3277d79e7fdff07919d1b74875522b908867a4b86c1a4e4b12aa",
+    "tests/test_merge_readiness.py": "f9e1e71b90945922a04cdaf9f9fca51e5c2efcb031d8e646d5f35e69d6861302",
+    "tests/test_ci_memory_contract_integrity.py": "28e75e7d82efc667b6c9e98ba40ce1a093e6d7074275eed66b93ae4797c9c116",
 }
+
+FORBIDDEN_IMPORT_HOOKS = ("scripts/__init__.py", "sitecustomize.py", "usercustomize.py")
 
 
 def verify(root: Path, expected: Mapping[str, str] = FROZEN_SHA256) -> list[str]:
@@ -34,6 +43,10 @@ def verify(root: Path, expected: Mapping[str, str] = FROZEN_SHA256) -> list[str]
             continue
         if sha256(path.read_bytes()).hexdigest() != approved_digest:
             errors.append(f"{relative}: SHA-256 differs from approved snapshot")
+    for relative in FORBIDDEN_IMPORT_HOOKS:
+        path = root / relative
+        if path.exists() or path.is_symlink():
+            errors.append(f"{relative}: unapproved import hook")
     return errors
 
 

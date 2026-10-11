@@ -12,6 +12,9 @@ on:
       - "tests/test_memory_fast_core_contracts.py"
       - "scripts/check_memory_contract_integrity.py"
       - "scripts/run_fast_contracts.py"
+      - "scripts/run_fast_contracts_trusted.py"
+      - "tests/test_ci_memory_trusted_runner.py"
+      - "tests/__init__.py"
       - ".github/workflows/ci.yml"
       - ".github/workflows/memory-db-core.yml"
   push:

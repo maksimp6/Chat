@@ -1,6 +1,7 @@
 """Negative tests for the immutable Memory DB gate."""
 
 from pathlib import Path
+import re
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -19,6 +20,8 @@ class IntegrityGuardContracts(unittest.TestCase):
                 FAST,
                 "tests/test_memory_fast_core_contracts.py",
                 "tests/test_memory_store.py",
+                "tests/__init__.py",
+                "scripts/run_fast_contracts_trusted.py",
                 "scripts/run_fast_contracts.py",
             }
             <= set(FROZEN_SHA256)
@@ -35,11 +38,20 @@ class IntegrityGuardContracts(unittest.TestCase):
     def test_fast_job_is_pinned_to_trusted_policy(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         fast_job = workflow.split("  fast-tests:\n", 1)[1].split("\n  backend:", 1)[0]
-        self.assertIn("ref: 2081d17b7401958ca3972aa4bfd7c9eb022b4adf", fast_job)
+        self.assertIsNotNone(re.search(r"(?m)^\s+ref: [0-9a-f]{40}\s*$", fast_job))
         self.assertIn(
-            "python .trusted-memory-policy/scripts/check_memory_contract_integrity.py", fast_job
+            "python -I -S .trusted-memory-policy/scripts/run_fast_contracts_trusted.py", fast_job
         )
         self.assertIn("python scripts/run_fast_contracts.py", fast_job)
+
+    def test_mutable_python_import_hook_is_rejected(self):
+        with TemporaryDirectory() as directory:
+            hook = Path(directory) / "scripts/__init__.py"
+            hook.parent.mkdir(parents=True)
+            hook.write_text("pass\n", encoding="utf-8")
+            self.assertTrue(
+                any("unapproved import hook" in error for error in verify(Path(directory), {}))
+            )
 
     def test_deleted_accepted_test_is_rejected(self):
         with TemporaryDirectory() as directory:
