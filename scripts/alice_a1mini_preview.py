@@ -58,39 +58,97 @@ def _stl_triangles(path: Path) -> list[tuple[tuple[float, float, float], ...]]:
     return faces
 
 
-def _render(faces: list, width: int, *, top: bool = False) -> bytes:
-    """Flat-shaded orthographic mesh render, deterministic and Pillow-free."""
-    # The light grid is decorative; placement on the printer is not claimed.
+def _base_canvas(width: int) -> bytearray:
     pixels = bytearray(width * width * 3)
     for y in range(width):
         shade = int(21 + 16 * y / width)
         for x in range(width):
             off = (y * width + x) * 3
             pixels[off:off + 3] = bytes((shade, shade + 8, shade + 16))
-
-    def set_pixel(x: int, y: int, color: tuple[int, int, int]) -> None:
-        if 0 <= x < width and 0 <= y < width:
-            k = (y * width + x) * 3
-            pixels[k:k + 3] = bytes(color)
-
-    grid = (43, 57, 70)
     for i in range(1, 10):
         at = int(i * width / 10)
         for t in range(width):
-            set_pixel(at, t, grid)
-            set_pixel(t, at, grid)
+            _set_pixel(pixels, width, at, t, (43, 57, 70))
+            _set_pixel(pixels, width, t, at, (43, 57, 70))
+    return pixels
 
-    def project(point: tuple[float, float, float]) -> tuple[float, float, float]:
-        x, y, z = point
-        if top:
-            return x, -y, z
-        return (
-            (x - y) * 0.7071067811865476,
-            z * 0.816496580927726 - (x + y) * 0.408248290463863,
-            (x + y + z) * 0.5773502691896258,
-        )
 
-    projected = [(tuple(project(p) for p in tri), tri) for tri in faces]
+def _set_pixel(
+    pixels: bytearray, width: int, x: int, y: int, color: tuple[int, int, int]
+) -> None:
+    if 0 <= x < width and 0 <= y < width:
+        offset = (y * width + x) * 3
+        pixels[offset:offset + 3] = bytes(color)
+
+
+def _project(
+    point: tuple[float, float, float], *, top: bool
+) -> tuple[float, float, float]:
+    x, y, z = point
+    if top:
+        return x, -y, z
+    return (
+        (x - y) * 0.7071067811865476,
+        z * 0.816496580927726 - (x + y) * 0.408248290463863,
+        (x + y + z) * 0.5773502691896258,
+    )
+
+
+def _paint_triangle(
+    pixels: bytearray,
+    width: int,
+    pts: list[tuple[float, float]],
+    triangle: tuple,
+) -> None:
+    (ax, ay), (bx, by), (cx, cy) = pts
+    area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    if abs(area) < 0.04:
+        return
+    a, b, c = triangle
+    u = tuple(b[j] - a[j] for j in range(3))
+    v = tuple(c[j] - a[j] for j in range(3))
+    n = (
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0],
+    )
+    norm = math.sqrt(sum(k * k for k in n))
+    light = abs((n[0] * -0.34 + n[1] * -0.42 + n[2] * 0.84) / norm)
+    color = tuple(int(value * (0.4 + 0.6 * light)) for value in (137, 192, 225))
+    for yy in range(max(0, int(min(ay, by, cy))), min(width, int(max(ay, by, cy)) + 2)):
+        for xx in range(max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)):
+            px, py = xx + 0.5, yy + 0.5
+            w0 = ((bx - px) * (cy - py) - (by - py) * (cx - px)) / area
+            w1 = ((cx - px) * (ay - py) - (cy - py) * (ax - px)) / area
+            if w0 >= -1e-7 and w1 >= -1e-7 and w0 + w1 <= 1 + 1e-7:
+                _set_pixel(pixels, width, xx, yy, color)
+
+
+def _png_chunk(kind: bytes, payload: bytes) -> bytes:
+    return (
+        struct.pack(">I", len(payload)) + kind + payload
+        + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
+    )
+
+
+def _encode_png(pixels: bytearray, width: int) -> bytes:
+    scan = b"".join(
+        b"\x00" + bytes(pixels[y * width * 3:(y + 1) * width * 3])
+        for y in range(width)
+    )
+    return (
+        _PNG_MAGIC
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, width, 8, 2, 0, 0, 0))
+        + _png_chunk(b"IDAT", zlib.compress(scan, level=6))
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def _render(faces: list, width: int, *, top: bool = False) -> bytes:
+    """Flat-shaded orthographic mesh render, deterministic and Pillow-free."""
+    # The grid is decorative; placement on the printer is not claimed.
+    pixels = _base_canvas(width)
+    projected = [(tuple(_project(p, top=top) for p in tri), tri) for tri in faces]
     all_points = [p for vertices, _ in projected for p in vertices]
     min_x = min(p[0] for p in all_points)
     max_x = max(p[0] for p in all_points)
@@ -101,8 +159,6 @@ def _render(faces: list, width: int, *, top: bool = False) -> bytes:
         raise RuntimeError("STL preview projection has zero area")
     scale = (width * 0.79) / extent
     center_x, center_y = (min_x + max_x) / 2, (min_y + max_y) / 2
-
-    # Far-to-near sorting keeps the rendering lightweight on CI.
     projected.sort(key=lambda item: sum(p[2] for p in item[0]) / 3)
     for vertices, tri in projected:
         pts = [
@@ -110,46 +166,8 @@ def _render(faces: list, width: int, *, top: bool = False) -> bytes:
              width * 0.51 - (p[1] - center_y) * scale)
             for p in vertices
         ]
-        (ax, ay), (bx, by), (cx, cy) = pts
-        area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-        if abs(area) < 0.04:
-            continue
-        a, b, c = tri
-        u = tuple(b[j] - a[j] for j in range(3))
-        v = tuple(c[j] - a[j] for j in range(3))
-        n = (
-            u[1] * v[2] - u[2] * v[1],
-            u[2] * v[0] - u[0] * v[2],
-            u[0] * v[1] - u[1] * v[0],
-        )
-        norm = math.sqrt(sum(k * k for k in n))
-        light = abs((n[0] * -0.34 + n[1] * -0.42 + n[2] * 0.84) / norm)
-        light = 0.4 + 0.6 * light
-        color = tuple(int(v * light) for v in (137, 192, 225))
-        for yy in range(max(0, int(min(ay, by, cy))), min(width, int(max(ay, by, cy)) + 2)):
-            for xx in range(max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)):
-                px, py = xx + 0.5, yy + 0.5
-                w0 = ((bx - px) * (cy - py) - (by - py) * (cx - px)) / area
-                w1 = ((cx - px) * (ay - py) - (cy - py) * (ax - px)) / area
-                if w0 >= -1e-7 and w1 >= -1e-7 and w0 + w1 <= 1 + 1e-7:
-                    set_pixel(xx, yy, color)
-
-    def chunk(kind: bytes, payload: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(payload)) + kind + payload
-            + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
-        )
-
-    scan = b"".join(
-        b"\x00" + bytes(pixels[y * width * 3:(y + 1) * width * 3])
-        for y in range(width)
-    )
-    return (
-        _PNG_MAGIC
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, width, 8, 2, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(scan, level=6))
-        + chunk(b"IEND", b"")
-    )
+        _paint_triangle(pixels, width, pts, tri)
+    return _encode_png(pixels, width)
 
 
 def _read_archive(path: Path) -> tuple[list[zipfile.ZipInfo], dict[str, bytes]]:
@@ -206,7 +224,7 @@ def _metadata_with_previews(raw: bytes) -> bytes:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def _verify_png(data: bytes, width: int) -> None:
+def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
     if not data.startswith(_PNG_MAGIC):
         raise RuntimeError("invalid PNG signature")
     chunks = []
@@ -215,26 +233,35 @@ def _verify_png(data: bytes, width: int) -> None:
         count = struct.unpack_from(">I", data, pos)[0]
         if count > 8 * 1024 * 1024 or pos + 12 + count > len(data):
             raise RuntimeError("invalid PNG chunk size")
-        typ = data[pos + 4:pos + 8]
+        kind = data[pos + 4:pos + 8]
         payload = data[pos + 8:pos + 8 + count]
-        crc = struct.unpack_from(">I", data, pos + 8 + count)[0]
-        if zlib.crc32(typ + payload) & 0xFFFFFFFF != crc:
+        expected = struct.unpack_from(">I", data, pos + 8 + count)[0]
+        if zlib.crc32(kind + payload) & 0xFFFFFFFF != expected:
             raise RuntimeError("invalid PNG chunk CRC")
-        chunks.append((typ, payload))
+        chunks.append((kind, payload))
         pos += 12 + count
-        if typ == b"IEND":
+        if kind == b"IEND":
             break
     if pos != len(data) or not chunks or chunks[0][0] != b"IHDR" or chunks[-1][0] != b"IEND":
         raise RuntimeError("incomplete PNG")
+    return chunks
+
+
+def _verify_png(data: bytes, width: int) -> None:
+    chunks = _png_chunks(data)
     header = chunks[0][1]
     if len(header) != 13 or struct.unpack(">II", header[:8]) != (width, width):
         raise RuntimeError("unexpected preview dimensions")
     if header[8:] != bytes((8, 2, 0, 0, 0)):
         raise RuntimeError("preview must be 8-bit RGB PNG")
-    data_parts = b"".join(payload for typ, payload in chunks if typ == b"IDAT")
-    if not data_parts or len(data_parts) > 8 * 1024 * 1024:
+    parts = b"".join(payload for kind, payload in chunks if kind == b"IDAT")
+    if not parts or len(parts) > 8 * 1024 * 1024:
         raise RuntimeError("PNG pixel data missing/oversized")
-    raw = zlib.decompress(data_parts)
+    raw = zlib.decompress(parts)
+    _verify_png_pixels(raw, width)
+
+
+def _verify_png_pixels(raw: bytes, width: int) -> None:
     if len(raw) != width * (1 + width * 3):
         raise RuntimeError("PNG pixel size mismatch")
     if any(raw[y * (1 + 3 * width)] != 0 for y in range(width)):
