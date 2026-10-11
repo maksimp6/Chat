@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "oem_spindle_v03",
+  "name": "OEM A1 mini: широкий вал v0.3",
+  "source_sha256": "d9fd89a55b00315211cbf72c904672c6c5523ec09c6d1897bfedc0a6ddc9c6b1",
+  "source_status": "fit_blocked",
+  "fit_status": "unverified",
+  "fit_evidence": null,
+  "license_status": "creator-stated original CAD, independent attribution not performed",
+  "machine": {
+    "model": "Bambu Lab A1 mini",
+    "nozzle_mm": "0.4",
+    "bed_mm": [
+      180,
+      180,
+      180
+    ]
+  },
+  "material": "PLA",
+  "gcode_status": "not_built",
+  "firmware_open_verified": false,
+  "physical_fit_verified": false,
+  "parts": {
+    "parts/a1mini_oem_wide_hub_HALF_A.stl": 1,
+    "parts/a1mini_oem_wide_hub_HALF_B.stl": 1,
+    "parts/alignment_pin_PRINT_4.stl": 4,
+    "parts/a1mini_oem_wide_hub_END_RETAINER.stl": 1
+  },
+  "verification_required": [
+    "source_hash",
+    "mesh_geometry",
+    "slicer_warning_free",
+    "gcode_crc_md5",
+    "printer_profile",
+    "material",
+    "toolpath_bounds",
+    "extrusion",
+    "firmware_open",
+    "physical_fit"
+  ]
+}

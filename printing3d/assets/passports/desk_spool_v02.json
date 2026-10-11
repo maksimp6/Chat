@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "desk_spool_v02",
+  "name": "Центрирующие втулки катушки v0.2",
+  "source_sha256": "54ae7342ad43376bd74879e7ac58639a53192ce364b1be25ded458cda6bf0885",
+  "source_status": "measure_spool_bore_first",
+  "fit_status": "unverified",
+  "fit_evidence": null,
+  "license_status": "creator-stated original CAD, independent attribution not performed",
+  "machine": {
+    "model": "Bambu Lab A1 mini",
+    "nozzle_mm": "0.4",
+    "bed_mm": [
+      180,
+      180,
+      180
+    ]
+  },
+  "material": "PETG",
+  "gcode_status": "not_built",
+  "firmware_open_verified": false,
+  "physical_fit_verified": false,
+  "parts": {
+    "adapters/ring_for_spool_bore_36mm_PRINT_2.stl": 2,
+    "adapters/ring_for_spool_bore_52mm_PRINT_2.stl": 2,
+    "adapters/ring_for_spool_bore_55mm_PRINT_2.stl": 2
+  },
+  "verification_required": [
+    "source_hash",
+    "mesh_geometry",
+    "slicer_warning_free",
+    "gcode_crc_md5",
+    "printer_profile",
+    "material",
+    "toolpath_bounds",
+    "extrusion",
+    "firmware_open",
+    "physical_fit"
+  ]
+}

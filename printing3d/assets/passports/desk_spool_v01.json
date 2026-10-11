@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "desk_spool_v01",
+  "name": "Настольный держатель катушки v0.1",
+  "source_sha256": "d962f12a287d0d13eef1397343c3d7d6186c5e61e11880e25560699627c0c7c3",
+  "source_status": "dry_fit_needed",
+  "fit_status": "unverified",
+  "fit_evidence": null,
+  "license_status": "creator-stated original CAD, independent attribution not performed",
+  "machine": {
+    "model": "Bambu Lab A1 mini",
+    "nozzle_mm": "0.4",
+    "bed_mm": [
+      180,
+      180,
+      180
+    ]
+  },
+  "material": "PETG",
+  "gcode_status": "not_built",
+  "firmware_open_verified": false,
+  "physical_fit_verified": false,
+  "parts": {
+    "parts/base_frame.stl": 1,
+    "parts/upright_A_print_twice.stl": 2,
+    "parts/axle_D_section.stl": 1
+  },
+  "verification_required": [
+    "source_hash",
+    "mesh_geometry",
+    "slicer_warning_free",
+    "gcode_crc_md5",
+    "printer_profile",
+    "material",
+    "toolpath_bounds",
+    "extrusion",
+    "firmware_open",
+    "physical_fit"
+  ]
+}
