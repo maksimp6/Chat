@@ -607,3 +607,25 @@ def test_same_uid_post_check_rename_remains_possible(tmp_path, monkeypatch):
         assert renamed
         assert not destination.exists()
         assert displaced.exists()
+
+
+def test_trusted_ancestor_rejects_foreign_owner(tmp_path, monkeypatch):
+    import memory_engine.store as engine
+
+    parent = tmp_path / "private"
+    parent.mkdir(mode=0o700)
+    parent.chmod(0o700)
+    original_fstat = engine.os.fstat
+
+    def foreign_owner(fd):
+        metadata = original_fstat(fd)
+        if metadata.st_ino == parent.stat().st_ino:
+            fields = list(metadata)
+            fields[4] = os.geteuid() + 10000
+            return os.stat_result(fields)
+        return metadata
+
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    monkeypatch.setattr(engine.os, "fstat", foreign_owner)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(parent / "journal.memory")
