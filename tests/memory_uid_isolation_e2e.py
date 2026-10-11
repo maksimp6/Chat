@@ -37,7 +37,7 @@ def main() -> None:
         private.chmod(0o700)
         journal = private / "journal.memory"
         owner_code = (
-            import os,sys; sys.path.insert(0,sys.argv[2]); from memory_engine import MemoryStore; "
+            "import os,sys; sys.path.insert(0,sys.argv[2]); from memory_engine import MemoryStore; "
             "os.environ['ALICE_MEMORY_TRUSTED_ROOT']='1'; "
             "s=MemoryStore(sys.argv[1]); s.set('safe',1); s.commit(); s.close()"
         )
