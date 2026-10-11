@@ -299,7 +299,7 @@ def embed_preview(path: Path, source_stl: Path) -> dict[str, object]:
         if report["gcode_sha256"] != gcode_before:
             raise RuntimeError("render embedding modified G-code")
         with zipfile.ZipFile(replacement) as check:
-            if check.read("Metadata/plate_1.gcode.md5") != md5_before if md5_before is not None else False:
+            if md5_before is not None and check.read("Metadata/plate_1.gcode.md5") != md5_before:
                 raise RuntimeError("render embedding modified G-code MD5")
         os.replace(replacement, path)
         return report
