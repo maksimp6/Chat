@@ -135,7 +135,6 @@ def _reject_extended_acl(fd: int) -> None:
         raise StoreError("untrusted Memory DB ACL")
 
 
-
 def _open_directory_nofollow(directory: Path) -> int:
     """Pin every directory component; never traverse a symlink."""
     absolute = Path(os.path.abspath(directory))
