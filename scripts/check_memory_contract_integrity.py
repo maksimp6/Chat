@@ -24,7 +24,7 @@ FROZEN_SHA256: dict[str, str] = {
     "scripts/check_memory_fast_budget.py": "d7a678dd35889a87dd5bb852f2e097bc0e524f6147d409960b47ecfc9a840d9a",
     "scripts/run_fast_contracts_trusted.py": "d536d6fcf65406e57f4584bacd8edb67fc76f30074d7d1a45926caa60436a395",
     "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tests/test_ci_memory_trusted_runner.py": "5605aefcaecbe9f67747f0717182e1e3c8205e4ceb252831aae2f23cf135ef4e",
+    "tests/test_ci_memory_trusted_runner.py": "7c8dcbdc05e36704f43ab2e521e379a5c2c6d051f3a14020bf7925d1507bda44",
     "tests/test_ci_develop_workflows.py": "0c56f55f87111f83d14e5e602b03dfb5117d4ce4d0988cc23556e7d16402d4e5",
     "tests/test_ci_platform_changes.py": "b5c46dd508ca3277d79e7fdff07919d1b74875522b908867a4b86c1a4e4b12aa",
     "tests/test_merge_readiness.py": "f9e1e71b90945922a04cdaf9f9fca51e5c2efcb031d8e646d5f35e69d6861302",

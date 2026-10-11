@@ -37,8 +37,7 @@ class TrustedImportContracts(unittest.TestCase):
 
     def test_combined_budget_rejects_missing_or_fabricated_results(self):
         trusted_line = (
-            "Fast isolated contracts: 15/15 in 0.800s "
-            "(budget 2.0s), skipped=0, integrity=VERIFIED"
+            "Fast isolated contracts: 15/15 in 0.800s (budget 2.0s), skipped=0, integrity=VERIFIED"
         )
         legacy_line = "Fast isolated contracts: 15 tests in 0.050s (budget 2.0s)"
         self.assertAlmostEqual(budget.combined_seconds(trusted_line, legacy_line), 0.85)
