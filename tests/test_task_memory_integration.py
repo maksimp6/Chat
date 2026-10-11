@@ -95,3 +95,38 @@ def test_task_record_and_events_are_copy_safe(tmp_path):
     tasks.events(task_id).clear()
     assert tasks.get(task_id)["payload"] == {"items": [1]}
     assert len(tasks.events(task_id)) == 1
+
+
+@pytest.mark.parametrize("fault", ["state", "task", "ownership", "events"])
+def test_invalid_repository_state_fails_closed(tmp_path, fault):
+    from agent_shell.store import _STATE_KEY
+
+    path = tmp_path / "shell.memory"
+    tasks = TaskStore(path)
+    task_id = tasks.add(role="docs-engineer", title="safe", kind="echo")
+    client = get_memory_client(path)
+    state = client.get(_STATE_KEY)
+    if fault == "state":
+        state["schema"] = 2
+    elif fault == "task":
+        state["tasks"][str(task_id)]["id"] = 0
+    elif fault == "ownership":
+        state["events"] = {}
+    else:
+        state["events"][str(task_id)] = [{"stage": "queued", "at": "invalid"}]
+    client.set(_STATE_KEY, state)
+    client.commit()
+    sequence = client.last_commit.sequence
+    with pytest.raises(StoreError, match="invalid task"):
+        tasks.claim_next()
+    assert client.last_commit.sequence == sequence
+
+
+def test_finishing_missing_task_does_not_create_orphan_event(tmp_path):
+    path = tmp_path / "shell.memory"
+    tasks = TaskStore(path)
+    with pytest.raises(ValueError, match="not found"):
+        tasks.finish(999, {})
+    assert tasks.list() == []
+    assert tasks.events(999) == []
+    assert get_memory_client(path).last_commit.sequence == 0

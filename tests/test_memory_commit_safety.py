@@ -166,3 +166,181 @@ def test_unknown_journal_format_is_rejected_even_with_valid_checksum(tmp_path, v
     path.write_text(json.dumps({"payload": payload, "digest": digest}) + "\n")
     with pytest.raises(StoreError, match="corrupt"):
         MemoryStore(path)
+
+
+def test_info_reads_only_acknowledged_ram_without_filesystem_access(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    with MemoryStore(tmp_path / "state.memory") as store:
+        store.set("saved", 1)
+        store.commit()
+        store.set("staged", 2)
+
+        def forbidden(*args, **kwargs):
+            raise AssertionError("diagnostics accessed filesystem")
+
+        monkeypatch.setattr(Path, "open", forbidden)
+        assert store.info().last_commit == 1
+
+
+@pytest.mark.parametrize("operation", ["set", "commit", "backup", "restore", "close"])
+def test_active_transaction_rejects_incompatible_operations(tmp_path, operation):
+    with MemoryStore(tmp_path / "state.memory") as store:
+        with store.transaction() as tx:
+            with pytest.raises(StoreError):
+                if operation == "set":
+                    store.set("outside", 1)
+                elif operation == "commit":
+                    store.commit()
+                elif operation == "backup":
+                    store.backup(tmp_path / "backup.memory")
+                elif operation == "restore":
+                    store.restore(tmp_path / "backup.memory")
+                else:
+                    store.close()
+            tx.set("inside", 2)
+        assert store.get("inside") == 2
+        assert store.get("outside") is None
+        with pytest.raises(StoreError, match="closed"):
+            tx.get("inside")
+
+
+def test_transaction_does_not_silently_include_client_staging(tmp_path):
+    with MemoryStore(tmp_path / "state.memory") as store:
+        store.set("pending", 1)
+        with pytest.raises(StoreError, match="idle"):
+            with store.transaction():
+                pass
+        assert store.last_commit.sequence == 0
+        assert store.commit() == 1
+
+
+def test_foreign_process_guard_before_read_or_unlock(tmp_path, monkeypatch):
+    import memory_engine.store as engine
+
+    with MemoryStore(tmp_path / "state.memory") as store:
+        real_pid = os.getpid()
+        with monkeypatch.context() as patch:
+            patch.setattr(engine.os, "getpid", lambda: real_pid + 1)
+            with pytest.raises(StoreError, match="process"):
+                store.get("anything")
+            with pytest.raises(StoreError, match="process"):
+                store.close()
+        store.set("parent", 1)
+        assert store.commit() == 1
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        [None],
+        [{"namespace": 3, "key": "a", "op": "delete"}],
+        [{"namespace": "values", "key": "a", "op": "unknown"}],
+    ],
+)
+def test_malformed_changes_fail_closed_with_matching_checksum(tmp_path, changes):
+    import hashlib
+    import json
+
+    payload = {"format": 1, "seq": 1, "changes": changes}
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    digest = hashlib.sha256(bytes.fromhex("0" * 64) + encoded).hexdigest()
+    path = tmp_path / "state.memory"
+    path.write_text(json.dumps({"payload": payload, "digest": digest}) + "\n")
+    original = path.read_bytes()
+    with pytest.raises(StoreError, match="corrupt"):
+        MemoryStore(path)
+    assert path.read_bytes() == original
+
+
+def test_invalid_utf8_value_never_reaches_journal(tmp_path):
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as store:
+        store.set("bad", "\ud800")
+        with pytest.raises(StoreError, match="JSON"):
+            store.commit()
+        assert not path.exists()
+        store.set("bad", "valid")
+        assert store.commit() == 1
+
+
+@pytest.mark.parametrize("failure", ["short", "readonly"])
+def test_write_fault_never_acknowledges_or_publishes(tmp_path, monkeypatch, failure):
+    from pathlib import Path
+
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as store:
+        store.set("stable", 1)
+        store.commit()
+        original_open = Path.open
+
+        class ShortStream:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def write(self, data):
+                return 0
+
+        def faulty_open(target, mode="r", *args, **kwargs):
+            if target == path and mode == "ab":
+                if failure == "short":
+                    return ShortStream()
+                raise OSError(errno.EROFS, "read only")
+            return original_open(target, mode, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", faulty_open)
+        with pytest.raises(StoreError, match="commit failed"):
+            with store.transaction() as tx:
+                tx.set("new", 2)
+        assert store.get("new") is None
+        assert store.get("stable") == 1
+        assert store.last_commit.sequence == 1
+
+
+def test_backup_rejects_changed_copy_before_publication(tmp_path, monkeypatch):
+    import shutil
+
+    path = tmp_path / "state.memory"
+    backup = tmp_path / "backup.memory"
+    with MemoryStore(path) as store:
+        store.set("saved", 1)
+        store.commit()
+        monkeypatch.setattr(shutil, "copyfileobj", lambda source, target: None)
+        with pytest.raises(StoreError, match="integrity mismatch"):
+            store.backup(backup)
+        assert not backup.exists()
+        assert store.get("saved") == 1
+
+
+def test_restore_io_failure_preserves_empty_ram_and_blocks_mutations(tmp_path, monkeypatch):
+    backup = tmp_path / "backup.memory"
+    with MemoryStore(tmp_path / "source.memory") as source:
+        source.set("saved", 1)
+        source.commit()
+        source.backup(backup)
+    with MemoryStore(tmp_path / "target.memory") as target:
+
+        def fail_replace(*args):
+            raise OSError(errno.EROFS, "read only")
+
+        monkeypatch.setattr(os, "replace", fail_replace)
+        with pytest.raises(StoreError, match="restore failed"):
+            target.restore(backup)
+        assert target.last_commit.sequence == 0
+        assert target.get("saved") is None
+        with pytest.raises(StoreError, match="recovery required"):
+            target.commit()
+
+
+def test_restore_rejects_missing_source_and_self_path(tmp_path):
+    path = tmp_path / "target.memory"
+    with MemoryStore(path) as target:
+        with pytest.raises(StoreError, match="live database path"):
+            target.restore(path)
+        with pytest.raises(StoreError, match="does not exist"):
+            target.restore(tmp_path / "missing.memory")

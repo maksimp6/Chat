@@ -328,3 +328,41 @@ def test_malformed_journal_fails_closed(tmp_path, malformed):
     path.write_bytes(malformed)
     with pytest.raises(StoreError, match="corrupt committed journal"):
         MemoryStore(path)
+
+
+def test_internal_deletion_survives_reopen(tmp_path):
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as store:
+        store.set("values", "saved", 1)
+        store.delete("values", "saved")
+        assert store.last_commit.sequence == 2
+    with MemoryStore(path) as store:
+        assert store.get("values", "saved") is None
+
+
+def test_internal_invalid_journal_keys_fail_before_write(tmp_path):
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as store:
+        with pytest.raises(StoreError, match="strings"):
+            store.set("values", None, 1)
+        assert not path.exists()
+
+
+def test_internal_transaction_handle_refuses_foreign_thread(tmp_path):
+    import threading
+
+    errors = []
+    with MemoryStore(tmp_path / "state.memory") as store:
+        with store.transaction() as tx:
+
+            def misuse():
+                try:
+                    tx.get("values", "saved")
+                except StoreError as exc:
+                    errors.append(str(exc))
+
+            worker = threading.Thread(target=misuse)
+            worker.start()
+            worker.join(timeout=5)
+            assert not worker.is_alive()
+            assert errors == ["transaction belongs to another thread"]
