@@ -437,13 +437,15 @@ def test_publish_uses_verified_inode_not_replaced_temp_name(tmp_path, monkeypatc
 
         monkeypatch.setattr(os, "link", replace_temp_before_link)
         if operation == "backup":
-            store.backup(backup)
+            with pytest.raises(OSError):
+                store.backup(backup)
             result = backup
         else:
             with MemoryStore(restored) as destination:
-                destination.restore(backup)
-                assert destination.get("safe") == 1
+                with pytest.raises(StoreError, match="recovery required"):
+                    destination.restore(backup)
+                assert destination.last_commit.sequence == 0
             result = restored
         assert attacked
-        assert result.read_bytes() != b"UNVERIFIED_VICTIM_CONTENT"
+        assert not result.exists()
         assert victim.read_bytes() == b"UNVERIFIED_VICTIM_CONTENT"
