@@ -167,3 +167,45 @@ def test_sigkill_after_ack_replays_committed_data(tmp_path):
     with MemoryStore(path) as reopened:
         assert reopened.get("durable") == 17
         assert reopened.last_commit.sequence == 1
+
+
+def test_ipc_dos_capacity_is_bounded(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    import memory_engine.service as service
+    from memory_engine import MemoryStore
+
+    slots = threading.BoundedSemaphore(service.MAX_INFLIGHT)
+    release = threading.Event()
+    entered = threading.Barrier(service.MAX_INFLIGHT + 1)
+    monkeypatch.setattr(service, "peer_uid", lambda _conn: 12345)
+
+    def stalled(_conn):
+        entered.wait(timeout=5)
+        release.wait(timeout=5)
+        raise TimeoutError("fault injected slow client")
+
+    monkeypatch.setattr(service, "receive", stalled)
+    pairs = [socket.socketpair() for _ in range(service.MAX_INFLIGHT)]
+    try:
+        with MemoryStore(tmp_path / "db.memory") as store:
+            with ThreadPoolExecutor(max_workers=service.MAX_INFLIGHT) as pool:
+                futures = []
+                for server, _client in pairs:
+                    assert slots.acquire(blocking=False)
+                    futures.append(
+                        pool.submit(service._serve_one, server, store, 12345, slots)
+                    )
+                entered.wait(timeout=5)
+                assert not slots.acquire(blocking=False)
+                release.set()
+                for future in futures:
+                    future.result(timeout=5)
+            assert slots.acquire(blocking=False)
+            slots.release()
+            assert store.last_commit.sequence == 0
+    finally:
+        release.set()
+        for server, client in pairs:
+            server.close()
+            client.close()
