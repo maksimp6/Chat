@@ -115,6 +115,7 @@ def test_concurrent_ipc_commits_are_individually_acknowledged(tmp_path, monkeypa
     monkeypatch.setattr(service, "peer_uid", lambda _conn: 12345)
     path = tmp_path / "db.memory"
     with MemoryStore(path) as store:
+
         def worker(index):
             server, client = socket.socketpair()
             try:
