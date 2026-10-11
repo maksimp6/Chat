@@ -39,7 +39,11 @@ def main() -> None:
         private.mkdir(mode=0o700)
         os.chown(private, owner.pw_uid, owner.pw_gid)
         private.chmod(0o700)
-        sock = root / "service.sock"
+        socket_dir = root / "socket-dir"
+        socket_dir.mkdir(mode=0o755)
+        os.chown(socket_dir, owner.pw_uid, owner.pw_gid)
+        socket_dir.chmod(0o755)
+        sock = socket_dir / "service.sock"
         env = os.environ.copy()
         env["ALICE_MEMORY_TRUSTED_ROOT"] = "1"
         env["PYTHONPATH"] = str(root)
