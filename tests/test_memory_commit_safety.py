@@ -319,10 +319,10 @@ def test_restore_io_failure_preserves_empty_ram_and_blocks_mutations(tmp_path, m
         source.backup(backup)
     with MemoryStore(tmp_path / "target.memory") as target:
 
-        def fail_replace(*args, **kwargs):
+        def fail_link(*args, **kwargs):
             raise OSError(errno.EROFS, "read only")
 
-        monkeypatch.setattr(os, "replace", fail_replace)
+        monkeypatch.setattr(os, "link", fail_link)
         with pytest.raises(StoreError, match="restore failed"):
             target.restore(backup)
         assert target.last_commit.sequence == 0
