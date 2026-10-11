@@ -236,6 +236,13 @@ def _open_journal_nofollow(
 class _JournalStore:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Prevent accidental policy downgrade after construction. This is not
+        # isolation against arbitrary code running inside the service process.
+        if name == "_trusted" and "_trusted" in self.__dict__:
+            raise StoreError("trusted policy is immutable")
+        object.__setattr__(self, name, value)
+
     def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
         self._trusted = (\n            (os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted\n        )
         self._pid = os.getpid()
