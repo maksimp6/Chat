@@ -48,3 +48,15 @@ Do **not** apply the ruleset delta until the trusted status has appeared as comp
 6. Confirm no merge, no migration and no deletion of legacy code took place. Document actual ruleset GET snapshots, the exact workflow run IDs, and the new SHA in #496.
 
 The implementation does **not** mark Issue #496 complete or PR #1106 merge-ready on its own.
+
+
+## Focused security audit exception (requires reviewer acceptance)
+
+`pull_request_target` is flagged by Zizmor's `dangerous-triggers` audit regardless of source checkout restrictions. This candidate retains the trigger only because it must create a status with `statuses: write` for same-repository PR heads. The explicit, single-line Zizmor exception does **not** disable the scanner globally. It requires a separate security review and is not proof of immunity: the workflow MUST always retain all of these restrictions:
+
+- Reject other repositories and fork PRs before privileged steps; no candidate/head checkout, import, shell expansion, artifact restore, or dependency installation.
+- Check out only the target branch's exact `base.sha`, with persisted credentials disabled.
+- Use only Python standard library and token scope `contents: read`, `pull-requests: read`, `statuses: write`.
+- Never accept a status name alone as a trustworthy source. Do not activate rulesets until exact-head producer identity and negative native admission tests are observed.
+
+**The P0 cannot be considered closed by suppressing a linter warning.** A dedicated GitHub App producer or another genuinely trusted check source remains the preferred long-term boundary.

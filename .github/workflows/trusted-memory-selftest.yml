@@ -25,4 +25,4 @@ jobs:
         with:
           python-version: "3.14"
       - name: Execute deterministic admission fixtures
-        run: python -m unittest -q tests.test_ci_trusted_memory_admission
+        run: python -m unittest -q tests.test_ci_trusted_memory_admission tests.test_ci_trusted_memory_security_edges

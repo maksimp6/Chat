@@ -3,7 +3,7 @@ name: Trusted Memory Contract Admission
 # This workflow is intentionally loaded from the PR's BASE branch. Never
 # checkout, import, or execute candidate code with statuses:write permissions.
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] base-only checkout, same-repo head, no candidate execution; required for authenticated commit status
     branches: [master, develop]
     types: [opened, reopened, synchronize, edited, ready_for_review]
 
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   admission:
     name: Trusted Memory Contract Admission
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.repository == 'maksimp6/Chat' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
