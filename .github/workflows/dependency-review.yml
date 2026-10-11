@@ -19,6 +19,10 @@ jobs:
       - name: Scan dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
+          # PR comments are best-effort (fork/Dependabot tokens can be read-only).
+          # Findings remain in the job summary and failure annotation.
           comment-summary-in-pr: always
           show-openssf-scorecard: false
-          warn-only: true
+          warn-only: false
+          fail-on-severity: low
+          fail-on-scopes: runtime, development, unknown
