@@ -212,17 +212,24 @@ class _JournalStore:
         finally:
             os.close(directory_fd)
         with os.fdopen(journal_fd, "rb") as journal:
-            while True:
-                frame = journal.readline(MAX_JOURNAL_FRAME_BYTES + 1)
-                if not frame:
-                    break
-                if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                    raise StoreError("journal frame exceeds size limit")
-                if not frame.endswith(b"\n"):
-                    raise StoreError("incomplete journal tail; recovery required")
-                state, sequence, digest = _JournalStore._apply_verified_frame(
-                    frame, state, sequence, digest
-                )
+            return _JournalStore._inspect_stream(journal)
+
+    @staticmethod
+    def _inspect_stream(journal: Any) -> tuple[dict[str, dict[str, Any]], int, str]:
+        state: dict[str, dict[str, Any]] = {}
+        sequence = 0
+        digest = "0" * 64
+        while True:
+            frame = journal.readline(MAX_JOURNAL_FRAME_BYTES + 1)
+            if not frame:
+                break
+            if len(frame) > MAX_JOURNAL_FRAME_BYTES:
+                raise StoreError("journal frame exceeds size limit")
+            if not frame.endswith(b"\n"):
+                raise StoreError("incomplete journal tail; recovery required")
+            state, sequence, digest = _JournalStore._apply_verified_frame(
+                frame, state, sequence, digest
+            )
         return state, sequence, digest
 
     @staticmethod
@@ -411,7 +418,6 @@ class _JournalStore:
     ) -> None:
         """Copy from a no-follow source fd into a pinned destination directory."""
         import shutil
-        import tempfile
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         source_dir = _open_directory_nofollow(source.parent)
@@ -419,28 +425,18 @@ class _JournalStore:
         temp_name = None
         try:
             source_fd = _open_journal_nofollow(source_dir, source.name, os.O_RDONLY)
-            try:
-                with os.fdopen(source_fd, "rb") as existing:
-                    with tempfile.TemporaryFile(dir=destination.parent) as output:
-                        shutil.copyfileobj(existing, output)
-                        output.flush()
-                        os.fsync(output.fileno())
-                        output.seek(0)
-                        copied = output.read()
-            finally:
-                # fdopen owns and closes source_fd.
-                pass
-            # Publish a named temporary file relative to the pinned directory.
             temp_name = ".alice-copy-" + os.urandom(16).hex()
             temp_fd = _open_journal_nofollow(
                 target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL
             )
-            with os.fdopen(temp_fd, "wb") as output:
-                output.write(copied)
-                output.flush()
-                os.fsync(output.fileno())
-            temp_path = destination.parent / temp_name
-            actual_state, sequence, digest = _JournalStore._inspect_log(temp_path)
+            with os.fdopen(source_fd, "rb") as existing:
+                with os.fdopen(temp_fd, "wb") as output:
+                    shutil.copyfileobj(existing, output)
+                    output.flush()
+                    os.fsync(output.fileno())
+            verify_fd = _open_journal_nofollow(target_dir, temp_name, os.O_RDONLY)
+            with os.fdopen(verify_fd, "rb") as verified:
+                actual_state, sequence, digest = _JournalStore._inspect_stream(verified)
             if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
                 raise StoreError("backup integrity mismatch")
             if destination_must_be_new:
