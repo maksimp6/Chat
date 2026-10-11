@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alice Pro — AI-ассистент с открытым кодом и MCP</title>
+    <meta name="description" content="Alice Pro — платформа AI-ассистента для самостоятельного развёртывания: Yandex AI Studio, MCP и локальные инструменты, трассировка выполнения и Android debug-клиент." />
+    <!-- Local review draft. Remove noindex only after approving the final URL.
+         Canonical and sitemap instructions: docs/deployment/alice-pro-pages.md. -->
+    <meta name="robots" content="noindex, follow" />
+    <meta name="theme-color" content="#ededeb" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Перейти к содержанию</a>
+    <header class="site-header wrap">
+      <a class="brand" href="#main" aria-label="Alice Pro — в начало">
+        <span class="mark" aria-hidden="true">a.</span> Alice Pro
+      </a>
+      <nav aria-label="Основная навигация">
+        <a href="#features">Возможности</a>
+        <a href="#start">Начать</a>
+        <a href="#english" lang="en">English</a>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">Открытый код · Самостоятельное развёртывание</p>
+          <h1 id="hero-title">Alice Pro<span>AI-ассистент.<br />Инструменты.<br />Прозрачное выполнение.</span></h1>
+          <p class="lead">Платформа, которая связывает диалог с моделью, вызовы инструментов и историю их выполнения. Для тех, кто хочет развернуть и изучить собственного AI-ассистента.</p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/maksimp6/Chat">Открыть проект на GitHub <span aria-hidden="true">→</span></a>
+            <a class="button secondary" href="#features">Как устроено <span aria-hidden="true">↓</span></a>
+          </div>
+          <p class="hero-note">Активная разработка · Лицензия MIT</p>
+        </div>
+        <figure class="flow">
+          <figcaption><span class="eyebrow">От запроса к результату</span><br />Один связанный процесс</figcaption>
+          <ol>
+            <li><span class="step" aria-hidden="true">01</span><div><strong>Диалог</strong><span>Веб-интерфейс или Android-клиент</span></div></li>
+            <li><span class="step" aria-hidden="true">02</span><div><strong>Модель</strong><span>Yandex AI Studio · Responses API</span></div></li>
+            <li><span class="step" aria-hidden="true">03</span><div><strong>Инструменты</strong><span>MCP и локальные вызовы</span></div></li>
+            <li><span class="step" aria-hidden="true">04</span><div><strong>История выполнения</strong><span>Вызовы, время, ошибки и учёт использования</span></div></li>
+          </ol>
+          <p>Схема архитектуры проекта</p>
+        </figure>
+      </section>
+      <section id="features" class="section wrap" aria-labelledby="features-title">
+        <div class="section-heading"><p class="eyebrow">Возможности проекта</p><h2 id="features-title">Больше контекста.<br />Больше контроля.</h2><p>Эти механизмы реализованы в репозитории. Для работы нужен собственный запуск и настройка провайдера и инструментов.</p></div>
+        <div class="cards">
+          <article><span class="card-number" aria-hidden="true">01 / AI</span><h3>Диалог с моделью</h3><p>Основной путь чата использует Yandex AI Studio Responses API. Доступ к провайдеру настраивается в приложении.</p></article>
+          <article><span class="card-number" aria-hidden="true">02 / Tools</span><h3>MCP и локальные инструменты</h3><p>Единый механизм выполнения связывает вызовы инструментов с запросом и его контекстом.</p></article>
+          <article><span class="card-number" aria-hidden="true">03 / Trace</span><h3>История каждого выполнения</h3><p>Execution Trace связывает запросы, вызовы инструментов, ошибки, время и данные учёта использования.</p></article>
+          <article><span class="card-number" aria-hidden="true">04 / Android</span><h3>Клиент для разработки</h3><p>Android WebView-клиент включает диагностику и путь сборки debug APK. Он предназначен для разработки и тестирования.</p></article>
+        </div>
+      </section>
+      <section class="section wrap" aria-labelledby="status-title">
+        <div class="status-panel"><div><p class="eyebrow">Текущее состояние</p><h2 id="status-title">Проект развивается<br />в открытом репозитории.</h2></div><div><p>Исходный код и документация доступны для изучения и самостоятельного запуска. Эта страница знакомит с проектом; публичный работающий сервис здесь не заявлен.</p><p>Стабильный Android-релиз, расширенная изоляция runtime и часть браузерных сценариев остаются экспериментальными или в планах. Актуальные ограничения описаны в README.</p><a class="text-link" href="https://github.com/maksimp6/Chat#current-status">Статус и ограничения в README <span aria-hidden="true">→</span></a></div></div>
+      </section>
+      <section id="start" class="section wrap" aria-labelledby="start-title">
+        <div class="section-heading"><p class="eyebrow">Первый шаг</p><h2 id="start-title">Начните с исходного кода.</h2><p>Для самостоятельного запуска понадобятся Python, Git и настроенный доступ к AI-провайдеру. Платформа требует собственной среды выполнения.</p></div>
+        <div class="start-links">
+          <a href="https://github.com/maksimp6/Chat#quick-start"><span><strong>Инструкция по запуску</strong><span>Требования, установка и настройка</span></span><span aria-hidden="true">→</span></a>
+          <a href="https://github.com/maksimp6/Chat/tree/develop/docs"><span><strong>Документация проекта</strong><span>Архитектура и механизмы платформы</span></span><span aria-hidden="true">→</span></a>
+        </div>
+      </section>
+      <section id="english" class="section wrap english" lang="en" aria-labelledby="english-title">
+        <p class="eyebrow">About the project</p>
+        <h2 id="english-title">Alice Pro, an open-source AI assistant platform.</h2>
+        <p>Alice Pro is a self-hosted AI assistant platform built around Yandex AI Studio, MCP and local tools, execution traces, usage accounting, and an Android WebView debug client. It is intended for developers and people exploring their own AI assistant setup.</p>
+        <p>The project is under active development. Public production deployment is not verified, and the Android debug build is for development and testing, not a stable release. Source code is available under the MIT License.</p>
+        <a class="text-link" href="https://github.com/maksimp6/Chat">Explore the source code on GitHub <span aria-hidden="true">→</span></a>
+      </section>
+    </main>
+    <footer class="wrap site-footer"><a class="brand" href="#main">Alice Pro</a><p>Открытый код. Понятная архитектура.</p><a href="https://github.com/maksimp6/Chat/blob/develop/LICENSE">Лицензия MIT</a></footer>
+  </body>
+</html>
