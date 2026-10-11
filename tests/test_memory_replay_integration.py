@@ -2,6 +2,7 @@
 
 Based on #1083 invariants; does not import the incompatible legacy _JournalEngine.
 """
+
 import json
 import os
 import signal
@@ -33,13 +34,28 @@ def test_semantically_invalid_hashed_frame_never_publishes_partial_changes(tmp_p
         store.set("stable", 1)
         store.commit()
     state, seq, digest = _JournalStore._inspect_log(path)
-    payload = {"format": 1, "seq": seq + 1, "changes": [
-        {"op": "set", "namespace": "values", "key": "stable", "value": 2},
-        {"op": "invalid", "namespace": "values", "key": "other"},
-    ]}
+    payload = {
+        "format": 1,
+        "seq": seq + 1,
+        "changes": [
+            {"op": "set", "namespace": "values", "key": "stable", "value": 2},
+            {"op": "invalid", "namespace": "values", "key": "other"},
+        ],
+    }
     import hashlib
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
-    frame = json.dumps({"payload": payload, "digest": hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest()}).encode() + b"\n"
+
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    frame = (
+        json.dumps(
+            {
+                "payload": payload,
+                "digest": hashlib.sha256(bytes.fromhex(digest) + encoded).hexdigest(),
+            }
+        ).encode()
+        + b"\n"
+    )
     with path.open("ab") as out:
         out.write(frame)
     before = path.read_bytes()
@@ -68,7 +84,13 @@ db.set('next',2);db.commit()
 print('ACK',flush=True)
 os.kill(os.getpid(),signal.SIGKILL)
 """
-    result = subprocess.run([sys.executable, "-c", code, str(path), boundary], capture_output=True, text=True, timeout=15)
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(path), boundary],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=15,
+    )
     assert result.returncode == -signal.SIGKILL, result.stderr
     assert ("ACK" in result.stdout) == (boundary == "after_ack")
     with MemoryStore(path) as recovered:
