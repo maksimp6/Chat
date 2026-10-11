@@ -91,25 +91,21 @@ jobs:
       - name: Load immutable Memory DB policy (pinned commit)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: d5d2f1c9a456ed3a53be66af12a326975e0bc5bb
+          ref: ed1f44e8914a67fa10d7cbea84da805018bee970
           path: .trusted-memory-policy
           sparse-checkout: |
             scripts/check_memory_contract_integrity.py
             scripts/run_fast_contracts_trusted.py
+            scripts/check_memory_fast_budget.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Run trusted identities and compatibility suite (combined 2s)
+      - name: Run approved contracts (combined 2s import+execution)
         shell: bash
         run: |
-          started="$(date +%s%N)"
-          python -I -S .trusted-memory-policy/scripts/run_fast_contracts_trusted.py --root .
-          python scripts/run_fast_contracts.py
-          elapsed_ns="$(( $(date +%s%N) - started ))"
-          echo "Combined fast contract execution: ${elapsed_ns}ns / 2000000000ns"
-          if (( elapsed_ns > 2000000000 )); then
-            echo "Combined fast contract budget exceeded"
-            exit 1
-          fi
+          set -euo pipefail
+          python -I -S .trusted-memory-policy/scripts/run_fast_contracts_trusted.py --root . 2>&1 | tee "$RUNNER_TEMP/memory-trusted.log"
+          python scripts/run_fast_contracts.py 2>&1 | tee "$RUNNER_TEMP/memory-compat.log"
+          python -I -S .trusted-memory-policy/scripts/check_memory_fast_budget.py --trusted-log "$RUNNER_TEMP/memory-trusted.log" --legacy-log "$RUNNER_TEMP/memory-compat.log"
 
   backend:
     name: Application tests
