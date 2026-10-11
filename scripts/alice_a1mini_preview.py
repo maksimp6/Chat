@@ -19,7 +19,7 @@ from pathlib import Path
 _MAIN = "Metadata/plate_1.png"
 _SMALL = "Metadata/plate_1_small.png"
 _TOP = "Metadata/top_1.png"
-_PREVIEWS = {_MAIN: 384, _SMALL: 128, _TOP: 320}
+_PREVIEWS = {_MAIN: 512, _SMALL: 128, _TOP: 320}
 _MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 _MAX_STL_BYTES = 20 * 1024 * 1024
 _PNG_MAGIC = bytes.fromhex("89504e470d0a1a0a")
