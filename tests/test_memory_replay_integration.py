@@ -503,3 +503,29 @@ def test_restore_parent_rename_does_not_publish_into_recreated_dir(tmp_path, mon
         assert destination.get("safe") == 1
     assert not target.exists()
     assert (moved / "restored.memory").exists()
+
+
+def test_post_publish_inode_swap_is_detected(tmp_path, monkeypatch):
+    path = tmp_path / "journal.memory"
+    backup = tmp_path / "backup.memory"
+    victim = tmp_path / "victim.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", 1)
+        store.commit()
+        victim.write_bytes(b"unverified")
+        original_stat = os.stat
+        swapped = False
+
+        def replace_published_before_stat(name, *args, **kwargs):
+            nonlocal swapped
+            if name == backup.name and kwargs.get("dir_fd") is not None and not swapped:
+                swapped = True
+                os.unlink(name, dir_fd=kwargs["dir_fd"])
+                os.link(victim, backup)
+            return original_stat(name, *args, **kwargs)
+
+        monkeypatch.setattr(os, "stat", replace_published_before_stat)
+        with pytest.raises(StoreError, match="published backup inode mismatch"):
+            store.backup(backup)
+        assert swapped
+        assert victim.read_bytes() == b"unverified"
