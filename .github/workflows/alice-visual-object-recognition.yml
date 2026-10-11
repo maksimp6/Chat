@@ -7,6 +7,11 @@ on:
       - ".github/workflows/alice-visual-object-recognition.yml"
       - "scripts/visual_object_contract.py"
       - "scripts/visual_object_benchmark.py"
+      - "scripts/alice_vision_shapes.py"
+      - "scripts/alice_vision_loopback.py"
+      - "scripts/alice_vision_perturbations.py"
+      - "tests/test_alice_vision_local.py"
+      - "tests/fixtures/visual3d_holdout.json"
       - "tests/test_visual_object_contract.py"
       - "tests/test_visual_object_benchmark.py"
       - "tests/fixtures/visual3d_cases.json"
@@ -34,3 +39,5 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check --no-deps Pillow==12.3.0
       - name: Run recognition evaluator and private-image boundary tests
         run: python3 -m unittest discover -s tests -p "test_visual_object*.py" -v
+      - name: Verify Pillow recognizer, loopback HTTP, and fail-closed training
+        run: python3 -m unittest discover -s tests -p "test_alice_vision_local.py" -v

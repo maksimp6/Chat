@@ -89,3 +89,72 @@ installed, near-lookalikes, partial occlusion and low light. Have another
 reviewer confirm boxes and labels. Pin hashes and run the real model over
 these photos. Record errors and visual overlays. Only then decide acceptance.
 No merge or printer motion/heating/print start in this test slice.
+
+
+## Actual local CPU recognizer — Alice shape-template v1
+
+This PR additionally provides an explicit **Pillow-only**, CPU-bound,
+supervised reference-shape matcher. It is a real image-processing engine:
+foreground connected-component extraction, learned 12x12 shape signatures,
+nearest-prototype matching and learned per-part bounding boxes. Neither
+class labels nor expected boxes are read from the incoming HTTP case ID.
+The pinned training inputs are seven initial CAD cases plus a separately
+labeled C-shaped retaining ring. **No pretrained general-purpose neural
+vision weights are present**, and photographic accuracy remains unknown.
+
+Train a private 0600 model and evaluate over actual loopback HTTP on the
+original hash-pinned local gallery:
+
+    python3 -m scripts.alice_vision_loopback evaluate \
+      --train-manifest tests/fixtures/visual3d_cases.json \
+      --eval-manifest tests/fixtures/visual3d_cases.json \
+      --gallery /path/to/authorized/private/gallery \
+      --results /path/to/private/in-sample-results \
+      --model /path/to/private/alice-shape-v1.json
+
+Evaluate the distinct pinned overview.png (six held-out render panels):
+
+    python3 -m scripts.alice_vision_loopback evaluate \
+      --train-manifest tests/fixtures/visual3d_cases.json \
+      --eval-manifest tests/fixtures/visual3d_holdout.json \
+      --gallery /path/to/authorized/private/gallery \
+      --results /path/to/private/holdout-results \
+      --model /path/to/private/alice-shape-v1.json
+
+The same object CADs appear in both sets at different render scales. The
+holdout file is separate and never used for training, but it is not
+equivalent to independently reviewed physical photos or different objects.
+**No training/test split proves photo accuracy** here. The CLI re-trains
+from hash-pinned inputs to validate an existing model artifact and rejects
+any stale or mutated model signatures. In-sample runs are always
+REVIEW_PENDING even when test labels were reviewed.
+
+An optional serve subcommand with --model, --model-sha256 and --port exposes
+only the fixed loopback 127.0.0.1 interface; no public bind option exists.
+The server accepts bounded PNG+SHA-256 JSON only. It rejects arbitrary file
+paths, external URLs, incorrect Host, changed model digest, invalid classes,
+oversized requests and unsafe image formats. It does not log image payloads
+or prompts. The E2E runner starts that same HTTP endpoint on an ephemeral
+loopback port and shuts it down immediately after checks, without touching
+RDC, printers, live services or the Android UI.
+
+## Optional private synthetic stress test
+
+To quantify failure modes, generate dim/bright/blur/mirror/grayscale/occluded
+variations **on the same authorized device**, never into public GitHub:
+
+    python3 -m scripts.alice_vision_perturbations \
+      --manifest tests/fixtures/visual3d_holdout.json \
+      --gallery /path/to/authorized/private/gallery \
+      --private-out /path/to/private/synthetic-corpus
+
+Evaluate these locally derived PNGs with the above evaluate subcommand, using
+the generated synthetic-corpus/manifest.json as --eval-manifest and adding
+--eval-gallery /path/to/private/synthetic-corpus. The report is marked
+SYNTHETIC_PERTURBATIONS_ONLY. These variants are derived from CAD previews;
+success does not qualify the model on real or novel objects.
+
+All code, documentation, provenance hashes, and tests are in this Draft PR.
+Raw images, private features/model JSON, overlays and photos remain outside
+GitHub. No merge, physical printing, printer activation, cloud upload or
+deployment.

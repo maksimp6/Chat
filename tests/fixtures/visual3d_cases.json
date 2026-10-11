@@ -263,5 +263,41 @@
       "assembled",
       "physically_printed"
     ]
+  },
+  {
+    "id": "spindle_retaining_ring",
+    "image": "oem_spindle_v03.png",
+    "image_sha256": "e533fa6111c84930fccd55904937763319b0d14412c4359623d546f8cc03df7b",
+    "crop": [
+      570,
+      390,
+      765,
+      535
+    ],
+    "source_kind": "cad_render",
+    "annotation_status": "provisional",
+    "objects": [
+      {
+        "label": "retaining_ring",
+        "bbox": [
+          0.119,
+          0.048,
+          0.827,
+          0.608
+        ]
+      }
+    ],
+    "forbidden_labels": [
+      "cutting_spindle",
+      "electric_motor",
+      "centering_adapter",
+      "filament_spool"
+    ],
+    "forbidden_claims": [
+      "assembled",
+      "physically_printed",
+      "safe_to_operate"
+    ],
+    "notes": "Separate C-shaped retaining ring from the spindle-cover assembly"
   }
 ]

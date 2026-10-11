@@ -11,9 +11,12 @@ import base64
 import hashlib
 import io
 import json
+import math
 import re
+import statistics
 import sys
 from pathlib import Path
+from time import perf_counter
 from urllib import error, parse, request
 
 from scripts.visual_object_contract import load_cases, verify_case
@@ -24,6 +27,7 @@ MAX_RESPONSE_BYTES = 128 * 1024
 # Fixed across all cases: prompt content cannot reveal ground-truth classes.
 LABEL_VOCABULARY = (
     "spool_spindle_shell",
+    "retaining_ring",
     "filament_spool_holder",
     "centering_adapter",
     "phone_stand",
@@ -250,6 +254,7 @@ def run_benchmark(
         digest = hashlib.sha256(cropped).hexdigest()
         prediction = None
         reason = "model_not_invoked"
+        began = perf_counter() if endpoint else None
         if endpoint:
             try:
                 prediction = _request_prediction(endpoint, case, cropped)
@@ -263,6 +268,9 @@ def run_benchmark(
             "source_sha256": case["image_sha256"],
             "inference_image_sha256": digest,
             "crop_size": list(size),
+            "inference_ms": round((perf_counter() - began) * 1000, 2)
+            if began is not None
+            else None,
         }
         if prediction is None:
             entry.update(status="blocked", reason=reason)
@@ -278,6 +286,21 @@ def run_benchmark(
         )
         results.append(entry)
     report = _summary(cases, results, backend)
+    latencies = [
+        entry["inference_ms"]
+        for entry in results
+        if entry["status"] == "evaluated" and entry["inference_ms"] is not None
+    ]
+    report["loopback_timing_ms"] = (
+        {
+            "requests": len(latencies),
+            "median": round(statistics.median(latencies), 2),
+            "p95": sorted(latencies)[max(0, math.ceil(0.95 * len(latencies)) - 1)],
+            "maximum": max(latencies),
+        }
+        if latencies
+        else None
+    )
     output_root.mkdir(parents=True, exist_ok=True)
     (output_root / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
