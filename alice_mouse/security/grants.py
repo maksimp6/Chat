@@ -43,7 +43,7 @@ class GrantError(ValueError):
     pass
 
 
-def _canonical(value: dict) -> bytes:
+def _canonical(value: dict[str, Any]) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
     ).encode("ascii")
@@ -61,7 +61,7 @@ class AuthenticatedPrincipal:
 @dataclass(frozen=True)
 class InputGrant:
     action: str
-    payload: dict
+    payload: dict[str, Any]
 
 
 class SessionAuthority:
@@ -74,7 +74,7 @@ class SessionAuthority:
         *,
         clock: Callable[[], int] | None = None,
         identity_verifier: Callable[[AuthenticatedPrincipal], bool] | None = None,
-    ):
+    ) -> None:
         if not owner or not device:
             raise GrantError("owner/device required")
         self.owner, self.device = owner, device
@@ -84,7 +84,7 @@ class SessionAuthority:
         self._identity_verifier = identity_verifier
         self.lock = threading.RLock()
         self.epoch = secrets.token_hex(16)
-        self.session = None
+        self.session: str | None = None
         self.lease_until = 0
 
     def authorize(self, principal: AuthenticatedPrincipal, lease_ns: int = 10_000_000_000) -> str:
@@ -100,9 +100,10 @@ class SessionAuthority:
             raise GrantError("controller authorization required")
         with self.lock:
             self.epoch = secrets.token_hex(16)
-            self.session = secrets.token_hex(16)
+            new_session = secrets.token_hex(16)
+            self.session = new_session
             self.lease_until = self.clock() + lease_ns
-            return self.session
+            return new_session
 
     def active(self, principal: AuthenticatedPrincipal) -> bool:
         with self.lock:
@@ -126,14 +127,14 @@ class SessionAuthority:
 class TrustedSigner:
     """Only constructed inside the authenticated server with protected key."""
 
-    def __init__(self, authority: SessionAuthority, key: bytes):
+    def __init__(self, authority: SessionAuthority, key: bytes) -> None:
         if type(key) is not bytes or len(key) != 32:
             raise GrantError("32-byte HMAC key required")
         self.authority = authority
         self._key = key
         self.lock = threading.Lock()
         self.seq = 0
-        self.bound_session = None
+        self.bound_session: str | None = None
 
     def sign(self, principal: AuthenticatedPrincipal, grant: InputGrant) -> bytes:
         if type(grant) is not InputGrant or grant.action not in ACTIONS:
@@ -294,7 +295,15 @@ class ProtectedVerifier:
     executable with isolated key provisioning and SO_PEERCRED.
     """
 
-    def __init__(self, key: bytes, owner: str, device: str, *, clock=None, dispatch=None):
+    def __init__(
+        self,
+        key: bytes,
+        owner: str,
+        device: str,
+        *,
+        clock: Callable[[], int] | None = None,
+        dispatch: Callable[[str, dict[str, Any]], bool] | None = None,
+    ) -> None:
         if type(key) is not bytes or len(key) != 32:
             raise GrantError("invalid verifier key")
         self._key = key
@@ -302,12 +311,12 @@ class ProtectedVerifier:
         self.clock = clock or time.monotonic_ns
         self.dispatch = dispatch or (lambda action, payload: False)
         self.lock = threading.RLock()
-        self.epoch = None
-        self.session = None
+        self.epoch: str | None = None
+        self.session: str | None = None
         self.lease_until = 0
         self.seq = 0
         self.shutdown_requested = threading.Event()
-        self._last_shutdown_epoch = None
+        self._last_shutdown_epoch: str | None = None
         self._shutdown_generation = 0
 
     def provision(self, authority: SessionAuthority, principal: AuthenticatedPrincipal) -> None:

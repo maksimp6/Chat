@@ -41,7 +41,7 @@ class SignedInputSocket:
         *,
         peer_uid: int,
         shared_gid: int | None = None,
-    ):
+    ) -> None:
         if type(peer_uid) is not int or peer_uid < 0:
             raise SocketBoundaryError("peer UID required")
         self.path = Path(path)
@@ -50,11 +50,11 @@ class SignedInputSocket:
             raise SocketBoundaryError("invalid shared group")
         self.peer_uid = peer_uid
         self.shared_gid = shared_gid
-        self._sock = None
+        self._sock: socket.socket | None = None
         self._stop = threading.Event()
-        self._thread = None
-        self._inode = None
-        self._parent_fd = None
+        self._thread: threading.Thread | None = None
+        self._inode: int | None = None
+        self._parent_fd: int | None = None
 
     def _open_checked_parent(self) -> tuple[int, os.stat_result]:
         """Acquire and verify a single directory inode, closing it on ANY failure."""
@@ -137,7 +137,7 @@ class SignedInputSocket:
             self._thread = None
             raise
 
-    def _unlink_owned(self):
+    def _unlink_owned(self) -> None:
         if self._parent_fd is None or self._inode is None:
             return
         try:
@@ -147,16 +147,19 @@ class SignedInputSocket:
         except FileNotFoundError:
             pass
 
-    def _close_parent(self):
+    def _close_parent(self) -> None:
         if self._parent_fd is not None:
             os.close(self._parent_fd)
             self._parent_fd = None
         self._inode = None
 
-    def _run(self):
+    def _run(self) -> None:
+        server = self._sock
+        if server is None:
+            return
         while not self._stop.is_set():
             try:
-                conn, _ = self._sock.accept()
+                conn, _ = server.accept()
             except socket.timeout:
                 continue
             except OSError:
@@ -183,7 +186,7 @@ class SignedInputSocket:
                     except OSError:
                         pass
 
-    def stop(self):
+    def stop(self) -> None:
         self.verifier.request_shutdown()
         self._stop.set()
         if self._sock is not None:
