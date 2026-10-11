@@ -129,3 +129,43 @@ def test_fsync_failure_fences_writer_and_preserves_acknowledged_state(tmp_path, 
         assert recovered.get("stable") == 1
         assert recovered.get("pending") in (None, 2)
         assert recovered.last_commit.sequence in (1, 2)
+
+
+def test_oversized_unterminated_frame_rejected_without_truncation(tmp_path):
+    from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+
+    path = tmp_path / "oversized.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", 1)
+        assert store.commit() == 1
+    with path.open("ab") as stream:
+        stream.write(b"x" * (MAX_JOURNAL_FRAME_BYTES + 1))
+    before = path.stat().st_size
+    with pytest.raises(StoreError, match="journal frame exceeds size limit"):
+        MemoryStore(path)
+    assert path.stat().st_size == before
+
+
+def test_oversized_commit_rejected_without_publishing(tmp_path):
+    from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+
+    path = tmp_path / "oversized-write.memory"
+    with MemoryStore(path) as store:
+        store.set("large", "x" * MAX_JOURNAL_FRAME_BYTES)
+        with pytest.raises(StoreError, match="journal frame exceeds size limit"):
+            store.commit()
+        assert store.last_commit.sequence == 0
+        assert not path.exists()
+
+
+def test_corrupt_complete_frame_fails_closed(tmp_path):
+    path = tmp_path / "corrupt.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", "committed")
+        assert store.commit() == 1
+    with path.open("ab") as stream:
+        stream.write(b'{"payload": {}, "digest": "bad"}\n')
+    original = path.read_bytes()
+    with pytest.raises(StoreError, match="corrupt committed journal"):
+        MemoryStore(path)
+    assert path.read_bytes() == original
