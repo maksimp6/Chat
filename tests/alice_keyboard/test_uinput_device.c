@@ -75,4 +75,23 @@ static void partial_write(void){
     assert(!alice_uinput_destroy(&d,&o));
     puts("reject-partial-event-write: PASS");
 }
-int main(void){lifecycle();failed_create();double_destroy();unsafe_direct_events();partial_write();return 0;}
+static void failed_key_release_destroys_mock_device(void){
+    mock m={0};alice_uinput_device d={0};alice_uinput_ops o=ops(&m);
+    assert(!alice_uinput_create(&d,&o));
+    alice_uinput_emitter e={&d,&o};alice_keyboard k;
+    assert(!alice_keyboard_init(&k,&e,alice_uinput_emit_bound,now));
+    alice_keyboard_set_destroy(&k,alice_uinput_destroy_bound);
+    assert(!alice_keyboard_down(&k,KEY_A));
+    /* Emulate a short write on KEY_UP while a key is physically held.
+     * The driver must invoke UI_DEV_DESTROY and close, not claim success. */
+    m.partial_write=1;
+    assert(alice_keyboard_up(&k,KEY_A)==-EIO);
+    assert(k.faulted && k.destroyed && k.held_count==0);
+    assert(m.destroys==1 && m.closes==1);
+    assert(d.fd==-1 && !d.owned && !d.created);
+    assert(alice_keyboard_down(&k,KEY_B)==-EIO);
+    assert(!alice_uinput_destroy(&d,&o));
+    assert(m.destroys==1 && m.closes==1);
+    puts("failed-key-release-destroys-mock-device: PASS");
+}
+int main(void){lifecycle();failed_create();double_destroy();unsafe_direct_events();partial_write();failed_key_release_destroys_mock_device();return 0;}
