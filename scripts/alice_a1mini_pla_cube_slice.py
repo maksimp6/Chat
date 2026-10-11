@@ -18,7 +18,10 @@ import sys
 import zipfile
 from pathlib import Path
 
-from alice_a1mini_preview import embed_preview
+if __package__:
+    from .alice_a1mini_preview import embed_preview
+else:
+    from alice_a1mini_preview import embed_preview
 
 NOZZLE_C = 220
 BED_C = 60
