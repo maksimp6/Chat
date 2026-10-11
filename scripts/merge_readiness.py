@@ -15,6 +15,7 @@ _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
 _CHECK_CONCLUSIONS = {
     "Platform changes": {"success"},
     "CI required": {"success"},
+    "Fast isolated contracts (2s)": {"success"},
 }
 
 
