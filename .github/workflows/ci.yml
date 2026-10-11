@@ -88,6 +88,16 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.14"
+      - name: Load immutable Memory DB policy (pinned commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: a04d587b47e32722cc61914d2ccca0261215dfc2
+          path: .trusted-memory-policy
+          sparse-checkout: scripts/check_memory_contract_integrity.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Verify frozen tests and preserved FileMemoryDB
+        run: python .trusted-memory-policy/scripts/check_memory_contract_integrity.py --root .
       - name: Verify isolated contracts (no third-party dependencies)
         run: python scripts/run_fast_contracts.py
 
