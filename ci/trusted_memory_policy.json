@@ -1,0 +1,48 @@
+{
+  "policy_version": 1,
+  "repository": "maksimp6/Chat",
+  "status_context": "Alice / Trusted Memory Contracts",
+  "protected_base_branches": ["master", "develop"],
+  "approved_ci_git_blob_sha": "e69158566e9dbd4f6c92834e3aaee3c9c760d637",
+  "pinned_from_pr": 1106,
+  "pinned_from_sha": "a82916624704cf65455d15d73df12faa98509db3",
+  "always_required": ["agent_memory/file_memory_db.py", "tests/__init__.py"],
+  "core_marker": "memory_engine/store.py",
+  "core_contracts": [
+    "tests/test_memory_explicit_commit_contract.py",
+    "tests/test_memory_v1_acceptance.py",
+    "tests/test_memory_store.py",
+    "tests/test_memory_standalone_boundary.py"
+  ],
+  "fast_markers": [
+    "tests/test_ci_fast_contracts.py",
+    "tests/test_memory_fast_core_contracts.py",
+    "scripts/run_fast_contracts.py"
+  ],
+  "forbidden_paths": ["scripts/__init__.py", "sitecustomize.py", "usercustomize.py"],
+  "trusted_control_paths": [
+    ".github/workflows/trusted-memory-admission.yml",
+    ".github/workflows/trusted-memory-selftest.yml",
+    "ci/trusted_memory_admission.py",
+    "ci/trusted_memory_policy.json",
+    "tests/test_ci_trusted_memory_admission.py"
+  ],
+  "pinned_sha256": {
+    "agent_memory/file_memory_db.py": "5d5ee883db178f236bf0486fe5b488a3934af05a117c06138d69c2f4063d00f9",
+    "tests/test_memory_explicit_commit_contract.py": "a8de71edaa01dbe7c4b2615818fc7f7fe8c92a699776c6db1a3158b29c4ac56c",
+    "tests/test_memory_v1_acceptance.py": "31b402e1c65e4a313df0d1c695fe6846ead855cbfc964f79d275fc7edd6e71b9",
+    "tests/test_memory_store.py": "37b6869a108fd028dca17af40a759e0212c78d2afd3da74c0934e16ab6313c37",
+    "tests/test_memory_standalone_boundary.py": "1083807db4fb6ec0d0a1fe7dc4ded4279b03574b4e91e91502c3951af5d03522",
+    "tests/test_ci_fast_contracts.py": "c14e53f452c9532a8c5ff6390c0347fb3f0b5fb4e520f29c18ad8c8a9f031ca3",
+    "tests/test_memory_fast_core_contracts.py": "6144f7d2d104ef93c2908335e991b7edcde5bf9c85c0b40f21aec9a3b1e1c3eb",
+    "scripts/run_fast_contracts.py": "5cdb4b2ff663b2982ceffcb843dfb914f2376c3e252a7f1c7a151c786364e389",
+    "scripts/check_memory_fast_budget.py": "d7a678dd35889a87dd5bb852f2e097bc0e524f6147d409960b47ecfc9a840d9a",
+    "scripts/run_fast_contracts_trusted.py": "d536d6fcf65406e57f4584bacd8edb67fc76f30074d7d1a45926caa60436a395",
+    "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests/test_ci_memory_trusted_runner.py": "7c8dcbdc05e36704f43ab2e521e379a5c2c6d051f3a14020bf7925d1507bda44",
+    "tests/test_ci_develop_workflows.py": "0c56f55f87111f83d14e5e602b03dfb5117d4ce4d0988cc23556e7d16402d4e5",
+    "tests/test_ci_platform_changes.py": "b5c46dd508ca3277d79e7fdff07919d1b74875522b908867a4e4b12aa",
+    "tests/test_merge_readiness.py": "f9e1e71b90945922a04cdaf9f9fca51e5c2efcb031d8e646d5f35e69d6861302",
+    "tests/test_ci_memory_contract_integrity.py": "43dd5ac0875fa027410f60627e6ac0bcd8644399a6ce14388da1819b2cb3f193"
+  }
+}
