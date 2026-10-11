@@ -100,7 +100,7 @@ def test_anthropic_key_is_scoped_and_action_output_is_not_dumped():
 def test_haiku_backend_is_not_a_ci_or_merge_readiness_requirement():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8").lower()
     readiness = (
-        ROOT / ".github" / "workflows" / "merge-readiness.yml"
-    ).read_text(encoding="utf-8").lower()
+        (ROOT / ".github" / "workflows" / "merge-readiness.yml").read_text(encoding="utf-8").lower()
+    )
     assert "haiku" not in ci
     assert "haiku" not in readiness
