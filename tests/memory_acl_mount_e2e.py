@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import pwd
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -76,7 +77,7 @@ def main() -> None:
         shell = (
             "mount --bind " + str(private) + " " + str(mounted) + " && "
             "runuser -u " + owner.pw_name + " -- " + sys.executable + " -c "
-            + subprocess.list2cmdline([owner_probe]) + " "
+            + shlex.quote(owner_probe) + " "
             + str(mounted / "new.memory") + " " + str(root)
         )
         probe = command(
