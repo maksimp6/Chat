@@ -19,7 +19,7 @@ FROZEN_SHA256: dict[str, str] = {
     "tests/test_memory_standalone_boundary.py": "1083807db4fb6ec0d0a1fe7dc4ded4279b03574b4e91e91502c3951af5d03522",
     "tests/test_ci_fast_contracts.py": "c14e53f452c9532a8c5ff6390c0347fb3f0b5fb4e520f29c18ad8c8a9f031ca3",
     "tests/test_memory_fast_core_contracts.py": "1a2075ea7700788224e7cbd250be373d98e48f3c2d385b96ddef0ec50d264d64",
-    "scripts/run_fast_contracts.py": "512cd929f0e423c2d20a497a3b80b380d4b45c725877bf7c3c8ed05fc8032f02"
+    "scripts/run_fast_contracts.py": "5cdb4b2ff663b2982ceffcb843dfb914f2376c3e252a7f1c7a151c786364e389"
 }
 
 
