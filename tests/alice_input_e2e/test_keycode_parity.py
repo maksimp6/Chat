@@ -3,6 +3,7 @@
 Requires Security #1090 and Keyboard #1091 to be integrated in this checkout.
 No Android device, root permissions, or actual input events are used.
 """
+
 from __future__ import annotations
 
 import os
@@ -33,21 +34,38 @@ def test_signed_verifier_and_c_keyboard_have_identical_keycode_policy():
         executable = Path(directory) / "keycodes"
         probe.write_text(
             '#include "keyboard.h"\n'
-            '#include <stdio.h>\n'
-            'int main(void){for(int k=0;k<=KEY_MAX;k++)'
-            'if(alice_keyboard_allowed((unsigned short)k))'
+            "#include <stdio.h>\n"
+            "int main(void){for(int k=0;k<=KEY_MAX;k++)"
+            "if(alice_keyboard_allowed((unsigned short)k))"
             'printf("%d\\n",k);return 0;}\n',
             encoding="utf-8",
         )
         subprocess.run(
-            [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-             "-pthread", "-I", str(HEADER.parent),
-             str(DRIVER), str(probe), "-o", str(executable)],
-            check=True, capture_output=True, text=True, timeout=30,
+            [
+                compiler,
+                "-std=c11",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-pthread",
+                "-I",
+                str(HEADER.parent),
+                str(DRIVER),
+                str(probe),
+                "-o",
+                str(executable),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         result = subprocess.run(
-            [str(executable)], check=True, capture_output=True,
-            text=True, timeout=10,
+            [str(executable)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         physical = {int(value) for value in result.stdout.splitlines()}
 

@@ -2,6 +2,7 @@
 
 No root, uinput or Android event injection. Requires Keyboard #1091.
 """
+
 import ctypes
 import shutil
 import subprocess
@@ -10,19 +11,20 @@ import threading
 import time
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[2]
-DRIVER=ROOT/'alice_mouse/drivers/keyboard/keyboard.c'
-HEADER=DRIVER.with_name('keyboard.h')
+ROOT = Path(__file__).resolve().parents[2]
+DRIVER = ROOT / "alice_mouse/drivers/keyboard/keyboard.c"
+HEADER = DRIVER.with_name("keyboard.h")
 
 
 def test_c_runner_releases_key_after_client_stall():
-    assert DRIVER.is_file() and HEADER.is_file(), 'Keyboard #1091 must be integrated'
-    cc=shutil.which('clang') or shutil.which('cc')
+    assert DRIVER.is_file() and HEADER.is_file(), "Keyboard #1091 must be integrated"
+    cc = shutil.which("clang") or shutil.which("cc")
     assert cc
-    with tempfile.TemporaryDirectory(prefix='alice-watchdog-') as tmp:
-        source=Path(tmp)/'harness.c'
-        executable=Path(tmp)/'harness'
-        source.write_text(r'''
+    with tempfile.TemporaryDirectory(prefix="alice-watchdog-") as tmp:
+        source = Path(tmp) / "harness.c"
+        executable = Path(tmp) / "harness"
+        source.write_text(
+            r"""
 #include "keyboard.h"
 #include <stdio.h>
 #include <time.h>
@@ -54,10 +56,30 @@ int main(void){
  puts("C_WATCHDOG_KEY_UP_PASS");
  return 0;
 }
-''',encoding='utf-8')
-        subprocess.run([cc,'-std=gnu11','-pthread','-Wall','-Wextra','-Werror',
-            '-I',str(HEADER.parent),str(DRIVER),str(source),'-o',str(executable)],
-            check=True,capture_output=True,text=True,timeout=30)
-        result=subprocess.run([str(executable)],capture_output=True,text=True,
-            timeout=6,check=True)
-        assert result.stdout.strip()=='C_WATCHDOG_KEY_UP_PASS'
+""",
+            encoding="utf-8",
+        )
+        subprocess.run(
+            [
+                cc,
+                "-std=gnu11",
+                "-pthread",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-I",
+                str(HEADER.parent),
+                str(DRIVER),
+                str(source),
+                "-o",
+                str(executable),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        result = subprocess.run(
+            [str(executable)], capture_output=True, text=True, timeout=6, check=True
+        )
+        assert result.stdout.strip() == "C_WATCHDOG_KEY_UP_PASS"

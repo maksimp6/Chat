@@ -3,21 +3,22 @@
 No /dev/uinput is opened, no root privileges, no Android event injection.
 Requires Keyboard #1091 in the combined checkout.
 """
+
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 
-ROOT=Path(__file__).resolve().parents[2]
-DRIVER=ROOT/'alice_mouse/drivers/keyboard'
+ROOT = Path(__file__).resolve().parents[2]
+DRIVER = ROOT / "alice_mouse/drivers/keyboard"
 
 
 def test_uinput_destroy_and_partial_write_fallback():
-    required=['keyboard.c','keyboard.h','uinput_device.c','uinput_device.h']
-    assert all((DRIVER/name).is_file() for name in required), 'Keyboard #1091 not integrated'
-    cc=shutil.which('clang') or shutil.which('cc')
+    required = ["keyboard.c", "keyboard.h", "uinput_device.c", "uinput_device.h"]
+    assert all((DRIVER / name).is_file() for name in required), "Keyboard #1091 not integrated"
+    cc = shutil.which("clang") or shutil.which("cc")
     assert cc
-    source=r'''
+    source = r"""
 #include "uinput_device.h"
 #include <assert.h>
 #include <errno.h>
@@ -69,15 +70,31 @@ int main(void){
     puts("MOCKED_UINPUT_TEARDOWN_PASS");
     return 0;
 }
-'''
-    with tempfile.TemporaryDirectory(prefix='alice-uinput-teardown-') as tmp:
-        code=Path(tmp)/'teardown.c'
-        exe=Path(tmp)/'teardown'
-        code.write_text(source,encoding='utf-8')
-        subprocess.run([cc,'-std=gnu11','-pthread','-Wall','-Wextra','-Werror',
-            '-I',str(DRIVER),str(DRIVER/'keyboard.c'),
-            str(DRIVER/'uinput_device.c'),str(code),'-o',str(exe)],
-            check=True,capture_output=True,text=True,timeout=30)
-        result=subprocess.run([str(exe)],capture_output=True,text=True,
-            timeout=10,check=True)
-        assert result.stdout.strip()=='MOCKED_UINPUT_TEARDOWN_PASS'
+"""
+    with tempfile.TemporaryDirectory(prefix="alice-uinput-teardown-") as tmp:
+        code = Path(tmp) / "teardown.c"
+        exe = Path(tmp) / "teardown"
+        code.write_text(source, encoding="utf-8")
+        subprocess.run(
+            [
+                cc,
+                "-std=gnu11",
+                "-pthread",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-I",
+                str(DRIVER),
+                str(DRIVER / "keyboard.c"),
+                str(DRIVER / "uinput_device.c"),
+                str(code),
+                "-o",
+                str(exe),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10, check=True)
+        assert result.stdout.strip() == "MOCKED_UINPUT_TEARDOWN_PASS"
