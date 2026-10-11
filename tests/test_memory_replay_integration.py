@@ -539,7 +539,7 @@ def test_trusted_root_rejects_unsafe_directory_modes(
     root.mkdir(mode=0o700)
     root.chmod(directory_mode)
     monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
-    with pytest.raises(StoreError, match="untrusted Memory DB directory"):
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
         MemoryStore(root / "journal.memory")
 
 
