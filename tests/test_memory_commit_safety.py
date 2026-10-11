@@ -268,13 +268,19 @@ def test_invalid_utf8_value_never_reaches_journal(tmp_path):
 
 @pytest.mark.parametrize("failure", ["short", "readonly"])
 def test_write_fault_never_acknowledges_or_publishes(tmp_path, monkeypatch, failure):
-    from pathlib import Path
+    import memory_engine.store as engine
 
     path = tmp_path / "state.memory"
     with MemoryStore(path) as store:
         store.set("stable", 1)
         store.commit()
-        original_open = Path.open
+        original_open = engine._open_journal_nofollow
+        original_fdopen = os.fdopen
+
+        def faulty_open(directory_fd, name, flags):
+            if name == path.name and flags & os.O_APPEND and failure == "readonly":
+                raise OSError(errno.EROFS, "read only")
+            return original_open(directory_fd, name, flags)
 
         class ShortStream:
             def __enter__(self):
@@ -286,14 +292,14 @@ def test_write_fault_never_acknowledges_or_publishes(tmp_path, monkeypatch, fail
             def write(self, data):
                 return 0
 
-        def faulty_open(target, mode="r", *args, **kwargs):
-            if target == path and mode == "ab":
-                if failure == "short":
-                    return ShortStream()
-                raise OSError(errno.EROFS, "read only")
-            return original_open(target, mode, *args, **kwargs)
+        def faulty_fdopen(fd, mode="r", *args, **kwargs):
+            if failure == "short" and mode == "ab":
+                os.close(fd)
+                return ShortStream()
+            return original_fdopen(fd, mode, *args, **kwargs)
 
-        monkeypatch.setattr(Path, "open", faulty_open)
+        monkeypatch.setattr(engine, "_open_journal_nofollow", faulty_open)
+        monkeypatch.setattr(os, "fdopen", faulty_fdopen)
         with pytest.raises(StoreError, match="commit failed"):
             with store.transaction() as tx:
                 tx.set("new", 2)
