@@ -1,145 +1,173 @@
+import zipfile
+
 """All inventoried 3D models require a passport and fail-closed G-code checks."""
+
 import importlib.util
 import json
 from pathlib import Path
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / 'printing3d/assets'
-SPEC = importlib.util.spec_from_file_location('gcode_audit', ROOT / 'printing3d/gcode_audit.py')
+ASSETS = ROOT / "printing3d/assets"
+SPEC = importlib.util.spec_from_file_location("gcode_audit", ROOT / "printing3d/gcode_audit.py")
 AUDIT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(AUDIT)
 
 
 def passports():
-    return {p.stem: json.loads(p.read_text()) for p in (ASSETS / 'passports').glob('*.json')}
+    return {p.stem: json.loads(p.read_text()) for p in (ASSETS / "passports").glob("*.json")}
 
 
 def test_every_model_has_exactly_one_passport():
-    inventory = json.loads((ASSETS / 'models_manifest.json').read_text())['models']
+    inventory = json.loads((ASSETS / "models_manifest.json").read_text())["models"]
     ps = passports()
-    assert set(ps) == {model['id'] for model in inventory}
+    assert set(ps) == {model["id"] for model in inventory}
     for model in inventory:
-        passport = ps[model['id']]
-        assert passport['id'] == model['id']
-        assert passport['source_sha256'] == model['source_archive_sha256']
-        assert passport['parts'] == model['quantity']
-        assert passport['gcode_status'] == 'not_built'
-        assert AUDIT.audit_passport(passport)['status'] == 'SOURCE_ONLY_NOT_PRINT_READY'
-        assert passport['firmware_open_verified'] is False
-        assert passport['physical_fit_verified'] is False
+        passport = ps[model["id"]]
+        assert passport["id"] == model["id"]
+        assert passport["source_sha256"] == model["source_archive_sha256"]
+        assert passport["parts"] == model["quantity"]
+        assert passport["gcode_status"] == "not_built"
+        assert AUDIT.audit_passport(passport)["status"] == "SOURCE_ONLY_NOT_PRINT_READY"
+        assert passport["firmware_open_verified"] is False
+        assert passport["physical_fit_verified"] is False
 
 
 def test_missing_source_provenance_rejected():
     p = next(iter(passports().values())).copy()
-    p['source_sha256'] = ''
-    with pytest.raises(ValueError, match='provenance'):
+    p["source_sha256"] = ""
+    with pytest.raises(ValueError, match="provenance"):
         AUDIT.audit_passport(p)
 
 
 def test_fake_fit_verification_rejected():
     p = next(iter(passports().values())).copy()
-    p['fit_status'] = 'verified'
-    with pytest.raises(ValueError, match='evidence'):
+    p["fit_status"] = "verified"
+    with pytest.raises(ValueError, match="evidence"):
         AUDIT.audit_passport(p)
 
 
 def test_source_only_3mf_rejected_as_print_job(tmp_path):
     p = next(iter(passports().values()))
-    source = tmp_path / 'model.3mf'
-    source.write_bytes(b'not sliced')
-    with pytest.raises(ValueError, match='sliced'):
+    source = tmp_path / "model.3mf"
+    source.write_bytes(b"not sliced")
+    with pytest.raises(ValueError, match="sliced"):
         AUDIT.audit_passport(p, source)
 
 
 def test_corrupt_sliced_archive_rejected(tmp_path):
     p = next(iter(passports().values()))
-    source = tmp_path / 'model.gcode.3mf'
-    source.write_bytes(b'not a zip')
-    with pytest.raises(Exception):
+    source = tmp_path / "model.gcode.3mf"
+    source.write_bytes(b"not a zip")
+    with pytest.raises(zipfile.BadZipFile):
         AUDIT.audit_passport(p, source)
 
 
 def test_all_passports_bound_to_specific_device():
     for passport in passports().values():
-        target = passport['target_printer']
-        assert target['host'] == '192.168.31.12'
-        assert target['model'] == 'Bambu Lab A1 mini'
-        assert target['printer_start_authorized'] is False
-        assert target['touchscreen_open_verified'] is False
-        assert target['firmware_compatibility_verified'] is False
+        target = passport["target_printer"]
+        assert target["host"] == "192.168.31.12"
+        assert target["model"] == "Bambu Lab A1 mini"
+        assert target["printer_start_authorized"] is False
+        assert target["touchscreen_open_verified"] is False
+        assert target["firmware_compatibility_verified"] is False
 
 
 def test_specific_device_rejects_unknown_firmware():
     passport = next(iter(passports().values()))
-    observed = dict(host='192.168.31.12', model='Bambu Lab A1 mini',
-                    authenticated_mqtt=True, ftps_certificate_pin_verified=True,
-                    serial_match_verified=True, firmware_version=None)
-    with pytest.raises(ValueError, match='firmware'):
+    observed = {
+        "host": "192.168.31.12",
+        "model": "Bambu Lab A1 mini",
+        "authenticated_mqtt": True,
+        "ftps_certificate_pin_verified": True,
+        "serial_match_verified": True,
+        "firmware_version": None,
+    }
+    with pytest.raises(ValueError, match="firmware"):
         AUDIT.verify_target_printer(passport, observed)
 
 
 def test_specific_device_rejects_wrong_host_and_serial():
     passport = next(iter(passports().values()))
-    observed = dict(host='192.168.31.99', model='Bambu Lab A1 mini',
-                    authenticated_mqtt=True, ftps_certificate_pin_verified=True,
-                    serial_match_verified=False)
-    with pytest.raises(ValueError, match='wrong physical printer'):
+    observed = {
+        "host": "192.168.31.99",
+        "model": "Bambu Lab A1 mini",
+        "authenticated_mqtt": True,
+        "ftps_certificate_pin_verified": True,
+        "serial_match_verified": False,
+    }
+    with pytest.raises(ValueError, match="wrong physical printer"):
         AUDIT.verify_target_printer(passport, observed)
-    observed['host'] = '192.168.31.12'
-    with pytest.raises(ValueError, match='serial'):
+    observed["host"] = "192.168.31.12"
+    with pytest.raises(ValueError, match="serial"):
         AUDIT.verify_target_printer(passport, observed)
 
 
 def test_specific_device_rejects_unopened_or_wrong_job():
     passport = next(iter(passports().values()))
-    observed = dict(host='192.168.31.12', model='Bambu Lab A1 mini',
-                    authenticated_mqtt=True, ftps_certificate_pin_verified=True,
-                    serial_match_verified=True, firmware_version='observed-test-version',
-                    firmware_compatibility_verified=True,
-                    printer_file_readback_verified=True, printer_file_sha256='a' * 64,
-                    touchscreen_open_verified=False)
-    with pytest.raises(ValueError, match='readback'):
-        AUDIT.verify_target_printer(passport, observed, 'b' * 64)
-    with pytest.raises(ValueError, match='opened'):
-        AUDIT.verify_target_printer(passport, observed, 'a' * 64)
-    observed['touchscreen_open_verified'] = True
-    assert AUDIT.verify_target_printer(passport, observed, 'a' * 64)['print_start_authorized'] is False
+    observed = {
+        "host": "192.168.31.12",
+        "model": "Bambu Lab A1 mini",
+        "authenticated_mqtt": True,
+        "ftps_certificate_pin_verified": True,
+        "serial_match_verified": True,
+        "firmware_version": "observed-test-version",
+        "firmware_compatibility_verified": True,
+        "printer_file_readback_verified": True,
+        "printer_file_sha256": "a" * 64,
+        "touchscreen_open_verified": False,
+    }
+    with pytest.raises(ValueError, match="readback"):
+        AUDIT.verify_target_printer(passport, observed, "b" * 64)
+    with pytest.raises(ValueError, match="opened"):
+        AUDIT.verify_target_printer(passport, observed, "a" * 64)
+    observed["touchscreen_open_verified"] = True
+    assert (
+        AUDIT.verify_target_printer(passport, observed, "a" * 64)["print_start_authorized"] is False
+    )
 
 
 def _preflight_module():
-    spec = importlib.util.spec_from_file_location('model_preflight', ROOT / 'printing3d/model_preflight.py')
+    spec = importlib.util.spec_from_file_location(
+        "model_preflight", ROOT / "printing3d/model_preflight.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
 def test_every_source_stl_passes_actual_mesh_preflight():
-    manifest = json.loads((ASSETS / 'models_manifest.json').read_text())
+    manifest = json.loads((ASSETS / "models_manifest.json").read_text())
     results = _preflight_module().verify_inventory_sources(manifest, ROOT)
     assert {name: len(parts) for name, parts in results.items()} == {
-        'oem_spindle_v03': 8, 'desk_spool_v01': 3, 'desk_spool_v02': 3}
+        "oem_spindle_v03": 8,
+        "desk_spool_v01": 3,
+        "desk_spool_v02": 3,
+    }
 
 
 def test_upload_rejected_without_firmware_acceptance():
-    passport = passports()['oem_spindle_v03']
-    evidence = [{'topology': 'closed_edge_manifold'}]
-    gcode = {'status': 'GCODE_VERIFIED_FIT_BLOCKED'}
-    with pytest.raises(ValueError, match='firmware acceptance'):
+    passport = passports()["oem_spindle_v03"]
+    evidence = [{"topology": "closed_edge_manifold"}]
+    gcode = {"status": "GCODE_VERIFIED_FIT_BLOCKED"}
+    with pytest.raises(ValueError, match="firmware acceptance"):
         _preflight_module().require_upload_preflight(passport, evidence, gcode)
 
 
 def test_upload_rejected_without_model_or_gcode_evidence():
-    passport = passports()['oem_spindle_v03']
+    passport = passports()["oem_spindle_v03"]
     preflight = _preflight_module().require_upload_preflight
-    with pytest.raises(ValueError, match='source and sliced'):
-        preflight(passport, [], {'status': 'GCODE_STATIC_VERIFIED'})
-    with pytest.raises(ValueError, match='source and sliced'):
-        preflight(passport, [{'topology': 'closed_edge_manifold'}], None)
+    with pytest.raises(ValueError, match="source and sliced"):
+        preflight(passport, [], {"status": "GCODE_STATIC_VERIFIED"})
+    with pytest.raises(ValueError, match="source and sliced"):
+        preflight(passport, [{"topology": "closed_edge_manifold"}], None)
 
 
 def _quality_module():
-    spec = importlib.util.spec_from_file_location('quality_capability', ROOT / 'printing3d/quality_capability.py')
+    spec = importlib.util.spec_from_file_location(
+        "quality_capability", ROOT / "printing3d/quality_capability.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -147,32 +175,36 @@ def _quality_module():
 
 def test_all_models_have_functional_quality_requirements():
     for passport in passports().values():
-        assert passport['intended_function']
-        assert passport['quality_requirements']
-        assert passport['quality_requirements_approved'] is False
-        assert _quality_module().assess_quality(passport, {})['status'] == 'UNKNOWN'
+        assert passport["intended_function"]
+        assert passport["quality_requirements"]
+        assert passport["quality_requirements_approved"] is False
+        assert _quality_module().assess_quality(passport, {})["status"] == "UNKNOWN"
 
 
 def test_unknown_printer_quality_cannot_pass():
-    passport = passports()['oem_spindle_v03'].copy()
-    passport['quality_requirements_approved'] = True
+    passport = passports()["oem_spindle_v03"].copy()
+    passport["quality_requirements_approved"] = True
     result = _quality_module().assess_quality(passport, {})
-    assert result['status'] == 'UNKNOWN'
-    assert result['print_quality_approved'] is False
+    assert result["status"] == "UNKNOWN"
+    assert result["print_quality_approved"] is False
 
 
 def test_mismatched_material_and_failed_measurement():
-    passport = passports()['desk_spool_v02'].copy()
-    passport['quality_requirements_approved'] = True
-    passport['process_profile_id'] = 'PETG_0.2'
+    passport = passports()["desk_spool_v02"].copy()
+    passport["quality_requirements_approved"] = True
+    passport["process_profile_id"] = "PETG_0.2"
     quality = _quality_module()
     measurements = {}
-    for r in passport['quality_requirements']:
-        measurements[r['metric']] = dict(value=0.1, evidence_id='test-only',
-                                         printer_id=passport['target_printer']['device_id'],
-                                         material='PLA', profile_id='PETG_0.2')
-    assert quality.assess_quality(passport, measurements)['status'] == 'UNKNOWN'
+    for r in passport["quality_requirements"]:
+        measurements[r["metric"]] = {
+            "value": 0.1,
+            "evidence_id": "test-only",
+            "printer_id": passport["target_printer"]["device_id"],
+            "material": "PLA",
+            "profile_id": "PETG_0.2",
+        }
+    assert quality.assess_quality(passport, measurements)["status"] == "UNKNOWN"
     for r in measurements.values():
-        r['material'] = 'PETG'
-        r['value'] = 100
-    assert quality.assess_quality(passport, measurements)['status'] == 'FAIL'
+        r["material"] = "PETG"
+        r["value"] = 100
+    assert quality.assess_quality(passport, measurements)["status"] == "FAIL"
