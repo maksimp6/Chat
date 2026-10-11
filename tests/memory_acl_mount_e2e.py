@@ -23,7 +23,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="memory-boundary-") as tmp:
         root = Path(tmp)
         root.chmod(0o755)
-        shutil.copytree(Path(__file__).resolve().parents[1] / "memory_engine", root / "memory_engine")
+        shutil.copytree(
+            Path(__file__).resolve().parents[1] / "memory_engine", root / "memory_engine"
+        )
         for entry in (root / "memory_engine").rglob("*"):
             entry.chmod(0o755 if entry.is_dir() else 0o644)
         (root / "memory_engine").chmod(0o755)
@@ -63,10 +65,20 @@ def main() -> None:
         assert attack.returncode == 0, attack.stderr
         print("ACL_ATTACK_REPRODUCED")
         denied = command(
-            "runuser", "-u", owner.pw_name, "--", sys.executable, "-c",
-            owner_probe, str(private / "new.memory"), str(root), check=False,
+            "runuser",
+            "-u",
+            owner.pw_name,
+            "--",
+            sys.executable,
+            "-c",
+            owner_probe,
+            str(private / "new.memory"),
+            str(root),
+            check=False,
         )
-        assert denied.returncode != 0 and "unsafe journal or lock path" in denied.stderr, denied.stderr
+        assert denied.returncode != 0 and "unsafe journal or lock path" in denied.stderr, (
+            denied.stderr
+        )
         print("ACL_GRANT_REJECTED_BY_MEMORY_DB")
         command("setfacl", "-b", str(private))
         private.chmod(0o700)
@@ -76,13 +88,26 @@ def main() -> None:
         mounted.mkdir()
         shell = (
             "mount --bind " + str(private) + " " + str(mounted) + " && "
-            "runuser -u " + owner.pw_name + " -- " + sys.executable + " -c "
-            + shlex.quote(owner_probe) + " "
-            + str(mounted / "new.memory") + " " + str(root)
+            "runuser -u "
+            + owner.pw_name
+            + " -- "
+            + sys.executable
+            + " -c "
+            + shlex.quote(owner_probe)
+            + " "
+            + str(mounted / "new.memory")
+            + " "
+            + str(root)
         )
         probe = command(
-            "unshare", "--mount", "--propagation", "private", "sh", "-c",
-            shell, check=False,
+            "unshare",
+            "--mount",
+            "--propagation",
+            "private",
+            "sh",
+            "-c",
+            shell,
+            check=False,
         )
         if "Operation not permitted" in probe.stderr and "mount" in probe.stderr:
             print("MOUNT_E2E_SKIPPED_NO_CAP_SYS_ADMIN")
