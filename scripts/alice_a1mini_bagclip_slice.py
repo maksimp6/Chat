@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+import struct
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -87,6 +88,65 @@ def validate_source(path: Path) -> str:
     return digest
 
 
+
+def merge_plate_stl(source: Path, destination: Path) -> int:
+    """Convert the exact pin-checked source 3MF into one three-island binary STL.
+
+    Bambu Studio CLI consumes STL reliably; plain Core-3MF without Bambu
+    project metadata was found to produce empty result.json objects.
+    Keep transforms and every original triangle, without decimation.
+    """
+    with zipfile.ZipFile(source) as archive:
+        root = ET.fromstring(archive.read("3D/3dmodel.model"))
+    obj_meshes = {}
+    for obj in root.findall(f".//{NS}resources/{NS}object"):
+        mesh = obj.find(f"{NS}mesh")
+        if mesh is None:
+            raise RuntimeError("missing geometry")
+        pts = [
+            tuple(float(v.get(axis, "nan")) for axis in ("x", "y", "z"))
+            for v in mesh.findall(f"{NS}vertices/{NS}vertex")
+        ]
+        triangles = [
+            tuple(int(t.attrib[key]) for key in ("v1", "v2", "v3"))
+            for t in mesh.findall(f"{NS}triangles/{NS}triangle")
+        ]
+        obj_meshes[obj.attrib["id"]] = (pts, triangles)
+    raw = bytearray(b"Alice bag clip PR1113: three separated parts".ljust(80, b" "))
+    raw.extend(struct.pack("<I", sum(len(v[1]) for v in obj_meshes.values())))
+    total = 0
+    for item in root.findall(f".//{NS}build/{NS}item"):
+        coords, tris = obj_meshes[item.attrib["objectid"]]
+        matrix = [float(x) for x in item.attrib["transform"].split()]
+        shift = (matrix[9], matrix[10], matrix[11])
+        for face in tris:
+            try:
+                a, b, c = [
+                    tuple(coords[n][i] + shift[i] for i in range(3))
+                    for n in face
+                ]
+            except IndexError as exc:
+                raise RuntimeError("source 3MF has invalid triangle indices") from exc
+            u = [b[i] - a[i] for i in range(3)]
+            v = [c[i] - a[i] for i in range(3)]
+            normal = (
+                u[1] * v[2] - u[2] * v[1],
+                u[2] * v[0] - u[0] * v[2],
+                u[0] * v[1] - u[1] * v[0],
+            )
+            length = math.sqrt(sum(value * value for value in normal))
+            if length <= 1e-9:
+                raise RuntimeError("source 3MF contains a degenerate triangle")
+            normal = tuple(value / length for value in normal)
+            raw.extend(struct.pack("<12fH", *(normal + a + b + c), 0))
+            total += 1
+    if total != sum(EXPECTED_TRIANGLES) or len(raw) != 84 + total * 50:
+        raise RuntimeError("merged STL has missing or extra faces")
+    destination.write_bytes(raw)
+    print("THREE_ISLAND_STL", total, hashlib.sha256(raw).hexdigest(), flush=True)
+    return total
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-3mf", type=Path, required=True)
@@ -105,6 +165,8 @@ def main() -> int:
     proc = json.loads(process.read_text(encoding="utf-8"))
     proc.update(wall_loops="4", sparse_infill_density="25%")
     process.write_text(json.dumps(proc, indent=2) + "\n", encoding="utf-8")
+    mesh_stl = out / "Alice_BagClip_PR1113_three_print_islands.stl"
+    face_count = merge_plate_stl(source, mesh_stl)
     env = dict(os.environ)
     env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
@@ -121,7 +183,7 @@ def main() -> int:
         str(filament),
         "--outputdir",
         str(out),
-        str(source),
+        str(mesh_stl),
     ]
     result = subprocess.run(
         command,
@@ -161,8 +223,11 @@ def main() -> int:
     objects = plates[0].get("objects") or []
     observed = sorted(int(o.get("triangle_count", -1)) for o in objects)
     print("BAG_CLIP_RESULT_OBJECTS", json.dumps(objects)[:5000], flush=True)
-    if observed != EXPECTED_TRIANGLES:
+    if observed != [face_count]:
         raise RuntimeError(f"sliced-result triangle counts mismatch: {observed!r}")
+    bbox = objects[0].get("bbox", {})
+    if not 15.8 <= float(bbox.get("height", 0)) <= 16.2:
+        raise RuntimeError("printed plate height differs from source")
     metadata = {
         "source_sha256": source_sha,
         "source_commit": "f6b75493921b8e9b68e207216abca22e8df6340d",
