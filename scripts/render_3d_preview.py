@@ -104,22 +104,30 @@ def _ascii_stl(data: bytes) -> list[Face]:
         decoded = data.decode("ascii")
     except UnicodeDecodeError as exc:
         raise PreviewError("invalid ASCII STL encoding") from exc
-    points: list[Vec3] = []
+    lines = [line.strip() for line in decoded.splitlines() if line.strip()]
+    if not lines or not lines[0].startswith("solid") or not lines[-1].startswith("endsolid"):
+        raise PreviewError("truncated ASCII STL solid")
     triangles: list[Face] = []
-    for line in decoded.splitlines():
-        parts = line.strip().split()
-        if not parts or parts[0] != "vertex":
-            continue
-        if len(parts) != 4:
-            raise PreviewError("invalid ASCII STL vertex")
-        points.append(_point(parts[1:]))
-        if len(points) == 3:
-            triangles.append((points[0], points[1], points[2]))
-            points.clear()
-            if len(triangles) > MAX_TRIANGLES:
-                raise PreviewError("STL exceeds triangle limit")
-    if points:
-        raise PreviewError("truncated ASCII STL face")
+    body = lines[1:-1]
+    if len(body) % 7:
+        raise PreviewError("invalid ASCII STL facet structure")
+    for offset in range(0, len(body), 7):
+        facet = body[offset : offset + 7]
+        normal = facet[0].split()
+        if len(normal) != 5 or normal[:2] != ["facet", "normal"]:
+            raise PreviewError("invalid ASCII STL facet normal")
+        _point(normal[2:])
+        if facet[1] != "outer loop" or facet[5:] != ["endloop", "endfacet"]:
+            raise PreviewError("invalid ASCII STL facet structure")
+        points = []
+        for line in facet[2:5]:
+            fields = line.split()
+            if len(fields) != 4 or fields[0] != "vertex":
+                raise PreviewError("invalid ASCII STL vertex")
+            points.append(_point(fields[1:]))
+        triangles.append(tuple(points))
+        if len(triangles) > MAX_TRIANGLES:
+            raise PreviewError("STL exceeds triangle limit")
     return triangles
 
 
@@ -175,6 +183,15 @@ def _part(archive: ZipFile, name: str, cache: dict[str, ET.Element]) -> ET.Eleme
     if not 0 < info.file_size <= MAX_MEMBER_BYTES:
         raise PreviewError("3MF XML part exceeds size limit")
     source = archive.read(info)
+    # Restrict XML to UTF-8 before checking declarations (UTF-16 can hide entities).
+    try:
+        text = source.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise PreviewError("3MF XML must be UTF-8") from exc
+    if "\x00" in text or re.search(
+        r'encoding\s*=\s*["\'](?!utf-8["\'])', text[:200], re.IGNORECASE
+    ):
+        raise PreviewError("3MF XML must be UTF-8")
     if b"<!DOCTYPE" in source.upper() or b"<!ENTITY" in source.upper():
         raise PreviewError("3MF XML entities are not supported")
     try:
@@ -194,6 +211,8 @@ def _triangles_for_mesh(mesh: ET.Element) -> list[Face]:
         raise PreviewError("3MF object lacks mesh vertices or triangles")
     if not 0 < len(vertices_node) <= MAX_VERTICES or not 0 < len(faces_node) <= MAX_TRIANGLES:
         raise PreviewError("3MF mesh exceeds vertex/triangle limits")
+    if any(node.tag != VERTEX_TAG for node in vertices_node):
+        raise PreviewError("unexpected 3MF vertex element")
     vertices = [_point((node.get("x"), node.get("y"), node.get("z"))) for node in vertices_node]
     triangles: list[Face] = []
     for node in faces_node:
@@ -223,9 +242,11 @@ def _object_faces(
     if key in parents or len(parents) > 16:
         raise PreviewError("cyclic or overly nested 3MF components")
     root = _part(archive, key[0], cache)
-    object_node = next(
-        (node for node in root.iter(OBJECT_TAG) if node.get("id") == object_id), None
-    )
+    objects = list(root.iter(OBJECT_TAG))
+    ids = [node.get("id") for node in objects]
+    if None in ids or len(set(ids)) != len(ids):
+        raise PreviewError("ambiguous 3MF object ids")
+    object_node = next((node for node in objects if node.get("id") == object_id), None)
     if object_node is None:
         raise PreviewError("missing 3MF object id")
     mesh = object_node.find(f"{{{CORE_NS}}}mesh")
@@ -260,6 +281,10 @@ def _validate_package(archive: ZipFile) -> None:
     for info in infos:
         if (
             info.flag_bits & 1
+            or "\\" in info.filename
+            or (info.external_attr >> 16) & 0o170000 == 0o120000
+            or info.compress_type not in (0, 8)
+            or info.file_size > max(1, info.compress_size) * 200
             or info.file_size > MAX_MEMBER_BYTES
             or info.filename.startswith("/")
             or ".." in PurePosixPath(info.filename).parts
@@ -301,7 +326,7 @@ def _3mf(data: bytes) -> tuple[list[Face], str]:
             cache: dict[str, ET.Element] = {}
             root = _part(archive, "3D/3dmodel.model", cache)
             return _build_faces(archive, root, cache), "mm"
-    except BadZipFile as exc:
+    except (BadZipFile, RuntimeError, NotImplementedError, EOFError) as exc:
         raise PreviewError("invalid 3MF ZIP") from exc
 
 

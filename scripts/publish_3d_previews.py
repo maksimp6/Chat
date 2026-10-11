@@ -16,11 +16,13 @@ import sys
 from pathlib import PurePosixPath
 from urllib import error, parse, request
 
-from scripts.render_3d_preview import PreviewError, load_mesh, render_preview
+from scripts.render_3d_preview import PreviewError
+from scripts.render_3d_worker import bounded_render
 
 MARKER = "<!-- alice-3d-preview:v1 -->"
 PREVIEW_BRANCH = "alice-3d-previews"
 INPUT_PREFIX = "printing3d/models/"
+INPUT_PREFIXES = (INPUT_PREFIX, "printing3d/assets/")
 OUTPUT_PREFIX = "printing3d/previews/"
 MAX_MODELS = 3
 MAX_CHANGED_FILES = 100
@@ -32,6 +34,11 @@ PATH_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 class PublishError(ValueError):
     """Cannot safely publish previews from the requested PR."""
+
+
+class NoRedirect(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise PublishError("GitHub API redirect refused")
 
 
 class Github:
@@ -60,7 +67,7 @@ class Github:
             "https://api.github.com" + path, data=raw, headers=headers, method=method
         )
         try:
-            with request.urlopen(call, timeout=30) as response:
+            with request.build_opener(NoRedirect()).open(call, timeout=30) as response:
                 response_bytes = response.read(MAX_API_BYTES + 1)
             if len(response_bytes) > MAX_API_BYTES:
                 raise PublishError("GitHub response exceeded byte limit")
@@ -74,14 +81,16 @@ class Github:
 
 def safe_model_path(path: object) -> bool:
     """Explicit GitHub-owned models directory, simple regular names only."""
-    if not isinstance(path, str) or not path.startswith(INPUT_PREFIX) or len(path) > 240:
+    if not isinstance(path, str) or not path.startswith(INPUT_PREFIXES) or len(path) > 240:
+        return False
+    if PurePosixPath(path).as_posix() != path:
         return False
     pieces = PurePosixPath(path).parts
-    prefix_parts = PurePosixPath(INPUT_PREFIX).parts
+    prefix_parts = PurePosixPath(next(p for p in INPUT_PREFIXES if path.startswith(p))).parts
     if pieces[: len(prefix_parts)] != prefix_parts:
         return False
     remainder = pieces[len(prefix_parts) :]
-    if not 1 <= len(remainder) <= 3:
+    if not 1 <= len(remainder) <= 4:
         return False
     if any(not PATH_RE.fullmatch(chunk) for chunk in remainder[:-1]):
         return False
@@ -157,25 +166,18 @@ def publish_images(api: Github, artifacts: list[tuple[str, bytes]]) -> str:
     if not artifacts:
         raise PublishError("cannot publish an empty image set")
     reference = _ref(api, PREVIEW_BRANCH)
-    if reference is None:
-        main_ref = _ref(api, "master")
-        if main_ref is None:
-            raise PublishError("repository master branch missing")
-        base_sha = _sha(main_ref["object"]["sha"])
-        api.json(
-            "POST",
-            api.prefix + "/git/refs",
-            {"ref": "refs/heads/" + PREVIEW_BRANCH, "sha": base_sha},
-        )
-    else:
+    base_sha = None
+    prior_tree = None
+    if reference is not None:
         base_sha = _sha(reference["object"]["sha"])
-    prior = api.json("GET", api.prefix + "/git/commits/" + base_sha)
-    if not isinstance(prior, dict) or not isinstance(prior.get("tree"), dict):
-        raise PublishError("invalid preview parent commit")
+        prior = api.json("GET", api.prefix + "/git/commits/" + base_sha)
+        if not isinstance(prior, dict) or not isinstance(prior.get("tree"), dict):
+            raise PublishError("invalid preview parent commit")
+        prior_tree = _sha(prior["tree"]["sha"])
     elements = []
     for target, png in artifacts:
         if (
-            not target.startswith(OUTPUT_PREFIX)
+            not re.fullmatch(r"printing3d/previews/pr-[0-9]+/[A-Za-z0-9_.-]+\.png", target)
             or len(png) > 1_200_000
             or not png.startswith(b"\x89PNG\r\n\x1a\n")
         ):
@@ -193,22 +195,32 @@ def publish_images(api: Github, artifacts: list[tuple[str, bytes]]) -> str:
     tree = api.json(
         "POST",
         api.prefix + "/git/trees",
-        {"base_tree": _sha(prior["tree"]["sha"]), "tree": elements},
+        ({"base_tree": prior_tree, "tree": elements} if prior_tree else {"tree": elements}),
     )
     if not isinstance(tree, dict):
         raise PublishError("GitHub did not create preview tree")
+    if base_sha and tree.get("sha") == prior_tree:
+        return base_sha
     new_commit = api.json(
         "POST",
         api.prefix + "/git/commits",
         {
             "message": "preview(3d): publish bounded mesh review images",
             "tree": _sha(tree.get("sha")),
-            "parents": [base_sha],
+            "parents": [base_sha] if base_sha else [],
         },
     )
     if not isinstance(new_commit, dict):
         raise PublishError("GitHub did not create preview commit")
     commit_sha = _sha(new_commit.get("sha"))
+    # Create an orphan image-only branch; never seed it with source or workflow code.
+    if base_sha is None:
+        api.json(
+            "POST",
+            api.prefix + "/git/refs",
+            {"ref": "refs/heads/" + PREVIEW_BRANCH, "sha": commit_sha},
+        )
+        return commit_sha
     # Reject branch races; retry on a later workflow, never force-rewrite.
     api.json(
         "PATCH",
@@ -237,15 +249,14 @@ def render_report(api: Github, pr_number: int, sha: str, models: list[dict]) -> 
         filename = PurePosixPath(path).name
         source_sha = _sha(model["sha"])
         try:
-            mesh = load_mesh(_blob(api, source_sha), filename)
-            png = render_preview(mesh)
+            mesh, png = bounded_render(_blob(api, source_sha), filename)
         except PreviewError as exc:
             # A misleading image is worse than an explicit unavailable result.
             images.append((path, None, str(exc), None))
             continue
         destination = _preview_path(pr_number, path)
         artifact_pngs.append((destination, png))
-        images.append((path, destination, mesh.source_sha256, mesh))
+        images.append((path, destination, mesh["sha256"], mesh))
     preview_sha = publish_images(api, artifact_pngs) if artifact_pngs else None
     for path, rendered, digest_or_error, mesh in images:
         source_url = f"https://github.com/{api.repo}/blob/{sha}/{parse.quote(path, safe='/.-_')}"
@@ -255,11 +266,11 @@ def render_report(api: Github, pr_number: int, sha: str, models: list[dict]) -> 
             summary.append(rf"Preview unavailable: `{digest_or_error[:140]}`.")
             continue
         dimensions = tuple(
-            round(mesh.maximum[index] - mesh.minimum[index], 2) for index in range(3)
+            round(mesh["maximum"][index] - mesh["minimum"][index], 2) for index in range(3)
         )
         summary.extend(
             [
-                rf"Mesh SHA-256: `{digest_or_error}` · {len(mesh.triangles)} triangles · {dimensions} {mesh.units}",
+                rf"Mesh SHA-256: `{digest_or_error}` · {mesh['triangles']} triangles · {dimensions} {mesh['units']}",
                 f"![Three real mesh views: {source_name}]({_url(api.repo, preview_sha, rendered)})",
             ]
         )
@@ -333,7 +344,14 @@ def run(
         and f"<!-- alice-3d-preview:head:{head_sha} -->" in prior.get("body", "")
     ):
         return "unchanged"
-    return upsert_comment(api, pr_number, render_report(api, pr_number, head_sha, models))
+    current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
+    if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
+        return "stale_head"
+    report = render_report(api, pr_number, head_sha, models)
+    current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
+    if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
+        return "stale_head"
+    return upsert_comment(api, pr_number, report)
 
 
 def scan_open_prs(api: Github) -> str:

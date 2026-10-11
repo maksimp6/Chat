@@ -5,7 +5,7 @@ Issue: [#1118](https://github.com/maksimp6/Chat/issues/1118). This is a review v
 ## Upload and trigger
 
 Place licensed, approved **STL** or genuine geometry-bearing **3MF** files in
-`printing3d/models/` (one or two simple subdirectories are supported).
+`printing3d/models/` or existing `printing3d/assets/` (up to three simple subdirectories).
 Open or update a same-repository PR. The trusted GitHub Actions
 `3D previews in PR comments` checks the latest 100 open PRs every
 15 minutes (best-effort, not a guaranteed exact-minute schedule):
@@ -13,7 +13,7 @@ Open or update a same-repository PR. The trusted GitHub Actions
 1. Uses **trusted code from the repository default branch**, never checks out
    the PR branch or executes PR G-code/commands.
 2. Reads the GitHub changed-file list, allowing up to **3** simple named
-   `.stl` / `.3mf` files **only** in `printing3d/models/`. Fetches each
+   `.stl` / `.3mf` files **only** in those two directories. Fetches each
    source as a SHA-verified Git blob through GitHub's API.
 3. Refuses oversized files, malformed ZIP/XML, unsupported 3MF components,
    invalid triangles and too-large output. Returns an explicit unavailable
@@ -77,7 +77,14 @@ as a one-time manual proof, not an auto-triggered run.
   uncompressed <= 40 MiB; member count <=100.
 - Max 25,000 triangles and 50,000 vertices; max 3 models per PR.
 - Render image <= 1.2 MiB; fixed three-view PNG; Actions job <=6 minutes.
-- Only allowlisted filename/paths; no input file extraction, subprocesses,
+- Only allowlisted filename/paths; no input file extraction, model-controlled subprocesses,
   sockets to the printer, model code execution, FTP or camera access.
 - Outputs in preview branch are **publicly retrievable** in a public repo.
   Do not commit confidential CAD/model assets to public PRs.
+
+The renderer runs in a credential-free child process with 30 s wall, 20 s CPU,
+512 MiB address-space, zero core-dump/file-write limits. This is resource containment,
+not a general OS sandbox. GitHub API redirects are rejected so the Authorization
+header cannot be forwarded. Head SHA is rechecked before rendering and before posting.
+A missing preview branch is initialized with an orphan image-only commit; identical
+PNG trees are reused on refresh. Existing model source bytes are not copied or edited.

@@ -18,9 +18,7 @@ on:
         type: boolean
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: read
+  contents: read
 
 concurrency:
   group: alice-3d-preview-publisher
@@ -28,6 +26,10 @@ concurrency:
 
 jobs:
   render:
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
     name: Render bounded real mesh geometry to one PR comment
     runs-on: ubuntu-latest
     timeout-minutes: 6

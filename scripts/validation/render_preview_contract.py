@@ -450,6 +450,191 @@ def test_matching_workflow_event_permits_only_own_pr(monkeypatch):
     assert len(saved) == 1
 
 
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"solid bad\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid\n",
+        b"solid bad\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\n",
+    ],
+)
+def test_ascii_stl_requires_complete_facets(data):
+    with pytest.raises(PreviewError):
+        load_mesh(data, "truncated.stl")
+
+
+def test_utf16_xml_entities_and_compression_bombs_are_rejected():
+    for source in [
+        ('<!DOCTYPE model [<!ENTITY x "injected">]>' + f'<model xmlns="{CORE}">&x;</model>').encode(
+            "utf-16"
+        ),
+        b" " * 1_000_000,
+    ]:
+        bio = BytesIO()
+        with ZipFile(bio, "w", compression=ZIP_DEFLATED) as archive:
+            archive.writestr("3D/3dmodel.model", source)
+        with pytest.raises(PreviewError):
+            load_mesh(bio.getvalue(), "bomb.3mf")
+
+
+def test_nonvertex_nodes_are_not_geometry():
+    bad = f'<model xmlns="{CORE}"><resources><object id="1"><mesh>{VERTICES.replace("vertex ", "evil ")}{TRIS}</mesh></object></resources><build><item objectid="1"/></build></model>'
+    bio = BytesIO()
+    with ZipFile(bio, "w") as archive:
+        archive.writestr("3D/3dmodel.model", bad)
+    with pytest.raises(PreviewError, match="vertex element"):
+        load_mesh(bio.getvalue(), "evil.3mf")
+
+
+@pytest.mark.parametrize(
+    "path", ["printing3d/assets/./a.stl", "printing3d/assets//a.stl", "printing3d/assets/../a.stl"]
+)
+def test_catalog_path_requires_canonical_name(path):
+    assert not publication.safe_model_path(path)
+
+
+def test_catalog_models_are_eligible_without_copying_sources():
+    assert publication.safe_model_path(
+        "printing3d/assets/oem_spindle_v03/parts/a1mini_oem_wide_hub_HALF_A.stl"
+    )
+    assert not publication.safe_model_path("printing3d/assets/source/generator.py.txt")
+
+
+def test_credential_free_worker_limits_and_determinism(monkeypatch):
+    from scripts import render_3d_worker as worker
+
+    original = worker.subprocess.run
+    calls = []
+
+    def checked(*args, **kwargs):
+        calls.append(kwargs)
+        assert "GH_TOKEN" not in kwargs["env"]
+        assert kwargs["timeout"] == 30
+        assert "-I" in args[0]
+        return original(*args, **kwargs)
+
+    monkeypatch.setenv("GH_TOKEN", "test-secret-never-in-output")
+    monkeypatch.setattr(worker.subprocess, "run", checked)
+    metadata, png = worker.bounded_render(tetra_stl(), "tetra.stl")
+    assert metadata["triangles"] == 4
+    assert png == worker.bounded_render(tetra_stl(), "tetra.stl")[1]
+    assert b"test-secret-never-in-output" not in png
+    with pytest.raises(PreviewError):
+        worker.bounded_render(b"broken", "tetra.stl")
+    assert calls
+
+
+def test_worker_timeout_reports_unavailable(monkeypatch):
+    from scripts import render_3d_worker as worker
+
+    def timeout(*args, **kwargs):
+        raise worker.subprocess.TimeoutExpired(args[0], 30)
+
+    monkeypatch.setattr(worker.subprocess, "run", timeout)
+    with pytest.raises(PreviewError, match="time budget"):
+        worker.bounded_render(tetra_stl(), "tetra.stl")
+
+
+def test_token_cannot_follow_api_redirect():
+    handler = publication.NoRedirect()
+    with pytest.raises(publication.PublishError, match="redirect"):
+        handler.redirect_request(None, None, 302, "found", {}, "https://evil.example/")
+
+
+def test_head_change_during_render_does_not_publish_stale_comment(monkeypatch):
+    api = StubGitHub()
+
+    def render(*args):
+        api.head = "2" * 40
+        return "stale report"
+
+    monkeypatch.setattr(publication, "render_report", render)
+    assert publication.run(api, 1118) == "stale_head"
+    assert not api.comments
+
+
+def test_new_preview_branch_is_orphan_image_only():
+    calls = []
+
+    class API:
+        prefix = "/repos/maksimp6/Chat"
+
+        def json(self, method, path, body=None):
+            calls.append((method, path, body))
+            if method == "GET":
+                assert path.endswith("/git/ref/heads/alice-3d-previews")
+                raise publication.PublishError("GitHub returned HTTP 404")
+            if path.endswith("/git/trees"):
+                assert "base_tree" not in body
+                assert all(
+                    item["path"].startswith(publication.OUTPUT_PREFIX) for item in body["tree"]
+                )
+            if path.endswith("/git/commits"):
+                assert body["parents"] == []
+            return {"sha": "a" * 40}
+
+    assert (
+        publication.publish_images(
+            API(),
+            [
+                (
+                    "printing3d/previews/pr-1/model.stl.png",
+                    render_preview(load_mesh(tetra_stl(), "model.stl")),
+                )
+            ],
+        )
+        == "a" * 40
+    )
+    assert calls[-1][2]["ref"] == "refs/heads/alice-3d-previews"
+    assert not any("master" in path or "develop" in path for _, path, _ in calls)
+
+
+def test_refresh_does_not_commit_identical_image_tree():
+    class API:
+        prefix = "/repos/maksimp6/Chat"
+
+        def json(self, method, path, body=None):
+            if path.endswith("/git/ref/heads/alice-3d-previews"):
+                return {"object": {"sha": "a" * 40}}
+            if path.endswith("/git/commits/" + "a" * 40):
+                return {"tree": {"sha": "b" * 40}}
+            if path.endswith("/git/blobs"):
+                return {"sha": "c" * 40}
+            if path.endswith("/git/trees"):
+                return {"sha": "b" * 40}
+            raise AssertionError("unchanged PNG must not commit/update ref")
+
+    assert (
+        publication.publish_images(
+            API(),
+            [
+                (
+                    "printing3d/previews/pr-1/model.stl.png",
+                    render_preview(load_mesh(tetra_stl(), "model.stl")),
+                )
+            ],
+        )
+        == "a" * 40
+    )
+
+
+@pytest.mark.parametrize(
+    "target", ["printing3d/previews/../secrets.png", ".github/workflows/run.png"]
+)
+def test_publication_rejects_unsafe_destination(target):
+    class API:
+        prefix = "/repos/maksimp6/Chat"
+
+        def json(self, method, path, body=None):
+            if path.endswith("/git/ref/heads/alice-3d-previews"):
+                return {"object": {"sha": "a" * 40}}
+            if path.endswith("/git/commits/" + "a" * 40):
+                return {"tree": {"sha": "b" * 40}}
+            raise AssertionError("unsafe output must not write")
+
+    with pytest.raises(publication.PublishError, match="destination"):
+        publication.publish_images(API(), [(target, b"\x89PNG\r\n\x1a\n")])
+
+
 def test_schedule_scans_only_same_repo_prs_and_deduplicates(monkeypatch):
     """One cron scan may publish images; repeated scans cannot flood comments."""
     api = StubGitHub()
