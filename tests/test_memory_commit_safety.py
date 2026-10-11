@@ -319,7 +319,7 @@ def test_restore_io_failure_preserves_empty_ram_and_blocks_mutations(tmp_path, m
         source.backup(backup)
     with MemoryStore(tmp_path / "target.memory") as target:
 
-        def fail_replace(*args):
+        def fail_replace(*args, **kwargs):
             raise OSError(errno.EROFS, "read only")
 
         monkeypatch.setattr(os, "replace", fail_replace)
