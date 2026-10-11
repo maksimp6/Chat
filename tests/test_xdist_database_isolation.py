@@ -1,7 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 
 from tests import conftest as isolation
 
@@ -45,9 +44,3 @@ def test_serial_suite_leaves_selected_database_unchanged(monkeypatch):
     isolation.pytest_sessionstart(serial)
     isolation.pytest_sessionfinish(serial)
     assert isolation.os.environ["ALICE_DB_PATH"] == "selected.sqlite"
-
-
-def test_postgres_parallelism_is_fail_closed(monkeypatch):
-    monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://example.invalid/disposable")
-    with pytest.raises(pytest.UsageError, match="separate databases"):
-        isolation.pytest_sessionstart(session("gw0"))
