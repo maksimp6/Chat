@@ -261,3 +261,48 @@ def test_nonregular_lock_file_is_rejected_without_fd_leak(tmp_path):
             _open_journal_nofollow(directory_fd, fifo.name, os.O_RDONLY | os.O_NONBLOCK)
     finally:
         os.close(directory_fd)
+
+
+def test_regular_inode_swap_does_not_write_to_replacement(tmp_path, monkeypatch):
+    path = tmp_path / "journal.memory"
+    victim = tmp_path / "victim.memory"
+    displaced = tmp_path / "displaced.memory"
+    with MemoryStore(path) as store:
+        store.set("stable", 1)
+        store.commit()
+        victim.write_bytes(b"victim-untouched")
+        original = os.stat
+        swapped = False
+
+        def swap_before_stat(target, *args, **kwargs):
+            nonlocal swapped
+            if target == path.name and kwargs.get("dir_fd") is not None and not swapped:
+                swapped = True
+                path.rename(displaced)
+                victim.rename(path)
+            return original(target, *args, **kwargs)
+
+        monkeypatch.setattr(os, "stat", swap_before_stat)
+        store.set("next", 2)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+        assert path.read_bytes() == b"victim-untouched"
+        assert store.last_commit.sequence == 1
+
+
+def test_renamed_parent_does_not_redirect_to_recreated_directory(tmp_path):
+    parent = tmp_path / "db"
+    parent.mkdir()
+    path = parent / "journal.memory"
+    with MemoryStore(path) as store:
+        store.set("stable", 1)
+        store.commit()
+        displaced = tmp_path / "db-moved"
+        parent.rename(displaced)
+        parent.mkdir()
+        victim = parent / "journal.memory"
+        victim.write_bytes(b"victim-untouched")
+        store.set("next", 2)
+        store.commit()
+        assert victim.read_bytes() == b"victim-untouched"
+        assert b"next" in (displaced / "journal.memory").read_bytes()
