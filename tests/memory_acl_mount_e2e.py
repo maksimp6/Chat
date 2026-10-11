@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import pwd
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,6 +22,15 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="memory-boundary-") as tmp:
         root = Path(tmp)
         root.chmod(0o755)
+        shutil.copytree(Path(__file__).resolve().parents[1] / "memory_engine", root / "memory_engine")
+        for entry in (root / "memory_engine").rglob("*"):
+            entry.chmod(0o755 if entry.is_dir() else 0o644)
+        (root / "memory_engine").chmod(0o755)
+        owner_probe = (
+            "import os,sys; sys.path.insert(0,sys.argv[2]); "
+            "os.environ['ALICE_MEMORY_TRUSTED_ROOT']='1'; "
+            "from memory_engine import MemoryStore; MemoryStore(sys.argv[1])"
+        )
         private = root / "private"
         private.mkdir(mode=0o700)
         os.chown(private, owner.pw_uid, owner.pw_gid)
@@ -51,25 +61,35 @@ def main() -> None:
         )
         assert attack.returncode == 0, attack.stderr
         print("ACL_ATTACK_REPRODUCED")
+        denied = command(
+            "runuser", "-u", owner.pw_name, "--", sys.executable, "-c",
+            owner_probe, str(private / "new.memory"), str(root), check=False,
+        )
+        assert denied.returncode != 0 and "unsafe journal or lock path" in denied.stderr, denied.stderr
+        print("ACL_GRANT_REJECTED_BY_MEMORY_DB")
+        command("setfacl", "-b", str(private))
+        private.chmod(0o700)
         # Mount boundary: an untrusted bind mount is not a symlink. A
         # separate mount namespace keeps the host runner untouched.
-        probe = command(
-            "unshare",
-            "--mount",
-            "--propagation",
-            "private",
-            "sh",
-            "-c",
-            "mkdir -p /tmp/memory-boundary-mount; "
-            "mount --bind /tmp /tmp/memory-boundary-mount; "
-            "test -d /tmp/memory-boundary-mount",
-            check=False,
+        mounted = root / "mounted"
+        mounted.mkdir()
+        shell = (
+            "mount --bind " + str(private) + " " + str(mounted) + " && "
+            "runuser -u " + owner.pw_name + " -- " + sys.executable + " -c "
+            + subprocess.list2cmdline([owner_probe]) + " "
+            + str(mounted / "new.memory") + " " + str(root)
         )
-        if probe.returncode != 0:
-            print("MOUNT_E2E_SKIPPED_NO_CAP_SYS_ADMIN", probe.stderr.strip())
+        probe = command(
+            "unshare", "--mount", "--propagation", "private", "sh", "-c",
+            shell, check=False,
+        )
+        if "Operation not permitted" in probe.stderr and "mount" in probe.stderr:
+            print("MOUNT_E2E_SKIPPED_NO_CAP_SYS_ADMIN")
         else:
-            print("MOUNT_BOUNDARY_REPRODUCED")
-        print("PASS: ACL exposure demonstrated; mount capability reported")
+            assert probe.returncode != 0
+            assert "unsafe journal or lock path" in probe.stderr, probe.stderr
+            print("BIND_MOUNT_REJECTED_BY_MEMORY_DB")
+        print("PASS: ACL rejection checked; mount capability reported")
 
 
 if __name__ == "__main__":
