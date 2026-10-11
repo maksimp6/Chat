@@ -165,6 +165,7 @@ class _JournalStore:
             self._lock_file.close()
             os.close(self._directory_fd)
             raise StoreError("database already has a writer") from exc
+        self._journal_fd: int | None = None
         self._state: dict[str, dict[str, Any]] = {}
         self._sequence: int = 0
         self._digest: str = "0" * 64
@@ -311,13 +312,32 @@ class _JournalStore:
 
     def _append_frame(self, frame: bytes) -> None:
         try:
-            fd = _open_journal_nofollow(
-                self._directory_fd, self._journal_name, os.O_WRONLY | os.O_APPEND | os.O_CREAT
+            if self._journal_fd is None:
+                self._journal_fd = _open_journal_nofollow(
+                    self._directory_fd, self._journal_name,
+                    os.O_WRONLY | os.O_APPEND | os.O_CREAT,
+                )
+            fd = self._journal_fd
+            # Pin the inode for this writer. A replaced pathname must never
+            # redirect appends to a different regular file.
+            path_stat = os.stat(
+                self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
             )
-            with os.fdopen(fd, "ab", buffering=0) as stream:
-                if stream.write(frame) != len(frame):
-                    raise OSError("short journal write")
-                os.fsync(stream.fileno())
+            opened_stat = os.fstat(fd)
+            if (path_stat.st_dev, path_stat.st_ino) != (
+                opened_stat.st_dev, opened_stat.st_ino
+            ):
+                raise StoreError("journal path replaced; recovery required")
+            if os.write(fd, frame) != len(frame):
+                raise OSError("short journal write")
+            os.fsync(fd)
+            path_stat = os.stat(
+                self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
+            )
+            if (path_stat.st_dev, path_stat.st_ino) != (
+                opened_stat.st_dev, opened_stat.st_ino
+            ):
+                raise StoreError("journal path replaced; recovery required")
             os.fsync(self._directory_fd)
         except (OSError, StoreError) as exc:
             self._failed = True
@@ -474,6 +494,9 @@ class _JournalStore:
             if self._active_transaction:
                 raise StoreError("cannot close during active transaction")
             if not self._closed:
+                if self._journal_fd is not None:
+                    os.close(self._journal_fd)
+                    self._journal_fd = None
                 if not self._lock_file.closed:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
                     self._lock_file.close()
