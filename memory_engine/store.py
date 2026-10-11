@@ -141,6 +141,11 @@ def _verify_trusted_ancestor(fd: int) -> None:
     mode = metadata.st_mode
     if not stat.S_ISDIR(mode):
         raise StoreError("untrusted Memory DB ancestor")
+    # Only root and the service identity may own path components.
+    # Root-owned sticky directories (e.g. /tmp) cannot be renamed
+    # by an unrelated UID, but do not isolate a same-UID attacker.
+    if metadata.st_uid not in (0, os.geteuid()):
+        raise StoreError("untrusted Memory DB ancestor owner")
     if mode & 0o022 and not (metadata.st_uid == 0 and mode & stat.S_ISVTX):
         raise StoreError("untrusted Memory DB ancestor permissions")
 
