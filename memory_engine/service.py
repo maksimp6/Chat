@@ -9,18 +9,21 @@ from __future__ import annotations
 
 import argparse
 from collections import deque
-import time
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
 import socket
 import struct
+import threading
+import time
 
 from memory_engine import MemoryStore
 
 MAX_REQUEST = 65536
 MAX_RESPONSE = 65536
 MAX_REQUESTS_PER_SECOND = 20
+MAX_INFLIGHT = 4
 
 
 def peer_uid(conn: socket.socket) -> int:
@@ -74,6 +77,19 @@ def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> 
         return
 
 
+def _serve_one(
+    conn: socket.socket,
+    store: MemoryStore,
+    allowed_uid: int,
+    slots: threading.BoundedSemaphore,
+) -> None:
+    try:
+        with conn:
+            handle_client(conn, store, allowed_uid)
+    finally:
+        slots.release()
+
+
 def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
     if os.geteuid() == 0 or allowed_uid == os.geteuid():
         raise RuntimeError("service requires distinct non-root service and client UIDs")
@@ -89,18 +105,28 @@ def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
             os.chmod(socket_path, 0o666)
             listener.listen(8)
             recent: deque[float] = deque()
-            while True:
-                conn, _ = listener.accept()
-                with conn:
+            slots = threading.BoundedSemaphore(MAX_INFLIGHT)
+            with ThreadPoolExecutor(max_workers=MAX_INFLIGHT) as workers:
+                while True:
+                    conn, _ = listener.accept()
                     if peer_uid(conn) != allowed_uid:
+                        conn.close()
                         continue
                     now = time.monotonic()
                     while recent and now - recent[0] >= 1.0:
                         recent.popleft()
-                    if len(recent) >= MAX_REQUESTS_PER_SECOND:
+                    if len(recent) >= MAX_REQUESTS_PER_SECOND or not slots.acquire(
+                        blocking=False
+                    ):
+                        conn.close()
                         continue
                     recent.append(now)
-                    handle_client(conn, store, allowed_uid)
+                    try:
+                        workers.submit(_serve_one, conn, store, allowed_uid, slots)
+                    except RuntimeError:
+                        slots.release()
+                        conn.close()
+                        raise
         finally:
             listener.close()
             socket_path.unlink(missing_ok=True)
