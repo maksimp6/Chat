@@ -25,7 +25,7 @@ def peer_uid(conn: socket.socket) -> int:
         raise RuntimeError("Linux SO_PEERCRED required")
     raw = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12)
     _pid, uid, _gid = struct.unpack("3i", raw)
-    return uid
+    return int(uid)
 
 
 def receive(conn: socket.socket) -> dict[str, object]:
