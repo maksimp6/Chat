@@ -397,7 +397,9 @@ def test_merge_readiness_blocks_failed_routed_platform(name):
     assert {name, "CI required"} <= {b.get("check") for b in result["blockers"]}
 
 
-@pytest.mark.parametrize("name", ["CI required", "Platform changes", "Fast isolated contracts (2s)"])
+@pytest.mark.parametrize(
+    "name", ["CI required", "Platform changes", "Fast isolated contracts (2s)"]
+)
 @pytest.mark.parametrize(
     "conclusion", ["failure", "cancelled", "timed_out", "skipped", "neutral", None]
 )
@@ -411,7 +413,9 @@ def test_merge_readiness_control_checks_require_success(name, conclusion):
     assert any(b.get("check") == name and b["code"] == "check_failed" for b in result["blockers"])
 
 
-@pytest.mark.parametrize("name", ["CI required", "Platform changes", "Fast isolated contracts (2s)"])
+@pytest.mark.parametrize(
+    "name", ["CI required", "Platform changes", "Fast isolated contracts (2s)"]
+)
 @pytest.mark.parametrize("state", ["missing", "queued", "in_progress"])
 def test_merge_readiness_waits_for_control_checks(name, state):
     value = platform_snapshot()
