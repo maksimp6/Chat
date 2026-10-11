@@ -113,15 +113,36 @@ def _open_directory_nofollow(directory: Path) -> int:
     """Pin every directory component; never traverse a symlink."""
     absolute = Path(os.path.abspath(directory))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
     try:
+        if trusted:
+            _verify_trusted_ancestor(fd)
         for part in absolute.parts[1:]:
             next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            try:
+                if trusted:
+                    _verify_trusted_ancestor(next_fd)
+            except BaseException:
+                os.close(next_fd)
+                raise
             os.close(fd)
             fd = next_fd
         return fd
     except BaseException:
         os.close(fd)
         raise
+
+
+def _verify_trusted_ancestor(fd: int) -> None:
+    """Reject writable ancestors except root-owned sticky shared directories."""
+    import stat
+
+    metadata = os.fstat(fd)
+    mode = metadata.st_mode
+    if not stat.S_ISDIR(mode):
+        raise StoreError("untrusted Memory DB ancestor")
+    if mode & 0o022 and not (metadata.st_uid == 0 and mode & stat.S_ISVTX):
+        raise StoreError("untrusted Memory DB ancestor permissions")
 
 
 def _verify_trusted_root(directory_fd: int) -> None:
