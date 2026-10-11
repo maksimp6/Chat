@@ -61,7 +61,34 @@ def main() -> None:
             str(journal),
         )
         assert result.returncode != 0 and "PermissionError" in result.stderr, result.stderr
-        print("PASS: distinct host UIDs, trusted root, rename/unlink denied")
+        backup = private / "backup.memory"
+        restored = private / "restored.memory"
+        backup_code = (
+            "import os,sys; sys.path.insert(0,sys.argv[3]); "
+            "from memory_engine import MemoryStore; "
+            "os.environ['ALICE_MEMORY_TRUSTED_ROOT']='1'; "
+            "s=MemoryStore(sys.argv[1]); s.backup(sys.argv[2]); s.close()"
+        )
+        result = run_as("memorydb_owner", backup_code, str(journal), str(backup), str(root))
+        assert result.returncode == 0, result.stderr
+        assert backup.exists()
+        for protected in (journal, backup):
+            result = run_as("memorydb_attacker", attack_code, str(protected))
+            assert result.returncode != 0 and "PermissionError" in result.stderr
+            assert protected.exists()
+        restore_code = (
+            "import os,sys; sys.path.insert(0,sys.argv[3]); "
+            "from memory_engine import MemoryStore; "
+            "os.environ['ALICE_MEMORY_TRUSTED_ROOT']='1'; "
+            "s=MemoryStore(sys.argv[2]); s.restore(sys.argv[1]); "
+            "assert s.get('safe') == 1; s.close()"
+        )
+        result = run_as("memorydb_owner", restore_code, str(backup), str(restored), str(root))
+        assert result.returncode == 0, result.stderr
+        result = run_as("memorydb_attacker", attack_code, str(restored))
+        assert result.returncode != 0 and "PermissionError" in result.stderr
+        assert restored.exists()
+        print("PASS: distinct host UIDs, trusted root, journal/backup/restore rename denied")
 
 
 if __name__ == "__main__":
