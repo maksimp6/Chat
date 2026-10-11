@@ -629,3 +629,16 @@ def test_trusted_ancestor_rejects_foreign_owner(tmp_path, monkeypatch):
     monkeypatch.setattr(engine.os, "fstat", foreign_owner)
     with pytest.raises(StoreError, match="unsafe journal or lock path"):
         MemoryStore(parent / "journal.memory")
+
+
+def test_trusted_ancestor_rejects_non_directory_descriptor(tmp_path):
+    import memory_engine.store as engine
+
+    ordinary = tmp_path / "ordinary-file"
+    ordinary.write_bytes(b"not a directory")
+    fd = os.open(ordinary, os.O_RDONLY)
+    try:
+        with pytest.raises(StoreError, match="untrusted Memory DB ancestor"):
+            engine._verify_trusted_ancestor(fd)
+    finally:
+        os.close(fd)
