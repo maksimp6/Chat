@@ -8,7 +8,7 @@ from pathlib import Path
 from .storyboard import FORMATS
 
 
-def verify_mp4(path: Path, format_name: str, duration_seconds: int) -> dict:
+def verify_mp4(path: Path, format_name: str, duration_seconds: int) -> dict[str, object]:
     if format_name not in FORMATS or not 1 <= duration_seconds <= 30:
         raise ValueError("Invalid video specification")
     if not path.is_file() or not path.stat().st_size:
