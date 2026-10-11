@@ -314,7 +314,8 @@ class _JournalStore:
         try:
             if self._journal_fd is None:
                 self._journal_fd = _open_journal_nofollow(
-                    self._directory_fd, self._journal_name,
+                    self._directory_fd,
+                    self._journal_name,
                     os.O_WRONLY | os.O_APPEND | os.O_CREAT,
                 )
             fd = self._journal_fd
@@ -324,9 +325,7 @@ class _JournalStore:
                 self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
             )
             opened_stat = os.fstat(fd)
-            if (path_stat.st_dev, path_stat.st_ino) != (
-                opened_stat.st_dev, opened_stat.st_ino
-            ):
+            if (path_stat.st_dev, path_stat.st_ino) != (opened_stat.st_dev, opened_stat.st_ino):
                 raise StoreError("journal path replaced; recovery required")
             if os.write(fd, frame) != len(frame):
                 raise OSError("short journal write")
@@ -334,9 +333,7 @@ class _JournalStore:
             path_stat = os.stat(
                 self._journal_name, dir_fd=self._directory_fd, follow_symlinks=False
             )
-            if (path_stat.st_dev, path_stat.st_ino) != (
-                opened_stat.st_dev, opened_stat.st_ino
-            ):
+            if (path_stat.st_dev, path_stat.st_ino) != (opened_stat.st_dev, opened_stat.st_ino):
                 raise StoreError("journal path replaced; recovery required")
             os.fsync(self._directory_fd)
         except (OSError, StoreError) as exc:
