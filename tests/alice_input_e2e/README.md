@@ -38,3 +38,15 @@ The signed-to-C test no longer casts an arbitrary Python `ctypes.create_string_b
 ## Authorization-path fault injection
 
 The main signed-to-C keyboard integration test now has a parametrized branch that monkeypatches the real `SessionAuthority.authorize()` call to throw after the C fixture is allocated. Test-only C counters verify that `ExitStack` performs exactly one close/free and leaves zero live fixtures. Combined temporary checkout: **8/8 PASS** on Redmi 9. No physical uinput or cross-UID root service was touched.
+
+## Composite Mouse + C keyboard signed-session proof — 2026-10-11
+
+The Integration-owned test `test_mouse_keyboard_shared_session.py` uses these exact, independently owned inputs in a **temporary checkout**:
+
+- Security head `5a48775b16b86cd442402b540966f1ddc4340359` (signed grants and Unix socket verifier)
+- Keyboard head `810738ca4d01c51b67040e2aecd551fc523f353b` (real C keyboard state machine behind mocked event emitter)
+- Alice Mouse head `74043cfb8dcbd146138a8eeb861e0de1776a428e` (test-only `RecordingBackend`)
+
+The combined checkout ran **9/9 isolated integration tests PASS** on Redmi 9. The new test checks one signed controller session across mouse and keyboard commands, shared replay sequence, unsigned and viewer denial, cursor-focus loss releasing a held mouse button, root-side verifier revocation (simulated by Python `ProtectedVerifier`) and C fixture close/free. The temporary Unix socket is inside a mode-0700 directory and all C events go into a test callback.
+
+**This is not physical/root E2E:** no root service, actual `/dev/uinput`, kernel InputReader, cross-UID access, SELinux change, APK install, cutover or merge. A plain #1089 checkout stays intentionally RED until Security #1090, Keyboard #1091 and Mouse #1082 are integrated under their canonical ownership and independently verified.
