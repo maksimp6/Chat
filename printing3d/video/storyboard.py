@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 ALLOWED_SHOTS = {"turntable", "exploded", "assembly", "print_orientation"}
 FORMATS = {"vertical": (720, 1280), "horizontal": (1280, 720)}
 
 
-def load_storyboard(path: Path) -> dict[str, object]:
+def load_storyboard(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("Storyboard must be an object")
