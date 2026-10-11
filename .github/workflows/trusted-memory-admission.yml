@@ -40,4 +40,4 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-        run: python -I -S ci/trusted_memory_admission.py
+        run: python -I -S scripts/trusted_memory_admission.py

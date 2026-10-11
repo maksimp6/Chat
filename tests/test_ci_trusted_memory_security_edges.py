@@ -5,8 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
-from ci import trusted_memory_admission as gate
-from tests.test_ci_trusted_memory_admission import BASE, HEAD, NEXT_HEAD, REPO, FakeGitHub
+from scripts import trusted_memory_admission as gate
+from tests.test_ci_trusted_memory_admission import (
+    BASE,
+    HEAD,
+    NEXT_HEAD,
+    REPO,
+    FakeGitHub,
+)
 
 
 class TrustedAdmissionSecurityEdges(unittest.TestCase):
@@ -34,7 +40,7 @@ class TrustedAdmissionSecurityEdges(unittest.TestCase):
     def test_trusted_control_removal_from_candidate_rejected(self) -> None:
         api = FakeGitHub(self.policy)
         api.seed()
-        marker = "ci/trusted_memory_admission.py"
+        marker = "scripts/trusted_memory_admission.py"
         api.present(BASE, marker)
         decision = gate.audit_pr(api, self.policy, 1106, HEAD, BASE)
         self.assertFalse(decision.accepted)
@@ -45,7 +51,12 @@ class TrustedAdmissionSecurityEdges(unittest.TestCase):
         api.seed(base_stage="core", head_stage="core")
         api.change_head_on_second_read = True
         state, decision = gate.execute(
-            api, self.policy, 1106, HEAD, BASE, f"https://github.com/{REPO}/actions/runs/5"
+            api,
+            self.policy,
+            1106,
+            HEAD,
+            BASE,
+            f"https://github.com/{REPO}/actions/runs/5",
         )
         self.assertEqual(state, "failure")
         self.assertIsNotNone(decision)

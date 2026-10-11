@@ -22,7 +22,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-POLICY_FILE = Path(__file__).with_name("trusted_memory_policy.json")
+POLICY_FILE = Path(__file__).resolve().parents[1] / "ci" / "trusted_memory_policy.json"
 SHA_PATTERN = re.compile(r"^[a-f0-9]{40}$")
 API_URL = "https://api.github.com"
 MAX_PROTECTED_FILE_BYTES = 1024 * 1024
@@ -86,8 +86,14 @@ class GitHubAPI:
         self.repository = repository
         self._file_cache: dict[tuple[str, str], FileRecord | None] = {}
 
-    def _json(self, method: str, path: str, payload: Mapping[str, Any] | None = None,
-              *, allow_missing: bool = False) -> Any:
+    def _json(
+        self,
+        method: str,
+        path: str,
+        payload: Mapping[str, Any] | None = None,
+        *,
+        allow_missing: bool = False,
+    ) -> Any:
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8") if payload else None
         request = Request(
             API_URL + path,
@@ -110,7 +116,9 @@ class GitHubAPI:
         except HTTPError as exc:
             if exc.code == 404 and allow_missing:
                 return None
-            raise AdmissionError(f"GitHub API {method} rejected request (HTTP {exc.code})") from None
+            raise AdmissionError(
+                f"GitHub API {method} rejected request (HTTP {exc.code})"
+            ) from None
         except (URLError, TimeoutError, OSError, ValueError) as exc:
             raise AdmissionError(f"GitHub API {method} failed ({type(exc).__name__})") from None
 
@@ -128,7 +136,8 @@ class GitHubAPI:
             return self._file_cache[key]
         url_path = quote(path, safe="/")
         value = self._json(
-            "GET", f"/repos/{self.repository}/contents/{url_path}?ref={sha}",
+            "GET",
+            f"/repos/{self.repository}/contents/{url_path}?ref={sha}",
             allow_missing=True,
         )
         if value is None:
@@ -150,9 +159,15 @@ class GitHubAPI:
         self._file_cache[key] = record
         return record
 
-    def post_status(self, head_sha: str, state: str, context: str, description: str,
-                    target_url: str) -> None:
-        if not is_sha(head_sha) or state not in ("pending", "success", "failure", "error"):
+    def post_status(
+        self, head_sha: str, state: str, context: str, description: str, target_url: str
+    ) -> None:
+        if not is_sha(head_sha) or state not in (
+            "pending",
+            "success",
+            "failure",
+            "error",
+        ):
             raise AdmissionError("invalid commit status input")
         self._json(
             "POST",
@@ -195,7 +210,10 @@ def _check_candidate_metadata(pr: Mapping[str, Any], policy: Mapping[str, Any]) 
     if not _same_repository(pr, str(policy["repository"])):
         errors.append("cross-repository candidate is not trusted")
     base_info = pr.get("base")
-    if not isinstance(base_info, dict) or base_info.get("ref") not in policy["protected_base_branches"]:
+    if (
+        not isinstance(base_info, dict)
+        or base_info.get("ref") not in policy["protected_base_branches"]
+    ):
         errors.append("PR does not target a trusted integration branch")
     return errors
 
@@ -216,12 +234,12 @@ def _check_trusted_files(api: Any, policy: Mapping[str, Any], head: str, base: s
     return errors
 
 
-def _determine_stage(api: Any, policy: Mapping[str, Any], head: str, base: str) -> tuple[bool, bool]:
+def _determine_stage(
+    api: Any, policy: Mapping[str, Any], head: str, base: str
+) -> tuple[bool, bool]:
     core = any(_file_exists(api, sha, policy["core_marker"]) for sha in (base, head))
     fast = any(
-        _file_exists(api, sha, path)
-        for sha in (base, head)
-        for path in policy["fast_markers"]
+        _file_exists(api, sha, path) for sha in (base, head) for path in policy["fast_markers"]
     )
     return core, fast
 
@@ -260,8 +278,7 @@ def _check_frozen_files(
 def _is_stale(api: Any, number: int, event_head: str, event_base: str) -> bool:
     current = api.get_pr(number)
     return (
-        _sha_from_pr(current, "head") != event_head
-        or _sha_from_pr(current, "base") != event_base
+        _sha_from_pr(current, "head") != event_head or _sha_from_pr(current, "base") != event_base
     )
 
 
@@ -284,25 +301,39 @@ def audit_pr(
     errors = _check_candidate_metadata(pr, policy)
     errors.extend(_check_trusted_files(api, policy, event_head, event_base))
     errors.extend(
-        _check_frozen_files(
-            api, policy, event_head, core_stage=core_stage, fast_stage=fast_stage
-        )
+        _check_frozen_files(api, policy, event_head, core_stage=core_stage, fast_stage=fast_stage)
     )
     if _is_stale(api, number, event_head, event_base):
         errors.append("PR advanced during trusted validation; stale evidence rejected")
     return Decision(event_head, event_base, stage, tuple(errors))
 
-def execute(api: Any, policy: Mapping[str, Any], number: int, head: str,
-            base: str, target_url: str) -> tuple[str, Decision | None]:
+
+def execute(
+    api: Any,
+    policy: Mapping[str, Any],
+    number: int,
+    head: str,
+    base: str,
+    target_url: str,
+) -> tuple[str, Decision | None]:
     """Always emit a terminal status for a head once its initial pending status exists."""
     context = str(policy["status_context"])
-    api.post_status(head, "pending", context, "Trusted contract verification in progress", target_url)
+    api.post_status(
+        head,
+        "pending",
+        context,
+        "Trusted contract verification in progress",
+        target_url,
+    )
     decision: Decision | None = None
     try:
         decision = audit_pr(api, policy, number, head, base)
         state = "success" if decision.accepted else "failure"
-        description = (f"Verified {decision.stage} contracts at exact head" if decision.accepted
-                       else decision.errors[0])
+        description = (
+            f"Verified {decision.stage} contracts at exact head"
+            if decision.accepted
+            else decision.errors[0]
+        )
     except (AdmissionError, KeyError, TypeError, ValueError) as exc:
         state = "error"
         description = f"Trusted validation error: {type(exc).__name__}"
@@ -325,14 +356,19 @@ def main() -> int:
         api = GitHubAPI(os.environ.get("GITHUB_TOKEN", ""), repo)
         state, decision = execute(api, policy, number, head, base, url)
         if decision is not None:
-            print(f"stage={decision.stage} exact_head={decision.head_sha} errors={len(decision.errors)}")
+            print(
+                f"stage={decision.stage} exact_head={decision.head_sha} errors={len(decision.errors)}"
+            )
             for error in decision.errors:
                 print(f"BLOCKED: {error}")
         else:
             print("BLOCKED: trusted status could not be established")
         return 0 if state == "success" else 1
     except (AdmissionError, KeyError, TypeError, ValueError, OSError) as exc:
-        print(f"BLOCKED: trusted gate initialization error ({type(exc).__name__})", file=sys.stderr)
+        print(
+            f"BLOCKED: trusted gate initialization error ({type(exc).__name__})",
+            file=sys.stderr,
+        )
         return 1
 
 

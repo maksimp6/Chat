@@ -11,7 +11,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from ci import trusted_memory_admission as gate
+from scripts import trusted_memory_admission as gate
 
 REPO = "maksimp6/Chat"
 HEAD = "a" * 40
@@ -44,15 +44,18 @@ class FakeGitHub:
     def file_at(self, sha: str, path: str) -> gate.FileRecord | None:
         return self.files.get((sha, path))
 
-    def post_status(self, head: str, state: str, context: str, description: str, target_url: str) -> None:
+    def post_status(
+        self, head: str, state: str, context: str, description: str, target_url: str
+    ) -> None:
         assert head == HEAD
         assert context == self.policy["status_context"]
         assert target_url.startswith("https://github.com/")
         assert len(description) <= 140
         self.statuses.append((head, state, description))
 
-    def present(self, sha: str, path: str, digest: str | None = None,
-                blob_sha: str = "d" * 40) -> None:
+    def present(
+        self, sha: str, path: str, digest: str | None = None, blob_sha: str = "d" * 40
+    ) -> None:
         if digest is None:
             digest = self.policy["pinned_sha256"].get(path, "e" * 64)
         self.files[sha, path] = gate.FileRecord(digest, blob_sha, 10)
@@ -68,8 +71,11 @@ class FakeGitHub:
             if stage == "fast":
                 for path in self.policy["pinned_sha256"]:
                     self.present(sha, path)
-                self.present(sha, ".github/workflows/ci.yml",
-                             blob_sha=self.policy["approved_ci_git_blob_sha"])
+                self.present(
+                    sha,
+                    ".github/workflows/ci.yml",
+                    blob_sha=self.policy["approved_ci_git_blob_sha"],
+                )
 
         install(BASE, base_stage)
         install(HEAD, head_stage)
@@ -78,8 +84,9 @@ class FakeGitHub:
 class TrustedAdmissionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.policy = gate.read_policy(Path(__file__).resolve().parents[1]
-                                      / "ci/trusted_memory_policy.json")
+        cls.policy = gate.read_policy(
+            Path(__file__).resolve().parents[1] / "ci/trusted_memory_policy.json"
+        )
 
     def fixture(self, base: str = "legacy", head: str = "legacy") -> FakeGitHub:
         api = FakeGitHub(self.policy)
@@ -140,7 +147,7 @@ class TrustedAdmissionTests(unittest.TestCase):
 
     def test_self_modification_of_trusted_workflow_is_rejected(self):
         api = self.fixture()
-        path = "ci/trusted_memory_admission.py"
+        path = "scripts/trusted_memory_admission.py"
         api.present(BASE, path, "9" * 64)
         api.present(HEAD, path, "8" * 64)
         self.assertTrue(any("trusted admission source" in x for x in self.decision(api).errors))
@@ -180,11 +187,19 @@ class TrustedAdmissionTests(unittest.TestCase):
 
     def test_api_failure_never_posts_success(self):
         api = self.fixture(head="fast")
+
         def fail(_number):
             raise gate.AdmissionError("GitHub unavailable")
+
         api.get_pr = fail
-        state, result = gate.execute(api, self.policy, 1106, HEAD, BASE,
-                                     "https://github.com/maksimp6/Chat/actions/runs/123")
+        state, result = gate.execute(
+            api,
+            self.policy,
+            1106,
+            HEAD,
+            BASE,
+            "https://github.com/maksimp6/Chat/actions/runs/123",
+        )
         self.assertEqual((state, result), ("error", None))
         self.assertEqual([s for _, s, _ in api.statuses], ["pending", "error"])
 
@@ -206,8 +221,13 @@ class TrustedAdmissionTests(unittest.TestCase):
         self.assertEqual(mocked.call_args.args[0].get_method(), "GET")
 
     def test_invalid_file_encoding_fails_closed(self):
-        payload = {"type": "file", "encoding": "base64", "content": "!!?",
-                   "size": 4, "sha": "d" * 40}
+        payload = {
+            "type": "file",
+            "encoding": "base64",
+            "content": "!!?",
+            "size": 4,
+            "sha": "d" * 40,
+        }
         with patch.object(gate, "urlopen", return_value=io.BytesIO(json.dumps(payload).encode())):
             with self.assertRaises(gate.AdmissionError):
                 gate.GitHubAPI("not-a-real-token", REPO).file_at(HEAD, "tests/__init__.py")
@@ -219,14 +239,16 @@ class TrustedAdmissionTests(unittest.TestCase):
         self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", trusted)
         self.assertNotIn("ref: ${{ github.event.pull_request.head.sha }}", trusted)
         self.assertIn("statuses: write", trusted)
-        self.assertIn("python -I -S ci/trusted_memory_admission.py", trusted)
+        self.assertIn("python -I -S scripts/trusted_memory_admission.py", trusted)
         selftest = (root / ".github/workflows/trusted-memory-selftest.yml").read_text()
         self.assertIn("pull_request:", selftest)
         self.assertNotIn("statuses: write", selftest)
 
     def test_file_digest_must_match_real_bytes(self):
-        self.assertEqual(hashlib.sha256(b"").hexdigest(),
-                         self.policy["pinned_sha256"]["tests/__init__.py"])
+        self.assertEqual(
+            hashlib.sha256(b"").hexdigest(),
+            self.policy["pinned_sha256"]["tests/__init__.py"],
+        )
         self.assertFalse(gate.is_sha("a" * 39))
         self.assertFalse(gate.is_sha("z" * 40))
 

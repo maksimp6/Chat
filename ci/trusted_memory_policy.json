@@ -33,7 +33,7 @@
   "trusted_control_paths": [
     ".github/workflows/trusted-memory-admission.yml",
     ".github/workflows/trusted-memory-selftest.yml",
-    "ci/trusted_memory_admission.py",
+    "scripts/trusted_memory_admission.py",
     "ci/trusted_memory_policy.json",
     "tests/test_ci_trusted_memory_admission.py"
   ],
