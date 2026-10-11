@@ -383,3 +383,26 @@ def test_backup_parent_rename_publishes_only_to_pinned_directory(tmp_path, monke
         except StoreError:
             pass
         assert not (parent / "backup.memory").exists()
+
+
+def test_backup_temp_cleanup_survives_concurrent_unlink(tmp_path, monkeypatch):
+    path = tmp_path / "journal.memory"
+    backup = tmp_path / "backup.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", 1)
+        store.commit()
+        original_unlink = os.unlink
+        removed = False
+
+        def competing_unlink(target, *args, **kwargs):
+            nonlocal removed
+            if isinstance(target, str) and target.startswith(".alice-copy-"):
+                removed = True
+                original_unlink(target, *args, **kwargs)
+                raise FileNotFoundError(target)
+            return original_unlink(target, *args, **kwargs)
+
+        monkeypatch.setattr(os, "unlink", competing_unlink)
+        store.backup(backup)
+        assert removed
+        assert backup.exists()
