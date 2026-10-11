@@ -437,18 +437,24 @@ class _JournalStore:
             verify_fd = _open_journal_nofollow(target_dir, temp_name, os.O_RDONLY)
             with os.fdopen(verify_fd, "rb") as verified:
                 actual_state, sequence, digest = _JournalStore._inspect_stream(verified)
-            if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
-                raise StoreError("backup integrity mismatch")
-            # Both backup and restore publish only to an absent destination.
-            # Never overwrite a concurrently substituted regular file or symlink.
-            os.link(
-                temp_name,
-                destination.name,
-                src_dir_fd=target_dir,
-                dst_dir_fd=target_dir,
-                follow_symlinks=False,
-            )
-            os.fsync(target_dir)
+                if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
+                    raise StoreError("backup integrity mismatch")
+                # Linux procfs names the already-verified open inode, not the
+                # attacker-replaceable temporary basename. Fail closed if procfs
+                # is unavailable; do not fall back to linking temp_name.
+                os.link(
+                    f"/proc/self/fd/{verified.fileno()}",
+                    destination.name,
+                    dst_dir_fd=target_dir,
+                    follow_symlinks=True,
+                )
+                published = os.stat(
+                    destination.name, dir_fd=target_dir, follow_symlinks=False
+                )
+                pinned = os.fstat(verified.fileno())
+                if (published.st_dev, published.st_ino) != (pinned.st_dev, pinned.st_ino):
+                    raise StoreError("published backup inode mismatch")
+                os.fsync(target_dir)
         except FileExistsError as exc:
             raise StoreError("destination was created concurrently") from exc
         finally:
