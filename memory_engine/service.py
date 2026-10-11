@@ -63,8 +63,9 @@ def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> 
         if op == "get" and isinstance(key, str):
             result = {"ok": True, "value": store.get(key)}
         elif op == "set" and isinstance(key, str):
-            store.set(key, request.get("value"))
-            result = {"ok": True, "sequence": store.commit()}
+            with store._engine._lock:
+                store.set(key, request.get("value"))
+                result = {"ok": True, "sequence": store.commit()}
         elif op == "info":
             result = {"ok": True, "sequence": store.info().last_commit}
         else:
