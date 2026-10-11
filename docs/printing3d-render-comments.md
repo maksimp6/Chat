@@ -88,3 +88,16 @@ not a general OS sandbox. GitHub API redirects are rejected so the Authorization
 header cannot be forwarded. Head SHA is rechecked before rendering and before posting.
 A missing preview branch is initialized with an orphan image-only commit; identical
 PNG trees are reused on refresh. Existing model source bytes are not copied or edited.
+
+## Bounded scan and larger catalogs
+
+Scheduled scans collect up to 300 open PRs with explicit pagination before any comment
+writes can reorder the updated list. An extra page detects overflow; malformed or duplicated
+page entries and an exhausted 240-second scan budget report incomplete, never all-PR success.
+The Actions job still has a hard six-minute timeout and per-render limits are unchanged.
+
+For up to 100 changed paths, eligible meshes are sorted deterministically. At most three
+are rendered; every other eligible mesh is listed as preview unavailable due to the per-PR
+budget, in the same bot comment. A partial preview is explicitly marked partial. The remaining
+files are not promised automatic rendering on that head. Same-head retries remain no-op;
+manual refresh updates the existing comment. Input/model/code execution limits are unchanged.

@@ -707,3 +707,90 @@ def test_schedule_ignores_pr_which_is_not_in_same_repo():
 
     api.json = catalog
     assert publication.scan_open_prs(api) == "scan_checked=0 preview_comments_changed=0"
+
+
+@pytest.mark.parametrize("count", [100, 101, 112, 300])
+def test_open_pr_catalog_reads_all_bounded_pages_before_processing(count, monkeypatch):
+    api = StubGitHub()
+    entries = [{"number": i + 1, "head": {"repo": {"full_name": api.repo}}} for i in range(count)]
+    reads = []
+    processed = []
+
+    def pages(method, path, body=None):
+        assert method == "GET"
+        page = int(path.rsplit("&page=", 1)[-1]) if "&page=" in path else 1
+        reads.append(page)
+        return entries[(page - 1) * 100 : page * 100]
+
+    def run(_api, number):
+        assert reads[-1] == count // 100 + 1
+        processed.append(number)
+        return "unchanged"
+
+    api.json = pages
+    monkeypatch.setattr(publication, "run", run)
+    assert publication.scan_open_prs(api) == f"scan_checked={count} preview_comments_changed=0"
+    assert processed == list(range(1, count + 1))
+
+
+def test_scan_overflow_never_claims_complete_or_processes_partial_catalog(monkeypatch):
+    api = StubGitHub()
+    entries = [{"number": i + 1} for i in range(301)]
+
+    def pages(method, path, body=None):
+        page = int(path.rsplit("&page=", 1)[-1]) if "&page=" in path else 1
+        return entries[(page - 1) * 100 : page * 100]
+
+    api.json = pages
+    monkeypatch.setattr(publication, "run", lambda *args: pytest.fail("partial scan must not run"))
+    with pytest.raises(publication.PublishError, match="scan incomplete"):
+        publication.scan_open_prs(api)
+
+
+def test_unstable_pagination_is_explicit_failure():
+    api = StubGitHub()
+    page = [{"number": i + 1} for i in range(100)]
+    api.json = lambda *args: page
+    with pytest.raises(publication.PublishError, match="unstable"):
+        publication._open_pr_catalog(api)
+
+
+def test_scan_wall_budget_returns_incomplete(monkeypatch):
+    api = StubGitHub()
+    api.json = lambda *args: [{"number": 1118}]
+    times = iter([0, publication.SCAN_SECONDS + 1])
+    monkeypatch.setattr(publication.time, "monotonic", lambda: next(times))
+    with pytest.raises(publication.PublishError, match="time budget"):
+        publication.scan_open_prs(api)
+
+
+def test_fifteen_mesh_pilot_reports_all_paths_with_only_three_renders(monkeypatch):
+    api = StubGitHub()
+    source = api.change[0]["sha"]
+    api.change = [
+        {"status": "added", "filename": f"printing3d/assets/demo/part_{i:02d}.stl", "sha": source}
+        for i in range(15)
+    ]
+    renders = []
+    original = publication.bounded_render
+
+    def render(raw, filename):
+        renders.append(filename)
+        return original(raw, filename)
+
+    monkeypatch.setattr(publication, "bounded_render", render)
+    published = []
+    monkeypatch.setattr(
+        publication, "publish_images", lambda _api, images: published.append(images) or "a" * 40
+    )
+    assert publication.run(api, 1118) == "created"
+    report = api.comments[0]["body"]
+    assert len(renders) == 3 and len(published[0]) == 3
+    assert "3 selected, 12 not rendered" in report
+    assert report.count("preview unavailable (per-PR budget") == 12
+    assert "will not be rendered automatically" in report
+    for i in range(15):
+        assert f"part_{i:02d}.stl" in report
+    assert publication.run(api, 1118) == "unchanged"
+    assert len(api.comments) == 1 and len(renders) == 3
+    assert len(published) == 1

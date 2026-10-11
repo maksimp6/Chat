@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import PurePosixPath
 from urllib import error, parse, request
 
@@ -25,6 +26,8 @@ INPUT_PREFIX = "printing3d/models/"
 INPUT_PREFIXES = (INPUT_PREFIX, "printing3d/assets/")
 OUTPUT_PREFIX = "printing3d/previews/"
 MAX_MODELS = 3
+MAX_OPEN_PRS = 300
+SCAN_SECONDS = 240
 MAX_CHANGED_FILES = 100
 MAX_API_BYTES = 25 * 1024 * 1024
 SHA_RE = re.compile(r"^[a-f0-9]{40}$")
@@ -105,7 +108,7 @@ def _sha(value: object) -> str:
     return value
 
 
-def select_models(changed: list[dict]) -> list[dict]:
+def _model_candidates(changed: list[dict]) -> list[dict]:
     if len(changed) > MAX_CHANGED_FILES:
         raise PublishError("PR changed-file list exceeds review cap")
     files = [
@@ -114,11 +117,16 @@ def select_models(changed: list[dict]) -> list[dict]:
         if item.get("status") in ("added", "modified", "renamed")
         and safe_model_path(item.get("filename"))
     ]
-    if len(files) > MAX_MODELS:
-        raise PublishError("PR adds too many 3D model previews")
     for item in files:
         _sha(item.get("sha"))
     return sorted(files, key=lambda item: item["filename"])
+
+
+def select_models(changed: list[dict]) -> list[dict]:
+    files = _model_candidates(changed)
+    if len(files) > MAX_MODELS:
+        raise PublishError("PR adds too many 3D model previews")
+    return files
 
 
 def _blob(api: Github, sha: str) -> bytes:
@@ -239,7 +247,9 @@ def _url(repo: str, sha: str, path: str) -> str:
     return f"https://raw.githubusercontent.com/{repo}/{_sha(sha)}/{parse.quote(path, safe='/.-_')}"
 
 
-def render_report(api: Github, pr_number: int, sha: str, models: list[dict]) -> str:
+def render_report(
+    api: Github, pr_number: int, sha: str, models: list[dict], *, omitted: list[dict] | None = None
+) -> str:
     """Publish successful PNGs and return the bot-owned Markdown comment body."""
     summary = [
         MARKER,
@@ -279,6 +289,15 @@ def render_report(api: Github, pr_number: int, sha: str, models: list[dict]) -> 
                 f"![Three real mesh views: {source_name}]({_url(api.repo, preview_sha, rendered)})",
             ]
         )
+    if omitted:
+        summary.append(
+            f"\n**Partial preview: {len(models)} selected, {len(omitted)} not rendered.**"
+        )
+        summary.extend(
+            f"- `{item['filename']}`: preview unavailable (per-PR budget: {MAX_MODELS} meshes)."
+            for item in omitted
+        )
+        summary.append("The remaining models will not be rendered automatically on this head.")
     summary.append(
         "\n*These images are derived from triangle geometry. They do not verify slicer settings, "
         "manifoldness, tolerances, mechanical strength, filament or finished-print quality.*"
@@ -339,7 +358,7 @@ def run(
         raise PublishError("invalid PR files response")
     if len(changed) != changed_files:
         raise PublishError("PR file listing incomplete; not publishing partial previews")
-    models = select_models(changed)
+    models = _model_candidates(changed)
     if not models:
         return "no_model_changes"
     prior = _bot_comment(api, pr_number)
@@ -349,34 +368,67 @@ def run(
         and f"<!-- alice-3d-preview:head:{head_sha} -->" in prior.get("body", "")
     ):
         return "unchanged"
-    return _publish_current_report(api, pr_number, head_sha, models)
+    return _publish_current_report(
+        api, pr_number, head_sha, models[:MAX_MODELS], models[MAX_MODELS:]
+    )
 
 
-def _publish_current_report(api: Github, pr_number: int, head_sha: str, models: list[dict]) -> str:
+def _publish_current_report(
+    api: Github,
+    pr_number: int,
+    head_sha: str,
+    models: list[dict],
+    omitted: list[dict] | None = None,
+) -> str:
     current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
     if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
         return "stale_head"
-    report = render_report(api, pr_number, head_sha, models)
+    report = (
+        render_report(api, pr_number, head_sha, models, omitted=omitted)
+        if omitted
+        else render_report(api, pr_number, head_sha, models)
+    )
     current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
     if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
         return "stale_head"
     return upsert_comment(api, pr_number, report)
 
 
+def _open_pr_catalog(api: Github) -> list[dict]:
+    """Collect bounded pages before writes can reorder GitHub's updated list."""
+    entries: list[dict] = []
+    seen: set[int] = set()
+    for page in range(1, MAX_OPEN_PRS // 100 + 2):
+        suffix = "" if page == 1 else f"&page={page}"
+        batch = api.json(
+            "GET",
+            api.prefix + "/pulls?state=open&sort=updated&direction=desc&per_page=100" + suffix,
+        )
+        if not isinstance(batch, list) or len(batch) > 100:
+            raise PublishError("invalid open-PR catalog page")
+        if len(entries) + len(batch) > MAX_OPEN_PRS:
+            raise PublishError("scan incomplete: open-PR catalog exceeds bound")
+        for item in batch:
+            number = item.get("number") if isinstance(item, dict) else None
+            if type(number) is not int or number in seen:
+                raise PublishError("invalid or unstable open-PR catalog")
+            seen.add(number)
+        entries.extend(batch)
+        if len(batch) < 100:
+            return entries
+    raise PublishError("scan incomplete: pagination limit reached")
+
+
 def scan_open_prs(api: Github) -> str:
     """Bounded periodic scan; trusted default workflow, no PR event tokens."""
-    prs = api.json(
-        "GET",
-        api.prefix + "/pulls?state=open&sort=updated&direction=desc&per_page=100",
-    )
-    if not isinstance(prs, list):
-        raise PublishError("invalid open-PR catalog")
-    if len(prs) > 100:
-        raise PublishError("open-PR catalog exceeds bound")
+    deadline = time.monotonic() + SCAN_SECONDS
+    prs = _open_pr_catalog(api)
     checked = 0
     changed = 0
     blocked: list[int] = []
     for item in prs:
+        if time.monotonic() >= deadline:
+            raise PublishError("scan incomplete: total time budget exhausted")
         if not isinstance(item, dict):
             raise PublishError("invalid open-PR entry")
         owner = (item.get("head") or {}).get("repo") or {}
@@ -393,6 +445,8 @@ def scan_open_prs(api: Github) -> str:
             continue
         if result in ("created", "updated"):
             changed += 1
+    if time.monotonic() >= deadline:
+        raise PublishError("scan incomplete: total time budget exhausted")
     if blocked:
         raise PublishError(f"{len(blocked)} preview publication(s) failed; first PR #{blocked[0]}")
     return f"scan_checked={checked} preview_comments_changed={changed}"

@@ -63,3 +63,20 @@ reported C901 (72 vs 69) and PLR0911 (20 vs 19). Extract facet decoding, preview
 and final current-head publication into focused helpers; preserve the repository ratchet.
 Focused renderer suite plus reliability gate: **60 passed locally** (59 + 1), Ruff passed.
 No baseline or rule suppression change. Subsequent exact-head CI is required separately.
+
+## Follow-up fixes for scan/catalog findings
+
+Admission: owner requested continuation; same Issue #1118 / Draft PR #1124 implementation
+lane, isolated local branch fix/3d-preview-contract-1118; published base 4d4e790.
+No merge, printer use or privileged-trigger activation authorized.
+
+- 100/101/112/300 PR pagination cases pass; 301 entries are explicit incomplete before writes.
+- Duplicate pagination entries fail closed; scan wall-budget exhaustion is explicit.
+- 15-mesh regression renders only three, labels all 12 others unavailable, and reuses one
+  comment without another image commit on a duplicate head event.
+- Real source check: PR #1114 d819c20, all 15 original mesh bytes supplied to publisher via
+  in-process fake GitHub API (no privileged workflow run). Actual credential-free renderers
+  produced three PNGs: 19,415 / 14,387 / 14,903 bytes. Report includes 12 unavailable paths;
+  second run unchanged, one comment, one image publication call. No source files altered.
+- Renderer/publisher + reliability: 68 passed locally; Ruff and offline Zizmor passed.
+  New exact-head GitHub CI is recorded in PR comments, not inferred from prior green head.
