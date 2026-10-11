@@ -18,8 +18,17 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-from alice_a1mini_preview import embed_preview
-from alice_a1mini_pla_cube_slice import (
+if __package__:
+    from .alice_a1mini_preview import embed_preview
+    from .alice_a1mini_pla_cube_slice import (
+        _read_sliced_archive,
+        _validate_gcode,
+        _validate_profile,
+        profiles,
+    )
+else:
+    from alice_a1mini_preview import embed_preview
+    from alice_a1mini_pla_cube_slice import (
     _read_sliced_archive,
     _validate_gcode,
     _validate_profile,
