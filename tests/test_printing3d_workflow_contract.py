@@ -84,36 +84,62 @@ class PrintWorkflowTests(unittest.TestCase):
     def test_wrong_profile_and_unsliced_artifact_rejected(self):
         self.workflow.advance(self.owner, self.id, "CAD_READY", {})
         self.workflow.advance(
-            self.owner, self.id, "GEOMETRY_VERIFIED",
+            self.owner,
+            self.id,
+            "GEOMETRY_VERIFIED",
             {"report_sha256": REPORT, "geometry_passed": True},
         )
         for filename, material in [("unsliced.3mf", "PETG"), (FILENAME, "PLA")]:
             with self.assertRaises(PrintGateError):
                 self.workflow.advance(
-                    self.owner, self.id, "SLICED",
-                    {"filename": filename, "artifact_sha256": SHA,
-                     "machine": "Bambu Lab A1 mini", "material": material, "nozzle_mm": 0.4},
+                    self.owner,
+                    self.id,
+                    "SLICED",
+                    {
+                        "filename": filename,
+                        "artifact_sha256": SHA,
+                        "machine": "Bambu Lab A1 mini",
+                        "material": material,
+                        "nozzle_mm": 0.4,
+                    },
                 )
 
     def test_bad_staging_readback_blocks(self):
         self.workflow.advance(self.owner, self.id, "CAD_READY", {})
         self.workflow.advance(
-            self.owner, self.id, "GEOMETRY_VERIFIED",
+            self.owner,
+            self.id,
+            "GEOMETRY_VERIFIED",
             {"report_sha256": REPORT, "geometry_passed": True},
         )
         self.workflow.advance(
-            self.owner, self.id, "SLICED",
-            {"filename": FILENAME, "artifact_sha256": SHA,
-             "material": "PETG", "machine": "Bambu Lab A1 mini", "nozzle_mm": 0.4},
+            self.owner,
+            self.id,
+            "SLICED",
+            {
+                "filename": FILENAME,
+                "artifact_sha256": SHA,
+                "material": "PETG",
+                "machine": "Bambu Lab A1 mini",
+                "nozzle_mm": 0.4,
+            },
         )
         self.workflow.advance(
-            self.owner, self.id, "AUDITED",
-            {"result": "ready_for_review", "single_plate": True,
-             "artifact_sha256": SHA, "report_sha256": REPORT},
+            self.owner,
+            self.id,
+            "AUDITED",
+            {
+                "result": "ready_for_review",
+                "single_plate": True,
+                "artifact_sha256": SHA,
+                "report_sha256": REPORT,
+            },
         )
         with self.assertRaises(PrintGateError):
             self.workflow.advance(
-                self.owner, self.id, "STAGED",
+                self.owner,
+                self.id,
+                "STAGED",
                 {"filename": FILENAME, "remote_sha256": REPORT, "readback_verified": True},
             )
 
@@ -123,7 +149,9 @@ class PrintWorkflowTests(unittest.TestCase):
         grant = self.workflow.sign_start_grant(
             self.store.read(self.owner, self.id),
             operator_id="authenticated-human",
-            key=key, expires_at=int(time.time()) + 120, nonce=uuid.uuid4().hex,
+            key=key,
+            expires_at=int(time.time()) + 120,
+            nonce=uuid.uuid4().hex,
         )
         tampered = dict(grant, artifact_sha256=REPORT)
         with self.assertRaises(PrintGateError):
@@ -136,9 +164,10 @@ class PrintWorkflowTests(unittest.TestCase):
             PrintWorkflow(FileJobStore(Path(self.tmp.name))).redeem_start(
                 self.owner, self.id, grant, key
             )
-        self.assertEqual(self.workflow.mark_start_result(
-            self.owner, self.id, observed_printing=False
-        )["state"], "START_UNKNOWN")
+        self.assertEqual(
+            self.workflow.mark_start_result(self.owner, self.id, observed_printing=False)["state"],
+            "START_UNKNOWN",
+        )
         with self.assertRaises(PrintGateError):
             self.workflow.mark_start_result(self.owner, self.id, observed_printing=True)
 
@@ -225,8 +254,10 @@ class VideoArchiveTests(unittest.TestCase):
 
     def test_remote_integrity_mismatch_blocks_success(self):
         self.drive.existing = {
-            "id": "existing", "name": self.job + "_bad.mp4",
-            "size": "999999", "md5Checksum": "wrong",
+            "id": "existing",
+            "name": self.job + "_bad.mp4",
+            "size": "999999",
+            "md5Checksum": "wrong",
         }
         with self.assertRaisesRegex(ArchiveError, "metadata mismatch"):
             self.service.archive(self.owner, self.job, self.file)
@@ -273,7 +304,7 @@ class FakeFTPS:
     def retrbinary(self, command, callback, blocksize):
         self.commands.append(command.split()[0])
         for i in range(0, len(self.data[command.split()[1]]), blocksize):
-            callback(self.data[command.split()[1]][i:i + blocksize])
+            callback(self.data[command.split()[1]][i : i + blocksize])
 
     def quit(self):
         pass

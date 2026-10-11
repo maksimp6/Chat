@@ -3,6 +3,7 @@
 Video bytes never belong in a public Git repository or Execution Trace.
 The OAuth token provider must come from Alice's server-side SecretProvider.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +15,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 MAX_VIDEO_BYTES = 10 * 1024 * 1024 * 1024
 MIN_FREE_RESERVE = 512 * 1024 * 1024
@@ -39,8 +40,8 @@ class MediaProof:
 
 class DriveClient(Protocol):
     def quota(self) -> tuple[int | None, int | None]: ...
-    def lookup(self, filename: str, sha256: str, parent_id: str) -> dict | None: ...
-    def upload(self, source: Path, proof: MediaProof, parent_id: str) -> dict: ...
+    def lookup(self, filename: str, sha256: str, parent_id: str) -> dict[str, Any] | None: ...
+    def upload(self, source: Path, proof: MediaProof, parent_id: str) -> dict[str, Any]: ...
 
 
 def _check_video(source: Path, root: Path, owner: str, job_id: str) -> MediaProof:
@@ -84,7 +85,7 @@ class VideoArchive:
         self.drive = drive
         self.folder_id = folder_id
 
-    def archive(self, owner: str, job_id: str, video: Path) -> dict:
+    def archive(self, owner: str, job_id: str, video: Path) -> dict[str, Any]:
         proof = _check_video(video, self.spool, owner, job_id)
         remote_name = job_id + "_" + proof.sha256[:12] + "_" + proof.filename
         existing = self.drive.lookup(remote_name, proof.sha256, self.folder_id)
@@ -99,7 +100,7 @@ class VideoArchive:
         return self._verify(remote, proof, remote_name)
 
     @staticmethod
-    def _verify(remote: dict, proof: MediaProof, remote_name: str) -> dict:
+    def _verify(remote: dict[str, Any], proof: MediaProof, remote_name: str) -> dict[str, Any]:
         if (
             not isinstance(remote, dict)
             or not isinstance(remote.get("id"), str)
@@ -118,6 +119,13 @@ class VideoArchive:
         }
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Do not forward a bearer token to a Location supplied by a server."""
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
 class GoogleDriveResumableClient:
     """Native Google Drive API v3 resumable upload using runtime OAuth.
 
@@ -130,6 +138,7 @@ class GoogleDriveResumableClient:
 
     def __init__(self, token_provider: Callable[[], str]):
         self._token_provider = token_provider
+        self._opener = urllib.request.build_opener(_NoRedirect())
 
     def _request(
         self,
@@ -155,7 +164,7 @@ class GoogleDriveResumableClient:
                 },
             )
             try:
-                with urllib.request.urlopen(request, timeout=60) as response:
+                with self._opener.open(request, timeout=60) as response:
                     return response.status, dict(response.headers), response.read(1024 * 1024)
             except urllib.error.HTTPError as error:
                 if error.code == 308:
@@ -178,13 +187,21 @@ class GoogleDriveResumableClient:
         used = quota.get("usage")
         return (int(limit) if limit is not None else None, int(used) if used is not None else None)
 
-    def lookup(self, filename: str, sha256: str, parent_id: str) -> dict | None:
+    def lookup(self, filename: str, sha256: str, parent_id: str) -> dict[str, Any] | None:
         if not FOLDER_ID.fullmatch(parent_id) or not re.fullmatch(r"[a-f0-9]{64}", sha256):
             raise ArchiveError("invalid Drive parent/hash")
         escaped = filename.replace("\\", "\\\\").replace("'", "\\'")
         query = f"'{parent_id}' in parents and name = '{escaped}' and trashed = false"
-        url = self.BASE + "/drive/v3/files?" + urllib.parse.urlencode(
-            {"q": query, "fields": "files(id,name,size,md5Checksum,appProperties),nextPageToken", "page_size": 20}
+        url = (
+            self.BASE
+            + "/drive/v3/files?"
+            + urllib.parse.urlencode(
+                {
+                    "q": query,
+                    "fields": "files(id,name,size,md5Checksum,appProperties),nextPageToken",
+                    "page_size": 20,
+                }
+            )
         )
         status, _, raw = self._request("GET", url)
         if status != 200:
@@ -192,18 +209,29 @@ class GoogleDriveResumableClient:
         data = json.loads(raw)
         files = data.get("files", [])
         matching = [f for f in files if f.get("appProperties", {}).get("sha256") == sha256]
-        if len(matching) > 1:
-            raise ArchiveError("ambiguous duplicate Drive videos")
+        if len(matching) > 1 or (files and not matching):
+            raise ArchiveError("conflicting or ambiguous Drive video metadata")
         return matching[0] if matching else None
 
-    def upload(self, source: Path, proof: MediaProof, parent_id: str) -> dict:
+    @staticmethod
+    def _require_session(status: int, headers: dict[str, str]) -> str:
+        session = headers.get("Location") or headers.get("location")
+        if status not in (200, 201) or not session:
+            raise ArchiveError("Drive did not return a resumable upload session")
+        return session
+
+    def upload(self, source: Path, proof: MediaProof, parent_id: str) -> dict[str, Any]:
         if not FOLDER_ID.fullmatch(parent_id):
             raise ArchiveError("invalid Drive folder")
         name = proof.job_id + "_" + proof.sha256[:12] + "_" + proof.filename
-        metadata = {
+        metadata: dict[str, Any] = {
             "name": name,
             "parents": [parent_id],
-            "mimeType": { ".mp4": "video/mp4", ".avi": "video/x-msvideo", ".mkv": "video/x-matroska" }[source.suffix.lower()],
+            "mimeType": {
+                ".mp4": "video/mp4",
+                ".avi": "video/x-msvideo",
+                ".mkv": "video/x-matroska",
+            }[source.suffix.lower()],
             "appProperties": {
                 "job_id": proof.job_id,
                 "owner_hash": proof.owner_hash,
@@ -212,7 +240,8 @@ class GoogleDriveResumableClient:
         }
         status, headers, _ = self._request(
             "POST",
-            self.BASE + "/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,md5Checksum",
+            self.BASE
+            + "/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,md5Checksum",
             json.dumps(metadata).encode(),
             {
                 "Content-Type": "application/json; charset=UTF-8",
@@ -220,18 +249,22 @@ class GoogleDriveResumableClient:
                 "X-Upload-Content-Length": str(proof.bytes),
             },
         )
-        session = headers.get("Location") or headers.get("location")
-        if status not in (200, 201) or not session:
-            raise ArchiveError("Drive did not return a resumable upload session")
+        session = self._require_session(status, headers)
         offset = 0
-        with source.open("rb") as stream:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(source, flags)
+        with os.fdopen(fd, "rb") as stream:
+            if os.fstat(stream.fileno()).st_size != proof.bytes:
+                raise ArchiveError("video changed since local audit")
             while offset < proof.bytes:
                 chunk = stream.read(min(self.CHUNK_BYTES, proof.bytes - offset))
                 if not chunk:
                     raise ArchiveError("local video ended before expected size")
                 end = offset + len(chunk) - 1
                 code, response_headers, result = self._request(
-                    "PUT", session, chunk,
+                    "PUT",
+                    session,
+                    chunk,
                     {
                         "Content-Type": metadata["mimeType"],
                         "Content-Length": str(len(chunk)),

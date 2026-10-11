@@ -3,17 +3,20 @@
 No print/start/heater controls are implemented in this transport. All Bambu
 device identifiers and access codes are supplied at runtime, not committed.
 """
+
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import re
 import socket
 import ssl
 import tempfile
-from ftplib import FTP, FTP_TLS
+from contextlib import suppress
+from ftplib import FTP, FTP_TLS, Error
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 HEX64 = re.compile(r"^[a-f0-9]{64}$")
 SAFE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,150}$")
@@ -37,6 +40,7 @@ class ImplicitPinnedFTPS(FTP_TLS):
         context.verify_mode = ssl.CERT_NONE
         super().__init__(context=context, timeout=timeout)
         self._fingerprint = fingerprint
+        self._prot_p: bool = False
 
     def _pin(self, sock: ssl.SSLSocket) -> None:
         cert = sock.getpeercert(binary_form=True)
@@ -48,7 +52,7 @@ class ImplicitPinnedFTPS(FTP_TLS):
         self,
         host: str = "",
         port: int = 990,
-        timeout: int | None = None,
+        timeout: float = 20.0,
         source_address: tuple[str, int] | None = None,
     ) -> str:
         if port != 990:
@@ -64,14 +68,16 @@ class ImplicitPinnedFTPS(FTP_TLS):
         self.welcome = self.getresp()
         return self.welcome
 
-    def ntransfercmd(self, cmd: str, rest: str | None = None):
+    def ntransfercmd(
+        self, cmd: str, rest: int | str | None = None
+    ) -> tuple[socket.socket, int | None]:
         sock, size = FTP.ntransfercmd(self, cmd, rest)
         if self._prot_p:
             try:
                 secure = self.context.wrap_socket(sock, server_hostname=self.host)
                 self._pin(secure)
                 sock = secure
-            except Exception:
+            except (OSError, ValueError, Error, PrinterTransferError):
                 sock.close()
                 raise
         return sock, size
@@ -97,6 +103,13 @@ class PrinterStorage:
         self.secret_provider = secret_provider
         self.connector = connector
 
+    @staticmethod
+    def _close(ftp: FTP_TLS) -> None:
+        with suppress(OSError, EOFError, Error):
+            ftp.quit()
+        with suppress(OSError, EOFError, Error):
+            ftp.close()
+
     def _connect(self) -> FTP_TLS:
         ftp = self.connector(self.fingerprint)
         try:
@@ -107,11 +120,8 @@ class PrinterStorage:
             ftp.login("bblp", credential)
             ftp.prot_p()
             return ftp
-        except Exception:
-            try:
-                ftp.close()
-            except Exception:
-                pass
+        except (OSError, EOFError, ValueError, Error, PrinterTransferError):
+            self._close(ftp)
             raise PrinterTransferError("FTPS connection or authorization rejected") from None
 
     @staticmethod
@@ -140,39 +150,42 @@ class PrinterStorage:
         ftp.retrbinary("RETR " + filename, receive, blocksize=128 * 1024)
         return hasher.hexdigest(), total
 
-    def stage_verified(self, filename: str, local_file: Path, expected_sha256: str) -> dict:
-        """Never auto-retry an uncertain STOR; verify readback first."""
-        self._name(filename)
-        if not HEX64.fullmatch(expected_sha256) or local_file.is_symlink() or not local_file.is_file():
+    @staticmethod
+    def _validate_source(filename: str, source: Path, expected: str) -> tuple[int, str, bytes]:
+        if not HEX64.fullmatch(expected) or source.is_symlink() or not source.is_file():
             raise PrinterTransferError("untrusted staging path or hash")
-        if local_file.name != filename:
+        if source.name != filename:
             raise PrinterTransferError("source/remote basename mismatch")
-        size = local_file.stat().st_size
+        size = source.stat().st_size
         if not 0 < size <= MAX_JOB_BYTES:
             raise PrinterTransferError("staged 3MF too large")
-        actual = hashlib.sha256(local_file.read_bytes()).hexdigest()
-        if actual != expected_sha256:
+        blob = source.read_bytes()
+        actual = hashlib.sha256(blob).hexdigest()
+        if actual != expected or len(blob) != size:
             raise PrinterTransferError("local 3MF hash mismatch")
+        return size, actual, blob
+
+    @staticmethod
+    def _upload_if_missing(ftp: FTP_TLS, filename: str, blob: bytes) -> None:
+        if filename in [Path(name).name for name in ftp.nlst()]:
+            return
+        try:
+            ftp.storbinary("STOR " + filename, io.BytesIO(blob), blocksize=128 * 1024)
+        except (OSError, EOFError, Error):
+            # STOR may have committed despite a timeout. VERIFY REMOTE; do not retry.
+            return
+
+    def stage_verified(
+        self, filename: str, local_file: Path, expected_sha256: str
+    ) -> dict[str, Any]:
+        """Stage one bounded G-code plate and prove the bytes match readback."""
+        self._name(filename)
+        size, actual, blob = self._validate_source(filename, local_file, expected_sha256)
         ftp = self._connect()
         try:
             ftp.cwd("/model")
-            exists = filename in [Path(n).name for n in ftp.nlst()]
-            if not exists:
-                transfer_error = False
-                try:
-                    with local_file.open("rb") as src:
-                        ftp.storbinary("STOR " + filename, src, blocksize=128 * 1024)
-                except Exception:
-                    transfer_error = True
-                # Even a timeout may follow a successful STOR. Read back exactly once.
-                try:
-                    remote_sha, remote_size = self._remote_hash(ftp, filename, MAX_JOB_BYTES)
-                except Exception:
-                    raise PrinterTransferError("upload uncertain; do not blindly retry") from None
-                if transfer_error and (remote_sha != actual or remote_size != size):
-                    raise PrinterTransferError("upload was interrupted; no automatic retry")
-            else:
-                remote_sha, remote_size = self._remote_hash(ftp, filename, MAX_JOB_BYTES)
+            self._upload_if_missing(ftp, filename, blob)
+            remote_sha, remote_size = self._remote_hash(ftp, filename, MAX_JOB_BYTES)
             if remote_sha != actual or remote_size != size:
                 raise PrinterTransferError("remote SD hash/size mismatch")
             return {
@@ -185,24 +198,19 @@ class PrinterStorage:
             }
         except PrinterTransferError:
             raise
-        except Exception:
-            raise PrinterTransferError("FTPS staging blocked; printer state unchanged") from None
+        except (OSError, EOFError, Error):
+            raise PrinterTransferError("FTPS staging uncertain; no blind retry") from None
         finally:
-            try:
-                ftp.quit()
-            except Exception:
-                ftp.close()
+            self._close(ftp)
 
-    def fetch_video(
-        self,
+    @staticmethod
+    def _video_destination(
         owner_hash: str,
         job_id: str,
         remote_folder: str,
         filename: str,
         spool_root: Path,
     ) -> Path:
-        """Copy a recording; NEVER delete it from the printer SD."""
-        self._name(filename, video=True)
         if not HEX64.fullmatch(owner_hash) or not JOB_ID.fullmatch(job_id):
             raise PrinterTransferError("invalid trusted owner/job id")
         if remote_folder not in {"/timelapse", "/recorder"}:
@@ -214,37 +222,55 @@ class PrinterStorage:
         destination = output_dir / filename
         if destination.exists() or destination.is_symlink():
             raise PrinterTransferError("recording exists; will not overwrite")
-        ftp = self._connect()
-        fd, tmp = tempfile.mkstemp(prefix=".video-", dir=output_dir)
-        try:
-            ftp.cwd(remote_folder)
-            total = 0
+        return destination
+
+    @staticmethod
+    def _download_video(ftp: FTP_TLS, filename: str, fd: int) -> None:
+        total = 0
+        with os.fdopen(fd, "wb", closefd=False) as stream:
 
             def write(block: bytes) -> None:
                 nonlocal total
                 total += len(block)
                 if total > MAX_VIDEO_BYTES:
                     raise PrinterTransferError("printer recording exceeds size cap")
-                os.write(fd, block)
+                stream.write(block)
 
             ftp.retrbinary("RETR " + filename, write, blocksize=128 * 1024)
             if total == 0:
                 raise PrinterTransferError("empty printer recording")
-            os.fsync(fd)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def fetch_video(
+        self,
+        owner_hash: str,
+        job_id: str,
+        remote_folder: str,
+        filename: str,
+        spool_root: Path,
+    ) -> Path:
+        """Read a printer recording; NEVER delete it from the printer SD."""
+        self._name(filename, video=True)
+        destination = self._video_destination(
+            owner_hash, job_id, remote_folder, filename, spool_root
+        )
+        ftp = self._connect()
+        fd, temporary = tempfile.mkstemp(prefix=".video-", dir=destination.parent)
+        try:
+            ftp.cwd(remote_folder)
+            self._download_video(ftp, filename, fd)
             os.close(fd)
             fd = -1
-            os.replace(tmp, destination)
+            os.link(temporary, destination, follow_symlinks=False)
             return destination
         except PrinterTransferError:
             raise
-        except Exception:
-            raise PrinterTransferError("printer recording unavailable; retry after inspection") from None
+        except (OSError, EOFError, Error):
+            raise PrinterTransferError("printer recording unavailable") from None
         finally:
             if fd >= 0:
                 os.close(fd)
-            if os.path.exists(tmp):
-                os.unlink(tmp)
-            try:
-                ftp.quit()
-            except Exception:
-                ftp.close()
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+            self._close(ftp)
