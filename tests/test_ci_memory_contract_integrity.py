@@ -22,6 +22,7 @@ class IntegrityGuardContracts(unittest.TestCase):
                 "tests/test_memory_store.py",
                 "tests/__init__.py",
                 "scripts/run_fast_contracts_trusted.py",
+                "scripts/check_memory_fast_budget.py",
                 "scripts/run_fast_contracts.py",
             }
             <= set(FROZEN_SHA256)
@@ -43,6 +44,10 @@ class IntegrityGuardContracts(unittest.TestCase):
             "python -I -S .trusted-memory-policy/scripts/run_fast_contracts_trusted.py", fast_job
         )
         self.assertIn("python scripts/run_fast_contracts.py", fast_job)
+        self.assertIn(
+            "python -I -S .trusted-memory-policy/scripts/check_memory_fast_budget.py",
+            fast_job,
+        )
 
     def test_mutable_python_import_hook_is_rejected(self):
         with TemporaryDirectory() as directory:

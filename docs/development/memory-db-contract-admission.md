@@ -17,7 +17,7 @@ The fast job checks out an immutable policy commit by its full SHA and executes 
 4. Rejects skipped, expected-failure, unexpected-success, missing or failing tests.
 5. Measures import plus execution against the 2-second limit.
 
-The original pinned `scripts/run_fast_contracts.py` also executes for backwards compatibility with accepted CI workflow contracts. The job enforces a **single combined 2-second wall-clock test budget** for both executions; package/setup time is outside this limit. This deliberate temporary duplication avoids weakening frozen tests.
+The original pinned `scripts/run_fast_contracts.py` also executes for backwards compatibility with accepted CI workflow contracts. A pinned parser enforces a **combined 2-second budget for both measured import-and-test intervals**, excluding Python interpreter startup, shell overhead and GitHub setup (matching the original #1104 timing scope). This temporary duplicate execution avoids weakening frozen tests; wall-clock job duration is separately visible.
 
 To add a new contract, add a new file or reviewed test suite, update the trusted inventory and SHA-256 manifest, create a new immutable policy commit, pin it in the workflow, verify all negative tests and exact-head CI, and request independent approval. Never silently rewrite an accepted test to improve CI results.
 

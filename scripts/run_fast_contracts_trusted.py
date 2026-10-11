@@ -123,7 +123,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         suite, identities = load_cases(root)
         result = unittest.TextTestRunner(verbosity=2).run(suite)
-    except Exception as exc:
+    except (
+        AttributeError,
+        ImportError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         print(f"BLOCKED: trusted runner failed: {exc}", file=sys.stderr)
         return 1
 

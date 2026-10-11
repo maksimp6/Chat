@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from scripts import run_fast_contracts_trusted as trusted
+from scripts import check_memory_fast_budget as budget
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,7 +33,21 @@ class TrustedImportContracts(unittest.TestCase):
             "python -I -S .trusted-memory-policy/scripts/run_fast_contracts_trusted.py", lane
         )
         self.assertIn("python scripts/run_fast_contracts.py", lane)
-        self.assertIn("elapsed_ns > 2000000000", lane)
+        self.assertIn("check_memory_fast_budget.py", lane)
+
+    def test_combined_budget_rejects_missing_or_fabricated_results(self):
+        trusted_line = (
+            "Fast isolated contracts: 15/15 in 0.800s "
+            "(budget 2.0s), skipped=0, integrity=VERIFIED"
+        )
+        legacy_line = "Fast isolated contracts: 15 tests in 0.050s (budget 2.0s)"
+        self.assertAlmostEqual(budget.combined_seconds(trusted_line, legacy_line), 0.85)
+        with self.assertRaises(ValueError):
+            budget.combined_seconds(trusted_line.replace("skipped=0", "skipped=1"), legacy_line)
+        with self.assertRaises(ValueError):
+            budget.combined_seconds(trusted_line + "\n" + trusted_line, legacy_line)
+        with self.assertRaises(ValueError):
+            budget.combined_seconds(trusted_line, "not executed")
 
     def test_fabricated_success_with_skips_is_rejected(self):
         result = unittest.TestResult()

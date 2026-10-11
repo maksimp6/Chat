@@ -13,6 +13,7 @@ on:
       - "scripts/check_memory_contract_integrity.py"
       - "scripts/run_fast_contracts.py"
       - "scripts/run_fast_contracts_trusted.py"
+      - "scripts/check_memory_fast_budget.py"
       - "tests/test_ci_memory_trusted_runner.py"
       - "tests/__init__.py"
       - ".github/workflows/ci.yml"
