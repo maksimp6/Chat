@@ -71,15 +71,11 @@ and the default active listing excludes expired records.
 
 The store does not automatically overwrite current GitHub facts with remembered data.
 
-## Storage
+## Storage — legacy slice and target
 
-`AgentMemoryStore` uses the existing database abstraction:
+**Legacy implementation documented by issue #578:** `AgentMemoryStore` used the database abstraction (SQLite by default, PostgreSQL selected by `ALICE_DATABASE_URL`) with deterministic JSON metadata. This is historical implementation context, **not** a declaration that SQL is the target or that current runtime is already SQL-free.
 
-- SQLite by default;
-- PostgreSQL when `ALICE_DATABASE_URL` selects it.
-
-The schema stores structured metadata as deterministic JSON text, so correctness does
-not depend on a vector database or external retrieval service.
+**Target:** move the typed agent-memory adapter to the file-native Memory DB under the [target architecture](memory-db-target.md), retaining provenance, role visibility, freshness, deterministic serialization and the secret boundary. Validate the actual current adapter and cutover state against source and tests before claiming completion. No implicit import of legacy `global_memory`.
 
 Hybrid retrieval/embeddings belong to #579.
 
