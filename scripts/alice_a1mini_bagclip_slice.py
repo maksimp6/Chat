@@ -88,7 +88,6 @@ def validate_source(path: Path) -> str:
     return digest
 
 
-
 def merge_plate_stl(source: Path, destination: Path) -> int:
     """Convert the exact pin-checked source 3MF into one three-island binary STL.
 
@@ -122,8 +121,7 @@ def merge_plate_stl(source: Path, destination: Path) -> int:
         for face in tris:
             try:
                 a, b, c = [
-                    tuple(coords[n][i] + shift[i] for i in range(3))
-                    for n in face
+                    tuple(coords[n][i] + shift[i] for i in range(3)) for n in face
                 ]
             except IndexError as exc:
                 raise RuntimeError("source 3MF has invalid triangle indices") from exc
