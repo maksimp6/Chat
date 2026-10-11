@@ -109,6 +109,33 @@ class Commit:
     digest: str
 
 
+def _trusted_mount_id(fd: int) -> int:
+    """Read the kernel mount identity; reject unverifiable Linux mounts."""
+    try:
+        with open(f"/proc/self/fdinfo/{fd}", encoding="ascii") as info:
+            for line in info:
+                if line.startswith("mnt_id:"):
+                    return int(line.split(":", 1)[1].strip())
+    except (OSError, ValueError) as exc:
+        raise StoreError("unverifiable Memory DB mount boundary") from exc
+    raise StoreError("unverifiable Memory DB mount boundary")
+
+
+def _reject_extended_acl(fd: int) -> None:
+    """Fail closed on POSIX access/default ACL xattrs, including inherited ACLs."""
+    import errno
+
+    for name in ("system.posix_acl_access", "system.posix_acl_default"):
+        try:
+            os.getxattr(fd, name)
+        except OSError as exc:
+            if exc.errno in (errno.ENODATA,):
+                continue
+            raise StoreError("unverifiable Memory DB ACL") from exc
+        raise StoreError("untrusted Memory DB ACL")
+
+
+
 def _open_directory_nofollow(directory: Path) -> int:
     """Pin every directory component; never traverse a symlink."""
     absolute = Path(os.path.abspath(directory))
@@ -117,11 +144,16 @@ def _open_directory_nofollow(directory: Path) -> int:
     try:
         if trusted:
             _verify_trusted_ancestor(fd)
+            previous_mount = _trusted_mount_id(fd)
         for part in absolute.parts[1:]:
             next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             try:
                 if trusted:
                     _verify_trusted_ancestor(next_fd)
+                    current_mount = _trusted_mount_id(next_fd)
+                    if current_mount != previous_mount:
+                        raise StoreError("untrusted Memory DB mount boundary")
+                    previous_mount = current_mount
             except BaseException:
                 os.close(next_fd)
                 raise
@@ -139,6 +171,7 @@ def _verify_trusted_ancestor(fd: int) -> None:
 
     metadata = os.fstat(fd)
     mode = metadata.st_mode
+    _reject_extended_acl(fd)
     if not stat.S_ISDIR(mode):
         raise StoreError("untrusted Memory DB ancestor")
     # Only root and the service identity may own path components.
@@ -155,6 +188,7 @@ def _verify_trusted_root(directory_fd: int) -> None:
     import stat
 
     metadata = os.fstat(directory_fd)
+    _reject_extended_acl(directory_fd)
     if (
         not stat.S_ISDIR(metadata.st_mode)
         or metadata.st_uid != os.geteuid()
@@ -169,6 +203,7 @@ def _verify_private_file(fd: int) -> None:
     import stat
 
     metadata = os.fstat(fd)
+    _reject_extended_acl(fd)
     if (
         not stat.S_ISREG(metadata.st_mode)
         or metadata.st_uid != os.geteuid()
