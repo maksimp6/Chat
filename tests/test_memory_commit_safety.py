@@ -268,38 +268,26 @@ def test_invalid_utf8_value_never_reaches_journal(tmp_path):
 
 @pytest.mark.parametrize("failure", ["short", "readonly"])
 def test_write_fault_never_acknowledges_or_publishes(tmp_path, monkeypatch, failure):
-    import memory_engine.store as engine
-
     path = tmp_path / "state.memory"
     with MemoryStore(path) as store:
         store.set("stable", 1)
         store.commit()
-        original_open = engine._open_journal_nofollow
-        original_fdopen = os.fdopen
+        original_write = os.write
+        original_fsync = os.fsync
+        journal_fd = store._engine._journal_fd
 
-        def faulty_open(directory_fd, name, flags):
-            if name == path.name and flags & os.O_APPEND and failure == "readonly":
-                raise OSError(errno.EROFS, "read only")
-            return original_open(directory_fd, name, flags)
-
-        class ShortStream:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
-            def write(self, data):
+        def faulty_write(fd, data):
+            if fd == journal_fd and failure == "short":
                 return 0
+            return original_write(fd, data)
 
-        def faulty_fdopen(fd, mode="r", *args, **kwargs):
-            if failure == "short" and mode == "ab":
-                os.close(fd)
-                return ShortStream()
-            return original_fdopen(fd, mode, *args, **kwargs)
+        def faulty_fsync(fd):
+            if fd == journal_fd and failure == "readonly":
+                raise OSError(errno.EROFS, "read only")
+            return original_fsync(fd)
 
-        monkeypatch.setattr(engine, "_open_journal_nofollow", faulty_open)
-        monkeypatch.setattr(os, "fdopen", faulty_fdopen)
+        monkeypatch.setattr(os, "write", faulty_write)
+        monkeypatch.setattr(os, "fsync", faulty_fsync)
         with pytest.raises(StoreError, match="commit failed"):
             with store.transaction() as tx:
                 tx.set("new", 2)
