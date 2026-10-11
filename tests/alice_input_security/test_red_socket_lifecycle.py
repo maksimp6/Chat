@@ -49,13 +49,16 @@ def test_group_setup_failure_removes_own_socket(harness,monkeypatch,failure):
 def test_directory_swap_before_bind_is_rejected(harness,monkeypatch):
     import alice_mouse.security.socket_boundary as module
     directory,_,_,_,verifier,endpoint,_=harness
-    original=module._check_directory
+    original=module.os.open
     moved=directory.parent/(directory.name+"-moved")
-    def swap(path,**kwargs):
-        original(path,**kwargs)
-        directory.rename(moved)
-        directory.mkdir(mode=0o700)
-    monkeypatch.setattr(module,"_check_directory",swap)
+    def swap(path,flags,*args,**kwargs):
+        fd=original(path,flags,*args,**kwargs)
+        if os.fspath(path)==os.fspath(directory):
+            # Emulate replacement immediately after the root pinned its dirfd.
+            directory.rename(moved)
+            directory.mkdir(mode=0o700)
+        return fd
+    monkeypatch.setattr(module.os,"open",swap)
     try:
         with pytest.raises(SocketBoundaryError):
             endpoint.start()
