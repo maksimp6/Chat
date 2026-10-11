@@ -135,11 +135,12 @@ def _reject_extended_acl(fd: int) -> None:
         raise StoreError("untrusted Memory DB ACL")
 
 
-def _open_directory_nofollow(directory: Path) -> int:
+def _open_directory_nofollow(directory: Path, *, trusted: bool | None = None) -> int:
     """Pin every directory component; never traverse a symlink."""
     absolute = Path(os.path.abspath(directory))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
-    trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
+    if trusted is None:
+        trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
     try:
         if trusted:
             _verify_trusted_ancestor(fd)
@@ -212,7 +213,9 @@ def _verify_private_file(fd: int) -> None:
         raise StoreError("untrusted Memory DB file ownership or permissions")
 
 
-def _open_journal_nofollow(directory_fd: int, name: str, flags: int) -> int:
+def _open_journal_nofollow(
+    directory_fd: int, name: str, flags: int, *, trusted: bool | None = None
+) -> int:
     """Open a regular journal relative to the pinned directory."""
     fd = os.open(name, flags | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=directory_fd)
     try:
@@ -220,7 +223,9 @@ def _open_journal_nofollow(directory_fd: int, name: str, flags: int) -> int:
 
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise StoreError("journal must be a regular file")
-        if os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1":
+        if trusted is None:
+            trusted = os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1"
+        if trusted:
             _verify_private_file(fd)
         return fd
     except BaseException:
@@ -231,17 +236,18 @@ def _open_journal_nofollow(directory_fd: int, name: str, flags: int) -> int:
 class _JournalStore:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
+        self._trusted = (os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
         self._pid = os.getpid()
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            self._directory_fd = _open_directory_nofollow(self.path.parent)
-            if os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1":
+            self._directory_fd = _open_directory_nofollow(self.path.parent, trusted=self._trusted)
+            if self._trusted:
                 _verify_trusted_root(self._directory_fd)
             self._journal_name = self.path.name
             lock_fd = _open_journal_nofollow(
-                self._directory_fd, self._journal_name + ".lock", os.O_RDWR | os.O_CREAT
+                self._directory_fd, self._journal_name + ".lock", os.O_RDWR | os.O_CREAT, trusted=self._trusted
             )
         except (OSError, StoreError) as exc:
             if hasattr(self, "_directory_fd"):
@@ -289,16 +295,18 @@ class _JournalStore:
             return Commit(self._sequence, self._digest)
 
     @staticmethod
-    def _inspect_log(path: Path) -> tuple[dict[str, dict[str, Any]], int, str]:
+    def _inspect_log(
+        path: Path, *, trusted: bool | None = None
+    ) -> tuple[dict[str, dict[str, Any]], int, str]:
         """Verify journal integrity without changing the live instance."""
         state: dict[str, dict[str, Any]] = {}
         sequence = 0
         digest = "0" * 64
         if not path.exists():
             return state, sequence, digest
-        directory_fd = _open_directory_nofollow(path.parent)
+        directory_fd = _open_directory_nofollow(path.parent, trusted=trusted)
         try:
-            journal_fd = _open_journal_nofollow(directory_fd, path.name, os.O_RDONLY)
+            journal_fd = _open_journal_nofollow(directory_fd, path.name, os.O_RDONLY, trusted=trusted)
         except OSError as exc:
             raise StoreError("unsafe journal path") from exc
         finally:
@@ -369,7 +377,7 @@ class _JournalStore:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
-        self._state, self._sequence, self._digest = self._inspect_log(self.path)
+        self._state, self._sequence, self._digest = self._inspect_log(self.path, trusted=self._trusted)
 
     def get(self, namespace: str, key: str) -> Any | None:
         """Return a deep copy of the last confirmed value from RAM."""
@@ -507,26 +515,27 @@ class _JournalStore:
         expected_commit: Commit,
         *,
         destination_must_be_new: bool = False,
+        trusted: bool | None = None,
     ) -> None:
         """Copy from a no-follow source fd into a pinned destination directory."""
         import shutil
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        source_dir = _open_directory_nofollow(source.parent)
-        target_dir = _open_directory_nofollow(destination.parent)
+        source_dir = _open_directory_nofollow(source.parent, trusted=trusted)
+        target_dir = _open_directory_nofollow(destination.parent, trusted=trusted)
         temp_name = None
         try:
-            source_fd = _open_journal_nofollow(source_dir, source.name, os.O_RDONLY)
+            source_fd = _open_journal_nofollow(source_dir, source.name, os.O_RDONLY, trusted=trusted)
             temp_name = ".alice-copy-" + os.urandom(16).hex()
             temp_fd = _open_journal_nofollow(
-                target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, trusted=trusted
             )
             with os.fdopen(source_fd, "rb") as existing:
                 with os.fdopen(temp_fd, "wb") as output:
                     shutil.copyfileobj(existing, output)
                     output.flush()
                     os.fsync(output.fileno())
-            verify_fd = _open_journal_nofollow(target_dir, temp_name, os.O_RDONLY)
+            verify_fd = _open_journal_nofollow(target_dir, temp_name, os.O_RDONLY, trusted=trusted)
             with os.fdopen(verify_fd, "rb") as verified:
                 actual_state, sequence, digest = _JournalStore._inspect_stream(verified)
                 if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
@@ -571,6 +580,7 @@ class _JournalStore:
                 self._state,
                 self.last_commit,
                 destination_must_be_new=True,
+                trusted=self._trusted,
             )
 
     def restore(self, source: str | Path) -> None:
@@ -584,11 +594,11 @@ class _JournalStore:
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
                 raise StoreError("cannot restore from the live database path")
-            state, sequence, digest = self._inspect_log(origin)
+            state, sequence, digest = self._inspect_log(origin, trusted=self._trusted)
             if not origin.exists():
                 raise StoreError("backup source does not exist")
             try:
-                self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
+                self._copy_verified_file(origin, self.path, state, Commit(sequence, digest), trusted=self._trusted)
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
@@ -629,8 +639,8 @@ class MemoryStore:
 
     _NAMESPACE = "values"
 
-    def __init__(self, path: str | Path) -> None:
-        self._engine = _JournalStore(path)
+    def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
+        self._engine = _JournalStore(path, trusted=trusted)
         self._pending: dict[str, Any] = {}
 
     @property
