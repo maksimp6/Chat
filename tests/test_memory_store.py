@@ -30,6 +30,33 @@ def test_committed_values_survive_reopen(tmp_path):
         assert db.get("chats:1") == {"text": "hello"}
 
 
+@pytest.mark.parametrize("use_transaction", [False, True])
+def test_tuple_values_support_verified_backup_and_restore(tmp_path, use_transaction):
+    """JSON-compatible tuples must not make an acknowledged commit unbackable."""
+    path = tmp_path / "alice.memory"
+    backup = tmp_path / "backup.memory"
+    value = {"points": [(1, 2), {"nested": (3, 4)}]}
+    expected = {"points": [[1, 2], {"nested": [3, 4]}]}
+    with MemoryStore(path) as db:
+        if use_transaction:
+            with db.transaction() as tx:
+                tx.set("geometry", value)
+        else:
+            db.set("geometry", value)
+            db.commit()
+        db.backup(backup)
+        assert db.get("geometry") == expected
+        assert value["points"][0] == (1, 2)
+        committed = db.last_commit
+    with MemoryStore(path) as reopened:
+        assert reopened.get("geometry") == expected
+        assert reopened.last_commit == committed
+    with MemoryStore(tmp_path / "restored.memory") as restored:
+        restored.restore(backup)
+        assert restored.get("geometry") == expected
+        assert restored.last_commit == committed
+
+
 def test_transaction_rollback_does_not_persist(tmp_path):
     path = tmp_path / "alice.memory"
     with MemoryStore(path) as db:
