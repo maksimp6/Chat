@@ -37,6 +37,8 @@ Observe a currently active A1 mini print through authorized read-only status and
 5. Match status changes to images; distinguish a finished machine state from an inferred 100% progress. Report temperatures as measured, not desired values.
 6. If a serious defect is visible, issue a concise warning and request explicit authorization before any stop/pause. When unknown, ask for a better one-shot observation instead of claiming a failure.
 7. Return a concise observation with **timestamp, current job, state, percent, remaining minutes, visible findings, confidence and next safe action**.
+8. For `FINISH`/100%, set product outcome to `print_finished_unverified`. The machine finished a job, **not** a physical fit/strength assessment; even a clear camera photo cannot establish correct first-use function.
+9. If the owner reports a lever, hinge, printed pin or latch broke during snapping/closing, classify `functional_failed`, keep the original machine status separate, note the broken part and uncertainty, and **do not automatically reprint**. Ask for a joint close-up only when needed to distinguish fused release from normal-use fracture.
 
 ## Approval boundaries
 
@@ -44,7 +46,7 @@ Status and camera reads require authorized device access but do not authorize co
 
 ## Validation
 
-Read telemetry and camera independently; do not invent printer-side results. The last observed progress may become stale. Detect no-access, offline, invalid TLS pin, malformed status, camera timeout and blocked view.
+Read telemetry and camera independently; do not invent printer-side results. A completed printer job can still be `functional_failed` after the owner's mechanical test. The last observed progress may become stale. Detect no-access, offline, invalid TLS pin, malformed status, camera timeout and blocked view.
 
 ## Failure behavior
 
@@ -52,4 +54,4 @@ If status fails, say `printer status unavailable` rather than `idle`. If camera 
 
 ## Output
 
-Report observed print with percentage, remaining time, material/temperatures and a calibrated visual assessment. Show one photograph only when freshly captured. Never show credentials or imply a print was started.
+Report observed print with percentage, remaining time, material/temperatures and a calibrated visual assessment. Keep printer state (`FINISH`) separate from physical product state (`print_finished_unverified` or `functional_failed`). Show one photograph only when freshly captured. Never show credentials or imply a print was started.
