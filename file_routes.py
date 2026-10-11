@@ -1,10 +1,15 @@
 """Flask routes for Files and Vector Stores API"""
 
 import os
+import errno
+import stat
+from contextlib import contextmanager, ExitStack
+from collections.abc import Iterator
 import io
 import logging
 from flask import Blueprint, request, jsonify, Response
 from config import Config
+from invocation.problems import problem
 from yandex_client import YandexResponsesClient, YandexClientError
 
 logger = logging.getLogger("alice_pro")
@@ -206,29 +211,54 @@ def remove_file_from_vs(vs_id, file_id):
 LOCAL_REPO_DIR = os.getenv("ALICE_LOCAL_REPO_DIR", "/sdcard/repo")
 
 
+@contextmanager
+def _local_directory(root_dir: str, target_dir: str) -> Iterator[int]:
+    """Pin the checked directory without following newly substituted symlinks.
+
+    The configured root and its ancestors are trusted deployment paths. This is
+    not a sandbox against mounts or privileged renames of already-open trees.
+    Platforms without descriptor-relative directory access fail closed.
+    """
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    with ExitStack() as opened:
+        directory = os.open(root_dir, flags)
+        opened.callback(os.close, directory)
+        relative = os.path.relpath(target_dir, root_dir)
+        if relative != ".":
+            for component in relative.split(os.sep):
+                directory = os.open(component, flags, dir_fd=directory)
+                opened.callback(os.close, directory)
+        yield directory
+
+
 @file_bp.route("/api/local-files", methods=["GET"])
 def list_local_files():
     try:
-        subpath = request.args.get("path", "").strip("/")
-        root_dir = os.path.abspath(LOCAL_REPO_DIR)
-        target_dir = os.path.abspath(os.path.join(root_dir, subpath))
-        try:
-            inside_root = os.path.commonpath([root_dir, target_dir]) == root_dir
-        except ValueError:
-            inside_root = False
-        if not inside_root:
-            return jsonify({"error": "Недопустимый путь"}), 400
-        if not os.path.exists(target_dir):
-            return jsonify({"error": f"Папка не найдена: {target_dir}"}), 404
+        subpath = request.args.get("path", "")
+        if os.path.isabs(subpath) or "\x00" in subpath:
+            return problem(400, "invalid_local_path", "Недопустимый путь")
+        root_dir = os.path.realpath(LOCAL_REPO_DIR)
+        target_dir = os.path.realpath(os.path.join(root_dir, subpath))
+        if os.path.commonpath([root_dir, target_dir]) != root_dir:
+            return problem(400, "invalid_local_path", "Недопустимый путь")
         items = []
-        for entry in os.scandir(target_dir):
-            items.append(
-                {
-                    "name": entry.name,
-                    "is_dir": entry.is_dir(),
-                    "size": entry.stat().st_size if entry.is_file() else 0,
-                }
-            )
+        with _local_directory(root_dir, target_dir) as directory:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    # Do not disclose metadata of an outside symlink target.
+                    metadata = entry.stat(follow_symlinks=False)
+                    items.append(
+                        {
+                            "name": entry.name,
+                            "is_dir": stat.S_ISDIR(metadata.st_mode),
+                            "size": metadata.st_size if stat.S_ISREG(metadata.st_mode) else 0,
+                        }
+                    )
         return jsonify({"success": True, "path": target_dir, "items": items})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except FileNotFoundError:
+        return problem(404, "local_directory_not_found", "Папка не найдена")
+    except Exception as exc:
+        if isinstance(exc, OSError) and exc.errno in (errno.ELOOP, errno.ENOTDIR):
+            return problem(400, "invalid_local_path", "Недопустимый путь")
+        logger.warning("Local directory listing failed: %s", type(exc).__name__)
+        return problem(500, "local_directory_unavailable", "Не удалось прочитать папку")

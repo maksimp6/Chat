@@ -9,9 +9,9 @@ EXCLUDED_PREFIXES = ("tests/", "node_modules/", "android/", "scripts/", "deploy/
 RESPONSE_BUILDERS = {"jsonify", "problem"}
 
 # Legacy {"error": ...} bodies still to convert to problem().
-LEGACY_ERROR_BODY_BASELINE = 200
+LEGACY_ERROR_BODY_BASELINE = 197
 # Responses built inside `except ... as exc` that echo the exception to the client.
-EXCEPTION_ECHO_BASELINE = 75
+EXCEPTION_ECHO_BASELINE = 74
 
 
 def _python_sources():
