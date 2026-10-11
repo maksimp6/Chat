@@ -395,10 +395,14 @@ class ProtectedVerifier:
     def accept(self, packet: bytes) -> bool:
         data = self._decoded_grant(packet)
         with self.lock:
+            # A signed grant may expire while queued behind another dispatch.
+            # Recheck freshness before advancing the replay sequence or input.
+            dispatch_now = self.clock()
             if (
                 self.shutdown_requested.is_set()
                 or self.session is None
-                or self.clock() >= self.lease_until
+                or dispatch_now >= self.lease_until
+                or not 0 <= dispatch_now - data["issued"] <= TTL_NS
                 or data["session"] != self.session
                 or data["epoch"] != self.epoch
                 or data["seq"] <= self.seq
