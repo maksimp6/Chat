@@ -24,13 +24,13 @@ with MemoryStore("alice.memory") as db:
 
 ## Bounds in the current implementation
 
-| Bound | Value | Meaning |
-| --- | --- | --- |
-| Journal frame | 8 MiB | Serialized JSON, metadata, digest and newline together; enforced on write and replay |
-| Text budget | 8 MiB | Sum of UTF-8 bytes in value strings and dictionary keys, per validated value |
-| Depth | 64 | Maximum nesting depth of a value |
-| Nodes | 100,000 | Traversed elements, including dictionary keys |
-| Cycles | Rejected | Shared references without cycles are permitted |
+| Bound         | Value    | Meaning                                                                              |
+| ------------- | -------- | ------------------------------------------------------------------------------------ |
+| Journal frame | 8 MiB    | Serialized JSON, metadata, digest and newline together; enforced on write and replay |
+| Text budget   | 8 MiB    | Sum of UTF-8 bytes in value strings and dictionary keys, per validated value         |
+| Depth         | 64       | Maximum nesting depth of a value                                                     |
+| Nodes         | 100,000  | Traversed elements, including dictionary keys                                        |
+| Cycles        | Rejected | Shared references without cycles are permitted                                       |
 
 Values larger than one frame, including attachments, must be stored separately. JSON escaping can make a frame exceed the text budget. Limits are implementation constants, not configurable public API parameters.
 
@@ -45,6 +45,6 @@ Values larger than one frame, including attachments, must be stored separately. 
 
 ## Verification and handoff
 
-On Redmi 9, the last completed local run before this documentation update reported **98 passed** for the 13 standalone test modules. This is evidence for the local worktree only, not GitHub Actions on the eventual PR SHA.
+On Redmi 9 (2026-10-11), **128 focused tests passed** on the stacked Memory DB tree after integrating the verified parent core and refactoring replay validation. This confirms only the tested local tree; exact-head GitHub CI and independent review remain separate acceptance requirements.
 
 Minimal `get / set / commit` was explicitly accepted by the owner locally. New bounds are tested but have not received separate owner acceptance. CI, Alice integration, and merge authorization are separate tasks. No push, commit, or merge is implied by this document.

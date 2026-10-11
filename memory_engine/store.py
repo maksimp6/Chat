@@ -31,67 +31,63 @@ MAX_VALUE_NODES = 100_000
 MAX_VALUE_TEXT_BYTES = MAX_JOURNAL_FRAME_BYTES
 
 
-def _validate_value_shape(value: Any) -> None:
-    """Validate JSON-compatible values and bound traversal before staging."""
-    import math
-
-    # Keep only active ancestors on the stack. Wide lists must not create
-    # one pending stack entry per element.
-    from collections.abc import Iterator as ValueIterator
-
-    stack: list[tuple[ValueIterator[Any], int, int]] = []
-    ancestors: set[int] = set()
-    count = 0
-    text_bytes = 0
-
-    def check_text(text: str) -> None:
-        nonlocal text_bytes
-        remaining = MAX_VALUE_TEXT_BYTES - text_bytes
-        if len(text) > remaining:
+def _bounded_text_bytes(text: str, used: int) -> int:
+    """Count UTF-8 bytes in bounded chunks without a giant temporary string."""
+    remaining = MAX_VALUE_TEXT_BYTES - used
+    if len(text) > remaining:
+        raise StoreError("value text exceeds size limit")
+    for offset in range(0, len(text), 16384):
+        try:
+            used += len(text[offset : offset + 16384].encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise StoreError("invalid Unicode text") from exc
+        if used > MAX_VALUE_TEXT_BYTES:
             raise StoreError("value text exceeds size limit")
-        # Encode bounded chunks in C: avoid a whole-string temporary buffer.
-        # Keep chunks aligned to Python Unicode characters.
-        for offset in range(0, len(text), 16384):
-            try:
-                chunk_bytes = len(text[offset : offset + 16384].encode("utf-8"))
-            except UnicodeEncodeError as exc:
-                raise StoreError("invalid Unicode text") from exc
-            text_bytes += chunk_bytes
-            if text_bytes > MAX_VALUE_TEXT_BYTES:
-                raise StoreError("value text exceeds size limit")
+    return used
 
+
+def _shape_children(
+    item: dict[str, Any] | list[Any] | tuple[Any, ...],
+    ancestors: set[int],
+    nodes: int,
+    text_bytes: int,
+) -> tuple[Iterator[Any], int, int]:
+    """Inspect keys before returning a bounded iterator over child values."""
+    identity = id(item)
+    if identity in ancestors:
+        raise StoreError("shared or cyclic container is unsupported")
+    ancestors.add(identity)
+    if isinstance(item, dict):
+        for key in item:
+            nodes += 1
+            if nodes > MAX_VALUE_NODES:
+                raise StoreError("value structure exceeds limit")
+            if type(key) is not str:
+                raise StoreError("object keys must be strings")
+            text_bytes = _bounded_text_bytes(key, text_bytes)
+        return iter(item.values()), nodes, text_bytes
+    return iter(item), nodes, text_bytes
+
+
+def _validate_value_shape(value: Any) -> None:
+    """Bound JSON-container traversal without recursion or wide pending stacks."""
+    stack: list[tuple[Iterator[Any], int, int]] = []
+    ancestors: set[int] = set()
+    nodes = 0
+    text_bytes = 0
     item = value
     depth = 0
     while True:
-        count += 1
-        if count > MAX_VALUE_NODES or depth > MAX_VALUE_DEPTH:
+        nodes += 1
+        if nodes > MAX_VALUE_NODES or depth > MAX_VALUE_DEPTH:
             raise StoreError("value structure exceeds limit")
         if isinstance(item, (dict, list, tuple)):
-            identity = id(item)
-            if identity in ancestors:
-                raise StoreError("shared or cyclic container is unsupported")
-            ancestors.add(identity)
-            if isinstance(item, dict):
-                for key in item:
-                    count += 1
-                    if count > MAX_VALUE_NODES:
-                        raise StoreError("value structure exceeds limit")
-                    if type(key) is not str:
-                        raise StoreError("object keys must be strings")
-                    check_text(key)
-                children = iter(item.values())
-            else:
-                children = iter(item)
-            stack.append((children, depth, identity))
+            children, nodes, text_bytes = _shape_children(item, ancestors, nodes, text_bytes)
+            stack.append((children, depth, id(item)))
         elif type(item) is str:
-            check_text(item)
-        elif item is None or type(item) in (int, bool):
-            pass
-        elif type(item) is float and math.isfinite(item):
-            pass
-        else:
-            # Preserve commit-time rejection of unsupported scalar values.
-            pass
+            text_bytes = _bounded_text_bytes(item, text_bytes)
+        # Unsupported scalars still reach the commit-time JSON encoder and
+        # fail without acknowledging a journal sequence.
         while stack:
             children, parent_depth, identity = stack[-1]
             try:
@@ -172,6 +168,22 @@ class _JournalEngine:
         return state, sequence, digest
 
     @staticmethod
+    def _validated_change(change: Any) -> tuple[str, str, str, Any]:
+        """Reject malformed changes before mutating replayed committed state."""
+        if not isinstance(change, dict):
+            raise ValueError("invalid journal change")
+        namespace, key = change["namespace"], change["key"]
+        if not isinstance(namespace, str) or not isinstance(key, str):
+            raise ValueError("invalid journal key")
+        op = change["op"]
+        if op not in ("set", "delete"):
+            raise ValueError("invalid journal operation")
+        value = change["value"] if op == "set" else None
+        if op == "set":
+            _validate_value_shape(value)
+        return op, namespace, key, value
+
+    @staticmethod
     def _apply_verified_frame(
         frame: bytes,
         state: dict[str, dict[str, Any]],
@@ -200,20 +212,7 @@ class _JournalEngine:
                 raise ValueError("commit chain mismatch")
             # Validate every operation before touching committed state.
             # Replay must not copy the accumulated database for each frame.
-            validated: list[tuple[str, str, str, Any]] = []
-            for change in payload["changes"]:
-                if not isinstance(change, dict):
-                    raise ValueError("invalid journal change")
-                namespace, key = change["namespace"], change["key"]
-                if not isinstance(namespace, str) or not isinstance(key, str):
-                    raise ValueError("invalid journal key")
-                op = change["op"]
-                if op not in ("set", "delete"):
-                    raise ValueError("invalid journal operation")
-                value = change["value"] if op == "set" else None
-                if op == "set":
-                    _validate_value_shape(value)
-                validated.append((op, namespace, key, value))
+            validated = [_JournalEngine._validated_change(change) for change in payload["changes"]]
             for op, namespace, key, value in validated:
                 if op == "set":
                     state.setdefault(namespace, {})[key] = value

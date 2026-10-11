@@ -1,9 +1,9 @@
 # Memory DB — ownership and dependency boundaries
 
-| Component | Role | Current status |
-|---|---|---|
-| `memory_engine/` | Foundational storage engine: RAM staging, journal, commit, recovery, backup | Standalone contract tested |
-| `agent_memory/` | Alice application layer and existing runtime persistence | Currently uses `FileMemoryDB` |
+| Component        | Role                                                                        | Current status                |
+| ---------------- | --------------------------------------------------------------------------- | ----------------------------- |
+| `memory_engine/` | Foundational storage engine: RAM staging, journal, commit, recovery, backup | Standalone contract tested    |
+| `agent_memory/`  | Alice application layer and existing runtime persistence                    | Currently uses `FileMemoryDB` |
 
 **Allowed dependency:** `agent_memory → memory_engine` (through the public API). **Forbidden dependency:** `memory_engine → agent_memory` or Alice-specific modules. The engine must remain independently testable.
 
