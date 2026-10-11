@@ -16,6 +16,38 @@ REQUIRED = {
 MOVE = re.compile(r"(?<!\w)([XYZ])([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?=\s|$)")
 
 
+def _verify_motion_bounds(command, bed):
+    for axis, raw in MOVE.findall(command):
+        value = float(raw)
+        if not math.isfinite(value):
+            raise ValueError("non-finite motion")
+        if axis in ("X", "Y") and not -2 <= value <= bed["XY".index(axis)] + 2:
+            raise ValueError("motion outside bed")
+        if axis == "Z" and not -2 <= value <= bed[2] + 2:
+            raise ValueError("Z outside printer height")
+
+
+def _verify_toolpaths(gcode, bed):
+    count, extrusion, heaters = 0, 0, set()
+    for line in gcode.splitlines():
+        command = line.split(";", 1)[0].strip()
+        if not command:
+            continue
+        opcode = command.split()[0]
+        if opcode in ("M112", "M500", "M502", "M997", "M999"):
+            raise ValueError("unexpected dangerous firmware command")
+        if opcode in ("M190", "M109"):
+            heaters.add(opcode)
+        if opcode in ("G0", "G1", "G2", "G3"):
+            count += 1
+            if opcode == "G1" and re.search(r"(?:^|\s)E[-+\d.]", command):
+                extrusion += 1
+            _verify_motion_bounds(command, bed)
+    if count < 10 or extrusion < 10 or heaters != {"M190", "M109"}:
+        raise ValueError("missing toolpaths, extrusion or heater commands")
+    return count, extrusion
+
+
 def audit_job(path, passport):
     """Validate archive, actual commands, material, machine and build boundaries.
 
@@ -51,30 +83,7 @@ def audit_job(path, passport):
     gcode = gcode_bytes.decode("utf-8")
     if not gcode.startswith("; HEADER_BLOCK_START") or "; EXECUTABLE_BLOCK_END" not in gcode:
         raise ValueError("incomplete Bambu G-code")
-    count, extrusion, heaters = 0, 0, set()
-    for line in gcode.splitlines():
-        command = line.split(";", 1)[0].strip()
-        if not command:
-            continue
-        opcode = command.split()[0]
-        if opcode in ("M112", "M500", "M502", "M997", "M999"):
-            raise ValueError("unexpected dangerous firmware command")
-        if opcode in ("M190", "M109"):
-            heaters.add(opcode)
-        if opcode in ("G0", "G1", "G2", "G3"):
-            count += 1
-            if opcode == "G1" and re.search(r"(?:^|\s)E[-+\d.]", command):
-                extrusion += 1
-            for axis, raw in MOVE.findall(command):
-                value = float(raw)
-                if not math.isfinite(value):
-                    raise ValueError("non-finite motion")
-                if axis in ("X", "Y") and not -2 <= value <= bed["XY".index(axis)] + 2:
-                    raise ValueError("motion outside bed")
-                if axis == "Z" and not -2 <= value <= bed[2] + 2:
-                    raise ValueError("Z outside printer height")
-    if count < 10 or extrusion < 10 or heaters != {"M190", "M109"}:
-        raise ValueError("missing toolpaths, extrusion or heater commands")
+    count, extrusion = _verify_toolpaths(gcode, bed)
     return {
         "status": "GCODE_STATIC_VERIFIED",
         "sha256": hashlib.sha256(data).hexdigest(),

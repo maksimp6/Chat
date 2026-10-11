@@ -7,17 +7,7 @@ from collections import Counter
 from pathlib import Path
 
 
-def validate_stl(path, record, bed=(180, 180, 180)):
-    """Validate original binary STL, indexed topology and per-part dimensions."""
-    path = Path(path)
-    data = path.read_bytes()
-    if hashlib.sha256(data).hexdigest() != record["sha256"]:
-        raise ValueError("STL source hash mismatch")
-    if len(data) < 84:
-        raise ValueError("STL truncated")
-    count = struct.unpack_from("<I", data, 80)[0]
-    if count != record["geometry"]["triangles"] or len(data) != 84 + 50 * count:
-        raise ValueError("STL face count/length mismatch")
+def _read_mesh_bounds_and_edges(data):
     # Merge exact shared vertex coordinates for manifold-edge checks.
     points = {}
     edges = Counter()
@@ -39,6 +29,21 @@ def validate_stl(path, record, bed=(180, 180, 180)):
             edges[tuple(sorted((ids[a], ids[b])))] += 1
     if any(n != 2 for n in edges.values()):
         raise ValueError("STL open or nonmanifold topology")
+    return xs, ys, zs
+
+
+def validate_stl(path, record, bed=(180, 180, 180)):
+    """Validate original binary STL, indexed topology and per-part dimensions."""
+    path = Path(path)
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != record["sha256"]:
+        raise ValueError("STL source hash mismatch")
+    if len(data) < 84:
+        raise ValueError("STL truncated")
+    count = struct.unpack_from("<I", data, 80)[0]
+    if count != record["geometry"]["triangles"] or len(data) != 84 + 50 * count:
+        raise ValueError("STL face count/length mismatch")
+    xs, ys, zs = _read_mesh_bounds_and_edges(data)
     bounds = [max(v) - min(v) for v in (xs, ys, zs)]
     if any(d <= 0 or d > bed[i] for i, d in enumerate(bounds)):
         raise ValueError("STL dimensions outside target printer")
