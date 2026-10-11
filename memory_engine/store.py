@@ -448,9 +448,7 @@ class _JournalStore:
                     dst_dir_fd=target_dir,
                     follow_symlinks=True,
                 )
-                published = os.stat(
-                    destination.name, dir_fd=target_dir, follow_symlinks=False
-                )
+                published = os.stat(destination.name, dir_fd=target_dir, follow_symlinks=False)
                 pinned = os.fstat(verified.fileno())
                 if (published.st_dev, published.st_ino) != (pinned.st_dev, pinned.st_ino):
                     raise StoreError("published backup inode mismatch")
