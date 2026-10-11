@@ -1,8 +1,0 @@
-{
-  "defaultShell": "/bin/bash",
-  "allowedDirectories": ["/workspace"],
-  "telemetryEnabled": false,
-  "fileReadLineLimit": 200,
-  "fileWriteLineLimit": 100,
-  "blockedCommands": ["mkfs", "fdisk", "parted", "shutdown", "reboot", "mount", "umount", "sudo"]
-}

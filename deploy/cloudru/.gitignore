@@ -1,7 +1,0 @@
-# Только локальные рабочие копии. Никогда не коммитить runtime secrets.
-private/
-*.local.json
-*.local.env
-*.pem
-*.key
-*.dump
