@@ -406,3 +406,44 @@ def test_backup_temp_cleanup_survives_concurrent_unlink(tmp_path, monkeypatch):
         store.backup(backup)
         assert removed
         assert backup.exists()
+
+
+@pytest.mark.parametrize("operation", ["backup", "restore"])
+def test_publish_uses_verified_inode_not_replaced_temp_name(tmp_path, monkeypatch, operation):
+    source = tmp_path / "source.memory"
+    backup = tmp_path / "backup.memory"
+    restored = tmp_path / "restored.memory"
+    victim = tmp_path / "victim.memory"
+    with MemoryStore(source) as store:
+        store.set("safe", 1)
+        store.commit()
+        if operation == "restore":
+            store.backup(backup)
+        victim.write_bytes(b"UNVERIFIED_VICTIM_CONTENT")
+        original_link = os.link
+        attacked = False
+
+        def replace_temp_before_link(src, dst, *args, **kwargs):
+            nonlocal attacked
+            if kwargs.get("dst_dir_fd") is not None and not attacked:
+                attacked = True
+                target_dir = kwargs["dst_dir_fd"]
+                for name in os.listdir(target_dir):
+                    if name.startswith(".alice-copy-"):
+                        os.unlink(name, dir_fd=target_dir)
+                        original_link(victim, name, dst_dir_fd=target_dir)
+                        break
+            return original_link(src, dst, *args, **kwargs)
+
+        monkeypatch.setattr(os, "link", replace_temp_before_link)
+        if operation == "backup":
+            store.backup(backup)
+            result = backup
+        else:
+            with MemoryStore(restored) as destination:
+                destination.restore(backup)
+                assert destination.get("safe") == 1
+            result = restored
+        assert attacked
+        assert result.read_bytes() != b"UNVERIFIED_VICTIM_CONTENT"
+        assert victim.read_bytes() == b"UNVERIFIED_VICTIM_CONTENT"
