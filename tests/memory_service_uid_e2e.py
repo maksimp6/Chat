@@ -91,8 +91,9 @@ def main() -> None:
                 ["runuser", "-u", client.pw_name, "--", sys.executable, "-c", code, str(sock)],
                 capture_output=True,
                 text=True,
-                check=True,
+                check=False,
             )
+            assert result.returncode == 0, result.stderr
             assert '"ok":true' in result.stdout, result.stdout
             denied = subprocess.run(
                 [
