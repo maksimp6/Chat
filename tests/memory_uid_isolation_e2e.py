@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import pwd
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -26,17 +27,21 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="memory-uid-e2e-") as tmp:
         root = Path(tmp)
         root.chmod(0o755)
+        shutil.copytree(Path(__file__).resolve().parents[1] / "memory_engine", root / "memory_engine")
+        for item in (root / "memory_engine").rglob("*"):
+            item.chmod(0o755 if item.is_dir() else 0o644)
+        (root / "memory_engine").chmod(0o755)
         private = root / "private"
         private.mkdir(mode=0o700)
         os.chown(private, owner.pw_uid, owner.pw_gid)
         private.chmod(0o700)
         journal = private / "journal.memory"
         owner_code = (
-            "import os,sys; from memory_engine import MemoryStore; "
+            import os,sys; sys.path.insert(0,sys.argv[2]); from memory_engine import MemoryStore; "
             "os.environ['ALICE_MEMORY_TRUSTED_ROOT']='1'; "
             "s=MemoryStore(sys.argv[1]); s.set('safe',1); s.commit(); s.close()"
         )
-        result = run_as("memorydb_owner", owner_code, str(journal))
+        result = run_as("memorydb_owner", owner_code, str(journal), str(root))
         assert result.returncode == 0, result.stderr
         assert journal.stat().st_uid == owner.pw_uid
         assert journal.stat().st_mode & 0o777 == 0o600
