@@ -29,6 +29,7 @@ def test_merge_readiness_workflow_requires_current_protected_checks() -> None:
     required_checks = [
         "Platform changes",
         "CI required",
+        "Fast isolated contracts (2s)",
         "Infrastructure tests",
         "MCP worker tests",
         "Application tests",
