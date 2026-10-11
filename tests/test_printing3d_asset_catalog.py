@@ -53,11 +53,7 @@ def test_catalog_schema_and_unique_assets() -> None:
 
 def test_committed_assets_match_original_byte_hashes() -> None:
     data = _catalog()
-    files = {
-        asset["path"]: asset
-        for asset in data["assets"]
-        if asset["location"] == "repo"
-    }
+    files = {asset["path"]: asset for asset in data["assets"] if asset["location"] == "repo"}
     assert set(files) == {"printing3d/assets/" + path for path in ORIGINALS}
     for relative, (size, sha256) in ORIGINALS.items():
         path = ASSETS / relative
@@ -74,14 +70,9 @@ def test_unsliced_3mf_is_safe_but_not_gcode() -> None:
     path = ASSETS / "parametric" / "test_tube_holder.3mf"
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
-        assert sorted(names) == sorted(
-            ["3D/3dmodel.model", "_rels/.rels", "[Content_Types].xml"]
-        )
+        assert sorted(names) == sorted(["3D/3dmodel.model", "_rels/.rels", "[Content_Types].xml"])
         assert archive.testzip() is None
-        assert all(
-            not name.startswith("/") and ".." not in name.split("/")
-            for name in names
-        )
+        assert all(not name.startswith("/") and ".." not in name.split("/") for name in names)
         assert not any(name.lower().endswith(".gcode") for name in names)
         assert sum(info.file_size for info in archive.infolist()) < 1_000_000
         model = ElementTree.fromstring(archive.read("3D/3dmodel.model"))
