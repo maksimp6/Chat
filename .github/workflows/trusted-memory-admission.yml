@@ -1,0 +1,43 @@
+name: Trusted Memory Contract Admission
+
+# This workflow is intentionally loaded from the PR's BASE branch. Never
+# checkout, import, or execute candidate code with statuses:write permissions.
+on:
+  pull_request_target:
+    branches: [master, develop]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: trusted-memory-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  admission:
+    name: Trusted Memory Contract Admission
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout trusted target branch only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Use Python from trusted runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Verify exact-head accepted contracts and publish fail-closed status
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: python -I -S ci/trusted_memory_admission.py
