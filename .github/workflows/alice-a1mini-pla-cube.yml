@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/alice-a1mini-pla-cube.yml"
       - "scripts/alice_a1mini_pla_cube_slice.py"
+      - "scripts/alice_a1mini_spindle_slice.py"
   workflow_dispatch:
 
 permissions:
@@ -112,6 +113,41 @@ jobs:
           path: |
             out-bag/Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf
             out-bag/bagclip_audit.json
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Fetch hash-pinned OEM spindle source 3MF
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out-spindle
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://raw.githubusercontent.com/maksimp6/Chat/codex/add-a1mini-spool-spindle-cover/printing3d/assets/spool_holder/alice_stock_spool_replacement_v03_A1mini.3mf' \
+            --output out-spindle/spindle_source.3mf
+          printf '%s  %s\n' \
+            '21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84' \
+            'out-spindle/spindle_source.3mf' | sha256sum --check
+
+      - name: Slice OEM spindle PLA fit prototype and audit G-code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/alice_a1mini_spindle_slice.py
+          python3 scripts/alice_a1mini_spindle_slice.py \
+            --source-3mf "$GITHUB_WORKSPACE/out-spindle/spindle_source.3mf" \
+            --slicer-root "$GITHUB_WORKSPACE/squashfs-root" \
+            --output-dir "$GITHUB_WORKSPACE/out-spindle"
+          test -s out-spindle/Alice_OEM_Spindle_v03_A1mini_PLA_FIT_PROTOTYPE.gcode.3mf
+          cat out-spindle/spindle_audit.json
+
+      - name: Upload verified spindle prototype for manual printer staging
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: alice-a1mini-spindle-pla-fit-prototype-ready
+          path: |
+            out-spindle/Alice_OEM_Spindle_v03_A1mini_PLA_FIT_PROTOTYPE.gcode.3mf
+            out-spindle/spindle_audit.json
           retention-days: 7
           if-no-files-found: error
           compression-level: 6
