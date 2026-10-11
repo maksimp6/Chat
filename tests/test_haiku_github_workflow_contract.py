@@ -37,9 +37,12 @@ def test_only_owner_authored_issue_comments_can_start_haiku():
     job = _job(config)
     condition = job["if"]
     assert "startsWith(github.event.comment.body, '@claude-lite')" in condition
+    assert "github.event.comment.user.login == 'maksimp6'" in condition
+    assert "github.event.comment.author_association == 'OWNER'" in condition
     assert "github.event.issue.user.login == 'maksimp6'" in condition
     assert "github.event.issue.pull_request == null" in condition
-    assert all(role in condition for role in ("OWNER", "MEMBER", "COLLABORATOR"))
+    assert "MEMBER" not in condition
+    assert "COLLABORATOR" not in condition
 
     action = _action_step(job)
     assert action["with"]["trigger_phrase"] == "@claude-lite"
