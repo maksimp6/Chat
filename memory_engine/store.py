@@ -49,7 +49,6 @@ def _validate_value(value: Any) -> None:
         raise StoreError("unsupported JSON value")
 
 
-
 def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, Any]]:
     """Validate every change before any committed state mutation."""
     validated: list[tuple[str, str, str, Any]] = []
@@ -69,6 +68,7 @@ def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, A
         else:
             raise ValueError("invalid journal operation")
     return validated
+
 
 class Store(Protocol[ValueT]):
     """Copy-safe name/value staging with an explicit durable commit."""
