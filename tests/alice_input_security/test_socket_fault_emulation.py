@@ -1,4 +1,5 @@
 """Fault-injection tests: emulate races and failures without Android input."""
+
 import os
 import socket
 import tempfile
@@ -13,10 +14,13 @@ class FakeVerifier:
     def __init__(self):
         self.shutdown = False
         self.revoked = False
+
     def request_shutdown(self):
         self.shutdown = True
+
     def revoke(self):
         self.revoked = True
+
     def accept(self, packet):
         return False
 
@@ -26,10 +30,12 @@ def test_bind_failure_leaves_no_socket_or_open_descriptor(tmp_path, monkeypatch)
     verifier = FakeVerifier()
     endpoint = SignedInputSocket(tmp_path / "input.sock", verifier, peer_uid=os.getuid())
     original_bind = socket.socket.bind
+
     def reject_bind(sock, address):
         if address.endswith("/input.sock"):
             raise OSError("emulated bind failure")
         return original_bind(sock, address)
+
     monkeypatch.setattr(socket.socket, "bind", reject_bind)
     with pytest.raises(OSError, match="emulated bind failure"):
         endpoint.start()
@@ -53,11 +59,13 @@ def test_parent_swap_during_bind_fails_closed(short_tmp, monkeypatch):
     verifier = FakeVerifier()
     endpoint = SignedInputSocket(parent / "input.sock", verifier, peer_uid=os.getuid())
     original_bind = socket.socket.bind
+
     def swap_parent(sock, address):
         if address.endswith("/input.sock"):
             parent.rename(tmp_path / "moved")
             replacement.rename(parent)
         return original_bind(sock, address)
+
     monkeypatch.setattr(socket.socket, "bind", swap_parent)
     with pytest.raises(SocketBoundaryError, match="parent replaced"):
         endpoint.start()

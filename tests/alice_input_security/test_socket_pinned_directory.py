@@ -1,4 +1,5 @@
 """Regression tests for descriptor-pinned socket directory policy (no uinput)."""
+
 import os
 import stat
 from pathlib import Path
