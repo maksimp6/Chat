@@ -71,11 +71,16 @@ def test_invalid_later_change_does_not_mutate_committed_state():
     from memory_engine.store import _JournalEngine
 
     state = {"values": {"original": 1}}
-    payload = {"seq": 1, "changes": [
-        {"namespace": "values", "key": "original", "op": "set", "value": 2},
-        {"namespace": "values", "key": "bad", "op": "invalid"},
-    ]}
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    payload = {
+        "seq": 1,
+        "changes": [
+            {"namespace": "values", "key": "original", "op": "set", "value": 2},
+            {"namespace": "values", "key": "bad", "op": "invalid"},
+        ],
+    }
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
     digest = hashlib.sha256(bytes.fromhex("0" * 64) + encoded).hexdigest()
     frame = json.dumps({"payload": payload, "digest": digest}).encode()
     with pytest.raises(StoreError, match="corrupt committed journal"):
@@ -103,13 +108,16 @@ def test_replay_does_not_deepcopy_accumulated_state(tmp_path, monkeypatch):
 
 def test_streaming_replay_never_reads_entire_journal(tmp_path, monkeypatch):
     from memory_engine.store import _JournalEngine
+
     path = tmp_path / "stream.memory"
     with MemoryStore(path) as store:
         for index in range(50):
             store.set(str(index), "v" * 128)
             store.commit()
+
     def forbidden_read(_path):
         raise AssertionError("full journal read is forbidden")
+
     monkeypatch.setattr(type(path), "read_bytes", forbidden_read)
     state, sequence, _ = _JournalEngine._inspect_log(path)
     assert sequence == 50 and state["values"]["49"] == "v" * 128
@@ -131,18 +139,25 @@ def test_streaming_replay_rejects_partial_tail_without_truncation(tmp_path):
 def test_streaming_replay_rejects_invalid_later_change_on_reopen(tmp_path):
     import hashlib
     import json
+
     path = tmp_path / "invalid.memory"
     with MemoryStore(path) as store:
         store.set("safe", "original")
         store.commit()
-    payload = {"seq": 2, "changes": [
-        {"namespace": "values", "key": "safe", "op": "set", "value": "changed"},
-        {"namespace": "values", "key": "bad", "op": "unknown"},
-    ]}
+    payload = {
+        "seq": 2,
+        "changes": [
+            {"namespace": "values", "key": "safe", "op": "set", "value": "changed"},
+            {"namespace": "values", "key": "bad", "op": "unknown"},
+        ],
+    }
     # The frame is correctly hashed but semantically invalid.
     import memory_engine.store as module
+
     _, _, previous = module._JournalEngine._inspect_log(path)
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
     digest = hashlib.sha256(bytes.fromhex(previous) + encoded).hexdigest()
     with path.open("ab") as stream:
         stream.write(json.dumps({"payload": payload, "digest": digest}).encode() + b"\n")
@@ -154,6 +169,7 @@ def test_streaming_replay_rejects_invalid_later_change_on_reopen(tmp_path):
 
 def test_replay_rejects_oversized_frame_without_modifying_journal(tmp_path):
     from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+
     path = tmp_path / "oversize.memory"
     with MemoryStore(path) as store:
         store.set("safe", "ok")
@@ -168,6 +184,7 @@ def test_replay_rejects_oversized_frame_without_modifying_journal(tmp_path):
 
 def test_commit_rejects_oversized_frame_without_publishing(tmp_path):
     from memory_engine.store import MAX_JOURNAL_FRAME_BYTES
+
     path = tmp_path / "too-large.memory"
     with MemoryStore(path) as store:
         store.set("large", "x" * MAX_JOURNAL_FRAME_BYTES)
@@ -179,12 +196,13 @@ def test_commit_rejects_oversized_frame_without_publishing(tmp_path):
 
 def test_frame_limit_exact_boundary_and_one_byte_over(tmp_path, monkeypatch):
     import memory_engine.store as module
+
     monkeypatch.setattr(module, "MAX_JOURNAL_FRAME_BYTES", 256)
     with MemoryStore(tmp_path / "boundary.memory") as store:
         store.set("a", "")
-        frame, _ = store._engine._encode_frame([
-            {"op": "set", "namespace": "values", "key": "a", "value": ""}
-        ])
+        frame, _ = store._engine._encode_frame(
+            [{"op": "set", "namespace": "values", "key": "a", "value": ""}]
+        )
         overhead = len(frame)
         exact = "x" * (256 - overhead)
         store.set("a", exact)
@@ -258,6 +276,7 @@ def test_tuple_json_array_roundtrip_is_explicit(tmp_path):
 
 def test_large_string_rejected_before_staging_and_existing_commit_preserved(tmp_path):
     from memory_engine.store import MAX_VALUE_TEXT_BYTES
+
     path = tmp_path / "text-limit.memory"
     with MemoryStore(path) as store:
         store.set("safe", "ok")
@@ -272,6 +291,7 @@ def test_large_string_rejected_before_staging_and_existing_commit_preserved(tmp_
 
 def test_combined_text_and_unicode_limit(tmp_path, monkeypatch):
     import memory_engine.store as module
+
     monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 10)
     with MemoryStore(tmp_path / "unicode.memory") as store:
         store.set("valid", ["é" * 5])
@@ -293,6 +313,7 @@ def test_invalid_unicode_rejected_as_store_error(tmp_path):
 
 def test_chunked_utf8_limit_across_boundaries(tmp_path, monkeypatch):
     import memory_engine.store as module
+
     monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 32769)
     with MemoryStore(tmp_path / "chunked.memory") as store:
         store.set("valid", "a" * 32769)
@@ -306,6 +327,7 @@ def test_chunked_utf8_limit_across_boundaries(tmp_path, monkeypatch):
 
 def test_dict_keys_count_toward_node_limit(tmp_path, monkeypatch):
     import memory_engine.store as module
+
     monkeypatch.setattr(module, "MAX_VALUE_NODES", 5)
     with MemoryStore(tmp_path / "keys.memory") as store:
         store.set("valid", {"a": 1, "b": 2})
@@ -335,13 +357,9 @@ def test_replay_rejects_invalid_value_in_valid_digest_frame(tmp_path, invalid_va
         value = float("nan")
     payload = {
         "seq": 1,
-        "changes": [
-            {"namespace": "values", "key": "unsafe", "op": "set", "value": value}
-        ],
+        "changes": [{"namespace": "values", "key": "unsafe", "op": "set", "value": value}],
     }
-    raw = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode()
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     digest = hashlib.sha256(bytes(32) + raw).hexdigest()
     frame = json.dumps({"payload": payload, "digest": digest}) + "\n"
     path = tmp_path / "invalid-value.memory"
@@ -350,3 +368,34 @@ def test_replay_rejects_invalid_value_in_valid_digest_frame(tmp_path, invalid_va
     with pytest.raises(StoreError, match="corrupt committed journal"):
         MemoryStore(path)
     assert path.read_bytes() == before
+
+
+def test_dictionary_key_count_is_bounded_before_staging(tmp_path, monkeypatch):
+    """Keys count toward the node budget, even before values are visited."""
+    import memory_engine.store as module
+
+    monkeypatch.setattr(module, "MAX_VALUE_NODES", 3)
+    with MemoryStore(tmp_path / "many-keys.memory") as store:
+        with pytest.raises(StoreError, match="value structure exceeds limit"):
+            store.set("too-wide", {"first": 1, "second": 2, "third": 3})
+        assert store.last_commit.sequence == 0
+        assert store.get("too-wide") is None
+
+
+def test_empty_unwritten_store_can_backup_restore_and_commit(tmp_path):
+    """A database without a journal still creates a valid empty backup."""
+    source = tmp_path / "source.memory"
+    backup = tmp_path / "source.backup"
+    restored = tmp_path / "restored.memory"
+    with MemoryStore(source) as store:
+        assert not source.exists()
+        store.backup(backup)
+        assert backup.exists() and backup.stat().st_size == 0
+    with MemoryStore(restored) as store:
+        store.restore(backup)
+        assert store.last_commit.sequence == 0
+        assert store.get("missing") is None
+        store.set("now-present", {"value": 123})
+        assert store.commit() == 1
+    with MemoryStore(restored) as reopened:
+        assert reopened.get("now-present") == {"value": 123}

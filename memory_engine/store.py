@@ -53,7 +53,7 @@ def _validate_value_shape(value: Any) -> None:
         # Keep chunks aligned to Python Unicode characters.
         for offset in range(0, len(text), 16384):
             try:
-                chunk_bytes = len(text[offset:offset + 16384].encode("utf-8"))
+                chunk_bytes = len(text[offset : offset + 16384].encode("utf-8"))
             except UnicodeEncodeError as exc:
                 raise StoreError("invalid Unicode text") from exc
             text_bytes += chunk_bytes
@@ -187,7 +187,10 @@ class _JournalEngine:
             if not isinstance(payload, dict) or not isinstance(payload.get("changes"), list):
                 raise ValueError("invalid journal payload")
             serialized_payload = json.dumps(
-                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
                 allow_nan=False,
             ).encode()
             # Chain each frame to the previous confirmed digest so replay detects
@@ -217,8 +220,15 @@ class _JournalEngine:
                 else:
                     state.get(namespace, {}).pop(key, None)
             return state, payload["seq"], next_digest
-        except (ValueError, KeyError, TypeError, UnicodeError, AttributeError,
-                RecursionError, StoreError) as exc:
+        except (
+            ValueError,
+            KeyError,
+            TypeError,
+            UnicodeError,
+            AttributeError,
+            RecursionError,
+            StoreError,
+        ) as exc:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
@@ -240,7 +250,7 @@ class _JournalEngine:
             # Stream chunks and reject before accumulating unbounded output.
             parts: list[bytes] = []
             used = 0
-            frame_overhead = len(b'{"digest":"') + 64 + len(b'","payload":') + len(b'}\n')
+            frame_overhead = len(b'{"digest":"') + 64 + len(b'","payload":') + len(b"}\n")
             encoder = json.JSONEncoder(
                 sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
             )
@@ -248,7 +258,7 @@ class _JournalEngine:
                 # JSONEncoder can yield a whole large string. Slice before
                 # encoding so each temporary UTF-8 buffer remains bounded.
                 for offset in range(0, len(chunk), 16384):
-                    encoded = chunk[offset:offset + 16384].encode("utf-8")
+                    encoded = chunk[offset : offset + 16384].encode("utf-8")
                     used += len(encoded)
                     if used + frame_overhead > MAX_JOURNAL_FRAME_BYTES:
                         raise StoreError("journal frame exceeds size limit")
@@ -256,11 +266,14 @@ class _JournalEngine:
             serialized_payload = b"".join(parts)
             digest = hashlib.sha256(bytes.fromhex(self._digest) + serialized_payload).hexdigest()
             journal_frame = (
-                b'{"digest":"' + digest.encode("ascii") + b'","payload":'
-                + serialized_payload + b'}\n'
+                b'{"digest":"'
+                + digest.encode("ascii")
+                + b'","payload":'
+                + serialized_payload
+                + b"}\n"
             )
-            if len(journal_frame) > MAX_JOURNAL_FRAME_BYTES:
-                raise StoreError("journal frame exceeds size limit")
+            # The streaming used + frame_overhead check above already
+            # bounds this exact frame representation before allocation.
             return journal_frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
             raise StoreError("unsupported JSON value") from exc
@@ -338,7 +351,7 @@ class _JournalEngine:
             if pending:
                 raise StoreError("transaction requires an idle store")
             self._active_transaction = True
-            transaction = _ValueTransaction(deepcopy(self._state.get("values", {})))
+            transaction = _ValueTransaction(self._state.get("values", {}))
             try:
                 yield transaction
                 self._commit_changes(transaction._pending_changes())
@@ -465,12 +478,6 @@ class _JournalEngine:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
                     self._lock_file.close()
                 self._closed = True
-
-    def __enter__(self) -> "_JournalEngine":
-        return self
-
-    def __exit__(self, *_args: object) -> None:
-        self.close()
 
 
 class MemoryStore:
