@@ -1,4 +1,5 @@
 """Offline render and encode a verified STL turntable."""
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="alice-3d-") as temp:
         folder = Path(temp)
         render_turntable(args.stl, folder, frames=plan["duration_seconds"] * fps)
-        command = ffmpeg_command(str(folder / "frame_%04d.png"), str(args.output), plan["format"], fps=fps)
+        command = ffmpeg_command(
+            str(folder / "frame_%04d.png"), str(args.output), plan["format"], fps=fps
+        )
         subprocess.run(command, check=True, timeout=180)
 
 

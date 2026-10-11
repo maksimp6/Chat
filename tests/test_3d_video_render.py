@@ -1,4 +1,5 @@
 import pytest
+import trimesh
 from printing3d.video.render import render_turntable
 
 
@@ -13,8 +14,6 @@ def test_reject_invalid_frame_count(tmp_path):
 
 
 def test_turntable_cube(tmp_path):
-    trimesh = pytest.importorskip("trimesh")
-    pytest.importorskip("matplotlib")
     mesh = trimesh.creation.box(extents=(10, 12, 8))
     stl = tmp_path / "cube.stl"
     mesh.export(stl)

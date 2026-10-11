@@ -1,4 +1,5 @@
 """Validate 3D video manifests and generate safe FFmpeg command arguments."""
+
 from __future__ import annotations
 
 import json
@@ -10,12 +11,14 @@ FORMATS = {"vertical": (720, 1280), "horizontal": (1280, 720)}
 
 
 def load_storyboard(path: Path) -> dict[str, Any]:
+    if path.stat().st_size > 16 * 1024:
+        raise ValueError("Storyboard exceeds 16 KiB")
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("Storyboard must be an object")
-    if data.get("shot") not in ALLOWED_SHOTS:
+    if type(data.get("shot")) is not str or data["shot"] not in ALLOWED_SHOTS:
         raise ValueError("Unsupported shot")
-    if data.get("format") not in FORMATS:
+    if type(data.get("format")) is not str or data["format"] not in FORMATS:
         raise ValueError("Unsupported format")
     duration = data.get("duration_seconds")
     if type(duration) is not int or not 1 <= duration <= 30:
@@ -33,6 +36,22 @@ def ffmpeg_command(frames_pattern: str, output: str, format_name: str, fps: int 
     if fps not in (24, 30):
         raise ValueError("Unsupported fps")
     width, height = FORMATS[format_name]
-    return ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-framerate", str(fps),
-            "-i", frames_pattern, "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", output]
+    return [
+        "ffmpeg",
+        "-hide_banner",
+        "-nostdin",
+        "-y",
+        "-framerate",
+        str(fps),
+        "-i",
+        frames_pattern,
+        "-vf",
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        output,
+    ]
