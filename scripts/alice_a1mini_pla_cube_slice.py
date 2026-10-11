@@ -18,6 +18,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+from alice_a1mini_preview import embed_preview
+
 NOZZLE_C = 220
 BED_C = 60
 SIZE_MM = 20.0
@@ -264,7 +266,11 @@ def main() -> int:
     if result.returncode != 0:
         raise RuntimeError("Bambu Studio CLI exited nonzero")
     destination = out / SLICED_FILENAME
+    preview = embed_preview(destination, stl)
+    with zipfile.ZipFile(destination) as image_archive:
+        (out / "preview.png").write_bytes(image_archive.read("Metadata/plate_1.png"))
     report = audit(destination, out / "result.json")
+    report["preview"] = preview
     (out / "audit.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
