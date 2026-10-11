@@ -529,3 +529,29 @@ def test_post_publish_inode_swap_is_detected(tmp_path, monkeypatch):
             store.backup(backup)
         assert swapped
         assert victim.read_bytes() == b"unverified"
+
+
+@pytest.mark.parametrize("directory_mode", [0o755, 0o770, 0o777])
+def test_trusted_root_rejects_unsafe_directory_modes(
+    tmp_path, monkeypatch, directory_mode
+):
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(directory_mode)
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    with pytest.raises(StoreError, match="untrusted Memory DB directory"):
+        MemoryStore(root / "journal.memory")
+
+
+def test_trusted_root_accepts_private_files_and_rejects_weak_lock(tmp_path, monkeypatch):
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    with MemoryStore(root / "journal.memory") as store:
+        store.set("safe", 1)
+        store.commit()
+    lock = root / "journal.memory.lock"
+    lock.chmod(0o644)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(root / "journal.memory")
