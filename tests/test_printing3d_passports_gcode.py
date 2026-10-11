@@ -105,3 +105,34 @@ def test_specific_device_rejects_unopened_or_wrong_job():
         AUDIT.verify_target_printer(passport, observed, 'a' * 64)
     observed['touchscreen_open_verified'] = True
     assert AUDIT.verify_target_printer(passport, observed, 'a' * 64)['print_start_authorized'] is False
+
+
+def _preflight_module():
+    spec = importlib.util.spec_from_file_location('model_preflight', ROOT / 'printing3d/model_preflight.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_every_source_stl_passes_actual_mesh_preflight():
+    manifest = json.loads((ASSETS / 'models_manifest.json').read_text())
+    results = _preflight_module().verify_inventory_sources(manifest, ROOT)
+    assert {name: len(parts) for name, parts in results.items()} == {
+        'oem_spindle_v03': 8, 'desk_spool_v01': 3, 'desk_spool_v02': 3}
+
+
+def test_upload_rejected_without_firmware_acceptance():
+    passport = passports()['oem_spindle_v03']
+    evidence = [{'topology': 'closed_edge_manifold'}]
+    gcode = {'status': 'GCODE_VERIFIED_FIT_BLOCKED'}
+    with pytest.raises(ValueError, match='firmware acceptance'):
+        _preflight_module().require_upload_preflight(passport, evidence, gcode)
+
+
+def test_upload_rejected_without_model_or_gcode_evidence():
+    passport = passports()['oem_spindle_v03']
+    preflight = _preflight_module().require_upload_preflight
+    with pytest.raises(ValueError, match='source and sliced'):
+        preflight(passport, [], {'status': 'GCODE_STATIC_VERIFIED'})
+    with pytest.raises(ValueError, match='source and sliced'):
+        preflight(passport, [{'topology': 'closed_edge_manifold'}], None)
