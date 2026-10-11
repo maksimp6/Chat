@@ -49,6 +49,27 @@ def _validate_value(value: Any) -> None:
         raise StoreError("unsupported JSON value")
 
 
+
+def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, Any]]:
+    """Validate every change before any committed state mutation."""
+    validated: list[tuple[str, str, str, Any]] = []
+    for change in payload["changes"]:
+        if not isinstance(change, dict):
+            raise ValueError("invalid journal change")
+        namespace, key = change["namespace"], change["key"]
+        if not isinstance(namespace, str) or not isinstance(key, str):
+            raise ValueError("invalid journal key")
+        operation = change["op"]
+        if operation == "set":
+            value = change["value"]
+            _validate_value(value)
+            validated.append((operation, namespace, key, value))
+        elif operation == "delete":
+            validated.append((operation, namespace, key, None))
+        else:
+            raise ValueError("invalid journal operation")
+    return validated
+
 class Store(Protocol[ValueT]):
     """Copy-safe name/value staging with an explicit durable commit."""
 
@@ -190,22 +211,7 @@ class _JournalStore:
                 raise ValueError("commit chain mismatch")
             # Validate the entire frame before mutating caller-owned state.
             # A malformed later operation must not publish earlier changes.
-            validated: list[tuple[str, str, str, Any]] = []
-            for change in payload["changes"]:
-                if not isinstance(change, dict):
-                    raise ValueError("invalid journal change")
-                namespace, key = change["namespace"], change["key"]
-                if not isinstance(namespace, str) or not isinstance(key, str):
-                    raise ValueError("invalid journal key")
-                operation = change["op"]
-                if operation == "set":
-                    value = change["value"]
-                    _validate_value(value)
-                    validated.append((operation, namespace, key, value))
-                elif operation == "delete":
-                    validated.append((operation, namespace, key, None))
-                else:
-                    raise ValueError("invalid journal operation")
+            validated = _validate_journal_changes(payload["changes"])
             for operation, namespace, key, value in validated:
                 if operation == "set":
                     state.setdefault(namespace, {})[key] = value
