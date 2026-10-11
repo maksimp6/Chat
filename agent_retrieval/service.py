@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from agent_context import CacheLookup
 from agent_memory import AgentMemoryStore, MemoryRecord
+from repository_index.provenance import snapshot_revision
 
 from .models import RetrievalBundle, RetrievalHit, RetrievalQuery
 
@@ -215,6 +216,17 @@ def _code_hits(
     ):
         return []
 
+    # Both consumers use the same fail-closed snapshot/legacy classification.
+    try:
+        bound_revision = snapshot_revision(repository_index)
+    except ValueError:
+        return []
+    if bound_revision is not None and (
+        bound_revision != query.head_sha
+        or repository_index.get("repository") != query.repository.lower()
+    ):
+        return []
+
     files = list(repository_index.get("files") or [])
     tests_by_module = repository_index.get("tests_by_module") or {}
     documents: list[str] = []
@@ -240,7 +252,7 @@ def _code_hits(
         hits.append(
             RetrievalHit(
                 source_type="code",
-                ref=str(item.get("path") or "code"),
+                ref=str(item.get("source_ref") or item.get("path") or "code"),
                 score=1.0 + score,
                 text=summary,
                 metadata={

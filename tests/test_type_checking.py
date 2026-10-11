@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 MYPY_ERROR_BASELINE = {
     "arg-type": 55,
-    "assignment": 52,
+    "assignment": 51,
     "attr-defined": 48,
     "call-arg": 2,
     "call-overload": 2,
@@ -88,6 +88,8 @@ STRICT_CLEAN_FILES = {
     "pricing_registry.py",
     "printing3d/__init__.py",
     "provider_key_rotation.py",
+    "repository_index/__init__.py",
+    "repository_index/provenance.py",
     "rdc_connection/__init__.py",
     "reasoning_plan.py",
     "responses_tool_loop.py",

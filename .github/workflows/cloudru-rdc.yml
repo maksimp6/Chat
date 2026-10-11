@@ -11,6 +11,10 @@ on:
         description: Object Storage tenant ID (not a secret); required for all actions unless configured
         type: string
         required: false
+      image:
+        description: Prebuilt immutable image digest reference; required for install, no build runs in this workflow
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -41,6 +45,7 @@ jobs:
         env:
           ACTION: ${{ inputs.action }}
           SOURCE_SHA: ${{ github.sha }}
+          ALICE_RDC_IMAGE: ${{ inputs.image }}
           CLOUDRU_STORAGE_TENANT_ID: ${{ inputs.storage_tenant_id || vars.CLOUDRU_STORAGE_TENANT_ID }}
           CLOUDRU_PROJECT_ID: ${{ vars.CLOUDRU_PROJECT_ID }}
           CLOUDRU_IAM_KEY_ID: ${{ secrets.CLOUDRU_IAM_KEY_ID }}
