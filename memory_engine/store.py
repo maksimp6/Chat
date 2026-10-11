@@ -442,8 +442,10 @@ class _JournalStore:
             # Both backup and restore publish only to an absent destination.
             # Never overwrite a concurrently substituted regular file or symlink.
             os.link(
-                temp_name, destination.name,
-                src_dir_fd=target_dir, dst_dir_fd=target_dir,
+                temp_name,
+                destination.name,
+                src_dir_fd=target_dir,
+                dst_dir_fd=target_dir,
                 follow_symlinks=False,
             )
             os.fsync(target_dir)
@@ -468,7 +470,10 @@ class _JournalStore:
             if target.resolve() == self.path.resolve() or target.exists():
                 raise StoreError("backup destination must be new")
             self._copy_verified_file(
-                self.path, target, self._state, self.last_commit,
+                self.path,
+                target,
+                self._state,
+                self.last_commit,
                 destination_must_be_new=True,
             )
 
