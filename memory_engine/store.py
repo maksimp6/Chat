@@ -439,20 +439,16 @@ class _JournalStore:
                 actual_state, sequence, digest = _JournalStore._inspect_stream(verified)
             if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
                 raise StoreError("backup integrity mismatch")
-            if destination_must_be_new:
-                os.link(
-                    temp_name, destination.name,
-                    src_dir_fd=target_dir, dst_dir_fd=target_dir,
-                    follow_symlinks=False,
-                )
-            else:
-                os.replace(
-                    temp_name, destination.name,
-                    src_dir_fd=target_dir, dst_dir_fd=target_dir,
-                )
+            # Both backup and restore publish only to an absent destination.
+            # Never overwrite a concurrently substituted regular file or symlink.
+            os.link(
+                temp_name, destination.name,
+                src_dir_fd=target_dir, dst_dir_fd=target_dir,
+                follow_symlinks=False,
+            )
             os.fsync(target_dir)
         except FileExistsError as exc:
-            raise StoreError("backup destination was created concurrently") from exc
+            raise StoreError("destination was created concurrently") from exc
         finally:
             if temp_name is not None:
                 try:
