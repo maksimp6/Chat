@@ -64,7 +64,7 @@ def _base_canvas(width: int) -> bytearray:
         shade = int(21 + 16 * y / width)
         for x in range(width):
             off = (y * width + x) * 3
-            pixels[off:off + 3] = bytes((shade, shade + 8, shade + 16))
+            pixels[off : off + 3] = bytes((shade, shade + 8, shade + 16))
     for i in range(1, 10):
         at = int(i * width / 10)
         for t in range(width):
@@ -78,7 +78,7 @@ def _set_pixel(
 ) -> None:
     if 0 <= x < width and 0 <= y < width:
         offset = (y * width + x) * 3
-        pixels[offset:offset + 3] = bytes(color)
+        pixels[offset : offset + 3] = bytes(color)
 
 
 def _project(
@@ -116,7 +116,9 @@ def _paint_triangle(
     light = abs((n[0] * -0.34 + n[1] * -0.42 + n[2] * 0.84) / norm)
     color = tuple(int(value * (0.4 + 0.6 * light)) for value in (137, 192, 225))
     for yy in range(max(0, int(min(ay, by, cy))), min(width, int(max(ay, by, cy)) + 2)):
-        for xx in range(max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)):
+        for xx in range(
+            max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)
+        ):
             px, py = xx + 0.5, yy + 0.5
             w0 = ((bx - px) * (cy - py) - (by - py) * (cx - px)) / area
             w1 = ((cx - px) * (ay - py) - (cy - py) * (ax - px)) / area
@@ -126,14 +128,16 @@ def _paint_triangle(
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
     return (
-        struct.pack(">I", len(payload)) + kind + payload
+        struct.pack(">I", len(payload))
+        + kind
+        + payload
         + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
     )
 
 
 def _encode_png(pixels: bytearray, width: int) -> bytes:
     scan = b"".join(
-        b"\x00" + bytes(pixels[y * width * 3:(y + 1) * width * 3])
+        b"\x00" + bytes(pixels[y * width * 3 : (y + 1) * width * 3])
         for y in range(width)
     )
     return (
@@ -162,8 +166,10 @@ def _render(faces: list, width: int, *, top: bool = False) -> bytes:
     projected.sort(key=lambda item: sum(p[2] for p in item[0]) / 3)
     for vertices, tri in projected:
         pts = [
-            (width * 0.5 + (p[0] - center_x) * scale,
-             width * 0.51 - (p[1] - center_y) * scale)
+            (
+                width * 0.5 + (p[0] - center_x) * scale,
+                width * 0.51 - (p[1] - center_y) * scale,
+            )
             for p in vertices
         ]
         _paint_triangle(pixels, width, pts, tri)
@@ -179,8 +185,11 @@ def _read_archive(path: Path) -> tuple[list[zipfile.ZipInfo], dict[str, bytes]]:
         if len(infos) > 128 or len(names) != len(set(names)):
             raise RuntimeError("duplicate/oversized 3MF members")
         if any(
-            not name or name.startswith("/") or "\\" in name
-            or ".." in name.split("/") or name.endswith("/")
+            not name
+            or name.startswith("/")
+            or "\\" in name
+            or ".." in name.split("/")
+            or name.endswith("/")
             for name in names
         ):
             raise RuntimeError("unsafe 3MF member path")
@@ -190,8 +199,10 @@ def _read_archive(path: Path) -> tuple[list[zipfile.ZipInfo], dict[str, bytes]]:
             raise RuntimeError("3MF ZIP CRC validation failed")
         content = {name: z.read(name) for name in names}
     required = (
-        "Metadata/plate_1.gcode", "Metadata/model_settings.config",
-        "_rels/.rels", "[Content_Types].xml",
+        "Metadata/plate_1.gcode",
+        "Metadata/model_settings.config",
+        "_rels/.rels",
+        "[Content_Types].xml",
     )
     if not all(name in content for name in required):
         raise RuntimeError("3MF missing G-code/metadata/relationships")
@@ -214,7 +225,10 @@ def _metadata_with_previews(raw: bytes) -> bytes:
         raise RuntimeError("only single-plate previews are supported")
     plate = plates[0]
     entries = {item.get("key"): item for item in plate.findall("metadata")}
-    if entries.get("gcode_file") is None or entries["gcode_file"].get("value") != "Metadata/plate_1.gcode":
+    if (
+        entries.get("gcode_file") is None
+        or entries["gcode_file"].get("value") != "Metadata/plate_1.gcode"
+    ):
         raise RuntimeError("unexpected plate G-code reference")
     for key, filename in (("thumbnail_file", _MAIN), ("top_file", _TOP)):
         if key in entries:
@@ -233,8 +247,8 @@ def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
         count = struct.unpack_from(">I", data, pos)[0]
         if count > 8 * 1024 * 1024 or pos + 12 + count > len(data):
             raise RuntimeError("invalid PNG chunk size")
-        kind = data[pos + 4:pos + 8]
-        payload = data[pos + 8:pos + 8 + count]
+        kind = data[pos + 4 : pos + 8]
+        payload = data[pos + 8 : pos + 8 + count]
         expected = struct.unpack_from(">I", data, pos + 8 + count)[0]
         if zlib.crc32(kind + payload) & 0xFFFFFFFF != expected:
             raise RuntimeError("invalid PNG chunk CRC")
@@ -242,7 +256,12 @@ def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
         pos += 12 + count
         if kind == b"IEND":
             break
-    if pos != len(data) or not chunks or chunks[0][0] != b"IHDR" or chunks[-1][0] != b"IEND":
+    if (
+        pos != len(data)
+        or not chunks
+        or chunks[0][0] != b"IHDR"
+        or chunks[-1][0] != b"IEND"
+    ):
         raise RuntimeError("incomplete PNG")
     return chunks
 
@@ -266,7 +285,7 @@ def _verify_png_pixels(raw: bytes, width: int) -> None:
         raise RuntimeError("PNG pixel size mismatch")
     if any(raw[y * (1 + 3 * width)] != 0 for y in range(width)):
         raise RuntimeError("unexpected PNG scanline filter")
-    if len(set(raw[1:1 + min(width, 30) * 3])) <= 1 and len(set(raw)) <= 3:
+    if len(set(raw[1 : 1 + min(width, 30) * 3])) <= 1 and len(set(raw)) <= 3:
         raise RuntimeError("blank thumbnail")
 
 
@@ -326,7 +345,10 @@ def embed_preview(path: Path, source_stl: Path) -> dict[str, object]:
         if report["gcode_sha256"] != gcode_before:
             raise RuntimeError("render embedding modified G-code")
         with zipfile.ZipFile(replacement) as check:
-            if md5_before is not None and check.read("Metadata/plate_1.gcode.md5") != md5_before:
+            if (
+                md5_before is not None
+                and check.read("Metadata/plate_1.gcode.md5") != md5_before
+            ):
                 raise RuntimeError("render embedding modified G-code MD5")
         os.replace(replacement, path)
         return report
