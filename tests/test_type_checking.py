@@ -118,6 +118,7 @@ STRICT_CLEAN_FILES = {
     "storage.py",
     "trace_timing.py",
     "tool_providers/__init__.py",
+    "tools/android/rdc_actions.py",
     "user_identity.py",
     "treasury_identity.py",
     "yandex_api_logger.py",

@@ -1,7 +1,9 @@
 """Offline tests for the restricted Android actions CLI."""
 import argparse
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
 from unittest.mock import patch
 import pytest
 
@@ -49,3 +51,41 @@ def test_home_uses_keyevent():
 def test_status_parses_focus():
     with patch.object(module, "device", return_value="serial"), patch.object(module, "run", return_value="mCurrentFocus=Window{123 app}\n"):
         assert module.execute(args("status"))["focus"] == "Window{123 app}"
+
+
+def test_unknown_action_is_rejected_before_adb():
+    with patch.object(module, "device") as connected:
+        with pytest.raises(ValueError, match="Unknown Android action"):
+            module.execute(args("unexpected"))
+        connected.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        FileNotFoundError("synthetic-private-path"),
+        PermissionError("synthetic-private-path"),
+        subprocess.TimeoutExpired("synthetic-private-command", 20),
+        subprocess.CalledProcessError(1, "synthetic-private-command"),
+    ],
+)
+def test_cli_errors_are_generic_json(failure, monkeypatch, capsys):
+    monkeypatch.setattr(module.sys, "argv", ["rdc_actions", "status"])
+    with patch.object(module, "execute", side_effect=failure):
+        assert module.main() == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err) == {
+        "error": type(failure).__name__,
+        "message": "Android action failed",
+    }
+    assert "synthetic-private" not in output.err
+
+
+def test_cli_reports_submitted_without_claiming_verified(monkeypatch, capsys):
+    monkeypatch.setattr(module.sys, "argv", ["rdc_actions", "home"])
+    with patch.object(module, "device", return_value="synthetic-device"), patch.object(module, "run"):
+        assert module.main() == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {"command": "home", "submitted": True, "verified": False}
+    assert output.err == ""

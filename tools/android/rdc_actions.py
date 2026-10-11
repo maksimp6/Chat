@@ -28,6 +28,8 @@ def device() -> str:
 
 def execute(args: argparse.Namespace) -> dict[str, object]:
     """Perform one bounded Android operation; never claim UI verification for taps."""
+    if args.command not in {"status", "screenshot", "tap", "swipe", "back", "home", "open"}:
+        raise ValueError("Unknown Android action")
     serial = device()
     prefix = ("-s", serial)
     if args.command == "status":
@@ -77,7 +79,7 @@ def main() -> int:
     try:
         print(json.dumps(execute(args), ensure_ascii=False))
         return 0
-    except (ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError) as exc:
         print(json.dumps({"error": type(exc).__name__, "message": "Android action failed"}), file=sys.stderr)
         return 1
 
