@@ -133,3 +133,37 @@ def test_concurrent_ipc_commits_are_individually_acknowledged(tmp_path, monkeypa
     with MemoryStore(path) as reopened:
         assert all(reopened.get(f"k{i}") == i for i in range(12))
         assert reopened.last_commit.sequence == 12
+
+
+@pytest.mark.skipif(not hasattr(__import__("signal"), "SIGKILL"), reason="POSIX SIGKILL required")
+def test_sigkill_after_ack_replays_committed_data(tmp_path):
+    import os
+    import signal
+    import subprocess
+    import sys
+    from memory_engine import MemoryStore
+
+    path = tmp_path / "db.memory"
+    code = (
+        "import sys,time; from memory_engine import MemoryStore; "
+        "s=MemoryStore(sys.argv[1]); s.set('durable',17); "
+        "s.commit(); print('ACK',flush=True); time.sleep(30)"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", code, str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "ACK"
+        os.kill(process.pid, signal.SIGKILL)
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+    with MemoryStore(path) as reopened:
+        assert reopened.get("durable") == 17
+        assert reopened.last_commit.sequence == 1
