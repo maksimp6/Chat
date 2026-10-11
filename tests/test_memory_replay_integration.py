@@ -681,3 +681,50 @@ def test_trusted_root_rejects_mount_boundary(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "_trusted_mount_id", injected_mount)
     with pytest.raises(StoreError, match="unsafe journal or lock path"):
         MemoryStore(root / "journal.memory")
+
+
+@pytest.mark.parametrize("mount_error", ["missing", "invalid", "unreadable"])
+def test_mount_id_inspection_fails_closed(tmp_path, monkeypatch, mount_error):
+    import builtins
+    import io
+    import memory_engine.store as engine
+
+    ordinary = tmp_path / "ordinary"
+    ordinary.write_bytes(b"x")
+    fd = os.open(ordinary, os.O_RDONLY)
+    original_open = builtins.open
+
+    def injected_open(path, *args, **kwargs):
+        if str(path) == f"/proc/self/fdinfo/{fd}":
+            if mount_error == "unreadable":
+                raise OSError("procfs unavailable")
+            if mount_error == "invalid":
+                return io.StringIO("mnt_id: invalid\n")
+            return io.StringIO("pos: 0\n")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", injected_open)
+    try:
+        with pytest.raises(StoreError, match="unverifiable Memory DB mount boundary"):
+            engine._trusted_mount_id(fd)
+    finally:
+        os.close(fd)
+
+
+def test_acl_inspection_error_fails_closed(tmp_path, monkeypatch):
+    import errno
+    import memory_engine.store as engine
+
+    ordinary = tmp_path / "ordinary"
+    ordinary.write_bytes(b"x")
+    fd = os.open(ordinary, os.O_RDONLY)
+
+    def denied_acl(*args):
+        raise OSError(errno.EACCES, "ACL inspection denied")
+
+    monkeypatch.setattr(engine.os, "getxattr", denied_acl)
+    try:
+        with pytest.raises(StoreError, match="unverifiable Memory DB ACL"):
+            engine._reject_extended_acl(fd)
+    finally:
+        os.close(fd)
