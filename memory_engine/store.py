@@ -109,16 +109,13 @@ class Commit:
     digest: str
 
 
-
 def _open_directory_nofollow(directory: Path) -> int:
     """Pin every directory component; never traverse a symlink."""
     absolute = Path(os.path.abspath(directory))
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in absolute.parts[1:]:
-            next_fd = os.open(
-                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
-            )
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             os.close(fd)
             fd = next_fd
         return fd
