@@ -63,7 +63,7 @@ def handle_client(conn: socket.socket, store: MemoryStore, allowed_uid: int) -> 
             result = {"ok": True, "sequence": store.info().last_commit}
         else:
             result = {"ok": False, "error": "invalid operation"}
-        response = (json.dumps(result, separators=(",", ":")) + "\\n").encode()
+        response = (json.dumps(result, separators=(",", ":")) + "\n").encode()
         if len(response) > MAX_RESPONSE:
             return
         conn.sendall(response)
