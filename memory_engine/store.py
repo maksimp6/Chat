@@ -53,7 +53,7 @@ def _validate_value(value: Any) -> None:
 def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, Any]]:
     """Validate every change before any committed state mutation."""
     validated: list[tuple[str, str, str, Any]] = []
-    for change in payload["changes"]:
+    for change in changes:
         if not isinstance(change, dict):
             raise ValueError("invalid journal change")
         namespace, key = change["namespace"], change["key"]
