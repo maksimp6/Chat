@@ -169,3 +169,31 @@ def test_corrupt_complete_frame_fails_closed(tmp_path):
     with pytest.raises(StoreError, match="corrupt committed journal"):
         MemoryStore(path)
     assert path.read_bytes() == original
+
+
+def test_invalid_later_operation_does_not_mutate_input_state():
+    """Replay validation must be atomic even for direct helper callers."""
+    import hashlib
+
+    state = {"values": {"stable": {"version": 1}}}
+    payload = {
+        "format": 1,
+        "seq": 1,
+        "changes": [
+            {
+                "op": "set",
+                "namespace": "values",
+                "key": "stable",
+                "value": {"version": 2},
+            },
+            {"op": "invalid", "namespace": "values", "key": "broken"},
+        ],
+    }
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
+    frame = json.dumps({"payload": payload, "digest": digest}).encode() + b"\n"
+    with pytest.raises(StoreError, match="corrupt committed journal"):
+        _JournalStore._apply_verified_frame(frame, state, 0, "0" * 64)
+    assert state == {"values": {"stable": {"version": 1}}}
