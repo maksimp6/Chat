@@ -305,9 +305,9 @@ def test_backup_destination_creation_race_does_not_overwrite(tmp_path, monkeypat
         db.set("items", "a", 1)
         original_link = module.os.link
 
-        def competing_link(source, destination):
+        def competing_link(source, destination, **kwargs):
             archive.write_bytes(b"another backup")
-            return original_link(source, destination)
+            return original_link(source, destination, **kwargs)
 
         monkeypatch.setattr(module.os, "link", competing_link)
         with pytest.raises(StoreError, match="created concurrently"):
