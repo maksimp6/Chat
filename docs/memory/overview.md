@@ -1,8 +1,8 @@
 # Работа с памятью в Alice Pro
 
-## Текущее состояние (master 2026-10-06)
+## Зафиксированное состояние (срез master от 2026-10-06; не текущая проверка)
 
-Система памяти находится в переходе к дurable file-native Storage Engine. На данный момент:
+Ниже — исторический срез миграции на 2026-10-06, **не утверждение о текущем состоянии master или полном SQL-free cutover**. Целевой контракт и проверки описаны в [Memory DB target architecture](../architecture/memory-db-target.md). На дату последующего обновления документации статус каждого runtime-потребителя необходимо перепроверять по коду и exact-head CI:
 
 - **Извлечение памяти** использует SQL-backed модель: `memory_manager.py` и `memory_extractor.py` создают таблицу `global_memory` для хранения фактов, извлечённых из диалогов
 - **Durable Storage Engine** (FileMemoryDB) реализован в `agent_memory/file_memory_db.py` (PR #856) с полноценной backup/restore (PR #857); Wave 1 уже перевёл `conversation_ownership.py` на file-native ownership (#920) и переводит `user_identity.py` вместе с GitHub account mapping как один atomic identity aggregate
@@ -41,9 +41,9 @@ Wave 1 интегрирует FileMemoryDB в `memory_manager` и заменит
 3. Atomic cutover только после verified equivalence
 4. Explicit rollback capability
 
-**Статус**: durable engine и backup/restore готовы; conversation ownership уже shipped в master (#920). User identity + GitHub mapping переведены следующим Wave 1 slice; после него остаются sessions/profiles и memory extraction.
+**Статус исторического среза (2026-10-06)**: заявлялись durable engine, backup/restore и перенос ownership (#920); identity, sessions/profiles и memory extraction требовали дальнейшей проверки. Это не свидетельство завершённой миграции на текущем HEAD.
 
-## Сценарии использования (текущие)
+## Сценарии SQL-backed пути (исторический срез 2026-10-06)
 
 1. **Добавление данных**: backend вызывает `memory_extractor.extract_and_save_facts()` для сохранения в SQL `global_memory`
 2. **Извлечение памяти**: `memory_manager.get_controlled_memory_summary()` читает из SQL с учётом конфигурации категорий
