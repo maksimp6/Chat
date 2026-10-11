@@ -27,7 +27,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="memory-uid-e2e-") as tmp:
         root = Path(tmp)
         root.chmod(0o755)
-        shutil.copytree(Path(__file__).resolve().parents[1] / "memory_engine", root / "memory_engine")
+        shutil.copytree(
+            Path(__file__).resolve().parents[1] / "memory_engine", root / "memory_engine"
+        )
         for item in (root / "memory_engine").rglob("*"):
             item.chmod(0o755 if item.is_dir() else 0o644)
         (root / "memory_engine").chmod(0o755)
