@@ -136,3 +136,43 @@ def test_upload_rejected_without_model_or_gcode_evidence():
         preflight(passport, [], {'status': 'GCODE_STATIC_VERIFIED'})
     with pytest.raises(ValueError, match='source and sliced'):
         preflight(passport, [{'topology': 'closed_edge_manifold'}], None)
+
+
+def _quality_module():
+    spec = importlib.util.spec_from_file_location('quality_capability', ROOT / 'printing3d/quality_capability.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_all_models_have_functional_quality_requirements():
+    for passport in passports().values():
+        assert passport['intended_function']
+        assert passport['quality_requirements']
+        assert passport['quality_requirements_approved'] is False
+        assert _quality_module().assess_quality(passport, {})['status'] == 'UNKNOWN'
+
+
+def test_unknown_printer_quality_cannot_pass():
+    passport = passports()['oem_spindle_v03'].copy()
+    passport['quality_requirements_approved'] = True
+    result = _quality_module().assess_quality(passport, {})
+    assert result['status'] == 'UNKNOWN'
+    assert result['print_quality_approved'] is False
+
+
+def test_mismatched_material_and_failed_measurement():
+    passport = passports()['desk_spool_v02'].copy()
+    passport['quality_requirements_approved'] = True
+    passport['process_profile_id'] = 'PETG_0.2'
+    quality = _quality_module()
+    measurements = {}
+    for r in passport['quality_requirements']:
+        measurements[r['metric']] = dict(value=0.1, evidence_id='test-only',
+                                         printer_id=passport['target_printer']['device_id'],
+                                         material='PLA', profile_id='PETG_0.2')
+    assert quality.assess_quality(passport, measurements)['status'] == 'UNKNOWN'
+    for r in measurements.values():
+        r['material'] = 'PETG'
+        r['value'] = 100
+    assert quality.assess_quality(passport, measurements)['status'] == 'FAIL'

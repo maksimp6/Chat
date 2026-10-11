@@ -51,5 +51,37 @@
     "touchscreen_open_verified": false,
     "printer_start_authorized": false,
     "firmware_evidence": "authenticated MQTT info/get_version (2026-10-11)"
-  }
+  },
+  "intended_function": "Support and rotate a filament spool without tipping, binding or fracture",
+  "process_profile_id": null,
+  "quality_requirements": [
+    {
+      "metric": "assembly_fit_error_mm",
+      "max_value": 0.4,
+      "unit": "mm",
+      "method": "printed fit coupons"
+    },
+    {
+      "metric": "load_deflection_mm",
+      "max_value": 1.0,
+      "unit": "mm",
+      "method": "load test at intended spool mass"
+    },
+    {
+      "metric": "minimum_strength_margin",
+      "min_value": 2.0,
+      "unit": "ratio",
+      "method": "load test"
+    }
+  ],
+  "quality_capability_status": "UNKNOWN",
+  "quality_approved": false,
+  "quality_evidence_required": [
+    "actual filament and nozzle",
+    "calibration print measurements",
+    "part fit test",
+    "functional load test"
+  ],
+  "quality_requirements_approved": false,
+  "quality_requirements_source": "PROPOSED engineering thresholds, not measured or approved; must be validated against actual use"
 }

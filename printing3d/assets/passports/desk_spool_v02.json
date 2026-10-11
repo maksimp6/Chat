@@ -51,5 +51,31 @@
     "touchscreen_open_verified": false,
     "printer_start_authorized": false,
     "firmware_evidence": "authenticated MQTT info/get_version (2026-10-11)"
-  }
+  },
+  "intended_function": "Center a measured spool bore on the matching shaft without excessive play",
+  "process_profile_id": null,
+  "quality_requirements": [
+    {
+      "metric": "bore_fit_error_mm",
+      "max_value": 0.3,
+      "unit": "mm",
+      "method": "caliper of actual bore and printed adapter"
+    },
+    {
+      "metric": "runout_mm",
+      "max_value": 0.5,
+      "unit": "mm",
+      "method": "assembled spool runout measurement"
+    }
+  ],
+  "quality_capability_status": "UNKNOWN",
+  "quality_approved": false,
+  "quality_evidence_required": [
+    "actual filament and nozzle",
+    "calibration print measurements",
+    "part fit test",
+    "functional load test"
+  ],
+  "quality_requirements_approved": false,
+  "quality_requirements_source": "PROPOSED engineering thresholds, not measured or approved; must be validated against actual use"
 }
