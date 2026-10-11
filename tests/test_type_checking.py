@@ -38,6 +38,8 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "agent_rules/__init__.py",
+    "agent_rules/controller.py",
     "agent_context/__init__.py",
     "agent_context/cache.py",
     "agent_context/models.py",
