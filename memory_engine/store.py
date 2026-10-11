@@ -237,7 +237,7 @@ class _JournalStore:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
     def __init__(self, path: str | Path, *, trusted: bool | None = None) -> None:
-        self._trusted = (os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted
+        self._trusted = (\n            (os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1") if trusted is None else trusted\n        )
         self._pid = os.getpid()
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -247,7 +247,7 @@ class _JournalStore:
                 _verify_trusted_root(self._directory_fd)
             self._journal_name = self.path.name
             lock_fd = _open_journal_nofollow(
-                self._directory_fd, self._journal_name + ".lock", os.O_RDWR | os.O_CREAT, trusted=self._trusted
+                self._directory_fd,\n                self._journal_name + ".lock",\n                os.O_RDWR | os.O_CREAT,\n                trusted=self._trusted,
             )
         except (OSError, StoreError) as exc:
             if hasattr(self, "_directory_fd"):
@@ -306,7 +306,7 @@ class _JournalStore:
             return state, sequence, digest
         directory_fd = _open_directory_nofollow(path.parent, trusted=trusted)
         try:
-            journal_fd = _open_journal_nofollow(directory_fd, path.name, os.O_RDONLY, trusted=trusted)
+            journal_fd = _open_journal_nofollow(\n                directory_fd, path.name, os.O_RDONLY, trusted=trusted\n            )
         except OSError as exc:
             raise StoreError("unsafe journal path") from exc
         finally:
@@ -377,7 +377,7 @@ class _JournalStore:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
-        self._state, self._sequence, self._digest = self._inspect_log(self.path, trusted=self._trusted)
+        self._state, self._sequence, self._digest = self._inspect_log(\n            self.path, trusted=self._trusted\n        )
 
     def get(self, namespace: str, key: str) -> Any | None:
         """Return a deep copy of the last confirmed value from RAM."""
@@ -525,7 +525,7 @@ class _JournalStore:
         target_dir = _open_directory_nofollow(destination.parent, trusted=trusted)
         temp_name = None
         try:
-            source_fd = _open_journal_nofollow(source_dir, source.name, os.O_RDONLY, trusted=trusted)
+            source_fd = _open_journal_nofollow(\n                source_dir, source.name, os.O_RDONLY, trusted=trusted\n            )
             temp_name = ".alice-copy-" + os.urandom(16).hex()
             temp_fd = _open_journal_nofollow(
                 target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, trusted=trusted
@@ -598,7 +598,7 @@ class _JournalStore:
             if not origin.exists():
                 raise StoreError("backup source does not exist")
             try:
-                self._copy_verified_file(origin, self.path, state, Commit(sequence, digest), trusted=self._trusted)
+                self._copy_verified_file(\n                    origin, self.path, state, Commit(sequence, digest), trusted=self._trusted\n                )
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
