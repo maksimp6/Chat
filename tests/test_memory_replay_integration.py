@@ -553,3 +553,27 @@ def test_trusted_root_accepts_private_files_and_rejects_weak_lock(tmp_path, monk
     lock.chmod(0o644)
     with pytest.raises(StoreError, match="unsafe journal or lock path"):
         MemoryStore(root / "journal.memory")
+
+
+@pytest.mark.parametrize("mode", [0o777, 0o775, 0o730])
+def test_trusted_root_rejects_writable_ancestor(tmp_path, monkeypatch, mode):
+    ancestor = tmp_path / "writable-parent"
+    ancestor.mkdir()
+    ancestor.chmod(mode)
+    root = ancestor / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(root / "journal.memory")
+
+
+def test_trusted_root_rejects_ancestor_symlink(tmp_path, monkeypatch):
+    real = tmp_path / "real"
+    real.mkdir(mode=0o700)
+    real.chmod(0o700)
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(alias / "journal.memory")
