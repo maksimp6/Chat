@@ -8,7 +8,7 @@ ALLOWED_SHOTS = {"turntable", "exploded", "assembly", "print_orientation"}
 FORMATS = {"vertical": (720, 1280), "horizontal": (1280, 720)}
 
 
-def load_storyboard(path: Path) -> dict:
+def load_storyboard(path: Path) -> dict[str, object]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("Storyboard must be an object")
