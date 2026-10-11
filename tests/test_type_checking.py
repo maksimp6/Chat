@@ -47,6 +47,7 @@ STRICT_CLEAN_FILES = {
     "agent_shell/store.py",
     "memory_engine/__init__.py",
     "memory_engine/store.py",
+    "memory_engine/service.py",
     "agent_office/__init__.py",
     "agent_office/dispatch_model.py",
     "agent_office/task_state.py",
