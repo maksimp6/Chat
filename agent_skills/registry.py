@@ -29,6 +29,8 @@ REQUIRED_SECTIONS = (
 
 ROLE_SKILL_ALLOWLIST = {
     "team-lead": {
+        "3d-print-preflight",
+        "a1-mini-print-watch",
         "github-pr-readiness",
         "github-ci-diagnosis",
         "issue-to-pr",
@@ -39,6 +41,7 @@ ROLE_SKILL_ALLOWLIST = {
         "release-readiness",
     },
     "backend-engineer": {
+        "3d-print-preflight",
         "issue-to-pr",
         "github-ci-diagnosis",
         "alice-runtime-debugging",
@@ -46,7 +49,13 @@ ROLE_SKILL_ALLOWLIST = {
     },
     "frontend-engineer": {"issue-to-pr", "github-ci-diagnosis", "security-review"},
     "android-engineer": {"issue-to-pr", "github-ci-diagnosis", "security-review"},
-    "test-engineer": {"github-ci-diagnosis", "issue-to-pr", "alice-runtime-debugging"},
+    "test-engineer": {
+        "3d-print-preflight",
+        "a1-mini-print-watch",
+        "github-ci-diagnosis",
+        "issue-to-pr",
+        "alice-runtime-debugging",
+    },
     "infra-engineer": {
         "github-ci-diagnosis",
         "cloudru-change",
@@ -74,6 +83,8 @@ ROLE_SKILL_ALLOWLIST = {
         "docs-sync",
     },
     "alice": {
+        "3d-print-preflight",
+        "a1-mini-print-watch",
         "github-pr-readiness",
         "github-ci-diagnosis",
         "issue-to-pr",

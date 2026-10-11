@@ -18,15 +18,16 @@ Owner определяется:
 
 ## Tools
 
-| Tool | Режим | Approval | Назначение |
-|---|---|---|---|
-| `printing3d.quote` | read-only, low risk | нет | Расчёт себестоимости и цены заказа |
-| `printing3d.order.create` | write, medium risk | да | Сохранить согласованный заказ |
-| `printing3d.finance.assess` | read-only, low risk | нет | AI-first оценка покупки/кредита |
-| `printing3d.finance.status` | read-only, low risk | нет | Сохранённый finance plan и фактическая окупаемость |
-| `printing3d.finance.plan.set` | write, medium risk | да | Сохранить принятые условия финансирования |
-| `printing3d.treasury.summary` | read-only, low risk | нет | Фактический P&L 3D-направления |
-| `printing3d.orders.list` | read-only, low risk | нет | Owner-scoped очередь заказов |
+| Tool                          | Режим               | Approval | Назначение                                           |
+| ----------------------------- | ------------------- | -------- | ---------------------------------------------------- |
+| `printing3d.plate.inspect`    | read-only, low risk | нет      | Проверить один файл A1 mini .gcode.3mf перед печатью |
+| `printing3d.quote`            | read-only, low risk | нет      | Расчёт себестоимости и цены заказа                   |
+| `printing3d.order.create`     | write, medium risk  | да       | Сохранить согласованный заказ                        |
+| `printing3d.finance.assess`   | read-only, low risk | нет      | AI-first оценка покупки/кредита                      |
+| `printing3d.finance.status`   | read-only, low risk | нет      | Сохранённый finance plan и фактическая окупаемость   |
+| `printing3d.finance.plan.set` | write, medium risk  | да       | Сохранить принятые условия финансирования            |
+| `printing3d.treasury.summary` | read-only, low risk | нет      | Фактический P&L 3D-направления                       |
+| `printing3d.orders.list`      | read-only, low risk | нет      | Owner-scoped очередь заказов                         |
 
 ## `printing3d.quote` и `printing3d.order.create`
 
@@ -115,3 +116,38 @@ Browser capability использует action-level approval:
 
 - [3D Printing Business](../printing3d.md)
 - [3D HTTP API](../api/printing3d.md)
+
+## Read-only single-file 3D preflight
+
+Alice loads the `3d-print-preflight` and `a1-mini-print-watch` skills through
+`SkillRegistry`. The new `printing3d.plate.inspect` tool accepts only
+`artifact_name`, never a URL or arbitrary local path.
+
+The trusted operator configures `ALICE_3D_ARTIFACT_ROOT`. Each artifact is
+staged in `<root>/<sha256(trusted_owner_id)>/<filename>`. Owner identity comes
+from authenticated Universal Tool Call context, **not** caller arguments.
+The trusted root, owner directory and file are opened using descriptor-relative
+operations and `O_NOFOLLOW`; symlinks are not followed.
+
+The bounded, offline `printing3d/plate.py` preflight checks the archive without
+extracting files: member counts and uncompressed size, duplicate/traversal paths,
+one sliced plate, `Metadata/project_settings.config`, Bambu Lab A1 mini profile,
+PLA/PETG, 0.4 mm nozzle, G-code MD5/CRC, thermal targets, extrusion and
+prohibited firmware/EEPROM commands. MD5 is only accidental-corruption
+detection, **not authenticity**.
+
+```bash
+python -m printing3d.plate "/path/to/one.gcode.3mf"
+```
+
+A source STL/OBJ or unsliced `.3mf` returns `needs_slicing` and is **not**
+ready to print. A verified sliced file returns `ready_for_review`, which still
+does **not** authorize upload or print-start. Geometry, material physically
+loaded, nozzle installed, bed adhesion and camera view need independent
+confirmation. Deliver **one** `.gcode.3mf` file for a printer job, not
+a ZIP of STL/PNG previews.
+
+A1 mini observation is read-only: when an authorized RDC device is connected,
+use MQTT telemetry plus one-shot JPEG frames. Never print camera codes,
+printer credentials or serials. Stop/start/pause and hardware changes require
+explicit separate approval.
