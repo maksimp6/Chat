@@ -20,7 +20,7 @@ class HolderRenderRED(unittest.TestCase):
     def test_three_orthogonal_and_isometric_views(self):
         result = self.renderer.render_views(self.parts)
         self.assertEqual(set(result.views), {"isometric", "top", "side"})
-        self.assertTrue(all(result.views[k].png_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        self.assertTrue(all(result.views[k].png_bytes.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10)))
                             for k in result.views))
 
     def test_images_are_not_empty_and_have_valid_dimensions(self):
