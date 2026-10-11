@@ -6,6 +6,9 @@ on:
     paths:
       - ".github/workflows/alice-a1mini-pla-cube.yml"
       - "scripts/alice_a1mini_pla_cube_slice.py"
+      - "scripts/alice_a1mini_bagclip_slice.py"
+      - "scripts/alice_a1mini_preview.py"
+      - "tests/test_a1mini_preview.py"
   workflow_dispatch:
 
 permissions:
@@ -25,6 +28,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Validate preview render contracts offline
+        run: python3 -m unittest discover -s tests -p "test_a1mini_preview.py" -v
 
       - name: Install Bambu Studio native dependencies
         shell: bash
@@ -76,6 +82,7 @@ jobs:
           path: |
             out/Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf
             out/audit.json
+            out/preview.png
           retention-days: 7
           if-no-files-found: error
           compression-level: 6
@@ -112,6 +119,7 @@ jobs:
           path: |
             out-bag/Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf
             out-bag/bagclip_audit.json
+            out-bag/preview.png
           retention-days: 7
           if-no-files-found: error
           compression-level: 6
