@@ -115,9 +115,7 @@ def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
                     now = time.monotonic()
                     while recent and now - recent[0] >= 1.0:
                         recent.popleft()
-                    if len(recent) >= MAX_REQUESTS_PER_SECOND or not slots.acquire(
-                        blocking=False
-                    ):
+                    if len(recent) >= MAX_REQUESTS_PER_SECOND or not slots.acquire(blocking=False):
                         conn.close()
                         continue
                     recent.append(now)
