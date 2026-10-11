@@ -103,14 +103,15 @@ def verify_backend_failure() -> int:
         called.append((action, payload))
         raise OSError("emulated device write failed")
 
-    _, owner, _, signer, verifier, _ = session(dispatch=faulty)
+    _, owner, authority, signer, verifier, _ = session(dispatch=faulty)
     first = signer.sign(owner, InputGrant("key_down", {"key": 30}))
     rejected(lambda: verifier.accept(first))
     assert verifier.session is None
     second = signer.sign(owner, InputGrant("key_up", {"key": 30}))
     rejected(lambda: verifier.accept(second))
+    rejected(lambda: verifier.provision(authority, owner))
     assert len(called) == 1
-    return 2
+    return 3
 
 
 def verify_queued_ttl() -> int:
@@ -150,6 +151,36 @@ def verify_queued_ttl() -> int:
     assert not worker.is_alive()
     assert results == ["denied"] and recorded == [] and verifier.seq == 0
     return 1
+
+
+def verify_provision_replay_fence() -> int:
+    """One authenticated lease can be provisioned only once, even on restart."""
+    _, owner, authority, signer, verifier, recorded = session()
+    first = signer.sign(owner, InputGrant("key_down", {"key": 30}))
+    assert verifier.accept(first)
+    rejected(lambda: verifier.provision(authority, owner))
+    rejected(lambda: verifier.accept(first))
+    assert len(recorded) == 1 and verifier.seq == 1
+
+    # A newly constructed verifier cannot forget the authority's issued epoch.
+    restarted = ProtectedVerifier(
+        bytes(range(32)),
+        "owner",
+        "test-device",
+        clock=verifier.clock,
+        dispatch=lambda action, payload: recorded.append((action, payload)) or True,
+    )
+    rejected(lambda: restarted.provision(authority, owner))
+    verifier.revoke()
+    rejected(lambda: verifier.provision(authority, owner))
+
+    authority.authorize(owner)
+    restarted.provision(authority, owner)
+    rejected(lambda: restarted.accept(first))
+    next_packet = signer.sign(owner, InputGrant("key_up", {"key": 30}))
+    assert restarted.accept(next_packet)
+    assert len(recorded) == 2
+    return 5
 
 
 def verify_unix_boundary() -> int:
@@ -254,6 +285,7 @@ def main() -> int:
         verify_signed_protocol()
         + verify_backend_failure()
         + verify_queued_ttl()
+        + verify_provision_replay_fence()
         + verify_unix_boundary()
         + verify_bind_swap()
         + verify_directory_fd_cleanup()

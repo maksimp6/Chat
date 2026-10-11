@@ -81,3 +81,5 @@ RED contract detected five keycode policy mismatches against the staged C keyboa
 ## Complete C/Python keycode parity probe
 
 Compiled the staged C `alice_keyboard_allowed()` on Redmi 9 and enumerated keycodes 0..255, then compared with Python `_validate_action_payload('key_down', {'key':code})`. Found 18 C-only codes (69..86), all in the C driver's accepted keyboard keycode set. Added RED tests and aligned Python's set. The two 0..255 sets now each contain 100 allowed codes; 113 Python tests PASS. A permanent parity check in the eventual combined integration checkout remains required to catch future C/Python drift.
+
+See [single-use session replay protection](REPLAY_FENCE.md) for issue #1090 review findings and the root trust boundary.

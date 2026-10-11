@@ -8,15 +8,15 @@ network user by itself; do not expose its constructors/signing as public RPC.
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import json
 import re
 import secrets
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 MAX_PACKET = 2048
 TTL_NS = 300_000_000
@@ -86,6 +86,9 @@ class SessionAuthority:
         self.epoch = secrets.token_hex(16)
         self.session: str | None = None
         self.lease_until = 0
+        # An epoch/session pair is a one-time capability, even if a verifier
+        # object is recreated while this authenticated authority stays alive.
+        self._claimed_provision: tuple[str, str] | None = None
 
     def authorize(self, principal: AuthenticatedPrincipal, lease_ns: int = 10_000_000_000) -> str:
         if (
@@ -330,14 +333,24 @@ class ProtectedVerifier:
                 raise GrantError("controller lease changed during provisioning")
             if self.shutdown_requested.is_set() and authority.epoch == self._last_shutdown_epoch:
                 raise GrantError("fresh epoch required after shutdown")
+            current_session = authority.session
+            if current_session is None:
+                raise GrantError("controller session no longer active")
+            claim = (authority.epoch, current_session)
+            if authority._claimed_provision == claim:
+                raise GrantError("session already provisioned; fresh epoch required")
             shutdown_generation = self._shutdown_generation
             self.shutdown_requested.clear()
             if shutdown_generation != self._shutdown_generation:
                 self.shutdown_requested.set()
                 raise GrantError("shutdown raced with provisioning")
-            self.epoch, self.session = authority.epoch, authority.session
+            # Authority lock serializes competing verifier instances. Never
+            # reset replay position for a previously issued epoch, including
+            # after backend failure, shutdown, or new verifier construction.
+            self.epoch, self.session = claim
             self.lease_until = authority.lease_until
             self.seq = 0
+            authority._claimed_provision = claim
 
     def _decoded_grant(self, packet: bytes) -> dict[str, Any]:
         """Verify signature, schema and TTL before any physical dispatch."""
