@@ -88,7 +88,7 @@ jobs:
           curl --fail --location --retry 3 --silent --show-error \
             'https://raw.githubusercontent.com/maksimp6/Chat/f6b75493921b8e9b68e207216abca22e8df6340d/3d-models/bag-clip/bag_clip_plate.3mf' \
             --output out-bag/bagclip_source.3mf
-          printf '%s  %s\\n' \
+          printf '%s  %s\n' \
             '6c3005537a4b5bdd25bad2e4d9c29f9c858869b02884cf6c52fe907269a267d1' \
             'out-bag/bagclip_source.3mf' | sha256sum --check
 
