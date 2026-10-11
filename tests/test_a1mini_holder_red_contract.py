@@ -3,6 +3,7 @@
 These tests intentionally fail until the parametric holder geometry and its
 validation adapter exist. No printer, slicer or network access is required.
 """
+
 import importlib
 import unittest
 
@@ -31,16 +32,15 @@ class HolderContractRED(unittest.TestCase):
 
     def test_ptfe_bend_radius_gate(self):
         route = self.mod.route_ptfe(
-            tube_od_mm=4.0, minimum_allowed_radius_mm=30.0,
+            tube_od_mm=4.0,
+            minimum_allowed_radius_mm=30.0,
             anchors_mm=[(0, 0, 0), (50, 0, 0), (100, 40, 0)],
         )
         self.assertGreaterEqual(route.minimum_radius_mm, 30.0)
 
     def test_full_travel_collision_gate(self):
         geometry = self.mod.build_holder_parts(ptfe_od_mm=4.0, cable_od_mm=5.0)
-        report = self.mod.check_a1mini_clearance(
-            geometry, travel_samples=101, clearance_min_mm=2.0
-        )
+        report = self.mod.check_a1mini_clearance(geometry, travel_samples=101, clearance_min_mm=2.0)
         self.assertEqual(report.samples_checked, 101)
         self.assertGreaterEqual(report.minimum_clearance_mm, 2.0)
         self.assertFalse(report.collisions)
@@ -54,9 +54,8 @@ class HolderContractRED(unittest.TestCase):
     def test_unmeasured_stock_spindle_fit_is_blocked(self):
         with self.assertRaises(self.mod.MissingMeasurementError):
             self.mod.verify_stock_spindle_fit(
-                measured_spindle_mm=None, geometry=self.mod.build_holder_parts(
-                    ptfe_od_mm=4.0, cable_od_mm=5.0
-                )
+                measured_spindle_mm=None,
+                geometry=self.mod.build_holder_parts(ptfe_od_mm=4.0, cable_od_mm=5.0),
             )
 
 
