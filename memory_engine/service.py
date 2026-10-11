@@ -8,6 +8,8 @@ UID; untrusted code must never execute under the service UID.
 from __future__ import annotations
 
 import argparse
+from collections import deque
+import time
 import json
 import os
 from pathlib import Path
@@ -18,6 +20,7 @@ from memory_engine import MemoryStore
 
 MAX_REQUEST = 65536
 MAX_RESPONSE = 65536
+MAX_REQUESTS_PER_SECOND = 20
 
 
 def peer_uid(conn: socket.socket) -> int:
@@ -85,9 +88,16 @@ def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
             # Peer credentials authorize requests, DAC permits client connections.
             os.chmod(socket_path, 0o666)
             listener.listen(8)
+            recent: deque[float] = deque()
             while True:
                 conn, _ = listener.accept()
                 with conn:
+                    now = time.monotonic()
+                    while recent and now - recent[0] >= 1.0:
+                        recent.popleft()
+                    if len(recent) >= MAX_REQUESTS_PER_SECOND:
+                        continue
+                    recent.append(now)
                     handle_client(conn, store, allowed_uid)
         finally:
             listener.close()
