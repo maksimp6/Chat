@@ -73,7 +73,7 @@ def main():
     if not binary.is_file(): raise FileNotFoundError(binary)
     stl=out/'spindle_plate.stl';make_stl(args.source_3mf,stl)
     machine,process,filament=profiles(root/'resources/profiles/BBL',out)
-    p=json.loads(process.read_text());p.update(wall_loops='4',sparse_infill_density='35%')
+    p=json.loads(process.read_text());p.update(wall_loops='4',sparse_infill_density='35%',enable_support='1',support_type='normal(auto)',support_on_build_plate_only='0')
     process.write_text(json.dumps(p,indent=2)+'\n')
     env=dict(os.environ,LC_ALL='C',LD_LIBRARY_PATH=str(root/'bin'))
     command=[str(binary),'--slice','0','--export-3mf',OUTPUT,'--load-settings',f'{machine};{process}','--load-filaments',str(filament),'--outputdir',str(out),str(stl)]
