@@ -642,3 +642,42 @@ def test_trusted_ancestor_rejects_non_directory_descriptor(tmp_path):
             engine._verify_trusted_ancestor(fd)
     finally:
         os.close(fd)
+
+
+def test_trusted_root_rejects_extended_acl(tmp_path, monkeypatch):
+    import memory_engine.store as engine
+
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    original = engine.os.getxattr
+
+    def granted_acl(fd, name):
+        if name == "system.posix_acl_access" and os.fstat(fd).st_ino == root.stat().st_ino:
+            return b"extended-acl"
+        return original(fd, name)
+
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    monkeypatch.setattr(engine.os, "getxattr", granted_acl)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(root / "journal.memory")
+
+
+def test_trusted_root_rejects_mount_boundary(tmp_path, monkeypatch):
+    import memory_engine.store as engine
+
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    original = engine._trusted_mount_id
+
+    def injected_mount(fd):
+        mount = original(fd)
+        if os.fstat(fd).st_ino == root.stat().st_ino:
+            return mount + 1000000
+        return mount
+
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    monkeypatch.setattr(engine, "_trusted_mount_id", injected_mount)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(root / "journal.memory")
