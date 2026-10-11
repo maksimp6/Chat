@@ -170,7 +170,7 @@ def main() -> int:
     command = [
         str(executable),
         "--arrange",
-        "0",
+        "1",
         "--slice",
         "0",
         "--export-3mf",
@@ -218,6 +218,7 @@ def main() -> int:
     plates = outcome.get("sliced_plates") or []
     if len(plates) != 1 or plates[0].get("warning_message"):
         raise RuntimeError("not exactly one plate or slicer warned")
+    print("BAG_CLIP_PLATE_SUMMARY", json.dumps(plates[0])[:5000], flush=True)
     objects = plates[0].get("objects") or []
     observed = sorted(int(o.get("triangle_count", -1)) for o in objects)
     print("BAG_CLIP_RESULT_OBJECTS", json.dumps(objects)[:5000], flush=True)
