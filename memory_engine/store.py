@@ -313,9 +313,13 @@ class _JournalEngine:
         if not changes:
             return
         journal_frame, digest = self._encode_frame(changes)
+        # Prepare the same JSON value representation that recovery will read.
+        # Decode only this delta before writing, so allocation/decoding failures
+        # cannot follow an acknowledged append or copy the entire RAM state.
+        committed_changes = json.loads(journal_frame)["payload"]["changes"]
         self._append_frame(journal_frame)
         # Publish only confirmed changes to the RAM view seen by readers.
-        self._apply_changes(changes)
+        self._apply_changes(committed_changes)
         self._sequence += 1
         self._digest = digest
 

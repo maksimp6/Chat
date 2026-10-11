@@ -37,7 +37,7 @@ Values larger than one frame, including attachments, must be stored separately. 
 ## Known limitations and failure behavior
 
 - These are **logical bounds**, not a hard process-RSS limit. `deepcopy`, JSON encoding, frame assembly, and journal replay can use additional RAM. `JSONEncoder.iterencode()` can yield an already-large string chunk before the code slices it.
-- Python `tuple` is serialized as a JSON array. A staged tuple can be returned as a tuple before commit, but after reopening it is a `list`. Do not rely on tuple type preservation.
+- Python `tuple` is serialized as a JSON array. A staged tuple can be returned as a tuple before commit. After commit, committed reads, verified backups and reopened stores consistently return a `list`, including nested tuples. Do not rely on tuple type preservation.
 - Some invalid scalar types are rejected only at `commit()`, not `set()`.
 - A partial trailing journal frame is not silently truncated; recovery requires explicit handling.
 - `backup()` does not publish atomically: a crashed copy may leave a partial destination. A backup file's existence is not proof of validity. `restore()` verifies journal integrity.
