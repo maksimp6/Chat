@@ -306,3 +306,31 @@ def test_renamed_parent_does_not_redirect_to_recreated_directory(tmp_path):
         store.commit()
         assert victim.read_bytes() == b"victim-untouched"
         assert b"next" in (displaced / "journal.memory").read_bytes()
+
+
+def test_post_fsync_regular_inode_swap_fences_writer(tmp_path, monkeypatch):
+    path = tmp_path / "journal.memory"
+    displaced = tmp_path / "displaced.memory"
+    victim = tmp_path / "victim.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", 1)
+        store.commit()
+        victim.write_bytes(b"unchanged")
+        original = os.stat
+        calls = 0
+
+        def swap_after_fsync(target, *args, **kwargs):
+            nonlocal calls
+            if target == path.name and kwargs.get("dir_fd") is not None:
+                calls += 1
+                if calls == 2:
+                    path.rename(displaced)
+                    victim.rename(path)
+            return original(target, *args, **kwargs)
+
+        monkeypatch.setattr(os, "stat", swap_after_fsync)
+        store.set("next", 2)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+        assert path.read_bytes() == b"unchanged"
+        assert store.last_commit.sequence == 1
