@@ -747,3 +747,10 @@ def test_trusted_policy_cannot_be_disabled_after_store_open(tmp_path, monkeypatc
     (root / "journal.memory").chmod(0o644)
     with pytest.raises(StoreError, match="unsafe journal or lock path"):
         MemoryStore(path, trusted=True)
+
+
+def test_trusted_policy_reassignment_is_rejected(tmp_path):
+    with MemoryStore(tmp_path / "journal.memory", trusted=False) as store:
+        with pytest.raises(StoreError, match="trusted policy is immutable"):
+            store._engine._trusted = True
+        assert store._engine._trusted is False
