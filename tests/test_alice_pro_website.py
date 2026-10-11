@@ -49,29 +49,46 @@ class WebsiteTests(unittest.TestCase):
     def test_local_assets_and_small_static_payload(self):
         self.assertFalse(any(t in ("script", "iframe", "form") for t, _ in self.elements))
         for tag, attrs in self.elements:
-            if tag == "link":
+            if tag == "link" and attrs.get("rel") in ("stylesheet", "icon"):
                 href = attrs["href"]
                 self.assertTrue(href.startswith("./"), href)
                 self.assertTrue((SITE / href).is_file(), href)
         self.assertLess(sum(p.stat().st_size for p in SITE.iterdir() if p.is_file()), 40_000)
         self.assertTrue((SITE / ".nojekyll").is_file())
 
-    def test_review_draft_cannot_claim_a_publication_url(self):
+    def test_approved_publication_metadata_is_consistent(self):
+        approved_url = "https://maxxxpavlov.online/"
         meta = {a.get("name"): a.get("content") for t, a in self.elements if t == "meta"}
-        self.assertIn("noindex", meta["robots"])
+        self.assertEqual(meta["robots"], "index, follow")
         self.assertTrue(meta["description"])
         self.assertIn("width=device-width", meta["viewport"])
-        self.assertFalse(any(a.get("rel") == "canonical" for _, a in self.elements))
+        canonical = [
+            a["href"] for t, a in self.elements if t == "link" and a.get("rel") == "canonical"
+        ]
+        self.assertEqual(canonical, [approved_url])
+        graph = {
+            a.get("property"): a.get("content")
+            for t, a in self.elements
+            if t == "meta" and "property" in a
+        }
+        self.assertEqual(graph["og:url"], approved_url)
+        self.assertEqual(graph["og:type"], "website")
+        self.assertEqual(graph["og:locale"], "ru_RU")
+        self.assertIn("Alice Pro", graph["og:title"])
+        self.assertTrue(graph["og:description"])
         self.assertFalse((SITE / "CNAME").exists())
-        self.assertFalse((SITE / "sitemap.xml").exists())
-        for unapproved in ("maxxxpavlov.ru", "maxxxpavlov.online", "example.invalid"):
-            self.assertNotIn(unapproved, self.text)
+        for forbidden in ("maxxxpavlov.ru", "example.invalid", "noindex", "APPROVED_ABSOLUTE_URL"):
+            for path in SITE.iterdir():
+                if path.is_file():
+                    self.assertNotIn(forbidden, path.read_text(), str(path))
         robots = (SITE / "robots.txt").read_text()
-        self.assertIn("Allow: /", robots)
-        self.assertFalse(any(line.startswith("Sitemap:") for line in robots.splitlines()))
-        template = ET.parse(ROOT / "docs/deployment/alice-pro-sitemap.xml.example")
-        loc = template.find(".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
-        self.assertEqual(loc.text, "https://example.invalid/")
+        self.assertEqual(
+            robots, "User-agent: *\nAllow: /\n\nSitemap: " + approved_url + "sitemap.xml\n"
+        )
+        sitemap = ET.parse(SITE / "sitemap.xml")
+        locations = sitemap.findall(".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
+        self.assertEqual([loc.text for loc in locations], [approved_url])
+        self.assertFalse(sitemap.findall(".//{http://www.sitemaps.org/schemas/sitemap/0.9}lastmod"))
 
     def test_external_links_point_to_the_real_repository(self):
         links = [a["href"] for t, a in self.elements if t == "a" and not a["href"].startswith("#")]

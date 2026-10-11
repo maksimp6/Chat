@@ -1,5 +1,4 @@
-# Review draft: index.html has noindex until the final URL is approved.
-# Allow crawling so crawlers can read that meta tag.
 User-agent: *
 Allow: /
-# Add an absolute Sitemap URL only when the publication URL is approved.
+
+Sitemap: https://maxxxpavlov.online/sitemap.xml

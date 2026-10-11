@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Template only. Replace example.invalid with the approved absolute site URL.
-     Keep a project subpath if publishing at a github.io project URL.
-     Save as sitemap.xml in the publication root only after approval. -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://example.invalid/</loc>
-  </url>
-</urlset>
