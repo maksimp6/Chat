@@ -1,0 +1,28 @@
+name: Trusted Memory Admission Selftest
+
+# This unprivileged candidate-head workflow is a unit-test signal only, NOT
+# the production trusted/required admission status.
+on:
+  pull_request:
+  push:
+    branches: [feature/trusted-memory-admission-496]
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    name: Trusted Memory Admission Selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout unprivileged test head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Execute deterministic admission fixtures
+        run: python -m unittest -q tests.test_ci_trusted_memory_admission
