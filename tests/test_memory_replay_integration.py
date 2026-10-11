@@ -74,3 +74,36 @@ os.kill(os.getpid(),signal.SIGKILL)
     with MemoryStore(path) as recovered:
         assert recovered.get("stable") == 1
         assert recovered.get("next") == (None if boundary == "before_append" else 2)
+
+
+def test_fsync_failure_fences_writer_and_preserves_acknowledged_state(tmp_path, monkeypatch):
+    """An ambiguous fsync failure must not publish or permit another commit."""
+    path = tmp_path / "fsync.memory"
+    with MemoryStore(path) as store:
+        store.set("stable", 1)
+        assert store.commit() == 1
+        store.set("pending", 2)
+
+        original_fsync = os.fsync
+        injected = {"done": False}
+
+        def fail_once(fd):
+            if not injected["done"]:
+                injected["done"] = True
+                raise OSError(5, "injected fsync failure")
+            return original_fsync(fd)
+
+        monkeypatch.setattr(os, "fsync", fail_once)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+        assert store.last_commit.sequence == 1
+        assert store.get("stable") == 1
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+
+    # The failed fsync can leave a complete frame on disk; reopening must
+    # independently verify its fate instead of assuming it was rolled back.
+    with MemoryStore(path) as recovered:
+        assert recovered.get("stable") == 1
+        assert recovered.get("pending") in (None, 2)
+        assert recovered.last_commit.sequence in (1, 2)
