@@ -728,3 +728,22 @@ def test_acl_inspection_error_fails_closed(tmp_path, monkeypatch):
             engine._reject_extended_acl(fd)
     finally:
         os.close(fd)
+
+
+def test_trusted_policy_cannot_be_disabled_after_store_open(tmp_path, monkeypatch):
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    path = root / "journal.memory"
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    with MemoryStore(path, trusted=True) as store:
+        store.set("safe", 1)
+        store.commit()
+        monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "0")
+        store.set("still-safe", 2)
+        store.commit()
+        store.backup(root / "backup.memory")
+        assert store.get("still-safe") == 2
+    (root / "journal.memory").chmod(0o644)
+    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+        MemoryStore(path, trusted=True)
