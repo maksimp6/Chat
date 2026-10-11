@@ -237,7 +237,12 @@ class ProtectedVerifier:
         except (ValueError,TypeError,KeyError,OverflowError,UnicodeError) as exc:
             raise GrantError("invalid signed grant") from exc
         with self.lock:
-            if (self.shutdown_requested.is_set() or self.session is None or self.clock()>=self.lease_until or
+            # Revalidate signed-command freshness AFTER waiting for the
+            # dispatch lock, otherwise queued commands outlive their 300ms TTL.
+            dispatch_now = self.clock()
+            if (self.shutdown_requested.is_set() or self.session is None or
+                dispatch_now >= self.lease_until or
+                not 0 <= dispatch_now-data["issued"] <= TTL_NS or
                 data["session"]!=self.session or data["epoch"]!=self.epoch or
                 data["seq"]<=self.seq):
                 raise GrantError("expired, revoked or replayed session")
