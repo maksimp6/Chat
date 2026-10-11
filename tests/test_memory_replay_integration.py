@@ -532,9 +532,7 @@ def test_post_publish_inode_swap_is_detected(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("directory_mode", [0o755, 0o770, 0o777])
-def test_trusted_root_rejects_unsafe_directory_modes(
-    tmp_path, monkeypatch, directory_mode
-):
+def test_trusted_root_rejects_unsafe_directory_modes(tmp_path, monkeypatch, directory_mode):
     root = tmp_path / "private"
     root.mkdir(mode=0o700)
     root.chmod(directory_mode)
