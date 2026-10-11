@@ -3,15 +3,16 @@
 The pipe is a harmless stand-in for a device descriptor; this deliberately
 does NOT claim Android/uinput physical-key release has been verified.
 """
+
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import select
 import shutil
 import signal
 import subprocess
 import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DRIVER = ROOT / "alice_mouse/drivers/keyboard/keyboard.c"
@@ -107,4 +108,3 @@ int main(int argc, char **argv) {
             os.close(read_fd)
             if write_fd >= 0:
                 os.close(write_fd)
-
