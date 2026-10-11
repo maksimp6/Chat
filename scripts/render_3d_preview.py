@@ -113,22 +113,26 @@ def _ascii_stl(data: bytes) -> list[Face]:
         raise PreviewError("invalid ASCII STL facet structure")
     for offset in range(0, len(body), 7):
         facet = body[offset : offset + 7]
-        normal = facet[0].split()
-        if len(normal) != 5 or normal[:2] != ["facet", "normal"]:
-            raise PreviewError("invalid ASCII STL facet normal")
-        _point(normal[2:])
-        if facet[1] != "outer loop" or facet[5:] != ["endloop", "endfacet"]:
-            raise PreviewError("invalid ASCII STL facet structure")
-        points = []
-        for line in facet[2:5]:
-            fields = line.split()
-            if len(fields) != 4 or fields[0] != "vertex":
-                raise PreviewError("invalid ASCII STL vertex")
-            points.append(_point(fields[1:]))
-        triangles.append(tuple(points))
+        triangles.append(_ascii_facet(facet))
         if len(triangles) > MAX_TRIANGLES:
             raise PreviewError("STL exceeds triangle limit")
     return triangles
+
+
+def _ascii_facet(facet: list[str]) -> Face:
+    normal = facet[0].split()
+    if len(normal) != 5 or normal[:2] != ["facet", "normal"]:
+        raise PreviewError("invalid ASCII STL facet normal")
+    _point(normal[2:])
+    if facet[1] != "outer loop" or facet[5:] != ["endloop", "endfacet"]:
+        raise PreviewError("invalid ASCII STL facet structure")
+    points = []
+    for line in facet[2:5]:
+        fields = line.split()
+        if len(fields) != 4 or fields[0] != "vertex":
+            raise PreviewError("invalid ASCII STL vertex")
+        points.append(_point(fields[1:]))
+    return tuple(points)
 
 
 def _stl(data: bytes) -> list[Face]:

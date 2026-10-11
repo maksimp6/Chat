@@ -54,3 +54,12 @@ Zizmor dangerous-triggers gate, so the published design uses the existing safer 
 This is an explicit trigger deviation from the original Issue #1118 contract, not an instant PR event.
 Pillow remains in the dedicated render test workflow; the main dependency set is unchanged.
 No audit rule is suppressed. Local Zizmor 1.30.1 checks are recorded separately from exact-head CI.
+
+## Exact-head CI follow-up
+
+Published `a1e87808f11cd59d7cee48f31562b267357ebe2f` passed the dedicated render contract,
+Zizmor, Trivy, dependency review, Format and startup smoke. Application tests/Code rules
+reported C901 (72 vs 69) and PLR0911 (20 vs 19). Extract facet decoding, preview blob storage
+and final current-head publication into focused helpers; preserve the repository ratchet.
+Focused renderer suite plus reliability gate: **60 passed locally** (59 + 1), Ruff passed.
+No baseline or rule suppression change. Subsequent exact-head CI is required separately.

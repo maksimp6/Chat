@@ -174,24 +174,7 @@ def publish_images(api: Github, artifacts: list[tuple[str, bytes]]) -> str:
         if not isinstance(prior, dict) or not isinstance(prior.get("tree"), dict):
             raise PublishError("invalid preview parent commit")
         prior_tree = _sha(prior["tree"]["sha"])
-    elements = []
-    for target, png in artifacts:
-        if (
-            not re.fullmatch(r"printing3d/previews/pr-[0-9]+/[A-Za-z0-9_.-]+\.png", target)
-            or len(png) > 1_200_000
-            or not png.startswith(b"\x89PNG\r\n\x1a\n")
-        ):
-            raise PublishError("non-PNG or unapproved destination")
-        blob = api.json(
-            "POST",
-            api.prefix + "/git/blobs",
-            {"content": base64.b64encode(png).decode("ascii"), "encoding": "base64"},
-        )
-        if not isinstance(blob, dict):
-            raise PublishError("GitHub did not store preview blob")
-        elements.append(
-            {"path": target, "mode": "100644", "type": "blob", "sha": _sha(blob.get("sha"))}
-        )
+    elements = _store_preview_blobs(api, artifacts)
     tree = api.json(
         "POST",
         api.prefix + "/git/trees",
@@ -228,6 +211,28 @@ def publish_images(api: Github, artifacts: list[tuple[str, bytes]]) -> str:
         {"sha": commit_sha, "force": False},
     )
     return commit_sha
+
+
+def _store_preview_blobs(api: Github, artifacts: list[tuple[str, bytes]]) -> list[dict]:
+    elements = []
+    for target, png in artifacts:
+        if (
+            not re.fullmatch(r"printing3d/previews/pr-[0-9]+/[A-Za-z0-9_.-]+\.png", target)
+            or len(png) > 1_200_000
+            or not png.startswith(b"\x89PNG\r\n\x1a\n")
+        ):
+            raise PublishError("non-PNG or unapproved destination")
+        blob = api.json(
+            "POST",
+            api.prefix + "/git/blobs",
+            {"content": base64.b64encode(png).decode("ascii"), "encoding": "base64"},
+        )
+        if not isinstance(blob, dict):
+            raise PublishError("GitHub did not store preview blob")
+        elements.append(
+            {"path": target, "mode": "100644", "type": "blob", "sha": _sha(blob.get("sha"))}
+        )
+    return elements
 
 
 def _url(repo: str, sha: str, path: str) -> str:
@@ -344,6 +349,10 @@ def run(
         and f"<!-- alice-3d-preview:head:{head_sha} -->" in prior.get("body", "")
     ):
         return "unchanged"
+    return _publish_current_report(api, pr_number, head_sha, models)
+
+
+def _publish_current_report(api: Github, pr_number: int, head_sha: str, models: list[dict]) -> str:
     current = api.json("GET", api.prefix + f"/pulls/{pr_number}")
     if current.get("state") != "open" or current.get("head", {}).get("sha") != head_sha:
         return "stale_head"
