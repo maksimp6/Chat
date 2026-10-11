@@ -38,16 +38,28 @@ def main() -> None:
         # The untrusted UID can now access the directory: demonstrates
         # why DAC/ACL policy must be checked, not only UID identity.
         attack = command(
-            "runuser", "-u", attacker.pw_name, "--", sys.executable, "-c",
+            "runuser",
+            "-u",
+            attacker.pw_name,
+            "--",
+            sys.executable,
+            "-c",
             "from pathlib import Path; import sys; Path(sys.argv[1]).rename(sys.argv[2])",
-            str(journal), str(private / "moved.memory"), check=False,
+            str(journal),
+            str(private / "moved.memory"),
+            check=False,
         )
         assert attack.returncode == 0, attack.stderr
         print("ACL_ATTACK_REPRODUCED")
         # Mount boundary: an untrusted bind mount is not a symlink. A
         # separate mount namespace keeps the host runner untouched.
         probe = command(
-            "unshare", "--mount", "--propagation", "private", "sh", "-c",
+            "unshare",
+            "--mount",
+            "--propagation",
+            "private",
+            "sh",
+            "-c",
             "mkdir -p /tmp/memory-boundary-mount; "
             "mount --bind /tmp /tmp/memory-boundary-mount; "
             "test -d /tmp/memory-boundary-mount",
