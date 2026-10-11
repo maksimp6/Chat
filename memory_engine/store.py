@@ -18,8 +18,87 @@ from threading import RLock
 from typing import Any, Iterator
 
 
+# Maximum serialized journal frame, including newline. Keep RAM replay bounded.
+MAX_JOURNAL_FRAME_BYTES = 8 * 1024 * 1024
+
+
 class StoreError(RuntimeError):
     """Persistence, integrity, or ownership failure."""
+
+
+MAX_VALUE_DEPTH = 64
+MAX_VALUE_NODES = 100_000
+MAX_VALUE_TEXT_BYTES = MAX_JOURNAL_FRAME_BYTES
+
+
+def _bounded_text_bytes(text: str, used: int) -> int:
+    """Count UTF-8 bytes in bounded chunks without a giant temporary string."""
+    remaining = MAX_VALUE_TEXT_BYTES - used
+    if len(text) > remaining:
+        raise StoreError("value text exceeds size limit")
+    for offset in range(0, len(text), 16384):
+        try:
+            used += len(text[offset : offset + 16384].encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise StoreError("invalid Unicode text") from exc
+        if used > MAX_VALUE_TEXT_BYTES:
+            raise StoreError("value text exceeds size limit")
+    return used
+
+
+def _shape_children(
+    item: dict[str, Any] | list[Any] | tuple[Any, ...],
+    ancestors: set[int],
+    nodes: int,
+    text_bytes: int,
+) -> tuple[Iterator[Any], int, int]:
+    """Inspect keys before returning a bounded iterator over child values."""
+    identity = id(item)
+    if identity in ancestors:
+        raise StoreError("shared or cyclic container is unsupported")
+    ancestors.add(identity)
+    if isinstance(item, dict):
+        for key in item:
+            nodes += 1
+            if nodes > MAX_VALUE_NODES:
+                raise StoreError("value structure exceeds limit")
+            if type(key) is not str:
+                raise StoreError("object keys must be strings")
+            text_bytes = _bounded_text_bytes(key, text_bytes)
+        return iter(item.values()), nodes, text_bytes
+    return iter(item), nodes, text_bytes
+
+
+def _validate_value_shape(value: Any) -> None:
+    """Bound JSON-container traversal without recursion or wide pending stacks."""
+    stack: list[tuple[Iterator[Any], int, int]] = []
+    ancestors: set[int] = set()
+    nodes = 0
+    text_bytes = 0
+    item = value
+    depth = 0
+    while True:
+        nodes += 1
+        if nodes > MAX_VALUE_NODES or depth > MAX_VALUE_DEPTH:
+            raise StoreError("value structure exceeds limit")
+        if isinstance(item, (dict, list, tuple)):
+            children, nodes, text_bytes = _shape_children(item, ancestors, nodes, text_bytes)
+            stack.append((children, depth, id(item)))
+        elif type(item) is str:
+            text_bytes = _bounded_text_bytes(item, text_bytes)
+        # Unsupported scalars still reach the commit-time JSON encoder and
+        # fail without acknowledging a journal sequence.
+        while stack:
+            children, parent_depth, identity = stack[-1]
+            try:
+                item = next(children)
+                depth = parent_depth + 1
+                break
+            except StopIteration:
+                stack.pop()
+                ancestors.remove(identity)
+        else:
+            return
 
 
 @dataclass(frozen=True)
@@ -75,17 +154,34 @@ class _JournalEngine:
         digest = "0" * 64
         if not path.exists():
             return state, sequence, digest
-        journal_bytes = path.read_bytes()
-        journal_frames = journal_bytes.split(b"\n")
-        # A trailing partial frame may be an ambiguous commit after a crash.
-        # Never truncate or accept it automatically: require verified recovery.
-        if journal_frames[-1]:
-            raise StoreError("incomplete journal tail; recovery required")
-        for frame in journal_frames[:-1]:
-            state, sequence, digest = _JournalEngine._apply_verified_frame(
-                frame, state, sequence, digest
-            )
+        # Stream complete newline-delimited frames: never load the full log.
+        # Reject a partial final frame without truncating ambiguous data.
+        with path.open("rb") as stream:
+            while frame := stream.readline(MAX_JOURNAL_FRAME_BYTES + 1):
+                if len(frame) > MAX_JOURNAL_FRAME_BYTES:
+                    raise StoreError("journal frame exceeds size limit")
+                if not frame.endswith(b"\n"):
+                    raise StoreError("incomplete journal tail; recovery required")
+                state, sequence, digest = _JournalEngine._apply_verified_frame(
+                    frame[:-1], state, sequence, digest
+                )
         return state, sequence, digest
+
+    @staticmethod
+    def _validated_change(change: Any) -> tuple[str, str, str, Any]:
+        """Reject malformed changes before mutating replayed committed state."""
+        if not isinstance(change, dict):
+            raise ValueError("invalid journal change")
+        namespace, key = change["namespace"], change["key"]
+        if not isinstance(namespace, str) or not isinstance(key, str):
+            raise ValueError("invalid journal key")
+        op = change["op"]
+        if op not in ("set", "delete"):
+            raise ValueError("invalid journal operation")
+        value = change["value"] if op == "set" else None
+        if op == "set":
+            _validate_value_shape(value)
+        return op, namespace, key, value
 
     @staticmethod
     def _apply_verified_frame(
@@ -103,27 +199,35 @@ class _JournalEngine:
             if not isinstance(payload, dict) or not isinstance(payload.get("changes"), list):
                 raise ValueError("invalid journal payload")
             serialized_payload = json.dumps(
-                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
             ).encode()
             # Chain each frame to the previous confirmed digest so replay detects
             # reordered, missing, or modified records (not malicious rewrites).
             next_digest = hashlib.sha256(bytes.fromhex(digest) + serialized_payload).hexdigest()
             if record["digest"] != next_digest or payload["seq"] != sequence + 1:
                 raise ValueError("commit chain mismatch")
-            for change in payload["changes"]:
-                if not isinstance(change, dict):
-                    raise ValueError("invalid journal change")
-                namespace, key = change["namespace"], change["key"]
-                if not isinstance(namespace, str) or not isinstance(key, str):
-                    raise ValueError("invalid journal key")
-                if change["op"] == "set":
-                    state.setdefault(namespace, {})[key] = change["value"]
-                elif change["op"] == "delete":
-                    state.get(namespace, {}).pop(key, None)
+            # Validate every operation before touching committed state.
+            # Replay must not copy the accumulated database for each frame.
+            validated = [_JournalEngine._validated_change(change) for change in payload["changes"]]
+            for op, namespace, key, value in validated:
+                if op == "set":
+                    state.setdefault(namespace, {})[key] = value
                 else:
-                    raise ValueError("invalid journal operation")
+                    state.get(namespace, {}).pop(key, None)
             return state, payload["seq"], next_digest
-        except (ValueError, KeyError, TypeError, UnicodeError, AttributeError) as exc:
+        except (
+            ValueError,
+            KeyError,
+            TypeError,
+            UnicodeError,
+            AttributeError,
+            RecursionError,
+            StoreError,
+        ) as exc:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
@@ -141,24 +245,34 @@ class _JournalEngine:
                 raise StoreError("namespace and key must be strings")
         payload = {"seq": self._sequence + 1, "changes": changes}
         try:
-            serialized_payload = json.dumps(
-                payload,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            ).encode("utf-8")
+            # Bound serialization itself, not just the completed frame.
+            # Stream chunks and reject before accumulating unbounded output.
+            parts: list[bytes] = []
+            used = 0
+            frame_overhead = len(b'{"digest":"') + 64 + len(b'","payload":') + len(b"}\n")
+            encoder = json.JSONEncoder(
+                sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+            )
+            for chunk in encoder.iterencode(payload):
+                # JSONEncoder can yield a whole large string. Slice before
+                # encoding so each temporary UTF-8 buffer remains bounded.
+                for offset in range(0, len(chunk), 16384):
+                    encoded = chunk[offset : offset + 16384].encode("utf-8")
+                    used += len(encoded)
+                    if used + frame_overhead > MAX_JOURNAL_FRAME_BYTES:
+                        raise StoreError("journal frame exceeds size limit")
+                    parts.append(encoded)
+            serialized_payload = b"".join(parts)
             digest = hashlib.sha256(bytes.fromhex(self._digest) + serialized_payload).hexdigest()
             journal_frame = (
-                json.dumps(
-                    {"payload": payload, "digest": digest},
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                ).encode("utf-8")
-                + b"\n"
+                b'{"digest":"'
+                + digest.encode("ascii")
+                + b'","payload":'
+                + serialized_payload
+                + b"}\n"
             )
+            # The streaming used + frame_overhead check above already
+            # bounds this exact frame representation before allocation.
             return journal_frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
             raise StoreError("unsupported JSON value") from exc
@@ -268,7 +382,7 @@ class _JournalEngine:
         *,
         destination_must_be_new: bool = False,
     ) -> None:
-        """Copy to a same-directory temp file, validate, then atomically publish."""
+        """Verify a temp copy, then publish it (exclusive backup is not atomic)."""
         import shutil
         import tempfile
 
@@ -392,6 +506,7 @@ class MemoryStore:
                 raise StoreError("name must be a nonempty string")
             if value is None:
                 raise StoreError("None is reserved for missing names")
+            _validate_value_shape(value)
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
@@ -449,6 +564,7 @@ class _ValueTransaction:
             raise StoreError("name must be a nonempty string")
         if value is None:
             raise StoreError("None is reserved for missing names")
+        _validate_value_shape(value)
         self._pending[name] = deepcopy(value)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
