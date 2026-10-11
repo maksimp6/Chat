@@ -104,3 +104,32 @@ def test_stalled_ipc_worker_releases_capacity(tmp_path, monkeypatch):
     finally:
         server.close()
         client.close()
+
+
+def test_concurrent_ipc_commits_are_individually_acknowledged(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import json
+    import memory_engine.service as service
+    from memory_engine import MemoryStore
+
+    monkeypatch.setattr(service, "peer_uid", lambda _conn: 12345)
+    path = tmp_path / "db.memory"
+    with MemoryStore(path) as store:
+        def worker(index):
+            server, client = socket.socketpair()
+            try:
+                payload = {"op": "set", "key": f"k{index}", "value": index}
+                client.sendall((json.dumps(payload) + "\n").encode())
+                service.handle_client(server, store, 12345)
+                return json.loads(client.recv(4096))
+            finally:
+                server.close()
+                client.close()
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(worker, range(12)))
+        assert all(result["ok"] for result in results)
+        assert sorted(result["sequence"] for result in results) == list(range(1, 13))
+    with MemoryStore(path) as reopened:
+        assert all(reopened.get(f"k{i}") == i for i in range(12))
+        assert reopened.last_commit.sequence == 12
