@@ -25,7 +25,13 @@ GCODE = b"; HEADER_BLOCK_START\nG1 X10 Y10 E1\n"
 MD5 = hashlib.md5(GCODE).hexdigest().encode("ascii")
 
 
-def archive(path: Path, *, bad_rel: bool = False, no_gcode: bool = False, traversal: bool = False) -> None:
+def archive(
+    path: Path,
+    *,
+    bad_rel: bool = False,
+    no_gcode: bool = False,
+    traversal: bool = False,
+) -> None:
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as z:
         z.writestr("_rels/.rels", b"<Relationships/>" if bad_rel else REL)
         z.writestr("[Content_Types].xml", TYPES)
@@ -48,13 +54,22 @@ class PreviewTests(unittest.TestCase):
 
     def test_embeddings_are_real_and_gcode_md5_unchanged(self) -> None:
         first = embed_preview(self.path, self.stl)
-        self.assertEqual(GCODE, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode"))
-        self.assertEqual(MD5, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode.md5"))
+        self.assertEqual(
+            GCODE, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode")
+        )
+        self.assertEqual(
+            MD5, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode.md5")
+        )
         self.assertEqual(first, audit_preview(self.path))
         images = first["images"]
-        self.assertEqual(set(images), {
-            "Metadata/plate_1.png", "Metadata/plate_1_small.png", "Metadata/top_1.png"
-        })
+        self.assertEqual(
+            set(images),
+            {
+                "Metadata/plate_1.png",
+                "Metadata/plate_1_small.png",
+                "Metadata/top_1.png",
+            },
+        )
         self.assertNotEqual(
             images["Metadata/plate_1.png"]["sha256"],
             images["Metadata/top_1.png"]["sha256"],
@@ -62,7 +77,9 @@ class PreviewTests(unittest.TestCase):
         with zipfile.ZipFile(self.path) as z:
             self.assertIsNone(z.testzip())
             self.assertEqual(len(z.namelist()), len(set(z.namelist())))
-            self.assertEqual(z.read("Metadata/plate_1.png")[:8], bytes.fromhex("89504e470d0a1a0a"))
+            self.assertEqual(
+                z.read("Metadata/plate_1.png")[:8], bytes.fromhex("89504e470d0a1a0a")
+            )
         second = embed_preview(self.path, self.stl)
         self.assertEqual(first, second)
 
