@@ -19,6 +19,8 @@ from threading import RLock, get_ident
 from typing import Any, Iterator, Protocol, TypeVar
 
 
+MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
+
 ValueT = TypeVar("ValueT")
 
 
@@ -141,8 +143,12 @@ class _JournalStore:
         if not path.exists():
             return state, sequence, digest
         with path.open("rb") as journal:
-            for frame in journal:
-                # Never discard a possibly confirmed partial frame automatically.
+            while True:
+                frame = journal.readline(MAX_JOURNAL_FRAME_BYTES + 1)
+                if not frame:
+                    break
+                if len(frame) > MAX_JOURNAL_FRAME_BYTES:
+                    raise StoreError("journal frame exceeds size limit")
                 if not frame.endswith(b"\n"):
                     raise StoreError("incomplete journal tail; recovery required")
                 state, sequence, digest = _JournalStore._apply_verified_frame(
@@ -234,6 +240,8 @@ class _JournalStore:
                 ).encode("utf-8")
                 + b"\n"
             )
+            if len(frame) > MAX_JOURNAL_FRAME_BYTES:
+                raise StoreError("journal frame exceeds size limit")
             return frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
             raise StoreError("unsupported JSON value") from exc
