@@ -1,0 +1,36 @@
+name: Alice visual object recognition regression
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/alice-visual-object-recognition.yml"
+      - "scripts/visual_object_contract.py"
+      - "scripts/visual_object_benchmark.py"
+      - "tests/test_visual_object_contract.py"
+      - "tests/test_visual_object_benchmark.py"
+      - "tests/fixtures/visual3d_cases.json"
+      - "docs/development/visual-object-recognition.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-visual-contracts:
+    name: Offline geometry recognition and HTTP stub checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout trusted source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Python without external model credentials
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
+        with:
+          python-version: "3.14"
+      - name: Install crop library only for this focused job
+        run: python3 -m pip install --disable-pip-version-check --no-deps Pillow==12.3.0
+      - name: Run recognition evaluator and private-image boundary tests
+        run: python3 -m unittest discover -s tests -p "test_visual_object*.py" -v
