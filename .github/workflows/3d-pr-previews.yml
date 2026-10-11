@@ -44,7 +44,7 @@ jobs:
       - name: Install pinned preview dependencies
         run: python -m pip install --disable-pip-version-check --no-input Pillow==12.3.0 pytest==9.1.1
       - name: Verify trusted publisher and preview regression suite
-        run: python -m pytest -q -p no:cacheprovider scripts/tests/test_render_3d_preview.py
+        run: python -m pytest -q -p no:cacheprovider scripts/validation/render_preview_contract.py
       - name: Commit image-only objects and upsert GitHub bot comment
         env:
           GH_TOKEN: ${{ github.token }}

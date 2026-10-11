@@ -27,7 +27,7 @@ Open or update a same-repository PR. The trusted GitHub Actions
    same PR head do **not** write another image commit or duplicate the comment.
 
 Test the publisher contract by running
-`python -m pytest scripts/tests/test_render_3d_preview.py` after installing
+`python -m pytest scripts/validation/render_preview_contract.py` after installing
 the pinned **Pillow==12.3.0**; the separate, read-only
 `3D render contract` workflow installs these dependencies and runs tests.
 

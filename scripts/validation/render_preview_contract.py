@@ -339,7 +339,7 @@ def test_preview_workflows_keep_comment_token_out_of_untrusted_pr_code():
     assert "actions/checkout@" in trusted and "scripts.publish_3d_previews" in trusted
     assert "GITHUB_TOKEN" not in tests and "contents: write" not in tests
     assert "Pillow==12.3.0" in tests
-    assert "scripts/tests/test_render_3d_preview.py" in tests
+    assert "scripts/validation/render_preview_contract.py" in tests
 
 
 def test_sliced_3mf_with_no_geometry_does_not_forge_preview():
