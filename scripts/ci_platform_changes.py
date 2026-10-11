@@ -9,8 +9,8 @@ from pathlib import PurePosixPath
 import sys
 from typing import Mapping
 
-PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
-JOBS = ("backend", "postgres", "android", "infra", "mcp")
+PLATFORMS = ("web", "backend", "android", "infra", "mcp")
+JOBS = ("backend", "android", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
@@ -50,11 +50,10 @@ def _runtime_platforms(path: str) -> set[str]:
         or path.startswith("migrations/")
         or "postgres" in path.lower()
     ):
-        return {"backend", "database"}
+        return {"backend"}
     if path.startswith("tests/") and path.endswith(".py"):
         return {"backend"}
     if path.endswith(".py"):
-        # Keep SQL compatibility coverage until the runtime migration is complete.
         return {"backend", "database"}
     if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
         return set()
@@ -103,7 +102,7 @@ def classify(paths: list[str]) -> dict[str, bool]:
     for path in paths:
         selected.update(_path_platforms(path))
     if "web" in selected:
-        selected.update(("backend", "android", "database", "mcp"))
+        selected.update(("backend", "android", "mcp"))
     return {platform: platform in selected for platform in PLATFORMS}
 
 
@@ -111,13 +110,13 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
     """A selected suite must succeed; only unselected suites may be skipped."""
     if set(plan) != set(PLATFORMS) or any(type(value) is not bool for value in plan.values()):
         raise ValueError("invalid platform plan")
-    if plan["web"] and not all(plan[key] for key in ("backend", "android", "database", "mcp")):
+    if plan["web"] and not all(plan[key] for key in ("backend", "android", "mcp")):
         raise ValueError("incomplete web dependency plan")
     for job in ("changes", "code-rules"):
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
     for job in JOBS:
-        required = plan["database"] if job == "postgres" else plan[job]
+        required = plan[job]
         allowed = {"success"} if required else {"success", "skipped"}
         if results.get(job) not in allowed:
             raise ValueError(f"platform check missing, failed or unexpectedly skipped: {job}")
