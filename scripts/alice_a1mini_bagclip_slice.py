@@ -32,24 +32,10 @@ OUTPUT = "Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf"
 NS = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
 
 
-def validate_source(path: Path) -> str:
-    data = path.read_bytes()
-    digest = hashlib.sha256(data).hexdigest()
-    if len(data) != SOURCE_BYTES or digest != SOURCE_SHA256:
-        raise RuntimeError("source artifact changed: size/hash mismatch")
-    with zipfile.ZipFile(path) as z:
-        if z.testzip() is not None:
-            raise RuntimeError("source 3MF failed CRC")
-        names = set(z.namelist())
-        if names != {"[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"}:
-            raise RuntimeError("unexpected 3MF source entries")
-        root = ET.fromstring(z.read("3D/3dmodel.model"))
-    if root.get("unit") != "millimeter":
-        raise RuntimeError("source units are not millimeters")
+def _source_geometry(root: ET.Element) -> dict[str, tuple[list[tuple[float, ...]], int]]:
     objects = root.findall(f".//{NS}resources/{NS}object")
-    items = root.findall(f".//{NS}build/{NS}item")
-    if len(objects) != 3 or len(items) != 3:
-        raise RuntimeError("expected exactly three parts on one plate")
+    if len(objects) != 3:
+        raise RuntimeError("expected exactly three source objects")
     geometry = {}
     for obj in objects:
         mesh = obj.find(f"{NS}mesh")
@@ -68,6 +54,13 @@ def validate_source(path: Path) -> str:
         geometry[obj.attrib["id"]] = (points, len(triangles))
     if sorted(value[1] for value in geometry.values()) != EXPECTED_TRIANGLES:
         raise RuntimeError("unexpected source triangle counts")
+    return geometry
+
+
+def _validate_build(root: ET.Element, geometry: dict) -> None:
+    items = root.findall(f".//{NS}build/{NS}item")
+    if len(items) != 3:
+        raise RuntimeError("expected three build items")
     ids = set()
     for item in items:
         object_id = item.attrib["objectid"]
@@ -81,10 +74,26 @@ def validate_source(path: Path) -> str:
             raise RuntimeError("unexpected source rotation or scaling")
         for x, y, z in geometry[object_id][0]:
             pos = (x + matrix[9], y + matrix[10], z + matrix[11])
-            if not (
-                1 <= pos[0] <= 179 and 1 <= pos[1] <= 179 and -0.01 <= pos[2] <= 180
-            ):
+            if not (1 <= pos[0] <= 179 and 1 <= pos[1] <= 179 and -0.01 <= pos[2] <= 180):
                 raise RuntimeError("source object outside A1 mini build volume")
+
+
+def validate_source(path: Path) -> str:
+    data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    if len(data) != SOURCE_BYTES or digest != SOURCE_SHA256:
+        raise RuntimeError("source artifact changed: size/hash mismatch")
+    with zipfile.ZipFile(path) as z:
+        if z.testzip() is not None:
+            raise RuntimeError("source 3MF failed CRC")
+        names = set(z.namelist())
+        if names != {"[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"}:
+            raise RuntimeError("unexpected 3MF source entries")
+        root = ET.fromstring(z.read("3D/3dmodel.model"))
+    if root.get("unit") != "millimeter":
+        raise RuntimeError("source units are not millimeters")
+    geometry = _source_geometry(root)
+    _validate_build(root, geometry)
     return digest
 
 
@@ -145,6 +154,40 @@ def merge_plate_stl(source: Path, destination: Path) -> int:
     return total
 
 
+
+def _verified_plate(dest: Path, result_file: Path, face_count: int) -> tuple[dict, int]:
+    settings, gcode = _read_sliced_archive(dest)
+    _validate_profile(settings)
+    _validate_gcode(gcode)
+    if (
+        settings.get("wall_loops") != "4"
+        or settings.get("sparse_infill_density") != "25%"
+    ):
+        raise RuntimeError("four-wall/25-percent process not preserved")
+    if not any(
+        line.startswith(("G1 ", "G1\t")) and " E" in line
+        for line in gcode.splitlines()
+        if not line.lstrip().startswith(";")
+    ):
+        raise RuntimeError("no extrusion command in sliced G-code")
+    outcome = json.loads(result_file.read_text(encoding="utf-8"))
+    if outcome.get("return_code") != 0:
+        raise RuntimeError("slicer result.json nonzero")
+    plates = outcome.get("sliced_plates") or []
+    if len(plates) != 1 or plates[0].get("warning_message"):
+        raise RuntimeError("not exactly one plate or slicer warned")
+    print("BAG_CLIP_PLATE_SUMMARY", json.dumps(plates[0])[:5000], flush=True)
+    objects = plates[0].get("objects") or []
+    observed = sorted(int(o.get("triangle_count", -1)) for o in objects)
+    print("BAG_CLIP_RESULT_OBJECTS", json.dumps(objects)[:5000], flush=True)
+    if observed != [face_count]:
+        raise RuntimeError(f"sliced-result triangle counts mismatch: {observed!r}")
+    bbox = objects[0].get("bbox", {})
+    if not 15.8 <= float(bbox.get("height", 0)) <= 16.2:
+        raise RuntimeError("printed plate height differs from source")
+    return plates[0], len(objects)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-3mf", type=Path, required=True)
@@ -197,36 +240,7 @@ def main() -> int:
     if result.returncode != 0:
         raise RuntimeError("Bambu Studio failed; do not stage artifact")
     dest = out / OUTPUT
-    settings, gcode = _read_sliced_archive(dest)
-    _validate_profile(settings)
-    _validate_gcode(gcode)
-    if (
-        settings.get("wall_loops") != "4"
-        or settings.get("sparse_infill_density") != "25%"
-    ):
-        raise RuntimeError("four-wall/25-percent process not preserved")
-    if not any(
-        line.startswith(("G1 ", "G1\t")) and " E" in line
-        for line in gcode.splitlines()
-        if not line.lstrip().startswith(";")
-    ):
-        raise RuntimeError("no extrusion command in sliced G-code")
-    result_file = out / "result.json"
-    outcome = json.loads(result_file.read_text(encoding="utf-8"))
-    if outcome.get("return_code") != 0:
-        raise RuntimeError("slicer result.json nonzero")
-    plates = outcome.get("sliced_plates") or []
-    if len(plates) != 1 or plates[0].get("warning_message"):
-        raise RuntimeError("not exactly one plate or slicer warned")
-    print("BAG_CLIP_PLATE_SUMMARY", json.dumps(plates[0])[:5000], flush=True)
-    objects = plates[0].get("objects") or []
-    observed = sorted(int(o.get("triangle_count", -1)) for o in objects)
-    print("BAG_CLIP_RESULT_OBJECTS", json.dumps(objects)[:5000], flush=True)
-    if observed != [face_count]:
-        raise RuntimeError(f"sliced-result triangle counts mismatch: {observed!r}")
-    bbox = objects[0].get("bbox", {})
-    if not 15.8 <= float(bbox.get("height", 0)) <= 16.2:
-        raise RuntimeError("printed plate height differs from source")
+    plate, object_count = _verified_plate(dest, out / "result.json", face_count)
     metadata = {
         "source_sha256": source_sha,
         "source_commit": "f6b75493921b8e9b68e207216abca22e8df6340d",
@@ -242,8 +256,8 @@ def main() -> int:
         "bed_c": 60,
         "perimeters": 4,
         "infill_percent": 25,
-        "object_count": len(objects),
-        "estimated_seconds": plates[0].get("total_predication"),
+        "object_count": object_count,
+        "estimated_seconds": plate.get("total_predication"),
         "state": "SLICED_NOT_PRINTED",
     }
     (out / "bagclip_audit.json").write_text(
