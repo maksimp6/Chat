@@ -91,16 +91,25 @@ jobs:
       - name: Load immutable Memory DB policy (pinned commit)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 2081d17b7401958ca3972aa4bfd7c9eb022b4adf
+          ref: d5d2f1c9a456ed3a53be66af12a326975e0bc5bb
           path: .trusted-memory-policy
-          sparse-checkout: scripts/check_memory_contract_integrity.py
+          sparse-checkout: |
+            scripts/check_memory_contract_integrity.py
+            scripts/run_fast_contracts_trusted.py
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Verify frozen tests and preserved FileMemoryDB
-        run: python .trusted-memory-policy/scripts/check_memory_contract_integrity.py --root .
-      - name: Verify isolated contracts (no third-party dependencies)
-        run: python scripts/run_fast_contracts.py
-
+      - name: Run trusted identities and compatibility suite (combined 2s)
+        shell: bash
+        run: |
+          started="$(date +%s%N)"
+          python -I -S .trusted-memory-policy/scripts/run_fast_contracts_trusted.py --root .
+          python scripts/run_fast_contracts.py
+          elapsed_ns="$(( $(date +%s%N) - started ))"
+          echo "Combined fast contract execution: ${elapsed_ns}ns / 2000000000ns"
+          if (( elapsed_ns > 2000000000 )); then
+            echo "Combined fast contract budget exceeded"
+            exit 1
+          fi
 
   backend:
     name: Application tests
