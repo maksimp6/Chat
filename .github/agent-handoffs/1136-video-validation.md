@@ -18,6 +18,9 @@ triangle vertices, so `process=False` followed directly by watertightness reject
 even an exported closed cube. Weld coincident vertices before topology checks,
 preserving finite-coordinate/size/complexity guards. Also reject nested manifest
 fields and non-finite ffprobe duration rather than accepting invalid evidence.
+The first corrected-head CI ran these real codec tests and proved both full-suite
+runner jobs lacked FFmpeg. Provision FFmpeg/ffprobe in those jobs; do not skip the
+end-to-end test or lower coverage to hide the missing system dependency.
 
 Owner's repository-completion request authorizes reversible code/test changes
 and publication to the same PR. No physical model, inferred assembly, model

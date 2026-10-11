@@ -110,6 +110,12 @@ jobs:
           echo "- Application dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Check source formatting
         run: bash scripts/format.sh check
+      - name: Install video codec test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
       - name: Generate hot-file modularity report
         run: |
           python scripts/hot_file_metrics.py \
@@ -367,6 +373,12 @@ jobs:
           started=$SECONDS
           pip install -r requirements.txt -r requirements-postgres.txt -r requirements-dev.txt
           echo "- PostgreSQL dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install video codec test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
       - name: Run full application suite on PostgreSQL
         run: pytest --durations=30 -q
       - name: Verify backup and restore of the application schema
