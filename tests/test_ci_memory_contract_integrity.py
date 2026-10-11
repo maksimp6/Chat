@@ -1,4 +1,5 @@
 """Negative tests for the immutable Memory DB gate."""
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -12,9 +13,16 @@ FAST = "tests/test_ci_fast_contracts.py"
 
 class IntegrityGuardContracts(unittest.TestCase):
     def test_manifest_covers_legacy_both_engines_and_runner(self):
-        self.assertTrue({LEGACY, FAST, "tests/test_memory_fast_core_contracts.py",
-                         "tests/test_memory_store.py", "scripts/run_fast_contracts.py"} <=
-                        set(FROZEN_SHA256))
+        self.assertTrue(
+            {
+                LEGACY,
+                FAST,
+                "tests/test_memory_fast_core_contracts.py",
+                "tests/test_memory_store.py",
+                "scripts/run_fast_contracts.py",
+            }
+            <= set(FROZEN_SHA256)
+        )
 
     def test_mutated_legacy_bytes_are_rejected(self):
         with TemporaryDirectory() as directory:
@@ -28,7 +36,9 @@ class IntegrityGuardContracts(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         fast_job = workflow.split("  fast-tests:\n", 1)[1].split("\n  backend:", 1)[0]
         self.assertIn("ref: 7429b02732e9e641b19579b9252e2147f269afe5", fast_job)
-        self.assertIn("python .trusted-memory-policy/scripts/check_memory_contract_integrity.py", fast_job)
+        self.assertIn(
+            "python .trusted-memory-policy/scripts/check_memory_contract_integrity.py", fast_job
+        )
         self.assertIn("python scripts/run_fast_contracts.py", fast_job)
 
     def test_deleted_accepted_test_is_rejected(self):

@@ -3,6 +3,7 @@
 CI executes this policy from a separate immutable commit checkout.
 Updating accepted contracts requires a new reviewed policy pin.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +19,8 @@ FROZEN_SHA256: dict[str, str] = {
     "tests/test_memory_store.py": "37b6869a108fd028dca17af40a759e0212c78d2afd3da74c0934e16ab6313c37",
     "tests/test_memory_standalone_boundary.py": "1083807db4fb6ec0d0a1fe7dc4ded4279b03574b4e91e91502c3951af5d03522",
     "tests/test_ci_fast_contracts.py": "c14e53f452c9532a8c5ff6390c0347fb3f0b5fb4e520f29c18ad8c8a9f031ca3",
-    "tests/test_memory_fast_core_contracts.py": "1a2075ea7700788224e7cbd250be373d98e48f3c2d385b96ddef0ec50d264d64",
-    "scripts/run_fast_contracts.py": "5cdb4b2ff663b2982ceffcb843dfb914f2376c3e252a7f1c7a151c786364e389"
+    "tests/test_memory_fast_core_contracts.py": "6144f7d2d104ef93c2908335e991b7edcde5bf9c85c0b40f21aec9a3b1e1c3eb",
+    "scripts/run_fast_contracts.py": "5cdb4b2ff663b2982ceffcb843dfb914f2376c3e252a7f1c7a151c786364e389",
 }
 
 

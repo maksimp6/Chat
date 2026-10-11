@@ -1,4 +1,5 @@
 """Fast standard-library smoke contracts for the standalone MemoryStore."""
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
