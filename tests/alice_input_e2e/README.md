@@ -50,3 +50,11 @@ The Integration-owned test `test_mouse_keyboard_shared_session.py` uses these ex
 The combined checkout ran **9/9 isolated integration tests PASS** on Redmi 9. The new test checks one signed controller session across mouse and keyboard commands, shared replay sequence, unsigned and viewer denial, cursor-focus loss releasing a held mouse button, root-side verifier revocation (simulated by Python `ProtectedVerifier`) and C fixture close/free. The temporary Unix socket is inside a mode-0700 directory and all C events go into a test callback.
 
 **This is not physical/root E2E:** no root service, actual `/dev/uinput`, kernel InputReader, cross-UID access, SELinux change, APK install, cutover or merge. A plain #1089 checkout stays intentionally RED until Security #1090, Keyboard #1091 and Mouse #1082 are integrated under their canonical ownership and independently verified.
+
+## Queued-grant TTL fail-closed proof (2026-10-11)
+
+The QA-owned `test_grant_ttl_socket_race.py` deterministically holds the verifier's dispatch lock after the socket handler has sampled grant age, advances the clock beyond the signed **300 ms TTL**, and checks that the authenticated Unix socket returns `DENIED` without consuming sequence or emitting any input.
+
+On the original Security parent `1dcb2f6`, the check **failed RED**: the stale signed command returned `OK`. With review-only Security change `5d57638`, this check **passes GREEN**. A temporary Redmi 9 checkout combining that review commit with canonical Keyboard `810738c` and Mouse `74043cf` ran **10/10 E2E tests PASS**. This is a synthetic protected-boundary proof using mocked input effects, not a root-owned persistent verifier or real `/dev/uinput` acceptance.
+
+The integration branch deliberately does not vendor Security or driver sources. Its full CI must remain blocked until those owners are integrated and independently accepted; this test must not be skipped to obtain green CI.
