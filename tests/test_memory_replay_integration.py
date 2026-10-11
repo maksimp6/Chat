@@ -577,3 +577,33 @@ def test_trusted_root_rejects_ancestor_symlink(tmp_path, monkeypatch):
     monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
     with pytest.raises(StoreError, match="unsafe journal or lock path"):
         MemoryStore(alias / "journal.memory")
+
+
+def test_same_uid_post_check_rename_remains_possible(tmp_path, monkeypatch):
+    """DAC alone cannot isolate an adversary sharing the service UID."""
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    source = root / "journal.memory"
+    destination = root / "backup.memory"
+    displaced = root / "displaced.memory"
+    monkeypatch.setenv("ALICE_MEMORY_TRUSTED_ROOT", "1")
+    with MemoryStore(source) as store:
+        store.set("safe", 1)
+        store.commit()
+        original_fsync = os.fsync
+        renamed = False
+
+        def rename_after_publication(fd):
+            nonlocal renamed
+            if not renamed and os.fstat(fd).st_ino == root.stat().st_ino:
+                if destination.exists():
+                    destination.rename(displaced)
+                    renamed = True
+            return original_fsync(fd)
+
+        monkeypatch.setattr(os, "fsync", rename_after_publication)
+        store.backup(destination)
+        assert renamed
+        assert not destination.exists()
+        assert displaced.exists()
