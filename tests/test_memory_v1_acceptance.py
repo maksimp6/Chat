@@ -449,3 +449,23 @@ def test_transaction_rejects_uncommitted_staging(tmp_path):
                 pass
         assert store.get("pending") == 1
         assert store.commit() == 1
+
+
+@pytest.mark.parametrize("invalid_name", ["", None, 42, False, []])
+def test_transaction_rejects_invalid_names_before_durable_commit(tmp_path, invalid_name):
+    """Transaction writes must enforce the same name boundary as set()."""
+    path = tmp_path / "invalid-tx-name.memory"
+    with MemoryStore(path) as store:
+        with store.transaction() as transaction:
+            with pytest.raises(StoreError, match="name must be a nonempty string"):
+                transaction.set(invalid_name, "must-not-persist")
+            transaction.set("valid", {"safe": True})
+        assert store.last_commit.sequence == 1
+        assert store.get("valid") == {"safe": True}
+    with MemoryStore(path) as reopened:
+        assert reopened.last_commit.sequence == 1
+        assert reopened.get("valid") == {"safe": True}
+    import json
+
+    journal = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [item["key"] for item in journal[0]["payload"]["changes"]] == ["valid"]
