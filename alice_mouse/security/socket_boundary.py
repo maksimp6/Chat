@@ -74,18 +74,33 @@ class SignedInputSocket:
         if (checked_parent.st_dev,checked_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
             os.close(parent_fd)
             raise SocketBoundaryError("socket parent replaced during validation")
-        if self.path.exists() or self.path.is_symlink():
+        # Check the socket name relative to the pinned directory, not an
+        # attacker-replaceable pathname. A racing bind will still fail EADDRINUSE.
+        try:
+            os.stat(self.path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
             os.close(parent_fd)
             raise SocketBoundaryError("refusing to replace existing socket")
         self._parent_fd=parent_fd
         server=socket.socket(socket.AF_UNIX,socket.SOCK_SEQPACKET)
         try:
             server.settimeout(0.1)
-            server.bind(str(self.path))
+            # Linux /proc/self/fd holds the already-validated directory inode.
+            # A rename/swap of the public path cannot redirect bind to a new
+            # directory. Do not fall back to the vulnerable public path.
+            bound_path=f"/proc/self/fd/{parent_fd}/{self.path.name}"
+            if len(os.fsencode(bound_path))>=108:
+                raise SocketBoundaryError("Unix socket address too long")
+            server.bind(bound_path)
+            # Record ownership before pathname revalidation; if the public
+            # parent was swapped during bind, cleanup must still unlink the
+            # socket created in the pinned (possibly renamed) directory.
+            self._inode=os.stat(self.path.name,dir_fd=parent_fd,follow_symlinks=False).st_ino
             current_parent=self.path.parent.lstat()
             if (current_parent.st_dev,current_parent.st_ino)!=(parent_identity.st_dev,parent_identity.st_ino):
                 raise SocketBoundaryError("socket parent replaced during bind")
-            self._inode=os.stat(self.path.name,dir_fd=parent_fd,follow_symlinks=False).st_ino
             # AF_UNIX socket FD is NOT the filesystem inode on Linux.
             # Use dirfd-relative operations under the pinned, service-owned parent.
             if self.shared_gid is not None:
