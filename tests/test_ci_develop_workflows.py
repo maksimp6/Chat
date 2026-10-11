@@ -33,6 +33,7 @@ def test_integration_required_check_runs_even_when_dependencies_fail():
     assert set(required["needs"]) == {
         "changes",
         "code-rules",
+        "fast-tests",
         "backend",
         "postgres",
         "android",
