@@ -209,6 +209,8 @@ class _JournalStore:
         directory_fd = _open_directory_nofollow(path.parent)
         try:
             journal_fd = _open_journal_nofollow(directory_fd, path.name, os.O_RDONLY)
+        except OSError as exc:
+            raise StoreError("unsafe journal path") from exc
         finally:
             os.close(directory_fd)
         with os.fdopen(journal_fd, "rb") as journal:
