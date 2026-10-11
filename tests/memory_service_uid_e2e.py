@@ -45,11 +45,24 @@ def main() -> None:
         env["PYTHONPATH"] = str(root)
         proc = subprocess.Popen(
             [
-                "runuser", "-u", owner.pw_name, "--", sys.executable,
-                "-m", "memory_engine.service", "--database", str(private / "db.memory"),
-                "--socket", str(sock), "--allowed-uid", str(client.pw_uid),
+                "runuser",
+                "-u",
+                owner.pw_name,
+                "--",
+                sys.executable,
+                "-m",
+                "memory_engine.service",
+                "--database",
+                str(private / "db.memory"),
+                "--socket",
+                str(sock),
+                "--allowed-uid",
+                str(client.pw_uid),
             ],
-            env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
         try:
             for _ in range(100):
@@ -69,15 +82,25 @@ def main() -> None:
             )
             result = subprocess.run(
                 ["runuser", "-u", client.pw_name, "--", sys.executable, "-c", code, str(sock)],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             assert '"ok":true' in result.stdout, result.stdout
             denied = subprocess.run(
                 [
-                    "runuser", "-u", client.pw_name, "--", sys.executable,
-                    "-c", "import pathlib,sys; pathlib.Path(sys.argv[1]).rename(sys.argv[2])",
-                    str(private / "db.memory"), str(private / "stolen.memory"),
-                ], capture_output=True, text=True,
+                    "runuser",
+                    "-u",
+                    client.pw_name,
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "import pathlib,sys; pathlib.Path(sys.argv[1]).rename(sys.argv[2])",
+                    str(private / "db.memory"),
+                    str(private / "stolen.memory"),
+                ],
+                capture_output=True,
+                text=True,
             )
             assert denied.returncode != 0 and "PermissionError" in denied.stderr
             assert (private / "db.memory").exists()
