@@ -42,13 +42,14 @@
     "host": "192.168.31.12",
     "model": "Bambu Lab A1 mini",
     "identity_source": "paired LAN credentials + authenticated MQTT",
-    "serial_match_verified": false,
-    "firmware_version": null,
+    "serial_match_verified": true,
+    "firmware_version": "01.08.01.00",
     "firmware_compatibility_verified": false,
     "ftps_certificate_pin_verified": false,
     "printer_file_sha256": null,
     "printer_file_readback_verified": false,
     "touchscreen_open_verified": false,
-    "printer_start_authorized": false
+    "printer_start_authorized": false,
+    "firmware_evidence": "authenticated MQTT info/get_version (2026-10-11)"
   }
 }
