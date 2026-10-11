@@ -3,6 +3,7 @@ name: 3D render contract
 on:
   pull_request:
     paths:
+      - printing3d/models/**
       - scripts/render_3d_preview.py
       - scripts/publish_3d_previews.py
       - scripts/tests/test_render_3d_preview.py

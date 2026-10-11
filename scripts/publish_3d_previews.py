@@ -300,7 +300,9 @@ def upsert_comment(api: Github, pr: int, body: str) -> str:
     return "created"
 
 
-def run(api: Github, pr_number: int, *, refresh: bool = False) -> str:
+def run(
+    api: Github, pr_number: int, *, refresh: bool = False, expected_head: str | None = None
+) -> str:
     if not 1 <= pr_number <= 1_000_000_000:
         raise PublishError("invalid PR number")
     pr = api.json("GET", api.prefix + f"/pulls/{pr_number}")
@@ -311,14 +313,16 @@ def run(api: Github, pr_number: int, *, refresh: bool = False) -> str:
     if owner.get("full_name") != api.repo:
         return "skipped_fork"
     head_sha = _sha(head.get("sha"))
+    if expected_head is not None and _sha(expected_head) != head_sha:
+        return "stale_head"
     changed_files = pr.get("changed_files")
     if type(changed_files) is not int or not 0 <= changed_files <= MAX_CHANGED_FILES:
         raise PublishError("PR changed-file count exceeds bounded preview scope")
     changed = api.json("GET", api.prefix + f"/pulls/{pr_number}/files?per_page=100")
-    if len(changed) != changed_files:
-        raise PublishError("PR file listing incomplete; not publishing partial previews")
     if not isinstance(changed, list):
         raise PublishError("invalid PR files response")
+    if len(changed) != changed_files:
+        raise PublishError("PR file listing incomplete; not publishing partial previews")
     models = select_models(changed)
     if not models:
         return "no_model_changes"
@@ -339,12 +343,14 @@ def main() -> int:
     parser.add_argument(
         "--refresh", action="store_true", help="rebuild previews even on unchanged PR head"
     )
+    parser.add_argument("--expected-head", default=None, help="reject a stale workflow_run event")
     options = parser.parse_args()
     try:
         result = run(
             Github(options.repo, os.environ.get("GH_TOKEN", "")),
             options.pr,
             refresh=options.refresh,
+            expected_head=options.expected_head,
         )
     except (PublishError, PreviewError) as exc:
         print("PREVIEW_BLOCKED:", str(exc)[:200], file=sys.stderr)

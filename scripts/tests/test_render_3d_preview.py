@@ -327,12 +327,13 @@ def test_preview_workflows_keep_comment_token_out_of_untrusted_pr_code():
     root = Path(__file__).resolve().parents[2]
     trusted = (root / ".github/workflows/3d-pr-previews.yml").read_text()
     tests = (root / ".github/workflows/3d-render-tests.yml").read_text()
-    assert "pull_request_target:" in trusted
-    assert "github.event.pull_request.head.repo.full_name == github.repository" in trusted
+    assert "workflow_run:" in trusted
+    assert "pull_request_target:" not in trusted
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in trusted
     assert ("ref: $" + "{{ github.event.repository.default_branch }}") in trusted
     assert "persist-credentials: false" in trusted
     assert "contents: write" in trusted and "issues: write" in trusted
-    assert "printing3d/models/**" in trusted
+    assert "printing3d/models/**" in tests
     assert "actions/checkout@" in trusted and "scripts.publish_3d_previews" in trusted
     assert "GITHUB_TOKEN" not in tests and "contents: write" not in tests
     assert "Pillow==12.3.0" in tests
@@ -428,3 +429,20 @@ def test_comment_marker_from_nonbot_cannot_be_hijacked(monkeypatch):
 def test_invalid_github_publication_configuration_is_blocked(repo, token):
     with pytest.raises(publication.PublishError):
         publication.Github(repo, token)
+
+
+def test_stale_workflow_event_is_noop_before_publication():
+    api = StubGitHub()
+    assert publication.run(api, 1118, expected_head="9" * 40) == "stale_head"
+    assert not api.comments
+    assert not any(method != "GET" for method, _, _ in api.writes)
+
+
+def test_matching_workflow_event_permits_only_own_pr(monkeypatch):
+    api = StubGitHub()
+    saved = []
+    monkeypatch.setattr(
+        publication, "publish_images", lambda _api, images: saved.append(images) or "a" * 40
+    )
+    assert publication.run(api, 1118, expected_head=api.head) == "created"
+    assert len(saved) == 1

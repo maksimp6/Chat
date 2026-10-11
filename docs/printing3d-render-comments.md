@@ -36,12 +36,16 @@ regenerated image, but still updates the same bot comment.
 
 ## Safety and release status
 
-The PR must be in the **same repository**. Forked PRs are ignored: no writable
-token is exposed to fork code. Workflow `pull_request_target` only processes
-untrusted model **bytes as data** with bounded parsers, no shell commands or
-checkout from that branch. `GITHUB_TOKEN` receives only the required
-`contents:write`, `issues:write`, `pull-requests:read` scope in the
-trusted workflow. No third-party upload host or user-owned access key is used.
+The PR must be in the **same repository**. Forked PRs are ignored.
+The **unprivileged** `pull_request` / `3D render contract` test workflow has
+only read permission. When it succeeds, a separate trusted `workflow_run`
+publisher starts with only the repository's default-branch code. It **never**
+executes or checks out code from the PR or loads its Actions artifacts:
+changed model **blobs are re-fetched by Git SHA** and parsed as bounded data.
+`GITHUB_TOKEN` is exposed only in the publisher step, never to untrusted
+models, using `contents:write`, `issues:write`, `pull-requests:read` permissions.
+A stale `workflow_run` head SHA is rejected rather than posting outdated PNGs.
+No third-party upload host or user-owned access key is used.
 
 The renderer does **not** infer whether a mesh is watertight, printable,
 dimensionally correct, safe for a child, safe for a machine, or a functional
