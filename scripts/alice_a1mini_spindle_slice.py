@@ -86,6 +86,7 @@ def main():
     if not any(line.startswith('G1 ') and ' E' in line for line in gcode.splitlines() if not line.startswith(';')): raise ValueError('no extrusion')
     report=json.loads((out/'result.json').read_text())
     plates=report.get('sliced_plates') or []
+    print('SPINDLE_RESULT',json.dumps(report,sort_keys=True)[:6500],flush=True)
     if report.get('return_code')!=0 or len(plates)!=1 or plates[0].get('warning_message'): raise ValueError('slicer result/warning')
     objs=plates[0].get('objects') or []
     if len(objs)!=1 or int(objs[0].get('triangle_count',-1))!=9660: raise ValueError('slicer geometry mismatch')
