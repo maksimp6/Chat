@@ -3,6 +3,7 @@
 A render must originate from real validated geometry, never an AI concept image.
 The renderer is intentionally not implemented yet. Tests must fail closed.
 """
+
 import hashlib
 import importlib
 import unittest
@@ -20,8 +21,12 @@ class HolderRenderRED(unittest.TestCase):
     def test_three_orthogonal_and_isometric_views(self):
         result = self.renderer.render_views(self.parts)
         self.assertEqual(set(result.views), {"isometric", "top", "side"})
-        self.assertTrue(all(result.views[k].png_bytes.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10)))
-                            for k in result.views))
+        self.assertTrue(
+            all(
+                result.views[k].png_bytes.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10)))
+                for k in result.views
+            )
+        )
 
     def test_images_are_not_empty_and_have_valid_dimensions(self):
         result = self.renderer.render_views(self.parts)
@@ -43,8 +48,7 @@ class HolderRenderRED(unittest.TestCase):
 
     def test_provenance_links_to_geometry(self):
         result = self.renderer.render_views(self.parts)
-        self.assertEqual(result.source_geometry_sha256,
-                         self.geometry.geometry_sha256(self.parts))
+        self.assertEqual(result.source_geometry_sha256, self.geometry.geometry_sha256(self.parts))
         self.assertEqual(len(result.source_geometry_sha256), 64)
         self.assertTrue(result.renderer_version)
 
