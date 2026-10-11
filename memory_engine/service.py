@@ -57,7 +57,7 @@ def serve(database: Path, socket_path: Path, allowed_uid: int) -> None:
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             listener.bind(str(socket_path))
-            os.chmod(socket_path, 0o600)
+            # Clients use SO_PEERCRED authorization, not the socket mode.\n            os.chmod(socket_path, 0o666)
             listener.listen(8)
             while True:
                 conn, _ = listener.accept()
