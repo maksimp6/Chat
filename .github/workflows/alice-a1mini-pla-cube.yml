@@ -79,3 +79,39 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           compression-level: 6
+
+      - name: Fetch hash-pinned source-only bag clip from reviewed PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out-bag
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://raw.githubusercontent.com/maksimp6/Chat/f6b75493921b8e9b68e207216abca22e8df6340d/3d-models/bag-clip/bag_clip_plate.3mf' \
+            --output out-bag/bagclip_source.3mf
+          printf '%s  %s\\n' \
+            '6c3005537a4b5bdd25bad2e4d9c29f9c858869b02884cf6c52fe907269a267d1' \
+            'out-bag/bagclip_source.3mf' | sha256sum --check
+
+      - name: Slice reviewed bag clip as PLA dimensional prototype
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/alice_a1mini_bagclip_slice.py
+          python3 scripts/alice_a1mini_bagclip_slice.py \
+            --source-3mf "$GITHUB_WORKSPACE/out-bag/bagclip_source.3mf" \
+            --slicer-root "$GITHUB_WORKSPACE/squashfs-root" \
+            --output-dir "$GITHUB_WORKSPACE/out-bag"
+          test -s out-bag/Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf
+          sha256sum out-bag/Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf
+          cat out-bag/bagclip_audit.json
+
+      - name: Upload single verified bag clip sliced job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: alice-a1mini-bagclip-pla-prototype-ready
+          path: |
+            out-bag/Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf
+            out-bag/bagclip_audit.json
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
