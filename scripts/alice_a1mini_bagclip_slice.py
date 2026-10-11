@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+from alice_a1mini_preview import embed_preview
 from alice_a1mini_pla_cube_slice import (
     _read_sliced_archive,
     _validate_gcode,
@@ -235,6 +236,9 @@ def main() -> int:
         raise RuntimeError("Bambu Studio failed; do not stage artifact")
     dest = out / OUTPUT
     plate, object_count = _verified_plate(dest, out / "result.json", face_count)
+    preview = embed_preview(dest, mesh_stl)
+    with zipfile.ZipFile(dest) as image_archive:
+        (out / "preview.png").write_bytes(image_archive.read("Metadata/plate_1.png"))
     metadata = {
         "source_sha256": source_sha,
         "source_commit": "f6b75493921b8e9b68e207216abca22e8df6340d",
@@ -253,6 +257,7 @@ def main() -> int:
         "object_count": object_count,
         "estimated_seconds": plate.get("total_predication"),
         "state": "SLICED_NOT_PRINTED",
+        "preview": preview,
     }
     (out / "bagclip_audit.json").write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n",
