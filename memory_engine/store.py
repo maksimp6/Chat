@@ -409,42 +409,65 @@ class _JournalStore:
         *,
         destination_must_be_new: bool = False,
     ) -> None:
-        """Copy to a same-directory temp file, validate, then atomically publish."""
+        """Copy from a no-follow source fd into a pinned destination directory."""
         import shutil
         import tempfile
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(prefix=".alice-copy-", dir=destination.parent)
-        temporary = Path(temp_name)
+        source_dir = _open_directory_nofollow(source.parent)
+        target_dir = _open_directory_nofollow(destination.parent)
+        temp_name = None
         try:
-            # Build and fsync the copy before publishing the destination path.
-            # The authoritative source remains unchanged on copy failure.
-            with os.fdopen(fd, "wb") as output:
-                if source.exists():
-                    with source.open("rb") as existing:
+            source_fd = _open_journal_nofollow(source_dir, source.name, os.O_RDONLY)
+            try:
+                with os.fdopen(source_fd, "rb") as existing:
+                    with tempfile.TemporaryFile(dir=destination.parent) as output:
                         shutil.copyfileobj(existing, output)
+                        output.flush()
+                        os.fsync(output.fileno())
+                        output.seek(0)
+                        copied = output.read()
+            finally:
+                # fdopen owns and closes source_fd.
+                pass
+            # Publish a named temporary file relative to the pinned directory.
+            temp_name = ".alice-copy-" + os.urandom(16).hex()
+            temp_fd = _open_journal_nofollow(
+                target_dir, temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            )
+            with os.fdopen(temp_fd, "wb") as output:
+                output.write(copied)
                 output.flush()
                 os.fsync(output.fileno())
-            actual_state, sequence, digest = _JournalStore._inspect_log(temporary)
+            temp_path = destination.parent / temp_name
+            actual_state, sequence, digest = _JournalStore._inspect_log(temp_path)
             if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
                 raise StoreError("backup integrity mismatch")
-            try:
-                if destination_must_be_new:
-                    os.link(temporary, destination)
-                else:
-                    os.replace(temporary, destination)
-            except FileExistsError as exc:
-                raise StoreError("backup destination was created concurrently") from exc
-            directory = os.open(str(destination.parent), os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            if destination_must_be_new:
+                os.link(
+                    temp_name, destination.name,
+                    src_dir_fd=target_dir, dst_dir_fd=target_dir,
+                    follow_symlinks=False,
+                )
+            else:
+                os.replace(
+                    temp_name, destination.name,
+                    src_dir_fd=target_dir, dst_dir_fd=target_dir,
+                )
+            os.fsync(target_dir)
+        except FileExistsError as exc:
+            raise StoreError("backup destination was created concurrently") from exc
         finally:
-            temporary.unlink(missing_ok=True)
+            if temp_name is not None:
+                try:
+                    os.unlink(temp_name, dir_fd=target_dir)
+                except FileNotFoundError:
+                    pass
+            os.close(source_dir)
+            os.close(target_dir)
 
     def backup(self, destination: str | Path) -> None:
-        """Create a verified, fsynced backup without overwriting another artifact."""
+        """Back up confirmed state; reject alias and symlink destination paths."""
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
@@ -453,15 +476,12 @@ class _JournalStore:
             if target.resolve() == self.path.resolve() or target.exists():
                 raise StoreError("backup destination must be new")
             self._copy_verified_file(
-                self.path,
-                target,
-                self._state,
-                self.last_commit,
+                self.path, target, self._state, self.last_commit,
                 destination_must_be_new=True,
             )
 
     def restore(self, source: str | Path) -> None:
-        """Restore a verified backup into a brand-new or empty store only."""
+        """Restore a verified backup into an empty store."""
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
