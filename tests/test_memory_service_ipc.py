@@ -79,3 +79,28 @@ def test_ipc_unauthorized_peer_never_reads_request(tmp_path, monkeypatch):
     finally:
         server.close()
         client.close()
+
+
+def test_stalled_ipc_worker_releases_capacity(tmp_path, monkeypatch):
+    import threading
+    import memory_engine.service as service
+    from memory_engine import MemoryStore
+
+    server, client = socket.socketpair()
+    slots = threading.BoundedSemaphore(1)
+    assert slots.acquire(blocking=False)
+    try:
+        monkeypatch.setattr(service, "peer_uid", lambda _conn: 12345)
+
+        def timeout(_conn):
+            raise TimeoutError("fault-injected stalled peer")
+
+        monkeypatch.setattr(service, "receive", timeout)
+        with MemoryStore(tmp_path / "db.memory") as store:
+            service._serve_one(server, store, 12345, slots)
+            assert slots.acquire(blocking=False)
+            slots.release()
+            assert store.last_commit.sequence == 0
+    finally:
+        server.close()
+        client.close()
