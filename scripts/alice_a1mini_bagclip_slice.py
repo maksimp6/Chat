@@ -80,7 +80,9 @@ def validate_source(path: Path) -> str:
             raise RuntimeError("unexpected source rotation or scaling")
         for x, y, z in geometry[object_id][0]:
             pos = (x + matrix[9], y + matrix[10], z + matrix[11])
-            if not (1 <= pos[0] <= 179 and 1 <= pos[1] <= 179 and -0.01 <= pos[2] <= 180):
+            if not (
+                1 <= pos[0] <= 179 and 1 <= pos[1] <= 179 and -0.01 <= pos[2] <= 180
+            ):
                 raise RuntimeError("source object outside A1 mini build volume")
     return digest
 
@@ -107,17 +109,28 @@ def main() -> int:
     env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(executable),
-        "--arrange", "0",
-        "--slice", "0",
-        "--export-3mf", OUTPUT,
-        "--load-settings", f"{machine};{process}",
-        "--load-filaments", str(filament),
-        "--outputdir", str(out),
+        "--arrange",
+        "0",
+        "--slice",
+        "0",
+        "--export-3mf",
+        OUTPUT,
+        "--load-settings",
+        f"{machine};{process}",
+        "--load-filaments",
+        str(filament),
+        "--outputdir",
+        str(out),
         str(source),
     ]
     result = subprocess.run(
-        command, capture_output=True, text=True, cwd=out, env=env,
-        timeout=240, check=False,
+        command,
+        capture_output=True,
+        text=True,
+        cwd=out,
+        env=env,
+        timeout=240,
+        check=False,
     )
     print("SLICER_EXIT", result.returncode, flush=True)
     print("SLICER_LOG_TAIL", (result.stdout + result.stderr)[-1800:], flush=True)
@@ -127,10 +140,16 @@ def main() -> int:
     settings, gcode = _read_sliced_archive(dest)
     _validate_profile(settings)
     _validate_gcode(gcode)
-    if settings.get("wall_loops") != "4" or settings.get("sparse_infill_density") != "25%":
+    if (
+        settings.get("wall_loops") != "4"
+        or settings.get("sparse_infill_density") != "25%"
+    ):
         raise RuntimeError("four-wall/25-percent process not preserved")
-    if not any(line.startswith(("G1 ", "G1\t")) and " E" in line
-               for line in gcode.splitlines() if not line.lstrip().startswith(";")):
+    if not any(
+        line.startswith(("G1 ", "G1\t")) and " E" in line
+        for line in gcode.splitlines()
+        if not line.lstrip().startswith(";")
+    ):
         raise RuntimeError("no extrusion command in sliced G-code")
     result_file = out / "result.json"
     outcome = json.loads(result_file.read_text(encoding="utf-8"))
@@ -172,7 +191,15 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (OSError, ValueError, RuntimeError, KeyError, TypeError,
-            subprocess.SubprocessError, zipfile.BadZipFile, ET.ParseError) as exc:
+    except (
+        OSError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+        subprocess.SubprocessError,
+        zipfile.BadZipFile,
+        ET.ParseError,
+    ) as exc:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)
