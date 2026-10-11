@@ -159,8 +159,10 @@ def main() -> int:
     if len(plates) != 1 or plates[0].get("warning_message"):
         raise RuntimeError("not exactly one plate or slicer warned")
     objects = plates[0].get("objects") or []
-    if sorted(int(o.get("triangle_count", -1)) for o in objects) != EXPECTED_TRIANGLES:
-        raise RuntimeError("parts not preserved in sliced result")
+    observed = sorted(int(o.get("triangle_count", -1)) for o in objects)
+    print("BAG_CLIP_RESULT_OBJECTS", json.dumps(objects)[:5000], flush=True)
+    if observed != EXPECTED_TRIANGLES:
+        raise RuntimeError(f"sliced-result triangle counts mismatch: {observed!r}")
     metadata = {
         "source_sha256": source_sha,
         "source_commit": "f6b75493921b8e9b68e207216abca22e8df6340d",
