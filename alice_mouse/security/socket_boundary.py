@@ -57,7 +57,16 @@ class SignedInputSocket:
         parent_fd=os.open(self.path.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC)
         parent_identity=os.fstat(parent_fd)
         try:
-            _check_directory(self.path.parent,shared_gid=self.shared_gid)
+            # Validate the pinned directory, not a separately resolved pathname.
+            info = os.fstat(parent_fd)
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+                raise SocketBoundaryError("socket directory must be owned by service")
+            if self.shared_gid is None:
+                if stat.S_IMODE(info.st_mode) != 0o700:
+                    raise SocketBoundaryError("private socket directory must be 0700")
+            elif (info.st_gid != self.shared_gid or
+                  stat.S_IMODE(info.st_mode) != 0o710):
+                raise SocketBoundaryError("shared socket directory must be owned and 0710")
         except Exception:
             os.close(parent_fd)
             raise
