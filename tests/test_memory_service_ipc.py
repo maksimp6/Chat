@@ -33,7 +33,7 @@ def test_ipc_rejects_incomplete_frame():
 def test_ipc_rejects_non_object():
     server, client = socket.socketpair()
     try:
-        client.sendall(b'[]\n')
+        client.sendall(b"[]\n")
         with pytest.raises(ValueError, match="invalid request"):
             receive(server)
     finally:
