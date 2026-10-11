@@ -33,11 +33,11 @@ The file store must use persistent mounted storage, **not** an ephemeral contain
 
 ## Transaction and recovery contract
 
-- `get` reads a documented view of working/committed state; `set` and `delete` stage mutations. `commit` is the explicit durability boundary.
+- **Proposed API semantics (must be matched to implementation before acceptance):** `set` and `delete` stage changes in the writer's private transaction; `get` in that writer reads its own staged values, while other readers see only the last committed generation. `commit` publishes the complete new generation only after its durability barrier succeeds. Aborted or crashed uncommitted changes are never visible to other readers or replayed. Snapshot readers pin one committed generation to avoid mixed-version reads.
 - A successful commit must have a durable journal record (including integrity framing/checksum) and required fsync of file and directory metadata where applicable before acknowledging success.
 - Recovery replays only complete, verified committed transactions. Torn tails, corruption, duplicate/replayed operations, invalid versions and oversized records must have bounded, deterministic handling.
-- A failed or ambiguous write fences the writer from publishing more commits until verified recovery/reopen. Never silently treat an unverified write as successful.
-- Snapshot publication is atomic and versioned; compaction preserves the previous recoverable generation until the replacement is verified.
+- If write/fsync returns an error or acknowledgement is lost, the outcome is **indeterminate**, not automatically rolled back: the transaction may already be durable. Fence that writer and reject subsequent writes/acks; reopen and verify the transaction ID against durable replay before returning committed/not-committed. Retry must use the same idempotency key and must not duplicate effects. Never silently treat an unverified write as successful.
+- **Proposed snapshot publish protocol:** write a new generation to a temporary file; flush and fsync it; verify checksum/schema; atomically rename to an immutable generation filename; fsync the containing directory; write/fsync a temporary manifest referencing that generation and its journal boundary; atomically replace the active manifest; fsync its directory. Keep the previous manifest/generation and required journal segments until the new manifest is durable and independently recoverable. Crash at any step must recover either the previous complete generation or the new complete generation, never a mixture. Filesystem rename/fsync guarantees must be validated on the deployment volume.
 - Enforce single-writer ownership, process restart semantics, size/record limits and namespace isolation. Multi-process writers require an explicit coordination design, not assumed safety.
 
 ## Backup and restore
@@ -54,6 +54,12 @@ The file store must use persistent mounted storage, **not** an ephemeral contain
 3. Shadow read/compare and reconcile row counts, keys, versions, access control and deletes. Missing values are not zero.
 4. Cut over each aggregate only after verified equivalence, migration marker and recovery test; keep rollback available.
 5. Remove SQL runtime dependencies only after all consumers and CI are verified. No premature global SQL-free claim.
+
+## CI interpretation
+
+- A job or workflow reported as `SKIPPED` was not executed; it is **not** a test failure. For docs-only changes, path-filtered application/integration jobs may legitimately skip.
+- `SUCCESS` on the aggregate required CI job means only that the configured gate passed. It does not prove that skipped Memory DB fault-injection tests ran.
+- Before implementation acceptance, verify branch protection's actual required checks, exact head SHA and evidence from relevant executed tests. Do not infer merge readiness from a documentation PR.
 
 ## Verification gates
 
