@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 """Verified, deterministic A1 mini PLA calibration cube slicing using Bambu Studio CLI.
 
 Does not access printers, network, secret stores or print-start controls.
 All physical printer actions are separate from this artifact-generation stage.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -11,12 +11,12 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import re
 import struct
 import subprocess
 import sys
 import zipfile
+from pathlib import Path
 
 NOZZLE_C = 220
 BED_C = 60
@@ -31,18 +31,28 @@ SLICED_FILENAME = "Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf"
 def cube_stl() -> bytes:
     half = SIZE_MM / 2
     verts = [
-        (-half, -half, 0.0), (half, -half, 0.0),
-        (half, half, 0.0), (-half, half, 0.0),
-        (-half, -half, SIZE_MM), (half, -half, SIZE_MM),
-        (half, half, SIZE_MM), (-half, half, SIZE_MM),
+        (-half, -half, 0.0),
+        (half, -half, 0.0),
+        (half, half, 0.0),
+        (-half, half, 0.0),
+        (-half, -half, SIZE_MM),
+        (half, -half, SIZE_MM),
+        (half, half, SIZE_MM),
+        (-half, half, SIZE_MM),
     ]
     triangles = [
-        (0, 2, 1), (0, 3, 2),
-        (4, 5, 6), (4, 6, 7),
-        (0, 1, 5), (0, 5, 4),
-        (1, 2, 6), (1, 6, 5),
-        (2, 3, 7), (2, 7, 6),
-        (3, 0, 4), (3, 4, 7),
+        (0, 2, 1),
+        (0, 3, 2),
+        (4, 5, 6),
+        (4, 6, 7),
+        (0, 1, 5),
+        (0, 5, 4),
+        (1, 2, 6),
+        (1, 6, 5),
+        (2, 3, 7),
+        (2, 7, 6),
+        (3, 0, 4),
+        (3, 4, 7),
     ]
     payload = bytearray(b"Alice Pro A1 mini Generic PLA 20 mm cube".ljust(80, b" "))
     payload.extend(struct.pack("<I", len(triangles)))
@@ -80,16 +90,18 @@ def profiles(profile_root: Path, output_dir: Path) -> tuple[Path, Path, Path]:
     filament = json.loads(filament_base.read_text(encoding="utf-8"))
     filament.update(json.loads(filament_override.read_text(encoding="utf-8")))
     filament.pop("inherits", None)
-    filament.update({
-        "name": "Alice Verified Generic PLA A1mini 0.4",
-        "filament_type": ["PLA"],
-        "filament_density": ["1.24"],
-        "nozzle_temperature": [str(NOZZLE_C)],
-        "nozzle_temperature_initial_layer": [str(NOZZLE_C)],
-        "textured_plate_temp": [str(BED_C)],
-        "textured_plate_temp_initial_layer": [str(BED_C)],
-        "filament_max_volumetric_speed": ["8"],
-    })
+    filament.update(
+        {
+            "name": "Alice Verified Generic PLA A1mini 0.4",
+            "filament_type": ["PLA"],
+            "filament_density": ["1.24"],
+            "nozzle_temperature": [str(NOZZLE_C)],
+            "nozzle_temperature_initial_layer": [str(NOZZLE_C)],
+            "textured_plate_temp": [str(BED_C)],
+            "textured_plate_temp_initial_layer": [str(BED_C)],
+            "filament_max_volumetric_speed": ["8"],
+        }
+    )
     filament_path = output_dir / "generic_pla_resolved.json"
     filament_path.write_text(json.dumps(filament, indent=2) + "\n", encoding="utf-8")
 
@@ -101,7 +113,7 @@ def profiles(profile_root: Path, output_dir: Path) -> tuple[Path, Path, Path]:
     return machine, process_path, filament_path
 
 
-def audit(path: Path, result_path: Path) -> dict[str, object]:
+def _read_sliced_archive(path: Path) -> tuple[dict[str, object], str]:
     if not path.is_file():
         raise RuntimeError("Bambu Studio did not produce the sliced 3MF")
     with zipfile.ZipFile(path) as archive:
@@ -113,8 +125,13 @@ def audit(path: Path, result_path: Path) -> dict[str, object]:
                 raise RuntimeError(f"3MF is missing {required}")
         settings = json.loads(archive.read("Metadata/project_settings.config"))
         gcode = archive.read("Metadata/plate_1.gcode").decode("utf-8", errors="replace")
+    if not isinstance(settings, dict):
+        raise TypeError("invalid project settings JSON")
+    return settings, gcode
 
-    expected = {
+
+def _validate_profile(settings: dict[str, object]) -> None:
+    expected: dict[str, object] = {
         "filament_type": ["PLA"],
         "filament_density": ["1.24"],
         "printer_model": PRINTER,
@@ -128,14 +145,25 @@ def audit(path: Path, result_path: Path) -> dict[str, object]:
     for key, wanted in expected.items():
         actual = settings.get(key)
         if actual != wanted:
-            raise RuntimeError(f"unsafe profile: {key}: expected {wanted!r}, got {actual!r}")
+            raise RuntimeError(
+                f"unsafe profile: {key}: expected {wanted!r}, got {actual!r}"
+            )
 
-    # Parse executable lines only, not comments containing other temperatures.
-    commands = [line.strip() for line in gcode.splitlines()
-                if line.strip() and not line.lstrip().startswith(";")]
-    for cmd, target in (("M109", NOZZLE_C), ("M190", BED_C)):
-        if not any(re.match(rf"^{cmd}\s+S{target}(?:\s|;|$)", line) for line in commands):
-            raise RuntimeError(f"G-code missing verified {cmd} S{target} temperature")
+
+def _validate_gcode(gcode: str) -> None:
+    # Do not mistake commented material settings for executable G-code commands.
+    commands = [
+        line.strip()
+        for line in gcode.splitlines()
+        if line.strip() and not line.lstrip().startswith(";")
+    ]
+    for command, target in (("M109", NOZZLE_C), ("M190", BED_C)):
+        if not any(
+            re.match(rf"^{command}\s+S{target}(?:\s|;|$)", line) for line in commands
+        ):
+            raise RuntimeError(
+                f"G-code missing verified {command} S{target} temperature"
+            )
     if not gcode.startswith("; HEADER_BLOCK_START"):
         raise RuntimeError("not a Bambu Studio G-code header")
     if "; total layer number:" not in gcode:
@@ -143,23 +171,41 @@ def audit(path: Path, result_path: Path) -> dict[str, object]:
     if len(gcode) < 5000:
         raise RuntimeError("G-code is unexpectedly small")
 
+
+def _validate_result(result_path: Path) -> dict[str, object]:
     result = json.loads(result_path.read_text(encoding="utf-8"))
     if result.get("return_code") != 0:
         raise RuntimeError(f"slicer failed: {result.get('error_string')}")
     plates = result.get("sliced_plates") or []
     if len(plates) != 1:
         raise RuntimeError("expected exactly one sliced plate")
-    if plates[0].get("warning_message"):
-        raise RuntimeError(f"slicer warning: {plates[0]['warning_message']}")
-    objects = plates[0].get("objects") or []
+    plate = plates[0]
+    if plate.get("warning_message"):
+        raise RuntimeError(f"slicer warning: {plate['warning_message']}")
+    objects = plate.get("objects") or []
     if len(objects) != 1 or (objects[0].get("triangle_count") != 12):
         raise RuntimeError("cube geometry was not preserved in slicing")
-    box = objects[0].get("bbox", {})
-    dims = (box.get("width", 0), box.get("depth", 0), box.get("height", 0))
-    if dims[2] < 19.8 or dims[2] > 20.2:
-        raise RuntimeError(f"unexpected model height: {dims!r}")
-    if any(float(v) <= 0 or float(v) > 180 for v in dims):
-        raise RuntimeError(f"invalid A1 mini build dimensions: {dims!r}")
+    dimensions = objects[0].get("bbox", {})
+    size = (
+        dimensions.get("width", 0),
+        dimensions.get("depth", 0),
+        dimensions.get("height", 0),
+    )
+    if not 19.8 <= size[2] <= 20.2:
+        raise RuntimeError(f"unexpected model height: {size!r}")
+    if any(float(value) <= 0 or float(value) > 180 for value in size):
+        raise RuntimeError(f"invalid A1 mini build dimensions: {size!r}")
+    return {
+        "estimated_seconds": plate.get("total_predication"),
+        "model_object_id": objects[0].get("id"),
+    }
+
+
+def audit(path: Path, result_path: Path) -> dict[str, object]:
+    settings, gcode = _read_sliced_archive(path)
+    _validate_profile(settings)
+    _validate_gcode(gcode)
+    slice_info = _validate_result(result_path)
     blob = path.read_bytes()
     return {
         "filename": path.name,
@@ -171,9 +217,8 @@ def audit(path: Path, result_path: Path) -> dict[str, object]:
         "plate": BED_TYPE,
         "printer": PRINTER,
         "nozzle_mm": NOZZLE_MM,
-        "estimated_seconds": plates[0].get("total_predication"),
+        **slice_info,
         "layers": 100,
-        "model_object_id": objects[0].get("id"),
         "source": "Bambu Studio 02.08.02.61 CLI",
     }
 
@@ -198,13 +243,27 @@ def main() -> int:
     env = dict(os.environ)
     env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
-        str(executable), "--slice", "0", "--export-3mf", SLICED_FILENAME,
-        "--load-settings", f"{machine};{process}",
-        "--load-filaments", str(filament), "--outputdir", str(out), str(stl),
+        str(executable),
+        "--slice",
+        "0",
+        "--export-3mf",
+        SLICED_FILENAME,
+        "--load-settings",
+        f"{machine};{process}",
+        "--load-filaments",
+        str(filament),
+        "--outputdir",
+        str(out),
+        str(stl),
     ]
     result = subprocess.run(
-        command, capture_output=True, text=True, cwd=out, env=env,
-        timeout=150, check=False,
+        command,
+        capture_output=True,
+        text=True,
+        cwd=out,
+        env=env,
+        timeout=150,
+        check=False,
     )
     print("SLICER_EXIT", result.returncode, flush=True)
     print("SLICER_LOG_TAIL", (result.stdout + result.stderr)[-1200:], flush=True)
@@ -222,6 +281,14 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:
+    except (
+        OSError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+        subprocess.SubprocessError,
+        zipfile.BadZipFile,
+    ) as exc:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)
