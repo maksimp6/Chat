@@ -34,7 +34,6 @@ def test_integration_required_check_runs_even_when_dependencies_fail():
         "changes",
         "code-rules",
         "backend",
-        "postgres",
         "android",
         "infra",
         "mcp",
