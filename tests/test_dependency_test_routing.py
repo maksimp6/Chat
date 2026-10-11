@@ -6,6 +6,7 @@ from scripts.ci_platform_changes import classify
 
 
 ALL = {"web", "backend", "android", "infra", "database", "mcp"}
+WEB = {"web", "backend", "android", "database", "mcp"}
 
 
 @pytest.mark.parametrize(
@@ -17,8 +18,8 @@ ALL = {"web", "backend", "android", "infra", "database", "mcp"}
         ("requirements-deploy.txt", {"infra"}),
         ("android/requirements.txt", {"android"}),
         ("android/app/build.gradle.kts", {"android"}),
-        ("package.json", ALL),
-        ("package-lock.json", ALL),
+        ("package.json", WEB),
+        ("package-lock.json", WEB),
         ("deploy/chrome-worker/package.json", {"infra", "mcp"}),
         ("deploy/chrome-worker/package-lock.json", {"infra", "mcp"}),
         ("deploy/oauth-idp/package.json", {"infra", "mcp"}),
