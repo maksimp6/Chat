@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Verified, deterministic A1 mini PLA calibration cube slicing using Bambu Studio CLI.
+
+Does not access printers, network, secret stores or print-start controls.
+All physical printer actions are separate from this artifact-generation stage.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import struct
+import subprocess
+import sys
+import zipfile
+
+NOZZLE_C = 220
+BED_C = 60
+SIZE_MM = 20.0
+FILAMENT_TYPE = "PLA"
+PRINTER = "Bambu Lab A1 mini"
+NOZZLE_MM = "0.4"
+BED_TYPE = "Textured PEI Plate"
+SLICED_FILENAME = "Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf"
+
+
+def cube_stl() -> bytes:
+    half = SIZE_MM / 2
+    verts = [
+        (-half, -half, 0.0), (half, -half, 0.0),
+        (half, half, 0.0), (-half, half, 0.0),
+        (-half, -half, SIZE_MM), (half, -half, SIZE_MM),
+        (half, half, SIZE_MM), (-half, half, SIZE_MM),
+    ]
+    triangles = [
+        (0, 2, 1), (0, 3, 2),
+        (4, 5, 6), (4, 6, 7),
+        (0, 1, 5), (0, 5, 4),
+        (1, 2, 6), (1, 6, 5),
+        (2, 3, 7), (2, 7, 6),
+        (3, 0, 4), (3, 4, 7),
+    ]
+    payload = bytearray(b"Alice Pro A1 mini Generic PLA 20 mm cube".ljust(80, b" "))
+    payload.extend(struct.pack("<I", len(triangles)))
+    volume = 0.0
+    for face in triangles:
+        a, b, c = (verts[i] for i in face)
+        u = tuple(b[i] - a[i] for i in range(3))
+        v = tuple(c[i] - a[i] for i in range(3))
+        normal = (
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        )
+        mag = math.sqrt(sum(n * n for n in normal))
+        normal = tuple(n / mag for n in normal)
+        payload.extend(struct.pack("<12fH", *(normal + a + b + c), 0))
+        cross = (
+            b[1] * c[2] - b[2] * c[1],
+            b[2] * c[0] - b[0] * c[2],
+            b[0] * c[1] - b[1] * c[0],
+        )
+        volume += sum(a[i] * cross[i] for i in range(3)) / 6
+    if abs(volume - 8000) > 0.01:
+        raise ValueError("cube STL signed volume is invalid")
+    if len(payload) != 684:
+        raise ValueError("cube STL length is invalid")
+    return bytes(payload)
+
+
+def profiles(profile_root: Path, output_dir: Path) -> tuple[Path, Path, Path]:
+    machine = profile_root / "machine" / "Bambu Lab A1 mini 0.4 nozzle.json"
+    process_source = profile_root / "process" / "0.20mm Standard @BBL A1M.json"
+    filament_base = profile_root / "filament" / "Generic PLA @base.json"
+    filament_override = profile_root / "filament" / "Generic PLA @BBL A1M.json"
+    filament = json.loads(filament_base.read_text(encoding="utf-8"))
+    filament.update(json.loads(filament_override.read_text(encoding="utf-8")))
+    filament.pop("inherits", None)
+    filament.update({
+        "name": "Alice Verified Generic PLA A1mini 0.4",
+        "filament_type": ["PLA"],
+        "filament_density": ["1.24"],
+        "nozzle_temperature": [str(NOZZLE_C)],
+        "nozzle_temperature_initial_layer": [str(NOZZLE_C)],
+        "textured_plate_temp": [str(BED_C)],
+        "textured_plate_temp_initial_layer": [str(BED_C)],
+        "filament_max_volumetric_speed": ["8"],
+    })
+    filament_path = output_dir / "generic_pla_resolved.json"
+    filament_path.write_text(json.dumps(filament, indent=2) + "\n", encoding="utf-8")
+
+    process = json.loads(process_source.read_text(encoding="utf-8"))
+    process["name"] = "Alice A1mini PLA Standard 0.20mm Textured PEI"
+    process["curr_bed_type"] = BED_TYPE
+    process_path = output_dir / "a1mini_process.json"
+    process_path.write_text(json.dumps(process, indent=2) + "\n", encoding="utf-8")
+    return machine, process_path, filament_path
+
+
+def audit(path: Path, result_path: Path) -> dict[str, object]:
+    if not path.is_file():
+        raise RuntimeError("Bambu Studio did not produce the sliced 3MF")
+    with zipfile.ZipFile(path) as archive:
+        if archive.testzip() is not None:
+            raise RuntimeError("3MF ZIP failed CRC validation")
+        names = set(archive.namelist())
+        for required in ("Metadata/project_settings.config", "Metadata/plate_1.gcode"):
+            if required not in names:
+                raise RuntimeError(f"3MF is missing {required}")
+        settings = json.loads(archive.read("Metadata/project_settings.config"))
+        gcode = archive.read("Metadata/plate_1.gcode").decode("utf-8", errors="replace")
+
+    expected = {
+        "filament_type": ["PLA"],
+        "filament_density": ["1.24"],
+        "printer_model": PRINTER,
+        "printer_variant": NOZZLE_MM,
+        "curr_bed_type": BED_TYPE,
+        "nozzle_temperature": [str(NOZZLE_C)],
+        "nozzle_temperature_initial_layer": [str(NOZZLE_C)],
+        "textured_plate_temp": [str(BED_C)],
+        "textured_plate_temp_initial_layer": [str(BED_C)],
+    }
+    for key, wanted in expected.items():
+        actual = settings.get(key)
+        if actual != wanted:
+            raise RuntimeError(f"unsafe profile: {key}: expected {wanted!r}, got {actual!r}")
+
+    # Parse executable lines only, not comments containing other temperatures.
+    commands = [line.strip() for line in gcode.splitlines()
+                if line.strip() and not line.lstrip().startswith(";")]
+    for cmd, target in (("M109", NOZZLE_C), ("M190", BED_C)):
+        if not any(re.match(rf"^{cmd}\s+S{target}(?:\s|;|$)", line) for line in commands):
+            raise RuntimeError(f"G-code missing verified {cmd} S{target} temperature")
+    if not gcode.startswith("; HEADER_BLOCK_START"):
+        raise RuntimeError("not a Bambu Studio G-code header")
+    if "; total layer number:" not in gcode:
+        raise RuntimeError("G-code has no layer-count header")
+    if len(gcode) < 5000:
+        raise RuntimeError("G-code is unexpectedly small")
+
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    if result.get("return_code") != 0:
+        raise RuntimeError(f"slicer failed: {result.get('error_string')}")
+    plates = result.get("sliced_plates") or []
+    if len(plates) != 1:
+        raise RuntimeError("expected exactly one sliced plate")
+    if plates[0].get("warning_message"):
+        raise RuntimeError(f"slicer warning: {plates[0]['warning_message']}")
+    objects = plates[0].get("objects") or []
+    if len(objects) != 1 or (objects[0].get("triangle_count") != 12):
+        raise RuntimeError("cube geometry was not preserved in slicing")
+    box = objects[0].get("bbox", {})
+    dims = (box.get("width", 0), box.get("depth", 0), box.get("height", 0))
+    if dims[2] < 19.8 or dims[2] > 20.2:
+        raise RuntimeError(f"unexpected model height: {dims!r}")
+    if any(float(v) <= 0 or float(v) > 180 for v in dims):
+        raise RuntimeError(f"invalid A1 mini build dimensions: {dims!r}")
+    blob = path.read_bytes()
+    return {
+        "filename": path.name,
+        "sha256": hashlib.sha256(blob).hexdigest(),
+        "size_bytes": len(blob),
+        "material": FILAMENT_TYPE,
+        "nozzle_c": NOZZLE_C,
+        "bed_c": BED_C,
+        "plate": BED_TYPE,
+        "printer": PRINTER,
+        "nozzle_mm": NOZZLE_MM,
+        "estimated_seconds": plates[0].get("total_predication"),
+        "layers": 100,
+        "model_object_id": objects[0].get("id"),
+        "source": "Bambu Studio 02.08.02.61 CLI",
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--slicer-root", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    args = parser.parse_args()
+    root = args.slicer_root.resolve()
+    executable = root / "bin" / "bambu-studio"
+    if not executable.is_file():
+        raise FileNotFoundError(executable)
+    out = args.output_dir.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    stl = out / "Alice_Cube_20mm_PLA.stl"
+    stl.write_bytes(cube_stl())
+    print("STL_VERIFIED", hashlib.sha256(stl.read_bytes()).hexdigest(), flush=True)
+
+    profile_root = root / "resources" / "profiles" / "BBL"
+    machine, process, filament = profiles(profile_root, out)
+    env = dict(os.environ)
+    env.update(LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
+    command = [
+        str(executable), "--slice", "0", "--export-3mf", SLICED_FILENAME,
+        "--load-settings", f"{machine};{process}",
+        "--load-filaments", str(filament), "--outputdir", str(out), str(stl),
+    ]
+    result = subprocess.run(
+        command, capture_output=True, text=True, cwd=out, env=env,
+        timeout=150, check=False,
+    )
+    print("SLICER_EXIT", result.returncode, flush=True)
+    print("SLICER_LOG_TAIL", (result.stdout + result.stderr)[-1200:], flush=True)
+    if result.returncode != 0:
+        raise RuntimeError("Bambu Studio CLI exited nonzero")
+    destination = out / SLICED_FILENAME
+    report = audit(destination, out / "result.json")
+    (out / "audit.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print("SLICED_VERIFIED", json.dumps(report, ensure_ascii=False), flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        sys.exit(1)
