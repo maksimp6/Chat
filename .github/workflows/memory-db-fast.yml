@@ -1,0 +1,26 @@
+name: Memory DB fast contracts (2s)
+on:
+  pull_request:
+    paths:
+      - "memory_engine/**"
+      - "tests/test_memory_fast_core_contracts.py"
+      - "scripts/run_memory_fast_core.py"
+      - ".github/workflows/memory-db-fast.yml"
+  push:
+    branches:
+      - "feature/memory-fast-unified-1104-1054"
+permissions:
+  contents: read
+jobs:
+  fast-core:
+    name: Memory DB core fast contracts (2s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - run: python scripts/run_memory_fast_core.py
