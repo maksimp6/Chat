@@ -54,12 +54,8 @@ class PreviewTests(unittest.TestCase):
 
     def test_embeddings_are_real_and_gcode_md5_unchanged(self) -> None:
         first = embed_preview(self.path, self.stl)
-        self.assertEqual(
-            GCODE, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode")
-        )
-        self.assertEqual(
-            MD5, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode.md5")
-        )
+        self.assertEqual(GCODE, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode"))
+        self.assertEqual(MD5, zipfile.ZipFile(self.path).read("Metadata/plate_1.gcode.md5"))
         self.assertEqual(first, audit_preview(self.path))
         images = first["images"]
         self.assertEqual(
@@ -77,9 +73,7 @@ class PreviewTests(unittest.TestCase):
         with zipfile.ZipFile(self.path) as z:
             self.assertIsNone(z.testzip())
             self.assertEqual(len(z.namelist()), len(set(z.namelist())))
-            self.assertEqual(
-                z.read("Metadata/plate_1.png")[:8], bytes.fromhex("89504e470d0a1a0a")
-            )
+            self.assertEqual(z.read("Metadata/plate_1.png")[:8], bytes.fromhex("89504e470d0a1a0a"))
         second = embed_preview(self.path, self.stl)
         self.assertEqual(first, second)
 

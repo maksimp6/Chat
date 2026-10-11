@@ -73,17 +73,13 @@ def _base_canvas(width: int) -> bytearray:
     return pixels
 
 
-def _set_pixel(
-    pixels: bytearray, width: int, x: int, y: int, color: tuple[int, int, int]
-) -> None:
+def _set_pixel(pixels: bytearray, width: int, x: int, y: int, color: tuple[int, int, int]) -> None:
     if 0 <= x < width and 0 <= y < width:
         offset = (y * width + x) * 3
         pixels[offset : offset + 3] = bytes(color)
 
 
-def _project(
-    point: tuple[float, float, float], *, top: bool
-) -> tuple[float, float, float]:
+def _project(point: tuple[float, float, float], *, top: bool) -> tuple[float, float, float]:
     x, y, z = point
     if top:
         return x, -y, z
@@ -116,9 +112,7 @@ def _paint_triangle(
     light = abs((n[0] * -0.34 + n[1] * -0.42 + n[2] * 0.84) / norm)
     color = tuple(int(value * (0.4 + 0.6 * light)) for value in (137, 192, 225))
     for yy in range(max(0, int(min(ay, by, cy))), min(width, int(max(ay, by, cy)) + 2)):
-        for xx in range(
-            max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)
-        ):
+        for xx in range(max(0, int(min(ax, bx, cx))), min(width, int(max(ax, bx, cx)) + 2)):
             px, py = xx + 0.5, yy + 0.5
             w0 = ((bx - px) * (cy - py) - (by - py) * (cx - px)) / area
             w1 = ((cx - px) * (ay - py) - (cy - py) * (ax - px)) / area
@@ -137,8 +131,7 @@ def _png_chunk(kind: bytes, payload: bytes) -> bytes:
 
 def _encode_png(pixels: bytearray, width: int) -> bytes:
     scan = b"".join(
-        b"\x00" + bytes(pixels[y * width * 3 : (y + 1) * width * 3])
-        for y in range(width)
+        b"\x00" + bytes(pixels[y * width * 3 : (y + 1) * width * 3]) for y in range(width)
     )
     return (
         _PNG_MAGIC
@@ -256,12 +249,7 @@ def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
         pos += 12 + count
         if kind == b"IEND":
             break
-    if (
-        pos != len(data)
-        or not chunks
-        or chunks[0][0] != b"IHDR"
-        or chunks[-1][0] != b"IEND"
-    ):
+    if pos != len(data) or not chunks or chunks[0][0] != b"IHDR" or chunks[-1][0] != b"IEND":
         raise RuntimeError("incomplete PNG")
     return chunks
 
@@ -322,10 +310,7 @@ def embed_preview(path: Path, source_stl: Path) -> dict[str, object]:
     infos, existing = _read_archive(path)
     gcode_before = hashlib.sha256(existing["Metadata/plate_1.gcode"]).hexdigest()
     md5_before = existing.get("Metadata/plate_1.gcode.md5")
-    renders = {
-        name: _render(faces, width, top=(name == _TOP))
-        for name, width in _PREVIEWS.items()
-    }
+    renders = {name: _render(faces, width, top=(name == _TOP)) for name, width in _PREVIEWS.items()}
     updated = dict(existing)
     updated.update(renders)
     updated["Metadata/model_settings.config"] = _metadata_with_previews(
@@ -345,10 +330,7 @@ def embed_preview(path: Path, source_stl: Path) -> dict[str, object]:
         if report["gcode_sha256"] != gcode_before:
             raise RuntimeError("render embedding modified G-code")
         with zipfile.ZipFile(replacement) as check:
-            if (
-                md5_before is not None
-                and check.read("Metadata/plate_1.gcode.md5") != md5_before
-            ):
+            if md5_before is not None and check.read("Metadata/plate_1.gcode.md5") != md5_before:
                 raise RuntimeError("render embedding modified G-code MD5")
         os.replace(replacement, path)
         return report
