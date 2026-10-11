@@ -745,7 +745,7 @@ def test_trusted_policy_cannot_be_disabled_after_store_open(tmp_path, monkeypatc
         store.backup(root / "backup.memory")
         assert store.get("still-safe") == 2
     (root / "journal.memory").chmod(0o644)
-    with pytest.raises(StoreError, match="unsafe journal or lock path"):
+    with pytest.raises(StoreError, match="untrusted Memory DB file ownership or permissions"):
         MemoryStore(path, trusted=True)
 
 
