@@ -20,19 +20,14 @@ class SocketBoundaryError(RuntimeError):
     pass
 
 
-def _check_directory(directory: Path, *, shared_gid: int | None = None) -> None:
-    info = directory.lstat()
+def _validate_pinned_directory(info: os.stat_result, shared_gid: int | None) -> None:
+    """Validate metadata of the opened inode, never a separately resolved path."""
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
         raise SocketBoundaryError("socket directory must be owned by service")
     if shared_gid is None:
         if stat.S_IMODE(info.st_mode) != 0o700:
             raise SocketBoundaryError("private socket directory must be 0700")
-    elif (
-        type(shared_gid) is not int
-        or shared_gid < 0
-        or info.st_gid != shared_gid
-        or stat.S_IMODE(info.st_mode) != 0o710
-    ):
+    elif info.st_gid != shared_gid or stat.S_IMODE(info.st_mode) != 0o710:
         raise SocketBoundaryError("shared socket directory must be owned and 0710")
 
 
@@ -61,68 +56,46 @@ class SignedInputSocket:
         self._inode = None
         self._parent_fd = None
 
-    def start(self) -> None:
-        # Capture directory identity before policy validation and recheck after.
-        if self._sock is not None:
-            raise SocketBoundaryError("server already started")
-        if self.path.name in ("", ".", ".."):
-            raise SocketBoundaryError("invalid socket basename")
+    def _open_checked_parent(self) -> tuple[int, os.stat_result]:
+        """Acquire and verify a single directory inode, closing it on ANY failure."""
         parent_fd = os.open(
             self.path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
         )
-        parent_identity = os.fstat(parent_fd)
         try:
-            # Validate the pinned directory, not a separately resolved pathname.
-            info = os.fstat(parent_fd)
-            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
-                raise SocketBoundaryError("socket directory must be owned by service")
-            if self.shared_gid is None:
-                if stat.S_IMODE(info.st_mode) != 0o700:
-                    raise SocketBoundaryError("private socket directory must be 0700")
-            elif info.st_gid != self.shared_gid or stat.S_IMODE(info.st_mode) != 0o710:
-                raise SocketBoundaryError("shared socket directory must be owned and 0710")
-        except Exception:
+            identity = os.fstat(parent_fd)
+            _validate_pinned_directory(identity, self.shared_gid)
+            current = self.path.parent.lstat()
+            if (current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino):
+                raise SocketBoundaryError("socket parent replaced during validation")
+            try:
+                os.stat(self.path.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise SocketBoundaryError("refusing to replace existing socket")
+            return parent_fd, identity
+        except BaseException:
             os.close(parent_fd)
             raise
-        checked_parent = self.path.parent.lstat()
-        if (checked_parent.st_dev, checked_parent.st_ino) != (
-            parent_identity.st_dev,
-            parent_identity.st_ino,
-        ):
-            os.close(parent_fd)
-            raise SocketBoundaryError("socket parent replaced during validation")
-        # Check the socket name relative to the pinned directory, not an
-        # attacker-replaceable pathname. A racing bind will still fail EADDRINUSE.
+
+    def _bind_checked_socket(
+        self, parent_fd: int, parent_identity: os.stat_result
+    ) -> socket.socket:
+        """Bind through /proc/self/fd; cleanup targets only our pinned directory."""
+        server = None
         try:
-            os.stat(self.path.name, dir_fd=parent_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            pass
-        else:
-            os.close(parent_fd)
-            raise SocketBoundaryError("refusing to replace existing socket")
-        self._parent_fd = parent_fd
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
-        try:
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
             server.settimeout(0.1)
-            # Linux /proc/self/fd holds the already-validated directory inode.
-            # A rename/swap of the public path cannot redirect bind to a new
-            # directory. Do not fall back to the vulnerable public path.
             bound_path = f"/proc/self/fd/{parent_fd}/{self.path.name}"
             if len(os.fsencode(bound_path)) >= 108:
                 raise SocketBoundaryError("Unix socket address too long")
             server.bind(bound_path)
-            # Record ownership before pathname revalidation; if the public
-            # parent was swapped during bind, cleanup must still unlink the
-            # socket created in the pinned (possibly renamed) directory.
+            # Ownership must be captured BEFORE public-path validation; otherwise
+            # an adversarial rename could leave a socket in the old inode.
             self._inode = os.stat(self.path.name, dir_fd=parent_fd, follow_symlinks=False).st_ino
-            current_parent = self.path.parent.lstat()
-            if (current_parent.st_dev, current_parent.st_ino) != (
-                parent_identity.st_dev,
-                parent_identity.st_ino,
-            ):
+            current = self.path.parent.lstat()
+            if (current.st_dev, current.st_ino) != (parent_identity.st_dev, parent_identity.st_ino):
                 raise SocketBoundaryError("socket parent replaced during bind")
-            # AF_UNIX socket FD is NOT the filesystem inode on Linux.
-            # Use dirfd-relative operations under the pinned, service-owned parent.
             if self.shared_gid is not None:
                 os.chown(
                     self.path.name, -1, self.shared_gid, dir_fd=parent_fd, follow_symlinks=False
@@ -134,17 +107,28 @@ class SignedInputSocket:
                 follow_symlinks=False,
             )
             server.listen(4)
-        except Exception:
-            server.close()
+            return server
+        except BaseException:
+            if server is not None:
+                server.close()
             self._unlink_owned()
             self._close_parent()
             raise
+
+    def start(self) -> None:
+        if self._sock is not None:
+            raise SocketBoundaryError("server already started")
+        if self.path.name in ("", ".", ".."):
+            raise SocketBoundaryError("invalid socket basename")
+        parent_fd, identity = self._open_checked_parent()
+        self._parent_fd = parent_fd
+        server = self._bind_checked_socket(parent_fd, identity)
         self._stop.clear()
         self._sock = server
         self._thread = threading.Thread(target=self._run, daemon=True)
         try:
             self._thread.start()
-        except Exception:
+        except BaseException:
             self._stop.set()
             server.close()
             self._unlink_owned()

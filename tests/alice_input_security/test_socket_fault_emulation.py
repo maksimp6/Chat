@@ -74,3 +74,33 @@ def test_parent_swap_during_bind_fails_closed(short_tmp, monkeypatch):
     assert not (parent / "input.sock").exists()
     # Even an adversarial path replacement cannot leave a socket in either tree.
     assert not (tmp_path / "moved" / "input.sock").exists()
+
+
+def test_disappearing_parent_does_not_leak_open_fd(tmp_path, monkeypatch):
+    """Emulate directory removal between open(dirfd) and pathname verification."""
+    import alice_mouse.security.socket_boundary as module
+
+    os.chmod(tmp_path, 0o700)
+    endpoint = SignedInputSocket(tmp_path / "input.sock", FakeVerifier(), peer_uid=os.getuid())
+    moved = tmp_path.with_name(tmp_path.name + "-moved")
+    original_open = os.open
+    opened = []
+
+    def disappear(path, flags, *args, **kwargs):
+        fd = original_open(path, flags, *args, **kwargs)
+        if os.fspath(path) == os.fspath(tmp_path):
+            opened.append(fd)
+            tmp_path.rename(moved)
+        return fd
+
+    monkeypatch.setattr(module.os, "open", disappear)
+    try:
+        with pytest.raises(FileNotFoundError):
+            endpoint.start()
+        assert opened
+        with pytest.raises(OSError):
+            os.fstat(opened[0])
+        assert endpoint._sock is None
+    finally:
+        if moved.exists():
+            moved.rename(tmp_path)

@@ -11,11 +11,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, cast
 
 MAX_PACKET = 2048
 TTL_NS = 300_000_000
@@ -169,34 +170,10 @@ class TrustedSigner:
             return packet
 
 
-def _validate_action_payload(action: str, payload: dict) -> None:
-    """Root-side, fail-closed v1 action schema; no shell or client-selected role."""
-    import re
-
-    if type(payload) is not dict:
-        raise GrantError("invalid payload")
-    if action in ("move", "click"):
-        if set(payload) != {"x", "y"} or any(
-            type(payload[k]) is not int or not -500 <= payload[k] <= 500 for k in ("x", "y")
-        ):
-            raise GrantError("invalid coordinates")
-    elif action in ("right", "down", "up"):
-        if (
-            set(payload) != {"button"}
-            or type(payload["button"]) is not int
-            or payload["button"] not in (1, 2)
-        ):
-            raise GrantError("invalid button")
-    elif action == "scroll":
-        if (
-            set(payload) != {"delta"}
-            or type(payload["delta"]) is not int
-            or not -20 <= payload["delta"] <= 20
-        ):
-            raise GrantError("invalid scroll")
-    elif action in ("key_down", "key_up"):
-        # Restricted safe subset of evdev keycodes, excluding power/system keys.
-        allowed = {
+# Immutable allowlist shared by key_down/key_up. KEY_POWER is excluded.
+_ALLOWED_KEY_CODES = (
+    frozenset(
+        {
             1,
             14,
             15,
@@ -223,33 +200,86 @@ def _validate_action_payload(action: str, payload: dict) -> None:
             125,
             126,
         }
-        allowed.update(range(2, 14))
-        allowed.update(range(16, 28))
-        allowed.update(range(30, 54))
-        allowed.update(range(59, 87))
-        if (
-            set(payload) != {"key"}
-            or type(payload["key"]) is not int
-            or payload["key"] not in allowed
-        ):
-            raise GrantError("invalid key")
-    elif action == "open":
-        if (
-            set(payload) != {"package"}
-            or type(payload["package"]) is not str
-            or not re.fullmatch(
-                r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+", payload["package"]
-            )
-        ):
-            raise GrantError("invalid package")
+    )
+    | frozenset(range(2, 14))
+    | frozenset(range(16, 28))
+    | frozenset(range(30, 54))
+    | frozenset(range(59, 87))
+)
+
+
+def _validate_coordinates(payload: dict[str, Any]) -> None:
+    if set(payload) != {"x", "y"} or any(
+        type(payload[k]) is not int or not -500 <= payload[k] <= 500 for k in ("x", "y")
+    ):
+        raise GrantError("invalid coordinates")
+
+
+def _validate_button(payload: dict[str, Any]) -> None:
+    if (
+        set(payload) != {"button"}
+        or type(payload["button"]) is not int
+        or payload["button"] not in (1, 2)
+    ):
+        raise GrantError("invalid button")
+
+
+def _validate_scroll(payload: dict[str, Any]) -> None:
+    if (
+        set(payload) != {"delta"}
+        or type(payload["delta"]) is not int
+        or not -20 <= payload["delta"] <= 20
+    ):
+        raise GrantError("invalid scroll")
+
+
+def _validate_key(payload: dict[str, Any]) -> None:
+    if (
+        set(payload) != {"key"}
+        or type(payload["key"]) is not int
+        or payload["key"] not in _ALLOWED_KEY_CODES
+    ):
+        raise GrantError("invalid key")
+
+
+def _validate_text(payload: dict[str, Any]) -> None:
+    if (
+        set(payload) != {"text"}
+        or type(payload["text"]) is not str
+        or not 0 < len(payload["text"]) <= 256
+        or any(ord(c) < 32 and c not in "\n\t" for c in payload["text"])
+    ):
+        raise GrantError("invalid text")
+
+
+def _validate_package(payload: dict[str, Any]) -> None:
+    if (
+        set(payload) != {"package"}
+        or type(payload["package"]) is not str
+        or not re.fullmatch(
+            r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+",
+            payload["package"],
+        )
+    ):
+        raise GrantError("invalid package")
+
+
+def _validate_action_payload(action: str, payload: dict[str, Any]) -> None:
+    """Root-side, fail-closed v1 schema; no shell or client-selected role."""
+    if type(payload) is not dict:
+        raise GrantError("invalid payload")
+    if action in ("move", "click"):
+        _validate_coordinates(payload)
+    elif action in ("right", "down", "up"):
+        _validate_button(payload)
+    elif action == "scroll":
+        _validate_scroll(payload)
+    elif action in ("key_down", "key_up"):
+        _validate_key(payload)
     elif action == "text":
-        if (
-            set(payload) != {"text"}
-            or type(payload["text"]) is not str
-            or not 0 < len(payload["text"]) <= 256
-            or any(ord(c) < 32 and c not in "\n\t" for c in payload["text"])
-        ):
-            raise GrantError("invalid text")
+        _validate_text(payload)
+    elif action == "open":
+        _validate_package(payload)
     elif action in ("home", "back", "recents"):
         if payload:
             raise GrantError("unexpected payload")
@@ -300,7 +330,8 @@ class ProtectedVerifier:
             self.lease_until = authority.lease_until
             self.seq = 0
 
-    def accept(self, packet: bytes) -> bool:
+    def _decoded_grant(self, packet: bytes) -> dict[str, Any]:
+        """Verify signature, schema and TTL before any physical dispatch."""
         if self.shutdown_requested.is_set():
             raise GrantError("verifier shut down")
         if type(packet) is not bytes or not 0 < len(packet) <= MAX_PACKET:
@@ -350,6 +381,10 @@ class ProtectedVerifier:
                 raise ValueError()
         except (ValueError, TypeError, KeyError, OverflowError, UnicodeError) as exc:
             raise GrantError("invalid signed grant") from exc
+        return cast(dict[str, Any], data)
+
+    def accept(self, packet: bytes) -> bool:
+        data = self._decoded_grant(packet)
         with self.lock:
             if (
                 self.shutdown_requested.is_set()
@@ -364,8 +399,8 @@ class ProtectedVerifier:
             try:
                 accepted = self.dispatch(data["action"], data["payload"])
             except Exception as exc:
-                # Physical dispatch may have partially executed. Revoke this
-                # session so no further input is permitted after a fault.
+                # Physical dispatch may have partially executed; revoke the
+                # entire session rather than accepting any further commands.
                 self.revoke()
                 raise GrantError("input backend failed; session revoked") from exc
             if self.shutdown_requested.is_set():
