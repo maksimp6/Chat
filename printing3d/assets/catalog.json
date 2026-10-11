@@ -14,7 +14,8 @@
       "sha256": "556b9992725142d45c953b0c1bb5f293a69aea066f07e0e3bdaa94e0b6f84d8f",
       "format": "SCAD",
       "print_status": "not_sliced",
-      "origin": "Google Drive: 3D Models"
+      "origin": "Google Drive: 3D Models",
+      "preview_path": "printing3d/assets/gallery/phone_stand.png"
     },
     {
       "id": "sauce-stand-source",
@@ -26,7 +27,8 @@
       "sha256": "c951711e947b143fb197917dfe734da10c431cad6f77070ec6a80fa59f767f27",
       "format": "SCAD",
       "print_status": "not_sliced",
-      "origin": "Google Drive: 3D модели"
+      "origin": "Google Drive: 3D модели",
+      "preview_path": "printing3d/assets/gallery/sauce_stand.png"
     },
     {
       "id": "tube-holder-source",
@@ -38,7 +40,8 @@
       "sha256": "263b2bffa4648e23acfaed335755392902c71ecd31590e550ae2b52ed537a36c",
       "format": "SCAD",
       "print_status": "not_sliced",
-      "origin": "Google Drive: 3D модели"
+      "origin": "Google Drive: 3D модели",
+      "preview_path": "printing3d/assets/gallery/test_tube_holder.png"
     },
     {
       "id": "tube-holder-model",
@@ -52,7 +55,8 @@
       "print_status": "unsliced",
       "origin": "Google Drive: 3D модели",
       "associated_source": "tube-holder-source",
-      "geometry_equivalence": "not_verified"
+      "geometry_equivalence": "not_verified",
+      "preview_path": "printing3d/assets/gallery/test_tube_holder.png"
     },
     {
       "id": "a1mini-oem-holder-pr",
@@ -65,7 +69,8 @@
       "sha256": "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84",
       "format": "3MF",
       "print_status": "unsliced",
-      "fit_status": "unverified_measurements"
+      "fit_status": "unverified_measurements",
+      "preview_path": "printing3d/assets/gallery/oem_spindle_v03.png"
     },
     {
       "id": "a1mini-oem-holder-library",
@@ -94,7 +99,8 @@
         "half_shell_B.step",
         "retainer.step",
         "README_RU.md"
-      ]
+      ],
+      "preview_path": "printing3d/assets/gallery/oem_spindle_v03.png"
     },
     {
       "id": "a1mini-oem-source-copy",
@@ -121,7 +127,8 @@
         "base_frame.stl",
         "upright_A_print_twice.stl",
         "axle_D_section.stl"
-      ]
+      ],
+      "preview_path": "printing3d/assets/gallery/desk_spool_v01.png"
     },
     {
       "id": "petg-holder-v02-archive",
@@ -136,7 +143,8 @@
         "spool_centering_adapters_v02.py",
         "manifest_v02.json",
         "README_RU.md"
-      ]
+      ],
+      "preview_path": "printing3d/assets/gallery/desk_spool_v02.png"
     },
     {
       "id": "ember-bust-wip",
@@ -250,5 +258,11 @@
       "stage": "in_progress",
       "scope": "consolidated audit / safe asset import"
     }
-  ]
+  ],
+  "model_sets_manifest": "printing3d/assets/models_manifest.json",
+  "gallery": {
+    "preview_path": "printing3d/assets/gallery/overview.png",
+    "source": "Visualizations rendered from actual STL/SCAD/3MF geometry, not AI-generated concepts",
+    "print_ready": false
+  }
 }
