@@ -37,6 +37,11 @@ Move from STL/OBJ/3MF (and approved game assets) to **one** verified, printer-ta
 5. Require **one resulting `.gcode.3mf`** rather than an archive of .stl/.png files or decorative renders. Keep source/preview separately only when expressly requested.
 6. Inspect via `printing3d.plate.inspect` or read-only `python -m printing3d.plate`. Verify ZIP entry bounds, single plate, embedded G-code, checksums, A1 mini identity, nozzle/filament and heat commands; report SHA-256.
 7. Stop on `needs_slicing`, `blocked`, `not_found`, `needs_configuration`, missing evidence or mismatch. The status `ready_for_review` is _not_ a print-start authorization.
+   The tool returns `print_ready=false` and explicit `unverified_checks`: complete
+   3MF package structure, machine-path XYZ bounds and heater state at extrusion
+   are outside its basic archive/profile/checksum checks. Require independent
+   evidence for those checks before proposing a print; model-entry existence,
+   positive E parameters and recorded heat targets do not certify them.
 8. For an actual upload/print, require the user's separate explicit approval and the printer's current verified idle/material state.
 9. When printer MQTT reports `FINISH`/100%, report `print_finished_unverified`, **not** a mechanically accepted product. Ask for the owner's first-use functional test; if a latch/pivot/clip breaks during first closing, record `functional_failed` even when the plate was visually fine.
 10. For a print-in-place snap/cam hinge, determine whether it was _released after printing_, _assembled_, or _closed normally_. Do not force a fused pivot, ignore snapped parts, or claim an intact hinge from a top photo; inspect the fracture and mating surfaces when safely available.
@@ -55,7 +60,10 @@ Read-only artifact inspection is allowed for an authorized owner. Asset download
 ## Validation
 
 - Status `ready_for_review` with matching single-file SHA-256, printer/material profile, bounded project/G-code entries and integrity checksum.
-- Real sliced path and extrusion commands are present; the file is not merely a ZIP/image renamed .3mf.
+- A sliced G-code entry and positive E parameters are present; these facts alone
+  do not validate model XML/package relationships, a safe machine path or actual
+  extrusion. Never promote `print_ready=false` to print readiness without the
+  independent evidence listed in `unverified_checks`.
 - Geometry, real spool and live camera adhesion are independent validations and must not be fabricated from archive metadata.
 - Mechanical acceptance requires a separate physical function test after printer `FINISH`; if a snap-fit breaks, mark `functional_failed`, preserve provenance and postpone another attempt pending review.
 - Adversarial archive, path traversal, owner-isolation and counterfeit metadata tests must pass before making this tool available in production.

@@ -33,13 +33,14 @@ def build_3mf(
     digest=None,
     include_md5=True,
     include_model=True,
+    model_content="<model/>",
     extras=(),
 ):
     path = tmp_path / name
     configuration = SETTINGS if settings is None else settings
     with ZipFile(path, "w", compression=ZIP_DEFLATED) as output:
         if include_model:
-            output.writestr("3D/3dmodel.model", "<model/>")
+            output.writestr("3D/3dmodel.model", model_content)
         output.writestr("Metadata/project_settings.config", json.dumps(configuration))
         if sliced:
             output.writestr(plate.GCODE_NAME, gcode)
@@ -402,3 +403,57 @@ def test_invalid_slicer_wall_count_blocks_preflight(tmp_path, bad_value):
         settings={**SETTINGS, "wall_loops": bad_value},
     )
     assert "slicer wall count" in plate.inspect_path(artifact)["reason"]
+
+
+@pytest.mark.parametrize("material", [["PLA"], {"name": "PLA"}, None, 1, True])
+def test_non_string_filament_member_blocks_without_exception(tmp_path, material):
+    artifact = build_3mf(tmp_path, settings={**SETTINGS, "filament_type": [material]})
+    original = artifact.read_bytes()
+    result = plate.inspect_path(artifact)
+    assert result["status"] == "blocked"
+    assert "filament type" in result["reason"]
+    assert artifact.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "wall_count",
+    ["7" * 7000, "0" * 7000 + "2", "100"],
+    ids=["oversized", "leading_zeroes", "out_of_range"],
+)
+def test_wall_digits_are_bounded_before_integer_conversion(tmp_path, wall_count):
+    artifact = build_3mf(tmp_path, settings={**SETTINGS, "wall_loops": wall_count})
+    original = artifact.read_bytes()
+    result = plate.inspect_path(artifact)
+    assert result["status"] == "blocked"
+    assert result["reason"] == "invalid slicer wall count"
+    assert wall_count not in json.dumps(result)
+    assert artifact.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "gcode",
+    [
+        b"M190 S60\nM109 S220\nG1 X999 Y999 Z999 E1\n",
+        b"M190 S60\nM109 S220\nM104 S0\nM140 S0\nG1 X5 E1\n",
+        b"M190 S60\nM109 S220\nG91\nG1 X180 E1\nG1 X180 E1\n",
+    ],
+)
+def test_basic_gcode_facts_never_certify_machine_path_or_current_heat(tmp_path, gcode):
+    result = plate.inspect_path(build_3mf(tmp_path, gcode=gcode))
+    assert result["status"] == "ready_for_review"
+    assert result["print_ready"] is False
+    assert "machine_path_bounds" in result["unverified_checks"]
+    assert "heater_state_at_extrusion" in result["unverified_checks"]
+    assert "machine path" in result["warning"]
+    assert "heater state" in result["warning"]
+
+
+def test_counterfeit_model_is_not_claimed_as_valid_3mf_package(tmp_path):
+    artifact = build_3mf(tmp_path, model_content="not XML or a valid 3MF package")
+    original = artifact.read_bytes()
+    result = plate.inspect_path(artifact)
+    assert result["status"] == "ready_for_review"
+    assert result["print_ready"] is False
+    assert "3mf_package_structure" in result["unverified_checks"]
+    assert "3MF package" in result["warning"]
+    assert artifact.read_bytes() == original

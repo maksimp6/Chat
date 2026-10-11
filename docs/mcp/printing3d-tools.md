@@ -141,10 +141,19 @@ python -m printing3d.plate "/path/to/one.gcode.3mf"
 ```
 
 A source STL/OBJ or unsliced `.3mf` returns `needs_slicing` and is **not**
-ready to print. A verified sliced file returns `ready_for_review`, which still
-does **not** authorize upload or print-start. Geometry, material physically
-loaded, nozzle installed, bed adhesion and camera view need independent
-confirmation. Deliver **one** `.gcode.3mf` file for a printer job, not
+ready to print. A candidate passing these basic archive/profile/checksum checks
+returns `ready_for_review` with **`print_ready=false`**. Its `unverified_checks`
+explicitly includes complete 3MF package structure, machine XYZ bounds and heater
+state at extrusion, plus geometry/fit/live printer readiness. The inspector only
+requires that the model entry exists; it does not validate its XML or package
+relationships. Heat-and-wait targets and positive E parameters are observed
+commands, not proof of safe travel, actual extrusion or an active heater when
+extrusion occurs. An out-of-bounds move, a heater-off sequence or a counterfeit
+model entry can pass the basic checks and must never be presented as a verified
+print-ready artifact. Independent package and machine-path validation is still
+required before upload or print-start approval. Geometry, material physically
+loaded, nozzle installed, bed adhesion and camera view also need independent
+confirmation. Deliver **one** verified `.gcode.3mf` file for a printer job, not
 a ZIP of STL/PNG previews.
 
 A1 mini observation is read-only: when an authorized RDC device is connected,

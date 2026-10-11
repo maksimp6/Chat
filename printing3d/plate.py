@@ -79,7 +79,7 @@ def _validated_wall_loops(value: object) -> int | None:
         return None
     if type(value) is int:
         count = value
-    elif type(value) is str and value.isdecimal():
+    elif type(value) is str and len(value) <= 2 and value.isdecimal():
         count = int(value)
     else:
         raise PlateError("invalid slicer wall count")
@@ -101,7 +101,12 @@ def _configuration(archive: ZipFile, names: dict[str, object]) -> tuple[str, flo
     if not isinstance(settings, dict) or settings.get("printer_model") != "Bambu Lab A1 mini":
         raise PlateError("printer profile is not Bambu Lab A1 mini")
     materials = settings.get("filament_type")
-    if not isinstance(materials, list) or len(materials) != 1 or materials[0] not in PROFILES:
+    if (
+        not isinstance(materials, list)
+        or len(materials) != 1
+        or type(materials[0]) is not str
+        or materials[0] not in PROFILES
+    ):
         raise PlateError("unsupported or ambiguous filament type")
     nozzle = settings.get("nozzle_diameter")
     if not isinstance(nozzle, list) or len(nozzle) != 1:
@@ -248,6 +253,15 @@ def inspect_archive(stream: BinaryIO, filename: str) -> dict[str, object]:
         return {"status": "blocked", "filename": filename, "reason": str(exc)}
     return {
         "status": "ready_for_review",
+        "print_ready": False,
+        "unverified_checks": [
+            "3mf_package_structure",
+            "machine_path_bounds",
+            "heater_state_at_extrusion",
+            "mesh_geometry",
+            "physical_fit",
+            "live_printer_readiness",
+        ],
         "filename": filename,
         "sha256": sha.hexdigest(),
         "printer": "Bambu Lab A1 mini",
@@ -256,7 +270,8 @@ def inspect_archive(stream: BinaryIO, filename: str) -> dict[str, object]:
         "wall_loops": wall_loops,
         **result,
         "warning": (
-            "Archive checks do not prove mesh geometry, mechanical fit, material on spool, "
+            "Archive checks do not prove complete 3MF package validity, machine path bounds, "
+            "heater state at extrusion, mesh geometry, mechanical fit, material on spool, "
             "camera quality or live printer readiness. Print start needs explicit approval."
         ),
     }
