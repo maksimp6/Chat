@@ -91,7 +91,7 @@ jobs:
       - name: Load immutable Memory DB policy (pinned commit)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ed1f44e8914a67fa10d7cbea84da805018bee970
+          ref: b1a38efe038d17e2382ee8e72aae6a5c8e5a1dd2
           path: .trusted-memory-policy
           sparse-checkout: |
             scripts/check_memory_contract_integrity.py
