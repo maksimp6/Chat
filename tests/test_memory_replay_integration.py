@@ -449,3 +449,57 @@ def test_publish_uses_verified_inode_not_replaced_temp_name(tmp_path, monkeypatc
         assert attacked
         assert not result.exists()
         assert victim.read_bytes() == b"UNVERIFIED_VICTIM_CONTENT"
+
+
+def test_restore_source_inode_swap_after_open_keeps_verified_content(tmp_path, monkeypatch):
+    import shutil
+
+    source = tmp_path / "source.memory"
+    backup = tmp_path / "backup.memory"
+    restored = tmp_path / "restored.memory"
+    victim = tmp_path / "victim.memory"
+    with MemoryStore(source) as store:
+        store.set("safe", 1)
+        store.commit()
+        store.backup(backup)
+    victim.write_bytes(b"UNVERIFIED_VICTIM_CONTENT")
+    original_copy = shutil.copyfileobj
+
+    def swap_after_open(src, output, *args, **kwargs):
+        backup.unlink()
+        backup.symlink_to(victim)
+        return original_copy(src, output, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "copyfileobj", swap_after_open)
+    with MemoryStore(restored) as destination:
+        destination.restore(backup)
+        assert destination.get("safe") == 1
+    assert b"UNVERIFIED_VICTIM_CONTENT" not in restored.read_bytes()
+
+
+def test_restore_parent_rename_does_not_publish_into_recreated_dir(tmp_path, monkeypatch):
+    import shutil
+
+    source = tmp_path / "source.memory"
+    backup = tmp_path / "backup.memory"
+    parent = tmp_path / "target"
+    moved = tmp_path / "target-moved"
+    parent.mkdir()
+    target = parent / "restored.memory"
+    with MemoryStore(source) as store:
+        store.set("safe", 1)
+        store.commit()
+        store.backup(backup)
+    original_copy = shutil.copyfileobj
+
+    def rename_after_open(src, output, *args, **kwargs):
+        parent.rename(moved)
+        parent.mkdir()
+        return original_copy(src, output, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "copyfileobj", rename_after_open)
+    with MemoryStore(target) as destination:
+        destination.restore(backup)
+        assert destination.get("safe") == 1
+    assert not target.exists()
+    assert (moved / "restored.memory").exists()
