@@ -258,8 +258,6 @@ def test_nonregular_lock_file_is_rejected_without_fd_leak(tmp_path):
         os.mkfifo(fifo)
         assert stat.S_ISFIFO(fifo.stat().st_mode)
         with pytest.raises(StoreError, match="journal must be a regular file"):
-            _open_journal_nofollow(
-                directory_fd, fifo.name, os.O_RDONLY | os.O_NONBLOCK
-            )
+            _open_journal_nofollow(directory_fd, fifo.name, os.O_RDONLY | os.O_NONBLOCK)
     finally:
         os.close(directory_fd)
