@@ -334,3 +334,52 @@ def test_post_fsync_regular_inode_swap_fences_writer(tmp_path, monkeypatch):
             store.commit()
         assert path.read_bytes() == b"unchanged"
         assert store.last_commit.sequence == 1
+
+
+def test_backup_regular_inode_swap_does_not_copy_victim(tmp_path, monkeypatch):
+    import shutil
+
+    path = tmp_path / "source.memory"
+    victim = tmp_path / "victim.memory"
+    backup = tmp_path / "backup.memory"
+    with MemoryStore(path) as store:
+        store.set("safe", 1)
+        store.commit()
+        victim.write_bytes(b"private-victim")
+        original_copy = shutil.copyfileobj
+
+        def swap_source_after_open(source, output, *args, **kwargs):
+            path.unlink()
+            path.symlink_to(victim)
+            return original_copy(source, output, *args, **kwargs)
+
+        monkeypatch.setattr(shutil, "copyfileobj", swap_source_after_open)
+        store.backup(backup)
+        assert victim.read_bytes() == b"private-victim"
+        assert b"private-victim" not in backup.read_bytes()
+
+
+def test_backup_parent_rename_publishes_only_to_pinned_directory(tmp_path, monkeypatch):
+    import shutil
+
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    moved = tmp_path / "moved"
+    source = parent / "source.memory"
+    backup = parent / "backup.memory"
+    with MemoryStore(source) as store:
+        store.set("safe", 1)
+        store.commit()
+        original_copy = shutil.copyfileobj
+
+        def rename_during_copy(source_stream, output, *args, **kwargs):
+            parent.rename(moved)
+            parent.mkdir()
+            return original_copy(source_stream, output, *args, **kwargs)
+
+        monkeypatch.setattr(shutil, "copyfileobj", rename_during_copy)
+        try:
+            store.backup(backup)
+        except StoreError:
+            pass
+        assert not (parent / "backup.memory").exists()
