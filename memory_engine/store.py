@@ -124,6 +124,34 @@ def _open_directory_nofollow(directory: Path) -> int:
         raise
 
 
+def _verify_trusted_root(directory_fd: int) -> None:
+    """Fail closed unless the pinned root belongs exclusively to this process."""
+    import stat
+
+    metadata = os.fstat(directory_fd)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or metadata.st_gid != os.getegid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise StoreError("untrusted Memory DB directory ownership or permissions")
+
+
+def _verify_private_file(fd: int) -> None:
+    """Reject existing journals and lock files with unsafe DAC permissions."""
+    import stat
+
+    metadata = os.fstat(fd)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or metadata.st_gid != os.getegid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+    ):
+        raise StoreError("untrusted Memory DB file ownership or permissions")
+
+
 def _open_journal_nofollow(directory_fd: int, name: str, flags: int) -> int:
     """Open a regular journal relative to the pinned directory."""
     fd = os.open(name, flags | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=directory_fd)
@@ -132,6 +160,8 @@ def _open_journal_nofollow(directory_fd: int, name: str, flags: int) -> int:
 
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise StoreError("journal must be a regular file")
+        if os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1":
+            _verify_private_file(fd)
         return fd
     except BaseException:
         os.close(fd)
@@ -147,6 +177,8 @@ class _JournalStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             self._directory_fd = _open_directory_nofollow(self.path.parent)
+            if os.environ.get("ALICE_MEMORY_TRUSTED_ROOT") == "1":
+                _verify_trusted_root(self._directory_fd)
             self._journal_name = self.path.name
             lock_fd = _open_journal_nofollow(
                 self._directory_fd, self._journal_name + ".lock", os.O_RDWR | os.O_CREAT
