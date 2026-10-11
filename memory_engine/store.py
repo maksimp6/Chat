@@ -109,6 +109,38 @@ class Commit:
     digest: str
 
 
+
+def _open_directory_nofollow(directory: Path) -> int:
+    """Pin every directory component; never traverse a symlink."""
+    absolute = Path(os.path.abspath(directory))
+    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in absolute.parts[1:]:
+            next_fd = os.open(
+                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd
+            )
+            os.close(fd)
+            fd = next_fd
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _open_journal_nofollow(directory_fd: int, name: str, flags: int) -> int:
+    """Open a regular journal relative to the pinned directory."""
+    fd = os.open(name, flags | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=directory_fd)
+    try:
+        import stat
+
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise StoreError("journal must be a regular file")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 class _JournalStore:
     """In-process committed RAM state backed by an fsynced append-only log."""
 
@@ -116,14 +148,25 @@ class _JournalStore:
         self._pid = os.getpid()
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self._directory_fd = _open_directory_nofollow(self.path.parent)
+            self._journal_name = self.path.name
+            lock_fd = _open_journal_nofollow(
+                self._directory_fd, self._journal_name + ".lock", os.O_RDWR | os.O_CREAT
+            )
+        except (OSError, StoreError) as exc:
+            if hasattr(self, "_directory_fd"):
+                os.close(self._directory_fd)
+            raise StoreError("unsafe journal or lock path") from exc
         self._lock = RLock()
         # Keep the lock in a separate stable file: replacing journal files must not
         # silently release ownership of the single-writer role.
-        self._lock_file = self.path.with_name(self.path.name + ".lock").open("a+b")
+        self._lock_file = os.fdopen(lock_fd, "a+b")
         try:
             fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             self._lock_file.close()
+            os.close(self._directory_fd)
             raise StoreError("database already has a writer") from exc
         self._state: dict[str, dict[str, Any]] = {}
         self._sequence: int = 0
@@ -163,7 +206,12 @@ class _JournalStore:
         digest = "0" * 64
         if not path.exists():
             return state, sequence, digest
-        with path.open("rb") as journal:
+        directory_fd = _open_directory_nofollow(path.parent)
+        try:
+            journal_fd = _open_journal_nofollow(directory_fd, path.name, os.O_RDONLY)
+        finally:
+            os.close(directory_fd)
+        with os.fdopen(journal_fd, "rb") as journal:
             while True:
                 frame = journal.readline(MAX_JOURNAL_FRAME_BYTES + 1)
                 if not frame:
@@ -263,22 +311,16 @@ class _JournalStore:
             raise StoreError("unsupported JSON value") from exc
 
     def _append_frame(self, frame: bytes) -> None:
-        first_write = not self.path.exists()
         try:
-            with self.path.open("ab", buffering=0) as stream:
+            fd = _open_journal_nofollow(
+                self._directory_fd, self._journal_name, os.O_WRONLY | os.O_APPEND | os.O_CREAT
+            )
+            with os.fdopen(fd, "ab", buffering=0) as stream:
                 if stream.write(frame) != len(frame):
                     raise OSError("short journal write")
-                # Do not acknowledge a commit before its journal bytes are synced.
                 os.fsync(stream.fileno())
-            if first_write:
-                directory = os.open(str(self.path.parent), os.O_RDONLY)
-                try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
-        except OSError as exc:
-            # A failed fsync may still have written bytes: the disk outcome is
-            # uncertain, so block future writes instead of claiming rollback.
+            os.fsync(self._directory_fd)
+        except (OSError, StoreError) as exc:
             self._failed = True
             raise StoreError("commit failed; recovery required") from exc
 
@@ -436,6 +478,7 @@ class _JournalStore:
                 if not self._lock_file.closed:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
                     self._lock_file.close()
+                os.close(self._directory_fd)
                 self._closed = True
 
     def __enter__(self) -> "_JournalStore":
