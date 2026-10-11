@@ -245,3 +245,21 @@ def test_replaced_journal_path_cannot_redirect_append(tmp_path):
         with pytest.raises(StoreError, match="recovery required"):
             store.commit()
         assert victim.read_bytes() == b"untouched"
+
+
+def test_nonregular_lock_file_is_rejected_without_fd_leak(tmp_path):
+    import stat
+
+    from memory_engine.store import _open_journal_nofollow
+
+    directory_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        fifo = tmp_path / "fake.lock"
+        os.mkfifo(fifo)
+        assert stat.S_ISFIFO(fifo.stat().st_mode)
+        with pytest.raises(StoreError, match="journal must be a regular file"):
+            _open_journal_nofollow(
+                directory_fd, fifo.name, os.O_RDONLY | os.O_NONBLOCK
+            )
+    finally:
+        os.close(directory_fd)
