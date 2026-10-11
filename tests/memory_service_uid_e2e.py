@@ -79,7 +79,7 @@ def main() -> None:
                     raise AssertionError(proc.stderr.read())
                 time.sleep(0.05)
             assert sock.exists(), "service did not start"
-            print("IPC_PERMISSIONS", oct(sock.stat().st_mode & 0o777), oct(socket_dir.stat().st_mode & 0o777), oct(root.stat().st_mode & 0o777), flush=True)
+            print(\n                "IPC_PERMISSIONS",\n                oct(sock.stat().st_mode & 0o777),\n                oct(socket_dir.stat().st_mode & 0o777),\n                oct(root.stat().st_mode & 0o777),\n                flush=True,\n            )
             # A root client is NOT the allowed UID.
             assert request(sock, {"op": "info"}) is None
             code = (
