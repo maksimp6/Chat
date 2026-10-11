@@ -28,6 +28,7 @@ jobs:
       MERGE_REQUIRED_CHECKS: >-
         Platform changes,
         CI required,
+        Fast isolated contracts (2s),
         Infrastructure tests,
         MCP worker tests,
         Code rules,
