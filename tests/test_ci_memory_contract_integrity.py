@@ -35,7 +35,7 @@ class IntegrityGuardContracts(unittest.TestCase):
     def test_fast_job_is_pinned_to_trusted_policy(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         fast_job = workflow.split("  fast-tests:\n", 1)[1].split("\n  backend:", 1)[0]
-        self.assertIn("ref: 7429b02732e9e641b19579b9252e2147f269afe5", fast_job)
+        self.assertIn("ref: 2081d17b7401958ca3972aa4bfd7c9eb022b4adf", fast_job)
         self.assertIn(
             "python .trusted-memory-policy/scripts/check_memory_contract_integrity.py", fast_job
         )
