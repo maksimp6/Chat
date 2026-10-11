@@ -158,3 +158,45 @@ All code, documentation, provenance hashes, and tests are in this Draft PR.
 Raw images, private features/model JSON, overlays and photos remain outside
 GitHub. No merge, physical printing, printer activation, cloud upload or
 deployment.
+
+
+## Measured private-device evidence, 11 October 2026
+
+Device: authorized Android Redmi 9 (AArch64, CPU-only, Pillow 12.3.0).
+All source/render files stayed on that device; the model is held in a
+user-private 0600 JSON artifact, not committed. The HTTP endpoint was
+127.0.0.1 with an ephemeral port, and each test shut it down cleanly.
+The GitHub source revision for the measured model was 76ca83fb6d61.
+
+| Corpus | True positive | False positive | False negative | Classification |
+| --- | ---: | ---: | ---: | --- |
+| Same render images used for training | 10 | 0 | 0 | REVIEW_PENDING / IN_SAMPLE_ONLY |
+| Six panels of different overview.png raster | 10 | 0 | 0 | REVIEW_PENDING / HELDOUT_RENDER_ONLY |
+| 36 synthetic perturbations from overview crops | 37 | 4 | 23 | FAILED / SYNTHETIC_PERTURBATIONS_ONLY |
+
+For the held-out raster, the median local HTTP inference request took
+319.57 ms, and p95 was 404.87 ms, over six requests. This excludes offline
+training and physical camera acquisition.
+
+**Synthetic robustness by transformation (each category has ten true objects):**
+
+| Mode | Detected | Extra detections | Misses |
+| --- | ---: | ---: | ---: |
+| Brightness increased | 10 | 0 | 0 |
+| Gaussian blur | 10 | 0 | 0 |
+| Dimmed | 6 | 3 | 4 |
+| Horizontal mirror | 5 | 0 | 5 |
+| Partial occlusion | 6 | 1 | 4 |
+| Grayscale | 0 | 0 | 10 |
+
+Total synthetic micro precision: 37/(37+4) = 90.24%; micro recall:
+37/(37+23) = 61.67%. The failed result remains visible. Current
+foreground selection is sensitive to color saturation and object orientation.
+CAD-only data does not establish accuracy under real lighting, occlusion,
+different camera lenses, or actual physical prints.
+
+**Acceptance gate remains BLOCKED for real photos.** There is no independently
+reviewed physical photograph test set, and there is no generalized multimodal
+Alice API included by this Draft PR. Its shape-template recognizer is real,
+but closed-set and intended only as a local CAD recognition baseline. Do not
+change its status to production-ready based on the in-sample 100% result.

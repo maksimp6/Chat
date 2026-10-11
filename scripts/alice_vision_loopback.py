@@ -34,6 +34,13 @@ MAX_PROMPT_CHARS = 2048
 _ALLOWED_KEYS = frozenset({"image_base64", "image_sha256", "mime_type", "prompt", "case_id"})
 
 
+class _RejectedRequest(Exception):
+    def __init__(self, status: int, code: str):
+        super().__init__(code)
+        self.status = status
+        self.code = code
+
+
 class LocalVisionHTTP(HTTPServer):
     allow_reuse_address = False
 
@@ -113,33 +120,40 @@ class LocalVisionHandler(BaseHTTPRequestHandler):
             raise ValueError("image SHA-256 mismatch")
         return blob
 
-    def do_POST(self) -> None:
+    def _read_local_payload(self) -> bytes:
         if not self._trusted_local_request():
-            return self._json(403, {"error": "forbidden_origin"})
+            raise _RejectedRequest(403, "forbidden_origin")
         if self.path != "/recognize":
-            return self._json(404, {"error": "not_found"})
+            raise _RejectedRequest(404, "not_found")
         if self.headers.get("Content-Type") != "application/json":
-            return self._json(415, {"error": "unsupported_media_type"})
+            raise _RejectedRequest(415, "unsupported_media_type")
         try:
             amount = int(self.headers.get("Content-Length", ""))
-        except ValueError:
-            return self._json(411, {"error": "content_length_required"})
+        except ValueError as exc:
+            raise _RejectedRequest(411, "content_length_required") from exc
         if amount < 2 or amount > MAX_WIRE:
-            return self._json(413, {"error": "invalid_body_size"})
+            raise _RejectedRequest(413, "invalid_body_size")
         self.connection.settimeout(10)
         try:
             raw = self.rfile.read(amount)
-        except TimeoutError:
-            return self._json(408, {"error": "request_timed_out"})
+        except TimeoutError as exc:
+            raise _RejectedRequest(408, "request_timed_out") from exc
         if len(raw) != amount:
-            return self._json(400, {"error": "truncated_body"})
+            raise _RejectedRequest(400, "truncated_body")
+        return raw
+
+    def do_POST(self) -> None:
         try:
+            raw = self._read_local_payload()
             image = self._decode(raw)
-            # Note: prompt and case_id are intentionally NEVER passed to predict().
+            # No case ID or instruction text reaches the model's pixel classifier.
             response = predict(image, self.server.vision_model)
+        except _RejectedRequest as exc:
+            self._json(exc.status, {"error": exc.code})
         except (ValueError, TypeError, KeyError, json.JSONDecodeError, OSError):
-            return self._json(400, {"error": "invalid_image_or_request"})
-        self._json(200, response)
+            self._json(400, {"error": "invalid_image_or_request"})
+        else:
+            self._json(200, response)
 
 
 def local_e2e(
