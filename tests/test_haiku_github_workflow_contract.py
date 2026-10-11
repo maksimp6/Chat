@@ -43,6 +43,8 @@ def test_only_owner_authored_issue_comments_can_start_haiku():
 
     action = _action_step(job)
     assert action["with"]["trigger_phrase"] == "@claude-lite"
+    assert action["with"]["base_branch"] == "develop"
+    assert action["with"]["branch_prefix"] == "haiku/"
     assert action["with"]["allowed_non_write_users"] == ""
     assert action["with"]["allowed_bots"] == ""
     assert action["with"]["include_comments_by_actor"] == "maksimp6"
