@@ -37,5 +37,19 @@
     "extrusion",
     "firmware_open",
     "physical_fit"
-  ]
+  ],
+  "target_printer": {
+    "device_id": "bambu-a1mini-lan-192-168-31-12",
+    "host": "192.168.31.12",
+    "model": "Bambu Lab A1 mini",
+    "identity_source": "paired LAN credentials + authenticated MQTT",
+    "serial_match_verified": false,
+    "firmware_version": null,
+    "firmware_compatibility_verified": false,
+    "ftps_certificate_pin_verified": false,
+    "printer_file_sha256": null,
+    "printer_file_readback_verified": false,
+    "touchscreen_open_verified": false,
+    "printer_start_authorized": false
+  }
 }

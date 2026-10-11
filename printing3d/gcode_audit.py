@@ -93,3 +93,30 @@ def audit_passport(passport, job_path=None):
     result = audit_job(job_path, passport)
     result['model_id'] = passport['id']
     return result
+
+
+def verify_target_printer(passport, observed, job_sha256=None):
+    """Fail closed until this exact device, firmware, readback and UI are proven.
+
+    Observations must come from independent printer-side evidence; caller-supplied
+    model names or a matching source G-code hash alone cannot approve printing.
+    """
+    target = passport['target_printer']
+    if observed.get('host') != target['host'] or observed.get('model') != target['model']:
+        raise ValueError('wrong physical printer')
+    if not observed.get('authenticated_mqtt') or not observed.get('ftps_certificate_pin_verified'):
+        raise ValueError('device authentication not verified')
+    if not observed.get('serial_match_verified'):
+        raise ValueError('device serial not independently matched')
+    if not observed.get('firmware_version') or not observed.get('firmware_compatibility_verified'):
+        raise ValueError('firmware compatibility unknown')
+    if job_sha256 is not None:
+        if not re.fullmatch('[0-9a-f]{64}', job_sha256):
+            raise ValueError('invalid job hash')
+        if observed.get('printer_file_sha256') != job_sha256 or not observed.get('printer_file_readback_verified'):
+            raise ValueError('printer job readback mismatch')
+        if not observed.get('touchscreen_open_verified'):
+            raise ValueError('printer firmware has not opened the job')
+    return {'status': 'PRINTER_COMPATIBILITY_VERIFIED', 'host': target['host'],
+            'firmware_version': observed['firmware_version'],
+            'job_verified': job_sha256 is not None, 'print_start_authorized': False}

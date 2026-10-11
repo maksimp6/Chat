@@ -58,3 +58,50 @@ def test_corrupt_sliced_archive_rejected(tmp_path):
     source.write_bytes(b'not a zip')
     with pytest.raises(Exception):
         AUDIT.audit_passport(p, source)
+
+
+def test_all_passports_bound_to_specific_device():
+    for passport in passports().values():
+        target = passport['target_printer']
+        assert target['host'] == '192.168.31.12'
+        assert target['model'] == 'Bambu Lab A1 mini'
+        assert target['printer_start_authorized'] is False
+        assert target['touchscreen_open_verified'] is False
+        assert target['firmware_compatibility_verified'] is False
+
+
+def test_specific_device_rejects_unknown_firmware():
+    passport = next(iter(passports().values()))
+    observed = dict(host='192.168.31.12', model='Bambu Lab A1 mini',
+                    authenticated_mqtt=True, ftps_certificate_pin_verified=True,
+                    serial_match_verified=True, firmware_version=None)
+    with pytest.raises(ValueError, match='firmware'):
+        AUDIT.verify_target_printer(passport, observed)
+
+
+def test_specific_device_rejects_wrong_host_and_serial():
+    passport = next(iter(passports().values()))
+    observed = dict(host='192.168.31.99', model='Bambu Lab A1 mini',
+                    authenticated_mqtt=True, ftps_certificate_pin_verified=True,
+                    serial_match_verified=False)
+    with pytest.raises(ValueError, match='wrong physical printer'):
+        AUDIT.verify_target_printer(passport, observed)
+    observed['host'] = '192.168.31.12'
+    with pytest.raises(ValueError, match='serial'):
+        AUDIT.verify_target_printer(passport, observed)
+
+
+def test_specific_device_rejects_unopened_or_wrong_job():
+    passport = next(iter(passports().values()))
+    observed = dict(host='192.168.31.12', model='Bambu Lab A1 mini',
+                    authenticated_mqtt=True, ftps_certificate_pin_verified=True,
+                    serial_match_verified=True, firmware_version='observed-test-version',
+                    firmware_compatibility_verified=True,
+                    printer_file_readback_verified=True, printer_file_sha256='a' * 64,
+                    touchscreen_open_verified=False)
+    with pytest.raises(ValueError, match='readback'):
+        AUDIT.verify_target_printer(passport, observed, 'b' * 64)
+    with pytest.raises(ValueError, match='opened'):
+        AUDIT.verify_target_printer(passport, observed, 'a' * 64)
+    observed['touchscreen_open_verified'] = True
+    assert AUDIT.verify_target_printer(passport, observed, 'a' * 64)['print_start_authorized'] is False
