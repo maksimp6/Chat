@@ -52,9 +52,24 @@ write or release their parent's writer lock. Supported platforms need POSIX
 
 Startup verifies frames in order, reading one line at a time. Unknown formats,
 malformed sequences, checksum failures and partial tails fail closed without
-modifying the source. Replay is idempotent. Replay time still grows with journal
-length; checkpointing and bounded recovery remain future work. SHA chaining
+modifying the source. Replay is idempotent. Replay time grows with the records
+appended since the last checkpoint. SHA chaining
 detects corruption, not an attacker able to rewrite the complete chain.
+
+`checkpoint()` requires no staged values or active transaction. Under the writer
+lock it verifies the source journal against confirmed RAM state, sequence and
+digest, then writes and verifies a snapshot, fsyncs it, atomically replaces the
+journal, and fsyncs the parent directory. The sequence stays unchanged; the digest
+becomes the new snapshot-chain baseline. Corrupt, missing or changed source data
+is preserved without replacement and blocks writes pending recovery. I/O errors
+or caller cancellation once publication starts also block further writes until
+verified reopen. An exception is not proof that replacement did not occur.
+
+The complete snapshot frame is capped at 1 MiB. An oversized snapshot is rejected
+without changing the valid journal or blocking ordinary commits. Checkpointing is
+explicit, with no background timer or automatic recovery-time guarantee; large
+states and a growing uncheckpointed journal still need future work. Compaction
+also verifies the complete current source, so its work grows with journal length.
 
 An append/fsync failure never acknowledges or publishes the staged transaction.
 The disk outcome can be uncertain, so subsequent mutations fail with recovery
@@ -106,7 +121,7 @@ concurrent runners, failed durable claim, and fresh-process interrupted-task
 recovery. The dedicated Memory DB workflow runs core verification independently.
 
 Full #776 acceptance is still incomplete: SQL-backed chat, sessions, context and
-other consumers remain, as do legacy import, checkpoints, health and Trace work.
+other consumers remain, as do legacy import, large-state checkpoints, health and Trace work.
 Passing core/task tests does not establish a SQL-free application or production
 readiness. The aggregate draft #1042 contains unrelated work and must not be
 merged wholesale.

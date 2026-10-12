@@ -414,6 +414,17 @@ class _JournalStore:
         finally:
             temporary.unlink(missing_ok=True)
 
+    def _verify_checkpoint_source(self) -> None:
+        """Never compact over corruption or an unobserved source mutation."""
+        try:
+            state, sequence, digest = self._inspect_log(self.path)
+        except StoreError as exc:
+            self._failed = True
+            raise StoreError("checkpoint source is corrupt; recovery required") from exc
+        if state != self._state or Commit(sequence, digest) != self.last_commit:
+            self._failed = True
+            raise StoreError("checkpoint source changed; recovery required")
+
     def checkpoint(self) -> int:
         """Atomically replace a long journal with one verified RAM-state frame."""
         import tempfile
@@ -455,6 +466,7 @@ class _JournalStore:
             replaced = False
             publication_started = False
             try:
+                self._verify_checkpoint_source()
                 fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
                 temporary = Path(temp_name)
                 with os.fdopen(fd, "wb") as stream:

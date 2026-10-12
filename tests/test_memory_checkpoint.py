@@ -190,7 +190,14 @@ def test_checkpoint_verification_failure_preserves_original(tmp_path, monkeypatc
         db.commit()
         original = path.read_bytes()
         with monkeypatch.context() as patch:
-            patch.setattr(db._engine, "_inspect_log", lambda path: ({}, 0, "0" * 64))
+            real_inspect = db._engine._inspect_log
+            patch.setattr(
+                db._engine,
+                "_inspect_log",
+                lambda candidate: (
+                    real_inspect(candidate) if candidate == path else ({}, 0, "0" * 64)
+                ),
+            )
             with pytest.raises(StoreError, match="verification failed"):
                 db.checkpoint()
         assert path.read_bytes() == original
@@ -315,3 +322,40 @@ def test_interrupted_checkpoint_never_allows_a_stale_digest_commit(
     with MemoryStore(path) as reopened:
         assert reopened.get("saved") == {"count": 1}
         assert reopened.get("next") == 2
+
+
+@pytest.mark.parametrize("damage", ["checksum", "truncated", "missing", "valid_other_state"])
+def test_checkpoint_preserves_changed_source_evidence_and_blocks_writer(tmp_path, damage):
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as db:
+        db.set("saved", "confirmed")
+        db.commit()
+        confirmed = db.last_commit
+        if damage == "missing":
+            path.unlink()
+            evidence = None
+        else:
+            raw = path.read_bytes()
+            if damage == "checksum":
+                evidence = raw.replace(b"confirmed", b"corrupted")
+            elif damage == "truncated":
+                evidence = raw[:-5]
+            else:
+                record = json.loads(raw)
+                record["payload"]["changes"][0]["value"] = "other"
+                encoded = json.dumps(
+                    record["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode()
+                record["digest"] = hashlib.sha256(bytes(32) + encoded).hexdigest()
+                evidence = json.dumps(record).encode() + b"\n"
+            path.write_bytes(evidence)
+        with pytest.raises(StoreError, match="source.*recovery required"):
+            db.checkpoint()
+        assert (path.read_bytes() if path.exists() else None) == evidence
+        assert not list(tmp_path.glob(".alice-checkpoint-*"))
+        assert db.last_commit == confirmed
+        assert db.get("saved") == "confirmed"
+        with pytest.raises(StoreError, match="recovery required"):
+            db.set("later", 2)
+        with pytest.raises(StoreError, match="recovery required"):
+            db.commit()
