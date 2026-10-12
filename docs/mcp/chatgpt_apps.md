@@ -108,6 +108,34 @@ The production service must be reachable over HTTPS. In ChatGPT developer mode, 
 
 For local development, expose the Flask service through a public HTTPS tunnel such as an approved development tunnel. Do not publish provider API keys or backend-only credentials.
 
+### Through OpenAI Secure MCP Tunnel
+
+The container entrypoint (`scripts/container_entrypoint.py`) can run
+[openai/tunnel-client](https://github.com/openai/tunnel-client) next to Alice.
+The client polls OpenAI over outbound HTTPS and forwards ChatGPT's MCP requests
+to `http://127.0.0.1:$PORT/mcp`, adding `Authorization: Bearer
+$ALICE_MCP_BEARER_TOKEN` itself, so the connector in ChatGPT needs no
+authentication of its own. The tunnel starts only when all of
+`OPENAI_TUNNEL_ID`, `OPENAI_TUNNEL_API_KEY`, `ALICE_MCP_BEARER_TOKEN` and
+`ALICE_MCP_USER_ID` are set; a partial set stops the container. Each process
+gets only its own secrets, and if either exits the container exits.
+
+Setup:
+
+1. Create a tunnel and a runtime API key at
+   `https://platform.openai.com/settings/organization/tunnels` (needs Tunnels
+   Read + Manage + Use) and associate the tunnel with your ChatGPT workspace.
+2. Store them as `OPENAI_TUNNEL_ID` and `OPENAI_TUNNEL_API_KEY` secrets of the
+   `production` GitHub environment.
+3. Run the **Cloud.ru OpenAI tunnel** workflow (`cloudru-openai-tunnel.yml`)
+   with action `deploy`. It deploys the `alice-openai-tunnel` service with one
+   always-on instance and generates the internal MCP bearer token per deploy.
+4. In ChatGPT: Plugins, **+**, **Add custom MCP server**, Connection
+   **Tunnel**, pick the tunnel.
+
+The pinned client is v0.0.14 (`tunnel-client-runtime`, linux-amd64), verified
+by SHA-256 in the `Dockerfile`.
+
 ## Validation
 
 The contract is covered by `tests/test_chatgpt_mcp.py`, including:

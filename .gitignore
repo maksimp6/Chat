@@ -29,3 +29,6 @@ app_logs.jsonl
 coverage.xml
 
 agent_shell.sqlite3
+
+# Native build output (scripts/build_c17_server.sh)
+build/
