@@ -18,13 +18,11 @@ Executable contract (proposed; implementation may negotiate versioning in #1178)
 Every accepted command ID must be stable across restart. No execution is requested.
 """
 
-import contextlib
 import http.client
 import json
 import os
 from pathlib import Path
 import signal
-import socket
 import subprocess
 import tempfile
 import time
@@ -197,11 +195,16 @@ class C17BlackBoxContract(unittest.TestCase):
     def test_duplicate_id_and_ack_replay_rejected(self):
         self.assertIn(self.server.create("once")[0], (201, 202))
         self.assertEqual(self.server.create("once")[0], 409)
-        self.assertEqual(
+        status, data, _ = self.server.request(
+            "GET", "/v1/commands/poll?timeout_ms=50", role="agent",
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("once", [command["id"] for command in data["commands"]])
+        self.assertIn(
             self.server.request(
                 "POST", "/v1/commands/once/ack", role="agent", body={"status": "done"},
-            )[0] in (200, 204),
-            True,
+            )[0],
+            (200, 204),
         )
         self.assertIn(
             self.server.request(
