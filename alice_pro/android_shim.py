@@ -33,7 +33,7 @@ class SimulatedAndroid:
     keyguard: Keyguard = Keyguard.LOCKED
     width: int = 360
     height: int = 800
-    events: list[dict] = field(default_factory=list)
+    events: list[dict[str, object]] = field(default_factory=list)
     faults: set[str] = field(default_factory=set)
 
     def observe(self) -> Evidence:
@@ -95,7 +95,7 @@ class AndroidShim:
         self.transport = transport if transport is not None else (
             SimulatedAndroid() if self.backend == Backend.SIMULATED else UnconfiguredTransport(self.backend)
         )
-        self.trace: list[dict] = []
+        self.trace: list[dict[str, object]] = []
         self._lock = threading.RLock()
 
     def _record(self, action: str, outcome: str) -> None:
@@ -131,8 +131,11 @@ class AndroidShim:
 
     def screenshot(self) -> bytes:
         data = self.transport.screenshot()
-        if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        if not data.startswith(bytes.fromhex("89504e470d0a1a0a")):
             self._record("screenshot", "invalid")
             raise ValueError("invalid screenshot")
-        self._record("screenshot", "simulated" if self.backend == Backend.SIMULATED else "captured_unverified")
+        self._record(
+            "screenshot",
+            "simulated" if self.backend == Backend.SIMULATED else "captured_unverified",
+        )
         return data
