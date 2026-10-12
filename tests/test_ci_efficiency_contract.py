@@ -1,7 +1,6 @@
 from pathlib import Path
 
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
@@ -36,7 +35,6 @@ def test_full_python_suites_report_slowest_tests() -> None:
     assert "Parallel Python application tests:" in application_step
 
 
-
 def test_focused_python_suites_are_not_duplicated_before_full_suite() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -45,5 +43,3 @@ def test_focused_python_suites_are_not_duplicated_before_full_suite() -> None:
     assert "pytest -q tests/test_unified_buttons_contract.py" not in workflow
     assert "pytest -q tests/test_real_ui_contract.py" not in workflow
     assert "pytest -q tests/test_frontend_module_code.py" not in workflow
-
-
