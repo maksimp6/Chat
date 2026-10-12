@@ -100,12 +100,15 @@ class FileMemoryDB:
             return seq
 
     def _commit_record(self, record: dict[str, Any]) -> None:
-        payload = self._encode(record)
         try:
-            self._append_payload(payload)
+            self._append(record)
         except OSError:
             self._poisoned = True
             raise
+
+    def _append(self, record: dict[str, Any]) -> None:
+        """Compatibility boundary used by existing identity fault-injection tests."""
+        self._append_payload(self._encode(record))
 
     def _append_payload(self, payload: bytes) -> None:
         existed = self.path.exists()
