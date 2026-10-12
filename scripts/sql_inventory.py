@@ -339,7 +339,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         root = args.root.resolve()
         source = (
-            f"{args.ref}@{_git(root, \"rev-parse\", args.ref).decode().strip()}"
+            f"{args.ref}@{_git(root, 'rev-parse', args.ref).decode().strip()}"
             if args.ref
             else _git(root, "rev-parse", "HEAD").decode().strip()
         )
