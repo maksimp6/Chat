@@ -1,4 +1,5 @@
 """Mock Bambu A1 mini TCP discovery: no physical printer, network, or secrets."""
+
 import json
 import socket
 import struct
@@ -46,18 +47,24 @@ def mock_printer(monkeypatch):
     def connect(address, timeout):
         connections.append((address, timeout))
         sock = MockPrinterSocket(
-            framed({"login": {
-                "command": "detect",
-                "model": "N1",
-                "version": "01.08.01.00",
-                "connect": "cloud",
-                "bind": "occupied",
-            }})
+            framed(
+                {
+                    "login": {
+                        "command": "detect",
+                        "model": "N1",
+                        "version": "01.08.01.00",
+                        "connect": "cloud",
+                        "bind": "occupied",
+                    }
+                }
+            )
         )
         sockets.append(sock)
         return sock
 
-    monkeypatch.setattr("alice_pro.printers.bambu_a1mini.resolve_lan", lambda host: "192.168.31.12", raising=False)
+    monkeypatch.setattr(
+        "alice_pro.printers.bambu_a1mini.resolve_lan", lambda host: "192.168.31.12", raising=False
+    )
     monkeypatch.setattr("alice_pro.printers.lan_address.resolve_lan", lambda host: "192.168.31.12")
     monkeypatch.setattr(socket, "create_connection", connect)
     return sockets, connections
@@ -74,27 +81,32 @@ def test_mock_discovery_fragmented_tcp(mock_printer):
     assert sockets[0].timeout == 3.0
     sent = sockets[0].sent
     assert sent.startswith(b"\xa5\xa5")
-    assert json.loads(sent[4:-2]) == {
-        "login": {"command": "detect", "sequence_id": "1"}
-    }
+    assert json.loads(sent[4:-2]) == {"login": {"command": "detect", "sequence_id": "1"}}
     assert b"print" not in sent and b"heat" not in sent
 
 
-@pytest.mark.parametrize("reply", [
-    b"",
-    b"\x00\x00\x06\x00\xa7\xa7",
-    framed({"login": {"command": "detect"}}),
-    framed({"login": {"command": "unexpected", "model": "N1"}}),
-])
+@pytest.mark.parametrize(
+    "reply",
+    [
+        b"",
+        b"\x00\x00\x06\x00\xa7\xa7",
+        framed({"login": {"command": "detect"}}),
+        framed({"login": {"command": "unexpected", "model": "N1"}}),
+    ],
+)
 def test_mock_malformed_and_missing_identity(monkeypatch, reply):
     monkeypatch.setattr("alice_pro.printers.lan_address.resolve_lan", lambda host: "192.168.31.12")
-    monkeypatch.setattr(socket, "create_connection", lambda *args, **kwargs: MockPrinterSocket(reply))
+    monkeypatch.setattr(
+        socket, "create_connection", lambda *args, **kwargs: MockPrinterSocket(reply)
+    )
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
 
 
 def test_mock_rejects_invalid_timeout_without_network(monkeypatch):
     monkeypatch.setattr("alice_pro.printers.lan_address.resolve_lan", lambda host: "192.168.31.12")
-    monkeypatch.setattr(socket, "create_connection", lambda *args, **kwargs: pytest.fail("network used"))
+    monkeypatch.setattr(
+        socket, "create_connection", lambda *args, **kwargs: pytest.fail("network used")
+    )
     with pytest.raises(ValueError):
         probe("printer.example.test", timeout=0)
