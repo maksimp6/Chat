@@ -116,31 +116,23 @@ def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]] | None:
     return None
 
 
-def validate_png(data: bytes) -> bool:
-    """Accept only a fully decoded, bounded non-interlaced RGB/RGBA PNG."""
-    chunks = _png_chunks(data)
-    if not chunks or chunks[0][0] != b"IHDR" or chunks[-1] != (b"IEND", b""):
-        return False
-    if len(chunks[0][1]) != 13:
-        return False
+def _png_header(chunks: list[tuple[bytes, bytes]]) -> tuple[int, int, int] | None:
+    if chunks[0][0] != b"IHDR" or len(chunks[0][1]) != 13:
+        return None
     width, height, depth, color, compression, filtering, interlace = struct.unpack(
         ">IIBBBBB", chunks[0][1]
     )
     if not (0 < width <= 8192 and 0 < height <= 8192):
-        return False
+        return None
     if (depth, color, compression, filtering, interlace) not in (
-        (8, 2, 0, 0, 0), (8, 6, 0, 0, 0)
+        (8, 2, 0, 0, 0),
+        (8, 6, 0, 0, 0),
     ):
-        return False
-    kinds = [kind for kind, _ in chunks]
-    if kinds.count(b"IHDR") != 1 or b"IDAT" not in kinds or kinds.count(b"IEND") != 1:
-        return False
-    if any(kind not in (b"IHDR", b"IDAT", b"IEND") for kind in kinds):
-        return False
-    if kinds != [b"IHDR"] + [b"IDAT"] * kinds.count(b"IDAT") + [b"IEND"]:
-        return False
-    raw = b"".join(payload for kind, payload in chunks if kind == b"IDAT")
-    expected = height * (1 + width * (3 if color == 2 else 4))
+        return None
+    return width, height, 3 if color == 2 else 4
+
+
+def _png_pixels(raw: bytes, expected: int, stride: int, height: int) -> bool:
     if expected > 16 * 1024 * 1024:
         return False
     try:
@@ -151,8 +143,24 @@ def validate_png(data: bytes) -> bool:
         return False
     if len(pixels) != expected or not decoder.eof or decoder.unused_data:
         return False
-    stride = 1 + width * (3 if color == 2 else 4)
     return all(pixels[row * stride] <= 4 for row in range(height))
+
+
+def validate_png(data: bytes) -> bool:
+    """Validate a bounded RGB/RGBA PNG with complete zlib and scanline filters."""
+    chunks = _png_chunks(data)
+    if not chunks or chunks[-1] != (b"IEND", b""):
+        return False
+    header = _png_header(chunks)
+    if header is None:
+        return False
+    kinds = [kind for kind, _ in chunks]
+    if kinds != [b"IHDR"] + [b"IDAT"] * kinds.count(b"IDAT") + [b"IEND"]:
+        return False
+    width, height, channels = header
+    raw = b"".join(payload for kind, payload in chunks if kind == b"IDAT")
+    stride = 1 + width * channels
+    return _png_pixels(raw, height * stride, stride, height)
 
 
 class AndroidShim:
@@ -165,7 +173,14 @@ class AndroidShim:
         self._lock = threading.RLock()
 
     def _record(self, action: str, outcome: str) -> None:
-        self.trace.append({"backend": self.backend.value, "action": action, "outcome": outcome, "timestamp_ns": time.monotonic_ns()})
+        self.trace.append(
+            {
+                "backend": self.backend.value,
+                "action": action,
+                "outcome": outcome,
+                "timestamp_ns": time.monotonic_ns(),
+            }
+        )
 
     def observe(self) -> Evidence:
         result = self.transport.observe()
@@ -173,7 +188,12 @@ class AndroidShim:
             self._record("observe", "backend_mismatch")
             raise RuntimeError("backend mismatch")
         # No configured trust anchor exists yet for real backends.
-        result = Evidence(self.backend, result.keyguard, False, "simulation" if self.backend == Backend.SIMULATED else "unverified_transport")
+        result = Evidence(
+            self.backend,
+            result.keyguard,
+            False,
+            "simulation" if self.backend == Backend.SIMULATED else "unverified_transport",
+        )
         self._record("observe", result.keyguard.value)
         return result
 
