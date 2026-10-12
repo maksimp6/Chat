@@ -1,16 +1,26 @@
 """Offline FDM shape benchmark unit tests; never contacts a printer."""
 
 import hashlib
+import io
 import json
 import math
+import runpy
 import struct
+import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from unittest.mock import patch
 from pathlib import Path
 
 from printing3d.shape_benchmarks import (
+    FACET_LIMIT,
     TRIANGLE_STRUCT,
+    _ring,
+    _triangles_for_prism,
+    _verify_shell,
     assess_dimension,
+    encode_binary_stl,
     build_coupons,
     inspect_binary_stl,
 )
@@ -165,6 +175,49 @@ class TestShapeBenchmarks(unittest.TestCase):
         self.assertTrue(all(e["physical_state"] == "UNVERIFIED" for e in disk["models"]))
         self.assertTrue(all("measure_after_print" not in e for e in disk["models"]))
         self.assertTrue(all(e["state"] == "SOURCE_ONLY_NOT_SLICED" for e in disk["models"]))
+
+    def test_reject_invalid_source_shape_parameters(self):
+        with self.assertRaisesRegex(ValueError, "invalid prism"):
+            _triangles_for_prism([(0, 0), (1, 0)], 1)
+        with self.assertRaisesRegex(ValueError, "CCW"):
+            _triangles_for_prism([(0, 0), (0, 1), (1, 0)], 1)
+        with self.assertRaisesRegex(ValueError, "invalid ring"):
+            _ring(5, 6, 8, 96)
+
+    def test_encoder_fail_closed_limits(self):
+        triangle = ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
+        with self.assertRaisesRegex(ValueError, "too many facets"):
+            encode_binary_stl([triangle] * (FACET_LIMIT + 1))
+        with self.assertRaisesRegex(ValueError, "degenerate triangle"):
+            encode_binary_stl([((0, 0, 0), (0, 0, 0), (1, 1, 1))])
+
+    def test_reject_disconnected_and_misoriented_valid_facets(self):
+        profile = [(0, 0), (10, 0), (10, 10), (0, 10)]
+        shell = _triangles_for_prism(profile, 10)
+        second = [tuple((x + 30, y, z) for x, y, z in facet) for facet in shell]
+        with self.assertRaisesRegex(ValueError, "multiple disconnected shells"):
+            _verify_shell(shell + second)
+        misoriented = list(shell)
+        a, b, c = misoriented[0]
+        misoriented[0] = (a, c, b)
+        with self.assertRaisesRegex(ValueError, "inconsistent triangle winding"):
+            _verify_shell(misoriented)
+        inverted = [(a, c, b) for a, b, c in shell]
+        with self.assertRaisesRegex(ValueError, "inverted or nonpositive volume"):
+            _verify_shell(inverted)
+
+    def test_offline_cli_only_generates_source_fixtures(self):
+        output = io.StringIO()
+        with patch.object(sys, "argv", ["shape_benchmarks.py", "--out", str(self.folder)]):
+            with redirect_stdout(output):
+                runpy.run_path(
+                    str(Path(__file__).resolve().parents[1] / "printing3d" / "shape_benchmarks.py"),
+                    run_name="__main__",
+                )
+        self.assertIn("Generated 6 source-only STL fixtures", output.getvalue())
+        self.assertFalse(
+            json.loads((self.folder / "manifest.json").read_text())["physical_print_approved"]
+        )
 
 
 if __name__ == "__main__":
