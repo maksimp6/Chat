@@ -11,7 +11,9 @@ migration inventory is in Draft PR #1172.
   serialization for recovery, reads, writes, compaction and backup export.
   NEVER unlink the lock file while a process may still have it open.
 - Every process must cooperate through FileMemoryDB, on the same local POSIX
-  filesystem. Network filesystems and object-store mounts are not proven.
+  filesystem. Paths are canonicalized before deriving lock identity, so a
+  symlink alias cannot introduce a competing lock. Network filesystems and
+  object-store mounts are not proven.
 - Every operation replays the file under the lock. This is intentionally
   correctness-first and O(file size) per operation; throughput is not accepted.
 - ACK follows data fsync; first creation/compaction also fsync the parent.
