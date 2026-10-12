@@ -53,7 +53,7 @@ def test_routing_unions_all_changed_paths():
 
 
 def results(**overrides):
-    value = dict.fromkeys(["backend", "postgres", "android", "infra", "mcp"], "skipped")
+    value = dict.fromkeys(["backend", "android", "infra", "mcp"], "skipped")
     value.update({"changes": "success", "code-rules": "success"})
     value.update(overrides)
     return value
@@ -99,9 +99,9 @@ def test_malformed_plan_fails_closed():
         routing.validate_results(plan, results())
 
 
-def test_web_dependency_requires_postgres_and_mcp():
+def test_web_dependency_requires_mcp():
     plan = routing.classify(["static/app.js"])
-    with pytest.raises(ValueError, match="postgres|mcp"):
+    with pytest.raises(ValueError, match="mcp"):
         routing.validate_results(plan, results(backend="success", android="success"))
 
 
@@ -112,7 +112,7 @@ def test_router_tests_are_part_of_always_run_code_rules():
 def test_workflow_has_real_independent_infra_and_mcp_jobs():
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     jobs = workflow["jobs"]
-    for job in ("backend", "postgres", "android", "infra", "mcp"):
+    for job in ("backend", "android", "infra", "mcp"):
         assert jobs[job]["needs"] == "changes"
     assert "infra" in jobs["required"]["needs"]
     assert "mcp" in jobs["required"]["needs"]
@@ -181,5 +181,5 @@ def test_incomplete_web_plan_cannot_hide_dependencies():
     plan["mcp"] = False
     with pytest.raises(ValueError, match="web dependency plan"):
         routing.validate_results(
-            plan, results(backend="success", android="success", postgres="success")
+            plan, results(backend="success", android="success")
         )
