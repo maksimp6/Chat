@@ -24,6 +24,19 @@ class BambuWifiDiscoveryTest {
         BambuWifiDiscovery.validateHost("printer.local")
     }
 
+    @Test fun parserRejectsInvalidFrameAndAcceptsDetect() {
+        val payload = """{"login":{"command":"detect","model":"N1"}}""".toByteArray(Charsets.UTF_8)
+        val size = payload.size + 6
+        val frame = byteArrayOf(0xa5.toByte(), 0xa5.toByte(),
+            (size and 255).toByte(), (size shr 8).toByte()) + payload +
+            byteArrayOf(0xa7.toByte(), 0xa7.toByte())
+        assertEquals("N1", BambuWifiDiscovery.parseFrame(frame).getString("model"))
+        try {
+            BambuWifiDiscovery.parseFrame(frame.copyOf(frame.size - 1))
+            fail("truncated frame accepted")
+        } catch (_: IllegalArgumentException) { }
+    }
+
     @Test fun discoveryFrameIsReadOnlyAndLengthMatched() {
         val frame = BambuWifiDiscovery.detectFrame()
         val declared = (frame[2].toInt() and 255) or ((frame[3].toInt() and 255) shl 8)
