@@ -3,6 +3,7 @@
 Linux SO_BINDTODEVICE is required for strong routing isolation. Platforms
 without permission or support must fail rather than silently fall back.
 """
+
 from __future__ import annotations
 
 import socket
@@ -19,7 +20,7 @@ class SocketFactory(Protocol):
     def __call__(self, family: int, kind: int) -> socket.socket: ...
 
 
-def connect_lan(
+def connect_lan_impl(
     host: str,
     port: int = 3000,
     *,
@@ -54,3 +55,7 @@ def connect_lan(
     except BaseException:
         sock.close()
         raise
+
+
+def connect_lan(host: str, port: int = 3000, *, interface: str = "wlan0", timeout: float = 3.0) -> socket.socket:
+    return connect_lan_impl(host, port, interface=interface, timeout=timeout)
