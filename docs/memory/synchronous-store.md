@@ -80,7 +80,10 @@ performed. Callers must not treat an exception as proof that a write is absent.
 `backup()` verifies a consistent committed journal copy before publishing to a
 new destination. It excludes staging and refuses overwrite, including destination
 creation races. `restore()` validates before atomically publishing to an empty,
-idle target; staging and existing committed data prevent restore. Backup targets
+idle target; staging and existing committed data prevent restore. An exception
+can occur after either a backup or restored store has already been published.
+A restore publication error or caller cancellation blocks subsequent writes until
+verified reopen; callers must not continue with the old empty RAM state. Backup targets
 must be private to their owner. This is local backup evidence, not remote storage
 replication. Historical SQL backups are untouched.
 

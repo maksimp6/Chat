@@ -535,12 +535,17 @@ class _JournalStore:
                 raise StoreError("backup source does not exist")
             try:
                 self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
+                self._state = state
+                self._sequence = sequence
+                self._digest = digest
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
-            self._state = state
-            self._sequence = sequence
-            self._digest = digest
+            except BaseException:
+                # Restore may have replaced the destination before cancellation.
+                # Empty/partial RAM metadata cannot be used to append to that log.
+                self._failed = True
+                raise
 
     def close(self) -> None:
         """Release the exclusive writer lock when no transaction is active."""

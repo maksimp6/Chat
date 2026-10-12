@@ -359,3 +359,54 @@ def test_checkpoint_preserves_changed_source_evidence_and_blocks_writer(tmp_path
             db.set("later", 2)
         with pytest.raises(StoreError, match="recovery required"):
             db.commit()
+
+
+@pytest.mark.parametrize("checkpointed", [False, True])
+@pytest.mark.parametrize("phase", ["directory_fsync", "after_copy"])
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
+def test_interrupted_restore_never_allows_an_empty_state_append(
+    tmp_path, monkeypatch, checkpointed, phase, interruption
+):
+    backup = tmp_path / "backup.memory"
+    target = tmp_path / "target.memory"
+    with MemoryStore(tmp_path / "source.memory") as source:
+        source.set("saved", {"count": 1})
+        source.commit()
+        if checkpointed:
+            source.checkpoint()
+        source.backup(backup)
+    with MemoryStore(target) as restored:
+        real_fsync = os.fsync
+        real_copy = restored._engine._copy_verified_file
+        with monkeypatch.context() as patch:
+
+            def interrupted_fsync(fd):
+                if stat.S_ISDIR(os.fstat(fd).st_mode):
+                    raise interruption("injected restore cancellation")
+                real_fsync(fd)
+
+            def interrupted_copy(*args, **kwargs):
+                real_copy(*args, **kwargs)
+                raise interruption("injected restore cancellation")
+
+            if phase == "directory_fsync":
+                patch.setattr(os, "fsync", interrupted_fsync)
+            else:
+                patch.setattr(restored._engine, "_copy_verified_file", interrupted_copy)
+            with pytest.raises(interruption):
+                restored.restore(backup)
+        assert restored.last_commit.sequence == 0
+        assert restored.get("saved") is None
+        assert not list(tmp_path.glob(".alice-copy-*"))
+        with pytest.raises(StoreError, match="recovery required"):
+            restored.set("next", 2)
+        with pytest.raises(StoreError, match="recovery required"):
+            restored.commit()
+    with MemoryStore(target) as recovered:
+        assert recovered.get("saved") == {"count": 1}
+        assert recovered.last_commit.sequence == 1
+        recovered.set("next", 2)
+        assert recovered.commit() == 2
+    with MemoryStore(target) as reopened:
+        assert reopened.get("saved") == {"count": 1}
+        assert reopened.get("next") == 2
