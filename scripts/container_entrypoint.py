@@ -111,28 +111,11 @@ def _stop(proc: subprocess.Popen) -> None:
         proc.wait()
 
 
-def main(
-    environ: Mapping[str, str] | None = None,
-    tunnel_binary: str = TUNNEL_BINARY,
-    app_argv: list[str] | None = None,
-    replace_process: bool = False,
-) -> int:
-    environ = dict(os.environ if environ is None else environ)
+def _supervise(app_argv: list[str], app_env: dict[str, str], tunnel: Process) -> int:
+    """Run Alice and the tunnel client; when either exits, stop both and fail."""
+    procs = [subprocess.Popen(app_argv, env=app_env)]
     try:
-        chosen = plan(environ, tunnel_binary, app_argv)
-    except TunnelConfigError as exc:
-        print(f"alice-entrypoint: {exc}", file=sys.stderr)
-        return 2
-
-    if chosen.tunnel is None:
-        if replace_process:
-            # Same process as before the entrypoint existed: Alice is PID 1 and gets signals directly.
-            os.execvpe(chosen.app_argv[0], chosen.app_argv, chosen.app_env)
-        return subprocess.call(chosen.app_argv, env=chosen.app_env)
-
-    procs = [subprocess.Popen(chosen.app_argv, env=chosen.app_env)]
-    try:
-        procs.append(subprocess.Popen(chosen.tunnel.argv, env=chosen.tunnel.env))
+        procs.append(subprocess.Popen(tunnel.argv, env=tunnel.env))
     except OSError:
         _stop(procs[0])
         raise
@@ -157,6 +140,28 @@ def main(
     for name, proc in zip(names, procs):
         print(f"alice-entrypoint: {name} exited with {proc.returncode}", file=sys.stderr)
     return 1
+
+
+def main(
+    environ: Mapping[str, str] | None = None,
+    tunnel_binary: str = TUNNEL_BINARY,
+    app_argv: list[str] | None = None,
+    replace_process: bool = False,
+) -> int:
+    environ = dict(os.environ if environ is None else environ)
+    try:
+        chosen = plan(environ, tunnel_binary, app_argv)
+    except TunnelConfigError as exc:
+        print(f"alice-entrypoint: {exc}", file=sys.stderr)
+        return 2
+
+    if chosen.tunnel is None:
+        if replace_process:
+            # Same process as before the entrypoint existed: Alice is PID 1 and gets signals directly.
+            os.execvpe(chosen.app_argv[0], chosen.app_argv, chosen.app_env)
+        return subprocess.call(chosen.app_argv, env=chosen.app_env)
+
+    return _supervise(chosen.app_argv, chosen.app_env, chosen.tunnel)
 
 
 if __name__ == "__main__":
