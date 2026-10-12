@@ -125,21 +125,15 @@ class MeshPipelineTests(unittest.TestCase):
             stl = folder / "tiny.stl"
             report = folder / "tiny.json"
             glb.write_bytes(fixture_glb())
-            data = convert(
-                glb, "test_mesh", stl, report, length_mm=15, orientation="head"
-            )
+            data = convert(glb, "test_mesh", stl, report, length_mm=15, orientation="head")
             self.assertTrue(stl.read_text().startswith("solid "))
-            self.assertTrue(
-                stl.read_text().endswith("endsolid dota_ember_spirit_weapon\n")
-            )
+            self.assertTrue(stl.read_text().endswith("endsolid dota_ember_spirit_weapon\n"))
             self.assertFalse(data["print_ready"])
             self.assertEqual(data["capped_boundary_loops"], 1)
             self.assertEqual(data["final_faces"], 12)
             self.assertEqual(data["final_topology"]["open_edges"], 0)
             self.assertEqual(data["connected_components"], 1)
-            self.assertEqual(
-                json.loads(report.read_text())["stl_sha256"], data["stl_sha256"]
-            )
+            self.assertEqual(json.loads(report.read_text())["stl_sha256"], data["stl_sha256"])
 
     def test_invalid_glb_header(self):
         with tempfile.TemporaryDirectory() as temp:
