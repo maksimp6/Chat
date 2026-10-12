@@ -3,7 +3,7 @@ import socket
 
 import pytest
 
-from alice_pro.printers.lan_socket import LanBindingError, connect_lan
+from alice_pro.printers.lan_socket import LanBindingError, connect_lan_impl as connect_lan
 
 
 class FakeSocket:
