@@ -58,5 +58,7 @@ def connect_lan_impl(
         raise
 
 
-def connect_lan(host: str, port: int = 3000, *, interface: str = "wlan0", timeout: float = 3.0) -> socket.socket:
+def connect_lan(
+    host: str, port: int = 3000, *, interface: str = "wlan0", timeout: float = 3.0
+) -> socket.socket:
     return connect_lan_impl(host, port, interface=interface, timeout=timeout)
