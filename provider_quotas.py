@@ -2,8 +2,7 @@
 
 Quotas are enforced before outbound provider requests and usage is recorded
 against the trusted user identity associated with the current invocation.
-SQLite uses an immediate transaction; PostgreSQL locks the usage row so two
-concurrent requests cannot spend the same quota bucket.
+The native MemoryStore write barrier serializes reservation and usage mutations.
 """
 
 from __future__ import annotations
@@ -13,8 +12,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from db import get_conn
-from db_backend import is_postgres_connection
+from db import get_store
 
 
 DEFAULT_POLICY = "default"
@@ -95,10 +93,6 @@ def _env_int(name: str, default: int, minimum: int = 0) -> int:
     return max(minimum, value)
 
 
-def _begin_transaction(conn) -> None:
-    conn.execute("BEGIN" if is_postgres_connection(conn) else "BEGIN IMMEDIATE")
-
-
 def _default_policy_values() -> tuple[int, int, int]:
     return (
         _env_int("ALICE_QUOTA_PERIOD_SECONDS", DEFAULT_PERIOD_SECONDS, 60),
@@ -111,55 +105,25 @@ def _default_policy_values() -> tuple[int, int, int]:
 
 
 def init_quota_tables() -> None:
-    conn = get_conn()
-    try:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS provider_quota_policies (
-                name TEXT PRIMARY KEY,
-                period_seconds INTEGER NOT NULL,
-                max_requests INTEGER NOT NULL,
-                max_requests_per_minute INTEGER NOT NULL DEFAULT 0,
-                enabled INTEGER NOT NULL DEFAULT 1,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS provider_user_quota_plans (
-                user_id TEXT PRIMARY KEY,
-                policy_name TEXT NOT NULL,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS provider_quota_usage (
-                user_id TEXT PRIMARY KEY,
-                period_start INTEGER NOT NULL,
-                request_count INTEGER NOT NULL DEFAULT 0,
-                token_count INTEGER NOT NULL DEFAULT 0,
-                cost REAL NOT NULL DEFAULT 0.0,
-                rate_window_start INTEGER NOT NULL,
-                rate_count INTEGER NOT NULL DEFAULT 0,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        now = _now()
-        period, max_requests, max_rate = _default_policy_values()
-        conn.execute(
-            """INSERT INTO provider_quota_policies
-               (name, period_seconds, max_requests, max_requests_per_minute, enabled, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 1, ?, ?)
-               ON CONFLICT(name) DO UPDATE SET
-                 period_seconds=excluded.period_seconds,
-                 max_requests=excluded.max_requests,
-                 max_requests_per_minute=excluded.max_requests_per_minute,
-                 enabled=excluded.enabled,
-                 updated_at=excluded.updated_at""",
-            (DEFAULT_POLICY, period, max_requests, max_rate, now, now),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    period, maximum, rate = _default_policy_values()
+    now = _now()
+    key = "quota/policy/" + DEFAULT_POLICY
+    with get_store().transaction() as tx:
+        old = tx.get(key)
+        row = {
+            "name": DEFAULT_POLICY,
+            "period_seconds": period,
+            "max_requests": maximum,
+            "max_requests_per_minute": rate,
+            "enabled": True,
+            "created_at": old["created_at"] if old else now,
+            "updated_at": now,
+        }
+        if old is None or any(
+            old[field] != row[field]
+            for field in ("period_seconds", "max_requests", "max_requests_per_minute", "enabled")
+        ):
+            tx.set(key, row)
 
 
 def upsert_policy(
@@ -171,101 +135,43 @@ def upsert_policy(
     enabled: bool = True,
 ) -> None:
     name = str(name or "").strip().lower()
-    if not name:
-        raise ValueError("policy name is required")
-    if period_seconds < 60:
-        raise ValueError("period_seconds must be at least 60")
-    if max_requests < 0 or max_requests_per_minute < 0:
-        raise ValueError("quota limits cannot be negative")
-
+    if not name or period_seconds < 60 or max_requests < 0 or max_requests_per_minute < 0:
+        raise ValueError("invalid quota policy")
     init_quota_tables()
+    key = "quota/policy/" + name
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO provider_quota_policies
-               (name, period_seconds, max_requests, max_requests_per_minute, enabled, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(name) DO UPDATE SET
-                 period_seconds=excluded.period_seconds,
-                 max_requests=excluded.max_requests,
-                 max_requests_per_minute=excluded.max_requests_per_minute,
-                 enabled=excluded.enabled,
-                 updated_at=excluded.updated_at""",
-            (
-                name,
-                int(period_seconds),
-                int(max_requests),
-                int(max_requests_per_minute),
-                1 if enabled else 0,
-                now,
-                now,
-            ),
+    with get_store().transaction() as tx:
+        old = tx.get(key)
+        tx.set(
+            key,
+            {
+                "name": name,
+                "period_seconds": int(period_seconds),
+                "max_requests": int(max_requests),
+                "max_requests_per_minute": int(max_requests_per_minute),
+                "enabled": bool(enabled),
+                "created_at": old["created_at"] if old else now,
+                "updated_at": now,
+            },
         )
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def assign_user_policy(user_id: str, policy_name: str) -> None:
-    user_id = str(user_id or "").strip()
-    policy_name = str(policy_name or "").strip().lower()
-    if not user_id:
-        raise ValueError("user_id is required")
-    if not policy_name:
-        raise ValueError("policy_name is required")
-
+    user_id, policy_name = str(user_id or "").strip(), str(policy_name or "").strip().lower()
+    if not user_id or not policy_name:
+        raise ValueError("user and policy are required")
     init_quota_tables()
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT 1 FROM provider_quota_policies WHERE name = ?",
-            (policy_name,),
-        ).fetchone()
-        if not row:
+    with get_store().transaction() as tx:
+        if tx.get("quota/policy/" + policy_name) is None:
             raise ValueError("quota policy not found")
-        conn.execute(
-            """INSERT INTO provider_user_quota_plans (user_id, policy_name, updated_at)
-               VALUES (?, ?, ?)
-               ON CONFLICT(user_id) DO UPDATE SET
-                 policy_name=excluded.policy_name,
-                 updated_at=excluded.updated_at""",
-            (user_id, policy_name, _now()),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+        tx.set("quota/plan/" + user_id, policy_name)
 
 
 def get_user_policy(user_id: str) -> dict[str, Any]:
     init_quota_tables()
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            """SELECT p.*
-               FROM provider_quota_policies p
-               JOIN provider_user_quota_plans u
-                 ON u.policy_name = p.name
-              WHERE u.user_id = ?""",
-            (user_id,),
-        ).fetchone()
-        if row is None:
-            row = conn.execute(
-                "SELECT * FROM provider_quota_policies WHERE name = ?",
-                (DEFAULT_POLICY,),
-            ).fetchone()
-    finally:
-        conn.close()
-
-    if not row:
-        raise RuntimeError("default quota policy is unavailable")
-    return {
-        "name": row["name"],
-        "period_seconds": int(row["period_seconds"]),
-        "max_requests": int(row["max_requests"]),
-        "max_requests_per_minute": int(row["max_requests_per_minute"]),
-        "enabled": bool(row["enabled"]),
-    }
+    store = get_store()
+    with store.transaction() as tx:
+        return _policy_for(tx, user_id)
 
 
 def reserve_request(
@@ -304,92 +210,69 @@ def reserve_request(
     rate_window_start = (now_value // 60) * 60
     rate_reset_at = rate_window_start + 60
 
-    conn = get_conn()
-    try:
-        _begin_transaction(conn)
-        select_sql = (
-            "SELECT * FROM provider_quota_usage WHERE user_id = ? FOR UPDATE"
-            if is_postgres_connection(conn)
-            else "SELECT * FROM provider_quota_usage WHERE user_id = ?"
-        )
-        usage = conn.execute(select_sql, (trusted_user_id,)).fetchone()
-        if usage is None:
-            conn.execute(
-                """INSERT INTO provider_quota_usage
-                   (user_id, period_start, request_count, token_count, cost,
-                    rate_window_start, rate_count, updated_at)
-                   VALUES (?, ?, 0, 0, 0, ?, 0, ?)
-                   ON CONFLICT(user_id) DO NOTHING""",
-                (trusted_user_id, period_start, rate_window_start, now_value),
-            )
-            usage = conn.execute(select_sql, (trusted_user_id,)).fetchone()
-
+    init_quota_tables()
+    with get_store().transaction() as tx:
+        policy = _policy_for(tx, trusted_user_id)
+        if not policy["enabled"]:
+            return None
+        period_seconds = policy["period_seconds"]
+        period_start = (now_value // period_seconds) * period_seconds
+        period_reset_at = period_start + period_seconds
+        key = "quota/usage/" + trusted_user_id
+        usage = tx.get(key) or {
+            "user_id": trusted_user_id,
+            "period_start": period_start,
+            "request_count": 0,
+            "token_count": 0,
+            "cost": 0.0,
+            "rate_window_start": rate_window_start,
+            "rate_count": 0,
+        }
         current_period = int(usage["period_start"]) == period_start
         current_rate_window = int(usage["rate_window_start"]) == rate_window_start
         used_requests = int(usage["request_count"]) if current_period else 0
         used_rate_requests = int(usage["rate_count"]) if current_rate_window else 0
-
-        max_requests = policy["max_requests"]
-        max_rate = policy["max_requests_per_minute"]
-        if max_requests > 0 and used_requests >= max_requests:
-            raise ProviderQuotaExceeded(
-                reason="period_quota_exhausted",
-                user_id=trusted_user_id,
-                period_start=period_start,
-                period_reset_at=period_reset_at,
-                used_requests=used_requests,
-                max_requests=max_requests,
-                rate_window_start=rate_window_start,
-                rate_reset_at=rate_reset_at,
-                used_rate_requests=used_rate_requests,
-                max_rate_requests=max_rate,
-            )
-        if max_rate > 0 and used_rate_requests >= max_rate:
-            raise ProviderQuotaExceeded(
-                reason="rate_limit_exhausted",
-                user_id=trusted_user_id,
-                period_start=period_start,
-                period_reset_at=period_reset_at,
-                used_requests=used_requests,
-                max_requests=max_requests,
-                rate_window_start=rate_window_start,
-                rate_reset_at=rate_reset_at,
-                used_rate_requests=used_rate_requests,
-                max_rate_requests=max_rate,
-            )
-
-        new_requests = used_requests + 1
-        new_rate_count = used_rate_requests + 1
-        conn.execute(
-            """UPDATE provider_quota_usage
-               SET period_start = ?,
-                   request_count = ?,
-                   rate_window_start = ?,
-                   rate_count = ?,
-                   updated_at = ?
-             WHERE user_id = ?""",
-            (
-                period_start,
-                new_requests,
-                rate_window_start,
-                new_rate_count,
-                now_value,
-                trusted_user_id,
-            ),
+        max_requests, max_rate = policy["max_requests"], policy["max_requests_per_minute"]
+        reason = (
+            "period_quota_exhausted"
+            if max_requests > 0 and used_requests >= max_requests
+            else "rate_limit_exhausted"
+            if max_rate > 0 and used_rate_requests >= max_rate
+            else None
         )
-        conn.commit()
+        if reason:
+            raise ProviderQuotaExceeded(
+                reason=reason,
+                user_id=trusted_user_id,
+                period_start=period_start,
+                period_reset_at=period_reset_at,
+                used_requests=used_requests,
+                max_requests=max_requests,
+                rate_window_start=rate_window_start,
+                rate_reset_at=rate_reset_at,
+                used_rate_requests=used_rate_requests,
+                max_rate_requests=max_rate,
+            )
+        tx.set(
+            key,
+            {
+                **usage,
+                "period_start": period_start,
+                "request_count": used_requests + 1,
+                "token_count": usage["token_count"] if current_period else 0,
+                "cost": usage["cost"] if current_period else 0.0,
+                "rate_window_start": rate_window_start,
+                "rate_count": used_rate_requests + 1,
+                "updated_at": now_value,
+            },
+        )
         return QuotaReservation(
             user_id=trusted_user_id,
             policy_name=policy["name"],
             period_start=period_start,
             period_reset_at=period_reset_at,
-            reserved_request_number=new_requests,
+            reserved_request_number=used_requests + 1,
         )
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
 
 
 def record_usage(
@@ -398,38 +281,25 @@ def record_usage(
     token_count: int = 0,
     cost: float = 0.0,
 ) -> None:
-    """Record actual provider usage against the reservation's period."""
     if reservation is None:
         return
-
     tokens = max(0, int(token_count or 0))
     numeric_cost = float(cost or 0.0)
     if numeric_cost < 0:
         raise ValueError("cost cannot be negative")
-
-    conn = get_conn()
-    try:
-        _begin_transaction(conn)
-        conn.execute(
-            """UPDATE provider_quota_usage
-               SET token_count = token_count + ?,
-                   cost = cost + ?,
-                   updated_at = ?
-             WHERE user_id = ? AND period_start = ?""",
-            (
-                tokens,
-                numeric_cost,
-                _now(),
-                reservation.user_id,
-                reservation.period_start,
-            ),
-        )
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    key = "quota/usage/" + reservation.user_id
+    with get_store().transaction() as tx:
+        row = tx.get(key)
+        if row is not None and row["period_start"] == reservation.period_start:
+            tx.set(
+                key,
+                {
+                    **row,
+                    "token_count": row["token_count"] + tokens,
+                    "cost": row["cost"] + numeric_cost,
+                    "updated_at": _now(),
+                },
+            )
 
 
 def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
@@ -443,14 +313,7 @@ def get_usage(user_id: str, *, now: Optional[int] = None) -> dict[str, Any]:
     rate_window_start = (now_value // 60) * 60
 
     init_quota_tables()
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM provider_quota_usage WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-    finally:
-        conn.close()
+    row = get_store().get("quota/usage/" + user_id)
 
     if row is None:
         used_requests = used_tokens = 0
@@ -487,3 +350,14 @@ __all__ = [
     "reserve_request",
     "upsert_policy",
 ]
+
+
+def _policy_for(tx: Any, user_id: str) -> dict[str, Any]:
+    name = tx.get("quota/plan/" + user_id) or DEFAULT_POLICY
+    row = tx.get("quota/policy/" + name)
+    if row is None:
+        raise RuntimeError("quota policy is unavailable")
+    return {
+        key: row[key]
+        for key in ("name", "period_seconds", "max_requests", "max_requests_per_minute", "enabled")
+    }

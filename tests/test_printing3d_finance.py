@@ -8,7 +8,7 @@ def finance_db(tmp_path, monkeypatch):
 
     path = tmp_path / "printing3d-finance.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_conn", db.get_conn)
+    monkeypatch.setattr(service, "get_store", db.get_store)
     db.init_db()
     service.init_3d_printing_tables()
     return path
@@ -177,13 +177,9 @@ def test_month_profit_filters_currency_and_month(finance_db):
     settle_order("owner-a", old["id"], actual_revenue=1000, actual_cost=100)
     settle_order("owner-a", usd["id"], actual_revenue=1000, actual_cost=50)
 
-    conn = service.get_conn()
-    conn.execute(
-        "UPDATE print_orders SET settled_at = ? WHERE id = ?",
-        ("2020-01-05T00:00:00", old["id"]),
-    )
-    conn.commit()
-    conn.close()
+    with service.get_store().transaction() as tx:
+        key = "printing/order/" + old["id"]
+        tx.set(key, {**tx.get(key), "settled_at": "2020-01-05T00:00:00"})
 
     current_month = get_payback_status("owner-a")["month"]
     status = get_payback_status("owner-a", month=current_month)

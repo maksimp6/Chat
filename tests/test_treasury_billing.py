@@ -10,7 +10,7 @@ def treasury_db(tmp_path, monkeypatch):
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
-    monkeypatch.setattr(treasury, "get_conn", db.get_conn)
+    monkeypatch.setattr(treasury, "get_store", db.get_store)
     close_memory_clients()
     db.init_db()
     treasury.init_treasury_tables()

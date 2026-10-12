@@ -1,3 +1,4 @@
+from agent_memory.client import close_memory_clients
 import json
 
 import pytest
@@ -106,17 +107,9 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
     )
     trace_data = trace.finalize()
 
-    conn = db.get_conn()
-    conn.execute(
-        "INSERT INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-        ("conversation-trace", "Trace", "aliceai-llm", 1, 1),
-    )
-    conn.execute(
-        "INSERT INTO messages (conversation_id, role, content, created_at, trace_json) VALUES (?, ?, ?, ?, ?)",
-        ("conversation-trace", "assistant", "ok", 1, json.dumps(trace_data)),
-    )
-    conn.commit()
-    conn.close()
+    db.create_conversation("conversation-trace", "Trace", "aliceai-llm")
+    db.add_message("conversation-trace", "assistant", "ok", trace=trace_data)
+    close_memory_clients()
 
     response = client.get(f"/api/invocations/{invocation['invocation_id']}/trace")
     assert response.status_code == 200

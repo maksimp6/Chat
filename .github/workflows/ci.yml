@@ -174,7 +174,7 @@ jobs:
           HOST: 127.0.0.1
           PORT: 5678
           FLASK_DEBUG: "0"
-          ALICE_DB_PATH: alice_pro_ci_live.db
+          ALICE_MEMORY_PATH: alice_ci_live.memory
         run: |
           python app.py > flask-live.log 2>&1 &
           echo $! > flask-live.pid
@@ -195,6 +195,8 @@ jobs:
           if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
+      - name: Build and check C17 fallback control server
+        run: bash scripts/build_c17_server.sh --check
       - name: Run Python application tests with coverage
         run: |
           started=$SECONDS

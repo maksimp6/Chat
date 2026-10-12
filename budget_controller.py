@@ -155,6 +155,18 @@ class BudgetController:
         self._repository = repository
         self._persistence_actor = persistence_actor
         self._lock = threading.RLock()
+        if self._repository is not None:
+            for account in self.accounts.values():
+                stored = self._repository.configure(self.budget_id, account)
+                for field_name in ("allocated", "spent", "reserved", "won", "loss_today"):
+                    setattr(account, field_name, Decimal(stored[field_name]))
+                account.loss_period = stored["loss_period"]
+                account.locked_until = (
+                    datetime.fromisoformat(stored["locked_until"])
+                    if stored["locked_until"]
+                    else None
+                )
+                account.limits = BudgetLimits(**stored["limits"])
         self._emit("budget_initialized", account_type="REAL", currency=real.currency)
 
     def account(self, account_type: AccountType) -> BudgetAccount:
@@ -460,10 +472,15 @@ class BudgetController:
         self._roll_loss_period(account)
         if amount > account.limits.max_single_operation:
             raise BudgetLimitExceeded("single-operation limit exceeded")
-        if account.spent + amount > account.limits.max_total_loss:
+        # Outstanding reservations are committed exposure: count them so that
+        # combinations of reserve/spend cannot bypass the loss ceilings (#1181).
+        if account.spent + account.reserved + amount > account.limits.max_total_loss:
             raise BudgetLimitExceeded("total-loss limit exceeded")
         if account.loss_today + amount > account.limits.max_daily_loss:
             self._lock_account(account, reason="daily_loss_limit")
+            raise BudgetLimitExceeded("daily-loss limit exceeded")
+        if account.loss_today + account.reserved + amount > account.limits.max_daily_loss:
+            # Pending exposure only: deny without cooldown, release restores headroom.
             raise BudgetLimitExceeded("daily-loss limit exceeded")
 
     def _roll_loss_period(self, account: BudgetAccount) -> None:

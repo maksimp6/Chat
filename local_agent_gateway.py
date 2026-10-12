@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
-from db import get_conn
+from db import get_store
 
 local_agent_bp = Blueprint("local_agents", __name__, url_prefix="/api/local-agents")
 
@@ -60,15 +60,12 @@ def _require_bootstrap() -> None:
         raise PermissionError("local-agent registration is not authorized")
 
 
-def _agent_row(agent_id: str):
-    conn = get_conn()
-    try:
-        return conn.execute("SELECT * FROM local_agents WHERE id = ?", (agent_id,)).fetchone()
-    finally:
-        conn.close()
+def _agent_row(agent_id: str) -> dict[str, Any] | None:
+    record = get_store().get("local-agent/" + agent_id)
+    return dict(record) if record is not None else None
 
 
-def _require_agent(agent_id: str):
+def _require_agent(agent_id: str) -> dict[str, Any]:
     if not _AGENT_ID_RE.fullmatch(agent_id):
         raise PermissionError("invalid agent id")
     row = _agent_row(agent_id)
@@ -82,53 +79,7 @@ def _require_agent(agent_id: str):
 
 
 def init_local_agent_tables() -> None:
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS local_agents (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                version TEXT NOT NULL DEFAULT '1.0',
-                capabilities_json TEXT NOT NULL DEFAULT '[]',
-                status TEXT NOT NULL DEFAULT 'offline',
-                token_hash TEXT NOT NULL,
-                last_seen REAL,
-                created_at REAL NOT NULL,
-                updated_at REAL NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS local_agent_jobs (
-                id TEXT PRIMARY KEY,
-                agent_id TEXT NOT NULL,
-                tool_name TEXT NOT NULL,
-                arguments_json TEXT NOT NULL DEFAULT '{}',
-                metadata_json TEXT NOT NULL DEFAULT '{}',
-                trace_id TEXT,
-                invocation_id TEXT,
-                status TEXT NOT NULL DEFAULT 'queued',
-                result_json TEXT,
-                error_json TEXT,
-                created_at REAL NOT NULL,
-                claimed_at REAL,
-                lease_until REAL,
-                completed_at REAL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_local_agent_jobs_poll "
-            "ON local_agent_jobs(agent_id, status, created_at)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_local_agent_jobs_trace ON local_agent_jobs(trace_id)"
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    get_store()
 
 
 def enqueue_local_tool_job(
@@ -150,48 +101,42 @@ def enqueue_local_tool_job(
     if not tool_name or not isinstance(arguments, Mapping):
         raise ValueError("tool_name and object arguments are required")
 
-    conn = get_conn()
-    try:
-        agent = conn.execute("SELECT status FROM local_agents WHERE id = ?", (agent_id,)).fetchone()
-        if agent is None:
+    job_id = str(uuid4())
+    with get_store().transaction() as tx:
+        if tx.get("local-agent/" + agent_id) is None:
             raise LookupError("agent_not_found")
-
-        job_id = str(uuid4())
-        conn.execute(
-            """
-            INSERT INTO local_agent_jobs (
-                id, agent_id, tool_name, arguments_json, metadata_json,
-                trace_id, invocation_id, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?)
-            """,
-            (
-                job_id,
-                agent_id,
-                tool_name,
-                _json(dict(arguments)),
-                _json(dict(metadata or {})),
-                trace_id,
-                invocation_id,
-                _now(),
-            ),
+        tx.set(
+            "local-job/" + job_id,
+            {
+                "id": job_id,
+                "agent_id": agent_id,
+                "tool_name": tool_name,
+                "arguments_json": _json(dict(arguments)),
+                "metadata_json": _json(dict(metadata or {})),
+                "trace_id": trace_id,
+                "invocation_id": invocation_id,
+                "status": "queued",
+                "created_at": _now(),
+                "claimed_at": None,
+                "lease_until": None,
+                "completed_at": None,
+                "result_json": None,
+                "error_json": None,
+            },
         )
-        conn.commit()
-        return job_id
-    finally:
-        conn.close()
+    return job_id
 
 
 def _recover_expired_jobs(conn, agent_id: str) -> None:
     now = _now()
-    conn.execute(
-        """
-        UPDATE local_agent_jobs
-        SET status = 'queued', claimed_at = NULL, lease_until = NULL
-        WHERE agent_id = ? AND status = 'running'
-          AND lease_until IS NOT NULL AND lease_until < ?
-        """,
-        (agent_id, now),
-    )
+    for key, row in get_store().items(prefix="local-job/").items():
+        if (
+            row["agent_id"] == agent_id
+            and row["status"] == "running"
+            and row["lease_until"] is not None
+            and row["lease_until"] < now
+        ):
+            conn.set(key, {**row, "status": "queued", "claimed_at": None, "lease_until": None})
 
 
 @local_agent_bp.post("/register")
@@ -218,37 +163,23 @@ def register_local_agent():
     now = _now()
     token = secrets.token_urlsafe(32)
 
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            INSERT INTO local_agents (
-                id, name, version, capabilities_json, status,
-                token_hash, last_seen, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'online', ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                name = excluded.name,
-                version = excluded.version,
-                capabilities_json = excluded.capabilities_json,
-                status = 'online',
-                token_hash = excluded.token_hash,
-                last_seen = excluded.last_seen,
-                updated_at = excluded.updated_at
-            """,
-            (
-                agent_id,
-                name,
-                version,
-                _json(capabilities),
-                _token_hash(token),
-                now,
-                now,
-                now,
-            ),
+    key = "local-agent/" + agent_id
+    with get_store().transaction() as tx:
+        old = tx.get(key)
+        tx.set(
+            key,
+            {
+                "id": agent_id,
+                "name": name,
+                "version": version,
+                "capabilities_json": _json(capabilities),
+                "status": "online",
+                "token_hash": _token_hash(token),
+                "last_seen": now,
+                "created_at": old["created_at"] if old else now,
+                "updated_at": now,
+            },
         )
-        conn.commit()
-    finally:
-        conn.close()
 
     return jsonify(
         {
@@ -266,137 +197,98 @@ def register_local_agent():
 
 @local_agent_bp.post("/<agent_id>/heartbeat")
 def local_agent_heartbeat(agent_id: str):
+
+    now = _now()
+    key = "local-agent/" + agent_id
     try:
-        _require_agent(agent_id)
+        with get_store().transaction() as tx:
+            agent = _require_agent(agent_id)
+            row = agent
+            tx.set(key, {**row, "status": "online", "last_seen": now, "updated_at": now})
     except LookupError as exc:
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 401
-
-    now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE local_agents SET status = 'online', last_seen = ?, updated_at = ? WHERE id = ?",
-            (now, now, agent_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
 
     return jsonify({"status": "ok", "agent_id": agent_id, "last_seen": now})
 
 
 @local_agent_bp.get("/<agent_id>/poll")
 def local_agent_poll(agent_id: str):
+
+    store = get_store()
     try:
-        _require_agent(agent_id)
+        with store.transaction() as tx:
+            agent = _require_agent(agent_id)
+            _recover_expired_jobs(tx, agent_id)
+            now = _now()
+            queued = []
+            for key in store.items(prefix="local-job/"):
+                item = tx.get(key)
+                if item is not None and item["agent_id"] == agent_id and item["status"] == "queued":
+                    queued.append(item)
+            row = min(queued, key=lambda item: item["created_at"]) if queued else None
+            agent_key = "local-agent/" + agent_id
+            tx.set(agent_key, {**agent, "status": "online", "last_seen": now, "updated_at": now})
+            if row is None:
+                return jsonify({"job": None, "poll_after_seconds": 2})
+            lease_until = now + _DEFAULT_LEASE_SECONDS
+            tx.set(
+                "local-job/" + row["id"],
+                {**row, "status": "running", "claimed_at": now, "lease_until": lease_until},
+            )
     except LookupError as exc:
         return jsonify({"error": str(exc)}), 404
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 401
-
-    conn = get_conn()
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-        _recover_expired_jobs(conn, agent_id)
-        now = _now()
-        row = conn.execute(
-            """
-            SELECT * FROM local_agent_jobs
-            WHERE agent_id = ? AND status = 'queued'
-            ORDER BY created_at ASC
-            LIMIT 1
-            """,
-            (agent_id,),
-        ).fetchone()
-
-        conn.execute(
-            "UPDATE local_agents SET status = 'online', last_seen = ?, updated_at = ? WHERE id = ?",
-            (now, now, agent_id),
-        )
-
-        if row is None:
-            conn.commit()
-            return jsonify({"job": None, "poll_after_seconds": 2})
-
-        lease_until = now + _DEFAULT_LEASE_SECONDS
-        conn.execute(
-            """
-            UPDATE local_agent_jobs
-            SET status = 'running', claimed_at = ?, lease_until = ?
-            WHERE id = ? AND status = 'queued'
-            """,
-            (now, lease_until, row["id"]),
-        )
-        conn.commit()
-
-        return jsonify(
-            {
-                "job": {
-                    "id": row["id"],
-                    "tool_name": row["tool_name"],
-                    "arguments": _parse_json(row["arguments_json"], {}),
-                    "metadata": _parse_json(row["metadata_json"], {}),
-                    "trace_id": row["trace_id"],
-                    "invocation_id": row["invocation_id"],
-                    "lease_until": lease_until,
-                },
-                "poll_after_seconds": 1,
-            }
-        )
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    return jsonify(
+        {
+            "job": {
+                "id": row["id"],
+                "tool_name": row["tool_name"],
+                "arguments": _parse_json(row["arguments_json"], {}),
+                "metadata": _parse_json(row["metadata_json"], {}),
+                "trace_id": row["trace_id"],
+                "invocation_id": row["invocation_id"],
+                "lease_until": lease_until,
+            },
+            "poll_after_seconds": 1,
+        }
+    )
 
 
 @local_agent_bp.post("/<agent_id>/jobs/<job_id>/result")
 def local_agent_result(agent_id: str, job_id: str):
-    try:
-        _require_agent(agent_id)
-    except LookupError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 401
 
     data = request.get_json(silent=True) or {}
     status = str(data.get("status") or "").strip().lower()
     if status not in {"completed", "failed"}:
         return jsonify({"error": "status_must_be_completed_or_failed"}), 400
 
-    conn = get_conn()
+    key = "local-job/" + job_id
     try:
-        row = conn.execute(
-            "SELECT status FROM local_agent_jobs WHERE id = ? AND agent_id = ?",
-            (job_id, agent_id),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "job_not_found"}), 404
-        if row["status"] in {"completed", "failed"}:
-            return jsonify({"status": "ok", "idempotent": True})
-
-        now = _now()
-        conn.execute(
-            """
-            UPDATE local_agent_jobs
-            SET status = ?, result_json = ?, error_json = ?, completed_at = ?,
-                lease_until = NULL
-            WHERE id = ? AND agent_id = ?
-            """,
-            (
-                status,
-                _json(data.get("result")),
-                _json(data.get("error")),
-                now,
-                job_id,
-                agent_id,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+        with get_store().transaction() as tx:
+            agent = _require_agent(agent_id)
+            row = tx.get(key)
+            if row is None or row["agent_id"] != agent_id:
+                return jsonify({"error": "job_not_found"}), 404
+            if row["status"] in {"completed", "failed"}:
+                return jsonify({"status": "ok", "idempotent": True})
+            tx.set(
+                key,
+                {
+                    **row,
+                    "status": status,
+                    "result_json": _json(data.get("result")),
+                    "error_json": _json(data.get("error")),
+                    "completed_at": _now(),
+                    "lease_until": None,
+                },
+            )
+    except LookupError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 401
 
     return jsonify({"status": "ok", "job_id": job_id})
 
@@ -408,18 +300,8 @@ def local_agent_health():
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 401
 
-    conn = get_conn()
-    try:
-        cutoff = _now() - 90
-        rows = conn.execute(
-            """
-            SELECT id, name, version, capabilities_json, status, last_seen, updated_at
-            FROM local_agents
-            ORDER BY id ASC
-            """
-        ).fetchall()
-    finally:
-        conn.close()
+    cutoff = _now() - 90
+    rows = sorted(get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"])
 
     agents = []
     for row in rows:

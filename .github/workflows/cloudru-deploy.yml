@@ -114,7 +114,7 @@ jobs:
           python-version-file: .python-version
       - name: Install dependencies
         if: inputs.action != 'preflight'
-        run: pip install -r requirements.txt -r requirements-postgres.txt
+        run: pip install -r requirements.txt
       - name: Deploy
         if: inputs.action == 'deploy'
         env:

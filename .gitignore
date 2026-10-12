@@ -29,3 +29,13 @@ app_logs.jsonl
 coverage.xml
 
 agent_shell.sqlite3
+
+# Native runtime database files and local preview workers
+alice.memory
+alice.memory.lock
+.alice-environments/
+node_modules/
+
+/node_modules
+# Native build output (scripts/build_c17_server.sh)
+build/

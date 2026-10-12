@@ -5,15 +5,23 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any
+from typing import Any, Literal, overload
 
-from db import get_conn
+from db import get_store
 
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
 def _money(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+@overload
+def _decimal(value: Any, name: str, *, nullable: Literal[False] = False) -> Decimal: ...
+
+
+@overload
+def _decimal(value: Any, name: str, *, nullable: Literal[True]) -> Decimal | None: ...
 
 
 def _decimal(value: Any, name: str, *, nullable: bool = False) -> Decimal | None:
@@ -45,28 +53,7 @@ def _optional_int(value: Any, name: str) -> int | None:
 
 
 def init_3d_finance_tables() -> None:
-    conn = get_conn()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS print_finance_plans (
-            owner_id TEXT PRIMARY KEY,
-            printer_model TEXT NOT NULL,
-            equipment_price REAL NOT NULL,
-            setup_cost REAL NOT NULL DEFAULT 0,
-            down_payment REAL NOT NULL DEFAULT 0,
-            credit_principal REAL NOT NULL DEFAULT 0,
-            credit_total_repayment REAL,
-            monthly_payment REAL,
-            term_months INTEGER,
-            psk_percent REAL,
-            currency TEXT NOT NULL DEFAULT 'RUB',
-            started_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+    get_store()
 
 
 def _plan_row(row) -> dict[str, Any]:
@@ -127,58 +114,28 @@ def set_financing_plan(owner_id: str, data: dict[str, Any]) -> dict[str, Any]:
     started_at = str(data.get("started_at") or now).strip() or now
 
     init_3d_finance_tables()
-    conn = get_conn()
-    conn.execute(
-        """
-        INSERT INTO print_finance_plans(
-            owner_id, printer_model, equipment_price, setup_cost, down_payment,
-            credit_principal, credit_total_repayment, monthly_payment, term_months,
-            psk_percent, currency, started_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(owner_id) DO UPDATE SET
-            printer_model = excluded.printer_model,
-            equipment_price = excluded.equipment_price,
-            setup_cost = excluded.setup_cost,
-            down_payment = excluded.down_payment,
-            credit_principal = excluded.credit_principal,
-            credit_total_repayment = excluded.credit_total_repayment,
-            monthly_payment = excluded.monthly_payment,
-            term_months = excluded.term_months,
-            psk_percent = excluded.psk_percent,
-            currency = excluded.currency,
-            started_at = excluded.started_at,
-            updated_at = excluded.updated_at
-        """,
-        (
-            owner_id,
-            model,
-            _money(equipment_price),
-            _money(setup_cost),
-            _money(down_payment),
-            _money(credit_principal),
-            _money(total_repayment) if total_repayment is not None else None,
-            _money(monthly_payment) if monthly_payment is not None else None,
-            term_months,
-            _money(psk_percent) if psk_percent is not None else None,
-            currency,
-            started_at,
-            now,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    record = {
+        "owner_id": owner_id,
+        "printer_model": model,
+        "equipment_price": _money(equipment_price),
+        "setup_cost": _money(setup_cost),
+        "down_payment": _money(down_payment),
+        "credit_principal": _money(credit_principal),
+        "credit_total_repayment": _money(total_repayment) if total_repayment is not None else None,
+        "monthly_payment": _money(monthly_payment) if monthly_payment is not None else None,
+        "term_months": term_months,
+        "psk_percent": _money(psk_percent) if psk_percent is not None else None,
+        "currency": currency,
+        "started_at": started_at,
+        "updated_at": now,
+    }
+    with get_store().transaction() as tx:
+        tx.set("printing/finance/" + owner_id, record)
     return get_financing_plan(owner_id) or {}
 
 
 def get_financing_plan(owner_id: str) -> dict[str, Any] | None:
-    init_3d_finance_tables()
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM print_finance_plans WHERE owner_id = ?",
-        (owner_id,),
-    ).fetchone()
-    conn.close()
-    return _plan_row(row) if row else None
+    return get_store().get("printing/finance/" + owner_id)
 
 
 def _month_profit(owner_id: str, currency: str, month: str) -> Decimal:

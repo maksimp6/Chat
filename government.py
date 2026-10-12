@@ -8,7 +8,7 @@ from typing import Any, Mapping, Optional
 from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
-from db import get_conn
+from db import get_store
 from treasury_identity import get_current_owner_id, TreasuryIdentityError
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
@@ -44,50 +44,7 @@ def _parse(value: Any, default: Any) -> Any:
 
 
 def init_government_tables() -> None:
-    conn = get_conn()
-    try:
-        conn.execute("""CREATE TABLE IF NOT EXISTS government_cases (
-            case_id TEXT PRIMARY KEY,
-            case_type TEXT NOT NULL,
-            status TEXT NOT NULL,
-            user_id TEXT,
-            payload_json TEXT NOT NULL DEFAULT '{}',
-            documents_json TEXT NOT NULL DEFAULT '[]',
-            deadlines_json TEXT NOT NULL DEFAULT '[]',
-            responses_json TEXT NOT NULL DEFAULT '[]',
-            user_approved INTEGER NOT NULL DEFAULT 0,
-            approval_at INTEGER,
-            submitted_at INTEGER,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-        )""")
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_government_cases_user ON government_cases(user_id)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_government_cases_status ON government_cases(status)"
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def _row(row: Any) -> dict[str, Any]:
-    return {
-        "case_id": row["case_id"],
-        "case_type": row["case_type"],
-        "status": row["status"],
-        "user_id": row["user_id"],
-        "payload": _parse(row["payload_json"], {}),
-        "documents": _parse(row["documents_json"], []),
-        "deadlines": _parse(row["deadlines_json"], []),
-        "responses": _parse(row["responses_json"], []),
-        "user_approved": bool(row["user_approved"]),
-        "approval_at": row["approval_at"],
-        "submitted_at": row["submitted_at"],
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }
+    get_store()
 
 
 def _current_owner() -> Optional[str]:
@@ -105,15 +62,7 @@ def _case_owned_by_current_user(case: Optional[dict[str, Any]]) -> bool:
 
 
 def get_case(case_id: str) -> Optional[dict[str, Any]]:
-    init_government_tables()
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM government_cases WHERE case_id = ?", (str(case_id),)
-        ).fetchone()
-    finally:
-        conn.close()
-    return _row(row) if row else None
+    return get_store().get("government/case/" + str(case_id))
 
 
 def _require_case(case_id: str) -> dict[str, Any]:
@@ -124,29 +73,12 @@ def _require_case(case_id: str) -> dict[str, Any]:
 
 
 def _save(case: dict[str, Any]) -> dict[str, Any]:
-    conn = get_conn()
-    try:
-        conn.execute(
-            """UPDATE government_cases SET status=?, user_id=?, payload_json=?, documents_json=?,
-            deadlines_json=?, responses_json=?, user_approved=?, approval_at=?, submitted_at=?, updated_at=?
-            WHERE case_id=?""",
-            (
-                case["status"],
-                case.get("user_id"),
-                _json(case["payload"]),
-                _json(case["documents"]),
-                _json(case["deadlines"]),
-                _json(case["responses"]),
-                1 if case.get("user_approved") else 0,
-                case.get("approval_at"),
-                case.get("submitted_at"),
-                _now(),
-                case["case_id"],
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    key = "government/case/" + case["case_id"]
+    with get_store().transaction() as tx:
+        current = tx.get(key)
+        if current is None or not _case_owned_by_current_user(current):
+            raise ValueError("government case not found")
+        tx.set(key, {**case, "updated_at": _now()})
     return _require_case(case["case_id"])
 
 
@@ -156,18 +88,27 @@ def create_case(
     case_type = str(case_type or "").strip().upper()
     if case_type not in CASE_TYPES:
         raise ValueError("unsupported government case type")
-    init_government_tables()
     case_id = "gov-" + uuid4().hex[:16]
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            "INSERT INTO government_cases (case_id,case_type,status,user_id,created_at,updated_at) VALUES (?,?,?,?,?,?)",
-            (case_id, case_type, "DRAFT", user_id, now, now),
+    with get_store().transaction() as tx:
+        tx.set(
+            "government/case/" + case_id,
+            {
+                "case_id": case_id,
+                "case_type": case_type,
+                "status": "DRAFT",
+                "user_id": user_id,
+                "payload": {},
+                "documents": [],
+                "deadlines": [],
+                "responses": [],
+                "user_approved": False,
+                "approval_at": None,
+                "submitted_at": None,
+                "created_at": now,
+                "updated_at": now,
+            },
         )
-        conn.commit()
-    finally:
-        conn.close()
     return _require_case(case_id)
 
 

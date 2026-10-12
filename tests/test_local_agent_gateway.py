@@ -1,5 +1,4 @@
 import json
-import sqlite3
 
 import pytest
 from flask import Flask
@@ -9,14 +8,6 @@ import local_agent_gateway
 
 @pytest.fixture()
 def client(monkeypatch, tmp_path):
-    db_path = tmp_path / "alice.db"
-
-    def connection():
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    monkeypatch.setattr(local_agent_gateway, "get_conn", connection)
     monkeypatch.setenv("ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
 
     app = Flask(__name__)

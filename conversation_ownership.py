@@ -26,7 +26,7 @@ class ConversationView(TypedDict):
 
 
 def _conversation_rows() -> list[ConversationView]:
-    rows = get_conversations()  # type: ignore[no-untyped-call]
+    rows = get_conversations()
     return [
         ConversationView(
             id=str(row["id"]),

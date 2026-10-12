@@ -105,8 +105,23 @@ writer ownership, backup and isolated restore. Alice tests cover task behavior,
 concurrent runners, failed durable claim, and fresh-process interrupted-task
 recovery. The dedicated Memory DB workflow runs core verification independently.
 
-Full #776 acceptance is still incomplete: SQL-backed chat, sessions, context and
-other consumers remain, as do legacy import, checkpoints, health and Trace work.
-Passing core/task tests does not establish a SQL-free application or production
-readiness. The aggregate draft #1042 contains unrelated work and must not be
-merged wholesale.
+Alice now uses the native MemoryStore writer for chat/messages/settings/config,
+identity and ownership, sessions, agent memory, invocation/Trace, MCP selection,
+local-agent jobs, environments, provider metadata/encrypted credentials, quotas,
+Treasury and business workflows. Records are separate native names; mutations
+use the shared write barrier. SQL drivers, connection adapters, SQL migrations,
+SQL query tool and PostgreSQL CI/deployment dependencies are retired.
+
+The Alice client adds detached prefix iteration and atomic deletion for these
+repositories. `items()` rejects incomplete RAM state; delete on a fenced writer
+fails even for a missing name. The application owns shared-writer shutdown;
+stopping a preview runtime releases only that runtime's writer before removal.
+
+Deployments require an explicit persistent `ALICE_MEMORY_PATH`, one writer
+process and independently verified restart/restore evidence. Cloud object storage
+remains backup, not the live filesystem. Repository implementation/testing does
+not approve production data cutover, delete historical backups or prove remote
+cloud persistence. No automatic SQL import or generic SQL compatibility adapter
+is provided. Startup refuses an implicit empty native database beside existing
+legacy data; an explicit native target belongs to separately verified activation. Full #776 cloud backup, large-state recovery and rollout acceptance
+remain separate. Aggregate #1042 must not be merged wholesale.

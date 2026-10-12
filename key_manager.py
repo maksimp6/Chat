@@ -15,7 +15,9 @@ from typing import Any, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from db_backend import DatabaseRow
+from db import get_store
+
+DatabaseRow = dict[str, Any]
 
 
 class KeyManagerError(RuntimeError):
@@ -83,56 +85,17 @@ def _fingerprint(secret: str) -> str:
 
 
 def create_schema(db: Any) -> None:
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS managed_keys (
-            key_ref TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            purpose TEXT NOT NULL,
-            provider TEXT NOT NULL,
-            environment TEXT NOT NULL,
-            owner TEXT NOT NULL DEFAULT '',
-            encrypted_secret TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'active',
-            created_at TEXT NOT NULL,
-            expires_at TEXT,
-            revoked_at TEXT,
-            rotated_from TEXT,
-            fingerprint TEXT NOT NULL
-        )
-        """
-    )
-    db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_managed_keys_lookup "
-        "ON managed_keys(provider, purpose, environment, status)"
-    )
+    db.info()
 
 
 def _ensure_schema() -> None:
-    from db import get_conn
-
-    conn = get_conn()
-    try:
-        create_schema(conn)
-        conn.commit()
-    finally:
-        conn.close()
+    get_store()
 
 
 def _get_row(key_ref: str) -> DatabaseRow:
-    from db import get_conn
-
-    _ensure_schema()
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM managed_keys WHERE key_ref = ?",
-            (key_ref,),
-        ).fetchone()
-    finally:
-        conn.close()
-    if not row:
-        raise KeyNotFoundError(f"Key '{key_ref}' not found")
+    row = get_store().get("key-manager/" + key_ref)
+    if row is None:
+        raise KeyNotFoundError("Managed key not found")
     return row
 
 
@@ -178,35 +141,26 @@ def store_secret(
     expires_value = _iso(expires_at) if expires_at else None
     encrypted = _fernet().encrypt(secret.encode("utf-8")).decode("ascii")
 
-    from db import get_conn
-
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            INSERT INTO managed_keys
-            (key_ref, name, purpose, provider, environment, owner,
-             encrypted_secret, status, created_at, expires_at, rotated_from, fingerprint)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-            """,
-            (
-                ref,
-                name.strip(),
-                purpose.strip(),
-                provider.strip(),
-                environment.strip(),
-                owner.strip(),
-                encrypted,
-                created_at,
-                expires_value,
-                rotated_from,
-                _fingerprint(secret),
-            ),
-        )
-        conn.commit()
-        row = conn.execute("SELECT * FROM managed_keys WHERE key_ref = ?", (ref,)).fetchone()
-    finally:
-        conn.close()
+    row = {
+        "key_ref": ref,
+        "name": name.strip(),
+        "purpose": purpose.strip(),
+        "provider": provider.strip(),
+        "environment": environment.strip(),
+        "owner": owner.strip(),
+        "encrypted_secret": encrypted,
+        "status": "active",
+        "created_at": created_at,
+        "expires_at": expires_value,
+        "rotated_from": rotated_from,
+        "fingerprint": _fingerprint(secret),
+        "revoked_at": None,
+    }
+    with get_store().transaction() as tx:
+        key = "key-manager/" + ref
+        if tx.get(key) is not None:
+            raise KeyManagerError("Managed key reference already exists")
+        tx.set(key, row)
     return _metadata(row)
 
 
@@ -230,69 +184,39 @@ def list_keys(
     environment: Optional[str] = None,
     include_revoked: bool = False,
 ) -> list[KeyMetadata]:
-    _ensure_schema()
-    clauses = []
-    params = []
-    if provider:
-        clauses.append("provider = ?")
-        params.append(provider)
-    if purpose:
-        clauses.append("purpose = ?")
-        params.append(purpose)
-    if environment:
-        clauses.append("environment = ?")
-        params.append(environment)
-    if not include_revoked:
-        clauses.append("status != 'revoked'")
-
-    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    from db import get_conn
-
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT * FROM managed_keys" + where + " ORDER BY created_at DESC",
-            params,
-        ).fetchall()
-    finally:
-        conn.close()
-    return [_metadata(row) for row in rows]
+    rows = get_store().items(prefix="key-manager/").values()
+    selected = [
+        row
+        for row in rows
+        if (not provider or row["provider"] == provider)
+        and (not purpose or row["purpose"] == purpose)
+        and (not environment or row["environment"] == environment)
+        and (include_revoked or row["status"] != "revoked")
+    ]
+    return [
+        _metadata(row) for row in sorted(selected, key=lambda row: row["created_at"], reverse=True)
+    ]
 
 
 def revoke_key(key_ref: str) -> None:
-    row = _get_row(key_ref)
-    if row["status"] == "revoked":
-        return
-    from db import get_conn
-
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE managed_keys SET status = 'revoked', revoked_at = ? WHERE key_ref = ?",
-            (_iso(_utcnow()), key_ref),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    key = "key-manager/" + key_ref
+    with get_store().transaction() as tx:
+        row = tx.get(key)
+        if row is None:
+            raise KeyNotFoundError("Managed key not found")
+        if row["status"] != "revoked":
+            tx.set(key, {**row, "status": "revoked", "revoked_at": _iso(_utcnow())})
 
 
 def delete_key(key_ref: str) -> None:
-    """Permanently remove a revoked key record.
-
-    Active keys must be revoked first so an accidental delete cannot bypass
-    the lifecycle and policy boundary.
-    """
-    row = _get_row(key_ref)
-    if row["status"] != "revoked":
-        raise KeyManagerError("Only revoked keys can be permanently deleted")
-    from db import get_conn
-
-    conn = get_conn()
-    try:
-        conn.execute("DELETE FROM managed_keys WHERE key_ref = ?", (key_ref,))
-        conn.commit()
-    finally:
-        conn.close()
+    key = "key-manager/" + key_ref
+    with get_store().transaction() as tx:
+        row = tx.get(key)
+        if row is None:
+            raise KeyNotFoundError("Managed key not found")
+        if row["status"] != "revoked":
+            raise KeyManagerError("Only revoked keys can be permanently deleted")
+        tx.delete(key)
 
 
 def rotate_key(

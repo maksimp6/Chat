@@ -12,7 +12,8 @@ from flask import Blueprint, jsonify, request
 
 from config import config
 from credential_crypto import decrypt_secret, encrypt_secret
-from db import get_conn
+from db import get_store
+from provider_credentials import list_provider_credentials
 from provider_credentials import (
     CLOUDRU,
     YANDEX,
@@ -119,18 +120,15 @@ def _provider_client(provider: str, project_id: str | None = None):
 
 
 def _load_credential(provider: str) -> ProviderCredential | None:
-    conn = get_conn()
+    conn = get_store()
     try:
-        try:
-            return get_active_credential(
-                conn,
-                decrypt_secret,
-                provider=provider,
-            )
-        except NoActiveCredentialError:
-            return None
-    finally:
-        conn.close()
+        return get_active_credential(
+            conn,
+            decrypt_secret,
+            provider=provider,
+        )
+    except NoActiveCredentialError:
+        return None
 
 
 def _metadata(credential: ProviderCredential | None) -> dict:
@@ -153,19 +151,8 @@ def _metadata(credential: ProviderCredential | None) -> dict:
 
 def _status_for(provider: str) -> dict:
     """Return metadata and cached health. Never decrypt a secret here."""
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            """SELECT id, provider, provider_key_id, yandex_key_id,
-                      project_id, issued_at, expires_at, status,
-                      fingerprint, last_checked_at, last_check_status, last_check_error
-               FROM provider_credentials
-               WHERE provider = ? AND status = 'active'
-               LIMIT 1""",
-            (provider,),
-        ).fetchone()
-    finally:
-        conn.close()
+    records = list_provider_credentials(get_store(), provider=provider)
+    row = next((item for item in records if item["status"] == "active"), None)
 
     if row:
         credential = {
@@ -242,16 +229,13 @@ def _perform_health_check(provider: str) -> dict:
         error = "provider_unavailable"
         status = "unavailable"
 
-    conn = get_conn()
-    try:
-        record_health_check(
-            conn,
-            provider,
-            status=status,
-            error=error,
-        )
-    finally:
-        conn.close()
+    conn = get_store()
+    record_health_check(
+        conn,
+        provider,
+        status=status,
+        error=error,
+    )
     return {"status": status, "error": error}
 
 
@@ -441,28 +425,25 @@ def bootstrap_cloudru():
         provider = CloudRuApiKeyProvider(base_url=config.CLOUDRU_BASE_URL, iam_client=management)
         provider.validate_key(api_secret)
 
-        conn = get_conn()
-        try:
-            save_cloudru_iam_credentials(
-                conn,
-                key_id=key_id,
-                key_secret=key_secret,
-                project_id=project_id,
-                service_account_id=service_account_id,
-                encrypt=encrypt_secret,
-            )
-            replace_active_credential(
-                conn,
-                api_secret,
-                project_id,
-                encrypt_secret,
-                CLOUDRU,
-                provider_key_id=api_key_id,
-                ttl=_cloudru_ttl(),
-            )
-            record_health_check(conn, CLOUDRU, status="connected", error=None)
-        finally:
-            conn.close()
+        conn = get_store()
+        save_cloudru_iam_credentials(
+            conn,
+            key_id=key_id,
+            key_secret=key_secret,
+            project_id=project_id,
+            service_account_id=service_account_id,
+            encrypt=encrypt_secret,
+        )
+        replace_active_credential(
+            conn,
+            api_secret,
+            project_id,
+            encrypt_secret,
+            CLOUDRU,
+            provider_key_id=api_key_id,
+            ttl=_cloudru_ttl(),
+        )
+        record_health_check(conn, CLOUDRU, status="connected", error=None)
 
         return jsonify(
             {
@@ -569,26 +550,23 @@ def update_provider_credentials():
             else:
                 logger.debug("provider credential accepted for storage: provider=%s", provider)
 
-        conn = get_conn()
-        try:
-            for provider, api_key in supplied:
-                replace_active_credential(
-                    conn,
-                    api_key,
-                    yandex_project_id if provider == YANDEX else "",
-                    encrypt_secret,
-                    provider,
-                    provider_key_id=None,
-                    ttl=timedelta(hours=12),
-                )
-                record_health_check(
-                    conn,
-                    provider,
-                    status="connected",
-                    error=None,
-                )
-        finally:
-            conn.close()
+        conn = get_store()
+        for provider, api_key in supplied:
+            replace_active_credential(
+                conn,
+                api_key,
+                str(yandex_project_id) if provider == YANDEX else "",
+                encrypt_secret,
+                provider,
+                provider_key_id=None,
+                ttl=timedelta(hours=12),
+            )
+            record_health_check(
+                conn,
+                provider,
+                status="connected",
+                error=None,
+            )
     except Exception as exc:
         logger.exception(
             "Provider credential storage failed: providers=%s error=%s",

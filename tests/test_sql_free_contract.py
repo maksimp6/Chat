@@ -5,6 +5,7 @@ Keep the accepted memory_engine journal/snapshot implementation in scope.
 """
 
 import ast
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -34,12 +35,15 @@ LEGACY_FILES = (
     "runtime_migrations.py",
     "requirements-postgres.txt",
     "docker-compose.postgres.yml",
+    "scripts/pg_backup.sh",
 )
 
 
 def test_no_sql_driver_imports_in_runtime():
     offenders = []
-    for relative in RUNTIME:
+    tracked = subprocess.check_output(["git", "ls-files", "*.py"], cwd=ROOT, text=True).splitlines()
+    runtime_files = [path for path in tracked if not path.startswith(("tests/", "node_modules/"))]
+    for relative in runtime_files:
         path = ROOT / relative
         if not path.exists():
             continue
@@ -77,3 +81,26 @@ def test_new_memory_store_is_the_only_accepted_engine():
     assert "class _JournalStore:" in source
     assert "import sqlite3" not in source
     assert "import psycopg" not in source
+
+
+def test_runtime_has_no_sql_connection_boundary():
+    import db
+
+    assert not hasattr(db, "get_conn")
+    assert not hasattr(db.get_store(), "execute")
+    paths = subprocess.check_output(["git", "ls-files", "*.py"], cwd=ROOT, text=True).splitlines()
+    offenders = []
+    for relative in paths:
+        if relative.startswith(("tests/", "node_modules/")):
+            continue
+        path = ROOT / relative
+        if not path.exists():
+            continue
+        tree = ast.parse(path.read_text())
+        if any(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name in {"get_conn", "_get_conn"}
+            for node in ast.walk(tree)
+        ):
+            offenders.append(relative)
+    assert not offenders, offenders

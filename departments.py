@@ -8,7 +8,7 @@ import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
-from db import get_conn
+from db import get_store
 from session_manager import create_session, get_session
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
@@ -31,30 +31,7 @@ def _parse(value: Any, default: Any) -> Any:
 
 
 def init_department_tables() -> None:
-    conn = get_conn()
-    try:
-        conn.execute("""CREATE TABLE IF NOT EXISTS departments (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            description TEXT NOT NULL DEFAULT '',
-            agent_id TEXT,
-            model_config_json TEXT NOT NULL DEFAULT '{}',
-            system_prompt TEXT NOT NULL DEFAULT '',
-            tools_json TEXT NOT NULL DEFAULT '[]',
-            capabilities_json TEXT NOT NULL DEFAULT '[]',
-            policies_json TEXT NOT NULL DEFAULT '{}',
-            knowledge_scope_json TEXT NOT NULL DEFAULT '{}',
-            session_config_json TEXT NOT NULL DEFAULT '{}',
-            status TEXT NOT NULL DEFAULT 'active',
-            metadata_json TEXT NOT NULL DEFAULT '{}',
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-        )""")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_departments_status ON departments(status)")
-        conn.commit()
-    finally:
-        conn.close()
+    get_store()
 
 
 def _admin_ok() -> bool:
@@ -70,112 +47,43 @@ def _validate_id(value: str) -> str:
     return value
 
 
-def _row_to_dict(row: Any) -> dict[str, Any]:
-    return {
-        "id": row["id"],
-        "name": row["name"],
-        "type": row["type"],
-        "description": row["description"],
-        "agent_id": row["agent_id"],
-        "model_config": _parse(row["model_config_json"], {}),
-        "system_prompt": row["system_prompt"],
-        "tools": _parse(row["tools_json"], []),
-        "capabilities": _parse(row["capabilities_json"], []),
-        "policies": _parse(row["policies_json"], {}),
-        "knowledge_scope": _parse(row["knowledge_scope_json"], {}),
-        "session_config": _parse(row["session_config_json"], {}),
-        "status": row["status"],
-        "metadata": _parse(row["metadata_json"], {}),
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }
-
-
 def list_departments() -> list[dict[str, Any]]:
-    init_department_tables()
-    conn = get_conn()
-    try:
-        rows = conn.execute("SELECT * FROM departments ORDER BY name ASC, id ASC").fetchall()
-    finally:
-        conn.close()
-    return [_row_to_dict(row) for row in rows]
+    return sorted(
+        get_store().items(prefix="department/").values(),
+        key=lambda item: (item["name"], item["id"]),
+    )
 
 
 def get_department(department_id: str) -> Optional[dict[str, Any]]:
-    department_id = _validate_id(department_id)
-    init_department_tables()
-    conn = get_conn()
-    try:
-        row = conn.execute("SELECT * FROM departments WHERE id = ?", (department_id,)).fetchone()
-    finally:
-        conn.close()
-    return _row_to_dict(row) if row else None
+    return get_store().get("department/" + _validate_id(department_id))
 
 
 def upsert_department(
     data: Mapping[str, Any], department_id: Optional[str] = None
 ) -> dict[str, Any]:
-    init_department_tables()
     ident = _validate_id(department_id or data.get("id") or ("dept-" + uuid4().hex[:12]))
     name = str(data.get("name") or "").strip()
     if not name:
         raise ValueError("department name is required")
-    now = _now()
-    payload = {
+    record: dict[str, Any] = {
+        "id": ident,
+        "name": name,
+        "type": str(data.get("type") or "general"),
         "description": str(data.get("description") or ""),
         "agent_id": str(data.get("agent_id") or "").strip() or None,
-        "model_config": dict(data.get("model_config") or {}),
         "system_prompt": str(data.get("system_prompt") or ""),
-        "tools": list(data.get("tools") or []),
-        "capabilities": list(data.get("capabilities") or []),
-        "policies": dict(data.get("policies") or {}),
-        "knowledge_scope": dict(data.get("knowledge_scope") or {}),
-        "session_config": dict(data.get("session_config") or {}),
         "status": str(data.get("status") or "active"),
-        "metadata": dict(data.get("metadata") or {}),
+        "updated_at": _now(),
     }
-    conn = get_conn()
-    try:
-        existing = conn.execute(
-            "SELECT created_at FROM departments WHERE id = ?", (ident,)
-        ).fetchone()
-        created_at = existing["created_at"] if existing else now
-        conn.execute(
-            """INSERT INTO departments
-            (id,name,type,description,agent_id,model_config_json,system_prompt,tools_json,
-             capabilities_json,policies_json,knowledge_scope_json,session_config_json,status,
-             metadata_json,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-              name=excluded.name,type=excluded.type,description=excluded.description,
-              agent_id=excluded.agent_id,model_config_json=excluded.model_config_json,
-              system_prompt=excluded.system_prompt,tools_json=excluded.tools_json,
-              capabilities_json=excluded.capabilities_json,policies_json=excluded.policies_json,
-              knowledge_scope_json=excluded.knowledge_scope_json,session_config_json=excluded.session_config_json,
-              status=excluded.status,metadata_json=excluded.metadata_json,updated_at=excluded.updated_at""",
-            (
-                ident,
-                name,
-                str(data.get("type") or "general"),
-                payload["description"],
-                payload["agent_id"],
-                _json(payload["model_config"]),
-                payload["system_prompt"],
-                _json(payload["tools"]),
-                _json(payload["capabilities"]),
-                _json(payload["policies"]),
-                _json(payload["knowledge_scope"]),
-                _json(payload["session_config"]),
-                payload["status"],
-                _json(payload["metadata"]),
-                created_at,
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    return get_department(ident)
+    for field in ("model_config", "policies", "knowledge_scope", "session_config", "metadata"):
+        record[field] = dict(data.get(field) or {})
+    for field in ("tools", "capabilities"):
+        record[field] = list(data.get(field) or [])
+    with get_store().transaction() as tx:
+        old = tx.get("department/" + ident)
+        record["created_at"] = old["created_at"] if old else record["updated_at"]
+        tx.set("department/" + ident, record)
+    return record
 
 
 @departments_bp.get("")
@@ -223,15 +131,11 @@ def departments_delete(department_id: str):
     department = get_department(department_id)
     if not department:
         return jsonify({"error": "department_not_found"}), 404
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE departments SET status='archived',updated_at=? WHERE id=?",
-            (_now(), department_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    key = "department/" + _validate_id(department_id)
+    with get_store().transaction() as tx:
+        record = tx.get(key)
+        if record is not None:
+            tx.set(key, {**record, "status": "archived", "updated_at": _now()})
     return jsonify({"status": "archived", "department_id": department_id})
 
 
