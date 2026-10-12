@@ -19,3 +19,5 @@ Required UI resources such as JavaScript, CSS, icons, and debugging UI bundles a
 ## Tracing
 
 Tool execution, provider requests, polling, and agent calls should preserve `trace_id`/invocation correlation and must not expose secrets in ExecutionTrace.
+
+C sources and native bridges follow [C17 development standard](docs/development/c-standard.md); run `bash scripts/check_c17.sh` when modifying C.
