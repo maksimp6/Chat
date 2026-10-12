@@ -115,6 +115,7 @@ def main(
     environ: Mapping[str, str] | None = None,
     tunnel_binary: str = TUNNEL_BINARY,
     app_argv: list[str] | None = None,
+    replace_process: bool = False,
 ) -> int:
     environ = dict(os.environ if environ is None else environ)
     try:
@@ -124,6 +125,9 @@ def main(
         return 2
 
     if chosen.tunnel is None:
+        if replace_process:
+            # Same process as before the entrypoint existed: Alice is PID 1 and gets signals directly.
+            os.execvpe(chosen.app_argv[0], chosen.app_argv, chosen.app_env)
         return subprocess.call(chosen.app_argv, env=chosen.app_env)
 
     procs = [subprocess.Popen(chosen.app_argv, env=chosen.app_env)]
@@ -156,4 +160,4 @@ def main(
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(replace_process=True))
