@@ -42,9 +42,7 @@ def _digest(data: Mapping[str, Any]) -> str:
 def _safe_metadata(value: object) -> bool:
     if isinstance(value, dict):
         return all(
-            isinstance(key, str)
-            and not _SECRET_KEYS.search(key)
-            and _safe_metadata(child)
+            isinstance(key, str) and not _SECRET_KEYS.search(key) and _safe_metadata(child)
             for key, child in value.items()
         )
     if isinstance(value, list):
