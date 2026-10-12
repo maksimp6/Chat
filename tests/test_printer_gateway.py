@@ -1,7 +1,12 @@
 """Contract tests: LAN and cloud API are isolated."""
+
 import pytest
 from alice_pro.printers.gateway import (
-    Operation, PrinterGateway, PrinterRequest, Transport, TransportUnavailable,
+    Operation,
+    PrinterGateway,
+    PrinterRequest,
+    Transport,
+    TransportUnavailable,
 )
 
 
