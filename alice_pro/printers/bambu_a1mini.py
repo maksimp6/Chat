@@ -5,7 +5,6 @@ No heating, motion, file upload, or print-start commands are implemented.
 from __future__ import annotations
 
 import json
-import ipaddress
 import socket
 import struct
 from typing import Any
