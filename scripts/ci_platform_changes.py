@@ -45,16 +45,13 @@ def _runtime_platforms(path: str) -> set[str]:
             "db_backend.py",
             "memory_db.py",
             "provider_credentials.py",
-            "requirements-postgres.txt",
         }
         or path.startswith("migrations/")
-        or "postgres" in path.lower()
     ):
         return {"backend", "database"}
     if path.startswith("tests/") and path.endswith(".py"):
         return {"backend"}
     if path.endswith(".py"):
-        # Keep SQL compatibility coverage until the runtime migration is complete.
         return {"backend", "database"}
     if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
         return set()
