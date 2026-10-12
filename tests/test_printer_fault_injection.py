@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from alice_pro.printers.bambu_a1mini import PrinterProtocolError, probe
+from alice_pro.printers import lan_socket
 
 ROUTES = (
     "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n"
@@ -23,6 +24,20 @@ class Socket:
     def __init__(self, response):
         self.response = response
         self.sent = b""
+        self.connected = None
+        self.closed = False
+
+    def setsockopt(self, level, option, value):
+        self.bound = value
+
+    def connect(self, address):
+        self.connected = address
+
+    def getpeername(self):
+        return self.connected
+
+    def close(self):
+        self.closed = True
 
     def __enter__(self):
         return self
@@ -60,11 +75,15 @@ def network(monkeypatch):
 
     monkeypatch.setattr(socket, "getaddrinfo", resolve)
 
-    def connect(address, timeout):
-        connections.append(address)
-        return Socket(frame({"login": {"command": "detect", "model": "N1"}}))
+    original = lan_socket.connect_lan
 
-    monkeypatch.setattr(socket, "create_connection", connect)
+    def connect(host, port, timeout):
+        fake = Socket(frame({"login": {"command": "detect", "model": "N1"}}))
+        result = original(host, port, timeout=timeout, socket_factory=lambda *args: fake)
+        connections.append(fake.connected)
+        return result
+
+    monkeypatch.setattr(lan_socket, "connect_lan", connect)
     return dns_calls, connections
 
 
@@ -107,16 +126,21 @@ def test_dns_route_vpn_override_never_opens_socket(monkeypatch, network):
     ],
 )
 def test_corrupt_or_truncated_frames(monkeypatch, network, response):
-    monkeypatch.setattr(socket, "create_connection", lambda *args, **kw: Socket(response))
+    original = lan_socket.connect_lan
+    monkeypatch.setattr(lan_socket, "connect_lan", lambda host, port, timeout: original(host, port, timeout=timeout, socket_factory=lambda *args: Socket(response)))
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
 
 
 def test_socket_timeout_propagates(monkeypatch, network):
     monkeypatch.setattr(
-        socket,
-        "create_connection",
-        lambda *args, **kw: Socket(socket.timeout("printer timeout")),
+        lan_socket,
+        "connect_lan",
+        lambda host, port, timeout: _raise_timeout(),
     )
     with pytest.raises(socket.timeout):
         probe("printer.example.test")
+
+
+def _raise_timeout():
+    raise socket.timeout("printer timeout")
