@@ -1,19 +1,22 @@
-"""Durable single-file append-only key/value store.
+"""Durable JSONL Memory DB with serialized cross-process file operations.
 
-The authoritative database is one JSONL file. Normal writes append one checksummed
-record and fsync before success. Compaction writes a temporary snapshot, fsyncs it,
-then atomically replaces the authoritative file.
+A persistent sidecar flock serializes recover/read/append/compaction and export.
+Writes are acknowledged only after fsync; uncertain writes poison the handle.
+All participants must use this API on one POSIX filesystem supporting flock.
 """
 
 from __future__ import annotations
 
+import copy
+import fcntl
 import hashlib
 import hmac
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, Iterator
 
 
 class FileMemoryError(Exception):
@@ -29,68 +32,82 @@ class FileMemoryDB:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
+        self._lock_path = self.path.with_name(f"{self.path.name}.lock")
         self._lock = RLock()
         self._state: dict[str, Any] = {}
         self._seq = 0
+        self._poisoned = False
+        self._ever_seen = self.path.exists()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._recover()
+        with self._guard():
+            pass
+
+    @contextmanager
+    def _guard(self, *, mutate: bool = False) -> Iterator[None]:
+        """Hold process and filesystem locks around a consistent state boundary."""
+        with self._lock:
+            if self._poisoned:
+                if mutate:
+                    raise FileMemoryError("uncertain write outcome; reopen after recovery")
+                yield  # Reads return only the last locally acknowledged state.
+                return
+            flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(self._lock_path, flags, 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                self._recover()
+                yield
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
 
     @property
     def sequence(self) -> int:
-        with self._lock:
+        with self._guard():
             return self._seq
 
     def get(self, key: str, default: Any = None) -> Any:
-        with self._lock:
-            return self._state.get(key, default)
+        with self._guard():
+            return copy.deepcopy(self._state.get(key, default))
 
     def items(self) -> dict[str, Any]:
-        with self._lock:
-            return dict(self._state)
+        with self._guard():
+            return copy.deepcopy(self._state)
 
     def put(self, key: str, value: Any) -> int:
         if not isinstance(key, str) or not key:
             raise ValueError("key must be a non-empty string")
-        with self._lock:
+        with self._guard(mutate=True):
             seq = self._seq + 1
             record = {"v": self.VERSION, "seq": seq, "op": "put", "key": key, "value": value}
-            self._append(record)
-            self._state[key] = value
+            self._commit_record(record)
+            self._state[key] = copy.deepcopy(value)
             self._seq = seq
             return seq
 
     def delete(self, key: str) -> int:
         if not isinstance(key, str) or not key:
             raise ValueError("key must be a non-empty string")
-        with self._lock:
+        with self._guard(mutate=True):
             seq = self._seq + 1
             record = {"v": self.VERSION, "seq": seq, "op": "delete", "key": key}
-            self._append(record)
+            self._commit_record(record)
             self._state.pop(key, None)
             self._seq = seq
             return seq
 
-    def compact(self) -> None:
-        with self._lock:
-            snapshot = {
-                "v": self.VERSION,
-                "seq": self._seq,
-                "op": "snapshot",
-                "value": self._state,
-            }
-            payload = self._encode(snapshot)
-            temporary = self.path.with_name(f"{self.path.name}.tmp")
-            fd = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-            try:
-                self._write_all(fd, payload)
-                os.fsync(fd)
-            finally:
-                os.close(fd)
-            os.replace(temporary, self.path)
-            self._fsync_parent()
-
-    def _append(self, record: dict[str, Any]) -> None:
+    def _commit_record(self, record: dict[str, Any]) -> None:
         payload = self._encode(record)
+        try:
+            self._append_payload(payload)
+        except OSError:
+            self._poisoned = True
+            raise
+
+    def _append_payload(self, payload: bytes) -> None:
         existed = self.path.exists()
         fd = os.open(self.path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
         try:
@@ -100,6 +117,38 @@ class FileMemoryDB:
             os.close(fd)
         if not existed:
             self._fsync_parent()
+        self._ever_seen = True
+
+    def export_snapshot(self) -> tuple[bytes, int]:
+        """Return mutually consistent bytes and sequence, for backups only."""
+        with self._guard(mutate=True):
+            return self.path.read_bytes() if self.path.exists() else b"", self._seq
+
+    def compact(self) -> None:
+        with self._guard(mutate=True):
+            snapshot = {
+                "v": self.VERSION,
+                "seq": self._seq,
+                "op": "snapshot",
+                "value": self._state,
+            }
+            payload = self._encode(snapshot)
+            temporary = self.path.with_name(f"{self.path.name}.tmp")
+            try:
+                fd = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+                try:
+                    self._write_all(fd, payload)
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+                os.replace(temporary, self.path)
+                self._fsync_parent()
+                self._ever_seen = True
+            except OSError:
+                self._poisoned = True
+                raise
+            finally:
+                temporary.unlink(missing_ok=True)
 
     @staticmethod
     def _write_all(fd: int, payload: bytes) -> None:
@@ -112,6 +161,10 @@ class FileMemoryDB:
 
     def _recover(self) -> None:
         if not self.path.exists():
+            if self._ever_seen:
+                raise FileMemoryCorruption("authoritative store disappeared")
+            self._state = {}
+            self._seq = 0
             return
 
         data = self.path.read_bytes()
@@ -122,22 +175,14 @@ class FileMemoryDB:
 
         for index, raw in enumerate(data.splitlines(keepends=True)):
             offset += len(raw)
-
             if not raw.endswith(b"\n"):
                 self._truncate(last_good)
                 break
 
-            line = raw[:-1]
             try:
-                record = json.loads(line)
+                record = json.loads(raw[:-1])
                 self._validate_record(record, seq, index == 0)
-            except (
-                json.JSONDecodeError,
-                UnicodeDecodeError,
-                KeyError,
-                TypeError,
-                ValueError,
-            ) as exc:
+            except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError, ValueError) as exc:
                 raise FileMemoryCorruption(f"corrupt record at offset {last_good}") from exc
 
             op = record["op"]
@@ -147,14 +192,16 @@ class FileMemoryDB:
                 state[record["key"]] = record["value"]
             elif op == "delete":
                 state.pop(record["key"], None)
-
             seq = record["seq"]
             last_good = offset
 
         self._state = state
         self._seq = seq
+        self._ever_seen = True
 
     def _validate_record(self, record: dict[str, Any], previous_seq: int, first: bool) -> None:
+        if not isinstance(record, dict):
+            raise ValueError("record must be an object")
         if record.get("v") != self.VERSION:
             raise ValueError("unsupported version")
         if not isinstance(record.get("seq"), int) or record["seq"] < 0:
