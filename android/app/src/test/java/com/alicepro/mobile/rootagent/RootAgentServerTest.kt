@@ -17,10 +17,12 @@ class RootAgentServerTest {
     private var treeDump = RootShellResult(
         0, "<?xml version='1.0' ?><hierarchy rotation=\"0\"><node text=\"a\\\"b\" /></hierarchy>\n", false, false,
     )
+    private var shotDump = RootShellResult(0, "iVBORw0KGgoB\n", false, false)
     private val operations = RootOperations(
         runRoot = { argv -> if (argv == RootOperations.STATUS_ARGV) statusDump else probe },
         deviceInfo = { mapOf("model" to "Redmi 9", "sdk" to "29") },
         runTree = { treeDump },
+        runScreenshot = { shotDump },
     )
     private lateinit var server: RootAgentServer
     private var port = 0
@@ -112,6 +114,20 @@ class RootAgentServerTest {
         treeDump = RootShellResult(null, "", timedOut = true, truncated = false)
         assertEquals(504, status(get("/v1/screen/tree")))
         assertEquals(401, status(get("/v1/screen/tree", auth = null)))
+    }
+
+    @Test
+    fun screenshotReturnsBase64Png() {
+        val ok = get("/v1/screen/capture")
+        assertEquals(200, status(ok))
+        assertTrue(ok, ok.endsWith("{\"format\":\"png\",\"png_base64\":\"iVBORw0KGgoB\"}"))
+        shotDump = RootShellResult(1, "secret", false, false)
+        val failed = get("/v1/screen/capture")
+        assertEquals(502, status(failed))
+        assertFalse(failed.contains("secret"))
+        shotDump = RootShellResult(null, "", timedOut = true, truncated = false)
+        assertEquals(504, status(get("/v1/screen/capture")))
+        assertEquals(401, status(get("/v1/screen/capture", auth = null)))
     }
 
     @Test
