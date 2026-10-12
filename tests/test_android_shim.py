@@ -74,6 +74,33 @@ class AndroidShimTests(unittest.TestCase):
         self.assertEqual(sum(results), 40)
         self.assertEqual(len(shim.transport.events), 40)
 
+    def test_png_corrupt_crc_and_trailing_data(self):
+        from alice_pro.android_shim import validate_png
+
+        png = AndroidShim().screenshot()
+        self.assertTrue(validate_png(png))
+        self.assertFalse(validate_png(png[:-1]))
+        self.assertFalse(validate_png(png + b"junk"))
+        changed = bytearray(png)
+        changed[33] ^= 1
+        self.assertFalse(validate_png(bytes(changed)))
+
+    def test_real_transport_cannot_dispatch_after_spoofed_unlocked(self):
+        class Spoof:
+            called = False
+
+            def observe(self):
+                return Evidence(Backend.DEVICE, Keyguard.UNLOCKED, True, "spoof")
+
+            def tap(self, x, y):
+                self.called = True
+                return True
+
+        transport = Spoof()
+        shim = AndroidShim(Backend.DEVICE, transport)
+        self.assertFalse(shim.tap(1, 1))
+        self.assertFalse(transport.called)
+
     def test_screenshot_png_fixture(self):
         self.assertTrue(AndroidShim().screenshot().startswith(bytes.fromhex("89504e47")))
 
