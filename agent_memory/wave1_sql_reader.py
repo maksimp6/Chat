@@ -93,6 +93,10 @@ class SqlSnapshotReader:
         if self.dialect == "postgresql":
             if getattr(conn, "autocommit", None) is not True:
                 raise SnapshotReadError("PostgreSQL source connection must be autocommit")
+            info = getattr(conn, "info", None)
+            status = getattr(info, "transaction_status", None)
+            if getattr(status, "name", None) != "IDLE":
+                raise SnapshotReadError("PostgreSQL source must be an idle fresh transaction")
             cursor.execute("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
         else:
             cursor.execute("PRAGMA query_only = ON")

@@ -173,7 +173,10 @@ class _FakeCursor:
 
 class _FakePgConnection:
     def __init__(self, autocommit=True):
+        from types import SimpleNamespace
+
         self.autocommit = autocommit
+        self.info = SimpleNamespace(transaction_status=SimpleNamespace(name="IDLE"))
         self.cursor_object = _FakeCursor()
         self.rollback_calls = 0
         self.closed = False
@@ -210,6 +213,15 @@ def test_postgres_rejects_non_autocommit_connection_before_any_reads():
     assert db.cursor_object.statements == []
     assert db.closed
     assert db.rollback_calls == 1
+
+
+def test_postgres_rejects_existing_transaction_before_read():
+    db = _FakePgConnection()
+    db.info.transaction_status.name = "INTRANS"
+    with pytest.raises(SnapshotReadError, match="idle"):
+        SqlSnapshotReader.postgresql(lambda: db).read()
+    assert db.cursor_object.statements == []
+    assert db.closed
 
 
 def test_real_postgres_readonly_repeatable_read_with_concurrent_writer():
