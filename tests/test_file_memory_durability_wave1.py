@@ -280,3 +280,11 @@ def test_poisoned_handle_cannot_produce_backup(tmp_path, monkeypatch):
     with pytest.raises(FileMemoryError, match="uncertain"):
         create_backup(db, tmp_path / "uncommitted")
     assert not (tmp_path / "uncommitted" / "COMMITTED").exists()
+
+def test_deleting_authoritative_file_after_ack_fails_closed(tmp_path):
+    path = tmp_path / "alice.memory"
+    db = FileMemoryDB(path)
+    db.put("keep", 1)
+    path.unlink()
+    with pytest.raises(FileMemoryCorruption, match="disappeared"):
+        db.items()
