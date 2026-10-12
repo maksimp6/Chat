@@ -26,7 +26,7 @@ def connect_lan_impl(
     *,
     interface: str = "wlan0",
     timeout: float = 3.0,
-    socket_factory: SocketFactory = socket.socket,
+    socket_factory: SocketFactory | None = None,
 ) -> socket.socket:
     """Resolve once and bind the socket to the verified interface before connect."""
     if not isinstance(port, int) or not 1 <= port <= 65535:
@@ -38,7 +38,8 @@ def connect_lan_impl(
     if not 0 < timeout <= 15:
         raise ValueError("invalid timeout")
     pinned_ip = resolve_lan(host, interface=interface)
-    sock = socket_factory(socket.AF_INET, socket.SOCK_STREAM)
+    factory = socket_factory if socket_factory is not None else socket.socket
+    sock = factory(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.settimeout(timeout)
         option = getattr(socket, "SO_BINDTODEVICE", None)
