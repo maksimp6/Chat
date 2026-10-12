@@ -57,6 +57,7 @@ STRICT_CLEAN_FILES = {
     "alice_pro/printers/gateway.py",
     "alice_pro/printers/lan.py",
     "alice_pro/printers/lan_address.py",
+    "alice_pro/printers/lan_socket.py",
     "alice_pro/printers/models.py",
     "alice_pro/printers/service.py",
     "alice_platform/__init__.py",
