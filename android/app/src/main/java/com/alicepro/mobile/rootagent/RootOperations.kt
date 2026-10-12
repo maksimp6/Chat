@@ -84,7 +84,7 @@ class RootOperations(
 
     companion object {
         val PROBE_ARGV = listOf("su", "-c", "id -u")
-        val TREE_ARGV = listOf("su", "-c", "uiautomator dump /dev/tty")
+        val TREE_ARGV = listOf("su", "-c", "uiautomator dump /proc/self/fd/1")
         private const val TREE_END = "</hierarchy>"
         val SCREENSHOT_ARGV = listOf("su", "-c", "screencap -p | base64")
         private val PNG_MAGIC = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)

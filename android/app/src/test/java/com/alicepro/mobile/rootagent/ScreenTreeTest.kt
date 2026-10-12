@@ -17,7 +17,7 @@ class ScreenTreeTest {
     @Test
     fun dumpIsExtractedFromUiautomatorOutput() {
         val seen = mutableListOf<List<String>>()
-        val out = RootShellResult(0, xml + "UI hierchary dumped to: /dev/tty\n", false, false)
+        val out = RootShellResult(0, xml + "UI hierchary dumped to: /proc/self/fd/1\n", false, false)
         val tree = ops(out, seen).screenTree()
         assertEquals(RootOperations.ScreenTree.Answered(xml), tree)
         assertEquals(listOf(RootOperations.TREE_ARGV), seen)
@@ -25,7 +25,9 @@ class ScreenTreeTest {
 
     @Test
     fun treeUsesAFixedArgv() {
-        assertEquals(listOf("su", "-c", "uiautomator dump /dev/tty"), RootOperations.TREE_ARGV)
+        // ProcessBuilder gives su no controlling terminal, so /dev/tty cannot be opened;
+        // uiautomator writes the dump to its own stdout pipe instead.
+        assertEquals(listOf("su", "-c", "uiautomator dump /proc/self/fd/1"), RootOperations.TREE_ARGV)
     }
 
     @Test

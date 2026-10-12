@@ -63,7 +63,7 @@ gradle :app:testDebugUnitTest
 - Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
   (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
   locked; the foreground app is not exposed), `GET /v1/screen/tree` (`{"xml": ...}` from a root
-  `uiautomator dump /dev/tty`, 15 s timeout, 2 MiB bound; failed, truncated or non-XML output is
+  `uiautomator dump /proc/self/fd/1`, 15 s timeout, 2 MiB bound; failed, truncated or non-XML output is
   `502` without the raw output; the read-only counterpart of Live Server `/screen/tree`),
   `GET /v1/screen/capture` (`{"format":"png","png_base64": ...}` from a root `screencap -p | base64`,
   15 s timeout, 12 MiB bound; anything that does not decode to a PNG is `502` without the raw
