@@ -37,8 +37,8 @@ def decode_probe(data: bytes) -> dict[str, Any]:
 
 def probe(host: str, timeout: float = 3.0) -> PrinterIdentity:
     """Identify the device. Does not authenticate or alter printer state."""
-    from .lan import require_lan_host
-    host = require_lan_host(host)
+    from .lan_address import resolve_lan
+    host = resolve_lan(host)
     if not 0 < timeout <= 15:
         raise ValueError("timeout must be between 0 and 15 seconds")
     request = {"login": {"command": "detect", "sequence_id": "1"}}
