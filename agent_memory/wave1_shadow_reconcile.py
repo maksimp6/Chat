@@ -11,7 +11,7 @@ from typing import Mapping
 from agent_memory.backup import create_backup, restore_backup
 from agent_memory.file_memory_db import FileMemoryDB
 from agent_memory.wave1_shadow import ShadowMismatch, stage_shadow, verify_shadow
-from agent_memory.wave1_sql_reader import SqlSnapshotReader, SqlSourceSnapshot
+from migrations.wave1_sql_reader import SqlSnapshotReader, SqlSourceSnapshot
 
 
 @dataclass(frozen=True)

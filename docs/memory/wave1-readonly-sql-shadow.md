@@ -4,7 +4,7 @@
 
 ## Transactional source
 
-`agent_memory.wave1_sql_reader.SqlSnapshotReader` reads all three tables in one transaction, with fixed SELECT projections and a 100,000-row limit per table:
+`migrations.wave1_sql_reader.SqlSnapshotReader` reads all three tables in one transaction, with fixed SELECT projections and a 100,000-row limit per table:
 
 - **SQLite**: requires an existing non-symlink source file; connects with URI `mode=ro`; enables `PRAGMA query_only=ON` and `BEGIN`, then always `ROLLBACK`. In WAL mode, concurrent commits after the first SELECT cannot mix session and memory revisions. The reader never invokes SQL DDL/DML.
 - **PostgreSQL**: requires a caller-owned fresh `autocommit=True` connection and begins `REPEATABLE READ READ ONLY` before selecting rows. It always rolls back and closes the supplied connection. Real PostgreSQL credentials/DSN are not accepted as arguments to this module. An adapter with non-idle transaction status is **refused**, even when autocommit is set. Production reader credentials must have database-level **SELECT-only** privileges; transaction read-only is defense in depth, not the sole security boundary. Never log credentials, SQL result values or owner roster.

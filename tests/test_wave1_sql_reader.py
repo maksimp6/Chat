@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 
 from agent_memory.wave1_shadow import ShadowMismatch
-from agent_memory.wave1_sql_reader import SnapshotReadError, SqlSnapshotReader
+from migrations.wave1_sql_reader import SnapshotReadError, SqlSnapshotReader
 
 
 def _source(tmp_path):

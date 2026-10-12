@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from agent_memory.wave1_sql_reader import SnapshotReadError, SqlSnapshotReader
+from migrations.wave1_sql_reader import SnapshotReadError, SqlSnapshotReader
 from tests.test_wave1_sql_reader import _source
 
 
@@ -16,7 +16,7 @@ def test_rejects_unsupported_dialect():
 
 
 def test_refuses_sql_row_limit(tmp_path, monkeypatch):
-    import agent_memory.wave1_sql_reader as module
+    import migrations.wave1_sql_reader as module
 
     monkeypatch.setattr(module, "MAX_ROWS", 1)
     with pytest.raises(SnapshotReadError, match="row limit"):
@@ -70,7 +70,7 @@ def test_duplicate_sql_session_ids_denied_before_staging(tmp_path):
 
 
 def test_owner_binding_invalid_identifier_is_denied():
-    from agent_memory.wave1_sql_reader import audit_owners
+    from migrations.wave1_sql_reader import audit_owners
 
     with pytest.raises(SnapshotReadError, match="invalid session owner"):
         audit_owners([{"id": 7}], {7: "owner"}, frozenset({"owner"}))

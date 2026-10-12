@@ -8,7 +8,7 @@ import pytest
 
 from agent_memory.wave1_shadow import ShadowMismatch, verify_shadow
 from agent_memory.wave1_shadow_reconcile import shadow_catchup
-from agent_memory.wave1_sql_reader import SqlSnapshotReader
+from migrations.wave1_sql_reader import SqlSnapshotReader
 from agent_memory.file_memory_db import FileMemoryDB
 from tests.test_wave1_sql_reader import _source
 

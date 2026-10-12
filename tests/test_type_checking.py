@@ -39,7 +39,7 @@ MYPY_ERROR_BASELINE = {
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
     "agent_memory/wave1_shadow.py",
-    "agent_memory/wave1_sql_reader.py",
+    "migrations/wave1_sql_reader.py",
     "agent_memory/wave1_shadow_reconcile.py",
     "agent_context/__init__.py",
     "agent_context/cache.py",
