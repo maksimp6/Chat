@@ -15,6 +15,12 @@ missing through this API. Values are finite JSON scalars, lists and string-keyed
 dictionaries. Tuples, non-string dictionary keys, nonfinite floats and arbitrary
 objects fail commit validation before any journal write.
 
+Container graphs are checked before staging copies: cycles, nesting beyond 64
+levels and more than 100,000 nodes (including dictionary keys) raise `StoreError`
+without replacing existing staging. Shared acyclic subtrees remain supported.
+Replay enforces the same limits and preserves invalid source bytes. These limits
+bound recursive copying/JSON encoding; the existing 1 MiB frame limit still applies.
+
 `set()` copies into client-owned staging and `get()` reads that staging before
 committed data. `commit()` validates all staged values and appends one durable
 record before publishing committed RAM state. An empty commit returns the current

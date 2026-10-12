@@ -9,6 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
+from itertools import chain
 import fcntl
 import hashlib
 import json
@@ -20,6 +21,8 @@ from typing import Any, Iterator, Protocol, TypeVar
 
 
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
+MAX_VALUE_DEPTH = 64
+MAX_VALUE_NODES = 100_000
 
 ValueT = TypeVar("ValueT")
 
@@ -33,19 +36,48 @@ def _validate_name(name: str) -> None:
         raise StoreError("name must be a nonempty string")
 
 
+def _walk_value(value: Any) -> Iterator[Any]:
+    """Bound traversal before recursive copying/encoding; allow shared subtrees."""
+    stack: list[tuple[Iterator[Any], int, int | None]] = [(iter((value,)), 0, None)]
+    active: set[int] = set()
+    nodes = 0
+    while stack:
+        children, depth, identity = stack[-1]
+        try:
+            item = next(children)
+        except StopIteration:
+            stack.pop()
+            if identity is not None:
+                active.remove(identity)
+            continue
+        nodes += 1
+        if depth > MAX_VALUE_DEPTH or nodes > MAX_VALUE_NODES:
+            raise StoreError("value structure exceeds limit")
+        yield item
+        if type(item) in (list, tuple, dict):
+            identity = id(item)
+            if identity in active:
+                raise StoreError("cyclic value structure")
+            active.add(identity)
+            descendants = chain(item.keys(), item.values()) if type(item) is dict else iter(item)
+            stack.append((descendants, depth + 1, identity))
+
+
+def _validate_value_shape(value: Any) -> None:
+    """Reject unsafe container graphs before copying into client staging."""
+    for _item in _walk_value(value):
+        pass
+
+
 def _validate_value(value: Any) -> None:
     """Reject JSON coercions that would change RAM values after replay."""
-    if value is None or type(value) in (str, bool, int):
-        return
-    if type(value) is float and math.isfinite(value):
-        return
-    if type(value) is list:
-        for item in value:
-            _validate_value(item)
-    elif type(value) is dict and all(type(key) is str for key in value):
-        for item in value.values():
-            _validate_value(item)
-    else:
+    for item in _walk_value(value):
+        if item is None or type(item) in (str, bool, int, list):
+            continue
+        if type(item) is float and math.isfinite(item):
+            continue
+        if type(item) is dict and all(type(key) is str for key in item):
+            continue
         raise StoreError("unsupported JSON value")
 
 
@@ -250,7 +282,15 @@ class _JournalStore:
                 else:
                     state.get(namespace, {}).pop(key, None)
             return state, payload["seq"], next_digest
-        except (ValueError, KeyError, TypeError, UnicodeError, AttributeError, StoreError) as exc:
+        except (
+            ValueError,
+            KeyError,
+            TypeError,
+            UnicodeError,
+            AttributeError,
+            StoreError,
+            RecursionError,
+        ) as exc:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
@@ -352,6 +392,7 @@ class _JournalStore:
             self._ensure_open()
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
+            _validate_value_shape(value)
             self._commit_changes(
                 [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
             )
@@ -622,6 +663,7 @@ class MemoryStore:
             if self._engine._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
             _validate_name(name)
+            _validate_value_shape(value)
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
@@ -709,6 +751,7 @@ class Transaction:
     def set(self, name: str, value: Any) -> None:
         self._ensure_open()
         _validate_name(name)
+        _validate_value_shape(value)
         self._pending[name] = deepcopy(value)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
@@ -745,6 +788,7 @@ class _JournalTransaction:
     def set(self, namespace: str, key: str, value: Any) -> None:
         """Stage a copy of the value without publishing it."""
         self._ensure_open()
+        _validate_value_shape(value)
         self._changes[(namespace, key)] = {
             "op": "set",
             "namespace": namespace,
