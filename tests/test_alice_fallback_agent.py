@@ -7,6 +7,7 @@ TLS ingress or RDC is involved; this is mock-agent E2E, not device evidence.
 
 import importlib.util
 import os
+import sys
 import tempfile
 import threading
 import unittest
@@ -18,6 +19,7 @@ _spec = importlib.util.spec_from_file_location(
     "alice_fallback_agent", ROOT / "android" / "fallback_agent" / "alice_fallback_agent.py"
 )
 agent_mod = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = agent_mod  # dataclasses resolve annotations via sys.modules
 _spec.loader.exec_module(agent_mod)
 
 
