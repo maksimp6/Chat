@@ -1,4 +1,5 @@
 """Race and fault injection for interface-bound LAN sockets."""
+
 import socket
 
 import pytest
@@ -36,8 +37,12 @@ class FakeSocket:
 
 @pytest.fixture
 def pinned(monkeypatch):
-    monkeypatch.setattr("alice_pro.printers.lan_socket.resolve_lan", lambda *a, **kw: "192.168.31.12")
-    monkeypatch.setattr(socket, "SO_BINDTODEVICE", getattr(socket, "SO_BINDTODEVICE", 25), raising=False)
+    monkeypatch.setattr(
+        "alice_pro.printers.lan_socket.resolve_lan", lambda *a, **kw: "192.168.31.12"
+    )
+    monkeypatch.setattr(
+        socket, "SO_BINDTODEVICE", getattr(socket, "SO_BINDTODEVICE", 25), raising=False
+    )
 
 
 def test_bind_before_connect(pinned):
