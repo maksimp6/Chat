@@ -162,6 +162,14 @@ def encode_binary_stl(triangles: list[Triangle]) -> bytes:
     return bytes(data)
 
 
+def _unit_normal_magnitude(normal: Point) -> float:
+    """STL normals must have unit length; direction alone is insufficient."""
+    magnitude = math.sqrt(_dot(normal, normal))
+    if not 0.99 <= magnitude <= 1.01:
+        raise ValueError("STL facet normal must have unit length")
+    return magnitude
+
+
 def _read_facets(data: bytes) -> list[Triangle]:
     if not 84 <= len(data) <= BYTE_LIMIT:
         raise ValueError("STL truncated or exceeds fixture limit")
@@ -175,6 +183,7 @@ def _read_facets(data: bytes) -> list[Triangle]:
         if row[-1] != 0 or not all(math.isfinite(v) for v in row[:-1]):
             raise ValueError("STL non-finite coordinate or nonzero facet attribute")
         normal: Point = row[0], row[1], row[2]
+        normal_magnitude = _unit_normal_magnitude(normal)
         tri: Triangle = (
             (round(row[3], 5), round(row[4], 5), round(row[5], 5)),
             (round(row[6], 5), round(row[7], 5), round(row[8], 5)),
@@ -183,7 +192,7 @@ def _read_facets(data: bytes) -> list[Triangle]:
         a, b, c = tri
         cross = _cross(_subtract(b, a), _subtract(c, a))
         area = math.sqrt(_dot(cross, cross))
-        if area < 1e-8 or _dot(cross, normal) / area < 0.98:
+        if area < 1e-8 or _dot(cross, normal) / (area * normal_magnitude) < 0.98:
             raise ValueError("STL degenerate triangle or inconsistent normal")
         ordered = sorted(tri)
         face_key = (ordered[0], ordered[1], ordered[2])

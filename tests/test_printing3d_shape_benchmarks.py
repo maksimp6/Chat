@@ -100,6 +100,17 @@ class TestShapeBenchmarks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "normal"):
             inspect_binary_stl(bytes(damaged))
 
+    def test_reject_non_unit_stl_normals(self):
+        """Length-corrupted normals cannot pass by keeping their direction."""
+        for factor in (0.0, 0.5, 10.0):
+            with self.subTest(factor=factor):
+                damaged = bytearray(self._data())
+                values = list(TRIANGLE_STRUCT.unpack_from(damaged, 84))
+                values[:3] = [coordinate * factor for coordinate in values[:3]]
+                TRIANGLE_STRUCT.pack_into(damaged, 84, *values)
+                with self.assertRaisesRegex(ValueError, "normal must have unit length"):
+                    inspect_binary_stl(bytes(damaged))
+
     def test_reject_open_mesh(self):
         data = bytearray(self._data())
         count = struct.unpack_from("<I", data, 80)[0]

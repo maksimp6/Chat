@@ -51,7 +51,7 @@ The horizontal cylinder highlights hypothetical adhesion/support risks; a
 | Gate | Decision evidence | Failure handling |
 | --- | --- | --- |
 | SOURCE | manifest, generator version, SHA-256, declared units & intended shape | Reject absent/ambiguous units or changed hash |
-| MESH | file length, finite vertices, normal agreement, no degenerate/duplicate faces, oriented watertight single shell, independent expected bbox | Fail closed; record deviation; no claims of full solid intersection detection |
+| MESH | file length, finite vertices, approximately unit-length facet normals and their directional agreement, no degenerate/duplicate faces, oriented watertight single shell, independent expected bbox | Fail closed; record deviation; no claims of full solid intersection detection |
 | SLICED (offline only) | pinned slicer, profile, orientation, supports and real CLI result.json | Delegate to #1096; offline evidence, never print authorization |
 | GCODE (offline only) | audited toolpaths/extrusion, ZIP CRC, heater/bed limits, forbidden commands and bounding placement | Delegate to PR #1140; analyze offline, **no printer upload** |
 | STAGED (useful part only) | separately approved useful print, exact byte/hash readback, idle printer and protected secrets | Delegate to #1096; **never stage these six reference fixtures** |
