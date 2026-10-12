@@ -65,10 +65,12 @@ def test_sqlite_reader_connection_rejects_writes(tmp_path):
 
 def test_wal_writer_during_read_does_not_tear_tables(tmp_path):
     path = _source(tmp_path)
+
     def concurrent_writer():
         with sqlite3.connect(path, timeout=2) as writer:
             writer.execute("UPDATE sessions SET updated_at = 5 WHERE id = 's1'")
             writer.execute("INSERT INTO global_memory VALUES (2,'git','Keep WAL',5)")
+
     source = SqlSnapshotReader.sqlite(path, between_selects=concurrent_writer)
     first = source.read()
     assert len(first.snapshot.facts) == 1
