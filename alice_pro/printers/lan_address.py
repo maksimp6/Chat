@@ -1,4 +1,5 @@
 """Resolve and pin LAN destinations before opening any printer socket."""
+
 from __future__ import annotations
 import ipaddress
 import socket
@@ -41,8 +42,7 @@ def _route_is_local(ip: str, interface: str, routes: str) -> bool:
     return selected_iface == interface and selected_gateway == 0
 
 
-def resolve_lan(host: str, *, interface: str = "wlan0",
-                route_table: str | None = None) -> str:
+def resolve_lan(host: str, *, interface: str = "wlan0", route_table: str | None = None) -> str:
     """Resolve once, validate every result, then return the pinned IP literal.
 
     Caller must connect only to the returned IP, never resolve the hostname again.
@@ -52,9 +52,13 @@ def resolve_lan(host: str, *, interface: str = "wlan0",
     try:
         addresses = [private_ipv4(host)]
     except ValueError:
-        if len(host) > 253 or host.endswith(".") or not all(
-            label and len(label) <= 63 and label.replace("-", "").isalnum()
-            for label in host.split(".")
+        if (
+            len(host) > 253
+            or host.endswith(".")
+            or not all(
+                label and len(label) <= 63 and label.replace("-", "").isalnum()
+                for label in host.split(".")
+            )
         ):
             raise ValueError("invalid DNS hostname") from None
         records = socket.getaddrinfo(host, 3000, family=socket.AF_INET, type=socket.SOCK_STREAM)
@@ -65,5 +69,7 @@ def resolve_lan(host: str, *, interface: str = "wlan0",
         route_table = Path("/proc/net/route").read_text(encoding="ascii")
     for ip in addresses:
         if not _route_is_local(ip, interface, route_table):
-            raise ValueError("LAN destination route is not directly connected via approved interface")
+            raise ValueError(
+                "LAN destination route is not directly connected via approved interface"
+            )
     return addresses[0]
