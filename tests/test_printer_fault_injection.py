@@ -100,11 +100,12 @@ def test_dns_route_vpn_override_never_opens_socket(monkeypatch, network):
 @pytest.mark.parametrize(
     "response",
     [
-    b"",
-    b"\xa5\xa5\x00\x00",
-    b"\xa5\xa5\xff\xff",
-    frame({"login": {"command": "detect", "model": "N1"}})[:-2],
-])
+        b"",
+        b"\xa5\xa5\x00\x00",
+        b"\xa5\xa5\xff\xff",
+        frame({"login": {"command": "detect", "model": "N1"}})[:-2],
+    ],
+)
 def test_corrupt_or_truncated_frames(monkeypatch, network, response):
     monkeypatch.setattr(socket, "create_connection", lambda *args, **kw: Socket(response))
     with pytest.raises(PrinterProtocolError):
