@@ -140,7 +140,7 @@ class TestShapeBenchmarks(unittest.TestCase):
         self.assertEqual(assess_dimension(20, 20.1, 0.2, 0.05)["verdict"], "PASS")
         self.assertEqual(assess_dimension(20, 20.18, 0.2, 0.05)["verdict"], "FAIL")
         self.assertEqual(assess_dimension(20, 20.1, None, 0.05)["verdict"], "MEASURED_UNRATED")
-        self.assertEqual(assess_dimension(20, None, 0.2, 0.05)["verdict"], "MEASURED_UNRATED")
+        self.assertEqual(assess_dimension(20, None, 0.2, 0.05)["verdict"], "UNVERIFIED")
         self.assertEqual(assess_dimension(20, 20.1, 0.2, None)["verdict"], "MEASURED_UNRATED")
 
     def test_reject_nonfinite_guard_band_values(self):
@@ -159,6 +159,11 @@ class TestShapeBenchmarks(unittest.TestCase):
         self.assertEqual(disk["units_declared"], "mm")
         self.assertEqual(disk["build_volume_A1mini_mm"], [180, 180, 180])
         self.assertFalse(disk["physical_print_approved"])
+        self.assertFalse(disk["standalone_calibration_print_allowed"])
+        self.assertEqual(disk["physical_characteristics_status"], "UNVERIFIED")
+        self.assertTrue(all(e["digital_fixture_only"] for e in disk["models"]))
+        self.assertTrue(all(e["physical_state"] == "UNVERIFIED" for e in disk["models"]))
+        self.assertTrue(all("measure_after_print" not in e for e in disk["models"]))
         self.assertTrue(all(e["state"] == "SOURCE_ONLY_NOT_SLICED" for e in disk["models"]))
 
 

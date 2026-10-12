@@ -1,1 +1,1 @@
-job_id,artifact_sha256,material,profile_sha256,measurement_id,nominal_mm,measured_mm,instrument,resolution_mm,uncertainty_mm,tolerance_mm,position,repeat_index,photo_ref,verdict,operator,timestamp_utc
+approval_ref,job_id,useful_part_sha256,material,profile_sha256,measurement_id,nominal_mm,measured_mm,instrument,resolution_mm,uncertainty_mm,tolerance_mm,position,repeat_index,photo_ref,verdict,operator,timestamp_utc

@@ -36,7 +36,11 @@ def _dot(a: Point, b: Point) -> float:
 def _triangles_for_prism(profile: list[tuple[float, float]], height: float) -> list[Triangle]:
     if len(profile) < 3 or height <= 0:
         raise ValueError("invalid prism")
-    area2 = sum(profile[i][0] * profile[(i + 1) % len(profile)][1] - profile[(i + 1) % len(profile)][0] * profile[i][1] for i in range(len(profile)))
+    area2 = sum(
+        profile[i][0] * profile[(i + 1) % len(profile)][1]
+        - profile[(i + 1) % len(profile)][0] * profile[i][1]
+        for i in range(len(profile))
+    )
     if not math.isfinite(area2) or area2 <= 0:
         raise ValueError("prism profile must be CCW")
     bottom = [(x, y, 0.0) for x, y in profile]
@@ -53,8 +57,14 @@ def _triangles_for_prism(profile: list[tuple[float, float]], height: float) -> l
 def _ring(outer: float, inner: float, height: float, segments: int) -> list[Triangle]:
     if not (outer > inner > 0 and height > 0 and segments >= 12):
         raise ValueError("invalid ring")
-    o = [(outer * math.cos(2 * math.pi * i / segments), outer * math.sin(2 * math.pi * i / segments)) for i in range(segments)]
-    h = [(inner * math.cos(2 * math.pi * i / segments), inner * math.sin(2 * math.pi * i / segments)) for i in range(segments)]
+    o = [
+        (outer * math.cos(2 * math.pi * i / segments), outer * math.sin(2 * math.pi * i / segments))
+        for i in range(segments)
+    ]
+    h = [
+        (inner * math.cos(2 * math.pi * i / segments), inner * math.sin(2 * math.pi * i / segments))
+        for i in range(segments)
+    ]
     triangles: list[Triangle] = []
     for i in range(segments):
         j = (i + 1) % segments
@@ -64,12 +74,18 @@ def _ring(outer: float, inner: float, height: float, segments: int) -> list[Tria
         ib, jb = (hi[0], hi[1], 0.0), (hj[0], hj[1], 0.0)
         ot, nt = (oi[0], oi[1], height), (oj[0], oj[1], height)
         it, jt = (hi[0], hi[1], height), (hj[0], hj[1], height)
-        triangles.extend([
-            (ot, nt, jt), (ot, jt, it),
-            (ob, jb, nb), (ob, ib, jb),
-            (ob, nb, nt), (ob, nt, ot),
-            (jb, ib, it), (jb, it, jt),
-        ])
+        triangles.extend(
+            [
+                (ot, nt, jt),
+                (ot, jt, it),
+                (ob, jb, nb),
+                (ob, ib, jb),
+                (ob, nb, nt),
+                (ob, nt, ot),
+                (jb, ib, it),
+                (jb, it, jt),
+            ]
+        )
     return triangles
 
 
@@ -87,7 +103,9 @@ def _translate_to_positive(triangles: list[Triangle]) -> list[Triangle]:
 
 def _samples() -> dict[str, Coupon]:
     n = 96
-    circle = [(10 * math.cos(2 * math.pi * i / n), 10 * math.sin(2 * math.pi * i / n)) for i in range(n)]
+    circle = [
+        (10 * math.cos(2 * math.pi * i / n), 10 * math.sin(2 * math.pi * i / n)) for i in range(n)
+    ]
     triangle = [(0.0, 12.0), (-6 * math.sqrt(3), -6.0), (6 * math.sqrt(3), -6.0)]
     upright = _triangles_for_prism(circle, 12)
     horizontal: list[Triangle] = [
@@ -99,11 +117,31 @@ def _samples() -> dict[str, Coupon]:
         for a, b, c in _triangles_for_prism([(0, 0), (30, 0), (30, 15)], 12)
     ]
     return {
-        "circle_vertical": (upright, (20, 20, 12), "XY circularity at three Z levels; seam and surface"),
-        "triangle": (_triangles_for_prism(triangle, 12), (12 * math.sqrt(3), 18, 12), "three sides, corner rounding and angles"),
-        "square": (_triangles_for_prism([(-10, -10), (10, -10), (10, 10), (-10, 10)], 10), (20, 20, 10), "X/Y skew, squareness and corners"),
-        "hole_ring": (_ring(16, 6, 8, n), (32, 32, 8), "outer/inner diameters in XY; ring thickness"),
-        "circle_horizontal": (horizontal, (20, 24, 20), "bottom arc, support scars; requires dedicated orientation review"),
+        "circle_vertical": (
+            upright,
+            (20, 20, 12),
+            "XY circularity at three Z levels; seam and surface",
+        ),
+        "triangle": (
+            _triangles_for_prism(triangle, 12),
+            (12 * math.sqrt(3), 18, 12),
+            "three sides, corner rounding and angles",
+        ),
+        "square": (
+            _triangles_for_prism([(-10, -10), (10, -10), (10, 10), (-10, 10)], 10),
+            (20, 20, 10),
+            "X/Y skew, squareness and corners",
+        ),
+        "hole_ring": (
+            _ring(16, 6, 8, n),
+            (32, 32, 8),
+            "outer/inner diameters in XY; ring thickness",
+        ),
+        "circle_horizontal": (
+            horizontal,
+            (20, 24, 20),
+            "bottom arc, support scars; requires dedicated orientation review",
+        ),
         "inclined_wedge": (wedge, (12, 30, 15), "inclined top surface, staircase effect and warp"),
     }
 
@@ -156,6 +194,23 @@ def _read_facets(data: bytes) -> list[Triangle]:
     return triangles
 
 
+def _assert_single_shell(edge_faces: dict[Edge, list[int]], face_count: int) -> None:
+    """Ensure all faces belong to one connected shell (edge adjacency)."""
+    neighbors: dict[int, list[int]] = defaultdict(list)
+    for first, second in edge_faces.values():
+        neighbors[first].append(second)
+        neighbors[second].append(first)
+    visited = {0}
+    queue = deque([0])
+    while queue:
+        for neighbor in neighbors[queue.popleft()]:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    if len(visited) != face_count:
+        raise ValueError("STL has multiple disconnected shells")
+
+
 def _verify_shell(triangles: list[Triangle]) -> float:
     edge_counts: Counter[Edge] = Counter()
     directed: Counter[Edge] = Counter()
@@ -174,30 +229,17 @@ def _verify_shell(triangles: list[Triangle]) -> float:
         raise ValueError("STL inconsistent triangle winding")
     if signed_volume <= 0:
         raise ValueError("STL inverted or nonpositive volume")
-    neighbors: dict[int, list[int]] = defaultdict(list)
-    for first, second in edge_faces.values():
-        neighbors[first].append(second)
-        neighbors[second].append(first)
-    visited = {0}
-    queue = deque([0])
-    while queue:
-        for neighbor in neighbors[queue.popleft()]:
-            if neighbor not in visited:
-                visited.add(neighbor)
-                queue.append(neighbor)
-    if len(visited) != len(triangles):
-        raise ValueError("STL has multiple disconnected shells")
+    _assert_single_shell(edge_faces, len(triangles))
     return signed_volume
 
 
 def _validate_extents(
-    triangles: list[Triangle], expected_mm: tuple[float, float, float] | None,
+    triangles: list[Triangle],
+    expected_mm: tuple[float, float, float] | None,
     tolerance_mm: float,
 ) -> tuple[float, float, float]:
     vertices = [point for tri in triangles for point in tri]
-    spans = [
-        (min(v[d] for v in vertices), max(v[d] for v in vertices)) for d in range(3)
-    ]
+    spans = [(min(v[d] for v in vertices), max(v[d] for v in vertices)) for d in range(3)]
     extents: Point = (
         round(spans[0][1] - spans[0][0], 4),
         round(spans[1][1] - spans[1][0], 4),
@@ -219,7 +261,8 @@ def _validate_extents(
 
 
 def inspect_binary_stl(
-    data: bytes, expected_mm: tuple[float, float, float] | None = None,
+    data: bytes,
+    expected_mm: tuple[float, float, float] | None = None,
     tolerance_mm: float = 0.03,
 ) -> dict[str, Any]:
     """Strict small-fixture inspector. STL units are declared in manifest, not encoded."""
@@ -227,8 +270,11 @@ def inspect_binary_stl(
     signed_volume = _verify_shell(triangles)
     extents = _validate_extents(triangles, expected_mm, tolerance_mm)
     return {
-        "facets": len(triangles), "extents_mm": extents,
-        "volume_mm3": round(signed_volume, 4), "watertight": True, "single_shell": True,
+        "facets": len(triangles),
+        "extents_mm": extents,
+        "volume_mm3": round(signed_volume, 4),
+        "watertight": True,
+        "single_shell": True,
     }
 
 
@@ -244,7 +290,9 @@ def assess_dimension(
     for value in (measured_mm, tolerance_mm, uncertainty_mm):
         if value is not None and (not math.isfinite(value) or value < 0):
             raise ValueError("invalid measurement")
-    if measured_mm is None or tolerance_mm is None or uncertainty_mm is None:
+    if measured_mm is None:
+        return {"verdict": "UNVERIFIED", "error_mm": None}
+    if tolerance_mm is None or uncertainty_mm is None:
         return {"verdict": "MEASURED_UNRATED", "error_mm": None}
     error = measured_mm - nominal_mm
     accepted = abs(error) + uncertainty_mm <= tolerance_mm + 1e-12
@@ -259,17 +307,45 @@ def build_coupons(out_dir: Path) -> dict[str, Any]:
         report = inspect_binary_stl(data, expected)
         name_stl = name + ".stl"
         (out_dir / name_stl).write_bytes(data)
-        models.append({"name": name, "file": name_stl, "sha256": hashlib.sha256(data).hexdigest(), "nominal_extents_mm": [round(v, 5) for v in expected], "measured_stl": report, "measure_after_print": measurement, "state": "SOURCE_ONLY_NOT_SLICED"})
-    manifest: dict[str, Any] = {"schema": 1, "units_declared": "mm", "build_volume_A1mini_mm": [180, 180, 180], "nozzle_nominal_mm": 0.4, "physical_print_approved": False, "material": "UNKNOWN", "models": models}
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        models.append(
+            {
+                "name": name,
+                "file": name_stl,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "nominal_extents_mm": [round(v, 5) for v in expected],
+                "measured_stl": report,
+                "comparable_useful_part_features": measurement,
+                "digital_fixture_only": True,
+                "physical_state": "UNVERIFIED",
+                "state": "SOURCE_ONLY_NOT_SLICED",
+            }
+        )
+    manifest: dict[str, Any] = {
+        "schema": 1,
+        "units_declared": "mm",
+        "build_volume_A1mini_mm": [180, 180, 180],
+        "nozzle_nominal_mm": 0.4,
+        "physical_print_approved": False,
+        "standalone_calibration_print_allowed": False,
+        "physical_characteristics_status": "UNVERIFIED",
+        "material": "UNKNOWN",
+        "models": models,
+    }
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return manifest
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate reference STL only; does not slice or start a printer")
+    parser = argparse.ArgumentParser(
+        description="Generate reference STL only; does not slice or start a printer"
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     result = build_coupons(args.out)
-    print(f"Generated {len(result['models'])} source-only STL fixtures; physical printing not approved")
+    print(
+        f"Generated {len(result['models'])} source-only STL fixtures; physical printing not approved"
+    )
