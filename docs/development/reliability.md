@@ -84,6 +84,13 @@ New modules are written fully typed: annotate every function, use precise
 container types (`dict[str, int]`, not `dict`) and avoid `Any` outside
 boundaries that parse external JSON.
 
+For new and changed function contracts, `scripts/check_changed_types.py`
+provides deterministic source-level diagnostics used by the focused contract
+tests. It rejects missing parameter/return annotations, bare generic return or
+parameter annotations, `Any` return leakage, and unqualified
+`# type: ignore`. Semantic typing remains the responsibility of
+`mypy --strict`; the source checker is deliberately not a second type checker.
+
 ## Where the rules run
 
 - **Locally:** `bash scripts/check_code_rules.sh` runs the naming, root-layout,
