@@ -21,7 +21,6 @@ from chatgpt_mcp import chatgpt_mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
-from runtime_migrations import init_runtime_tables
 from local_agent_gateway import local_agent_bp, init_local_agent_tables
 from cloudru_iam_routes import cloudru_iam_bp
 from provider_credentials_routes import provider_credentials_bp
@@ -58,7 +57,6 @@ from ssh_runtime_settings import public_settings, save_settings, test_connection
 from plugin_routes import plugin_bp
 from project_tree import project_tree_bp
 from voice_routes import voice_bp
-from observability_migrations import apply_observability_migrations
 from printing3d import init_3d_printing_tables
 from printing3d.routes import printing3d_bp
 
@@ -143,7 +141,6 @@ def _set_web_cache_headers(response):
 
 
 init_db()
-init_runtime_tables()
 init_local_agent_tables()
 init_treasury_tables()
 init_3d_printing_tables()
@@ -159,7 +156,6 @@ ensure_partner_department()
 init_government_tables()
 ensure_government_department()
 init_environment_tables()
-apply_observability_migrations()
 logger.info("[BOOT] hello: database initialization completed")
 
 

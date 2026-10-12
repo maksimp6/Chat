@@ -1,18 +1,18 @@
-"""Invocation lifecycle and persistence for serverless execution."""
+"""Invocation lifecycle and trace persistence on native MemoryStore."""
 
-import json
+from __future__ import annotations
+
 import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from db import get_conn
-from db_backend import IntegrityError
+from agent_memory.client import get_memory_client
+from db import memory_file_path
 from .context import InvocationContext
-from runtime_migrations import init_runtime_tables
 from session_manager import create_session, restore_session
 
-
+_INVOCATION_PREFIX = "runtime_invocation:"
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:api[_-]?key|authorization|password|passwd|secret|token|credential|cookie|private[_-]?key)",
     re.IGNORECASE,
@@ -38,8 +38,12 @@ def _sanitize_metadata(value: Any) -> Any:
     return value
 
 
+def _key(invocation_id: str) -> str:
+    return _INVOCATION_PREFIX + str(invocation_id)
+
+
 def _resolve_request_session_id(session_id: str, conversation_id: str) -> str:
-    """Honor an explicit /api/chat session while preserving legacy behavior."""
+    """Honor an explicit /api/chat session when it differs from conversation_id."""
     if session_id != conversation_id:
         return session_id
     try:
@@ -63,28 +67,19 @@ def create_invocation(
     *,
     create_missing_session: bool = True,
 ) -> InvocationContext:
-    """Create a request-scoped invocation and persist its correlation IDs.
-
-    ``/api/chat`` keeps legacy behavior by creating a session on first use.
-    Explicit runtime APIs can disable that behavior so a missing session is a
-    real lifecycle error rather than an implicit side effect.
-    """
     session_id = _resolve_request_session_id(session_id, conversation_id)
-    init_runtime_tables()
     session = restore_session(session_id)
-    if not session:
+    if session is None:
         if not create_missing_session:
             raise ValueError(f"Session not found: {session_id}")
         try:
-            session = create_session(
+            create_session(
                 session_id,
                 metadata={"conversation_id": conversation_id, "legacy": True},
             )
-        except IntegrityError:
-            # Another concurrent invocation won the first-use race. Reload the
-            # now-existing session rather than failing the request.
-            session = restore_session(session_id)
-            if not session:
+        except ValueError:
+            # Concurrent first use may have created the same native session.
+            if restore_session(session_id) is None:
                 raise
 
     invocation_id = str(uuid.uuid4())
@@ -96,26 +91,23 @@ def create_invocation(
     )
     if resolved_user_id is not None:
         persisted_metadata["user_id"] = resolved_user_id
-    conn = get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO invocations
-               (id, session_id, conversation_id, trace_id, status, metadata_json,
-                trace_json, created_at, started_at)
-               VALUES (?, ?, ?, ?, 'created', ?, '{}', ?, NULL)""",
-            (
-                invocation_id,
-                session_id,
-                conversation_id,
-                trace_id,
-                json.dumps(persisted_metadata, ensure_ascii=False),
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
+    record = {
+        "id": invocation_id,
+        "session_id": session_id,
+        "conversation_id": conversation_id,
+        "trace_id": trace_id,
+        "user_id": resolved_user_id,
+        "status": "created",
+        "metadata": persisted_metadata,
+        "result": None,
+        "error": None,
+        "trace": {},
+        "created_at": now,
+        "started_at": None,
+        "completed_at": None,
+    }
+    with get_memory_client(memory_file_path()).transaction() as tx:
+        tx.set(_key(invocation_id), record)
     return InvocationContext(
         session_id=session_id,
         conversation_id=conversation_id,
@@ -127,33 +119,30 @@ def create_invocation(
 
 
 def start_invocation(invocation_id: str) -> bool:
-    conn = get_conn()
-    try:
-        cur = conn.execute(
-            "UPDATE invocations SET status = 'running', started_at = ? WHERE id = ? AND status = 'created'",
-            (_now(), invocation_id),
-        )
-        conn.commit()
-        return cur.rowcount == 1
-    finally:
-        conn.close()
+    key = _key(invocation_id)
+    with get_memory_client(memory_file_path()).transaction() as tx:
+        record = tx.get(key)
+        if record is None or record["status"] != "created":
+            return False
+        record["status"] = "running"
+        record["started_at"] = _now()
+        tx.set(key, record)
+        return True
 
 
 def persist_invocation_trace(invocation_id: str, trace: Any) -> bool:
-    """Persist the complete invocation-owned trace independently of messages."""
+    """Durably store invocation-owned traces independently of chat messages."""
     if hasattr(trace, "finalize"):
         trace = trace.finalize()
     sanitized = _sanitize_metadata(trace or {})
-    conn = get_conn()
-    try:
-        cur = conn.execute(
-            "UPDATE invocations SET trace_json = ? WHERE id = ?",
-            (json.dumps(sanitized, ensure_ascii=False), invocation_id),
-        )
-        conn.commit()
-        return cur.rowcount == 1
-    finally:
-        conn.close()
+    key = _key(invocation_id)
+    with get_memory_client(memory_file_path()).transaction() as tx:
+        record = tx.get(key)
+        if record is None:
+            return False
+        record["trace"] = sanitized
+        tx.set(key, record)
+        return True
 
 
 def finish_invocation(invocation_id: str, result: Any = None) -> bool:
@@ -169,60 +158,23 @@ def cancel_invocation(invocation_id: str, reason: Any = None) -> bool:
 
 
 def _complete(invocation_id: str, status: str, result: Any = None, error: Any = None) -> bool:
-    now = _now()
-    conn = get_conn()
-    try:
-        cur = conn.execute(
-            """UPDATE invocations
-               SET status = ?, completed_at = ?, result_json = ?, error_json = ?
-               WHERE id = ? AND status IN ('created', 'running')""",
-            (
-                status,
-                now,
-                json.dumps(_sanitize_metadata(result), ensure_ascii=False)
-                if result is not None
-                else None,
-                json.dumps(_sanitize_metadata(error), ensure_ascii=False)
-                if error is not None
-                else None,
-                invocation_id,
-            ),
-        )
-        conn.commit()
-        return cur.rowcount == 1
-    finally:
-        conn.close()
+    key = _key(invocation_id)
+    with get_memory_client(memory_file_path()).transaction() as tx:
+        record = tx.get(key)
+        if record is None or record["status"] not in {"created", "running"}:
+            return False
+        record["status"] = status
+        record["completed_at"] = _now()
+        record["result"] = _sanitize_metadata(result) if result is not None else None
+        record["error"] = _sanitize_metadata(error) if error is not None else None
+        tx.set(key, record)
+        return True
 
 
 def get_invocation(invocation_id: str) -> Optional[Dict[str, Any]]:
-    conn = get_conn()
-    try:
-        row = conn.execute("SELECT * FROM invocations WHERE id = ?", (invocation_id,)).fetchone()
-    finally:
-        conn.close()
-    if not row:
+    value = get_memory_client(memory_file_path()).get(_key(invocation_id))
+    if value is None:
         return None
-
-    def decode(value: Any, default: Any) -> Any:
-        if not value:
-            return default
-        try:
-            return json.loads(value)
-        except (TypeError, ValueError):
-            return default
-
-    return {
-        "id": row["id"],
-        "session_id": row["session_id"],
-        "conversation_id": row["conversation_id"],
-        "trace_id": row["trace_id"],
-        "user_id": decode(row["metadata_json"], {}).get("user_id"),
-        "status": row["status"],
-        "metadata": decode(row["metadata_json"], {}),
-        "result": decode(row["result_json"], None),
-        "error": decode(row["error_json"], None),
-        "trace": decode(row["trace_json"] if "trace_json" in row.keys() else None, {}),
-        "created_at": row["created_at"],
-        "started_at": row["started_at"],
-        "completed_at": row["completed_at"],
-    }
+    if not isinstance(value, dict) or value.get("id") != str(invocation_id):
+        raise ValueError("invalid invocation record")
+    return value
