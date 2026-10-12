@@ -1,4 +1,5 @@
 """Correctness and schema tests for the printer benchmark runner."""
+
 import pytest
 
 from scripts.benchmark_printer import benchmarks, measure, run
@@ -28,5 +29,8 @@ def test_machine_readable_report():
     assert result["schema"] == "alice-printer-benchmark-v1"
     assert result["mode"] == "mock-no-network"
     assert set(result["results"]) == {
-        "frame_decode", "rfc1918_validation", "route_lookup", "telemetry_merge"
+        "frame_decode",
+        "rfc1918_validation",
+        "route_lookup",
+        "telemetry_merge",
     }
