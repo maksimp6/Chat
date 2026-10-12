@@ -195,6 +195,8 @@ jobs:
           if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
+      - name: Build and check C17 fallback control server
+        run: bash scripts/build_c17_server.sh --check
       - name: Run Python application tests with coverage
         run: |
           started=$SECONDS
@@ -207,7 +209,7 @@ jobs:
           cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-${{ github.run_number }}
           path: |
@@ -367,6 +369,8 @@ jobs:
           started=$SECONDS
           pip install -r requirements.txt -r requirements-postgres.txt -r requirements-dev.txt
           echo "- PostgreSQL dependency install: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build C17 fallback control server
+        run: bash scripts/build_c17_server.sh
       - name: Run full application suite on PostgreSQL
         run: pytest --durations=30 -q
       - name: Verify backup and restore of the application schema
@@ -444,7 +448,7 @@ jobs:
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload debug APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: alice-pro-debug-apk-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk

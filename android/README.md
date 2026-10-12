@@ -52,6 +52,30 @@ cd android
 gradle :app:testDebugUnitTest
 ```
 
+## RootAgent (first slice, #650)
+
+`rootagent/` is the in-app replacement for the Termux Live Server: one foreground
+`RootAgentService` serving a loopback-only API on `127.0.0.1:8766`.
+
+- Started only from **Diagnostics → RootAgent: проверить**, which also runs an in-app
+  self-check (health + root probe) and shows the result; **RootAgent: остановить** stops it.
+  The service is not exported and never starts on its own.
+- Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
+  (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
+  locked; the foreground app is not exposed), `GET /v1/screen/tree` (`{"xml": ...}` from a root
+  `uiautomator dump /proc/self/fd/1`, 15 s timeout, 2 MiB bound; failed, truncated or non-XML output is
+  `502` without the raw output; the read-only counterpart of Live Server `/screen/tree`),
+  `GET /v1/screen/capture` (`{"format":"png","png_base64": ...}` from a root `screencap -p | base64`,
+  15 s timeout, 12 MiB bound; anything that does not decode to a PNG is `502` without the raw
+  output; the read-only counterpart of Live Server `/screen/capture`),
+  `GET /v1/root-probe` (`su -c "id -u"` must print `0`,
+  5 s timeout). No shell, input, package or process mutation.
+- Bearer token: 32 random bytes, encrypted at rest with an AndroidKeyStore AES-256-GCM key;
+  it never leaves the app process. Requests with `Origin`, a cross-site `Sec-Fetch-Site` or a
+  foreign `Host` are refused, so WebView pages and DNS rebinding cannot reach the API.
+- JVM unit tests in `app/src/test/java/com/alicepro/mobile/rootagent/` cover the bounded shell,
+  the HTTP boundary and the self-check client. Real-device smoke on the Redmi 9 is still pending.
+
 ## System insets
 
 The Android WebView runs in edge-to-edge mode. Safe content padding is resolved centrally from three inset sources: system bars, display cutout and IME. The resolver takes the largest value for each edge, so a keyboard cannot reduce the navigation-bar safe area and a display cutout cannot be hidden by the system-bar inset.

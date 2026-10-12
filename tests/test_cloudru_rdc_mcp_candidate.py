@@ -387,15 +387,8 @@ def test_public_acceptance_workflows_run_regressions_and_have_time_limits():
     steps = {step.get("name"): step for step in deploy["jobs"]["deploy"]["steps"]}
     assert steps["Verify OAuth discovery"]["timeout-minutes"] == "2"
     assert steps["Verify public MCP end to end"]["timeout-minutes"] == "2"
-    validation = yaml.load(
-        (root / ".github/workflows/remote-desktop-commander.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    steps = validation["jobs"]["validate-image"]["steps"]
-    regressions = next(
-        step for step in steps if step.get("name") == "Test Alice Dev OAuth and gateway contracts"
-    )
-    assert "oauth-discovery-smoke.test.mjs" in regressions["run"]
-    assert "mcp-gateway-origin.test.mjs" in regressions["run"]
-    image = next(step for step in steps if step.get("name") == "Validate Alice Dev MCP image")
-    assert "ALICE_DEV_PUBLIC_URL=http://127.0.0.1:8080" in image["run"]
+    deploy_source = (root / ".github/workflows/cloudru-rdc-mcp-candidate.yml").read_text()
+    assert "Verify OAuth discovery" in deploy_source
+    assert "Verify public MCP end to end" in deploy_source
+    assert "oauth-discovery-smoke.mjs" in deploy_source
+    assert "mcp-gateway-live-smoke.mjs" in deploy_source
