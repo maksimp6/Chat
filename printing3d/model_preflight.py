@@ -11,7 +11,7 @@ from typing import Any
 def _read_mesh_bounds_and_edges(data: bytes) -> tuple[list[float], list[float], list[float]]:
     # Merge exact shared vertex coordinates for manifold-edge checks.
     points: dict[tuple[float, float, float], int] = {}
-    edges = Counter()
+    edges: Counter[tuple[int, ...]] = Counter()
     xs, ys, zs = [], [], []
     for offset in range(84, len(data), 50):
         values = struct.unpack_from("<12fH", data, offset)
