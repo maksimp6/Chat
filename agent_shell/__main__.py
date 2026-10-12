@@ -51,11 +51,11 @@ def main(argv=None, handlers=None):
             print(str(exc), file=sys.stderr)
             return 1
     else:
-        task = store.get(args.task_id)
-        if task is None:
+        shown_task = store.get(args.task_id)
+        if shown_task is None:
             print("task not found", file=sys.stderr)
             return 1
-        print(json.dumps({**task, "events": store.events(args.task_id)}, sort_keys=True))
+        print(json.dumps({**shown_task, "events": store.events(args.task_id)}, sort_keys=True))
     return 0
 
 
