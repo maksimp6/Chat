@@ -149,6 +149,7 @@ class _JournalStore:
         self._sequence: int = 0
         self._digest: str = "0" * 64
         self._failed: bool = False
+        self._ram_valid: bool = True
         self._closed: bool = False
         self._active_transaction: bool = False
         try:
@@ -167,12 +168,14 @@ class _JournalStore:
         """Return confirmed in-memory sequence without reading the journal."""
         with self._lock:
             self._ensure_open()
-            return DatabaseInfo(last_commit=self._sequence)
+            return DatabaseInfo(last_commit=self._sequence if self._ram_valid else None)
 
     @property
     def last_commit(self) -> Commit:
         with self._lock:
             self._ensure_open()
+            if not self._ram_valid:
+                raise StoreError("recovery required; RAM publication was interrupted")
             return Commit(self._sequence, self._digest)
 
     @staticmethod
@@ -257,6 +260,8 @@ class _JournalStore:
         """Return a deep copy of the last confirmed value from RAM."""
         with self._lock:
             self._ensure_open()
+            if not self._ram_valid:
+                raise StoreError("recovery required; RAM publication was interrupted")
             return deepcopy(self._state.get(namespace, {}).get(key))
 
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
@@ -327,11 +332,19 @@ class _JournalStore:
         if not changes:
             return
         frame, digest = self._encode_frame(changes)
-        self._append_frame(frame)
-        # Publish only confirmed changes to the RAM view seen by readers.
-        self._apply_changes(changes)
-        self._sequence += 1
-        self._digest = digest
+        try:
+            self._append_frame(frame)
+            # Publish only confirmed changes to the RAM view seen by readers.
+            self._ram_valid = False
+            self._apply_changes(changes)
+            self._sequence += 1
+            self._digest = digest
+            self._ram_valid = True
+        except BaseException:
+            # A complete frame may exist even when append or RAM publication
+            # was interrupted. Retrying from stale metadata would break replay.
+            self._failed = True
+            raise
 
     def set(self, namespace: str, key: str, value: Any) -> None:
         """Synchronous durable write; reject direct writes inside a transaction."""
@@ -535,9 +548,11 @@ class _JournalStore:
                 raise StoreError("backup source does not exist")
             try:
                 self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
+                self._ram_valid = False
                 self._state = state
                 self._sequence = sequence
                 self._digest = digest
+                self._ram_valid = True
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
