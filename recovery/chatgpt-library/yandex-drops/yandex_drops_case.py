@@ -158,14 +158,18 @@ def validate_params(p: Parameters) -> None:
     if p.loop_enabled and not (
         9 <= p.loop_od <= 20
         and 3 <= p.loop_hole <= p.loop_od - 4.5
-        and 3 <= p.loop_t <= min(p.depth - 4, (p.seam_y - p.separation / 2 + p.outer_height / 2) - 2)
+        and 3
+        <= p.loop_t
+        <= min(p.depth - 4, (p.seam_y - p.separation / 2 + p.outer_height / 2) - 2)
         and p.loop_od / 2 - 3 <= p.loop_projection <= p.loop_od / 2 - 0.8
         and 0 <= p.loop_y_offset <= 0.5
     ):
         raise ValueError("Lanyard loop would protrude through seam/bottom or disconnect")
 
 
-def rounded_body(width: float, height: float, depth: float, xy_radius: float, z_radius: float) -> cq.Workplane:
+def rounded_body(
+    width: float, height: float, depth: float, xy_radius: float, z_radius: float
+) -> cq.Workplane:
     """Smooth rounded cuboid: constant radius in photo plane, rolled front/back edges."""
     return (
         cq.Workplane("XY")
@@ -195,14 +199,20 @@ def create_assembled_solids(p: Parameters) -> dict[str, cq.Workplane]:
     )
     empty_shell = outer.cut(inner)
     # Cut entire shell at photo-derived seam so both pieces are truly independent.
-    top_cut = cq.Workplane("XY").box(200, 200, 120).translate((0, p.seam_y + p.separation / 2 + 100, 0))
-    base_cut = cq.Workplane("XY").box(200, 200, 120).translate((0, p.seam_y - p.separation / 2 - 100, 0))
+    top_cut = (
+        cq.Workplane("XY").box(200, 200, 120).translate((0, p.seam_y + p.separation / 2 + 100, 0))
+    )
+    base_cut = (
+        cq.Workplane("XY").box(200, 200, 120).translate((0, p.seam_y - p.separation / 2 - 100, 0))
+    )
     lid = empty_shell.intersect(top_cut)
     base = empty_shell.intersect(base_cut)
 
     # Rear hinge may need greater clearance than this provisional slot.
-    hinge = cq.Workplane("XY").box(p.hinge_w, p.hinge_h, p.hinge_d + 0.8).translate(
-        (0, p.seam_y, -p.outer_depth / 2 + (p.hinge_d + 0.8) / 2 - 0.6)
+    hinge = (
+        cq.Workplane("XY")
+        .box(p.hinge_w, p.hinge_h, p.hinge_d + 0.8)
+        .translate((0, p.seam_y, -p.outer_depth / 2 + (p.hinge_d + 0.8) / 2 - 0.6))
     )
     lid = lid.cut(hinge)
     base = base.cut(hinge)
@@ -247,12 +257,18 @@ def create_assembled_solids(p: Parameters) -> dict[str, cq.Workplane]:
         # rounded body; all interior intrusions are removed by the cavity cut.
         root_x = p.outer_width / 2 - p.corner_r * 0.85
         neck_far_x = cx + p.loop_hole / 2 + 0.7
-        neck = (cq.Workplane("XY")
-                .box(neck_far_x - root_x, p.loop_t, p.loop_hole + 3.5)
-                .translate(((neck_far_x + root_x) / 2, cy, 0)))
-        loop_hole_cutter = (cq.Workplane("XZ").center(cx, 0)
-                             .circle(p.loop_hole / 2).extrude(p.loop_t + 2)
-                             .translate((0, bottom_y + p.loop_t + 1, 0)))
+        neck = (
+            cq.Workplane("XY")
+            .box(neck_far_x - root_x, p.loop_t, p.loop_hole + 3.5)
+            .translate(((neck_far_x + root_x) / 2, cy, 0))
+        )
+        loop_hole_cutter = (
+            cq.Workplane("XZ")
+            .center(cx, 0)
+            .circle(p.loop_hole / 2)
+            .extrude(p.loop_t + 2)
+            .translate((0, bottom_y + p.loop_t + 1, 0))
+        )
         base = base.union(neck).union(lanyard).cut(inner).cut(loop_hole_cutter)
         base = base.intersect(base_cut)
 
@@ -293,10 +309,15 @@ def mesh_validation(stl: Path) -> dict[str, Any]:
         "volume_mm3": round(float(mesh.volume), 3),
         "fits_A1_mini_180mm": bool(all(0 < v <= 180 for v in dims)),
     }
-    if not (report["watertight"] and report["winding_consistent"] and report["connected_bodies"] == 1
-            and report["volume_mm3"] > 50 and report["fits_A1_mini_180mm"]
-            and abs(report["min_print_z_mm"]) < 0.03
-            and report["flat_bed_contact_area_mm2"] >= 150):
+    if not (
+        report["watertight"]
+        and report["winding_consistent"]
+        and report["connected_bodies"] == 1
+        and report["volume_mm3"] > 50
+        and report["fits_A1_mini_180mm"]
+        and abs(report["min_print_z_mm"]) < 0.03
+        and report["flat_bed_contact_area_mm2"] >= 150
+    ):
         raise ValueError(f"Unusable STL mesh: {report}")
     return report
 
@@ -324,8 +345,16 @@ def generate(config: dict[str, Any], outdir: Path) -> dict[str, Any]:
         "image_photo_based": True,
         "geometry": {
             "seam_y_mm": round(p.seam_y, 3),
-            "outer_size_mm_excluding_loop": [round(p.outer_width, 2),round(p.outer_height, 2),round(p.outer_depth, 2)],
-            "inner_size_mm": [p.width+2*p.clearance,p.height+2*p.clearance,p.depth+2*p.clearance],
+            "outer_size_mm_excluding_loop": [
+                round(p.outer_width, 2),
+                round(p.outer_height, 2),
+                round(p.outer_depth, 2),
+            ],
+            "inner_size_mm": [
+                p.width + 2 * p.clearance,
+                p.height + 2 * p.clearance,
+                p.depth + 2 * p.clearance,
+            ],
             "loop_center_xy_mm": [round(n, 3) for n in p.loop_xy],
             "lid_fraction_from_top": p.lid_fraction,
         },
@@ -333,13 +362,17 @@ def generate(config: dict[str, Any], outdir: Path) -> dict[str, Any]:
         "stl_files": validations,
     }
     (outdir / "reports").mkdir(exist_ok=True)
-    (outdir / "reports" / "geometry_validation.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
+    (outdir / "reports" / "geometry_validation.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False) + "\n"
+    )
     return summary
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--config", type=Path, required=True, help="JSON dimensions (all assumptions adjustable)")
+    ap.add_argument(
+        "--config", type=Path, required=True, help="JSON dimensions (all assumptions adjustable)"
+    )
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
     cfg = json.loads(args.config.read_text(encoding="utf-8"))
