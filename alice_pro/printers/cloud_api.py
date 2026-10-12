@@ -3,6 +3,7 @@
 Cloud API transport is intentionally NOT implemented. Do not substitute LAN
 access codes for cloud credentials. This interface is read-only.
 """
+
 from __future__ import annotations
 
 from typing import Protocol, Mapping, Any
