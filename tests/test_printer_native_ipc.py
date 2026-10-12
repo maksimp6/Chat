@@ -1,4 +1,5 @@
 """In-process Chaquopy IPC tests; no Android runtime, network or printer."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -11,7 +12,9 @@ import pytest
 
 @pytest.fixture
 def bridge(monkeypatch):
-    path = Path(__file__).resolve().parents[1] / "android/app/src/main/python/printer_native_bridge.py"
+    path = (
+        Path(__file__).resolve().parents[1] / "android/app/src/main/python/printer_native_bridge.py"
+    )
     spec = importlib.util.spec_from_file_location("printer_native_bridge_test", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -44,7 +47,9 @@ def test_bridge_rejects_null_context(bridge):
 
 def test_bridge_calls_native_discovery(bridge, monkeypatch):
     calls = []
-    native = types.SimpleNamespace(discover=lambda context, host: calls.append((context, host)) or Result())
+    native = types.SimpleNamespace(
+        discover=lambda context, host: calls.append((context, host)) or Result()
+    )
     monkeypatch.setitem(sys.modules, "java", types.SimpleNamespace(jclass=lambda name: native))
     context = Context()
     bridge.install_context(context)
