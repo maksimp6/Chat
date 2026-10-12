@@ -1,4 +1,5 @@
 """Mock contract tests; never connect to a real Android device."""
+
 import pytest
 
 from alice_pro.printers.android_bridge_contract import (
@@ -30,11 +31,14 @@ def test_bridge_missing_fails_closed():
         discover_via_android(None, "printer.local")
 
 
-@pytest.mark.parametrize("result", [
-    DiscoveryResult("192.168.31.12", "N1", "CELLULAR"),
-    DiscoveryResult("8.8.8.8", "N1", "WIFI"),
-    DiscoveryResult("192.168.31.12", "", "WIFI"),
-])
+@pytest.mark.parametrize(
+    "result",
+    [
+        DiscoveryResult("192.168.31.12", "N1", "CELLULAR"),
+        DiscoveryResult("8.8.8.8", "N1", "WIFI"),
+        DiscoveryResult("192.168.31.12", "", "WIFI"),
+    ],
+)
 def test_untrusted_result_rejected(result):
     with pytest.raises((AndroidBridgeUnavailable, ValueError)):
         discover_via_android(FakeBridge(result), "printer.local")
