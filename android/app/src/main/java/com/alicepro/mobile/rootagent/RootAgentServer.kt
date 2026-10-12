@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit
  * - Requests carrying browser markers (`Origin`, non-`none` `Sec-Fetch-Site`) or a
  *   Host other than 127.0.0.1/localhost on this port are refused, so a WebView or
  *   a DNS-rebinding page cannot reach it.
- * - GET /v1/health, /v1/device-info, /v1/status, /v1/screen/tree, /v1/root-probe only. One request per
+ * - GET /v1/health, /v1/device-info, /v1/status, /v1/screen/tree, /v1/screen/capture,
+ *   /v1/root-probe only. One request per
  *   connection, bounded header size, read timeout and worker count.
  */
 class RootAgentServer(
@@ -155,6 +156,12 @@ class RootAgentServer(
                 RootOperations.ScreenTree.Unavailable -> 502 to error("screen_tree_unavailable")
                 RootOperations.ScreenTree.TimedOut -> 504 to error("screen_tree_timeout")
             }
+            "/v1/screen/capture" -> when (val shot = operations.screenshot()) {
+                is RootOperations.Screenshot.Answered ->
+                    200 to "{\"format\":\"png\",\"png_base64\":\"${shot.pngBase64}\"}"
+                RootOperations.Screenshot.Unavailable -> 502 to error("screenshot_unavailable")
+                RootOperations.Screenshot.TimedOut -> 504 to error("screenshot_timeout")
+            }
             else -> when (val probe = operations.rootProbe()) {
                 is RootOperations.Probe.Answered -> 200 to "{\"root\":${probe.root}}"
                 RootOperations.Probe.TimedOut -> 504 to error("root_probe_timeout")
@@ -209,7 +216,7 @@ class RootAgentServer(
         private const val MAX_QUEUED = 16
         private const val READ_TIMEOUT_MS = 5_000
         private const val MAX_HEAD_BYTES = 16 * 1024
-        private val ROUTES = setOf("/v1/health", "/v1/device-info", "/v1/status", "/v1/screen/tree", "/v1/root-probe")
+        private val ROUTES = setOf("/v1/health", "/v1/device-info", "/v1/status", "/v1/screen/tree", "/v1/screen/capture", "/v1/root-probe")
         private val REASONS = mapOf(
             200 to "OK", 400 to "Bad Request", 401 to "Unauthorized", 403 to "Forbidden",
             404 to "Not Found", 405 to "Method Not Allowed", 431 to "Request Header Fields Too Large",
