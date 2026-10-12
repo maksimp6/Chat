@@ -1,4 +1,5 @@
 """Unit tests for safe A1 mini discovery helpers."""
+
 import json
 import struct
 
@@ -21,10 +22,15 @@ def test_detect_frame():
     assert decode_probe(frame({"login": {"model": "N1"}}))["login"]["model"] == "N1"
 
 
-@pytest.mark.parametrize("invalid", [
-    b"", b"abcd", b"\xa5\xa5\x06\x00\xa7\x00",
-    b"\xa5\xa5\x08\x00xx\xa7\xa7",
-])
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        b"",
+        b"abcd",
+        b"\xa5\xa5\x06\x00\xa7\x00",
+        b"\xa5\xa5\x08\x00xx\xa7\xa7",
+    ],
+)
 def test_invalid_frame(invalid):
     with pytest.raises(PrinterProtocolError):
         decode_probe(invalid)
@@ -39,8 +45,14 @@ def test_delta_merge_preserves_other_fields_and_inputs():
 
 
 def test_safe_summary_excludes_sensitive_data():
-    report = {"print": {"gcode_state": "IDLE", "nozzle_temper": 21,
-                        "serial": "SECRET", "access_code": "SECRET"}}
+    report = {
+        "print": {
+            "gcode_state": "IDLE",
+            "nozzle_temper": 21,
+            "serial": "SECRET",
+            "access_code": "SECRET",
+        }
+    }
     assert summarize_status(report) == {"gcode_state": "IDLE", "nozzle_temper": 21}
 
 
