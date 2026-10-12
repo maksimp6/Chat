@@ -24,7 +24,14 @@ def percentile(samples: list[float], fraction: float) -> float:
     return ordered[max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))]
 
 
-def run_hardware(host: str, *, requests: int = 50, warmup: int = 5, tcp_nodelay: bool = False, keepalive: bool = False) -> dict[str, Any]:
+def run_hardware(
+    host: str,
+    *,
+    requests: int = 50,
+    warmup: int = 5,
+    tcp_nodelay: bool = False,
+    keepalive: bool = False,
+) -> dict[str, Any]:
     host = private_ipv4(host)
     if requests < 1 or not 0 <= warmup <= 100:
         raise ValueError("invalid sample count")
@@ -32,7 +39,9 @@ def run_hardware(host: str, *, requests: int = 50, warmup: int = 5, tcp_nodelay:
     def connector(ip: str, port: int, *, timeout: float) -> socket.socket:
         return socket.create_connection((ip, port), timeout=timeout)
 
-    with PrinterSession(host, connector=connector, tcp_nodelay=tcp_nodelay, keepalive=keepalive) as session:
+    with PrinterSession(
+        host, connector=connector, tcp_nodelay=tcp_nodelay, keepalive=keepalive
+    ) as session:
         for _ in range(warmup):
             session.detect()
         samples = []
@@ -66,7 +75,18 @@ def main() -> None:
     args = parser.parse_args()
     if not args.hardware:
         parser.error("explicit --hardware required")
-    print(json.dumps(run_hardware(args.host, requests=args.requests, warmup=args.warmup, tcp_nodelay=args.tcp_nodelay, keepalive=args.keepalive), indent=2))
+    print(
+        json.dumps(
+            run_hardware(
+                args.host,
+                requests=args.requests,
+                warmup=args.warmup,
+                tcp_nodelay=args.tcp_nodelay,
+                keepalive=args.keepalive,
+            ),
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
