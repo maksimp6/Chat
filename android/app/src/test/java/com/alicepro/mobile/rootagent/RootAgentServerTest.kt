@@ -104,6 +104,7 @@ class RootAgentServerTest {
 
     @Test
     fun screenTreeReturnsEscapedXml() {
+        statusDump = RootShellResult(0, "isKeyguardShowing=false\n", false, false)
         val ok = get("/v1/screen/tree")
         assertEquals(200, status(ok))
         assertTrue(ok, ok.endsWith("{\"xml\":\"<?xml version='1.0' ?><hierarchy rotation=\\\"0\\\"><node text=\\\"a\\\\\\\"b\\\" /></hierarchy>\"}"))
@@ -118,6 +119,7 @@ class RootAgentServerTest {
 
     @Test
     fun screenshotReturnsBase64Png() {
+        statusDump = RootShellResult(0, "isKeyguardShowing=false\n", false, false)
         val ok = get("/v1/screen/capture")
         assertEquals(200, status(ok))
         assertTrue(ok, ok.endsWith("{\"format\":\"png\",\"png_base64\":\"iVBORw0KGgoB\"}"))
@@ -128,6 +130,26 @@ class RootAgentServerTest {
         shotDump = RootShellResult(null, "", timedOut = true, truncated = false)
         assertEquals(504, status(get("/v1/screen/capture")))
         assertEquals(401, status(get("/v1/screen/capture", auth = null)))
+    }
+
+    @Test
+    fun screenContentIsRefusedWhileLockedOrUnknown() {
+        treeDump = RootShellResult(0, "<?xml ?><hierarchy><node text=\"secret\"/></hierarchy>", false, false)
+        shotDump = RootShellResult(0, "iVBORw0KGgoB\n", false, false)
+        val lockedOrUnknown = listOf(
+            RootShellResult(0, "isKeyguardShowing=true\n", false, false),
+            RootShellResult(null, "", timedOut = true, truncated = false),
+            RootShellResult(1, "", false, false),
+        )
+        for (dump in lockedOrUnknown) {
+            statusDump = dump
+            for (path in listOf("/v1/screen/tree", "/v1/screen/capture")) {
+                val response = get(path)
+                assertEquals("$path with $dump", 423, status(response))
+                assertTrue(response.endsWith("{\"error\":\"device_locked\"}"))
+                assertFalse(response.contains("secret"))
+            }
+        }
     }
 
     @Test
