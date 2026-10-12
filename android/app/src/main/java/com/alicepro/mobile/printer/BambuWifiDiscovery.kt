@@ -14,7 +14,7 @@ import org.json.JSONObject
  * Native read-only A1 mini discovery. Not exported as an Android service and
  * never changes process-wide network binding or printer state.
  */
-internal object BambuWifiDiscovery {
+object BambuWifiDiscovery {
     internal fun privateIpv4(address: InetAddress): Boolean {
         if (address !is Inet4Address) return false
         val bytes = address.address.map { it.toInt() and 255 }
@@ -50,6 +50,7 @@ internal object BambuWifiDiscovery {
 
     internal data class Identity(val pinnedIp: String, val modelCode: String)
 
+    @JvmStatic
     fun discover(context: Context, host: String): Identity {
         validateHost(host)
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
