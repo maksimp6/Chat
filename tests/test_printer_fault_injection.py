@@ -77,10 +77,9 @@ def test_real_resolver_dns_is_pinned(network):
 def test_dns_public_answer_never_opens_socket(monkeypatch, network):
     dns_calls, connections = network
     monkeypatch.setattr(
-        socket, "getaddrinfo",
-        lambda host, port, **kw: [
-            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", port))
-        ],
+        socket,
+        "getaddrinfo",
+        lambda host, port, **kw: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", port))],
     )
     with pytest.raises(ValueError):
         probe("printer.example.test")
@@ -97,27 +96,24 @@ def test_dns_route_vpn_override_never_opens_socket(monkeypatch, network):
     assert connections == []
 
 
-@pytest.mark.parametrize("response", [
+@pytest.mark.parametrize(
+    "response",
+    [
     b"",
     b"\xa5\xa5\x00\x00",
     b"\xa5\xa5\xff\xff",
     frame({"login": {"command": "detect", "model": "N1"}})[:-2],
-    frame({"login": {"command": "detect", "model": "N1"}}) + b"extra",
 ])
 def test_corrupt_or_truncated_frames(monkeypatch, network, response):
-    monkeypatch.setattr(
-        socket, "create_connection", lambda *args, **kw: Socket(response)
-    )
-    if response.endswith(b"extra"):
-        # Trailing bytes beyond a declared frame are not read by this protocol.
-        pytest.skip("TCP stream trailing data requires a separate framing policy")
+    monkeypatch.setattr(socket, "create_connection", lambda *args, **kw: Socket(response))
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
 
 
 def test_socket_timeout_propagates(monkeypatch, network):
     monkeypatch.setattr(
-        socket, "create_connection",
+        socket,
+        "create_connection",
         lambda *args, **kw: Socket(socket.timeout("printer timeout")),
     )
     with pytest.raises(socket.timeout):
