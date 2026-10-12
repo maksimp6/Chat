@@ -50,7 +50,8 @@ class RootAgentService : Service() {
     private fun startServer(): RootAgentServer {
         val token = RootAgentTokenStore(this).loadOrCreate()
         val shell = RootShell(timeoutMs = ROOT_TIMEOUT_MS, maxOutputBytes = ROOT_OUTPUT_BYTES)
-            val operations = RootOperations(runRoot = shell::run, deviceInfo = ::deviceInfo)
+        val treeShell = RootShell(timeoutMs = TREE_TIMEOUT_MS, maxOutputBytes = TREE_OUTPUT_BYTES)
+        val operations = RootOperations(runRoot = shell::run, deviceInfo = ::deviceInfo, runTree = treeShell::run)
         val candidate = RootAgentServer(RootAgentServer.LOOPBACK, PORT, { token }, operations)
         candidate.start()
         return candidate
@@ -93,6 +94,8 @@ class RootAgentService : Service() {
         private const val NOTIFICATION_ID = 8766
         private const val ROOT_TIMEOUT_MS = 5_000L
         private const val ROOT_OUTPUT_BYTES = 4096
+        private const val TREE_TIMEOUT_MS = 15_000L
+        private const val TREE_OUTPUT_BYTES = 2 * 1024 * 1024
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, RootAgentService::class.java))
