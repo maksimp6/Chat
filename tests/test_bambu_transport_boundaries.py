@@ -26,10 +26,11 @@ def test_lan_accepts_rfc1918(host):
     assert require_lan_host(host) == host
 
 
-def test_lan_rejects_dns_before_socket(monkeypatch):
+def test_lan_dns_resolution_requires_validated_route(monkeypatch):
     def fail(*args, **kwargs):
         raise AssertionError("DNS resolution attempted")
-    monkeypatch.setattr("socket.getaddrinfo", fail)
+    monkeypatch.setattr("socket.getaddrinfo", lambda *args, **kwargs: [(2, 1, 6, "", ("8.8.8.8", 3000))])
+    monkeypatch.setattr("socket.create_connection", fail)
     with pytest.raises(ValueError):
         identify(Transport.LAN, host="printer.local")
 
