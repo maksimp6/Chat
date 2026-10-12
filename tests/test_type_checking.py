@@ -51,6 +51,7 @@ STRICT_CLEAN_FILES = {
     "agent_shell/__init__.py",
     "agent_skills/__init__.py",
     "agent_skills/registry.py",
+    "alice_pro/printers/android_bridge_contract.py",
     "alice_pro/printers/api.py",
     "alice_pro/printers/bambu_a1mini.py",
     "alice_pro/printers/cloud_api.py",
