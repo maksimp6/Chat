@@ -460,10 +460,15 @@ class BudgetController:
         self._roll_loss_period(account)
         if amount > account.limits.max_single_operation:
             raise BudgetLimitExceeded("single-operation limit exceeded")
-        if account.spent + amount > account.limits.max_total_loss:
+        # Outstanding reservations are committed exposure: count them so that
+        # combinations of reserve/spend cannot bypass the loss ceilings (#1181).
+        if account.spent + account.reserved + amount > account.limits.max_total_loss:
             raise BudgetLimitExceeded("total-loss limit exceeded")
         if account.loss_today + amount > account.limits.max_daily_loss:
             self._lock_account(account, reason="daily_loss_limit")
+            raise BudgetLimitExceeded("daily-loss limit exceeded")
+        if account.loss_today + account.reserved + amount > account.limits.max_daily_loss:
+            # Pending exposure only: deny without cooldown, release restores headroom.
             raise BudgetLimitExceeded("daily-loss limit exceeded")
 
     def _roll_loss_period(self, account: BudgetAccount) -> None:
