@@ -24,7 +24,7 @@ SOURCE_SHA = "21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84"
 OUTPUT = "Alice_OEM_Spindle_v03_A1mini_PLA_FIT_PROTOTYPE.gcode.3mf"
 
 
-def make_stl(src: Path, out: Path):
+def _load_source_parts(src: Path):
     raw = src.read_bytes()
     if hashlib.sha256(raw).hexdigest() != SOURCE_SHA or len(raw) != 106016:
         raise ValueError("spindle source hash/size mismatch")
@@ -42,6 +42,10 @@ def make_stl(src: Path, out: Path):
     items = root.findall(".//{*}build/{*}item")
     if len(objects) != 7 or len(items) != 7:
         raise ValueError("expected seven parts")
+    return objects, items
+
+
+def _read_meshes(objects):
     meshes = {}
     for obj in objects:
         mesh = obj.find("{*}mesh")
@@ -60,38 +64,53 @@ def make_stl(src: Path, out: Path):
         meshes[obj.get("id")] = (verts, faces)
     if sorted(len(v[1]) for v in meshes.values()) != [668, 986, 986, 986, 986, 2524, 2524]:
         raise ValueError("unexpected geometry")
+    return meshes
+
+
+def _item_transform(item):
+    m = [float(n) for n in item.get("transform", "").split()]
+    if len(m) != 12 or not all(math.isfinite(n) for n in m):
+        raise ValueError("invalid transform")
+
+    def move(p):
+        return (
+            p[0] * m[0] + p[1] * m[3] + p[2] * m[6] + m[9],
+            p[0] * m[1] + p[1] * m[4] + p[2] * m[7] + m[10],
+            p[0] * m[2] + p[1] * m[5] + p[2] * m[8] + m[11],
+        )
+
+    return move
+
+
+def _triangle_record(a, b, c) -> bytes:
+    u = [b[i] - a[i] for i in range(3)]
+    v = [c[i] - a[i] for i in range(3)]
+    normal = (
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0],
+    )
+    length = math.sqrt(sum(q * q for q in normal))
+    if length < 1e-9:
+        raise ValueError("degenerate triangle")
+    return struct.pack("<12fH", *(tuple(q / length for q in normal) + a + b + c), 0)
+
+
+def make_stl(src: Path, out: Path):
+    objects, items = _load_source_parts(src)
+    meshes = _read_meshes(objects)
     blob = bytearray(b"Alice OEM spindle v03 PLA fit prototype".ljust(80, b" "))
     blob.extend(struct.pack("<I", 9660))
     xs, ys, zs = [], [], []
     for item in items:
         vertices, faces = meshes[item.get("objectid")]
-        m = [float(n) for n in item.get("transform", "").split()]
-        if len(m) != 12 or not all(math.isfinite(n) for n in m):
-            raise ValueError("invalid transform")
-
-        def move(p):
-            return (
-                p[0] * m[0] + p[1] * m[3] + p[2] * m[6] + m[9],
-                p[0] * m[1] + p[1] * m[4] + p[2] * m[7] + m[10],
-                p[0] * m[2] + p[1] * m[5] + p[2] * m[8] + m[11],
-            )
-
+        move = _item_transform(item)
         for face in faces:
             try:
                 a, b, c = [move(vertices[n]) for n in face]
             except IndexError as e:
                 raise ValueError("bad face index") from e
-            u = [b[i] - a[i] for i in range(3)]
-            v = [c[i] - a[i] for i in range(3)]
-            normal = (
-                u[1] * v[2] - u[2] * v[1],
-                u[2] * v[0] - u[0] * v[2],
-                u[0] * v[1] - u[1] * v[0],
-            )
-            length = math.sqrt(sum(q * q for q in normal))
-            if length < 1e-9:
-                raise ValueError("degenerate triangle")
-            blob.extend(struct.pack("<12fH", *(tuple(q / length for q in normal) + a + b + c), 0))
+            blob.extend(_triangle_record(a, b, c))
             xs.extend((a[0], b[0], c[0]))
             ys.extend((a[1], b[1], c[1]))
             zs.extend((a[2], b[2], c[2]))
