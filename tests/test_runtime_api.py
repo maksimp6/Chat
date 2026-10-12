@@ -21,7 +21,7 @@ def client(tmp_path, monkeypatch):
     close_memory_clients()
 
 
-def test_def test_session_and_invocation_api(client):
+def test_session_and_invocation_api(client):
     session_response = client.post("/api/sessions", json={"metadata": {"profile": "assistant"}})
     assert session_response.status_code == 201
     session = session_response.get_json()

@@ -18,7 +18,7 @@ def async_runtime_db(tmp_path, monkeypatch):
     close_memory_clients()
 
 
-@pytest.mark.asyncio@pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runtime_db):
     from invocation.manager import (
         create_invocation,

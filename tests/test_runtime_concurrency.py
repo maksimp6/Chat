@@ -17,7 +17,7 @@ def runtime_db(tmp_path, monkeypatch):
     close_memory_clients()
 
 
-def test_def test_parallel_invocations_keep_context_and_trace_isolated(runtime_db):
+def test_parallel_invocations_keep_context_and_trace_isolated(runtime_db):
     from session_manager import create_session
     from invocation.manager import create_invocation, finish_invocation, get_invocation
 

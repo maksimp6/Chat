@@ -15,7 +15,7 @@ def runtime_db(tmp_path, monkeypatch):
     close_memory_clients()
 
 
-def test_def test_session_restore(runtime_db):
+def test_session_restore(runtime_db):
     from session_manager import create_session, restore_session, get_session
 
     session = create_session(metadata={"profile": "developer"})

@@ -33,7 +33,7 @@ def runtime_db(tmp_path, monkeypatch):
     close_memory_clients()
 
 
-def test_def test_clone_persists_independent_session(runtime_db):
+def test_clone_persists_independent_session(runtime_db):
     result = clone_profile("developer", "My Developer")
 
     session = result["session"]

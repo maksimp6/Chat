@@ -18,7 +18,7 @@ def treasury_db(tmp_path, monkeypatch):
     close_memory_clients()
 
 
-def test_def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
+def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
     from billing import settle_billing_to_treasury
     from treasury import demo_top_up, get_account
 
