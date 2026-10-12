@@ -48,7 +48,7 @@ object BambuWifiDiscovery {
         return login
     }
 
-    internal data class Identity(val pinnedIp: String, val modelCode: String)
+    data class Identity(val pinnedIp: String, val modelCode: String)
 
     @JvmStatic
     fun discover(context: Context, host: String): Identity {
