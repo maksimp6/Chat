@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
 import shutil
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -75,6 +77,7 @@ def create_backup(db: FileMemoryDB, destination: str | Path) -> MemoryBackupMani
     _write_fsynced(root / MANIFEST_NAME, (manifest.to_json() + "\n").encode("utf-8"))
     _write_fsynced(root / COMMIT_NAME, b"committed\n")
     _fsync_directory(root)
+    _fsync_directory(root.parent)
     return manifest
 
 
@@ -97,22 +100,33 @@ def restore_backup(source: str | Path, destination: str | Path) -> FileMemoryDB:
         raise MemoryBackupError("backup payload checksum mismatch")
 
     target = Path(destination)
-    if target.exists():
-        raise MemoryBackupError("restore destination already exists")
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f"{target.name}.restore.tmp")
+    lock_path = target.with_name(f"{target.name}.lock")
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    lock_fd = os.open(lock_path, flags, 0o600)
     try:
-        _write_fsynced(temporary, payload)
-        candidate = FileMemoryDB(temporary)
-        if candidate.sequence != manifest.sequence:
-            raise MemoryBackupError("restored sequence mismatch")
-        os.replace(temporary, target)
-        _fsync_directory(target.parent)
-    except Exception:
-        temporary.unlink(missing_ok=True)
-        raise
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        if os.path.lexists(target):
+            raise MemoryBackupError("restore destination already exists")
+        temporary = target.with_name(f"{target.name}.restore-{uuid.uuid4().hex}.tmp")
+        try:
+            _write_fsynced(temporary, payload)
+            candidate = FileMemoryDB(temporary)
+            if candidate.sequence != manifest.sequence:
+                raise MemoryBackupError("restored sequence mismatch")
+            os.replace(temporary, target)
+            _fsync_directory(target.parent)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
+        finally:
+            temporary.with_name(f"{temporary.name}.lock").unlink(missing_ok=True)
     finally:
-        temporary.with_name(f"{temporary.name}.lock").unlink(missing_ok=True)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        finally:
+            os.close(lock_fd)
 
     return FileMemoryDB(target)
 
