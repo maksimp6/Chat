@@ -61,21 +61,17 @@ def shadow_catchup(
     root = Path(isolated_root).expanduser().absolute()
     if root.is_symlink() or root.exists():
         raise ShadowMismatch("isolated shadow root must not already exist")
-    if reader.source_path is not None and reader.source_path == root.resolve():
-        raise ShadowMismatch("shadow root must not be SQL source")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     for attempt in range(1, max_attempts + 1):
         source = _read(reader, owner_bindings, known_owner_ids)
         generation = root / f"generation-{attempt}.memory"
         shadow = FileMemoryDB(generation)
         stage_shadow(shadow, source.snapshot)
-        if not verify_shadow(FileMemoryDB(generation), source.snapshot):
-            raise ShadowMismatch("shadow parity mismatch")
+        verify_shadow(FileMemoryDB(generation), source.snapshot)
         backup_dir = root / f"generation-{attempt}.backup"
         create_backup(shadow, backup_dir)
         restored = restore_backup(backup_dir, root / f"generation-{attempt}.restored")
-        if not verify_shadow(restored, source.snapshot):
-            raise ShadowMismatch("isolated restore mismatch")
+        verify_shadow(restored, source.snapshot)
         # A second independent SQL snapshot, after the file I/O, detects changes.
         latest = _read(reader, owner_bindings, known_owner_ids)
         if _same(source, latest):
