@@ -46,6 +46,28 @@ class AndroidShimTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             AndroidShim(Backend.SIMULATED, Spoof()).observe()
 
+    def test_backend_spoof_cannot_claim_verified(self):
+        class Spoof:
+            def observe(self):
+                return Evidence(Backend.DEVICE, Keyguard.UNLOCKED, True, "trusted")
+        self.assertFalse(AndroidShim(Backend.DEVICE, Spoof()).observe().verified)
+
+    def test_keyguard_changes_before_dispatch(self):
+        class Flipping(SimulatedAndroid):
+            def observe(self):
+                self.keyguard = Keyguard.LOCKED
+                return super().observe()
+        shim = AndroidShim(transport=Flipping(keyguard=Keyguard.UNLOCKED))
+        self.assertFalse(shim.tap(1, 1))
+
+    def test_parallel_simulated_taps(self):
+        from concurrent.futures import ThreadPoolExecutor
+        shim = AndroidShim(transport=SimulatedAndroid(keyguard=Keyguard.UNLOCKED))
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _: shim.tap(1, 1), range(40)))
+        self.assertEqual(sum(results), 40)
+        self.assertEqual(len(shim.transport.events), 40)
+
     def test_screenshot_png_fixture(self):
         self.assertTrue(AndroidShim().screenshot().startswith(b"\\x89PNG"))
 
