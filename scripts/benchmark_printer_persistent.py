@@ -3,6 +3,7 @@
 Only request RTT is measured; TCP setup and teardown are excluded. An explicit
 hardware flag is required. No automatic reconnect, heating, motion or printing.
 """
+
 from __future__ import annotations
 
 import argparse
