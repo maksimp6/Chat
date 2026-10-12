@@ -304,20 +304,13 @@ def save_dialog_settings(conv_id):
 
 
 from memory_manager import load_memory_config, save_memory_config, clear_global_memory
-from memory_extractor import init_global_memory
-from db import get_conn
+from memory_extractor import list_global_memory_facts
 
 
 @app.route("/api/memory/manage", methods=["GET"])
 def api_memory_panel_data():
     cfg = load_memory_config()
-    init_global_memory()
-    conn = get_conn()
-    facts = [
-        dict(r)
-        for r in conn.execute("SELECT * FROM global_memory ORDER BY updated_at DESC").fetchall()
-    ]
-    conn.close()
+    facts = list_global_memory_facts()
     return jsonify({"config": cfg, "facts": facts})
 
 
