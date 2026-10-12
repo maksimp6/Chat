@@ -62,7 +62,10 @@ gradle :app:testDebugUnitTest
   The service is not exported and never starts on its own.
 - Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
   (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
-  locked; the foreground app is not exposed), `GET /v1/root-probe` (`su -c "id -u"` must print `0`,
+  locked; the foreground app is not exposed), `GET /v1/screen/tree` (`{"xml": ...}` from a root
+  `uiautomator dump /proc/self/fd/1`, 15 s timeout, 2 MiB bound; failed, truncated or non-XML output is
+  `502` without the raw output; the read-only counterpart of Live Server `/screen/tree`),
+  `GET /v1/root-probe` (`su -c "id -u"` must print `0`,
   5 s timeout). No shell, input, package or process mutation.
 - Bearer token: 32 random bytes, encrypted at rest with an AndroidKeyStore AES-256-GCM key;
   it never leaves the app process. Requests with `Origin`, a cross-site `Sec-Fetch-Site` or a
