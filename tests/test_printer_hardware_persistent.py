@@ -4,6 +4,7 @@ Disabled unless ALICE_PRINTER_HARDWARE_IP is explicitly supplied. The
 hardware connector is injected because unprivileged Termux cannot use
 SO_BINDTODEVICE. No writes beyond the read-only detect command.
 """
+
 from __future__ import annotations
 
 import os
