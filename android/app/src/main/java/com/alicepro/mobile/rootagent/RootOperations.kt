@@ -1,13 +1,16 @@
 package com.alicepro.mobile.rootagent
 
 /**
- * The only operations the first RootAgent slice exposes (#650): read-only
- * device information, the lock-screen state and one harmless root probe. No shell, input, package or
- * process mutation is reachable from here.
+ * The only operations the RootAgent core exposes so far (#650): read-only
+ * device information, the lock-screen state, the UI tree and one harmless root probe. No shell,
+ * input, package or process mutation is reachable from here.
+ *
+ * [runTree] runs the UI dump with a larger output bound than the small probes.
  */
 class RootOperations(
     private val runRoot: (List<String>) -> RootShellResult,
     private val deviceInfo: () -> Map<String, String>,
+    private val runTree: (List<String>) -> RootShellResult = runRoot,
 ) {
     sealed class Probe {
         data class Answered(val root: Boolean) : Probe()
@@ -19,7 +22,24 @@ class RootOperations(
         object TimedOut : Status()
     }
 
+    sealed class ScreenTree {
+        data class Answered(val xml: String) : ScreenTree()
+        object Unavailable : ScreenTree()
+        object TimedOut : ScreenTree()
+    }
+
     fun deviceInfo(): Map<String, String> = deviceInfo.invoke()
+
+    /** The uiautomator hierarchy XML, or Unavailable; raw failure output is never returned. */
+    fun screenTree(): ScreenTree {
+        val result = runTree(TREE_ARGV)
+        if (result.timedOut) return ScreenTree.TimedOut
+        if (result.exitCode != 0 || result.truncated) return ScreenTree.Unavailable
+        val start = result.output.indexOf("<?xml")
+        val end = result.output.lastIndexOf(TREE_END)
+        if (start < 0 || end < start || !result.output.contains("<hierarchy")) return ScreenTree.Unavailable
+        return ScreenTree.Answered(result.output.substring(start, end + TREE_END.length))
+    }
 
     /** Lock-screen state only; foreground app and window names are not exposed. */
     fun status(): Status {
@@ -38,6 +58,8 @@ class RootOperations(
 
     companion object {
         val PROBE_ARGV = listOf("su", "-c", "id -u")
+        val TREE_ARGV = listOf("su", "-c", "uiautomator dump /dev/tty")
+        private const val TREE_END = "</hierarchy>"
         val STATUS_ARGV = listOf(
             "su", "-c",
             "dumpsys window | grep -E 'isKeyguardShowing|mShowingLockscreen|mKeyguardShowing'",
