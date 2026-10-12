@@ -31,7 +31,7 @@ class FileMemoryDB:
     VERSION = 1
 
     def __init__(self, path: str | Path) -> None:
-        self.path = Path(path)
+        self.path = Path(path).expanduser().resolve()
         self._lock_path = self.path.with_name(f"{self.path.name}.lock")
         self._lock = RLock()
         self._state: dict[str, Any] = {}
