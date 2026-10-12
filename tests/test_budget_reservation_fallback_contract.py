@@ -104,8 +104,7 @@ def test_exhausted_real_reservation_falls_back_to_demo_only_when_enabled():
     assert controller.account(AccountType.REAL).spent == Decimal("0.00")
     assert controller.account(AccountType.DEMO).reserved == Decimal("10.00")
     assert any(
-        event["event"] == "mode_switch"
-        and event.get("reason") == "real_budget_exhausted"
+        event["event"] == "mode_switch" and event.get("reason") == "real_budget_exhausted"
         for event in events
     )
 
