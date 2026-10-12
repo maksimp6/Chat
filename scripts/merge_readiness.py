@@ -169,9 +169,7 @@ def collect_solution_review_evidence(
             or str(run.get("conclusion") or "") != "success"
         ):
             continue
-        artifact_data = _gh_json(
-            [f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100"]
-        )
+        artifact_data = _gh_json([f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100"])
         enriched: list[dict[str, Any]] = []
         for artifact in artifact_data.get("artifacts", []):
             item = dict(artifact)
@@ -219,8 +217,11 @@ def _valid_review_payload(
         if report.get(field) != value or evidence.get(field) != value:
             return False
     for field in (
-        "outcome", "reviewer_role", "reviewer_session",
-        "implementation_role", "implementation_session",
+        "outcome",
+        "reviewer_role",
+        "reviewer_session",
+        "implementation_role",
+        "implementation_session",
     ):
         if report.get(field) != evidence.get(field):
             return False
@@ -308,7 +309,10 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
         or not str(report.get("rationale") or "").strip()
         or not str(report.get("risk_assessment") or "").strip()
     ):
-        return {"code": "solution_review_invalid", "detail": "authenticated substantive review report is missing"}
+        return {
+            "code": "solution_review_invalid",
+            "detail": "authenticated substantive review report is missing",
+        }
 
     outcome = str(evidence["outcome"])
     if outcome == "CHANGES_REQUESTED":
@@ -327,19 +331,17 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
             "detail": "solution-review outcome is not recognized",
         }
 
-    if (
-        str(evidence["reviewed_head_sha"]) != str(snapshot["head_sha"])
-        or str(evidence["reviewed_base_sha"]) != str(snapshot["base_sha"])
-    ):
+    if str(evidence["reviewed_head_sha"]) != str(snapshot["head_sha"]) or str(
+        evidence["reviewed_base_sha"]
+    ) != str(snapshot["base_sha"]):
         return {
             "code": "solution_review_stale",
             "detail": "solution review is not bound to the exact current head and base",
         }
 
-    if (
-        str(evidence["reviewer_role"]) == str(evidence["implementation_role"])
-        or str(evidence["reviewer_session"]) == str(evidence["implementation_session"])
-    ):
+    if str(evidence["reviewer_role"]) == str(evidence["implementation_role"]) or str(
+        evidence["reviewer_session"]
+    ) == str(evidence["implementation_session"]):
         return {
             "code": "solution_review_not_independent",
             "detail": "solution reviewer role and session must be independent from implementation",
