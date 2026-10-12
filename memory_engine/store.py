@@ -23,6 +23,7 @@ from typing import Any, Iterator, Protocol, TypeVar
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
 MAX_VALUE_DEPTH = 64
 MAX_VALUE_NODES = 100_000
+MAX_VALUE_TEXT_BYTES = MAX_JOURNAL_FRAME_BYTES
 
 ValueT = TypeVar("ValueT")
 
@@ -36,11 +37,26 @@ def _validate_name(name: str) -> None:
         raise StoreError("name must be a nonempty string")
 
 
+def _check_text_budget(value: Any, used: int) -> int:
+    """Check UTF-8 incrementally without allocating a full encoded text copy."""
+    if type(value) is not str:
+        return used
+    for offset in range(0, len(value), 16384):
+        try:
+            used += len(value[offset : offset + 16384].encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise StoreError("invalid Unicode text") from exc
+        if used > MAX_VALUE_TEXT_BYTES:
+            raise StoreError("value text exceeds size limit")
+    return used
+
+
 def _walk_value(value: Any) -> Iterator[Any]:
     """Bound traversal before recursive copying/encoding; allow shared subtrees."""
     stack: list[tuple[Iterator[Any], int, int | None]] = [(iter((value,)), 0, None)]
     active: set[int] = set()
     nodes = 0
+    text_bytes = 0
     while stack:
         children, depth, identity = stack[-1]
         try:
@@ -53,6 +69,7 @@ def _walk_value(value: Any) -> Iterator[Any]:
         nodes += 1
         if depth > MAX_VALUE_DEPTH or nodes > MAX_VALUE_NODES:
             raise StoreError("value structure exceeds limit")
+        text_bytes = _check_text_budget(item, text_bytes)
         yield item
         if type(item) in (list, tuple, dict):
             identity = id(item)

@@ -20,6 +20,12 @@ levels and more than 100,000 nodes (including dictionary keys) raise `StoreError
 without replacing existing staging. Shared acyclic subtrees remain supported.
 Replay enforces the same limits and preserves invalid source bytes. These limits
 bound recursive copying/JSON encoding; the existing 1 MiB frame limit still applies.
+Text in each value (including dictionary keys) has a combined 1 MiB UTF-8
+budget, checked in small chunks before staging. Invalid Unicode and text beyond
+that budget fail without replacing previous staging or blocking the writer.
+Shared text is counted each time it appears in the serialized value. Frame
+metadata/JSON escaping can still make a value within this budget exceed the
+separate encoded-frame limit at commit.
 
 `set()` copies into client-owned staging and `get()` reads that staging before
 committed data. `commit()` validates all staged values and appends one durable
