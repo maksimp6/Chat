@@ -289,3 +289,22 @@ def test_deleting_authoritative_file_after_ack_fails_closed(tmp_path):
     path.unlink()
     with pytest.raises(FileMemoryCorruption, match="disappeared"):
         db.items()
+
+
+def test_symlink_aliases_share_one_filesystem_lock(tmp_path):
+    target = tmp_path / "canonical.memory"
+    alias = tmp_path / "alias.memory"
+    alias.symlink_to(target)
+    first = FileMemoryDB(target)
+    second = FileMemoryDB(alias)
+    assert first.path == second.path == target
+    assert first._lock_path == second._lock_path
+
+    def write(index):
+        db = first if index % 2 else second
+        return db.put(f"k{index}", index)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        sequences = list(pool.map(write, range(40)))
+    assert sorted(sequences) == list(range(1, 41))
+    assert len(FileMemoryDB(target).items()) == 40
