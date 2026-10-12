@@ -8,10 +8,10 @@ The accepted #776 / #780 architecture targets the durable file-native Memory DB.
 
 `scripts/sql_inventory.py` scans **every tracked file** from the exact `master` Git ref and emits `master.json` + `master.md`; a second scan inventories the PR HEAD. Both outputs are attached to each run of **SQL dependency inventory**. The JSON includes exact paths, categories, migration wave, marker rule IDs, and line numbers. No raw source lines, credentials, screenshot or PII are written into artifacts.
 
-- GitHub tree preflight, 2026-10-12: **939 Git blobs** across **1,055 tree entries**, tree not truncated. This is **not** the SQL-match count; the CI-generated inventory provides exhaustive match counts and files from a checked-out tree.
+- GitHub tree preflight, 2026-10-12: **939 Git blobs** across **1,055 tree entries**, tree not truncated. The first exact-head CI run found **160 marker files / 34 runtime direct-marked files**, including two frontend JavaScript false positives. The revised frontend classification excludes those from authoritative runtime debt; use the latest workflow artifacts for exact corrected counts.
 - The scanner tracks unreadable/binary files explicitly and does not infer that indirect SQL usage is absent merely because a file has no keyword match.
 - Evidence is **lexical/static**, not runtime-reachability or data equivalence. Unknown runtime owners are listed as `triage`, never silently assigned to a wave.
-- The guard compares tracked PR HEAD to current `origin/master` and blocks new **direct runtime SQL** signal occurrences per path/rule. Existing debt may decrease; the test remains green while waves are in progress. Docs, tests, CI and infrastructure references remain visible but do not count as new production SQL consumers.
+- The guard compares tracked PR HEAD to current `origin/master` and blocks new **direct runtime SQL** signal occurrences per path/rule. Existing debt may decrease; the test remains green while waves are in progress. Frontend, docs, tests, CI and infrastructure references remain visible but do not count as new production SQL consumers.
 - For exact file-specific evidence, refer to the `master.md`/`master.json` artifacts, not the representative list below.
 
 ## Confirmed runtime migration inventory, representative direct dependencies

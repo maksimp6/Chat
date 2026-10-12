@@ -33,6 +33,15 @@ class SQLInventoryTests(unittest.TestCase):
         self.assertEqual(category("session_manager.py"), "runtime")
         self.assertEqual(category("scripts/pg_backup.sh"), "infra")
 
+    def test_frontend_sql_words_are_not_runtime_debt(self) -> None:
+        inv = build_inventory(
+            [("static/eruda.js", b"const query = 'SELECT x FROM table';\\n")],
+            "fixture",
+        )
+        self.assertEqual(inv["direct_runtime_files"], 0)
+        self.assertEqual(inv["matched_by_category"]["frontend"], 1)
+        self.assertEqual(inv["unknown_runtime_direct"], [])
+
     def test_owner_waves(self) -> None:
         self.assertEqual(wave("session_manager.py", "runtime"), "wave-1")
         self.assertEqual(wave("invocation/manager.py", "runtime"), "wave-2")
@@ -65,16 +74,24 @@ class SQLInventoryTests(unittest.TestCase):
 
     def test_new_sql_conn_fails_guard(self) -> None:
         before = build_inventory([("session_manager.py", b"def f(): return 1\n")], "base")
-        after = build_inventory([("session_manager.py", b"from db import get_conn\nconn = get_conn()\n")], "head")
-        self.assertEqual(new_debt(before, after), [{"path": "session_manager.py", "rule": "sql_connection", "baseline": 0, "current": 1}])
+        after = build_inventory(
+            [("session_manager.py", b"from db import get_conn\nconn = get_conn()\n")], "head"
+        )
+        self.assertEqual(
+            new_debt(before, after),
+            [{"path": "session_manager.py", "rule": "sql_connection", "baseline": 0, "current": 1}],
+        )
 
     def test_no_growth_allows_migration_and_docs(self) -> None:
         base = build_inventory([("session_manager.py", b"get_conn()\nget_conn()\n")], "master")
-        head = build_inventory([
-            ("session_manager.py", b"get_conn()\n"),
-            ("docs/database.md", b"get_conn() psycopg sqlite3 SELECT * FROM users\n"),
-            ("tests/test_sql.py", b"import sqlite3\n"),
-        ], "head")
+        head = build_inventory(
+            [
+                ("session_manager.py", b"get_conn()\n"),
+                ("docs/database.md", b"get_conn() psycopg sqlite3 SELECT * FROM users\n"),
+                ("tests/test_sql.py", b"import sqlite3\n"),
+            ],
+            "head",
+        )
         self.assertEqual(new_debt(base, head), [])
 
     def test_unknown_sql_owner_is_not_silently_assigned(self) -> None:
@@ -93,7 +110,9 @@ class SQLInventoryTests(unittest.TestCase):
             _git(root, "commit", "-qm", "baseline")
             base = build_inventory(_tracked_ref(root, "HEAD"), "HEAD")
             self.assertEqual(base["tracked_files"], 2)
-            self.assertEqual(new_debt(base, build_inventory(_tracked_worktree(root), "worktree")), [])
+            self.assertEqual(
+                new_debt(base, build_inventory(_tracked_worktree(root), "worktree")), []
+            )
             (root / "session_manager.py").write_text("get_conn()\n", encoding="utf-8")
             _git(root, "add", "session_manager.py")
             head = build_inventory(_tracked_worktree(root), "worktree")
