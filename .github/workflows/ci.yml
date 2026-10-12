@@ -201,6 +201,8 @@ jobs:
           if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
           if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
 
+      - name: Build and check C17 fallback control server
+        run: bash scripts/build_c17_server.sh --check
       - name: Run Python application tests with coverage
         run: |
           started=$SECONDS
@@ -379,6 +381,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends ffmpeg
           ffmpeg -version
           ffprobe -version
+      - name: Build C17 fallback control server
+        run: bash scripts/build_c17_server.sh
       - name: Run full application suite on PostgreSQL
         run: pytest --durations=30 -q
       - name: Verify backup and restore of the application schema
