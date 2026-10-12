@@ -1,4 +1,5 @@
 """Persistent connection contract and failure isolation."""
+
 import json
 import struct
 
@@ -36,9 +37,11 @@ class FakeSocket:
 def test_one_connection_multiple_requests():
     sock = FakeSocket()
     calls = []
+
     def connect(*args, **kwargs):
         calls.append((args, kwargs))
         return sock
+
     with PrinterSession("192.168.31.12", connector=connect) as session:
         first, first_ms = session.detect()
         second, second_ms = session.detect()
