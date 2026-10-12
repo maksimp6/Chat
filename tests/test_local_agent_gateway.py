@@ -141,3 +141,46 @@ def test_health_does_not_expose_runtime_tokens(client):
     response = client.get("/api/local-agents/health", headers=auth("bootstrap"))
     assert response.status_code == 200
     assert "token" not in json.dumps(response.get_json())
+
+
+@pytest.mark.parametrize("endpoint", ["heartbeat", "poll", "jobs/job/result"])
+@pytest.mark.parametrize(
+    "failure,status,code",
+    [
+        (LookupError, 404, "agent_not_found"),
+        (PermissionError, 401, "local_agent_unauthorized"),
+    ],
+)
+def test_agent_errors_never_expose_internal_exception_details(
+    client, monkeypatch, endpoint, failure, status, code
+):
+    secret_detail = "/private/runtime/path: credential-like-internal-detail"
+
+    def reject(_agent_id):
+        raise failure(secret_detail)
+
+    monkeypatch.setattr(local_agent_gateway, "_require_agent", reject)
+    if endpoint == "poll":
+        response = client.get(f"/api/local-agents/android-test/{endpoint}")
+    else:
+        response = client.post(
+            f"/api/local-agents/android-test/{endpoint}", json={"status": "completed"}
+        )
+    assert response.status_code == status
+    assert response.get_json() == {"error": code}
+    assert secret_detail not in response.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("endpoint", ["register", "health"])
+def test_bootstrap_errors_use_fixed_public_code(client, monkeypatch, endpoint):
+    def reject():
+        raise PermissionError("private internal credential detail")
+
+    monkeypatch.setattr(local_agent_gateway, "_require_bootstrap", reject)
+    response = (
+        client.post("/api/local-agents/register", json={})
+        if endpoint == "register"
+        else client.get("/api/local-agents/health")
+    )
+    assert response.status_code == 401
+    assert response.get_json() == {"error": "local_agent_unauthorized"}

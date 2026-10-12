@@ -143,8 +143,8 @@ def _recover_expired_jobs(conn, agent_id: str) -> None:
 def register_local_agent():
     try:
         _require_bootstrap()
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 401
+    except PermissionError:
+        return jsonify({"error": "local_agent_unauthorized"}), 401
 
     data = request.get_json(silent=True) or {}
     agent_id = str(data.get("agent_id") or f"android-{uuid4().hex[:12]}").strip()
@@ -205,10 +205,10 @@ def local_agent_heartbeat(agent_id: str):
             agent = _require_agent(agent_id)
             row = agent
             tx.set(key, {**row, "status": "online", "last_seen": now, "updated_at": now})
-    except LookupError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 401
+    except LookupError:
+        return jsonify({"error": "agent_not_found"}), 404
+    except PermissionError:
+        return jsonify({"error": "local_agent_unauthorized"}), 401
 
     return jsonify({"status": "ok", "agent_id": agent_id, "last_seen": now})
 
@@ -237,10 +237,10 @@ def local_agent_poll(agent_id: str):
                 "local-job/" + row["id"],
                 {**row, "status": "running", "claimed_at": now, "lease_until": lease_until},
             )
-    except LookupError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 401
+    except LookupError:
+        return jsonify({"error": "agent_not_found"}), 404
+    except PermissionError:
+        return jsonify({"error": "local_agent_unauthorized"}), 401
     return jsonify(
         {
             "job": {
@@ -285,10 +285,10 @@ def local_agent_result(agent_id: str, job_id: str):
                     "lease_until": None,
                 },
             )
-    except LookupError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 401
+    except LookupError:
+        return jsonify({"error": "agent_not_found"}), 404
+    except PermissionError:
+        return jsonify({"error": "local_agent_unauthorized"}), 401
 
     return jsonify({"status": "ok", "job_id": job_id})
 
@@ -297,8 +297,8 @@ def local_agent_result(agent_id: str, job_id: str):
 def local_agent_health():
     try:
         _require_bootstrap()
-    except PermissionError as exc:
-        return jsonify({"error": str(exc)}), 401
+    except PermissionError:
+        return jsonify({"error": "local_agent_unauthorized"}), 401
 
     cutoff = _now() - 90
     rows = sorted(get_store().items(prefix="local-agent/").values(), key=lambda row: row["id"])
