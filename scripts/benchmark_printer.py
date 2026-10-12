@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import struct
 import statistics
 import time
 from typing import Callable
@@ -14,7 +15,8 @@ from typing import Callable
 from alice_pro.printers.bambu_a1mini import decode_probe, merge_report
 from alice_pro.printers.lan_address import _route_is_local, private_ipv4
 
-FRAME = b'\xa5\xa5\x35\x00{"login":{"command":"detect","model":"N1"}}\xa7\xa7'
+PAYLOAD = b'{"login":{"command":"detect","model":"N1"}}'
+FRAME = b"\x5cxa5\x5cxa5" + struct.pack("<H", len(PAYLOAD) + 6) + PAYLOAD + b"\x5cxa7\x5cxa7"
 ROUTES = (
     "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n"
     "wlan0 001FA8C0 00000000 0001 0 0 0 00FFFFFF 0 0 0\n"
