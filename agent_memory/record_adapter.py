@@ -10,7 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from memory_engine import MemoryStore, StoreError
+from memory_engine import MemoryStore
 
 _RECORDS = "alice/legacy-records"
 
