@@ -4,8 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
-import hashlib
-import json
+import threading
 import time
 
 
@@ -97,6 +96,7 @@ class AndroidShim:
             SimulatedAndroid() if self.backend == Backend.SIMULATED else UnconfiguredTransport(self.backend)
         )
         self.trace: list[dict] = []
+        self._lock = threading.RLock()
 
     def _record(self, action: str, outcome: str) -> None:
         self.trace.append({"backend": self.backend.value, "action": action, "outcome": outcome, "timestamp_ns": time.monotonic_ns()})
@@ -106,26 +106,28 @@ class AndroidShim:
         if result.backend != self.backend:
             self._record("observe", "backend_mismatch")
             raise RuntimeError("backend mismatch")
-        if self.backend == Backend.SIMULATED:
-            result = Evidence(Backend.SIMULATED, result.keyguard, False, "simulation")
+        # No configured trust anchor exists yet for real backends.
+        result = Evidence(self.backend, result.keyguard, False, "simulation" if self.backend == Backend.SIMULATED else "unverified_transport")
         self._record("observe", result.keyguard.value)
         return result
 
     def tap(self, x: int, y: int) -> bool:
-        if self.observe().keyguard != Keyguard.UNLOCKED:
-            self._record("tap", "denied_keyguard")
-            return False
-        ok = self.transport.tap(x, y)
-        self._record("tap", "submitted" if ok else "rejected")
-        return ok
+        with self._lock:
+            if self.observe().keyguard != Keyguard.UNLOCKED:
+                self._record("tap", "denied_keyguard")
+                return False
+            ok = self.transport.tap(x, y)
+            self._record("tap", "submitted" if ok else "rejected")
+            return ok
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int) -> bool:
-        if self.observe().keyguard != Keyguard.UNLOCKED:
-            self._record("swipe", "denied_keyguard")
-            return False
-        ok = self.transport.swipe(x1, y1, x2, y2)
-        self._record("swipe", "submitted" if ok else "rejected")
-        return ok
+        with self._lock:
+            if self.observe().keyguard != Keyguard.UNLOCKED:
+                self._record("swipe", "denied_keyguard")
+                return False
+            ok = self.transport.swipe(x1, y1, x2, y2)
+            self._record("swipe", "submitted" if ok else "rejected")
+            return ok
 
     def screenshot(self) -> bytes:
         data = self.transport.screenshot()
