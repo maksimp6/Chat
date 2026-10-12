@@ -504,6 +504,12 @@ def test_merge_readiness_rejects_missing_solution_review_evidence():
 def test_merge_readiness_rejects_invalid_solution_review_evidence(override, expected):
     evidence = dict(snapshot()["solution_review"])
     evidence.update(override)
+    if "outcome" in override:
+        # The authenticated report must agree with the evidence outcome.
+        evidence["review_report"] = {
+            **evidence["review_report"],
+            "outcome": override["outcome"],
+        }
     result = merge_readiness.evaluate_snapshot(snapshot(solution_review=evidence))
 
     assert result["ready"] is False
