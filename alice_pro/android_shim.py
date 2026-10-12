@@ -64,7 +64,7 @@ class SimulatedAndroid:
             raise RuntimeError("simulated capture failure")
         # Valid deterministic 1x1 PNG fixture, not a real screen capture.
         import base64
-        return base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6S0sAAAAASUVORK5CYII=")
+        return base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC")
 
 
 class AndroidTransport(Protocol):
