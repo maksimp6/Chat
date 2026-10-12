@@ -20,7 +20,7 @@ class MockPrinterSocket:
         self.fragment = fragment
         self.sent = b""
         self.timeout = None
-        self.peer = ('192.168.31.12', 3000)
+        self.peer = ("192.168.31.12", 3000)
 
     def getpeername(self):
         return self.peer
@@ -99,12 +99,16 @@ def test_mock_discovery_fragmented_tcp(mock_printer):
     ],
 )
 def test_mock_malformed_and_missing_identity(monkeypatch, reply):
-    monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: MockPrinterSocket(reply))
+    monkeypatch.setattr(
+        "alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: MockPrinterSocket(reply)
+    )
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
 
 
 def test_mock_rejects_invalid_timeout_without_network(monkeypatch):
-    monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: pytest.fail("network used"))
+    monkeypatch.setattr(
+        "alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: pytest.fail("network used")
+    )
     with pytest.raises(ValueError):
         probe("printer.example.test", timeout=0)
