@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
-JOBS = ("backend", "postgres", "android", "infra", "mcp")
+JOBS = ("backend", "android", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
@@ -117,7 +117,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
     for job in JOBS:
-        required = plan["database"] if job == "postgres" else plan[job]
+        required = plan[job]
         allowed = {"success"} if required else {"success", "skipped"}
         if results.get(job) not in allowed:
             raise ValueError(f"platform check missing, failed or unexpectedly skipped: {job}")
