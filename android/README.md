@@ -69,7 +69,9 @@ gradle :app:testDebugUnitTest
   15 s timeout, 12 MiB bound; anything that does not decode to a PNG is `502` without the raw
   output; the read-only counterpart of Live Server `/screen/capture`),
   `GET /v1/root-probe` (`su -c "id -u"` must print `0`,
-  5 s timeout). No shell, input, package or process mutation.
+  5 s timeout). Screen tree and capture return `423 device_locked` unless `/v1/status` reads the
+  lock screen as off; a timeout or unexpected output counts as locked. No shell, input, package
+  or process mutation.
 - Bearer token: 32 random bytes, encrypted at rest with an AndroidKeyStore AES-256-GCM key;
   it never leaves the app process. Requests with `Origin`, a cross-site `Sec-Fetch-Site` or a
   foreign `Host` are refused, so WebView pages and DNS rebinding cannot reach the API.
