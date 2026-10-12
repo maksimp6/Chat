@@ -3,6 +3,7 @@
 Connection setup is excluded from request RTT. One in-flight request at a
 time; any I/O or protocol failure invalidates the socket (no silent retry).
 """
+
 from __future__ import annotations
 
 import json
@@ -16,8 +17,13 @@ from .lan_socket import connect_lan
 
 
 class PrinterSession:
-    def __init__(self, host: str, *, timeout: float = 3.0,
-                 connector: Callable[..., socket.socket] = connect_lan) -> None:
+    def __init__(
+        self,
+        host: str,
+        *,
+        timeout: float = 3.0,
+        connector: Callable[..., socket.socket] = connect_lan,
+    ) -> None:
         self.host = host
         self.timeout = timeout
         self._connector = connector
@@ -61,7 +67,11 @@ class PrinterSession:
             response = decode_probe(header + _recv_exact(sock, length - 4))
             elapsed_ms = (time.perf_counter_ns() - started) / 1_000_000
             login = response.get("login")
-            if not isinstance(login, dict) or login.get("command") != "detect" or not login.get("model"):
+            if (
+                not isinstance(login, dict)
+                or login.get("command") != "detect"
+                or not login.get("model")
+            ):
                 raise PrinterProtocolError("invalid detect response")
             if str(login.get("sequence_id", str(self._sequence))) != str(self._sequence):
                 raise PrinterProtocolError("sequence mismatch")
