@@ -10,3 +10,7 @@ ruff==0.16.9
 mypy==2.4.0
 diff-cover==10.6.0
 PyYAML==6.0.3
+# Real offline mesh/video regression fixtures (FFmpeg/ffprobe are OS tools).
+numpy==2.3.5
+matplotlib==3.10.8
+trimesh==4.9.0
