@@ -8,11 +8,26 @@ The accepted #776 / #780 architecture targets the durable file-native Memory DB.
 
 `scripts/sql_inventory.py` scans **every tracked file** from the exact `master` Git ref and emits `master.json` + `master.md`; a second scan inventories the PR HEAD. Both outputs are attached to each run of **SQL dependency inventory**. The JSON includes exact paths, categories, migration wave, marker rule IDs, and line numbers. No raw source lines, credentials, screenshot or PII are written into artifacts.
 
-- GitHub tree preflight, 2026-10-12: **939 Git blobs** across **1,055 tree entries**, tree not truncated. The first exact-head CI run found **160 marker files / 34 runtime direct-marked files**, including two frontend JavaScript false positives. The revised frontend classification excludes those from authoritative runtime debt; use the latest workflow artifacts for exact corrected counts.
+- GitHub tree preflight, 2026-10-12: **939 Git blobs** across **1,055 tree entries**, tree not truncated. Exact `master` at `51aaf8273f4f465fe78aa0a79e76a22d8f141e35`: **939 tracked files, 937 scanned UTF-8 text files, 160 marker files, 32 direct runtime SQL-marker files**. Two JavaScript/frontend matches were excluded from authoritative runtime debt after independent review. The remaining **3 unassigned direct runtime files** are `agent_shell/__main__.py`, `agent_shell/store.py` and `tool_providers/filesystem.py`. Counts are from [exact-head SQL inventory workflow #38218729975](https://github.com/maksimp6/Chat/actions/runs/38218729975), not from search-index estimates.
 - The scanner tracks unreadable/binary files explicitly and does not infer that indirect SQL usage is absent merely because a file has no keyword match.
 - Evidence is **lexical/static**, not runtime-reachability or data equivalence. Unknown runtime owners are listed as `triage`, never silently assigned to a wave.
 - The guard compares tracked PR HEAD to current `origin/master` and blocks new **direct runtime SQL** signal occurrences per path/rule. Existing debt may decrease; the test remains green while waves are in progress. Frontend, docs, tests, CI and infrastructure references remain visible but do not count as new production SQL consumers.
 - For exact file-specific evidence, refer to the `master.md`/`master.json` artifacts, not the representative list below.
+
+## Machine inventory classification (pinned master)
+
+| Area | Marker files |
+|---|---:|
+| Runtime | 33 (32 direct, 1 reference-only) |
+| Tests | 50 |
+| CI | 6 |
+| Documentation | 46 |
+| Frontend (non-authoritative UI) | 4 |
+| Infrastructure / deploy | 10 |
+| SQL migrations | 5 |
+| Other tracked configuration | 6 |
+
+Runtime waves: **wave 1: 6**, **wave 2: 9**, **wave 3: 12**, **wave 4: 2**, plus **4 runtime triage-marker files** (3 direct, 1 reference-only). The two non-text tracked files are `.coverage` and `r/frontend/src/assets/hero.png`; both are explicitly listed as skipped in the generated JSON.
 
 ## Confirmed runtime migration inventory, representative direct dependencies
 
