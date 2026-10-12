@@ -33,3 +33,13 @@ def test_record_adapter_copy_isolation_and_atomic_updates(tmp_path):
         with pytest.raises(ValueError, match="key"):
             records.put("", 1)
         assert store.last_commit.sequence == 1
+
+
+def test_closing_adapter_does_not_close_shared_store(tmp_path):
+    with MemoryStore(tmp_path / "shared.memory") as store:
+        first = MemoryRecordAdapter(store)
+        second = MemoryRecordAdapter(store)
+        first.put("owner:1", {"user": "alice"})
+        first.close()
+        assert second.get("owner:1") == {"user": "alice"}
+        assert second.put("owner:2", {"user": "bob"}) == 2
