@@ -20,6 +20,13 @@ class MockPrinterSocket:
         self.fragment = fragment
         self.sent = b""
         self.timeout = None
+        self.peer = ('192.168.31.12', 3000)
+
+    def getpeername(self):
+        return self.peer
+
+    def close(self):
+        pass
 
     def __enter__(self):
         return self
@@ -44,8 +51,8 @@ def mock_printer(monkeypatch):
     sockets = []
     connections = []
 
-    def connect(address, timeout):
-        connections.append((address, timeout))
+    def connect(host, port, timeout):
+        connections.append(((host, port), timeout))
         sock = MockPrinterSocket(
             framed(
                 {
@@ -62,11 +69,7 @@ def mock_printer(monkeypatch):
         sockets.append(sock)
         return sock
 
-    monkeypatch.setattr(
-        "alice_pro.printers.bambu_a1mini.resolve_lan", lambda host: "192.168.31.12", raising=False
-    )
-    monkeypatch.setattr("alice_pro.printers.lan_address.resolve_lan", lambda host: "192.168.31.12")
-    monkeypatch.setattr(socket, "create_connection", connect)
+    monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", connect)
     return sockets, connections
 
 
@@ -77,7 +80,7 @@ def test_mock_discovery_fragmented_tcp(mock_printer):
     assert identity.model == "Bambu Lab A1 mini"
     assert identity.firmware == "01.08.01.00"
     assert identity.host == "192.168.31.12"
-    assert connections == [(("192.168.31.12", 3000), 3.0)]
+    assert connections == [(("printer.example.test", 3000), 3.0)]
     assert sockets[0].timeout == 3.0
     sent = sockets[0].sent
     assert sent.startswith(b"\xa5\xa5")
@@ -95,18 +98,12 @@ def test_mock_discovery_fragmented_tcp(mock_printer):
     ],
 )
 def test_mock_malformed_and_missing_identity(monkeypatch, reply):
-    monkeypatch.setattr("alice_pro.printers.lan_address.resolve_lan", lambda host: "192.168.31.12")
-    monkeypatch.setattr(
-        socket, "create_connection", lambda *args, **kwargs: MockPrinterSocket(reply)
-    )
+    monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: MockPrinterSocket(reply))
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
 
 
 def test_mock_rejects_invalid_timeout_without_network(monkeypatch):
-    monkeypatch.setattr("alice_pro.printers.lan_address.resolve_lan", lambda host: "192.168.31.12")
-    monkeypatch.setattr(
-        socket, "create_connection", lambda *args, **kwargs: pytest.fail("network used")
-    )
+    monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", lambda *a, **kw: pytest.fail("network used"))
     with pytest.raises(ValueError):
         probe("printer.example.test", timeout=0)
