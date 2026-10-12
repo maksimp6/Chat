@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import socket
 import struct
+import threading
 import time
 from typing import Callable
 
@@ -23,29 +24,49 @@ class PrinterSession:
         *,
         timeout: float = 3.0,
         connector: Callable[..., socket.socket] = connect_lan,
+        tcp_nodelay: bool = False,
+        keepalive: bool = False,
     ) -> None:
         self.host = host
         self.timeout = timeout
         self._connector = connector
         self._sock: socket.socket | None = None
         self._sequence = 0
+        self._lock = threading.RLock()
+        self.tcp_nodelay = tcp_nodelay
+        self.keepalive = keepalive
 
     def __enter__(self) -> "PrinterSession":
-        if self._sock is not None:
-            raise RuntimeError("session already open")
-        self._sock = self._connector(self.host, 3000, timeout=self.timeout)
-        return self
+        with self._lock:
+            if self._sock is not None:
+                raise RuntimeError("session already open")
+            sock = self._connector(self.host, 3000, timeout=self.timeout)
+            try:
+                if self.tcp_nodelay:
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                if self.keepalive:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            except BaseException:
+                sock.close()
+                raise
+            self._sock = sock
+            return self
 
     def __exit__(self, *_args: object) -> None:
         self.close()
 
     def close(self) -> None:
-        sock, self._sock = self._sock, None
-        if sock is not None:
-            sock.close()
+        with self._lock:
+            sock, self._sock = self._sock, None
+            if sock is not None:
+                sock.close()
 
     def detect(self) -> tuple[dict[str, str], float]:
-        """Return sanitized detect fields and request-only RTT in milliseconds."""
+        """Serialize requests; return RTT ending at final recv, before JSON decode."""
+        with self._lock:
+            return self._detect_locked()
+
+    def _detect_locked(self) -> tuple[dict[str, str], float]:
         sock = self._sock
         if sock is None:
             raise RuntimeError("session not connected")
@@ -64,8 +85,9 @@ class PrinterSession:
             length = struct.unpack("<H", header[2:4])[0]
             if not 6 <= length <= 65535:
                 raise PrinterProtocolError("invalid response length")
-            response = decode_probe(header + _recv_exact(sock, length - 4))
+            raw = header + _recv_exact(sock, length - 4)
             elapsed_ms = (time.perf_counter_ns() - started) / 1_000_000
+            response = decode_probe(raw)
             login = response.get("login")
             if (
                 not isinstance(login, dict)
