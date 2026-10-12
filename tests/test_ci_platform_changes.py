@@ -24,7 +24,6 @@ ROOT = Path(__file__).resolve().parents[1]
         (["deploy/remote-desktop-commander/credential-handoff.mjs"], {"infra", "mcp"}),
         (["deploy/chrome-worker/oauth.mjs"], {"infra", "mcp"}),
         (["deploy/oauth-idp/server.mjs"], {"infra", "mcp"}),
-        (["requirements-postgres.txt"], {"backend", "database"}),
         (["db.py"], {"backend", "database"}),
         (["db_backend.py"], {"backend", "database"}),
         (["tests/test_user_identity.py"], {"backend"}),
