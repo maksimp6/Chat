@@ -15,6 +15,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -157,6 +158,15 @@ class Supervision(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIsNone(self.record("tunnel"))
         self.assertIsNotNone(self.record("app"))
+
+    def test_without_tunnel_the_container_process_becomes_alice(self):
+        """PID 1 must be Alice itself so SIGTERM and exit codes behave as before."""
+        with mock.patch.object(entry.os, "execvpe", side_effect=SystemExit(0)) as execvpe:
+            with self.assertRaises(SystemExit):
+                entry.main(environ=dict(BASE_ENV), app_argv=["python", "app.py"], replace_process=True)
+        argv0, argv, env = execvpe.call_args.args
+        self.assertEqual((argv0, argv), ("python", ["python", "app.py"]))
+        self.assertEqual(env["ALICE_SHORT_TOKEN"], "short-token-secret-value")
 
     def test_tunnel_exit_stops_alice_and_fails(self):
         env = {**BASE_ENV, **TUNNEL_ENV}
