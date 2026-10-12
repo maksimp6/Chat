@@ -61,19 +61,18 @@ COMMIT_NAME = "COMMITTED"
 
 def create_backup(db: FileMemoryDB, destination: str | Path) -> MemoryBackupManifest:
     root = Path(destination)
-    root.mkdir(parents=True, exist_ok=False)
+    root.mkdir(mode=0o700, parents=True, exist_ok=False)
 
-    with db._lock:
-        payload = db.path.read_bytes() if db.path.exists() else b""
-        manifest = MemoryBackupManifest(
-            version=1,
-            sequence=db.sequence,
-            size=len(payload),
-            sha256=hashlib.sha256(payload).hexdigest(),
-        )
-        _write_fsynced(root / PAYLOAD_NAME, payload)
-        _write_fsynced(root / MANIFEST_NAME, (manifest.to_json() + "\n").encode("utf-8"))
-
+    # Read both image and sequence under the same interprocess file lock.
+    payload, sequence = db.export_snapshot()
+    manifest = MemoryBackupManifest(
+        version=1,
+        sequence=sequence,
+        size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+    _write_fsynced(root / PAYLOAD_NAME, payload)
+    _write_fsynced(root / MANIFEST_NAME, (manifest.to_json() + "\n").encode("utf-8"))
     _write_fsynced(root / COMMIT_NAME, b"committed\n")
     _fsync_directory(root)
     return manifest
@@ -112,6 +111,8 @@ def restore_backup(source: str | Path, destination: str | Path) -> FileMemoryDB:
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
+    finally:
+        temporary.with_name(f"{temporary.name}.lock").unlink(missing_ok=True)
 
     return FileMemoryDB(target)
 
@@ -124,6 +125,7 @@ def copy_verified_backup(source: str | Path, destination: str | Path) -> None:
         restore_backup(root, restore_probe)
     finally:
         restore_probe.unlink(missing_ok=True)
+        restore_probe.with_name(f"{restore_probe.name}.lock").unlink(missing_ok=True)
     shutil.copytree(root, destination)
 
 
