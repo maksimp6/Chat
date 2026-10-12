@@ -125,3 +125,73 @@ def test_mutated_snapshot_object_rejected(tmp_path):
     with pytest.raises(ShadowMismatch, match="snapshot changed"):
         stage_shadow(FileMemoryDB(tmp_path / "new.memory"), snapshot)
     sql.close()
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    [
+        ("id", "", "invalid session id"),
+        ("status", "paused", "invalid session status"),
+        ("updated_at", 0, "invalid session timestamps"),
+        ("completed_at", 0, "invalid session completion timestamp"),
+        ("metadata_json", None, "invalid session metadata"),
+        ("metadata_json", "{", "invalid session metadata"),
+    ],
+)
+def test_shadow_rejects_invalid_legacy_sessions(field, value, error):
+    sql = _sql_snapshot()
+    rows = [dict(row) for row in sql.execute("SELECT * FROM sessions")]
+    rows[0][field] = value
+    with pytest.raises(ShadowMismatch, match=error):
+        make_snapshot(rows, [], None, source_revision="rev")
+    sql.close()
+
+
+def test_shadow_rejects_secrets_in_nested_list():
+    sql = _sql_snapshot()
+    rows = [dict(row) for row in sql.execute("SELECT * FROM sessions")]
+    rows[0]["metadata_json"] = '{"items":[{"refresh_token":"secret"}]}'
+    with pytest.raises(ShadowMismatch, match="secret-store"):
+        make_snapshot(rows, [], None, source_revision="rev")
+    sql.close()
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    [
+        ("id", 0, "invalid fact id"),
+        ("category", 123, "invalid fact category"),
+        ("fact", "", "invalid fact"),
+        ("updated_at", "now", "invalid fact timestamp"),
+    ],
+)
+def test_shadow_rejects_invalid_legacy_facts(field, value, error):
+    sql = _sql_snapshot()
+    facts = [dict(row) for row in sql.execute("SELECT * FROM global_memory")]
+    facts[0][field] = value
+    with pytest.raises(ShadowMismatch, match=error):
+        make_snapshot([], facts, None, source_revision="rev")
+    sql.close()
+
+
+def test_shadow_rejects_duplicate_facts():
+    base = {"id": 1, "category": "demo", "fact": "first", "updated_at": 1}
+    with pytest.raises(ShadowMismatch, match="duplicate fact id"):
+        make_snapshot([], [base, {**base, "fact": "second"}], None, source_revision="rev")
+    with pytest.raises(ShadowMismatch, match="duplicate fact text"):
+        make_snapshot([], [base, {**base, "id": 2}], None, source_revision="rev")
+
+
+def test_shadow_rejects_sensitive_config():
+    with pytest.raises(ShadowMismatch, match="secret-bearing"):
+        make_snapshot([], [], {"provider_token": "secret"}, source_revision="rev")
+
+
+def test_verify_rejects_mutated_source_object(tmp_path):
+    sql = _sql_snapshot()
+    snap = _snapshot(sql)
+    db = FileMemoryDB(tmp_path / "shadow.memory")
+    stage_shadow(db, snap)
+    snap.sessions[0]["updated_at"] = 999
+    with pytest.raises(ShadowMismatch, match="source snapshot changed"):
+        verify_shadow(db, snap)
+    sql.close()
