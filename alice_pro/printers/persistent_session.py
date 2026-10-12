@@ -38,7 +38,7 @@ class PrinterSession:
         if sock is not None:
             sock.close()
 
-    def detect(self) -> tuple[dict, float]:
+    def detect(self) -> tuple[dict[str, str], float]:
         """Return sanitized detect fields and request-only RTT in milliseconds."""
         sock = self._sock
         if sock is None:
