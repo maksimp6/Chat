@@ -28,10 +28,24 @@ TRUSTED_TARGET = "Redmi_9"
 
 def ensure_token():
     BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if not TOKEN_PATH.exists():
-        TOKEN_PATH.write_text(secrets.token_urlsafe(32))
-        TOKEN_PATH.chmod(0o600)
-    return TOKEN_PATH.read_text().strip()
+    # Exclusive creation prevents symlink following and concurrent token replacement.
+    try:
+        fd = os.open(TOKEN_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        with os.fdopen(fd, "w") as stream:
+            stream.write(secrets.token_urlsafe(32))
+            stream.flush()
+            os.fsync(stream.fileno())
+    fd = os.open(TOKEN_PATH, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd) as stream:
+        if os.fstat(stream.fileno()).st_mode & 0o077:
+            raise PermissionError("Live token permissions are too broad")
+        token = stream.read().strip()
+    if not token:
+        raise RuntimeError("Live token is empty")
+    return token
 
 TOKEN = ensure_token()
 FRAME_LOCK = threading.RLock()
