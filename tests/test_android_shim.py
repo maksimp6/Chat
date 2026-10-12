@@ -101,6 +101,48 @@ class AndroidShimTests(unittest.TestCase):
         self.assertFalse(shim.tap(1, 1))
         self.assertFalse(transport.called)
 
+    def test_spoofed_device_swipe_never_dispatched(self):
+        class Spoof:
+            called = False
+
+            def observe(self):
+                return Evidence(Backend.DEVICE, Keyguard.UNLOCKED, True, "spoof")
+
+            def swipe(self, *args):
+                self.called = True
+                return True
+
+        transport = Spoof()
+        self.assertFalse(AndroidShim(Backend.DEVICE, transport).swipe(1, 1, 2, 2))
+        self.assertFalse(transport.called)
+
+    def test_toctou_between_observation_and_dispatch(self):
+        class Flipping(SimulatedAndroid):
+            def observe(self):
+                evidence = super().observe()
+                self.keyguard = Keyguard.LOCKED
+                return evidence
+
+        transport = Flipping(keyguard=Keyguard.UNLOCKED)
+        shim = AndroidShim(transport=transport)
+        self.assertFalse(shim.tap(1, 1))
+        self.assertFalse(shim.swipe(1, 1, 2, 2))
+        self.assertEqual(transport.events, [])
+
+    def test_png_invalid_compressed_payload_with_valid_crc(self):
+        import struct
+        import zlib
+        from alice_pro.android_shim import validate_png
+
+        png = bytearray(AndroidShim().screenshot())
+        offset = 8 + 25
+        length = struct.unpack_from(">I", png, offset)[0]
+        self.assertEqual(png[offset + 4:offset + 8], b"IDAT")
+        png[offset + 8] ^= 0xFF
+        crc = zlib.crc32(png[offset + 4:offset + 8 + length])
+        struct.pack_into(">I", png, offset + 8 + length, crc)
+        self.assertFalse(validate_png(bytes(png)))
+
     def test_screenshot_png_fixture(self):
         self.assertTrue(AndroidShim().screenshot().startswith(bytes.fromhex("89504e47")))
 
