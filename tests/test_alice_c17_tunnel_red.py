@@ -21,14 +21,13 @@ Every accepted command ID must be stable across restart. No execution is request
 import http.client
 import json
 import os
-from pathlib import Path
 import signal
 import subprocess
 import tempfile
 import time
 import unittest
 import urllib.parse
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(os.environ.get("ALICE_C17_SERVER_BIN", "build/alice-lan-c17"))
