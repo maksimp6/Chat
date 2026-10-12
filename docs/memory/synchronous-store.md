@@ -71,7 +71,11 @@ explicit, with no background timer or automatic recovery-time guarantee; large
 states and a growing uncheckpointed journal still need future work. Compaction
 also verifies the complete current source, so its work grows with journal length.
 
-An append/fsync failure never acknowledges or publishes the staged transaction.
+An append/fsync failure never acknowledges the staged transaction. Caller
+cancellation during append or RAM publication also blocks further mutations:
+incomplete RAM metadata must not be used to retry a possibly persisted frame.
+If RAM publication was interrupted, committed reads and `last_commit` fail until
+reopen, while `info().last_commit` returns `None` instead of partial metadata.
 The disk outcome can be uncertain, so subsequent mutations fail with recovery
 required. Reopen verifies disk evidence; an unacknowledged complete frame may
 survive. No automatic retry, rollback of journal bytes, or silent truncation is

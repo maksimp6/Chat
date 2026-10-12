@@ -410,3 +410,42 @@ def test_interrupted_restore_never_allows_an_empty_state_append(
     with MemoryStore(target) as reopened:
         assert reopened.get("saved") == {"count": 1}
         assert reopened.get("next") == 2
+
+
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, MemoryError])
+def test_interrupted_restore_ram_publication_never_exposes_partial_metadata(
+    tmp_path, monkeypatch, interruption
+):
+    backup = tmp_path / "backup.memory"
+    target = tmp_path / "target.memory"
+    with MemoryStore(tmp_path / "source.memory") as source:
+        source.set("saved", 1)
+        source.commit()
+        source.checkpoint()
+        source.backup(backup)
+    with MemoryStore(target) as restored:
+        engine = restored._engine
+        cls = type(engine)
+        real_setattr = cls.__setattr__
+
+        def interrupted_setattr(instance, name, value):
+            if instance is engine and name == "_sequence":
+                raise interruption("injected RAM publication failure")
+            real_setattr(instance, name, value)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(cls, "__setattr__", interrupted_setattr)
+            with pytest.raises(interruption):
+                restored.restore(backup)
+        assert restored.info().last_commit is None
+        with pytest.raises(StoreError, match="RAM publication"):
+            restored.last_commit
+        with pytest.raises(StoreError, match="RAM publication"):
+            restored.get("saved")
+        with pytest.raises(StoreError, match="recovery required"):
+            restored.commit()
+    with MemoryStore(target) as recovered:
+        assert recovered.get("saved") == 1
+        assert recovered.last_commit.sequence == 1
+        recovered.set("next", 2)
+        assert recovered.commit() == 2
