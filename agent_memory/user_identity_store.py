@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any, Mapping, TypedDict
 
-from agent_memory.file_memory_db import FileMemoryDB
+from agent_memory.record_adapter import MemoryRecordAdapter
 
 IDENTITY_KEY = "user_identity:v1"
 IDENTITY_SCHEMA = 1
@@ -73,7 +73,7 @@ def identity_digest(
 
 
 class UserIdentityStore:
-    def __init__(self, db: FileMemoryDB) -> None:
+    def __init__(self, db: MemoryRecordAdapter) -> None:
         self.db = db
 
     @staticmethod
