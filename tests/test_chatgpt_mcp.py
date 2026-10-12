@@ -463,14 +463,12 @@ def test_mcp_initialize_handshake_is_supported(client):
 
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
     import db
-    from runtime_migrations import init_runtime_tables
 
     monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")
     monkeypatch.setenv("ALICE_MCP_USER_ID", "trace-user")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     db.init_db()
-    init_runtime_tables()
 
     from flask import Flask
 

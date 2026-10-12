@@ -4,23 +4,21 @@ import pytest
 @pytest.fixture
 def treasury_db(tmp_path, monkeypatch):
     import db
-    import invocation.manager as invocation_manager
-    import runtime_migrations
     import treasury
+    from agent_memory.client import close_memory_clients
 
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
     monkeypatch.setattr(treasury, "get_conn", db.get_conn)
-
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
     treasury.init_treasury_tables()
-    return path
+    yield path
+    close_memory_clients()
 
 
-def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
+def test_def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
     from billing import settle_billing_to_treasury
     from treasury import demo_top_up, get_account
 

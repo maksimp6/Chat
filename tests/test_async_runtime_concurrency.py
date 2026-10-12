@@ -7,23 +7,18 @@ import pytest
 @pytest.fixture
 def async_runtime_db(tmp_path, monkeypatch):
     import db
-    import invocation.manager as invocation_manager
-    import runtime_migrations
-    import session_manager
+    from agent_memory.client import close_memory_clients
 
     path = tmp_path / "async-concurrency.db"
-    if not db.postgres_url_from_env():
-        monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(session_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
-
+    monkeypatch.setattr(db, "DB_PATH", str(path))
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
-    return path
+    yield path
+    close_memory_clients()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio@pytest.mark.asyncio
 async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runtime_db):
     from invocation.manager import (
         create_invocation,

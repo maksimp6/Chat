@@ -1,7 +1,6 @@
+import pytest
 
 from memory_engine.store import MemoryStore
-
-import pytest
 
 from agent_context import CacheLookup, ContextSlice, EvidenceVersion, TaskPacket, TaskScope
 from agent_memory import AgentMemoryStore, MemoryRecord
