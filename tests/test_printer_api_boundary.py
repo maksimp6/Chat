@@ -1,4 +1,5 @@
 """Boundary tests: application API cannot silently fall back to LAN or cloud."""
+
 from unittest.mock import Mock
 
 import pytest
