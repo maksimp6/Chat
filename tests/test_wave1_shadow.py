@@ -126,6 +126,7 @@ def test_mutated_snapshot_object_rejected(tmp_path):
         stage_shadow(FileMemoryDB(tmp_path / "new.memory"), snapshot)
     sql.close()
 
+
 @pytest.mark.parametrize(
     ("field", "value", "error"),
     [
