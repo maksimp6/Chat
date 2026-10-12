@@ -37,6 +37,13 @@ ROOT = Path(__file__).resolve().parents[1]
         (["scripts/ci_platform_changes.py"], {"infra"}),
         ([".github/workflows/ci.yml"], ALL),
         (["requirements.txt"], ALL),
+        # Manifests that Dependabot PRs touch (docs/development/dependency-updates.md).
+        (["android/build.gradle.kts"], {"android"}),
+        ([".github/workflows/security.yml"], {"infra"}),
+        (["deploy/chrome-worker/package-lock.json"], {"infra", "mcp"}),
+        (["deploy/remote-desktop-commander/Dockerfile.mcp"], {"infra", "mcp"}),
+        (["requirements-dev.txt"], ALL),
+        (["Dockerfile"], ALL),
         (["new-platform/entry.wasm"], ALL),
         ([], ALL),
     ],
