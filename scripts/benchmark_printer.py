@@ -3,6 +3,7 @@
 No network or real printer access. Performance thresholds are deliberately
 not hard-coded until a hardware baseline is collected.
 """
+
 from __future__ import annotations
 
 import argparse
