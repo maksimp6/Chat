@@ -2,6 +2,7 @@
 
 This module deliberately imports no networking or cloud SDKs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,6 +37,13 @@ def summarize_status(report: dict[str, Any]) -> dict[str, Any]:
     state = report.get("print", report)
     if not isinstance(state, dict):
         raise ValueError("print status must be an object")
-    keys = ("gcode_state", "nozzle_temper", "bed_temper",
-            "mc_percent", "mc_remaining_time", "print_error", "wifi_signal")
+    keys = (
+        "gcode_state",
+        "nozzle_temper",
+        "bed_temper",
+        "mc_percent",
+        "mc_remaining_time",
+        "print_error",
+        "wifi_signal",
+    )
     return {key: state[key] for key in keys if key in state}
