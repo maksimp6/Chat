@@ -68,8 +68,9 @@ def get_controlled_memory_summary() -> str:
 def clear_global_memory(category: str | None = None) -> None:
     """Remove matching facts in one journal transaction; preserve config."""
     store = get_memory_client(memory_file_path())
-    records = list_global_memory_facts()
     with store.transaction() as tx:
-        for item in records:
-            if category is None or item["category"] == category:
-                tx.delete("global_fact:" + item["id"])
+        for key, record in store.items(prefix="global_fact:").items():
+            if not isinstance(record, dict):
+                raise ValueError("invalid native memory fact")
+            if category is None or record.get("category") == category:
+                tx.delete(key)
