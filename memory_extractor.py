@@ -94,9 +94,7 @@ def extract_and_save_facts(dialog_messages: list) -> int:
     """Use the provider to extract stable facts, then commit only validated data."""
     if not dialog_messages:
         return 0
-    formatted_chat = "\n".join(
-        f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]
-    )
+    formatted_chat = "\n".join(f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:])
     payload = {
         "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {

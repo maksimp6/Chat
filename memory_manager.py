@@ -55,8 +55,7 @@ def get_controlled_memory_summary() -> str:
     if not isinstance(allowed, list):
         raise ValueError("categories_allowed must be a list")
     facts = [
-        item for item in list_global_memory_facts()
-        if not allowed or item["category"] in allowed
+        item for item in list_global_memory_facts() if not allowed or item["category"] in allowed
     ][:limit]
     if not facts:
         return ""

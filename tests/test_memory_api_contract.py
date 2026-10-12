@@ -24,10 +24,13 @@ def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch)
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
-    save_global_memory_facts([
-        {"category": "profile", "fact": "Живёт в Москве"},
-        {"category": "profile", "fact": "Любит чай"},
-    ], now=1)
+    save_global_memory_facts(
+        [
+            {"category": "profile", "fact": "Живёт в Москве"},
+            {"category": "profile", "fact": "Любит чай"},
+        ],
+        now=1,
+    )
     store = get_memory_client(path)
     # Read API order must be deterministic even for concurrent equal timestamps.
     response = app.test_client().get("/api/memory/manage")
@@ -49,9 +52,12 @@ def test_fact_deduplication_and_targeted_deletion(tmp_path, monkeypatch):
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
     close_memory_clients()
-    assert save_global_memory_facts(
-        [{"category": "git", "fact": "one"}, {"category": "tools", "fact": "two"}], now=1
-    ) == 2
+    assert (
+        save_global_memory_facts(
+            [{"category": "git", "fact": "one"}, {"category": "tools", "fact": "two"}], now=1
+        )
+        == 2
+    )
     assert save_global_memory_facts([{"category": "git", "fact": "one"}], now=2) == 0
     assert len(list_global_memory_facts()) == 2
     config = load_memory_config()
