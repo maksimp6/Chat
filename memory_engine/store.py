@@ -453,6 +453,7 @@ class _JournalStore:
                 raise StoreError("checkpoint exceeds frame size limit")
             temporary: Path | None = None
             replaced = False
+            publication_started = False
             try:
                 fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
                 temporary = Path(temp_name)
@@ -464,6 +465,10 @@ class _JournalStore:
                 state, seq, verified_digest = self._inspect_log(temporary)
                 if state != self._state or seq != self._sequence or verified_digest != digest:
                     raise StoreError("checkpoint verification failed")
+                # Cancellation can arrive inside replace, after the path changed
+                # but before the return/assignment. Treat publication as uncertain
+                # from this point until the directory sync and RAM digest update.
+                publication_started = True
                 os.replace(temporary, self.path)
                 replaced = True
                 directory = os.open(str(self.path.parent), os.O_RDONLY)
@@ -477,6 +482,10 @@ class _JournalStore:
                 # A replace or directory fsync failure leaves publication uncertain.
                 self._failed = True
                 raise StoreError("checkpoint failed; recovery required") from exc
+            except BaseException:
+                if publication_started:
+                    self._failed = True
+                raise
             finally:
                 if temporary is not None and not replaced:
                     temporary.unlink(missing_ok=True)

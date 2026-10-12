@@ -268,3 +268,50 @@ def test_checkpoint_validator_rejects_non_string_key_before_publication():
 
     with pytest.raises(ValueError, match="checkpoint key"):
         _validate_checkpoint({"seq": 1, "changes": [], "state": {"values": {1: "invalid"}}})
+
+
+@pytest.mark.parametrize("phase", ["before_replace", "after_replace", "directory_fsync"])
+@pytest.mark.parametrize("interruption", [KeyboardInterrupt, SystemExit])
+def test_interrupted_checkpoint_never_allows_a_stale_digest_commit(
+    tmp_path, monkeypatch, phase, interruption
+):
+    path = tmp_path / "state.memory"
+    with MemoryStore(path) as db:
+        db.set("saved", {"count": 1})
+        db.commit()
+        confirmed = db.last_commit
+        real_replace, real_fsync = os.replace, os.fsync
+        with monkeypatch.context() as patch:
+
+            def interrupted_replace(source, destination):
+                if phase == "before_replace":
+                    raise interruption("injected cancellation")
+                real_replace(source, destination)
+                raise interruption("injected cancellation")
+
+            def interrupted_fsync(fd):
+                if stat.S_ISDIR(os.fstat(fd).st_mode):
+                    raise interruption("injected cancellation")
+                real_fsync(fd)
+
+            if phase == "directory_fsync":
+                patch.setattr(os, "fsync", interrupted_fsync)
+            else:
+                patch.setattr(os, "replace", interrupted_replace)
+            with pytest.raises(interruption):
+                db.checkpoint()
+        assert db.get("saved") == {"count": 1}
+        assert db.last_commit == confirmed
+        with pytest.raises(StoreError, match="recovery required"):
+            db.set("next", 2)
+        with pytest.raises(StoreError, match="recovery required"):
+            db.commit()
+        assert not list(tmp_path.glob(".alice-checkpoint-*"))
+    with MemoryStore(path) as recovered:
+        assert recovered.get("saved") == {"count": 1}
+        assert recovered.last_commit.sequence == 1
+        recovered.set("next", 2)
+        assert recovered.commit() == 2
+    with MemoryStore(path) as reopened:
+        assert reopened.get("saved") == {"count": 1}
+        assert reopened.get("next") == 2
