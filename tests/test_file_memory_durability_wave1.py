@@ -210,6 +210,8 @@ def test_non_object_committed_record_is_corruption(tmp_path):
     path.write_text("true\n", encoding="utf-8")
     with pytest.raises(FileMemoryCorruption):
         FileMemoryDB(path)
+
+
 def _restore_worker(source: str, target: str, start, results) -> None:
     from agent_memory.backup import MemoryBackupError
 
