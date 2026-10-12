@@ -1,4 +1,5 @@
 """Explicit transport selection; no fallback across network trust boundaries."""
+
 from enum import Enum
 from .models import PrinterIdentity
 from .lan import probe
