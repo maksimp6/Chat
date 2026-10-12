@@ -16,7 +16,7 @@ from alice_pro.printers.bambu_a1mini import decode_probe, merge_report
 from alice_pro.printers.lan_address import _route_is_local, private_ipv4
 
 PAYLOAD = b'{"login":{"command":"detect","model":"N1"}}'
-FRAME = b"\x5cxa5\x5cxa5" + struct.pack("<H", len(PAYLOAD) + 6) + PAYLOAD + b"\x5cxa7\x5cxa7"
+FRAME = bytes((165, 165)) + struct.pack("<H", len(PAYLOAD) + 6) + PAYLOAD + bytes((167, 167))
 ROUTES = (
     "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n"
     "wlan0 001FA8C0 00000000 0001 0 0 0 00FFFFFF 0 0 0\n"
