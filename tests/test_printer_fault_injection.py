@@ -75,7 +75,7 @@ def network(monkeypatch):
 
     monkeypatch.setattr(socket, "getaddrinfo", resolve)
 
-    original = lan_socket.connect_lan
+    original = lan_socket.connect_lan_impl
 
     def connect(host, port, timeout):
         fake = Socket(frame({"login": {"command": "detect", "model": "N1"}}))
@@ -126,8 +126,14 @@ def test_dns_route_vpn_override_never_opens_socket(monkeypatch, network):
     ],
 )
 def test_corrupt_or_truncated_frames(monkeypatch, network, response):
-    original = lan_socket.connect_lan
-    monkeypatch.setattr(lan_socket, "connect_lan", lambda host, port, timeout: original(host, port, timeout=timeout, socket_factory=lambda *args: Socket(response)))
+    original = lan_socket.connect_lan_impl
+    monkeypatch.setattr(
+        lan_socket,
+        "connect_lan",
+        lambda host, port, timeout: original(
+            host, port, timeout=timeout, socket_factory=lambda *args: Socket(response)
+        ),
+    )
     with pytest.raises(PrinterProtocolError):
         probe("printer.example.test")
 
