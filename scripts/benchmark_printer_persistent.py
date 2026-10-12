@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import socket
 import statistics
 from typing import Any
@@ -19,7 +20,7 @@ def percentile(samples: list[float], fraction: float) -> float:
     if not samples:
         raise ValueError("no samples")
     ordered = sorted(samples)
-    return ordered[max(0, min(len(ordered) - 1, int((len(ordered) - 1) * fraction + 0.999999)))]
+    return ordered[max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))]
 
 
 def run_hardware(host: str, *, requests: int = 50, warmup: int = 5) -> dict[str, Any]:
