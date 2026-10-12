@@ -182,7 +182,13 @@ class FileMemoryDB:
             try:
                 record = json.loads(raw[:-1])
                 self._validate_record(record, seq, index == 0)
-            except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError, ValueError) as exc:
+            except (
+                json.JSONDecodeError,
+                UnicodeDecodeError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 raise FileMemoryCorruption(f"corrupt record at offset {last_good}") from exc
 
             op = record["op"]
