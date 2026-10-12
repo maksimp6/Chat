@@ -250,7 +250,21 @@ def test_checkpoint_remains_first_and_preserves_writer_lock(tmp_path):
         db.set("next", 2)
         db.commit()
     # A checkpoint after another committed frame would reset history illegally.
+    record = json.loads(checkpoint)
+    previous_digest = json.loads(path.read_bytes().splitlines()[-1])["digest"]
+    record["payload"]["seq"] = 3
+    encoded = json.dumps(
+        record["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    record["digest"] = hashlib.sha256(bytes.fromhex(previous_digest) + encoded).hexdigest()
     with path.open("ab") as journal:
-        journal.write(checkpoint)
+        journal.write(json.dumps(record).encode() + b"\n")
     with pytest.raises(StoreError, match="corrupt"):
         MemoryStore(path)
+
+
+def test_checkpoint_validator_rejects_non_string_key_before_publication():
+    from memory_engine.store import _validate_checkpoint
+
+    with pytest.raises(ValueError, match="checkpoint key"):
+        _validate_checkpoint({"seq": 1, "changes": [], "state": {"values": {1: "invalid"}}})
