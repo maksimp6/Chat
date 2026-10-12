@@ -27,7 +27,7 @@ def discover(hostname: str) -> dict[str, str]:
     from java import jclass  # type: ignore[import-not-found]
 
     native = jclass("com.alicepro.mobile.printer.BambuWifiDiscovery")
-    result = native.INSTANCE.discover(_context, hostname)
+    result = native.discover(_context, hostname)
     return {
         "pinned_ip": str(result.getPinnedIp()),
         "model_code": str(result.getModelCode()),
