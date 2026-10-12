@@ -4,17 +4,17 @@
 
 Use the smallest independent change that satisfies an issue or subtask.
 
-1. Inspect the issue and current `master`.
-2. Create a branch named for the issue/change.
+1. Inspect the issue, current `develop`, and current `master`; record the intended PR base.
+2. Create a branch named for the issue/change from current `develop`. A stacked slice may use its canonical parent; a direct `master` hotfix requires an explicit task exception.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
 5. Before publishing any non-RED implementation commit, work from a real checkout/worktree and run the fast `bash scripts/pre_push.sh` formatting gate. Run focused tests separately when the change requires them; full suites remain CI/final-handoff evidence rather than part of every pre-push. The formatting gate must finish with a clean worktree; if the execution backend cannot provide a shell checkout, do not use repository file APIs as a substitute for this gate.
 6. Run the relevant backend/Android checks in CI.
 7. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
-8. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
+8. Push the focused branch to `origin` and create the feature PR against `develop` (or its recorded stack parent) using `gh pr create` or the available GitHub publication tool. Promotion is a separate `develop` to `master` PR with an actual diff. Follow `docs/development/develop-integration.md`.
 9. If publication is blocked by missing remote, credentials, network access, or tooling, report the exact failing command/error and do not claim that a PR exists.
 10. Merge only after required checks and review policy are satisfied.
-11. Never rewrite `master` directly and never commit secrets.
+11. Never push directly to `develop` or `master`, never rewrite either integration branch, and never commit secrets.
 
 Before dispatch or resuming an agent, apply the scoped work-admission checklist in
 `docs/agents/role-based-agent-office.md`. Record the canonical task and current
@@ -113,6 +113,12 @@ Repository automation should prefer deterministic GitHub workflows and explicit 
 Every agent opens one focused pull request per issue. Only the maintainer
 merges, after green CI; agents never push to `master`.
 
+Branch rules and agent admission are separate controls. A disabled ruleset does
+not enforce this policy. The verified enforcement gap and proposed settings are
+recorded in `docs/development/branch-policy-alignment.md` under canonical #496;
+do not claim native protection or close #496 until live settings and negative
+admission probes have been verified. No instruction here authorizes merge.
+
 ## Maintainer
 
 The maintainer is a **role**, not a model/provider identity. It consumes the
@@ -144,6 +150,7 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   thread before merging.
 - The final corrected head is validated by required CI plus resolved review threads. Extra model review is optional and never a merge prerequisite.
 - Merge is fail-closed. Immediately before merge, verify the pull request is
+  synchronized with its recorded integration base/stack parent. For promotion,
   synchronized with the current `master` (`behind master = 0`). Required
   checks must be green on the exact current PR head after that synchronization,
   not merely on an earlier head or an older base.
