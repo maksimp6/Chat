@@ -137,11 +137,39 @@ class AndroidShimTests(unittest.TestCase):
         png = bytearray(AndroidShim().screenshot())
         offset = 8 + 25
         length = struct.unpack_from(">I", png, offset)[0]
-        self.assertEqual(png[offset + 4:offset + 8], b"IDAT")
+        self.assertEqual(png[offset + 4 : offset + 8], b"IDAT")
         png[offset + 8] ^= 0xFF
-        crc = zlib.crc32(png[offset + 4:offset + 8 + length])
+        crc = zlib.crc32(png[offset + 4 : offset + 8 + length])
         struct.pack_into(">I", png, offset + 8 + length, crc)
         self.assertFalse(validate_png(bytes(png)))
+
+    def test_png_trailing_zlib_stream_rejected(self):
+        import struct
+        import zlib
+        from alice_pro.android_shim import validate_png
+
+        png = AndroidShim().screenshot()
+        offset = 33
+        length = struct.unpack_from(">I", png, offset)[0]
+        payload = png[offset + 8 : offset + 8 + length] + b"trailing"
+        chunk = struct.pack(">I", len(payload)) + b"IDAT" + payload
+        chunk += struct.pack(">I", zlib.crc32(b"IDAT" + payload))
+        modified = png[:offset] + chunk + png[offset + 12 + length :]
+        self.assertFalse(validate_png(modified))
+
+    def test_png_invalid_filter_rejected(self):
+        import struct
+        import zlib
+        from alice_pro.android_shim import validate_png
+
+        png = AndroidShim().screenshot()
+        offset = 33
+        length = struct.unpack_from(">I", png, offset)[0]
+        original = zlib.decompress(png[offset + 8 : offset + 8 + length])
+        payload = zlib.compress(bytes([5]) + original[1:])
+        chunk = struct.pack(">I", len(payload)) + b"IDAT" + payload
+        chunk += struct.pack(">I", zlib.crc32(b"IDAT" + payload))
+        self.assertFalse(validate_png(png[:offset] + chunk + png[offset + 12 + length :]))
 
     def test_screenshot_png_fixture(self):
         self.assertTrue(AndroidShim().screenshot().startswith(bytes.fromhex("89504e47")))
