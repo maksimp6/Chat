@@ -123,7 +123,7 @@ jobs:
           set -euo pipefail
           mkdir -p out-spindle
           curl --fail --location --retry 3 --silent --show-error \
-            'https://raw.githubusercontent.com/maksimp6/Chat/codex/add-a1mini-spool-spindle-cover/printing3d/assets/spool_holder/alice_stock_spool_replacement_v03_A1mini.3mf' \
+            'https://raw.githubusercontent.com/maksimp6/Chat/ed677d7d1187c863b86529ee4173b3e17e9b05fa/printing3d/assets/spool_holder/alice_stock_spool_replacement_v03_A1mini.3mf' \
             --output out-spindle/spindle_source.3mf
           printf '%s  %s\n' \
             '21fe9c783b15d00421dfb39dd0c79666ac1fe6f8bb672eaec1c0e86decdbbf84' \
