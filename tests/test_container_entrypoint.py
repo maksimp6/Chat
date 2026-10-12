@@ -163,7 +163,9 @@ class Supervision(unittest.TestCase):
         """PID 1 must be Alice itself so SIGTERM and exit codes behave as before."""
         with mock.patch.object(entry.os, "execvpe", side_effect=SystemExit(0)) as execvpe:
             with self.assertRaises(SystemExit):
-                entry.main(environ=dict(BASE_ENV), app_argv=["python", "app.py"], replace_process=True)
+                entry.main(
+                    environ=dict(BASE_ENV), app_argv=["python", "app.py"], replace_process=True
+                )
         argv0, argv, env = execvpe.call_args.args
         self.assertEqual((argv0, argv), ("python", ["python", "app.py"]))
         self.assertEqual(env["ALICE_SHORT_TOKEN"], "short-token-secret-value")
