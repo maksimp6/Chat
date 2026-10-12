@@ -59,13 +59,17 @@ class SqlSnapshotReader:
         self._between_selects = between_selects
 
     @classmethod
-    def sqlite(cls, path: str | Path, *, between_selects: Callable[[], None] | None = None) -> "SqlSnapshotReader":
+    def sqlite(
+        cls, path: str | Path, *, between_selects: Callable[[], None] | None = None
+    ) -> "SqlSnapshotReader":
         source = Path(path).expanduser().absolute()
         if source.is_symlink() or not source.is_file():
             raise SnapshotReadError("source must be an existing non-symlink SQLite file")
 
         def connect() -> sqlite3.Connection:
-            conn = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, isolation_level=None, timeout=5)
+            conn = sqlite3.connect(
+                source.as_uri() + "?mode=ro", uri=True, isolation_level=None, timeout=5
+            )
             conn.row_factory = sqlite3.Row
             return conn
 
@@ -73,7 +77,10 @@ class SqlSnapshotReader:
 
     @classmethod
     def postgresql(
-        cls, connection_factory: Callable[[], Any], *, between_selects: Callable[[], None] | None = None
+        cls,
+        connection_factory: Callable[[], Any],
+        *,
+        between_selects: Callable[[], None] | None = None,
     ) -> "SqlSnapshotReader":
         """Require a fresh connection opened in autocommit mode by the caller.
 
@@ -94,7 +101,9 @@ class SqlSnapshotReader:
     @staticmethod
     def _fetch_dicts(cursor: Any, sql: str) -> list[dict[str, Any]]:
         cursor.execute(sql)
-        columns = [column.name if hasattr(column, "name") else column[0] for column in cursor.description]
+        columns = [
+            column.name if hasattr(column, "name") else column[0] for column in cursor.description
+        ]
         result: list[dict[str, Any]] = []
         while True:
             rows = cursor.fetchmany(1024)
@@ -105,7 +114,9 @@ class SqlSnapshotReader:
                 raise SnapshotReadError("SQL snapshot exceeded row limit")
         return result
 
-    def _read_tables(self, cursor: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any] | None]:
+    def _read_tables(
+        self, cursor: Any
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any] | None]:
         sessions = self._fetch_dicts(
             cursor,
             "SELECT id, status, metadata_json, created_at, updated_at, completed_at "
@@ -152,7 +163,9 @@ class SqlSnapshotReader:
             owner_audit = audit_owners(sessions, owner_bindings, known_owner_ids)
             source_digest = _content_digest(sessions, facts, config)
             snapshot = make_snapshot(
-                sessions, facts, config,
+                sessions,
+                facts,
+                config,
                 source_revision=f"{self.dialect}:content-sha256:{source_digest}",
             )
             return SqlSourceSnapshot(snapshot, owner_audit, self.dialect)
@@ -162,10 +175,14 @@ class SqlSnapshotReader:
             raise SnapshotReadError("read-only SQL snapshot failed") from exc
 
 
-def _content_digest(sessions: list[dict[str, Any]], facts: list[dict[str, Any]], config: dict[str, Any] | None) -> str:
+def _content_digest(
+    sessions: list[dict[str, Any]], facts: list[dict[str, Any]], config: dict[str, Any] | None
+) -> str:
     payload = json.dumps(
         {"sessions": sessions, "facts": facts, "config": config},
-        ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
@@ -185,12 +202,25 @@ def audit_owners(
         raise SnapshotReadError("incomplete or extra owner bindings")
     if known_owner_ids is None:
         raise SnapshotReadError("authoritative owner roster is required")
-    if any(not isinstance(owner, str) or not owner or owner not in known_owner_ids for owner in owner_bindings.values()):
+    if any(
+        not isinstance(owner, str) or not owner or owner not in known_owner_ids
+        for owner in owner_bindings.values()
+    ):
         raise SnapshotReadError("unknown owner binding")
     if not all(isinstance(session_id, str) and session_id for session_id in owner_bindings):
         raise SnapshotReadError("invalid session owner binding")
-    encoded = json.dumps(sorted(owner_bindings.items()), ensure_ascii=False, separators=(",", ":")).encode()
-    return OwnerAudit("externally_asserted_unverified", len(ids), hashlib.sha256(encoded).hexdigest())
+    encoded = json.dumps(
+        sorted(owner_bindings.items()), ensure_ascii=False, separators=(",", ":")
+    ).encode()
+    return OwnerAudit(
+        "externally_asserted_unverified", len(ids), hashlib.sha256(encoded).hexdigest()
+    )
 
 
-__all__ = ["OwnerAudit", "SnapshotReadError", "SqlSnapshotReader", "SqlSourceSnapshot", "audit_owners"]
+__all__ = [
+    "OwnerAudit",
+    "SnapshotReadError",
+    "SqlSnapshotReader",
+    "SqlSourceSnapshot",
+    "audit_owners",
+]

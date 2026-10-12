@@ -19,7 +19,9 @@ def test_shadow_reconcile_reopens_restores_and_does_not_modify_sql(tmp_path):
         original = tuple(db.iterdump())
     reader = SqlSnapshotReader.sqlite(source)
     evidence = shadow_catchup(
-        reader, tmp_path / "isolated", owner_bindings={"s1": "owner", "s2": "owner"},
+        reader,
+        tmp_path / "isolated",
+        owner_bindings={"s1": "owner", "s2": "owner"},
         known_owner_ids=frozenset({"owner"}),
     )
     assert evidence.status == "SHADOW_ONLY_UNVERIFIED_OWNER"
@@ -52,8 +54,13 @@ def test_shadow_catches_up_to_second_revision(tmp_path):
     assert result.attempts == 2
     assert result.facts == 2
     assert result.status == "SHADOW_ONLY_UNVERIFIED_OWNER"
-    assert FileMemoryDB(tmp_path / "isolated/generation-1.memory").get("shadow:wave1:fact:2") is None
-    assert FileMemoryDB(tmp_path / "isolated/generation-2.memory").get("shadow:wave1:fact:2") is not None
+    assert (
+        FileMemoryDB(tmp_path / "isolated/generation-1.memory").get("shadow:wave1:fact:2") is None
+    )
+    assert (
+        FileMemoryDB(tmp_path / "isolated/generation-2.memory").get("shadow:wave1:fact:2")
+        is not None
+    )
 
 
 def test_continuous_sql_churn_fails_closed_without_cutover(tmp_path):
@@ -89,12 +96,16 @@ def test_ownership_mismatch_does_not_stage_any_file(tmp_path):
     root = tmp_path / "isolated"
     with pytest.raises(Exception, match="owner"):
         shadow_catchup(
-            SqlSnapshotReader.sqlite(source), root,
-            owner_bindings={"s1": "owner"}, known_owner_ids=frozenset({"owner"}),
+            SqlSnapshotReader.sqlite(source),
+            root,
+            owner_bindings={"s1": "owner"},
+            known_owner_ids=frozenset({"owner"}),
         )
     assert not (root / "generation-1.memory").exists()
 
 
 def test_bounded_catchup_attempts(tmp_path):
     with pytest.raises(ValueError, match="1..3"):
-        shadow_catchup(SqlSnapshotReader.sqlite(_source(tmp_path)), tmp_path / "isolated", max_attempts=0)
+        shadow_catchup(
+            SqlSnapshotReader.sqlite(_source(tmp_path)), tmp_path / "isolated", max_attempts=0
+        )

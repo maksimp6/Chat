@@ -81,7 +81,9 @@ def test_wal_writer_during_read_does_not_tear_tables(tmp_path):
 
 def test_owners_are_external_provisional_only(tmp_path):
     reader = SqlSnapshotReader.sqlite(_source(tmp_path))
-    audited = reader.read(owner_bindings={"s1": "user1", "s2": "user2"}, known_owner_ids=frozenset({"user1", "user2"}))
+    audited = reader.read(
+        owner_bindings={"s1": "user1", "s2": "user2"}, known_owner_ids=frozenset({"user1", "user2"})
+    )
     assert audited.owner_audit.status == "externally_asserted_unverified"
     assert len(audited.owner_audit.digest) == 64
     assert "user1" not in audited.owner_audit.digest
@@ -90,14 +92,18 @@ def test_owners_are_external_provisional_only(tmp_path):
 
 @pytest.mark.parametrize(
     ("mapping", "owners"),
-    [({"s1": "user1"}, frozenset({"user1"})),
-     ({"s1": "user1", "s2": "user3"}, frozenset({"user1", "user2"})),
-     ({"s1": "user1", "s2": "user2", "extra": "user1"}, frozenset({"user1", "user2"})),
-     ({"s1": "user1", "s2": "user2"}, None)],
+    [
+        ({"s1": "user1"}, frozenset({"user1"})),
+        ({"s1": "user1", "s2": "user3"}, frozenset({"user1", "user2"})),
+        ({"s1": "user1", "s2": "user2", "extra": "user1"}, frozenset({"user1", "user2"})),
+        ({"s1": "user1", "s2": "user2"}, None),
+    ],
 )
 def test_missing_or_untrusted_owner_bindings_fail_closed(tmp_path, mapping, owners):
     with pytest.raises(SnapshotReadError, match="owner"):
-        SqlSnapshotReader.sqlite(_source(tmp_path)).read(owner_bindings=mapping, known_owner_ids=owners)
+        SqlSnapshotReader.sqlite(_source(tmp_path)).read(
+            owner_bindings=mapping, known_owner_ids=owners
+        )
 
 
 def test_symlinked_sqlite_source_rejected(tmp_path):
@@ -111,7 +117,9 @@ def test_symlinked_sqlite_source_rejected(tmp_path):
 def test_secret_bearing_sql_data_is_not_staged(tmp_path):
     path = _source(tmp_path)
     with sqlite3.connect(path) as db:
-        db.execute("UPDATE sessions SET metadata_json = ? WHERE id = 's1'", ('{"access_token":"secret"}',))
+        db.execute(
+            "UPDATE sessions SET metadata_json = ? WHERE id = 's1'", ('{"access_token":"secret"}',)
+        )
     with pytest.raises(ShadowMismatch, match="secret-store"):
         SqlSnapshotReader.sqlite(path).read()
 
@@ -133,7 +141,17 @@ class _FakeCursor:
     def execute(self, sql):
         self.statements.append(sql)
         if "FROM sessions" in sql:
-            self.description = [(name,) for name in ("id", "status", "metadata_json", "created_at", "updated_at", "completed_at")]
+            self.description = [
+                (name,)
+                for name in (
+                    "id",
+                    "status",
+                    "metadata_json",
+                    "created_at",
+                    "updated_at",
+                    "completed_at",
+                )
+            ]
             self.rows = [("s1", "active", "{}", 1, 1, None)]
         elif "FROM global_memory" in sql:
             self.description = [(name,) for name in ("id", "category", "fact", "updated_at")]
@@ -173,7 +191,10 @@ def test_postgres_uses_repeatable_read_only_and_rolls_back():
     reader = SqlSnapshotReader.postgresql(lambda: db)
     snap = reader.read()
     assert len(snap.snapshot.sessions) == 1
-    assert db.cursor_object.statements[0] == "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+    assert (
+        db.cursor_object.statements[0]
+        == "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+    )
     assert db.rollback_calls == 1
     assert db.closed
     assert db.cursor_object.closed
@@ -206,12 +227,16 @@ def test_real_postgres_readonly_repeatable_read_with_concurrent_writer():
         setup.execute(sql.SQL("CREATE SCHEMA {}").format(ident))
         try:
             setup.execute(
-                sql.SQL("CREATE TABLE {}.sessions (id text PRIMARY KEY, status text, metadata_json text, "
-                        "created_at integer, updated_at integer, completed_at integer)").format(ident)
+                sql.SQL(
+                    "CREATE TABLE {}.sessions (id text PRIMARY KEY, status text, metadata_json text, "
+                    "created_at integer, updated_at integer, completed_at integer)"
+                ).format(ident)
             )
             setup.execute(
-                sql.SQL("CREATE TABLE {}.global_memory (id integer PRIMARY KEY, category text, "
-                        "fact text, updated_at integer)").format(ident)
+                sql.SQL(
+                    "CREATE TABLE {}.global_memory (id integer PRIMARY KEY, category text, "
+                    "fact text, updated_at integer)"
+                ).format(ident)
             )
             setup.execute(
                 sql.SQL("CREATE TABLE {}.configs (key text PRIMARY KEY, value text)").format(ident)
@@ -220,7 +245,10 @@ def test_real_postgres_readonly_repeatable_read_with_concurrent_writer():
                 sql.SQL("INSERT INTO {}.sessions VALUES (%s,%s,%s,%s,%s,%s)").format(ident),
                 ("s1", "active", "{}", 1, 1, None),
             )
-            setup.execute(sql.SQL("INSERT INTO {}.global_memory VALUES (1,'git','old',1)").format(ident))
+
+            setup.execute(
+                sql.SQL("INSERT INTO {}.global_memory VALUES (1,'git','old',1)").format(ident)
+            )
             setup.execute(
                 sql.SQL("INSERT INTO {}.configs VALUES (%s,%s)").format(ident),
                 ("memory_config", '{"enabled":true}'),
@@ -233,10 +261,18 @@ def test_real_postgres_readonly_repeatable_read_with_concurrent_writer():
 
             def concurrent_writer():
                 with psycopg.connect(dsn, autocommit=True) as writer:
-                    writer.execute(sql.SQL("UPDATE {}.sessions SET updated_at=7 WHERE id='s1'").format(ident))
-                    writer.execute(sql.SQL("INSERT INTO {}.global_memory VALUES (2,'git','new',7)").format(ident))
+                    writer.execute(
+                        sql.SQL("UPDATE {}.sessions SET updated_at=7 WHERE id='s1'").format(ident)
+                    )
+                    writer.execute(
+                        sql.SQL("INSERT INTO {}.global_memory VALUES (2,'git','new',7)").format(
+                            ident
+                        )
+                    )
 
-            first = SqlSnapshotReader.postgresql(connection, between_selects=concurrent_writer).read()
+            first = SqlSnapshotReader.postgresql(
+                connection, between_selects=concurrent_writer
+            ).read()
             second = SqlSnapshotReader.postgresql(connection).read()
             assert len(first.snapshot.facts) == 1
             assert first.snapshot.sessions[0]["updated_at"] == 1
