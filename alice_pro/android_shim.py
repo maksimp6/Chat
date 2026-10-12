@@ -91,38 +91,68 @@ class UnconfiguredTransport:
         raise RuntimeError("transport not configured")
 
 
-def validate_png(data: bytes) -> bool:
-    """Validate bounded PNG structure, chunk CRCs and terminal IEND."""
-    if len(data) < 45 or len(data) > 16 * 1024 * 1024:
-        return False
+def _png_chunks(data: bytes) -> list[tuple[bytes, bytes]] | None:
+    """Parse complete, CRC-checked PNG chunks within a size limit."""
+    if not (45 <= len(data) <= 16 * 1024 * 1024):
+        return None
     if not data.startswith(bytes.fromhex("89504e470d0a1a0a")):
-        return False
+        return None
+    chunks: list[tuple[bytes, bytes]] = []
     offset = 8
-    seen_ihdr = False
-    seen_idat = False
     while offset + 12 <= len(data):
         length = struct.unpack_from(">I", data, offset)[0]
         end = offset + 12 + length
-        if length > 16 * 1024 * 1024 or end > len(data):
-            return False
+        if end > len(data):
+            return None
         kind = data[offset + 4 : offset + 8]
         payload = data[offset + 8 : offset + 8 + length]
         expected = struct.unpack_from(">I", data, offset + 8 + length)[0]
         if zlib.crc32(kind + payload) != expected:
-            return False
-        if not seen_ihdr:
-            if kind != b"IHDR" or length != 13:
-                return False
-            width, height = struct.unpack_from(">II", payload)
-            if not (0 < width <= 8192 and 0 < height <= 8192):
-                return False
-            seen_ihdr = True
-        elif kind == b"IDAT":
-            seen_idat = True
-        elif kind == b"IEND":
-            return seen_idat and length == 0 and end == len(data)
+            return None
+        chunks.append((kind, payload))
         offset = end
-    return False
+        if kind == b"IEND":
+            return chunks if end == len(data) else None
+    return None
+
+
+def validate_png(data: bytes) -> bool:
+    """Accept only a fully decoded, bounded non-interlaced RGB/RGBA PNG."""
+    chunks = _png_chunks(data)
+    if not chunks or chunks[0][0] != b"IHDR" or chunks[-1] != (b"IEND", b""):
+        return False
+    if len(chunks[0][1]) != 13:
+        return False
+    width, height, depth, color, compression, filtering, interlace = struct.unpack(
+        ">IIBBBBB", chunks[0][1]
+    )
+    if not (0 < width <= 8192 and 0 < height <= 8192):
+        return False
+    if (depth, color, compression, filtering, interlace) not in (
+        (8, 2, 0, 0, 0), (8, 6, 0, 0, 0)
+    ):
+        return False
+    kinds = [kind for kind, _ in chunks]
+    if kinds.count(b"IHDR") != 1 or b"IDAT" not in kinds or kinds.count(b"IEND") != 1:
+        return False
+    if any(kind not in (b"IHDR", b"IDAT", b"IEND") for kind in kinds):
+        return False
+    if kinds != [b"IHDR"] + [b"IDAT"] * kinds.count(b"IDAT") + [b"IEND"]:
+        return False
+    raw = b"".join(payload for kind, payload in chunks if kind == b"IDAT")
+    expected = height * (1 + width * (3 if color == 2 else 4))
+    if expected > 16 * 1024 * 1024:
+        return False
+    try:
+        decoder = zlib.decompressobj()
+        pixels = decoder.decompress(raw, expected + 1)
+        pixels += decoder.flush(expected + 1 - len(pixels))
+    except (zlib.error, ValueError):
+        return False
+    if len(pixels) != expected or not decoder.eof or decoder.unused_data:
+        return False
+    stride = 1 + width * (3 if color == 2 else 4)
+    return all(pixels[row * stride] <= 4 for row in range(height))
 
 
 class AndroidShim:
@@ -158,7 +188,7 @@ class AndroidShim:
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int) -> bool:
         with self._lock:
-            if self.observe().keyguard != Keyguard.UNLOCKED:
+            if self.backend != Backend.SIMULATED or self.observe().keyguard != Keyguard.UNLOCKED:
                 self._record("swipe", "denied_keyguard")
                 return False
             ok = self.transport.swipe(x1, y1, x2, y2)
