@@ -1,4 +1,5 @@
 """Regression tests for persistent TCP concurrency, failures and socket options."""
+
 from __future__ import annotations
 
 import json
@@ -36,15 +37,24 @@ class Socket:
             self.max_active = max(self.max_active, self.active)
         time.sleep(0.001)
         sequence = json.loads(data[4:-2])["login"]["sequence_id"]
-        body = json.dumps({"login": {
-            "command": "other" if self.bad_login else "detect",
-            "model": "N1",
-            "sequence_id": "wrong" if self.bad_seq else sequence,
-        }}).encode()
+        body = json.dumps(
+            {
+                "login": {
+                    "command": "other" if self.bad_login else "detect",
+                    "model": "N1",
+                    "sequence_id": "wrong" if self.bad_seq else sequence,
+                }
+            }
+        ).encode()
         size = len(body) + 6
         self.buffer = (
-            (b"BAD!" if self.bad_header else b"\xa5\xa5" + struct.pack("<H", 1 if self.bad_length else size))
-            + body + b"\xa7\xa7"
+            (
+                b"BAD!"
+                if self.bad_header
+                else b"\xa5\xa5" + struct.pack("<H", 1 if self.bad_length else size)
+            )
+            + body
+            + b"\xa7\xa7"
         )
 
     def recv(self, count):
@@ -75,10 +85,15 @@ def test_second_enter_rejected():
             session.__enter__()
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"bad_header": True}, {"bad_length": True},
-    {"bad_login": True}, {"bad_seq": True},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"bad_header": True},
+        {"bad_length": True},
+        {"bad_login": True},
+        {"bad_seq": True},
+    ],
+)
 def test_invalid_frame_closes_connection(kwargs):
     sock = Socket(**kwargs)
     with PrinterSession("192.168.31.12", connector=lambda *a, **k: sock) as session:
@@ -90,8 +105,10 @@ def test_invalid_frame_closes_connection(kwargs):
 def test_tcp_flags_are_explicit_and_set_before_request():
     sock = Socket()
     with PrinterSession(
-        "192.168.31.12", connector=lambda *a, **k: sock,
-        tcp_nodelay=True, keepalive=True,
+        "192.168.31.12",
+        connector=lambda *a, **k: sock,
+        tcp_nodelay=True,
+        keepalive=True,
     ) as session:
         assert (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) in sock.options
         assert (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) in sock.options
@@ -102,6 +119,7 @@ def test_option_failure_closes_socket():
     class Failing(Socket):
         def setsockopt(self, *args):
             raise OSError("unsupported")
+
     sock = Failing()
     with pytest.raises(OSError):
         with PrinterSession("192.168.31.12", connector=lambda *a, **k: sock, keepalive=True):
