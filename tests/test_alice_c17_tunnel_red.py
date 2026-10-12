@@ -61,11 +61,17 @@ class Transport:
         ready_file.unlink(missing_ok=True)
         self.process = subprocess.Popen(
             [
-                str(BINARY), "--listen", "127.0.0.1:0",
-                "--state-dir", str(self.state_dir),
-                "--ready-file", str(ready_file),
-                "--admin-token-file", str(admin_file),
-                "--agent-token-file", str(agent_file),
+                str(BINARY),
+                "--listen",
+                "127.0.0.1:0",
+                "--state-dir",
+                str(self.state_dir),
+                "--ready-file",
+                str(ready_file),
+                "--admin-token-file",
+                str(admin_file),
+                "--agent-token-file",
+                str(agent_file),
             ],
             cwd=ROOT,
             stdout=subprocess.DEVNULL,
@@ -130,7 +136,9 @@ class Transport:
 
     def create(self, command_id):
         return self.request(
-            "POST", "/v1/commands", role="admin",
+            "POST",
+            "/v1/commands",
+            role="admin",
             body={"id": command_id, "kind": "noop", "payload": {}},
         )
 
@@ -155,14 +163,19 @@ class C17BlackBoxContract(unittest.TestCase):
 
     def test_admin_agent_roles_are_not_interchangeable(self):
         status, _, _ = self.server.request(
-            "POST", "/v1/commands", role="agent",
+            "POST",
+            "/v1/commands",
+            role="agent",
             body={"id": "nope", "kind": "noop", "payload": {}},
         )
         self.assertEqual(status, 403)
         status, _, _ = self.server.request("GET", "/v1/commands/poll?timeout_ms=0", role="admin")
         self.assertEqual(status, 403)
         status, _, _ = self.server.request(
-            "POST", "/v1/commands/x/ack", role="admin", body={"status": "done"},
+            "POST",
+            "/v1/commands/x/ack",
+            role="admin",
+            body={"status": "done"},
         )
         self.assertEqual(status, 403)
 
@@ -170,7 +183,9 @@ class C17BlackBoxContract(unittest.TestCase):
         for credential in ("wrong", self.server.admin_token[:-1], ""):
             with self.subTest(token_length=len(credential)):
                 status, _, _ = self.server.request(
-                    "POST", "/v1/commands", token=credential,
+                    "POST",
+                    "/v1/commands",
+                    token=credential,
                     body={"id": "bad-token", "kind": "noop", "payload": {}},
                 )
                 self.assertIn(status, (401, 403))
@@ -179,13 +194,18 @@ class C17BlackBoxContract(unittest.TestCase):
         status, _, _ = self.server.create("command-1")
         self.assertIn(status, (201, 202))
         status, data, _ = self.server.request(
-            "GET", "/v1/commands/poll?timeout_ms=50", role="agent",
+            "GET",
+            "/v1/commands/poll?timeout_ms=50",
+            role="agent",
         )
         self.assertEqual(status, 200)
         self.assertIsInstance(data, dict)
         self.assertEqual([c["id"] for c in data["commands"]], ["command-1"])
         status, _, _ = self.server.request(
-            "POST", "/v1/commands/command-1/ack", role="agent", body={"status": "done"},
+            "POST",
+            "/v1/commands/command-1/ack",
+            role="agent",
+            body={"status": "done"},
         )
         self.assertIn(status, (200, 204))
         status, data, _ = self.server.request("GET", "/v1/commands/command-1", role="admin")
@@ -196,19 +216,27 @@ class C17BlackBoxContract(unittest.TestCase):
         self.assertIn(self.server.create("once")[0], (201, 202))
         self.assertEqual(self.server.create("once")[0], 409)
         status, data, _ = self.server.request(
-            "GET", "/v1/commands/poll?timeout_ms=50", role="agent",
+            "GET",
+            "/v1/commands/poll?timeout_ms=50",
+            role="agent",
         )
         self.assertEqual(status, 200)
         self.assertIn("once", [command["id"] for command in data["commands"]])
         self.assertIn(
             self.server.request(
-                "POST", "/v1/commands/once/ack", role="agent", body={"status": "done"},
+                "POST",
+                "/v1/commands/once/ack",
+                role="agent",
+                body={"status": "done"},
             )[0],
             (200, 204),
         )
         self.assertIn(
             self.server.request(
-                "POST", "/v1/commands/once/ack", role="agent", body={"status": "done"},
+                "POST",
+                "/v1/commands/once/ack",
+                role="agent",
+                body={"status": "done"},
             )[0],
             (409, 410),
         )
@@ -228,7 +256,9 @@ class C17BlackBoxContract(unittest.TestCase):
                 conn = http.client.HTTPConnection("127.0.0.1", self.server.base_url.port, timeout=2)
                 try:
                     conn.request(
-                        "POST", "/v1/commands", body=data,
+                        "POST",
+                        "/v1/commands",
+                        body=data,
                         headers={
                             "Authorization": "Bearer " + self.server.admin_token,
                             "Content-Type": "application/json",
@@ -244,7 +274,10 @@ class C17BlackBoxContract(unittest.TestCase):
     def test_poll_deadline_is_bounded(self):
         start = time.monotonic()
         status, _, _ = self.server.request(
-            "GET", "/v1/commands/poll?timeout_ms=150", role="agent", timeout=2,
+            "GET",
+            "/v1/commands/poll?timeout_ms=150",
+            role="agent",
+            timeout=2,
         )
         elapsed = time.monotonic() - start
         self.assertIn(status, (200, 204))
