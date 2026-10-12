@@ -30,7 +30,6 @@ def record():
 def health(**overrides):
     return {
         "mode": "cloud-rdc",
-        "browser_ready": True,
         "rdc_running": True,
         "state_ready": True,
         "paired": True,
@@ -49,6 +48,11 @@ def apps_with(item=None):
         stop=Mock(),
         start=Mock(),
     )
+    apps.get = Mock(
+        side_effect=lambda name: next(
+            (entry for entry in apps.list() if entry.get("name") == name), None
+        )
+    )
     return apps
 
 
@@ -59,7 +63,6 @@ def response(value, status=200):
 def closed_health(generation=2, **overrides):
     return health(
         **{
-            "browser_ready": False,
             "rdc_running": False,
             "quiesced": True,
             "checkpoint_generation": generation,
@@ -132,7 +135,7 @@ def test_ownership_blocks_unrelated_or_weakened_config(change):
     apps.stop.assert_not_called()
 
 
-@pytest.mark.parametrize("cpu,memory", [("1000m", "4Gi"), (1, 4294967296)])
+@pytest.mark.parametrize("cpu,memory", [("200m", "0.5Gi"), (0.2, 536870912)])
 def test_ownership_diagnostics_identify_encodings_without_accepting_them(cpu, memory, capsys):
     item = record()
     item["template"]["containers"][0]["resources"].update(cpu=cpu, memory=memory)
@@ -142,8 +145,8 @@ def test_ownership_diagnostics_identify_encodings_without_accepting_them(cpu, me
     assert error.value.code == "rdc_ownership_unconfirmed"
     diagnostic = json.loads(capsys.readouterr().out)
     assert diagnostic["fields"] == ["cpu", "memory"]
-    assert diagnostic["cpu_form"] in {"thousand_millicores", "one_number"}
-    assert diagnostic["memory_form"] in {"4_gib", "bytes_number"}
+    assert diagnostic["cpu_form"] in {"millicores", "tenth_number"}
+    assert diagnostic["memory_form"] in {"half_gib", "bytes_number"}
     apps.stop.assert_not_called()
     apps.start.assert_not_called()
 
@@ -189,11 +192,19 @@ def test_proto_defaults_and_expanded_managed_volume_do_not_break_ownership():
         rdc.owned_record(apps_with(item), tenant=TENANT, identifier=DEVICE)
 
 
-def test_ambiguous_inventory_cannot_authorize_mutation():
+def test_lookup_by_name_rejects_a_different_container():
     apps = apps_with()
-    apps.list.return_value = [record(), record()]
+    apps.get = Mock(return_value={**record(), "name": "rdc-other"})
     with pytest.raises(CloudProviderError):
         rdc.owned_record(apps, tenant=TENANT)
+
+
+def test_lookup_never_lists_the_whole_project():
+    apps = apps_with()
+    apps.list.side_effect = AssertionError("project-wide list must not be called")
+    apps.get = Mock(return_value=None)
+    assert rdc.named_record(apps) is None
+    apps.get.assert_called_once_with(rdc.names(PROJECT)[0])
 
 
 @pytest.mark.parametrize(
@@ -1317,3 +1328,124 @@ def test_readiness_starting_deadline_never_calls_health(monkeypatch):
     apps.client.request.assert_not_called()
     apps.start.assert_not_called()
     apps.stop.assert_not_called()
+
+
+def test_secret_import_testcall_base64_encodes_body_and_returns_metadata_only():
+    apps = apps_with()
+    apps.client.request.return_value = response(
+        {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}, status=201
+    )
+    secret = b"synthetic-private-value"
+
+    result = rdc.test_call(
+        apps,
+        "/rdc/secrets",
+        "POST",
+        nonce=NONCE,
+        body_bytes=secret,
+        alias=rdc.SECRET_ALIAS,
+    )
+
+    assert result == {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}
+    request = apps.client.request.call_args.kwargs["json_body"]
+    assert request["method"] == "post"
+    assert request["path"] == "/rdc/secrets"
+    assert request["isBase64Encoded"] is True
+    assert request["body"] != secret.decode()
+    assert secret.decode() not in json.dumps(request)
+    assert request["headers"] == {
+        rdc.CONTROL_HEADER: NONCE,
+        "Content-Type": "application/octet-stream",
+        "X-Alice-Secret-Alias": rdc.SECRET_ALIAS,
+    }
+
+
+def test_secret_import_permit_binds_alias_and_body_digest():
+    apps = apps_with()
+    store = private_store()
+    clock = Clock()
+    digest = hashlib.sha256(b"synthetic-private-value").hexdigest()
+
+    nonce = rdc.issue_control_permit(
+        apps,
+        store,
+        object(),
+        30,
+        clock=clock,
+        sleep=clock.sleep,
+        action="secret_import",
+        alias=rdc.SECRET_ALIAS,
+        body_sha256=digest,
+    )
+
+    assert len(nonce) == 64
+    permit = json.loads(store.download(rdc.CONTROL_FILE))
+    assert permit["action"] == "secret_import"
+    assert permit["alias"] == rdc.SECRET_ALIAS
+    assert permit["body_sha256"] == digest
+    assert "synthetic-private-value" not in json.dumps(permit)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"body_bytes": b"", "alias": rdc.SECRET_ALIAS},
+        {"body_bytes": b"x" * (rdc.SECRET_MAX_BYTES + 1), "alias": rdc.SECRET_ALIAS},
+        {"body_bytes": b"ok", "alias": "other"},
+    ],
+)
+def test_secret_import_testcall_rejects_invalid_body_or_alias(kwargs):
+    with pytest.raises(CloudProviderError):
+        rdc.test_call(apps_with(), "/rdc/secrets", "POST", nonce=NONCE, **kwargs)
+
+
+def test_import_runtime_secret_uses_digest_bound_permit_and_returns_no_plaintext(monkeypatch):
+    apps = apps_with()
+    store = private_store()
+    secret = b"synthetic-private-value"
+    captured = {}
+
+    monkeypatch.setattr(rdc, "require_owned_bucket", lambda *args, **kwargs: None)
+
+    def permit(*args, **kwargs):
+        captured["permit"] = kwargs
+        return NONCE
+
+    def call(*args, **kwargs):
+        captured["call"] = kwargs
+        return {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}
+
+    monkeypatch.setattr(rdc, "issue_control_permit", permit)
+    monkeypatch.setattr(rdc, "test_call", call)
+
+    result = rdc.import_runtime_secret(apps, store, object(), secret)
+
+    assert result == {"status": "secret_imported", "alias": rdc.SECRET_ALIAS}
+    assert captured["permit"]["action"] == "secret_import"
+    assert captured["permit"]["alias"] == rdc.SECRET_ALIAS
+    assert captured["permit"]["body_sha256"] == hashlib.sha256(secret).hexdigest()
+    assert captured["call"]["body_bytes"] == secret
+    assert secret.decode() not in json.dumps(result)
+
+
+@pytest.mark.parametrize("failing", ["list", "bucket"])
+def test_preflight_reports_failing_step_without_provider_values(failing, capsys):
+    apps = apps_with()
+    store = Mock(_timeout=30)
+    if failing == "list":
+        apps.list.side_effect = CloudProviderError(
+            "secret-provider-detail", code="provider_http_error"
+        )
+    else:
+        apps.list.return_value = []
+        store._request.side_effect = CloudProviderError(
+            "secret-provider-detail", code="provider_http_error"
+        )
+    with pytest.raises(CloudProviderError):
+        rdc.preflight(apps, store, object(), tenant=TENANT)
+    out = capsys.readouterr().out
+    assert json.loads(out) == {
+        "stage": "rdc_preflight_failed",
+        "step": "find_container" if failing == "list" else "bucket_inventory",
+    }
+    assert "secret-provider-detail" not in out
