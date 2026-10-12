@@ -55,7 +55,8 @@ class MemoryRecordAdapter:
         return self.sequence
 
     def close(self) -> None:
-        self._store.close()
+        """Adapter does not own the shared MemoryStore lifecycle."""
+        return None
 
 
 __all__ = ["MemoryRecordAdapter"]
