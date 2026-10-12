@@ -5,6 +5,7 @@ Android process must bind its socket using ConnectivityManager.Network APIs,
 then return only verified read-only discovery results over an authenticated
 local IPC channel. No process-wide network binding or privilege escalation.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,9 +39,7 @@ class AuthorizedAndroidBridge(Protocol):
     def discover(self, request: DiscoveryRequest) -> DiscoveryResult: ...
 
 
-def discover_via_android(
-    bridge: AuthorizedAndroidBridge | None, hostname: str
-) -> DiscoveryResult:
+def discover_via_android(bridge: AuthorizedAndroidBridge | None, hostname: str) -> DiscoveryResult:
     """Fail closed if the authorized native bridge has not been provided."""
     if bridge is None:
         raise AndroidBridgeUnavailable("Android Network.bindSocket bridge unavailable")
