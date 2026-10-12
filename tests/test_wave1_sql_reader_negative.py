@@ -9,6 +9,7 @@ import pytest
 from agent_memory.wave1_sql_reader import SnapshotReadError, SqlSnapshotReader
 from tests.test_wave1_sql_reader import _source
 
+
 def test_rejects_unsupported_dialect():
     with pytest.raises(ValueError, match="unsupported"):
         SqlSnapshotReader("mysql", lambda: None)
@@ -27,10 +28,13 @@ def test_refuses_ambiguous_memory_config(tmp_path):
     with sqlite3.connect(path) as db:
         db.execute("DROP TABLE configs")
         db.execute("CREATE TABLE configs (key TEXT, value TEXT)")
-        db.executemany("INSERT INTO configs VALUES (?, ?)", [
-            ("memory_config", '{}'),
-            ("memory_config", '{}'),
-        ])
+        db.executemany(
+            "INSERT INTO configs VALUES (?, ?)",
+            [
+                ("memory_config", "{}"),
+                ("memory_config", "{}"),
+            ],
+        )
     with pytest.raises(SnapshotReadError, match="ambiguous"):
         SqlSnapshotReader.sqlite(path).read()
 
