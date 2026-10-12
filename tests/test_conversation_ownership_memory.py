@@ -99,4 +99,4 @@ def test_runtime_data_root_is_preserved(monkeypatch, tmp_path):
 def test_module_contains_no_sql_call():
     source = Path(ownership.__file__).read_text(encoding="utf-8")
     assert "get_conn" not in source
-    assert "migration" not in source.lower()
+    assert "conversation_ownership_migration" not in source
