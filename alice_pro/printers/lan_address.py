@@ -20,7 +20,7 @@ def private_ipv4(value: str) -> str:
 def _route_is_local(ip: str, interface: str, routes: str) -> bool:
     """Reject any more-specific route to a different interface or via gateway."""
     address = int(ipaddress.IPv4Address(ip))
-    matches = []
+    matches: list[tuple[int, int, str, int]] = []
     for line in routes.splitlines()[1:]:
         parts = line.split()
         if len(parts) < 8:
@@ -37,8 +37,8 @@ def _route_is_local(ip: str, interface: str, routes: str) -> bool:
             continue
     if not matches:
         return False
-    _, _, iface, gateway = max(matches)
-    return iface == interface and gateway == 0
+    _, _, selected_iface, selected_gateway = max(matches)
+    return selected_iface == interface and selected_gateway == 0
 
 
 def resolve_lan(host: str, *, interface: str = "wlan0",
@@ -56,11 +56,11 @@ def resolve_lan(host: str, *, interface: str = "wlan0",
             label and len(label) <= 63 and label.replace("-", "").isalnum()
             for label in host.split(".")
         ):
-            raise ValueError("invalid DNS hostname")
+            raise ValueError("invalid DNS hostname") from None
         records = socket.getaddrinfo(host, 3000, family=socket.AF_INET, type=socket.SOCK_STREAM)
-        addresses = [private_ipv4(item[4][0]) for item in records]
+        addresses = [private_ipv4(str(item[4][0])) for item in records]
         if not addresses:
-            raise ValueError("empty DNS response")
+            raise ValueError("empty DNS response") from None
     if route_table is None:
         route_table = Path("/proc/net/route").read_text(encoding="ascii")
     for ip in addresses:
