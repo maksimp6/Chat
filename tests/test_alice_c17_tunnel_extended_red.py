@@ -4,7 +4,6 @@ Requires real C17 server; reuses Transport from test_alice_c17_tunnel_red.
 These are deliberately not mocked or xfailed.
 """
 import concurrent.futures
-import http.client
 import json
 import random
 import socket
