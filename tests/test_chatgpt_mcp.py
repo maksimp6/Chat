@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 import pytest
 from flask import Flask
@@ -273,7 +274,33 @@ def test_project_tools_execute_through_mcp(client):
         assert isinstance(result, dict)
 
 
-def test_existing_git_read_tools_execute_through_mcp(client):
+@pytest.mark.parametrize("linked", [False, True])
+def test_existing_git_read_tools_execute_through_mcp(client, linked, tmp_path, monkeypatch):
+    if linked:
+        repository = tmp_path / "repository"
+        repository.mkdir()
+        (repository / "tracked.txt").write_text("synthetic\n", encoding="utf-8")
+        commands = [
+            ["init", "-q"],
+            ["add", "."],
+            [
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            ["worktree", "add", "-q", "-b", "linked", str(tmp_path / "linked")],
+        ]
+        for command in commands:
+            subprocess.run(
+                ["git", "-C", str(repository), *command], check=True, capture_output=True
+            )
+        monkeypatch.chdir(tmp_path / "linked")
     cases = [
         ("git_status", {"repo_path": "."}),
         ("git_log", {"repo_path": ".", "limit": 2}),
