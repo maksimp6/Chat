@@ -13,8 +13,9 @@ import org.junit.Test
 class RootAgentServerTest {
     private val token = "root-agent-test-" + "t".repeat(32)
     private var probe = RootShellResult(exitCode = 0, output = "0\n", timedOut = false, truncated = false)
+    private var statusDump = RootShellResult(exitCode = 0, output = "isKeyguardShowing=true\n", timedOut = false, truncated = false)
     private val operations = RootOperations(
-        runRoot = { probe },
+        runRoot = { argv -> if (argv == RootOperations.STATUS_ARGV) statusDump else probe },
         deviceInfo = { mapOf("model" to "Redmi 9", "sdk" to "29") },
     )
     private lateinit var server: RootAgentServer
@@ -80,6 +81,19 @@ class RootAgentServerTest {
     fun rootProbeTimeoutIsAGatewayTimeout() {
         probe = RootShellResult(exitCode = null, output = "", timedOut = true, truncated = false)
         assertEquals(504, status(get("/v1/root-probe")))
+    }
+
+    @Test
+    fun statusReportsOnlyTheKeyguardBoolean() {
+        val locked = get("/v1/status")
+        assertEquals(200, status(locked))
+        assertTrue(locked.endsWith("{\"keyguard_locked\":true}"))
+        statusDump = RootShellResult(0, "isKeyguardShowing=false\nmCurrentFocus=Window{42 u0 com.secret.app}", false, false)
+        val unlocked = get("/v1/status")
+        assertTrue(unlocked.endsWith("{\"keyguard_locked\":false}"))
+        assertFalse(unlocked.contains("com.secret.app"))
+        statusDump = RootShellResult(null, "", timedOut = true, truncated = false)
+        assertEquals(504, status(get("/v1/status")))
     }
 
     @Test
