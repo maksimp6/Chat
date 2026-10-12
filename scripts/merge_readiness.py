@@ -203,29 +203,27 @@ def _valid_review_payload(
     canonical = json.dumps(
         report, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
-    if hashlib.sha256(canonical).hexdigest() != evidence.get("review_report_sha256"):
-        return False
-    if run.get("path") != ".github/workflows/solution-review.yml":
-        return False
-    if str(evidence.get("runner_sha") or "") != str(run.get("head_sha") or ""):
-        return False
-    for field, value in (
+    bound = (
         ("task", f"pr:{pr_number}"),
         ("reviewed_head_sha", head_sha),
         ("reviewed_base_sha", base_sha),
-    ):
-        if report.get(field) != value or evidence.get(field) != value:
-            return False
-    for field in (
+    )
+    mirrored = (
         "outcome",
         "reviewer_role",
         "reviewer_session",
         "implementation_role",
         "implementation_session",
-    ):
-        if report.get(field) != evidence.get(field):
-            return False
-    return True
+    )
+    return (
+        hashlib.sha256(canonical).hexdigest() == evidence.get("review_report_sha256")
+        and run.get("path") == ".github/workflows/solution-review.yml"
+        and str(evidence.get("runner_sha") or "") == str(run.get("head_sha") or "")
+        and all(
+            report.get(field) == value and evidence.get(field) == value for field, value in bound
+        )
+        and all(report.get(field) == evidence.get(field) for field in mirrored)
+    )
 
 
 def select_solution_review_evidence(
@@ -267,37 +265,44 @@ def select_solution_review_evidence(
     return None
 
 
-def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
-    evidence = snapshot.get("solution_review")
-    if not isinstance(evidence, dict):
-        return {
-            "code": "solution_review_missing",
-            "detail": "trusted solution-review evidence is missing",
-        }
+_SOLUTION_REVIEW_REQUIRED_FIELDS = (
+    "task",
+    "outcome",
+    "reviewed_head_sha",
+    "reviewed_base_sha",
+    "reviewer_role",
+    "reviewer_session",
+    "implementation_role",
+    "implementation_session",
+    "provenance",
+    "review_report_sha256",
+    "verification",
+)
 
-    required = {
-        "task",
-        "outcome",
-        "reviewed_head_sha",
-        "reviewed_base_sha",
-        "reviewer_role",
-        "reviewer_session",
-        "implementation_role",
-        "implementation_session",
-        "provenance",
-        "review_report_sha256",
-        "verification",
-    }
-    if any(not str(evidence.get(field) or "").strip() for field in required):
-        return {
-            "code": "solution_review_invalid",
-            "detail": "solution-review evidence is incomplete",
-        }
+_SOLUTION_REVIEW_OUTCOME_BLOCKERS = {
+    "CHANGES_REQUESTED": {
+        "code": "solution_review_changes_requested",
+        "detail": "solution reviewer requested implementation changes",
+    },
+    "BLOCKED": {
+        "code": "solution_review_blocked",
+        "detail": "solution review is blocked",
+    },
+}
+
+
+def _invalid_review(detail: str) -> dict[str, Any]:
+    return {"code": "solution_review_invalid", "detail": detail}
+
+
+def _solution_review_evidence_error(evidence: dict[str, Any]) -> dict[str, Any] | None:
+    """Reject incomplete, unsupported or unauthenticated review evidence."""
+    if any(
+        not str(evidence.get(field) or "").strip() for field in _SOLUTION_REVIEW_REQUIRED_FIELDS
+    ):
+        return _invalid_review("solution-review evidence is incomplete")
     if evidence.get("schema_version") != 2:
-        return {
-            "code": "solution_review_invalid",
-            "detail": "solution-review evidence schema version is unsupported",
-        }
+        return _invalid_review("solution-review evidence schema version is unsupported")
 
     report = evidence.get("review_report")
     if (
@@ -309,27 +314,19 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
         or not str(report.get("rationale") or "").strip()
         or not str(report.get("risk_assessment") or "").strip()
     ):
-        return {
-            "code": "solution_review_invalid",
-            "detail": "authenticated substantive review report is missing",
-        }
+        return _invalid_review("authenticated substantive review report is missing")
+    return None
 
+
+def _solution_review_outcome_blocker(
+    evidence: dict[str, Any], snapshot: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Require an ACCEPTED, exact-head/base, independent review."""
     outcome = str(evidence["outcome"])
-    if outcome == "CHANGES_REQUESTED":
-        return {
-            "code": "solution_review_changes_requested",
-            "detail": "solution reviewer requested implementation changes",
-        }
-    if outcome == "BLOCKED":
-        return {
-            "code": "solution_review_blocked",
-            "detail": "solution review is blocked",
-        }
     if outcome != "ACCEPTED":
-        return {
-            "code": "solution_review_invalid",
-            "detail": "solution-review outcome is not recognized",
-        }
+        return _SOLUTION_REVIEW_OUTCOME_BLOCKERS.get(
+            outcome, _invalid_review("solution-review outcome is not recognized")
+        )
 
     if str(evidence["reviewed_head_sha"]) != str(snapshot["head_sha"]) or str(
         evidence["reviewed_base_sha"]
@@ -346,8 +343,19 @@ def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
             "code": "solution_review_not_independent",
             "detail": "solution reviewer role and session must be independent from implementation",
         }
-
     return None
+
+
+def _solution_review_blocker(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    evidence = snapshot.get("solution_review")
+    if not isinstance(evidence, dict):
+        return {
+            "code": "solution_review_missing",
+            "detail": "trusted solution-review evidence is missing",
+        }
+    return _solution_review_evidence_error(evidence) or _solution_review_outcome_blocker(
+        evidence, snapshot
+    )
 
 
 def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
