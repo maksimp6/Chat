@@ -23,6 +23,8 @@ migration inventory is in Draft PR #1172.
 - Torn final records are discarded, but complete corrupted records fail closed.
   Backup captures payload + sequence atomically under the same cross-process
   lock; restore verifies SHA-256 and sequence in an isolated destination.
+  Restore also locks its target path to reject concurrent restorations and
+  dangling symlink targets; backup fsyncs its own parent directory.
 - SHA-256 is unkeyed corruption detection, not adversarial integrity/KMS.
 - A process-shared file lock is not a security boundary against uncooperative
   actors, root, direct file writes or a foreign filesystem. FileMemoryDB
@@ -34,8 +36,9 @@ Focused tests use temporary directories only. They cover a child exiting
 immediately after an acknowledged write, four independent writers with a
 concurrent compactor, monotonic sequences, cross-instance visibility, crashing
 lock holder, ENOSPC/torn append, ambiguous fsync, corruption refusal,
-compaction failure, defensive read copies and consistent backup/restore while
-another writer is active. No real SQL, RDC, Cloud.ru or phone was changed.
+compaction failure, defensive read copies, consistent backup/restore while
+another writer is active, two simultaneous restore attempts, symlink refusal
+and refusal to back up poisoned handles. No real SQL, RDC, Cloud.ru or phone was changed.
 
 ## Wave 1 shadow-only rehearsal
 
