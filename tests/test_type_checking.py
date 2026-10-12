@@ -38,6 +38,7 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "agent_memory/wave1_shadow.py",
     "agent_context/__init__.py",
     "agent_context/cache.py",
     "agent_context/models.py",
