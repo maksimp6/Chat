@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Iterable, Mapping, TypedDict
 
-from agent_memory.file_memory_db import FileMemoryDB
+from agent_memory.record_adapter import MemoryRecordAdapter
 
 OWNER_PREFIX = "conversation_owner:"
 MIGRATION_KEY = "migration:conversation_owners:v1"
@@ -24,7 +24,7 @@ class MigrationMarker(TypedDict):
 
 
 class ConversationOwnershipStore:
-    def __init__(self, db: FileMemoryDB) -> None:
+    def __init__(self, db: MemoryRecordAdapter) -> None:
         self.db = db
 
     @staticmethod
