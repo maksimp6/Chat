@@ -210,3 +210,71 @@ def test_non_object_committed_record_is_corruption(tmp_path):
     path.write_text("true\n", encoding="utf-8")
     with pytest.raises(FileMemoryCorruption):
         FileMemoryDB(path)
+def _restore_worker(source: str, target: str, start, results) -> None:
+    from agent_memory.backup import MemoryBackupError
+
+    if not start.wait(10):
+        results.put("timeout")
+        return
+    try:
+        restore_backup(source, target)
+        results.put("restored")
+    except MemoryBackupError:
+        results.put("already_exists")
+
+
+def test_concurrent_restore_only_one_wins(tmp_path):
+    source_db = FileMemoryDB(tmp_path / "source.memory")
+    source_db.put("stable", 123)
+    backup = tmp_path / "backup"
+    create_backup(source_db, backup)
+
+    ctx = multiprocessing.get_context("spawn")
+    start, results = ctx.Event(), ctx.Queue()
+    target = tmp_path / "restored.memory"
+    children = [
+        ctx.Process(target=_restore_worker, args=(str(backup), str(target), start, results))
+        for _ in range(2)
+    ]
+    for child in children:
+        child.start()
+    try:
+        start.set()
+        assert sorted(results.get(timeout=15) for _ in children) == ["already_exists", "restored"]
+    finally:
+        for child in children:
+            child.join(5)
+            if child.is_alive():
+                child.terminate()
+                child.join(5)
+    assert all(child.exitcode == 0 for child in children)
+    assert FileMemoryDB(target).items() == {"stable": 123}
+
+
+def test_dangling_symlink_restore_target_rejected(tmp_path):
+    from agent_memory.backup import MemoryBackupError
+
+    db = FileMemoryDB(tmp_path / "source.memory")
+    db.put("one", 1)
+    backup = tmp_path / "backup"
+    create_backup(db, backup)
+    target = tmp_path / "destination.memory"
+    target.symlink_to(tmp_path / "missing.memory")
+    with pytest.raises(MemoryBackupError, match="already exists"):
+        restore_backup(backup, target)
+    assert target.is_symlink()
+
+
+def test_poisoned_handle_cannot_produce_backup(tmp_path, monkeypatch):
+    db = FileMemoryDB(tmp_path / "source.memory")
+    db.put("stable", 1)
+
+    def fail_append(_record):
+        raise OSError("simulated ENOSPC")
+
+    monkeypatch.setattr(db, "_append", fail_append)
+    with pytest.raises(OSError):
+        db.put("failed", 2)
+    with pytest.raises(FileMemoryError, match="uncertain"):
+        create_backup(db, tmp_path / "uncommitted")
+    assert not (tmp_path / "uncommitted" / "COMMITTED").exists()
