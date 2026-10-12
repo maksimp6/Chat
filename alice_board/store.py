@@ -83,43 +83,49 @@ class BoardStore:
                 self.path.stat().st_mode & 0o077 or self.path.stat().st_uid != os.getuid()
             ):
                 raise BoardUnavailable("database permissions are too broad")
-            entries = self._db.items()
-            if any(not key.startswith(PREFIX) for key in entries):
-                raise BoardUnavailable("unexpected key in dedicated board database")
-            try:
-                ordered = sorted(entries.items(), key=lambda row: int(row[0][len(PREFIX) :]))
-            except ValueError as exc:
-                raise BoardUnavailable("invalid event key") from exc
-            self._events: list[dict[str, Any]] = []
-            self._idem: dict[str, dict[str, Any]] = {}
-            for seq, (key, value) in enumerate(ordered, 1):
-                if (
-                    key != f"{PREFIX}{seq:09d}"
-                    or not isinstance(value, dict)
-                    or value.get("seq") != seq
-                ):
-                    raise BoardUnavailable("event sequence is corrupt")
-                if value.get("digest") != _sha(value["kind"], value["payload"]):
-                    raise BoardUnavailable("event digest mismatch")
-                rid = value["request_id"]
-                if rid in self._idem:
-                    raise BoardUnavailable("reused idempotency key in history")
-                self._events.append(value)
-                self._idem[rid] = value
-            if self._db.sequence != len(self._events):
-                raise BoardUnavailable("Memory DB sequence does not match board history")
-            self._project()
-            if not any(t["category"] == "shame" for t in self.threads()):
-                self.create_thread(
-                    "Доска позора",
-                    "Подтверждённые ошибки Alice Pro и регрессионные проверки.",
-                    "shame",
-                    "bootstrap:alice-board:shame:v1",
-                    actor="system",
-                )
+            self._load_events()
+            self._ensure_bootstrap()
         except BaseException:
             self.close()
             raise
+
+    def _load_events(self) -> None:
+        entries = self._db.items()
+        if any(not key.startswith(PREFIX) for key in entries):
+            raise BoardUnavailable("unexpected key in dedicated board database")
+        try:
+            ordered = sorted(entries.items(), key=lambda row: int(row[0][len(PREFIX) :]))
+        except ValueError as exc:
+            raise BoardUnavailable("invalid event key") from exc
+        self._events: list[dict[str, Any]] = []
+        self._idem: dict[str, dict[str, Any]] = {}
+        for seq, (key, value) in enumerate(ordered, 1):
+            if (
+                key != f"{PREFIX}{seq:09d}"
+                or not isinstance(value, dict)
+                or value.get("seq") != seq
+            ):
+                raise BoardUnavailable("event sequence is corrupt")
+            if value.get("digest") != _sha(value["kind"], value["payload"]):
+                raise BoardUnavailable("event digest mismatch")
+            rid = value["request_id"]
+            if rid in self._idem:
+                raise BoardUnavailable("reused idempotency key in history")
+            self._events.append(value)
+            self._idem[rid] = value
+        if self._db.sequence != len(self._events):
+            raise BoardUnavailable("Memory DB sequence does not match board history")
+        self._project()
+
+    def _ensure_bootstrap(self) -> None:
+        if not any(t["category"] == "shame" for t in self.threads()):
+            self.create_thread(
+                "Доска позора",
+                "Подтверждённые ошибки Alice Pro и регрессионные проверки.",
+                "shame",
+                "bootstrap:alice-board:shame:v1",
+                actor="system",
+            )
 
     def _check(self, *, write: bool = False) -> None:
         if self._closed or self._pid != os.getpid():
