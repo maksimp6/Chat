@@ -70,6 +70,26 @@ def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, A
     return validated
 
 
+def _validate_checkpoint(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Validate the complete checkpoint before publishing recovered state."""
+    if payload["seq"] < 1 or payload["changes"] != []:
+        raise ValueError("invalid checkpoint baseline")
+    snapshot = payload.get("state")
+    if not isinstance(snapshot, dict):
+        raise ValueError("invalid checkpoint state")
+    checked: dict[str, dict[str, Any]] = {}
+    for namespace, values in snapshot.items():
+        if not isinstance(namespace, str) or not isinstance(values, dict):
+            raise ValueError("invalid checkpoint namespace")
+        checked[namespace] = {}
+        for key, value in values.items():
+            if not isinstance(key, str):
+                raise ValueError("invalid checkpoint key")
+            _validate_value(value)
+            checked[namespace][key] = value
+    return checked
+
+
 class Store(Protocol[ValueT]):
     """Copy-safe name/value staging with an explicit durable commit."""
 
@@ -206,9 +226,18 @@ class _JournalStore:
             if (
                 type(payload["seq"]) is not int
                 or record["digest"] != next_digest
-                or payload["seq"] != sequence + 1
+                or (
+                    payload["seq"] != sequence + 1
+                    and not (sequence == 0 and payload.get("checkpoint") is True)
+                )
             ):
                 raise ValueError("commit chain mismatch")
+            # A checkpoint is the first and only baseline frame after compaction.
+            # Keep the original sequence monotonic across compactions.
+            if payload.get("checkpoint") is True:
+                if sequence != 0 or state:
+                    raise ValueError("checkpoint must be first")
+                return _validate_checkpoint(payload), payload["seq"], next_digest
             # Validate the entire frame before mutating caller-owned state.
             # A malformed later operation must not publish earlier changes.
             validated = _validate_journal_changes(payload["changes"])
@@ -385,6 +414,94 @@ class _JournalStore:
         finally:
             temporary.unlink(missing_ok=True)
 
+    def _verify_checkpoint_source(self) -> None:
+        """Never compact over corruption or an unobserved source mutation."""
+        try:
+            state, sequence, digest = self._inspect_log(self.path)
+        except StoreError as exc:
+            self._failed = True
+            raise StoreError("checkpoint source is corrupt; recovery required") from exc
+        if state != self._state or Commit(sequence, digest) != self.last_commit:
+            self._failed = True
+            raise StoreError("checkpoint source changed; recovery required")
+
+    def checkpoint(self) -> int:
+        """Atomically replace a long journal with one verified RAM-state frame."""
+        import tempfile
+
+        with self._lock:
+            self._ensure_open()
+            if self._failed or self._active_transaction:
+                raise StoreError("checkpoint requires a healthy idle store")
+            if self._sequence == 0:
+                return 0
+            payload = {
+                "format": 1,
+                "seq": self._sequence,
+                "changes": [],
+                "checkpoint": True,
+                "state": deepcopy(self._state),
+            }
+            encoded = json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+            digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
+            frame = (
+                json.dumps(
+                    {"payload": payload, "digest": digest},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ).encode("utf-8")
+                + b"\n"
+            )
+            if len(frame) > MAX_JOURNAL_FRAME_BYTES:
+                raise StoreError("checkpoint exceeds frame size limit")
+            temporary: Path | None = None
+            replaced = False
+            publication_started = False
+            try:
+                self._verify_checkpoint_source()
+                fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
+                temporary = Path(temp_name)
+                with os.fdopen(fd, "wb") as stream:
+                    if stream.write(frame) != len(frame):
+                        raise OSError("short checkpoint write")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                state, seq, verified_digest = self._inspect_log(temporary)
+                if state != self._state or seq != self._sequence or verified_digest != digest:
+                    raise StoreError("checkpoint verification failed")
+                # Cancellation can arrive inside replace, after the path changed
+                # but before the return/assignment. Treat publication as uncertain
+                # from this point until the directory sync and RAM digest update.
+                publication_started = True
+                os.replace(temporary, self.path)
+                replaced = True
+                directory = os.open(str(self.path.parent), os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+                self._digest = digest
+                return self._sequence
+            except OSError as exc:
+                # A replace or directory fsync failure leaves publication uncertain.
+                self._failed = True
+                raise StoreError("checkpoint failed; recovery required") from exc
+            except BaseException:
+                if publication_started:
+                    self._failed = True
+                raise
+            finally:
+                if temporary is not None and not replaced:
+                    temporary.unlink(missing_ok=True)
+
     def backup(self, destination: str | Path) -> None:
         """Create a verified, fsynced backup without overwriting another artifact."""
         with self._lock:
@@ -418,12 +535,17 @@ class _JournalStore:
                 raise StoreError("backup source does not exist")
             try:
                 self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
+                self._state = state
+                self._sequence = sequence
+                self._digest = digest
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
-            self._state = state
-            self._sequence = sequence
-            self._digest = digest
+            except BaseException:
+                # Restore may have replaced the destination before cancellation.
+                # Empty/partial RAM metadata cannot be used to append to that log.
+                self._failed = True
+                raise
 
     def close(self) -> None:
         """Release the exclusive writer lock when no transaction is active."""
@@ -517,6 +639,13 @@ class MemoryStore:
                         tx.set(change["namespace"], change["key"], change["value"])
                 finally:
                     wrapper._closed = True
+
+    def checkpoint(self) -> int:
+        """Compact the confirmed journal without changing visible RAM values."""
+        with self._engine._lock:
+            if self._pending:
+                raise StoreError("checkpoint requires no staged values")
+            return self._engine.checkpoint()
 
     def backup(self, destination: str | Path) -> None:
         """Back up only confirmed journal state."""
