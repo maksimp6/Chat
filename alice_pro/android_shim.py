@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
 import threading
+import struct
+import zlib
 import time
 
 
@@ -89,6 +91,40 @@ class UnconfiguredTransport:
         raise RuntimeError("transport not configured")
 
 
+def validate_png(data: bytes) -> bool:
+    """Validate bounded PNG structure, chunk CRCs and terminal IEND."""
+    if len(data) < 45 or len(data) > 16 * 1024 * 1024:
+        return False
+    if not data.startswith(bytes.fromhex("89504e470d0a1a0a")):
+        return False
+    offset = 8
+    seen_ihdr = False
+    seen_idat = False
+    while offset + 12 <= len(data):
+        length = struct.unpack_from(">I", data, offset)[0]
+        end = offset + 12 + length
+        if length > 16 * 1024 * 1024 or end > len(data):
+            return False
+        kind = data[offset + 4 : offset + 8]
+        payload = data[offset + 8 : offset + 8 + length]
+        expected = struct.unpack_from(">I", data, offset + 8 + length)[0]
+        if zlib.crc32(kind + payload) != expected:
+            return False
+        if not seen_ihdr:
+            if kind != b"IHDR" or length != 13:
+                return False
+            width, height = struct.unpack_from(">II", payload)
+            if not (0 < width <= 8192 and 0 < height <= 8192):
+                return False
+            seen_ihdr = True
+        elif kind == b"IDAT":
+            seen_idat = True
+        elif kind == b"IEND":
+            return seen_idat and length == 0 and end == len(data)
+        offset = end
+    return False
+
+
 class AndroidShim:
     def __init__(self, backend: Backend = Backend.SIMULATED, transport: AndroidTransport | None = None):
         self.backend = Backend(backend)
@@ -113,7 +149,7 @@ class AndroidShim:
 
     def tap(self, x: int, y: int) -> bool:
         with self._lock:
-            if self.observe().keyguard != Keyguard.UNLOCKED:
+            if self.backend != Backend.SIMULATED or self.observe().keyguard != Keyguard.UNLOCKED:
                 self._record("tap", "denied_keyguard")
                 return False
             ok = self.transport.tap(x, y)
@@ -131,7 +167,7 @@ class AndroidShim:
 
     def screenshot(self) -> bytes:
         data = self.transport.screenshot()
-        if not data.startswith(bytes.fromhex("89504e470d0a1a0a")):
+        if not validate_png(data):
             self._record("screenshot", "invalid")
             raise ValueError("invalid screenshot")
         self._record(
