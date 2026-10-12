@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
  * - Requests carrying browser markers (`Origin`, non-`none` `Sec-Fetch-Site`) or a
  *   Host other than 127.0.0.1/localhost on this port are refused, so a WebView or
  *   a DNS-rebinding page cannot reach it.
- * - GET /v1/health, /v1/device-info, /v1/root-probe only. One request per
+ * - GET /v1/health, /v1/device-info, /v1/status, /v1/root-probe only. One request per
  *   connection, bounded header size, read timeout and worker count.
  */
 class RootAgentServer(
@@ -146,6 +146,10 @@ class RootAgentServer(
         return when (path) {
             "/v1/health" -> 200 to "{\"status\":\"ok\"}"
             "/v1/device-info" -> 200 to json(operations.deviceInfo())
+            "/v1/status" -> when (val status = operations.status()) {
+                is RootOperations.Status.Answered -> 200 to "{\"keyguard_locked\":${status.keyguardLocked}}"
+                RootOperations.Status.TimedOut -> 504 to error("status_timeout")
+            }
             else -> when (val probe = operations.rootProbe()) {
                 is RootOperations.Probe.Answered -> 200 to "{\"root\":${probe.root}}"
                 RootOperations.Probe.TimedOut -> 504 to error("root_probe_timeout")
@@ -200,7 +204,7 @@ class RootAgentServer(
         private const val MAX_QUEUED = 16
         private const val READ_TIMEOUT_MS = 5_000
         private const val MAX_HEAD_BYTES = 16 * 1024
-        private val ROUTES = setOf("/v1/health", "/v1/device-info", "/v1/root-probe")
+        private val ROUTES = setOf("/v1/health", "/v1/device-info", "/v1/status", "/v1/root-probe")
         private val REASONS = mapOf(
             200 to "OK", 400 to "Bad Request", 401 to "Unauthorized", 403 to "Forbidden",
             404 to "Not Found", 405 to "Method Not Allowed", 431 to "Request Header Fields Too Large",
