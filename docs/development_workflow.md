@@ -406,6 +406,8 @@ Snapshot относится только к состоянию, которое �
 
 - обычное продвижение `master` само по себе не создаёт новый snapshot run для старого PR head;
 - resolve/unresolve review thread сам по себе не является workflow trigger;
+- после закрытия threads повторите существующую failed PR job через проверенный
+  [путь восстановления](development/branch-policy-alignment.md#recover-readiness-after-resolving-threads);
 - snapshot не обновляет ветку и не заменяет strict up-to-date policy ruleset;
 - snapshot сейчас информационный и не является самостоятельной заменой защищённого merge gate.
 

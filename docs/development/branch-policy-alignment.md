@@ -47,6 +47,9 @@ file commit for an actual settings update.
 2. Verify all proposed contexts are actually produced on the current promotion
    head, including `Offline startup and restart smoke` and non-draft `Merge readiness snapshot`.
    Snapshot must not require itself in its input list. No merge-queue support is claimed.
+   Before requiring snapshot, verify recovery after thread resolution using the
+   existing PR job rerun described below. A successful develop/Draft skip does not
+   prove readiness ran or that master promotion is admissible.
 3. Apply the reviewed payloads to the existing IDs through authenticated GitHub
    administration; do not introduce bypass actors or disable existing protections.
 4. Read back both rulesets. Confirm active enforcement, exact contexts and producer
@@ -62,6 +65,29 @@ GitHub Actions producer binding (integration 15368) does not make PR-editable
 workflows tamper-proof. #1117 owns the separate trusted Memory admission groundwork;
 its status must not become required before a protected producer is deployed and
 verified. This settings proposal does not claim to close that security boundary.
+
+## Recover readiness after resolving threads
+
+Thread resolution alone does not trigger the snapshot workflow. GitHub's native
+rerun of an existing failed PR job is available without `workflow_dispatch`.
+It retains the original PR run/check binding; a new manual dispatch on an arbitrary
+branch would not supply equivalent exact-head required-check evidence.
+
+Use `python scripts/readiness_rerun.py --pr <PR> --run <snapshot-run> --head <full-SHA>`
+to validate and print a read-only recovery plan. Add `--execute` only to request
+the existing job rerun. It requires an authenticated `gh` session with Actions
+write permission; it does not change branch protection or merge the PR.
+
+The helper rejects stale heads, forks, draft/closed PRs, non-master targets,
+unrelated/manual runs, incomplete job collections, skipped/successful jobs and
+wrong check producers. It recollects the plan before POST. A concurrent head
+change after that check can rerun only the old job; never accept its result for
+the new head. The readiness evaluator still checks live head/base/threads.
+
+The helper's tests use fake API data, not native admission evidence. After rollout,
+prove on a controlled non-draft master PR that unresolved threads fail readiness,
+then resolve them and rerun the same exact-head job; require actual success and
+native eligibility. Do not claim that fixture ran on this develop Draft.
 
 ## Handoff
 
