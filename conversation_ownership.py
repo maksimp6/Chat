@@ -1,8 +1,7 @@
 """Durable ownership boundary for user-facing conversations.
 
-Conversation metadata remains behind the typed db API during Wave 1 migration.
-Ownership itself is authoritative in the file-native Memory DB after a verified
-one-time import from the legacy SQL side table.
+Conversation metadata is read through the application DB boundary. Ownership is
+stored directly in the native MemoryStore with no SQL migration.
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from threading import RLock
 import time
 from typing import Optional, TypedDict
 
-from agent_memory.conversation_ownership_migration import ensure_conversation_ownership_migrated
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
 from agent_memory.runtime_store import get_runtime_memory_db
 from db import get_conversations, memory_file_path
@@ -42,13 +40,11 @@ def _conversation_rows() -> list[ConversationView]:
 
 
 def _store() -> ConversationOwnershipStore:
-    store = ConversationOwnershipStore(get_runtime_memory_db(memory_file_path()))
-    ensure_conversation_ownership_migrated(store)
-    return store
+    return ConversationOwnershipStore(get_runtime_memory_db(memory_file_path()))
 
 
 def init_conversation_ownership_table() -> None:
-    """Import/verify legacy ownership once, then reopen durable ownership state."""
+    """Ensure the native ownership store is available."""
     with _OWNERSHIP_LOCK:
         _store()
 
@@ -115,4 +111,4 @@ def delete_owner(conversation_id: str, user_id: Optional[str] = None) -> None:
             return
         if user_id is not None and existing_owner != str(user_id):
             return
-        store.delete(conversation_id)
+        store.delete(conversation_id, user_id)

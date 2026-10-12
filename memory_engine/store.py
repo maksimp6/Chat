@@ -476,6 +476,20 @@ class MemoryStore:
                 return deepcopy(self._pending[name])
             return self._engine.get(self._NAMESPACE, name)
 
+    def items(self, prefix: str = "") -> dict[str, Any]:
+        """Read a detached snapshot of committed and staged named values."""
+        if not isinstance(prefix, str):
+            raise StoreError("prefix must be a string")
+        with self._engine._lock:
+            self._engine._ensure_open()
+            values = self._engine._state.get(self._NAMESPACE, {})
+            names = set(values) | set(self._pending)
+            return {
+                name: deepcopy(self._pending[name] if name in self._pending else values[name])
+                for name in sorted(names)
+                if name.startswith(prefix)
+            }
+
     def set(self, name: str, value: Any) -> None:
         """Stage a copy without acknowledging a durable write."""
         with self._engine._lock:
@@ -503,6 +517,16 @@ class MemoryStore:
             self._pending.clear()
             return self._engine.last_commit.sequence
 
+    def delete(self, name: str) -> None:
+        """Durably delete an existing named value without an empty commit."""
+        _validate_name(name)
+        with self._engine._lock:
+            self._engine._ensure_open()
+            if self._pending or self._engine._active_transaction:
+                raise StoreError("delete requires an idle store")
+            if name in self._engine._state.get(self._NAMESPACE, {}):
+                self._engine.delete(self._NAMESPACE, name)
+
     @contextmanager
     def transaction(self) -> Iterator["Transaction"]:
         """Serialize an atomic read-modify-write operation."""
@@ -514,7 +538,10 @@ class MemoryStore:
                 try:
                     yield wrapper
                     for change in wrapper._pending_changes():
-                        tx.set(change["namespace"], change["key"], change["value"])
+                        if change["op"] == "delete":
+                            tx.delete(change["namespace"], change["key"])
+                        else:
+                            tx.set(change["namespace"], change["key"], change["value"])
                 finally:
                     wrapper._closed = True
 
@@ -549,6 +576,7 @@ class Transaction:
         self._committed = committed
         self._owner = get_ident()
         self._pending: dict[str, Any] = {}
+        self._deleted: set[str] = set()
         self._closed = False
 
     def _ensure_open(self) -> None:
@@ -560,19 +588,35 @@ class Transaction:
     def get(self, name: str) -> Any | None:
         self._ensure_open()
         _validate_name(name)
+        if name in self._deleted:
+            return None
         return deepcopy(self._pending[name] if name in self._pending else self._committed.get(name))
 
     def set(self, name: str, value: Any) -> None:
         self._ensure_open()
         _validate_name(name)
+        self._deleted.discard(name)
         self._pending[name] = deepcopy(value)
+
+    def delete(self, name: str) -> None:
+        """Stage a deletion in the same atomic journal transaction."""
+        self._ensure_open()
+        _validate_name(name)
+        self._pending.pop(name, None)
+        if name in self._committed:
+            self._deleted.add(name)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
-        return [
+        changes = [
             {"op": "set", "namespace": "values", "key": name, "value": value}
-            for name, value in sorted(self._pending.items())
+            for name, value in self._pending.items()
         ]
+        changes.extend(
+            {"op": "delete", "namespace": "values", "key": name}
+            for name in self._deleted
+        )
+        return sorted(changes, key=lambda change: change["key"])
 
 
 class _JournalTransaction:
