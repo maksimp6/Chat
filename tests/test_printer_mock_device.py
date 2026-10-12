@@ -67,6 +67,7 @@ def mock_printer(monkeypatch):
             )
         )
         sockets.append(sock)
+        sock.settimeout(timeout)
         return sock
 
     monkeypatch.setattr("alice_pro.printers.lan_socket.connect_lan", connect)
