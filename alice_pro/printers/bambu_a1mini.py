@@ -38,16 +38,13 @@ def decode_probe(data: bytes) -> dict[str, Any]:
 
 def probe(host: str, timeout: float = 3.0) -> PrinterIdentity:
     """Identify the device. Does not authenticate or alter printer state."""
-    from .lan_address import resolve_lan
-
-    host = resolve_lan(host)
+    from .lan_socket import connect_lan
     if not 0 < timeout <= 15:
         raise ValueError("timeout must be between 0 and 15 seconds")
     request = {"login": {"command": "detect", "sequence_id": "1"}}
     body = json.dumps(request, separators=(",", ":")).encode()
     frame = _FRAME_START + struct.pack("<H", len(body) + 6) + body + _FRAME_END
-    with socket.create_connection((host, 3000), timeout=timeout) as sock:
-        sock.settimeout(timeout)
+    with connect_lan(host, 3000, timeout=timeout) as sock:
         sock.sendall(frame)
         header = _recv_exact(sock, 4)
         if not header.startswith(_FRAME_START):
@@ -63,7 +60,7 @@ def probe(host: str, timeout: float = 3.0) -> PrinterIdentity:
     if not code:
         raise PrinterProtocolError("missing model")
     return PrinterIdentity(
-        host=host,
+        host=sock.getpeername()[0],
         model_code=code,
         model=MODEL_CODES.get(code, "Unknown Bambu Lab model"),
         firmware=str(login.get("version", "")),
