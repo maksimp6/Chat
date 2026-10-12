@@ -58,7 +58,7 @@ class RootOperations(
 
     companion object {
         val PROBE_ARGV = listOf("su", "-c", "id -u")
-        val TREE_ARGV = listOf("su", "-c", "uiautomator dump /dev/tty")
+        val TREE_ARGV = listOf("su", "-c", "uiautomator dump /proc/self/fd/1")
         private const val TREE_END = "</hierarchy>"
         val STATUS_ARGV = listOf(
             "su", "-c",
