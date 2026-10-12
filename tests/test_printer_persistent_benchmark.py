@@ -1,4 +1,5 @@
 """Tests for request-only hardware benchmark statistics and safety gate."""
+
 import pytest
 
 from scripts.benchmark_printer_persistent import percentile, run_hardware
