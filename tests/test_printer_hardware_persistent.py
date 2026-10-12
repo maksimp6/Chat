@@ -16,7 +16,6 @@ from alice_pro.printers.lan_address import private_ipv4
 from alice_pro.printers.persistent_session import PrinterSession
 
 
-@pytest.mark.hardware
 def test_persistent_a1mini_real_network():
     host = os.getenv("ALICE_PRINTER_HARDWARE_IP")
     if not host:
