@@ -15,7 +15,7 @@ import time
 import uuid
 from typing import Any, Mapping, Optional
 
-from agent_memory.runtime_store import get_runtime_memory_db
+from agent_memory.client import get_memory_client
 from agent_memory.user_identity_store import (
     GitHubAccountRecord,
     IdentityState,
@@ -60,15 +60,16 @@ def _sanitize(value: Any) -> Any:
 
 
 def _store() -> UserIdentityStore:
-    return UserIdentityStore(get_runtime_memory_db(memory_file_path()))
+    return UserIdentityStore(get_memory_client(memory_file_path()))
 
 
 def _state() -> tuple[UserIdentityStore, IdentityState]:
     store = _store()
     state = store.load()
     if state is None:
-        state = {"schema": IDENTITY_SCHEMA, "users": {}, "github_accounts": {}}
-        store.save(state)
+        empty: IdentityState = {"schema": IDENTITY_SCHEMA, "users": {}, "github_accounts": {}}
+        store.save(empty)
+        state = empty
     return store, state
 
 

@@ -7,14 +7,14 @@ import pytest
 import conversation_ownership as ownership
 import db
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
-from agent_memory.runtime_store import clear_runtime_memory_db, get_runtime_memory_db
+from agent_memory.client import close_memory_clients, get_memory_client
 
 
 def _configure(monkeypatch, tmp_path):
     path = tmp_path / "alice.memory"
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
-    clear_runtime_memory_db()
+    close_memory_clients()
     return path
 
 
@@ -22,12 +22,12 @@ def test_owner_survives_reopen_without_sql(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
     ownership.init_conversation_ownership_table()
     ownership.set_owner("conversation-a", "user-a")
-    before = get_runtime_memory_db(path).last_commit.sequence
+    before = get_memory_client(path).last_commit.sequence
     ownership.set_owner("conversation-a", "user-a")
-    assert get_runtime_memory_db(path).last_commit.sequence == before
-    clear_runtime_memory_db(path)
+    assert get_memory_client(path).last_commit.sequence == before
+    close_memory_clients(path)
     assert ownership.get_owner("conversation-a") == "user-a"
-    clear_runtime_memory_db(path)
+    close_memory_clients(path)
 
 
 def test_owner_cannot_be_reassigned(monkeypatch, tmp_path):
@@ -41,10 +41,10 @@ def test_owner_cannot_be_reassigned(monkeypatch, tmp_path):
 def test_scoped_delete_and_missing_delete_are_noops(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
     ownership.set_owner("conversation-a", "user-a")
-    before = get_runtime_memory_db(path).last_commit.sequence
+    before = get_memory_client(path).last_commit.sequence
     ownership.delete_owner("missing")
     ownership.delete_owner("conversation-a", "user-b")
-    assert get_runtime_memory_db(path).last_commit.sequence == before
+    assert get_memory_client(path).last_commit.sequence == before
     ownership.delete_owner("conversation-a", "user-a")
     assert ownership.get_owner("conversation-a") is None
 
@@ -53,17 +53,20 @@ def test_ownership_records_are_individual_delta_keys(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
     ownership.set_owner("conversation-a", "user-a")
     ownership.set_owner("conversation-b", "user-b")
-    raw = get_runtime_memory_db(path)
+    raw = get_memory_client(path)
     assert raw.get("conversation_owner:conversation-a")["user_id"] == "user-a"
     assert raw.get("conversation_owner:conversation-b")["user_id"] == "user-b"
     records = ConversationOwnershipStore(raw).records()
     assert set(records) == {"conversation-a", "conversation-b"}
-    assert raw.items(prefix="conversation_owner:")["conversation_owner:conversation-a"] == records["conversation-a"]
+    assert (
+        raw.items(prefix="conversation_owner:")["conversation_owner:conversation-a"]
+        == records["conversation-a"]
+    )
 
 
 def test_invalid_owner_fails_closed(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
-    raw = get_runtime_memory_db(path)
+    raw = get_memory_client(path)
     raw.set("conversation_owner:bad", {"user_id": "", "created_at": "invalid"})
     raw.commit()
     with pytest.raises(ValueError, match="invalid conversation ownership record"):
@@ -87,6 +90,7 @@ def test_runtime_data_root_is_preserved(monkeypatch, tmp_path):
     monkeypatch.delenv("ALICE_MEMORY_PATH", raising=False)
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "fallback" / "alice.db"))
     from runtime.request_context import bind_runtime_request
+
     root = tmp_path / "runtime"
     with bind_runtime_request("runtime-a", "/runtime-a", data_root=str(root)):
         assert db.memory_file_path() == root / "alice.memory"

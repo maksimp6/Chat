@@ -326,11 +326,11 @@ def test_bootstrap_cannot_mint_token_for_promoted_user(temp_db):
 
 
 def test_bootstrap_refuses_rows_that_are_no_longer_anonymous(temp_db):
-    from agent_memory.runtime_store import get_runtime_memory_db
+    from agent_memory.client import get_memory_client
     from agent_memory.user_identity_store import UserIdentityStore
 
     anon = register_anonymous_user("web-installation-0004", {})
-    store = UserIdentityStore(get_runtime_memory_db(db.memory_file_path()))
+    store = UserIdentityStore(get_memory_client(db.memory_file_path()))
     state = store.load()
     assert state is not None
     state["users"][anon["user_id"]]["status"] = "github"

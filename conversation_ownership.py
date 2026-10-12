@@ -11,7 +11,7 @@ import time
 from typing import Optional, TypedDict
 
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
-from agent_memory.runtime_store import get_runtime_memory_db
+from agent_memory.client import get_memory_client
 from db import get_conversations, memory_file_path
 
 _OWNERSHIP_LOCK = RLock()
@@ -40,7 +40,7 @@ def _conversation_rows() -> list[ConversationView]:
 
 
 def _store() -> ConversationOwnershipStore:
-    return ConversationOwnershipStore(get_runtime_memory_db(memory_file_path()))
+    return ConversationOwnershipStore(get_memory_client(memory_file_path()))
 
 
 def init_conversation_ownership_table() -> None:

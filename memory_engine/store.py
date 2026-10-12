@@ -613,8 +613,7 @@ class Transaction:
             for name, value in self._pending.items()
         ]
         changes.extend(
-            {"op": "delete", "namespace": "values", "key": name}
-            for name in self._deleted
+            {"op": "delete", "namespace": "values", "key": name} for name in self._deleted
         )
         return sorted(changes, key=lambda change: change["key"])
 

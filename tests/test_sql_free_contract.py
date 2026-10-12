@@ -18,7 +18,9 @@ RUNTIME = (
     "mcp_storage.py",
     "storage.py",
     "runtime/storage.py",
-    "agent_memory/runtime_store.py",
+    "agent_memory/client.py",
+    "conversation_ownership.py",
+    "user_identity.py",
     "agent_memory/repository.py",
     "agent_shell/store.py",
 )

@@ -40,7 +40,7 @@ class ConversationOwnershipStore:
 
     def records(self) -> dict[str, OwnershipRecord]:
         return {
-            key[len(OWNER_PREFIX):]: self._record(value)
+            key[len(OWNER_PREFIX) :]: self._record(value)
             for key, value in self.db.items(prefix=OWNER_PREFIX).items()
         }
 
