@@ -3,6 +3,7 @@
 The application consumes this adapter rather than reaching into LAN sockets.
 Cloud implementations must be injected explicitly; there is no fallback.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -44,6 +45,7 @@ class LanReader:
 
     def identity(self) -> PrinterIdentity:
         from .lan import probe
+
         return probe(self.host, timeout=self.timeout)
 
     def status(self) -> dict[str, Any]:
