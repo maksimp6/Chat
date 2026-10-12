@@ -2,6 +2,15 @@
 
 В системе Alice Pro используются специализированные AI‑агенты, каждый из которых выполняет чётко определённые функции.
 
+## Два уровня агентов
+
+Слово «агент» в документации означает две разные вещи:
+
+- **Runtime-агенты и адаптеры Alice** — части приложения: backend chat path, CLI-транспорт, голос и UI, выполнение инструментов. Они описаны на этой странице.
+- **Роли разработки в репозитории** — Team Lead, Backend, Frontend, Android, Test, Infra Engineer, Security Reviewer, Docs Engineer, Release Manager и надзорные роли. Они определены в `.github/agents/*.agent.md` и описаны в [Role-based agent office](role-based-agent-office.md).
+
+Роли разработки не входят в runtime Alice, а runtime-адаптеры не являются ролями GitHub office.
+
 ## Типы агентов
 
 ### 1. CLI/Termux‑адаптер (`cli_agent.py`)
