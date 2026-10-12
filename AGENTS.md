@@ -171,8 +171,8 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
 - Keep secrets out of logs, traces, issues, tests, and client-visible errors.
 - Prefer repository-local web UI assets. Do not introduce CDN-hosted UI dependencies without an explicit issue.
 - Android changes must preserve system-bar safety and stable debug/release signing boundaries.
-- PostgreSQL is an optional runtime backend selected only by ALICE_DATABASE_URL; SQLite remains the default local/Termux backend.
-- Database schema changes must keep both SQLite and PostgreSQL paths working.
+- The accepted persistence engine is native `memory_engine.store.MemoryStore` with one writer per journal path. Do not introduce SQL, SQLite, PostgreSQL, SQL migration code, alternative storage engines, or compatibility adapters.
+- Durable data changes must use native MemoryStore transactions and verified backup/restore. Keep SQL-free acceptance tests fail-closed until every runtime SQL consumer has been removed.
 - Preview/runtime modules under `runtime/` must use `RuntimeDispatcher` for shared database, filesystem, network, process, MCP/tool-registry, event, and cross-runtime resource access.
 - A preview runtime must never access another runtime's resources directly. Preserve the caller `runtime_id` and fail cross-runtime access with `RuntimeScopeViolation`.
 - Python threads are execution units, not isolation boundaries. Do not use process-global mutable runtime state as a substitute for `RuntimeContext` or dispatcher-owned scoped resources.
