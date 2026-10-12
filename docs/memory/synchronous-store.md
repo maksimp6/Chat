@@ -1,0 +1,130 @@
+# Synchronous Memory DB: functional core and Alice task adapter
+
+The accepted owner contracts are [#1045](https://github.com/maksimp6/Chat/issues/1045)
+and [#1046](https://github.com/maksimp6/Chat/issues/1046), within
+[#776](https://github.com/maksimp6/Chat/issues/776). This focused implementation
+contains one library copy, relevant tests, and an Alice consumer. Packaging,
+PyPI, transport schemas, mirroring and build-performance work stay separate.
+
+## Public contract
+
+`Store[ValueT]` has one name/value API: `get(name)`, `set(name, value)`, and
+`commit() -> int`. `MemoryStore` implements it. Names are nonempty strings;
+missing names return `None`. JSON `null` is therefore indistinguishable from
+missing through this API. Values are finite JSON scalars, lists and string-keyed
+dictionaries. Tuples, non-string dictionary keys, nonfinite floats and arbitrary
+objects fail commit validation before any journal write.
+
+`set()` copies into client-owned staging and `get()` reads that staging before
+committed data. `commit()` validates all staged values and appends one durable
+record before publishing committed RAM state. An empty commit returns the current
+sequence. `close()` discards staging. Reads and input values are copy-safe.
+Staging belongs to the client instance, not individual threads; concurrent
+read-modify-write consumers must use `transaction()`.
+
+```python
+from memory_engine import MemoryStore
+
+with MemoryStore("alice.memory") as store:
+    store.set("settings/theme", "gray")
+    assert store.commit() == 1
+    with store.transaction() as tx:
+        tx.set("settings/theme", "dark")
+        tx.set("settings/language", "ru")
+    assert store.get("settings/theme") == "dark"
+```
+
+A successful transaction context exit commits all changes once. Exceptions
+roll back its private overlay. Nested transactions, direct mutations during a
+transaction, cross-thread transaction handles and escaped closed handles fail.
+A transaction requires no outstanding client staging. The public interface has
+no namespace argument, automatic `set()` commit, or per-value version.
+
+## Durability and recovery
+
+The internal journal uses version-1 JSON frames with ordered sequences and chained
+SHA-256 digests. Its namespace representation is a private format detail, not an
+application API. Append and `fsync` precede acknowledgement; creation also fsyncs
+the parent directory. A stable POSIX lock file protects one writer process, while
+an in-process lock serializes commits and committed reads. Forked handles cannot
+write or release their parent's writer lock. Supported platforms need POSIX
+`fcntl` and a filesystem supporting file/directory fsync and atomic publication.
+
+Startup verifies frames in order, reading one line at a time. Unknown formats,
+malformed sequences, checksum failures and partial tails fail closed without
+modifying the source. Replay is idempotent. Replay time grows with the records
+appended since the last checkpoint. SHA chaining
+detects corruption, not an attacker able to rewrite the complete chain.
+
+`checkpoint()` requires no staged values or active transaction. Under the writer
+lock it verifies the source journal against confirmed RAM state, sequence and
+digest, then writes and verifies a snapshot, fsyncs it, atomically replaces the
+journal, and fsyncs the parent directory. The sequence stays unchanged; the digest
+becomes the new snapshot-chain baseline. Corrupt, missing or changed source data
+is preserved without replacement and blocks writes pending recovery. I/O errors
+or caller cancellation once publication starts also block further writes until
+verified reopen. An exception is not proof that replacement did not occur.
+
+The complete snapshot frame is capped at 1 MiB. An oversized snapshot is rejected
+without changing the valid journal or blocking ordinary commits. Checkpointing is
+explicit, with no background timer or automatic recovery-time guarantee; large
+states and a growing uncheckpointed journal still need future work. Compaction
+also verifies the complete current source, so its work grows with journal length.
+
+An append/fsync failure never acknowledges or publishes the staged transaction.
+The disk outcome can be uncertain, so subsequent mutations fail with recovery
+required. Reopen verifies disk evidence; an unacknowledged complete frame may
+survive. No automatic retry, rollback of journal bytes, or silent truncation is
+performed. Callers must not treat an exception as proof that a write is absent.
+
+`backup()` verifies a consistent committed journal copy before publishing to a
+new destination. It excludes staging and refuses overwrite, including destination
+creation races. `restore()` validates before atomically publishing to an empty,
+idle target; staging and existing committed data prevent restore. An exception
+can occur after either a backup or restored store has already been published.
+A restore publication error or caller cancellation blocks subsequent writes until
+verified reopen; callers must not continue with the old empty RAM state. Backup targets
+must be private to their owner. This is local backup evidence, not remote storage
+replication. Historical SQL backups are untouched.
+
+## Alice integration
+
+`agent_memory.client` owns the application writer registry and explicit shutdown.
+Canonical path aliases share one `MemoryStore`; the library has no Alice imports
+or global database owner. Stop consumers before `close_memory_clients()`.
+
+`agent_shell.TaskStore` uses a typed, versioned task aggregate through this adapter.
+Task IDs, state and events commit together. FIFO claims are serialized; external
+handlers run after the claim commits and outside the storage lock. Running tasks
+found after restart fail as interrupted instead of automatically rerunning.
+Multiple task repositories in one process share the writer. Another process is
+refused rather than allowed to independently claim tasks.
+
+For a new file-native task store:
+
+```sh
+python -m agent_shell --db ./shell.memory add --role docs-engineer --title Example --kind echo
+python -m agent_shell --db ./shell.memory list
+```
+
+The existing CLI default path/environment selector is preserved to avoid silently
+switching users with existing data to an empty database. Existing SQLite files
+are rejected and preserved; automatic legacy task import is not implemented.
+Use an explicit new path for isolated acceptance. Live legacy cutover needs a
+verified import before rollout; this change does not authorize deployment.
+
+## Verification and remaining scope
+
+Independent core tests run with only pytest and the standard library, outside
+Alice's conftest and requirements. Strict mypy checks the library. Regression
+coverage includes fresh-process reopen, SIGKILL before append/after fsync/after
+ACK, failed fsync without publication, invalid values, corruption, transactions,
+writer ownership, backup and isolated restore. Alice tests cover task behavior,
+concurrent runners, failed durable claim, and fresh-process interrupted-task
+recovery. The dedicated Memory DB workflow runs core verification independently.
+
+Full #776 acceptance is still incomplete: SQL-backed chat, sessions, context and
+other consumers remain, as do legacy import, large-state checkpoints, health and Trace work.
+Passing core/task tests does not establish a SQL-free application or production
+readiness. The aggregate draft #1042 contains unrelated work and must not be
+merged wholesale.
