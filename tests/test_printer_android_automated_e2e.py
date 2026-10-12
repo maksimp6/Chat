@@ -4,6 +4,7 @@ Exercises the Python IPC boundary, validates the Kotlin contract's safety
 invariants, and fails if Android exposes a printer WebView/HTTP entry point.
 A separate instrumented test is still required for a real Android Network.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -83,10 +84,10 @@ def test_ipc_not_exposed_to_webview_or_exported_service():
     main = MAIN.read_text()
     manifest = MANIFEST.read_text()
     assert 'getModule("printer_native_bridge")' in main
-    assert "callAttr(\"install_context\", applicationContext)" in main
+    assert 'callAttr("install_context", applicationContext)' in main
     assert "@JavascriptInterface\n        fun discoverPrinter" not in main
     assert "printer_native_bridge" not in manifest
-    assert "android:exported=\"true\"" not in manifest.split("<provider")[1]
+    assert 'android:exported="true"' not in manifest.split("<provider")[1]
 
 
 def test_native_discovery_is_read_only():
