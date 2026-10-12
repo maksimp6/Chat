@@ -70,6 +70,26 @@ def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, A
     return validated
 
 
+def _validate_checkpoint(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Validate the complete checkpoint before publishing recovered state."""
+    if payload["seq"] < 1 or payload["changes"] != []:
+        raise ValueError("invalid checkpoint baseline")
+    snapshot = payload.get("state")
+    if not isinstance(snapshot, dict):
+        raise ValueError("invalid checkpoint state")
+    checked: dict[str, dict[str, Any]] = {}
+    for namespace, values in snapshot.items():
+        if not isinstance(namespace, str) or not isinstance(values, dict):
+            raise ValueError("invalid checkpoint namespace")
+        checked[namespace] = {}
+        for key, value in values.items():
+            if not isinstance(key, str):
+                raise ValueError("invalid checkpoint key")
+            _validate_value(value)
+            checked[namespace][key] = value
+    return checked
+
+
 class Store(Protocol[ValueT]):
     """Copy-safe name/value staging with an explicit durable commit."""
 
@@ -215,24 +235,9 @@ class _JournalStore:
             # A checkpoint is the first and only baseline frame after compaction.
             # Keep the original sequence monotonic across compactions.
             if payload.get("checkpoint") is True:
-                if sequence != 0 or state or payload["seq"] < 1:
+                if sequence != 0 or state:
                     raise ValueError("checkpoint must be first")
-                if payload.get("changes") != []:
-                    raise ValueError("checkpoint must not contain changes")
-                snapshot = payload.get("state")
-                if not isinstance(snapshot, dict):
-                    raise ValueError("invalid checkpoint state")
-                checked: dict[str, dict[str, Any]] = {}
-                for namespace, values in snapshot.items():
-                    if not isinstance(namespace, str) or not isinstance(values, dict):
-                        raise ValueError("invalid checkpoint namespace")
-                    checked[namespace] = {}
-                    for key, value in values.items():
-                        if not isinstance(key, str):
-                            raise ValueError("invalid checkpoint key")
-                        _validate_value(value)
-                        checked[namespace][key] = value
-                return checked, payload["seq"], next_digest
+                return _validate_checkpoint(payload), payload["seq"], next_digest
             # Validate the entire frame before mutating caller-owned state.
             # A malformed later operation must not publish earlier changes.
             validated = _validate_journal_changes(payload["changes"])
@@ -427,23 +432,33 @@ class _JournalStore:
                 "state": deepcopy(self._state),
             }
             encoded = json.dumps(
-                payload, sort_keys=True, separators=(",", ":"),
-                ensure_ascii=False, allow_nan=False,
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
             ).encode("utf-8")
             digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
-            frame = json.dumps(
-                {"payload": payload, "digest": digest},
-                sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                allow_nan=False,
-            ).encode("utf-8") + b"\n"
+            frame = (
+                json.dumps(
+                    {"payload": payload, "digest": digest},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ).encode("utf-8")
+                + b"\n"
+            )
             if len(frame) > MAX_JOURNAL_FRAME_BYTES:
                 raise StoreError("checkpoint exceeds frame size limit")
-            fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
-            temporary = Path(temp_name)
+            temporary: Path | None = None
             replaced = False
             try:
+                fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
+                temporary = Path(temp_name)
                 with os.fdopen(fd, "wb") as stream:
-                    stream.write(frame)
+                    if stream.write(frame) != len(frame):
+                        raise OSError("short checkpoint write")
                     stream.flush()
                     os.fsync(stream.fileno())
                 state, seq, verified_digest = self._inspect_log(temporary)
@@ -463,7 +478,7 @@ class _JournalStore:
                 self._failed = True
                 raise StoreError("checkpoint failed; recovery required") from exc
             finally:
-                if not replaced:
+                if temporary is not None and not replaced:
                     temporary.unlink(missing_ok=True)
 
     def backup(self, destination: str | Path) -> None:
