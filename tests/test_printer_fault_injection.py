@@ -3,6 +3,7 @@
 Only the OS DNS, route-table read and TCP socket are mocked. The resolver,
 validation, pinning and protocol parser execute without substitution.
 """
+
 import json
 import socket
 import struct
