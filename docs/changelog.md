@@ -5,6 +5,12 @@
 Для общего понимания структуры проекта и его компонентов ознакомьтесь с [README](README.md) и [архитектурой системы](architecture/overview.md).
 
 
+## 2026-10-10 — Cloud.ru acceptance deploy и persistent RDC
+
+- `cloudru-deploy.yml` `deploy` стал ограниченным платным acceptance-прогоном: бюджет 5 RUB / 900 с, job до 15 минут, idle timeout 60 с, cleanup под `always()` удаляет созданный сервис или восстанавливает прежний; `ALICE_DATABASE_URL` больше не передаётся ([#1002](https://github.com/maksimp6/Chat/pull/1002)).
+- Persistent RDC: профиль 0.2 vCPU / 512Mi, `install` принимает готовый digest образа и не собирает его, Git-ключ доставляется только через `POST /rdc/secrets` ([#1016](https://github.com/maksimp6/Chat/pull/1016), [#1017](https://github.com/maksimp6/Chat/pull/1017)).
+- Валидация RDC в PR больше не собирает образ ([#1015](https://github.com/maksimp6/Chat/pull/1015)); SSH-деплой RDC удалён ранее ([#861](https://github.com/maksimp6/Chat/pull/861)).
+
 ## 2026-10-06 — Memory DB Wave 1, Alice Dev worker, и ChatGPT OAuth
 
 ### Memory DB Wave 1: файловый бэкенд для conversation и user identity
