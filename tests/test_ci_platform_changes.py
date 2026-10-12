@@ -180,6 +180,4 @@ def test_incomplete_web_plan_cannot_hide_dependencies():
     plan = routing.classify(["static/app.js"])
     plan["mcp"] = False
     with pytest.raises(ValueError, match="web dependency plan"):
-        routing.validate_results(
-            plan, results(backend="success", android="success")
-        )
+        routing.validate_results(plan, results(backend="success", android="success"))
