@@ -40,32 +40,15 @@ def consume_print_report(
     return record_bambu_print_report(owner_id, printer_id, decoded, timestamp)
 
 
-def read_live_status(
+def _install_callbacks(
+    client: Any,
     owner_id: str,
     serial: str,
-    access_code: str,
-    *,
-    host: str,
-    timeout: float = 20,
-    clock: Callable[[], float] = time.time,
-) -> dict[str, Any]:
-    """Wait for one unsolicited report. Never publish commands or credentials.
-
-    Bambu LAN firmware uses a device-local self-signed TLS certificate.
-    The connection is LAN-scoped, but certificate identity cannot be verified
-    without a separately pinned trust anchor.
-    """
-    if not access_code or not host or timeout <= 0 or timeout > 120:
-        raise ValueError("missing printer credentials or invalid timeout")
-    topic = printer_report_topic(serial)
-    mqtt = importlib.import_module("paho.mqtt.client")
-    received: list[dict[str, Any]] = []
-    failures: list[str] = []
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
-    client.username_pw_set("bblp", access_code)
-    client.tls_set(cert_reqs=ssl.CERT_NONE)
-    client.tls_insecure_set(True)
-
+    topic: str,
+    clock: Callable[[], float],
+    received: list[dict[str, Any]],
+    failures: list[str],
+) -> None:
     def on_connect(client: Any, _userdata: Any, _flags: Any, reason: Any, _props: Any) -> None:
         if reason.is_failure:
             failures.append("MQTT authentication failed")
@@ -88,6 +71,40 @@ def read_live_status(
     client.on_connect = on_connect
     client.on_subscribe = on_subscribe
     client.on_message = on_message
+
+
+def read_live_status(
+    owner_id: str,
+    serial: str,
+    access_code: str,
+    *,
+    host: str,
+    timeout: float = 20,
+    clock: Callable[[], float] = time.time,
+    trusted_cert_pem: str,
+) -> dict[str, Any]:
+    """Wait for one unsolicited report. Never publish commands or credentials.
+
+    Bambu LAN firmware uses a device-local self-signed TLS certificate.
+    The connection is LAN-scoped, but certificate identity cannot be verified
+    without a separately pinned trust anchor.
+    """
+    if not access_code or not host or timeout <= 0 or timeout > 120:
+        raise ValueError("missing printer credentials or invalid timeout")
+    topic = printer_report_topic(serial)
+    mqtt = importlib.import_module("paho.mqtt.client")
+    received: list[dict[str, Any]] = []
+    failures: list[str] = []
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
+    client.username_pw_set("bblp", access_code)
+    if not trusted_cert_pem or "BEGIN CERTIFICATE" not in trusted_cert_pem:
+        raise ValueError("trusted printer certificate required")
+    context = ssl.create_default_context()
+    context.check_hostname = False  # Fixed LAN IP; identity bound to configured cert.
+    context.load_verify_locations(cadata=trusted_cert_pem)
+    client.tls_set_context(context)
+
+    _install_callbacks(client, owner_id, serial, topic, clock, received, failures)
     client.connect(host, port=8883, keepalive=15)
     client.loop_start()
     try:
