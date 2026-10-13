@@ -2,7 +2,8 @@
 
 Issues [#1072](https://github.com/maksimp6/Chat/issues/1072) and
 [#1084](https://github.com/maksimp6/Chat/issues/1084) own this workflow.
-Feature PRs can target `develop`; promotion is a separate PR from `develop` to
+Feature PRs target `develop` by default; stacked slices record their parent and
+direct master hotfixes require an explicit task exception. Promotion is a separate PR from `develop` to
 protected `master`. Open a promotion PR only when the branches have an actual diff.
 
 ## Workflow inventory
@@ -55,8 +56,11 @@ The owner's #1084 contract records ruleset `develop integration` (#24841115) as
 Disabled: PR required, conversations resolved, no bypass, no deletion/force push,
 and `CI required`; strict base freshness is disabled for stacked PRs. This change
 does not modify or enable any ruleset. Master protection remains unchanged.
-Live settings must be inspected before proposing enforcement changes, and enabling
-the develop ruleset requires its separate owner acceptance.
+Live settings must be inspected before proposing enforcement changes. The current
+owner request to reconcile branch rules authorizes preparing the settings proposal
+in [branch-policy-alignment.md](branch-policy-alignment.md); applying it still needs
+an authorized administration capability and live verification. This documentation
+change is not evidence that develop enforcement has been enabled.
 
 The regression tests in `tests/test_ci_develop_workflows.py` prove workflow
 eligibility for master, develop and stack parents and the always-run aggregate.
