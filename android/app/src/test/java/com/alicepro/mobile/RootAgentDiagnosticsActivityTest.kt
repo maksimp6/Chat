@@ -10,6 +10,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.ScrollView
 import androidx.appcompat.app.AlertDialog
 import com.alicepro.mobile.rootagent.RootAgentClient
 import java.io.ByteArrayOutputStream
@@ -25,6 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
@@ -37,6 +39,61 @@ import org.robolectric.shadows.ShadowDialog
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RootAgentDiagnosticsActivityTest {
     private val controllers = mutableListOf<ActivityController<RootAgentDiagnosticsActivity>>()
+
+    @Test
+    @Config(qualifiers = "w320dp-h640dp")
+    fun narrowScreenWithDoubleFontKeepsEveryButtonLabelUnclipped() {
+        RuntimeEnvironment.setFontScale(2f)
+        val activity = panel { error("Layout must not make a request") }.get()
+        layout(activity, 320, 640)
+        val buttons = views(activity.window.decorView).filterIsInstance<Button>()
+        assertEquals(13, buttons.size)
+        for (button in buttons) {
+            assertTrue(button.text.toString(), button.height >= (48 * activity.resources.displayMetrics.density).toInt())
+            assertNotNull(button.layout)
+            assertTrue(button.text.toString(), button.height - button.compoundPaddingTop - button.compoundPaddingBottom >= button.layout.height)
+        }
+        assertTrue(button(activity, "Копировать отчёт без содержимого экрана").layout.lineCount > 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h320dp-land")
+    fun shortLandscapeWithLargeFontKeepsNavigationInsideScrollableContent() {
+        RuntimeEnvironment.setFontScale(2f)
+        val activity = panel { error("Layout must not make a request") }.get()
+        layout(activity, 640, 320)
+        val scroll = views(activity.window.decorView).filterIsInstance<ScrollView>().single()
+        assertTrue(scroll.height > 0)
+        assertTrue(scroll.getChildAt(0).height > scroll.height)
+        var parent: android.view.ViewParent? = button(activity, "Назад к диагностике").parent
+        while (parent != null && parent !== scroll) parent = parent.parent
+        assertSame(scroll, parent)
+    }
+
+    @Test
+    fun completingRequestShowsUsefulResultAtTopWithoutManualSearch() {
+        val connection = Connection("{\"status\":\"ok\"}")
+        val activity = panel { RootAgentClient(8766, connectionFactory = { connection }) { "synthetic-token" } }.get()
+        layout(activity, 320, 640)
+        button(activity, "Проверить связь").performClick()
+        await { text(activity).contains("API отвечает") }
+        val summary = views(activity.window.decorView).filterIsInstance<TextView>().first {
+            it.accessibilityLiveRegion == View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        assertTrue(summary.text.toString().contains("API отвечает"))
+        assertTrue(summary.top < button(activity, "Запустить сервис").top)
+        assertFalse(summary.text.toString().contains("synthetic-token"))
+    }
+
+    private fun layout(activity: RootAgentDiagnosticsActivity, widthDp: Int, heightDp: Int) {
+        val density = activity.resources.displayMetrics.density
+        val width = (widthDp * density).toInt()
+        val height = (heightDp * density).toInt()
+        val decor = activity.window.decorView
+        decor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        decor.layout(0, 0, width, height)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+    }
 
     private class Connection(private val body: String, private val blocked: Boolean = false, private val code: Int = 200) : HttpURLConnection(URL("http://127.0.0.1/")) {
         val reading = CountDownLatch(1)
@@ -99,7 +156,7 @@ class RootAgentDiagnosticsActivityTest {
             requests.incrementAndGet()
             error("Opening panel must not create a client")
         }.get()
-        button(activity, "Разблокировка: почему недоступна").performClick()
+        button(activity, "Почему разблокировка недоступна").performClick()
         assertEquals(0, requests.get())
         val dialog = ShadowDialog.getLatestDialog() as AlertDialog
         assertTrue(dialog.isShowing)
@@ -115,7 +172,7 @@ class RootAgentDiagnosticsActivityTest {
         val connection = Connection("{\"format\":\"png\",\"png_base64\":\"$encoded\"}")
         val controller = panel { RootAgentClient(8766, connectionFactory = { connection }) { "synthetic-token" } }
         val activity = controller.get()
-        button(activity, "Получить и показать PNG").performClick()
+        button(activity, "Сделать снимок экрана").performClick()
         await { text(activity).contains("PNG декодирован") }
         val dialog = ShadowDialog.getLatestDialog() as AlertDialog
         assertTrue(dialog.isShowing)
@@ -127,7 +184,7 @@ class RootAgentDiagnosticsActivityTest {
         val report = clipboard.primaryClip!!.getItemAt(0).text.toString()
         assertFalse(report.contains(encoded))
         assertFalse(report.contains("synthetic-token"))
-        button(activity, "Получить и показать PNG").performClick()
+        button(activity, "Сделать снимок экрана").performClick()
         await { (ShadowDialog.getLatestDialog() as AlertDialog).isShowing }
         val reopened = ShadowDialog.getLatestDialog() as AlertDialog
         controller.pause().stop().destroy()
@@ -146,7 +203,7 @@ class RootAgentDiagnosticsActivityTest {
         val next = Connection("{\"status\":\"ok\"}")
         val second = panel { RootAgentClient(8766, connectionFactory = { next }) { "synthetic-token" } }
         // Cancellation must release global ownership before a replacement request can execute.
-        button(second.get(), "Проверить health").performClick()
+        button(second.get(), "Проверить связь").performClick()
         await { text(second.get()).contains("API отвечает") }
         assertFalse(text(second.get()).contains("Предыдущая проверка ещё завершается"))
     }
@@ -155,7 +212,7 @@ class RootAgentDiagnosticsActivityTest {
     fun invalidPngDoesNotProducePreviewOrSuccessfulResult() {
         val connection = Connection("{\"format\":\"png\",\"png_base64\":\"AAAA\"}")
         val activity = panel { RootAgentClient(8766, connectionFactory = { connection }) { "synthetic-token" } }.get()
-        button(activity, "Получить и показать PNG").performClick()
+        button(activity, "Сделать снимок экрана").performClick()
         await { text(activity).contains("Данные не подтверждены") }
         assertFalse(text(activity).contains("PNG декодирован"))
     }

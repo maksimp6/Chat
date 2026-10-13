@@ -40,6 +40,7 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var progress: ProgressBar
     private lateinit var output: TextView
+    private lateinit var scroll: ScrollView
     private var busy = false
     private var visible = false
     private var preview: AlertDialog? = null
@@ -49,8 +50,11 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         SystemInsets.applySafePadding(root, baseLeft = dp(16), baseTop = dp(12), baseRight = dp(16), baseBottom = dp(12))
-        root.addView(TextView(this).apply { text = "RootAgent"; textSize = 26f })
-        root.addView(TextView(this).apply {
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        scroll = ScrollView(this).apply { isFillViewport = true; addView(content) }
+        root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
+        content.addView(TextView(this).apply { text = "RootAgent"; textSize = 26f })
+        content.addView(TextView(this).apply {
             text = "Диагностика устройства · локальный API\nПроверки запускаются только по нажатию."
             textSize = 14f
             setPadding(0, dp(8), 0, dp(12))
@@ -59,14 +63,12 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
             text = "Ещё не проверено"
             accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
-        root.addView(status)
+        content.addView(status)
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = true
             visibility = android.view.View.GONE
         }
-        root.addView(progress, LinearLayout.LayoutParams(-1, dp(4)))
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        content.addView(progress, LinearLayout.LayoutParams(-1, dp(4)))
         section(content, "Сервис")
         action(content, "Запустить сервис") {
             perform("Сервис") {
@@ -93,7 +95,7 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
                 }.show()
         }
         section(content, "Проверки")
-        action(content, "Проверить API и root") {
+        action(content, "Проверить связь и root") {
             perform("API и root") {
                 val client = client()
                 val health = describe(Endpoint.HEALTH, client.request(Endpoint.HEALTH))
@@ -101,8 +103,8 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
                 UiResult("API: ${health.text}\nRoot: ${root.text}")
             }
         }
-        queryButton(content, "Проверить health", Endpoint.HEALTH)
-        queryButton(content, "Проверить root", Endpoint.ROOT)
+        queryButton(content, "Проверить связь", Endpoint.HEALTH)
+        queryButton(content, "Проверить root-доступ", Endpoint.ROOT)
         queryButton(content, "Состояние блокировки", Endpoint.STATUS)
         queryButton(content, "Информация об устройстве", Endpoint.DEVICE)
         section(content, "Экран · по запросу")
@@ -110,9 +112,9 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
             text = "При блокировке ожидается HTTP 423. XML и изображение не попадают в журнал или копируемый отчёт."
             textSize = 14f
         })
-        queryButton(content, "Получить и проверить XML", Endpoint.TREE)
-        queryButton(content, "Получить и показать PNG", Endpoint.CAPTURE)
-        action(content, "Разблокировка: почему недоступна") {
+        queryButton(content, "Проверить дерево интерфейса", Endpoint.TREE)
+        queryButton(content, "Сделать снимок экрана", Endpoint.CAPTURE)
+        action(content, "Почему разблокировка недоступна") {
             AlertDialog.Builder(this).setTitle("Разблокировка не реализована")
                 .setMessage("В этой версии нет unlock endpoint и связи RootAgent с C-драйвером. Разрешение root само по себе не разблокирует экран.")
                 .setPositiveButton("Понятно", null).show()
@@ -131,7 +133,13 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
             output.text = "Результатов пока нет"
             status.text = "Результаты очищены"
         }
-        root.addView(Button(this).apply { text = "Назад к диагностике"; setOnClickListener { finish() } })
+        content.addView(Button(this).apply {
+            text = "Назад к диагностике"
+            isAllCaps = false
+            minHeight = dp(48)
+            setSingleLine(false)
+            setOnClickListener { finish() }
+        })
         setContentView(root)
     }
 
@@ -151,6 +159,8 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
             text = label
             isAllCaps = false
             minHeight = dp(48)
+            setSingleLine(false)
+            maxLines = Int.MAX_VALUE
             setOnClickListener { if (!busy) run() }
         }
         controls.add(button)
@@ -201,9 +211,10 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
                 busy = false
                 controls.forEach { it.isEnabled = true }
                 progress.visibility = android.view.View.GONE
-                status.text = "$label · завершено"
+                status.text = "$label\n${result.text}"
                 results[label] = "${DateFormat.getTimeInstance().format(Date())}\n${result.text}"
                 output.text = results.entries.joinToString("\n\n") { "${it.key}\n${it.value}" }
+                scroll.post { if (!current.cancelled.get()) scroll.smoothScrollTo(0, 0) }
                 result.image?.let { if (visible) showImage(it) else it.recycle() }
             }
         }
