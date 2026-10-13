@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from PIL import Image, UnidentifiedImageError
 
-SCRIPT = Path(__file__).with_name("analyze_images.py")
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "analyze_images.py"
 spec = importlib.util.spec_from_file_location("analyze_images", SCRIPT)
 module = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
