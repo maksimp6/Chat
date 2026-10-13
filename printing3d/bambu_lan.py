@@ -92,13 +92,13 @@ def read_live_status(
     if not access_code or not host or timeout <= 0 or timeout > 120:
         raise ValueError("missing printer credentials or invalid timeout")
     topic = printer_report_topic(serial)
-    mqtt = importlib.import_module("paho.mqtt.client")
     received: list[dict[str, Any]] = []
     failures: list[str] = []
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
-    client.username_pw_set("bblp", access_code)
     if not trusted_cert_pem or "BEGIN CERTIFICATE" not in trusted_cert_pem:
         raise ValueError("trusted printer certificate required")
+    mqtt = importlib.import_module("paho.mqtt.client")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
+    client.username_pw_set("bblp", access_code)
     context = ssl.create_default_context()
     context.check_hostname = False  # Fixed LAN IP; identity bound to configured cert.
     context.load_verify_locations(cadata=trusted_cert_pem)
