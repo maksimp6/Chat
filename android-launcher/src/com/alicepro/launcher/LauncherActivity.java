@@ -40,10 +40,10 @@ public class LauncherActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_launcher);
-        clock = findViewById(R.id.clock);
+        clock = (TextView) findViewById(R.id.clock);
 
         apps = loadApps();
-        GridView grid = findViewById(R.id.apps);
+        GridView grid = (GridView) findViewById(R.id.apps);
         grid.setAdapter(new AppAdapter());
         grid.setOnItemClickListener((parent, view, position, id) -> {
             Intent launch = getPackageManager()
