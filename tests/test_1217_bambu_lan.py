@@ -1,4 +1,5 @@
 """Safety and status-report tests for LAN MQTT integration."""
+
 import json
 
 import pytest
@@ -27,12 +28,17 @@ def test_reject_wrong_topic_and_oversize_without_persistence(monkeypatch):
 
 def test_authenticated_report_forwards_to_canonical_store(monkeypatch):
     observed = []
+
     def persist(*args):
         observed.append(args)
         return True
+
     monkeypatch.setattr(bambu_lan, "record_bambu_print_report", persist)
     assert bambu_lan.consume_print_report(
-        "owner", "ABC", "device/ABC/report",
-        json.dumps({"print": {"gcode_state": "IDLE"}}).encode(), 12
+        "owner",
+        "ABC",
+        "device/ABC/report",
+        json.dumps({"print": {"gcode_state": "IDLE"}}).encode(),
+        12
     )
     assert observed == [("owner", "ABC", {"print": {"gcode_state": "IDLE"}}, 12)]
