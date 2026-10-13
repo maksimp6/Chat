@@ -38,6 +38,7 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "printing3d/bambu_requests.py",
     "budget_repository.py",
     "db.py",
     "mcp_storage.py",
