@@ -193,6 +193,8 @@ def test_fake_mqtt_full_connection_lifecycle(monkeypatch, scenario, expected):
         trusted_cert_pem="trusted",
     )
     assert result["received"] is expected
+    if scenario == "ok":
+        assert result["state"] == "idle"
     assert clients[0].calls[-2:] == ["stopped", "disconnected"]
     if scenario == "ok":
         assert "pushall" in clients[0].calls
@@ -257,3 +259,38 @@ def test_non_print_reports_never_reach_memory(payload, monkeypatch):
     with pytest.raises(ValueError, match="invalid printer report"):
         bambu_lan.consume_print_report("owner", "ABC", "device/ABC/report", payload, 1)
     assert not seen
+
+
+def test_failed_tls_connect_always_closes_socket_without_loop(monkeypatch):
+    events = []
+
+    class FakeClient:
+        on_socket_open = None
+        def __init__(self, *a, **kw):
+            pass
+        def tls_set_context(self, ctx):
+            pass
+        def username_pw_set(self, *a):
+            pass
+        def connect(self, host, port, keepalive):
+            raise ssl.SSLError("peer certificate mismatch")
+        def loop_start(self):
+            events.append("unexpected-start")
+        def loop_stop(self):
+            events.append("unexpected-stop")
+        def disconnect(self):
+            events.append("disconnect")
+
+    fake = SimpleNamespace(
+        Client=FakeClient,
+        CallbackAPIVersion=SimpleNamespace(VERSION2=2),
+        MQTTv311=4,
+    )
+    monkeypatch.setattr(bambu_lan.importlib, "import_module", lambda name: fake)
+    monkeypatch.setattr(bambu_lan, "_certificate_fingerprint", lambda pem: b"pin")
+    with pytest.raises(ssl.SSLError):
+        bambu_lan.read_live_status(
+            "owner", "ABC", "12345678", host="192.168.31.12",
+            trusted_cert_pem="test-only",
+        )
+    assert events == ["disconnect"]
