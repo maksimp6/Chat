@@ -3,6 +3,7 @@
 The snapshot is a JSON-safe value suitable for the canonical MemoryStore.
 A sample records an observed transition, not proof of status between disconnects.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -44,7 +45,9 @@ class DowntimeTracker:
         self._ids: dict[str, Observation] = {}
 
     @staticmethod
-    def _validate_input(state: str, timestamp: float, reason: str | None, event_id: str | None) -> None:
+    def _validate_input(
+        state: str, timestamp: float, reason: str | None, event_id: str | None
+    ) -> None:
         if state not in _STATES:
             raise ValueError("Invalid printer state")
         if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
