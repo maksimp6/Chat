@@ -1,4 +1,5 @@
 """Bambu status ingress and telemetry timeout regression contracts."""
+
 from datetime import datetime, timezone
 
 import pytest
