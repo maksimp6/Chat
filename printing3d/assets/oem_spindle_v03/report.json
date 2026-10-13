@@ -1,0 +1,180 @@
+{
+  "name": "Alice Pro A1 mini stock holder wide hub conversion v0.3",
+  "scope": "Temporary replacement of NARROW CONTACT SHAFT; OEM bracket and spindle retained",
+  "material": "PETG",
+  "extruder_nozzle_mm": 0.4,
+  "unit": "mm",
+  "fit_status": "UNVERIFIED - dimensional inputs must be measured on physical OEM holder and spool",
+  "geometry_nominal": {
+    "spool_bore_nominal_mm": 52.5,
+    "stock_spindle_od_nominal_mm": 22.0,
+    "outer_bearing_diameter_mm": 51.7,
+    "inner_shaft_clearance_diameter_mm": 22.8,
+    "stock_tip_clearance_diameter_mm": 32.6,
+    "total_length_mm": 82.0,
+    "usable_width_between_retainer_faces_mm": 71.0
+  },
+  "files": {
+    "a1mini_oem_wide_hub_HALF_A.stl": {
+      "name": "a1mini_oem_wide_hub_HALF_A.stl",
+      "sha256": "617e40eb88b46712f1a91cde02d8545c9709945a77b83863cf757289d399058b",
+      "dimensions_mm": [
+        82.0,
+        60.0,
+        29.25
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 2524,
+      "volume_cm3": 65.68,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 83.41
+    },
+    "a1mini_oem_wide_hub_HALF_B.stl": {
+      "name": "a1mini_oem_wide_hub_HALF_B.stl",
+      "sha256": "f69cec6a98cde018afbd5c53399d4b76744d5c367f048472de44f2727d24f6f1",
+      "dimensions_mm": [
+        82.0,
+        60.0,
+        29.25
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 2524,
+      "volume_cm3": 65.68,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 83.41
+    },
+    "a1mini_oem_wide_hub_END_RETAINER.stl": {
+      "name": "a1mini_oem_wide_hub_END_RETAINER.stl",
+      "sha256": "af1cf4643f9c9277642b5c7357cb64db53db772bc13ee1220733b5aae10e3888",
+      "dimensions_mm": [
+        59.09,
+        60.0,
+        3.95
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 668,
+      "volume_cm3": 3.13,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 3.98
+    },
+    "alignment_pin_PRINT_4.stl": {
+      "name": "alignment_pin_PRINT_4.stl",
+      "sha256": "449ec86150e60facbd28e57c61f678989e1fbfc1ad22c886620e31fcb384650e",
+      "dimensions_mm": [
+        3.6,
+        3.6,
+        8.25
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 986,
+      "volume_cm3": 0.08,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 0.1
+    }
+  },
+  "gauge_files": {
+    "fit_gauge_stock_spindle_18mm_HALF.stl": {
+      "name": "fit_gauge_stock_spindle_18mm_HALF.stl",
+      "sha256": "16cb7bb7135b26e6e6254dec2a59e676d5dbd3e4f5d792a8afc35ccb36783e90",
+      "dimensions_mm": [
+        14.39,
+        28.8,
+        5.0
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 364,
+      "volume_cm3": 0.93,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 1.19
+    },
+    "fit_gauge_stock_spindle_20mm_HALF.stl": {
+      "name": "fit_gauge_stock_spindle_20mm_HALF.stl",
+      "sha256": "d9c13226ad2436e4a295257e77034da4555c9530bf1881ab7869751895309112",
+      "dimensions_mm": [
+        15.39,
+        30.8,
+        5.0
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 364,
+      "volume_cm3": 1.01,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 1.29
+    },
+    "fit_gauge_stock_spindle_22mm_HALF.stl": {
+      "name": "fit_gauge_stock_spindle_22mm_HALF.stl",
+      "sha256": "e1e464f9f87983f542ffe8bbd7c4d3ff8092b84fe57749127a1dc4f681eab042",
+      "dimensions_mm": [
+        16.39,
+        32.8,
+        5.0
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 364,
+      "volume_cm3": 1.09,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 1.39
+    },
+    "fit_gauge_stock_spindle_24mm_HALF.stl": {
+      "name": "fit_gauge_stock_spindle_24mm_HALF.stl",
+      "sha256": "09708605a6898f8e75514b483f4479f1588debf39439fc2cc6f26136696d0e33",
+      "dimensions_mm": [
+        17.39,
+        34.8,
+        5.0
+      ],
+      "watertight": true,
+      "winding_consistent": true,
+      "components": 1,
+      "triangle_count": 364,
+      "volume_cm3": 1.17,
+      "fits_A1_mini": true,
+      "rests_on_plate": true,
+      "nominal_petg_weight_g": 1.49
+    }
+  },
+  "counts_to_print": {
+    "HALF_A": 1,
+    "HALF_B": 1,
+    "END_RETAINER": 1,
+    "PIN": 4
+  },
+  "assembly_notes": [
+    "Confirm spool core diameter and OEM shaft diameter using caliper or photo and ruler",
+    "Print small spindle fit gauge before printing complete halves",
+    "Place the two halves around the factory spindle; insert four aligning pins into matching blind holes",
+    "Install spool over wide hub, then stretch retaining ring slightly over end lip into annular groove",
+    "Do not install if end retainer is loose, pin binding, shell cracks or spool rubs frame",
+    "Perform unloaded spin and full 1kg spool dry test; keep clear of PTFE tube and moving printer components"
+  ],
+  "print_approval": "NOT GIVEN",
+  "known_blockers": [
+    "Stock shaft diameter unmeasured",
+    "Spool bore unmeasured",
+    "PETG shrink and spring force untested",
+    "OEM arm 68mm, sleeve extends ~14mm beyond it: load check required",
+    "Actual fit of retainer ring not physically tested",
+    "Slicing PETG Bambu Studio not verified"
+  ]
+}
