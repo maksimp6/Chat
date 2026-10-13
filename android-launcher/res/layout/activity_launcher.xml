@@ -13,6 +13,19 @@
         android:textColor="#FFFFFF"
         android:textSize="28sp" />
 
+    <EditText
+        android:id="@+id/search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="#2A3340"
+        android:hint="Поиск"
+        android:inputType="text"
+        android:padding="10dp"
+        android:singleLine="true"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#8A94A6" />
+
     <TextView
         android:id="@+id/alice"
         android:layout_width="match_parent"
