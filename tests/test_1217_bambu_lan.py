@@ -42,3 +42,10 @@ def test_authenticated_report_forwards_to_canonical_store(monkeypatch):
         12,
     )
     assert observed == [("owner", "ABC", {"print": {"gcode_state": "IDLE"}}, 12)]
+
+
+def test_live_connection_requires_pinned_certificate():
+    with pytest.raises(ValueError, match="trusted printer certificate required"):
+        bambu_lan.read_live_status(
+            "owner", "ABC", "dummy-secret", host="127.0.0.1", trusted_cert_pem=""
+        )
