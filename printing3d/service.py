@@ -353,7 +353,7 @@ def get_printer_downtime(
 def record_bambu_print_report(
     owner_id: str,
     printer_id: str,
-    payload: dict,
+    payload: dict[str, Any],
     received_at: float,
     *,
     event_id: str | None = None,
