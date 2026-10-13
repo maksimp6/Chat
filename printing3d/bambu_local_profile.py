@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 import stat
 
-from .bambu_lan import printer_report_topic, _certificate_fingerprint
+from .bambu_lan import _certificate_fingerprint, printer_report_topic, read_live_status
 
 
 @dataclass(frozen=True)
@@ -62,3 +62,18 @@ def load_local_profile(directory: str | Path) -> LocalBambuProfile:
         raise ValueError("invalid printer access code format")
     _certificate_fingerprint(pem)
     return LocalBambuProfile(host=host, serial=serial, access_code=code, trusted_cert_pem=pem)
+
+
+def read_status_from_local_profile(
+    owner_id: str, directory: str | Path, *, timeout: float = 20
+) -> dict[str, object]:
+    """Use only the local protected profile for real device authentication."""
+    profile = load_local_profile(directory)
+    return read_live_status(
+        owner_id,
+        profile.serial,
+        profile.access_code,
+        host=profile.host,
+        trusted_cert_pem=profile.trusted_cert_pem,
+        timeout=timeout,
+    )
