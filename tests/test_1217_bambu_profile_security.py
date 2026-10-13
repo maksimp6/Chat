@@ -110,3 +110,26 @@ def test_delta_without_gcode_state_not_mistaken_for_unknown(monkeypatch):
             "owner", "ABC", "device/ABC/report", b'{"print":{"bed_temper":25}}', 7
         )
     assert persisted == []
+
+
+def test_authenticated_monitor_reads_only_protected_local_profile(tmp_path, monkeypatch):
+    folder = tmp_path / "profile"
+    _private_profile(folder)
+    monkeypatch.setattr(bambu_local_profile, "_certificate_fingerprint", lambda pem: b"pin")
+    calls = []
+
+    def fake_monitor(owner, serial, secret, **kwargs):
+        calls.append((owner, serial, secret, kwargs))
+        return {"received": True, "state": "idle"}
+
+    monkeypatch.setattr(bambu_local_profile, "read_live_status", fake_monitor)
+    result = bambu_local_profile.read_status_from_local_profile("owner", folder, timeout=5)
+    assert result == {"received": True, "state": "idle"}
+    assert calls == [
+        (
+            "owner",
+            "A1MINI123",
+            "ABC12345",
+            {"host": "192.168.31.12", "trusted_cert_pem": "dummy-cert", "timeout": 5},
+        )
+    ]
