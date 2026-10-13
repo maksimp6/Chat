@@ -15,6 +15,7 @@ import time
 from typing import Any, Callable
 
 from .service import record_bambu_print_report
+from .bambu_telemetry import parse_bambu_report
 
 
 def printer_report_topic(serial: str) -> str:
@@ -103,10 +104,16 @@ def _install_callbacks(
                 return
             if "gcode_state" not in decoded["print"]:
                 return  # Partial reports/ACKs are not evidence of state changes.
+            observed_at = clock()
             changed = consume_print_report(
-                owner_id, serial, message.topic, message.payload, clock()
+                owner_id, serial, message.topic, message.payload, observed_at
             )
-            received.append({"received": True, "changed": changed, "at": clock()})
+            received.append({
+                "received": True,
+                "state": parse_bambu_report(decoded),
+                "changed": changed,
+                "at": observed_at,
+            })
         except (ValueError, UnicodeError, json.JSONDecodeError):
             failures.append("invalid MQTT report")
 
@@ -148,9 +155,11 @@ def read_live_status(
     _install_tls_pin(client, expected_fingerprint)
     client.username_pw_set("bblp", access_code)
     _install_callbacks(client, owner_id, serial, topic, clock, received, failures)
-    client.connect(host, port=8883, keepalive=15)
-    client.loop_start()
+    loop_started = False
     try:
+        client.connect(host, port=8883, keepalive=15)
+        client.loop_start()
+        loop_started = True
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and not received and not failures:
             time.sleep(0.1)
@@ -160,5 +169,6 @@ def read_live_status(
             return received[0]
         return {"received": False, "error": "No status report received before timeout"}
     finally:
-        client.loop_stop()
+        if loop_started:
+            client.loop_stop()
         client.disconnect()
