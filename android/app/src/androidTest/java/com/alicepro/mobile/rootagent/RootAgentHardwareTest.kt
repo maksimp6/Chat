@@ -3,18 +3,21 @@ package com.alicepro.mobile.rootagent
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Build
-import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.After
-import org.junit.Before
-import org.junit.Test
-import org.junit.Assert.*
 import android.util.Base64
 import android.util.Xml
+import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.Socket
 import java.net.URL
 import org.json.JSONObject
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
 import org.xmlpull.v1.XmlPullParser
 
 /** Manual physical-device tests. No emulator pass, input, install or existing-service takeover. */
@@ -30,7 +33,11 @@ class RootAgentHardwareTest {
         val expected = InstrumentationRegistry.getArguments().getString("expectedVersionName")
         assertTrue("Pass the artifact's exact expectedVersionName", !expected.isNullOrBlank())
         val context = instrumentation.targetContext
-        assertEquals(expected, context.packageManager.getPackageInfo(context.packageName, 0).versionName)
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0)
+        assertEquals(expected, installed.versionName)
+        val expectedCode = InstrumentationRegistry.getArguments().getString("expectedVersionCode")?.toLongOrNull()
+        assertNotNull("Pass the artifact's exact expectedVersionCode", expectedCode)
+        assertEquals(expectedCode, installed.longVersionCode)
         val occupied = try {
             Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", 8766), 500) }
             true
@@ -49,7 +56,9 @@ class RootAgentHardwareTest {
                 if (!ready) Thread.sleep(100)
             }
             assertTrue("RootAgentService did not become healthy", ready)
-            assertTrue("Root not granted to the app process", JSONObject(get("/v1/root-probe").second).getBoolean("root"))
+            val probe = get("/v1/root-probe")
+            assertEquals(200, probe.first)
+            assertTrue("Root not granted to the app process", JSONObject(probe.second).getBoolean("root"))
         } catch (failure: Throwable) {
             stopOwnedService()
             throw failure
@@ -118,6 +127,25 @@ class RootAgentHardwareTest {
         assertEquals(200, response.first)
         assertEquals("Redmi 9", JSONObject(response.second).getString("model"))
         assertEquals("galahad", JSONObject(response.second).getString("device"))
+    }
+
+    @Test
+    fun testRealCommandFailureOutputBoundAndTimeout() {
+        val shell = RootShell(timeoutMs = 500, maxOutputBytes = 16)
+        val missing = shell.run(listOf("su", "-c", "exec /system/bin/alice-no-such-tool-650"))
+        assertFalse(missing.timedOut)
+        assertTrue("Missing utility must fail", missing.exitCode != null && missing.exitCode != 0)
+        val bounded = shell.run(listOf("su", "-c", "printf %032d 0"))
+        assertEquals(0, bounded.exitCode)
+        assertTrue(bounded.truncated)
+        assertEquals(16, bounded.output.length)
+        val started = System.nanoTime()
+        val timeout = shell.run(listOf("/system/bin/sleep", "3"))
+        assertTrue(timeout.timedOut)
+        assertTrue("Unbounded process timeout", (System.nanoTime() - started) / 1_000_000 < 2_500)
+        val probe = get("/v1/root-probe")
+        assertEquals(200, probe.first)
+        assertTrue("Service remains usable after command faults", JSONObject(probe.second).getBoolean("root"))
     }
 
     @Test
