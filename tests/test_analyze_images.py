@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import runpy
 from pathlib import Path
 
 import pytest
@@ -79,6 +80,14 @@ def test_exif_orientation_is_applied_and_reported(tmp_path):
     assert Image.open(out / result["outputs"]["contrast"]).size == (2, 4)
 
 
+def test_output_path_cannot_alias_an_input(tmp_path):
+    source = tmp_path / "sample.png"
+    source.write_bytes(b"input")
+
+    with pytest.raises(ValueError, match="overwrite an input image"):
+        module._ensure_outputs_available([source], [source])
+
+
 def test_analyze_refuses_to_overwrite_existing_output(tmp_path):
     source = tmp_path / "sample.png"
     Image.new("RGB", (4, 4), "white").save(source)
@@ -92,6 +101,20 @@ def test_analyze_refuses_to_overwrite_existing_output(tmp_path):
 
     assert prior.read_bytes() == b"keep me"
     assert list(out.iterdir()) == [prior]
+
+
+def test_png_writer_removes_partial_output_after_encoding_error(tmp_path, monkeypatch):
+    output = tmp_path / "partial.png"
+
+    def fail_save(self, fp, format=None, **kwargs):
+        fp.write(b"partial")
+        raise OSError("synthetic encoder failure")
+
+    monkeypatch.setattr(Image.Image, "save", fail_save)
+    with pytest.raises(OSError, match="synthetic encoder failure"):
+        module._save_png(Image.new("RGB", (1, 1), "white"), output)
+
+    assert not output.exists()
 
 
 def test_png_writer_preserves_file_created_after_preflight(tmp_path):
@@ -133,18 +156,90 @@ def test_comparison_reports_dimensions_and_true_difference(tmp_path):
         assert output.size == (20, 10)
 
 
-def test_cli_writes_valid_report_and_refuses_report_collision(tmp_path, monkeypatch):
+def test_cli_writes_single_image_report(tmp_path, monkeypatch):
     source = tmp_path / "sample.png"
     Image.new("RGB", (4, 4), "white").save(source)
     out = tmp_path / "out"
-    monkeypatch.setattr("sys.argv", ["analyze_images.py", str(source), "--output", str(out)])
+    monkeypatch.setattr(
+        "sys.argv", ["analyze_images.py", str(source), "--output", str(out)]
+    )
+
     module.main()
 
     report = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert report["images"][0]["file"] == source.name
-    assert report["images"][0]["outputs"]["edges"] == "sample_edges.png"
+    assert "comparison" not in report
+
+
+def test_cli_writes_comparison_report_and_refuses_report_collision(
+    tmp_path, monkeypatch
+):
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    Image.new("RGB", (4, 4), "white").save(first)
+    Image.new("RGB", (8, 8), "black").save(second)
+    out = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv", ["analyze_images.py", str(first), str(second), "--output", str(out)]
+    )
+    runpy.run_path(str(SCRIPT), run_name="__main__")
+
+    report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert [item["file"] for item in report["images"]] == [first.name, second.name]
+    assert report["comparison"]["files"] == [first.name, second.name]
+    assert report["comparison"]["output"] == "difference.png"
 
     with pytest.raises(SystemExit) as error:
         module.main()
     assert error.value.code == 2
     assert (out / "report.json").is_file()
+
+
+def test_cli_rejects_too_many_or_missing_images(tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["analyze_images.py", "one.png", "two.png", "three.png", "--output", str(out)],
+    )
+    with pytest.raises(SystemExit) as too_many:
+        module.main()
+    assert too_many.value.code == 2
+
+    missing = tmp_path / "missing.png"
+    monkeypatch.setattr(
+        "sys.argv", ["analyze_images.py", str(missing), "--output", str(out)]
+    )
+    with pytest.raises(SystemExit) as missing_input:
+        module.main()
+    assert missing_input.value.code == 2
+
+
+def test_cli_rejects_duplicate_names_and_report_input_collision(tmp_path, monkeypatch):
+    first_dir = tmp_path / "one"
+    second_dir = tmp_path / "two"
+    out = tmp_path / "out"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    first = first_dir / "same.png"
+    second = second_dir / "same.png"
+    Image.new("RGB", (2, 2), "white").save(first)
+    Image.new("RGB", (2, 2), "black").save(second)
+    monkeypatch.setattr(
+        "sys.argv", ["analyze_images.py", str(first), str(second), "--output", str(out)]
+    )
+    with pytest.raises(SystemExit) as duplicate:
+        module.main()
+    assert duplicate.value.code == 2
+    assert list(out.iterdir()) == []
+
+    report_image = tmp_path / "report.json"
+    Image.new("RGB", (2, 2), "white").save(report_image, format="PNG")
+    original_bytes = report_image.read_bytes()
+    monkeypatch.setattr(
+        "sys.argv", ["analyze_images.py", str(report_image), "--output", str(tmp_path)]
+    )
+    with pytest.raises(SystemExit) as collision:
+        module.main()
+    assert collision.value.code == 2
+    assert report_image.read_bytes() == original_bytes
+    assert not (tmp_path / "report_edges.png").exists()
