@@ -1,6 +1,6 @@
 """Native MemoryStore persistence contracts for printer downtime #1217."""
 import pytest
-from memory_engine.store import _JournalStore as MemoryStore
+from memory_engine import MemoryStore
 from printing3d import service
 
 
