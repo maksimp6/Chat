@@ -81,5 +81,3 @@ class MockBroker:
         event = capture_request(topic, payload, self.serial)
         self.requested += 1
         return event
-
-[executed on device: Redmi 9 (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
