@@ -118,7 +118,7 @@ def compare(first: Path, second: Path, out: Path) -> dict:
     diff = ImageChops.difference(a, b)
     output = out / "difference.png"
     _ensure_outputs_available([output], [first, second])
-    _save_png(ImageOps.autocontrast(diff), output)
+    _save_png(diff, output)
     return {
         "files": [first.name, second.name],
         "oriented_sizes": [list(first_oriented_size), list(second_oriented_size)],
