@@ -108,12 +108,14 @@ def _install_callbacks(
             changed = consume_print_report(
                 owner_id, serial, message.topic, message.payload, observed_at
             )
-            received.append({
-                "received": True,
-                "state": parse_bambu_report(decoded),
-                "changed": changed,
-                "at": observed_at,
-            })
+            received.append(
+                {
+                    "received": True,
+                    "state": parse_bambu_report(decoded),
+                    "changed": changed,
+                    "at": observed_at,
+                }
+            )
         except (ValueError, UnicodeError, json.JSONDecodeError):
             failures.append("invalid MQTT report")
 
