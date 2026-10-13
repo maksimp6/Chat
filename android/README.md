@@ -57,10 +57,15 @@ gradle :app:testDebugUnitTest
 `rootagent/` is the in-app replacement for the Termux Live Server: one foreground
 `RootAgentService` serving a loopback-only API on `127.0.0.1:8766`.
 
-- Started only from **Diagnostics → RootAgent: проверить**, which also runs an in-app
-  self-check (health + root probe; with root, also `/v1/status`, `/v1/screen/tree` and
-  `/v1/screen/capture`, reporting only the lock flag and HTTP codes, never screen content) and
-  shows the result; **RootAgent: остановить** stops it.
+- Open **Diagnostics → RootAgent: панель** for owner-operated diagnostics. Opening the
+  panel starts no service or request. Separate buttons start/stop the service, check
+  health/root/status/device metadata, parse a requested XML hierarchy, or decode and
+  preview a requested PNG. Screen requests are never included in the API/root check.
+  Only one operation runs at a time; results have timestamps and can be copied without
+  screen content or credentials. The screenshot preview is protected from ordinary
+  Android screenshots and dismissed when the activity leaves the foreground.
+  Stop reports submission, not verified port closure. Unlock is explicitly unavailable:
+  there is no unlock endpoint or C-driver adapter in this build. No input or grants.
   The service is not exported and never starts on its own.
 - Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
   (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
