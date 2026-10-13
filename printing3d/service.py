@@ -336,7 +336,9 @@ def record_printer_downtime(
     return changed
 
 
-def get_printer_downtime(owner_id: str, printer_id: str, start: float, end: float) -> dict[str, object]:
+def get_printer_downtime(
+    owner_id: str, printer_id: str, start: float, end: float
+) -> dict[str, object]:
     """Read committed downtime intervals for this owner/printer."""
     if not owner_id or not printer_id or "/" in printer_id:
         raise ValueError("owner and printer are required")
