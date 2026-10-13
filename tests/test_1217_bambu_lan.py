@@ -39,6 +39,6 @@ def test_authenticated_report_forwards_to_canonical_store(monkeypatch):
         "ABC",
         "device/ABC/report",
         json.dumps({"print": {"gcode_state": "IDLE"}}).encode(),
-        12
+        12,
     )
     assert observed == [("owner", "ABC", {"print": {"gcode_state": "IDLE"}}, 12)]
