@@ -125,7 +125,7 @@ def read_live_status(
     clock: Callable[[], float] = time.time,
     trusted_cert_pem: str,
 ) -> dict[str, Any]:
-    """Wait for one unsolicited report. Never publish commands or credentials.
+    """Wait for a status report using one read-only pushall query.
 
     Bambu LAN firmware uses a device-local self-signed TLS certificate.
     The connection is LAN-scoped. Its exact DER certificate is verified via a
@@ -137,17 +137,16 @@ def read_live_status(
     topic = printer_report_topic(serial)
     received: list[dict[str, Any]] = []
     failures: list[str] = []
-    if not trusted_cert_pem or "BEGIN CERTIFICATE" not in trusted_cert_pem:
-        raise ValueError("trusted printer certificate required")
     mqtt = importlib.import_module("paho.mqtt.client")
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
-    client.username_pw_set("bblp", access_code)
-    context = ssl.create_default_context()
-    context.check_hostname = False  # Fixed LAN IP; identity bound to configured cert.
-    context.load_verify_locations(cadata=trusted_cert_pem)
+    # Bambu's device leaf lacks CA key-usage extensions. The peer is pinned in
+    # on_socket_open *before* Paho transmits MQTT CONNECT/password.
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
     client.tls_set_context(context)
-
     _install_tls_pin(client, expected_fingerprint)
+    client.username_pw_set("bblp", access_code)
     _install_callbacks(client, owner_id, serial, topic, clock, received, failures)
     client.connect(host, port=8883, keepalive=15)
     client.loop_start()
