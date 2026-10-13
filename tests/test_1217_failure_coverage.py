@@ -266,18 +266,25 @@ def test_failed_tls_connect_always_closes_socket_without_loop(monkeypatch):
 
     class FakeClient:
         on_socket_open = None
+
         def __init__(self, *a, **kw):
             pass
+
         def tls_set_context(self, ctx):
             pass
+
         def username_pw_set(self, *a):
             pass
+
         def connect(self, host, port, keepalive):
             raise ssl.SSLError("peer certificate mismatch")
+
         def loop_start(self):
             events.append("unexpected-start")
+
         def loop_stop(self):
             events.append("unexpected-stop")
+
         def disconnect(self):
             events.append("disconnect")
 
@@ -290,7 +297,10 @@ def test_failed_tls_connect_always_closes_socket_without_loop(monkeypatch):
     monkeypatch.setattr(bambu_lan, "_certificate_fingerprint", lambda pem: b"pin")
     with pytest.raises(ssl.SSLError):
         bambu_lan.read_live_status(
-            "owner", "ABC", "12345678", host="192.168.31.12",
+            "owner",
+            "ABC",
+            "12345678",
+            host="192.168.31.12",
             trusted_cert_pem="test-only",
         )
     assert events == ["disconnect"]
