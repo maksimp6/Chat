@@ -236,3 +236,20 @@ def test_private_profile_rejects_oversize(tmp_path):
     (folder / "serial").write_text("ABC" * 100)
     with pytest.raises(ValueError, match="too large"):
         bambu_local_profile.load_local_profile(folder)
+
+
+def test_no_mqtt_connection_on_invalid_inputs():
+    with pytest.raises(ValueError, match="missing printer credentials"):
+        bambu_lan.read_live_status(
+            "owner", "ABC", "", host="192.168.31.12",
+            trusted_cert_pem="", timeout=1,
+        )
+
+
+@pytest.mark.parametrize("payload", [b"[]", b'{"print":[]}', b'{"pushing":{"command":"pushall"}}'])
+def test_non_print_reports_never_reach_memory(payload, monkeypatch):
+    seen = []
+    monkeypatch.setattr(bambu_lan, "record_bambu_print_report", lambda *args: seen.append(args))
+    with pytest.raises(ValueError, match="invalid printer report"):
+        bambu_lan.consume_print_report("owner", "ABC", "device/ABC/report", payload, 1)
+    assert not seen
