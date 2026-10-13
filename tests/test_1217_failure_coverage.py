@@ -2,6 +2,7 @@
 
 MQTT client simulations never open a network socket or send printer commands.
 """
+
 import hashlib
 import json
 import ssl
@@ -39,12 +40,15 @@ def test_failure_inputs_do_not_change_downtime_history():
     assert len(t.snapshot()["events"]) == 1
 
 
-@pytest.mark.parametrize("fn", [
-    lambda: service.record_printer_downtime("", "ABC", "idle", 1),
-    lambda: service.get_printer_downtime("", "ABC", 0, 1),
-    lambda: service.expire_printer_telemetry("", "ABC", last_seen=0, now=2),
-    lambda: service.get_printer_daily_downtime("", "ABC", None),
-])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        lambda: service.record_printer_downtime("", "ABC", "idle", 1),
+        lambda: service.get_printer_downtime("", "ABC", 0, 1),
+        lambda: service.expire_printer_telemetry("", "ABC", last_seen=0, now=2),
+        lambda: service.get_printer_daily_downtime("", "ABC", None),
+    ],
+)
 def test_missing_owner_rejected_before_store_open(fn):
     with pytest.raises(ValueError, match="owner and printer"):
         fn()
@@ -95,12 +99,15 @@ def test_mqtt_callback_error_and_incomplete_deltas(monkeypatch):
     assert failures == ["invalid MQTT report"]
 
 
-@pytest.mark.parametrize("scenario, expected", [
-    ("ok", True),
-    ("auth", False),
-    ("subscribe", False),
-    ("timeout", False),
-])
+@pytest.mark.parametrize(
+    "scenario, expected",
+    [
+        ("ok", True),
+        ("auth", False),
+        ("subscribe", False),
+        ("timeout", False),
+    ],
+)
 def test_fake_mqtt_full_connection_lifecycle(monkeypatch, scenario, expected):
     """Observe CONNECT -> SUBSCRIBE -> pushall -> report without a real printer."""
     clients = []
@@ -137,21 +144,30 @@ def test_fake_mqtt_full_connection_lifecycle(monkeypatch, scenario, expected):
             assert topic == "device/ABC/request"
             assert json.loads(payload)["pushing"]["command"] == "pushall"
             self.on_message(
-                self, None,
-                SimpleNamespace(topic="device/ABC/report", payload=b'{"print":{"gcode_state":"IDLE"}}'),
+                self,
+                None,
+                SimpleNamespace(
+                    topic="device/ABC/report", payload=b'{"print":{"gcode_state":"IDLE"}}'
+                ),
             )
 
         def loop_start(self):
             self.calls.append("started")
             if scenario != "timeout":
                 self.on_connect(
-                    self, None, None,
-                    SimpleNamespace(is_failure=scenario == "auth"), None,
+                    self,
+                    None,
+                    None,
+                    SimpleNamespace(is_failure=scenario == "auth"),
+                    None,
                 )
                 if scenario in ("ok", "subscribe"):
                     self.on_subscribe(
-                        self, None, 1,
-                        [SimpleNamespace(is_failure=scenario == "subscribe")], None,
+                        self,
+                        None,
+                        1,
+                        [SimpleNamespace(is_failure=scenario == "subscribe")],
+                        None,
                     )
 
         def loop_stop(self):
@@ -169,8 +185,12 @@ def test_fake_mqtt_full_connection_lifecycle(monkeypatch, scenario, expected):
     monkeypatch.setattr(bambu_lan, "_certificate_fingerprint", lambda pem: b"fixed-pin")
     monkeypatch.setattr(bambu_lan, "record_bambu_print_report", lambda *args: True)
     result = bambu_lan.read_live_status(
-        "owner", "ABC", "12345678", host="192.168.31.12",
-        timeout=0.01, trusted_cert_pem="trusted",
+        "owner",
+        "ABC",
+        "12345678",
+        host="192.168.31.12",
+        timeout=0.01,
+        trusted_cert_pem="trusted",
     )
     assert result["received"] is expected
     assert clients[0].calls[-2:] == ["stopped", "disconnected"]
@@ -193,11 +213,14 @@ def _config(path: Path):
         (path / name).chmod(0o600)
 
 
-@pytest.mark.parametrize("name,value,error", [
-    ("host", "invalid", "LAN IPv4"),
-    ("host", "127.0.0.1", "private LAN"),
-    ("access_code", "invalid!", "access code"),
-])
+@pytest.mark.parametrize(
+    "name,value,error",
+    [
+        ("host", "invalid", "LAN IPv4"),
+        ("host", "127.0.0.1", "private LAN"),
+        ("access_code", "invalid!", "access code"),
+    ],
+)
 def test_private_profile_rejects_bad_fields(tmp_path, monkeypatch, name, value, error):
     folder = tmp_path / "profile"
     _config(folder)
