@@ -307,3 +307,43 @@ def _publish_settlement(
                     "updated_at": now,
                 },
             )
+
+
+def record_printer_downtime(
+    owner_id: str,
+    printer_id: str,
+    state: str,
+    timestamp: float,
+    *,
+    reason: str | None = None,
+    event_id: str | None = None,
+) -> bool:
+    """Commit one trusted observation to canonical shared MemoryStore atomically.
+
+    This is a backend API, not a publicly exposed telemetry endpoint.
+    """
+    if not owner_id or not printer_id or "/" in printer_id:
+        raise ValueError("owner and printer are required")
+    from .downtime import DowntimeTracker
+
+    key = "printing/downtime/" + owner_id + "/" + printer_id
+    with get_store().transaction() as tx:
+        snapshot = tx.get(key)
+        tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+        changed = tracker.observe(state, timestamp, reason=reason, event_id=event_id)
+        if changed:
+            tx.set(key, tracker.snapshot())
+    return changed
+
+
+def get_printer_downtime(
+    owner_id: str, printer_id: str, start: float, end: float
+) -> dict:
+    """Read committed downtime intervals for this owner/printer."""
+    if not owner_id or not printer_id or "/" in printer_id:
+        raise ValueError("owner and printer are required")
+    from .downtime import DowntimeTracker
+
+    snapshot = get_store().get("printing/downtime/" + owner_id + "/" + printer_id)
+    tracker = DowntimeTracker.from_snapshot(snapshot) if snapshot else DowntimeTracker()
+    return tracker.summary(start, end)
