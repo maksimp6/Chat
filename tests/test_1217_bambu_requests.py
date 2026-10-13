@@ -79,5 +79,3 @@ def test_reject_other_printer_and_oversize():
         capture_request(request_topic("OTHER"), encode_pushall("a"), "ABC")
     with pytest.raises(ValueError):
         capture_request(request_topic("ABC"), b"x" * 4097, "ABC")
-
-[executed on device: Redmi 9 (bb12d9f4-83a6-41b5-9ede-8717bac12a0a)]
