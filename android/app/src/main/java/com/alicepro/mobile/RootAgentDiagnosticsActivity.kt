@@ -22,6 +22,7 @@ import com.alicepro.mobile.rootagent.RootAgentClient
 import com.alicepro.mobile.rootagent.RootAgentClient.Endpoint
 import com.alicepro.mobile.rootagent.RootAgentService
 import com.alicepro.mobile.rootagent.RootAgentTokenStore
+import com.alicepro.mobile.rootagent.StartupHealthCheck
 import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.Executors
@@ -33,6 +34,7 @@ import org.xmlpull.v1.XmlPullParser
 /** Owner-operated diagnostics. No input, unlock, root grant or automatic screen requests. */
 class RootAgentDiagnosticsActivity : AppCompatActivity() {
     internal var clientFactory: (() -> RootAgentClient)? = null
+    internal var serviceStarter: () -> Unit = { RootAgentService.start(applicationContext) }
     internal val hasRunningOperation: Boolean get() = running.get()
     private var operation: Operation? = null
     private val controls = mutableListOf<Button>()
@@ -73,13 +75,8 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
         action(content, "Запустить сервис") {
             perform("Сервис") {
                 val client = client()
-                RootAgentService.start(applicationContext)
-                val deadline = System.nanoTime() + 10_000_000_000L
-                var response = client.request(Endpoint.HEALTH)
-                while (response.code != 200 && response.error != "cancelled" && System.nanoTime() < deadline) {
-                    Thread.sleep(150)
-                    response = client.request(Endpoint.HEALTH)
-                }
+                serviceStarter()
+                val response = StartupHealthCheck.await(probe = { remaining -> client.request(Endpoint.HEALTH, remaining) })
                 describe(Endpoint.HEALTH, response)
             }
         }

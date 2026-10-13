@@ -95,4 +95,18 @@ class RootAgentCancellationTest {
         assertTrue((System.nanoTime() - started) / 1_000_000 < 2000)
         assertEquals(0, connection.disconnected.count)
     }
+
+    @Test
+    fun remainingActionBudgetShortensTheRequestDeadlineAndZeroBudgetNeverConnects() {
+        val connection = DelayedConnection()
+        var connections = 0
+        val client = RootAgentClient(8766, connectionFactory = { connections++; connection }, totalTimeoutMs = 3000) { "synthetic-token" }
+        assertEquals("timeout", client.request(RootAgentClient.Endpoint.HEALTH, 0).error)
+        assertEquals(0, connections)
+        val started = System.nanoTime()
+        assertEquals("timeout", client.request(RootAgentClient.Endpoint.HEALTH, 100).error)
+        assertTrue((System.nanoTime() - started) / 1_000_000 < 1500)
+        assertEquals(1, connections)
+        assertEquals(0, connection.disconnected.count)
+    }
 }

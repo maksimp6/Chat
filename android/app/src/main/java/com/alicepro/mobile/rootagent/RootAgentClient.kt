@@ -37,8 +37,8 @@ class RootAgentClient(
         override fun toString(): String = "Response(code=$code, error=$error)"
     }
 
-    fun request(endpoint: Endpoint): Response = try {
-        val (code, body) = get(endpoint.path)
+    fun request(endpoint: Endpoint, remainingMs: Long? = null): Response = try {
+        val (code, body) = get(endpoint.path, remainingMs)
         Response(code, body, null)
     } catch (_: ResponseTooLarge) {
         Response(null, "", "response_too_large")
@@ -84,8 +84,11 @@ class RootAgentClient(
         }
     }
 
-    private fun get(path: String): Pair<Int, String> {
+    private fun get(path: String, remainingMs: Long? = null): Pair<Int, String> {
         if (closed.get()) throw IOException("cancelled")
+        val standard = if (path == Endpoint.TREE.path || path == Endpoint.CAPTURE.path) 28_000L else 8_000L
+        val budget = minOf(standard, totalTimeoutMs ?: standard, remainingMs ?: standard)
+        if (budget <= 0) throw java.net.SocketTimeoutException()
         val connection = connectionFactory(URI("http://${RootAgentServer.LOOPBACK}:$port$path"))
         synchronized(lock) {
             if (closed.get()) throw IOException("cancelled")
@@ -96,10 +99,10 @@ class RootAgentClient(
         val deadline = deadlines.schedule({
             expired.set(true)
             connection.disconnect()
-        }, totalTimeoutMs ?: if (path == Endpoint.TREE.path || path == Endpoint.CAPTURE.path) 28_000L else 8_000L, TimeUnit.MILLISECONDS)
+        }, budget, TimeUnit.MILLISECONDS)
         try {
-            connection.connectTimeout = TIMEOUT_MS
-            connection.readTimeout = if (path == Endpoint.TREE.path || path == Endpoint.CAPTURE.path) 28_000 else TIMEOUT_MS
+            connection.connectTimeout = minOf(TIMEOUT_MS.toLong(), budget).toInt()
+            connection.readTimeout = budget.toInt()
             connection.instanceFollowRedirects = false
             connection.setRequestProperty("Authorization", "Bearer " + token())
             val status = connection.responseCode

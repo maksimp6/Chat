@@ -20,6 +20,7 @@ import java.net.URL
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.time.Duration
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
@@ -83,6 +84,50 @@ class RootAgentDiagnosticsActivityTest {
         assertTrue(summary.text.toString().contains("API отвечает"))
         assertTrue(summary.top < button(activity, "Запустить сервис").top)
         assertFalse(summary.text.toString().contains("synthetic-token"))
+    }
+
+    @Test
+    fun completionScrollsBackFromBottomToTheLatestResult() {
+        val connection = Connection("{\"status\":\"ok\"}")
+        val activity = panel { RootAgentClient(8766, connectionFactory = { connection }) { "synthetic-token" } }.get()
+        layout(activity, 320, 640)
+        val scroll = views(activity.window.decorView).filterIsInstance<ScrollView>().single()
+        button(activity, "Проверить связь").performClick()
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        assertTrue("Must begin below the result", scroll.scrollY > 0)
+        await { text(activity).contains("API отвечает") }
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1000))
+        scroll.computeScroll()
+        assertEquals(0, scroll.scrollY)
+    }
+
+    @Test
+    fun backButtonRemainsAvailableWhileBusyAndClosesTheBlockedRequest() {
+        val connection = Connection("", blocked = true)
+        val controller = panel { RootAgentClient(8766, connectionFactory = { connection }) { "synthetic-token" } }
+        val activity = controller.get()
+        button(activity, "Проверить связь").performClick()
+        assertTrue(connection.reading.await(2, TimeUnit.SECONDS))
+        assertFalse(button(activity, "Сделать снимок экрана").isEnabled)
+        val back = button(activity, "Назад к диагностике")
+        assertTrue(back.isEnabled)
+        back.performClick()
+        assertTrue(activity.isFinishing)
+        controller.pause().stop().destroy()
+        assertTrue(connection.disconnected.await(2, TimeUnit.SECONDS))
+        await { !activity.hasRunningOperation }
+        assertFalse(text(activity).contains("API отвечает"))
+    }
+
+    @Test
+    fun startButtonUsesTheBoundedHealthFlowWithoutStartingARealService() {
+        val connection = Connection("{\"status\":\"ok\"}")
+        val activity = panel { RootAgentClient(8766, connectionFactory = { connection }) { "synthetic-token" } }.get()
+        var starts = 0
+        activity.serviceStarter = { starts++ }
+        button(activity, "Запустить сервис").performClick()
+        await { text(activity).contains("API отвечает") }
+        assertEquals(1, starts)
     }
 
     private fun layout(activity: RootAgentDiagnosticsActivity, widthDp: Int, heightDp: Int) {
