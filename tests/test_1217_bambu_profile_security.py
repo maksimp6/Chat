@@ -1,4 +1,5 @@
 """Private credential loading and fail-closed TLS pin regressions."""
+
 import hashlib
 import os
 from pathlib import Path
@@ -91,7 +92,9 @@ def test_subscribe_sends_only_safe_status_query():
             published.append((topic, payload, qos))
 
     client = FakeClient()
-    bambu_lan._install_callbacks(client, "owner", "A1MINI123", "device/A1MINI123/report", lambda: 1.0, [], [])
+    bambu_lan._install_callbacks(
+        client, "owner", "A1MINI123", "device/A1MINI123/report", lambda: 1.0, [], []
+    )
     client.on_subscribe(client, None, 1, [SimpleNamespace(is_failure=False)], None)
     assert len(published) == 1
     topic, payload, qos = published[0]
@@ -103,5 +106,7 @@ def test_delta_without_gcode_state_not_mistaken_for_unknown(monkeypatch):
     persisted = []
     monkeypatch.setattr(bambu_lan, "record_bambu_print_report", lambda *a: persisted.append(a))
     with pytest.raises(ValueError, match="not a printer state report"):
-        bambu_lan.consume_print_report("owner", "ABC", "device/ABC/report", b'{"print":{"bed_temper":25}}', 7)
+        bambu_lan.consume_print_report(
+            "owner", "ABC", "device/ABC/report", b'{"print":{"bed_temper":25}}', 7
+        )
     assert persisted == []
