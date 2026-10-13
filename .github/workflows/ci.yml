@@ -380,7 +380,7 @@ jobs:
         working-directory: android
         run: |
           started=$SECONDS
-          gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} -PaliceCommitHash=${{ github.sha }} :app:testDebugUnitTest :app:assembleDebug
+          gradle --no-daemon -PaliceBuildNumber=${{ github.run_number }} -PaliceCommitHash=${{ github.sha }} :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
           echo "- Android test/build: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify debug APK
         run: |
