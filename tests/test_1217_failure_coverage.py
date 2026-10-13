@@ -25,11 +25,11 @@ def test_failure_inputs_do_not_change_downtime_history():
     ):
         with pytest.raises(ValueError):
             t.observe(**kw)
-    t.observe("idle", 10, reason="no_filament")
+    t.observe("blocked", 10, reason="maintenance")
     with pytest.raises(ValueError, match="Conflicting simultaneous observation"):
         t.observe("printing", 10)
     with pytest.raises(ValueError, match="Conflicting simultaneous reason"):
-        t.observe("idle", 10)
+        t.observe("blocked", 10, reason="no_filament")
     for start, end in ((10, 9), (-1, 3), (0, float("nan"))):
         with pytest.raises(ValueError):
             t.summary(start, end)
