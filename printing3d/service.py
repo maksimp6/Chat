@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
@@ -394,8 +395,8 @@ def expire_printer_telemetry(
 
 
 def get_printer_daily_downtime(
-    owner_id: str, printer_id: str, now, *, days: int = 7
-) -> list[dict]:
+    owner_id: str, printer_id: str, now: datetime, *, days: int = 7
+) -> list[dict[str, Any]]:
     """Return day-level summaries from the current canonical MemoryStore history."""
     from .bambu_telemetry import period_summaries
     from .downtime import DowntimeTracker
