@@ -96,3 +96,73 @@ def test_unsupported_json_types_still_fail_at_commit(tmp_path):
                 store.commit()
         store.set("value", "corrected")
         assert store.commit() == 1
+
+
+@pytest.mark.parametrize("mode", ["staging", "transaction"])
+@pytest.mark.parametrize("value", ["\ud800", {"\ud800": "ok"}, {"ok": "\udfff"}])
+def test_invalid_unicode_rejected_without_replacing_staging(tmp_path, mode, value):
+    with MemoryStore(tmp_path / "unicode.memory") as store:
+        store.set("saved", 1)
+        store.commit()
+        if mode == "staging":
+            store.set("pending", "old")
+            with pytest.raises(StoreError, match="invalid Unicode"):
+                store.set("pending", value)
+            assert store.get("pending") == "old"
+            assert store.commit() == 2
+        else:
+            with store.transaction() as tx:
+                tx.set("pending", "old")
+                with pytest.raises(StoreError, match="invalid Unicode"):
+                    tx.set("pending", value)
+                assert tx.get("pending") == "old"
+
+
+def test_text_budget_counts_utf8_bytes_and_dictionary_keys(tmp_path, monkeypatch):
+    import memory_engine.store as module
+
+    monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 10)
+    with MemoryStore(tmp_path / "text.memory") as store:
+        store.set("unicode", "Ж" * 5)
+        for value in ("Ж" * 6, ["abcd", "efgh", "ijk"], {"abcd": "efghijk"}):
+            with pytest.raises(StoreError, match="text exceeds"):
+                store.set("rejected", value)
+        assert store.get("rejected") is None
+        assert store.commit() == 1
+    with MemoryStore(tmp_path / "text.memory") as reopened:
+        assert reopened.get("unicode") == "Ж" * 5
+
+
+def test_text_chunk_boundary_and_invalid_late_unicode(tmp_path, monkeypatch):
+    import memory_engine.store as module
+
+    monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 32769)
+    with MemoryStore(tmp_path / "chunks.memory") as store:
+        store.set("limit", "a" * 32769)
+        with pytest.raises(StoreError, match="text exceeds"):
+            store.set("over", "a" * 32770)
+        with pytest.raises(StoreError, match="invalid Unicode"):
+            store.set("invalid", "a" * 16384 + "\ud800")
+        assert store.commit() == 1
+
+
+@pytest.mark.parametrize("value", ["\ud800", "x" * 11])
+def test_replay_rejects_correctly_hashed_invalid_text_without_changing_source(
+    tmp_path, monkeypatch, value
+):
+    import memory_engine.store as module
+
+    monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 10)
+    payload = {
+        "changes": [{"key": "bad", "namespace": "values", "op": "set", "value": value}],
+        "format": 1,
+        "seq": 1,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
+    path = tmp_path / "invalid-text.memory"
+    path.write_text(json.dumps({"digest": digest, "payload": payload}) + "\n")
+    before = path.read_bytes()
+    with pytest.raises(StoreError, match="corrupt committed journal"):
+        MemoryStore(path)
+    assert path.read_bytes() == before
