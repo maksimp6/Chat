@@ -131,7 +131,7 @@ class RootAgentHardwareTest {
 
     @Test
     fun testRealCommandFailureOutputBoundAndTimeout() {
-        val shell = RootShell(timeoutMs = 500, maxOutputBytes = 16)
+        val shell = RootShell(timeoutMs = 5_000, maxOutputBytes = 16)
         val missing = shell.run(listOf("su", "-c", "exec /system/bin/alice-no-such-tool-650"))
         assertFalse(missing.timedOut)
         assertTrue("Missing utility must fail", missing.exitCode != null && missing.exitCode != 0)
@@ -140,7 +140,7 @@ class RootAgentHardwareTest {
         assertTrue(bounded.truncated)
         assertEquals(16, bounded.output.length)
         val started = System.nanoTime()
-        val timeout = shell.run(listOf("/system/bin/sleep", "3"))
+        val timeout = RootShell(timeoutMs = 500, maxOutputBytes = 16).run(listOf("/system/bin/sleep", "3"))
         assertTrue(timeout.timedOut)
         assertTrue("Unbounded process timeout", (System.nanoTime() - started) / 1_000_000 < 2_500)
         val probe = get("/v1/root-probe")

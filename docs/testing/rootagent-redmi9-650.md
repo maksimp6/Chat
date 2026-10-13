@@ -21,12 +21,20 @@ Hardware observations, through the existing authorized RDC channel:
 
 `RootAgentFaultTest` executes the production loopback server and operations with injected command outcomes. It covers corrupt/truncated/CRC-damaged PNGs, lock-state transitions during capture, unknown post-capture state, authorization before execution, untrusted Keyguard output, root-command failures, output bounds and timeout-content suppression.
 
-RED tests intentionally expose current implementation defects:
+Baseline `b67c316d169790da9045c05f2f869dcf8a5a4000` has six RED tests exposing two implementation defects:
 
 - PNG validation checks only eight signature bytes, accepting incomplete and corrupted images.
 - Keyguard is checked only before capture; the server returns captured content if the screen locks or status becomes unknown during capture.
 
 Do not disable these assertions or call RED merge-ready. Existing PNG success fixtures now use a complete 1x1 PNG with valid chunk CRCs instead of signature-only bytes.
+
+The follow-up keeps all baseline assertions and fixes both defects:
+
+- `PngScreenshotValidator` checks complete chunk structure/order/CRC, an exact final IEND, bounded dimensions and decompression, zlib integrity, scanline lengths and filter bytes. It accepts non-interlaced 8-bit RGB/RGBA, up to 8192 per dimension / 16 Mi pixels / 9 MiB encoded PNG bytes; other profiles fail closed as unavailable. This matches the expected ordinary `screencap` format, but the actual Redmi 9 output profile remains unverified until the hardware test runs. No unbounded bitmap allocation or Android-only decoder is needed in the core.
+- Both successful XML and PNG captures recheck Keyguard after capture. Failed, timed-out, truncated, malformed or locked post-capture state returns 423 and discards the screen response. Error responses remain sanitized. The before/after checks narrow the capture race; they do not make an Android state query and socket delivery atomic or detect a transient lock/unlock occurring between both checks.
+- Independent corrupt-zlib/scanline/chunk-order/dimension tests and a synthetic 720x1600 scanline fixture supplement the baseline faults. They do not imply an actual device screenshot was decoded.
+
+CI publishes the app and instrumentation APKs as separate artifacts to preserve the existing app artifact layout. Retain their workflow run, actual checked-out merge SHA, full PR HEAD, file hashes, package versions and signing certificates before any installation. Hardware test root-command failures use a 5-second startup allowance; only the intentional Android sleep timeout uses 500 ms.
 
 ## Manual physical-device tests after a separately approved installation
 

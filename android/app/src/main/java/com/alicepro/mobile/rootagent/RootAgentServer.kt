@@ -153,7 +153,7 @@ class RootAgentServer(
                 RootOperations.Status.TimedOut -> 504 to error("status_timeout")
             }
             "/v1/screen/tree", "/v1/screen/capture" ->
-                if (!unlocked()) 423 to error("device_locked") else screenContent(path)
+                guardedScreenContent(path)
             else -> when (val probe = operations.rootProbe()) {
                 is RootOperations.Probe.Answered -> 200 to "{\"root\":${probe.root}}"
                 RootOperations.Probe.TimedOut -> 504 to error("root_probe_timeout")
@@ -164,6 +164,14 @@ class RootAgentServer(
     /** Screen content is served only when the lock screen is known to be off. */
     private fun unlocked(): Boolean =
         (operations.status() as? RootOperations.Status.Answered)?.keyguardLocked == false
+
+    private fun guardedScreenContent(path: String): Pair<Int, String?> {
+        if (!unlocked()) return 423 to error("device_locked")
+        val content = screenContent(path)
+        // Capture can take seconds. Discard success if Keyguard locked or became unknown meanwhile.
+        if (content.first == 200 && !unlocked()) return 423 to error("device_locked")
+        return content
+    }
 
     private fun screenContent(path: String): Pair<Int, String?> = when (path) {
         "/v1/screen/tree" -> when (val tree = operations.screenTree()) {

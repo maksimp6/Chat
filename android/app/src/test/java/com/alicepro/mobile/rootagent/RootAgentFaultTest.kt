@@ -115,6 +115,36 @@ class RootAgentFaultTest {
     }
 
     @Test
+    fun failedOrTruncatedPostCaptureGuardDiscardsBothFormats() {
+        for (failure in listOf(
+            RootShellResult(1, marker, false, false),
+            RootShellResult(0, "isKeyguardShowing=false", false, true),
+            RootShellResult(null, marker, false, false, failedToStart = true),
+            RootShellResult(0, "isKeyguardShowing=invalid", false, false),
+        )) {
+            for (route in listOf("/v1/screen/tree", "/v1/screen/capture")) {
+                var captured = false
+                val encoded = Base64.getEncoder().encodeToString(validPng)
+                val ops = RootOperations(
+                    runRoot = { if (captured) failure else unlocked }, deviceInfo = { emptyMap() },
+                    runTree = {
+                        captured = true
+                        RootShellResult(0, "<?xml version='1.0'?><hierarchy><node text='$marker'/></hierarchy>", false, false)
+                    },
+                    runScreenshot = {
+                        captured = true
+                        RootShellResult(0, encoded, false, false)
+                    },
+                )
+                val response = exchange(ops, route)
+                assertEquals(423, status(response))
+                assertFalse(response.contains(marker))
+                assertFalse(response.contains(encoded))
+            }
+        }
+    }
+
+    @Test
     fun unauthorizedRequestsNeverInvokeRootOrScreenRunners() {
         val ops = RootOperations(
             runRoot = { error("unauthorized root execution") }, deviceInfo = { error("unauthorized metadata") },
