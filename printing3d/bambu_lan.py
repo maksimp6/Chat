@@ -65,9 +65,7 @@ def _install_tls_pin(client: Any, expected_fingerprint: bytes) -> None:
         if not isinstance(sock, ssl.SSLSocket):
             raise ssl.SSLError("printer MQTT socket is not TLS")
         cert = sock.getpeercert(binary_form=True)
-        if not cert or not hmac.compare_digest(
-            hashlib.sha256(cert).digest(), expected_fingerprint
-        ):
+        if not cert or not hmac.compare_digest(hashlib.sha256(cert).digest(), expected_fingerprint):
             raise ssl.SSLError("printer TLS peer differs from trusted certificate")
 
     client.suppress_exceptions = False
@@ -148,6 +146,7 @@ def read_live_status(
     context.load_verify_locations(cadata=trusted_cert_pem)
     client.tls_set_context(context)
 
+    _install_tls_pin(client, expected_fingerprint)
     _install_callbacks(client, owner_id, serial, topic, clock, received, failures)
     client.connect(host, port=8883, keepalive=15)
     client.loop_start()
