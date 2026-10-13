@@ -33,9 +33,7 @@ def _load_rgb(
         original_size = source.size
         orientation = source.getexif().get(274)
         if source.width * source.height > pixel_limit:
-            raise ValueError(
-                f"Image exceeds the {pixel_limit:,}-pixel limit: {path.name}"
-            )
+            raise ValueError(f"Image exceeds the {pixel_limit:,}-pixel limit: {path.name}")
         source.load()
         image = ImageOps.exif_transpose(source).convert("RGB")
     return image, original_size, orientation
@@ -113,9 +111,7 @@ def compare(first: Path, second: Path, out: Path) -> dict:
     first_oriented_size = a.size
     second_oriented_size = b.size
     if a.width * b.height != b.width * a.height:
-        raise ValueError(
-            "Images have different aspect ratios; pixel comparison is not valid"
-        )
+        raise ValueError("Images have different aspect ratios; pixel comparison is not valid")
 
     a.thumbnail(COMPARISON_SIZE)
     b = b.resize(a.size, Image.Resampling.LANCZOS)
@@ -127,9 +123,7 @@ def compare(first: Path, second: Path, out: Path) -> dict:
         "files": [first.name, second.name],
         "oriented_sizes": [list(first_oriented_size), list(second_oriented_size)],
         "comparison_size": list(a.size),
-        "mean_absolute_rgb_difference": [
-            round(value, 3) for value in ImageStat.Stat(diff).mean
-        ],
+        "mean_absolute_rgb_difference": [round(value, 3) for value in ImageStat.Stat(diff).mean],
         "output": output.name,
         "warning": (
             "The second image was resized with its aspect ratio preserved, but the images "
@@ -140,9 +134,7 @@ def compare(first: Path, second: Path, out: Path) -> dict:
 
 
 def _validate_output_plan(images: list[Path], out: Path) -> None:
-    planned = [
-        output for path in images for output in _analysis_outputs(path, out).values()
-    ]
+    planned = [output for path in images for output in _analysis_outputs(path, out).values()]
     if len(images) == 2:
         planned.append(out / "difference.png")
     planned.append(out / "report.json")
