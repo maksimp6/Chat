@@ -27,3 +27,22 @@ def test_invalid_observation_cannot_change_committed_state(tmp_path, monkeypatch
         with pytest.raises(ValueError):
             service.record_printer_downtime("a", "A1", "printing", 9)
         assert service.get_printer_downtime("a", "A1", 0, 30) == before
+
+
+def test_bambu_report_timeout_and_daily_persisted(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    midnight = datetime(2026, 10, 13, tzinfo=timezone.utc).timestamp()
+    with MemoryStore(tmp_path / "printer.memory") as store:
+        monkeypatch.setattr(service, "get_store", lambda: store)
+        assert service.record_bambu_print_report(
+            "owner", "A1", {"print": {"gcode_state": "RUNNING"}}, midnight
+        )
+        assert service.expire_printer_telemetry(
+            "owner", "A1", last_seen=midnight, now=midnight + 200, timeout=90
+        )
+        daily = service.get_printer_daily_downtime(
+            "owner", "A1", datetime.fromtimestamp(midnight + 200, timezone.utc), days=1
+        )
+        assert daily[0]["seconds"]["PRINTING"] == 90
+        assert daily[0]["seconds"]["UNKNOWN"] == 110
