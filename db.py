@@ -1,6 +1,7 @@
 import os
 import json
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -264,7 +265,7 @@ def get_conversations():
 
 
 def create_conversation(conv_id, title, model):
-    now = int(datetime.utcnow().timestamp())
+    now = int(time.time())
     if is_memory_configured():
         _memory_setup()
         updated = _MEMORY_DB.update(
@@ -334,14 +335,14 @@ def update_conversation_title(conv_id, title, owner_id=None):
             "conversations",
             lambda r: r["id"] == conv_id,
             title=normalized,
-            updated_at=int(datetime.utcnow().timestamp()),
+            updated_at=int(time.time()),
         )
         return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
-        (normalized, int(datetime.utcnow().timestamp()), conv_id),
+        (normalized, int(time.time()), conv_id),
     )
     conn.commit()
     conn.close()
@@ -363,7 +364,7 @@ def maybe_update_conversation_title(conv_id, source_text):
             "conversations",
             lambda r: r["id"] == conv_id and r["title"] in ("Новый чат", "Новый диалог"),
             title=candidate,
-            updated_at=int(datetime.utcnow().timestamp()),
+            updated_at=int(time.time()),
         )
         return candidate if changed else get_conversation_title(conv_id)
     conn = get_conn()
@@ -376,7 +377,7 @@ def maybe_update_conversation_title(conv_id, source_text):
         """,
         (
             candidate,
-            int(datetime.utcnow().timestamp()),
+            int(time.time()),
             conv_id,
             "Новый чат",
             "Новый диалог",
@@ -394,14 +395,14 @@ def update_conversation_model(conv_id, model):
             "conversations",
             lambda r: r["id"] == conv_id,
             model=model,
-            updated_at=int(datetime.utcnow().timestamp()),
+            updated_at=int(time.time()),
         )
         return
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         "UPDATE conversations SET model = ?, updated_at = ? WHERE id = ?",
-        (model, int(datetime.utcnow().timestamp()), conv_id),
+        (model, int(time.time()), conv_id),
     )
     conn.commit()
     conn.close()
@@ -496,7 +497,7 @@ def add_message(
     source=None,
     trace=None,
 ):
-    now = int(datetime.utcnow().timestamp())
+    now = int(time.time())
     if is_memory_configured():
         if not isinstance(content, str):
             content = json.dumps(content, ensure_ascii=False) if content is not None else ""
@@ -538,7 +539,7 @@ def add_message(
 
 
 def save_conv_settings(conv_id, settings_dict):
-    now = int(datetime.utcnow().timestamp())
+    now = int(time.time())
     if is_memory_configured():
         payload = json.dumps(settings_dict, ensure_ascii=False)
         updated = _MEMORY_DB.update(
