@@ -43,14 +43,8 @@ class DowntimeTracker:
         self._events: list[Observation] = []
         self._ids: dict[str, Observation] = {}
 
-    def observe(
-        self,
-        state: str,
-        timestamp: float,
-        *,
-        reason: str | None = None,
-        event_id: str | None = None,
-    ) -> bool:
+    @staticmethod
+    def _validate_input(state: str, timestamp: float, reason: str | None, event_id: str | None) -> None:
         if state not in _STATES:
             raise ValueError("Invalid printer state")
         if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
@@ -61,6 +55,16 @@ class DowntimeTracker:
             raise ValueError("Invalid downtime reason")
         if event_id is not None and (not isinstance(event_id, str) or not event_id):
             raise ValueError("Invalid event id")
+
+    def observe(
+        self,
+        state: str,
+        timestamp: float,
+        *,
+        reason: str | None = None,
+        event_id: str | None = None,
+    ) -> bool:
+        self._validate_input(state, timestamp, reason, event_id)
         canonical_reason = reason if state == "blocked" and reason else "undetermined"
         entry = Observation(_STATES[state], float(timestamp), canonical_reason, event_id)
         if event_id is not None and event_id in self._ids:
