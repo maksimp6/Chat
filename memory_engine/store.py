@@ -678,6 +678,11 @@ class MemoryStore:
             except OSError as exc:
                 self._engine._failed = True
                 raise StoreError("durability confirmation failed; recovery required") from exc
+            except BaseException:
+                # Cancellation leaves the recovered durability barrier uncertain.
+                # Fence the writer while preserving the original exception.
+                self._engine._failed = True
+                raise
             return commit
 
     def info(self) -> DatabaseInfo:

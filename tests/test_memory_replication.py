@@ -244,3 +244,55 @@ def test_empty_confirmation_and_directory_failure(tmp_path, monkeypatch):
         with pytest.raises(StoreError):
             sink(store).apply(packet())
         assert count == 2
+
+
+@pytest.mark.parametrize("cancel_at", [1, 2], ids=["file", "directory"])
+def test_interrupted_recovered_confirmation_preserves_exception_and_fences(
+    tmp_path, monkeypatch, cancel_at
+):
+    path = tmp_path / "db"
+    with MemoryStore(path) as store:
+        with monkeypatch.context() as injected:
+
+            def fail(_fd):
+                raise OSError("initial fsync uncertainty")
+
+            injected.setattr(os, "fsync", fail)
+            with pytest.raises(StoreError):
+                sink(store).apply(packet())
+
+    # A complete frame can survive the failure; replay alone is not a barrier.
+    with MemoryStore(path) as store:
+        receiver = sink(store)
+        assert store.last_commit.sequence == 1 and store.get("item") == 7
+        cursor = store._engine.get("_replication", "cursor")
+        next_packet = packet(2, cursor["digest"])
+        real_fsync = os.fsync
+        cancellation = KeyboardInterrupt("confirmation interrupted")
+        count = 0
+
+        def cancel(fd):
+            nonlocal count
+            count += 1
+            if count == cancel_at:
+                raise cancellation
+            real_fsync(fd)
+
+        with monkeypatch.context() as injected:
+            injected.setattr(os, "fsync", cancel)
+            with pytest.raises(KeyboardInterrupt) as raised:
+                receiver.apply(packet())
+        assert raised.value is cancellation and count == cancel_at
+
+        # Restoring fsync must not silently remove the uncertainty fence.
+        for wire in (packet(), next_packet):
+            with pytest.raises(StoreError, match="recovery required"):
+                receiver.apply(wire)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.confirm_durable()
+        with pytest.raises(StoreError, match="recovery required"):
+            store.set("local", 99)
+        with pytest.raises(StoreError, match="recovery required"):
+            store.commit()
+        assert store.last_commit.sequence == 1
+        assert store._engine.get("_replication", "cursor") == cursor
