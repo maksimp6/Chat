@@ -61,6 +61,7 @@ def _install_tls_pin(client: Any, expected_fingerprint: bytes) -> None:
     Paho reconnect invokes on_socket_open *before* _send_connect.  All reconnects
     use the same callback; mismatch raises and prevents MQTT credential delivery.
     """
+
     def on_socket_open(_client: Any, _userdata: Any, sock: Any) -> None:
         if not isinstance(sock, ssl.SSLSocket):
             raise ssl.SSLError("printer MQTT socket is not TLS")
