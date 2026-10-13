@@ -160,9 +160,7 @@ def test_cli_writes_single_image_report(tmp_path, monkeypatch):
     source = tmp_path / "sample.png"
     Image.new("RGB", (4, 4), "white").save(source)
     out = tmp_path / "out"
-    monkeypatch.setattr(
-        "sys.argv", ["analyze_images.py", str(source), "--output", str(out)]
-    )
+    monkeypatch.setattr("sys.argv", ["analyze_images.py", str(source), "--output", str(out)])
 
     module.main()
 
@@ -171,9 +169,7 @@ def test_cli_writes_single_image_report(tmp_path, monkeypatch):
     assert "comparison" not in report
 
 
-def test_cli_writes_comparison_report_and_refuses_report_collision(
-    tmp_path, monkeypatch
-):
+def test_cli_writes_comparison_report_and_refuses_report_collision(tmp_path, monkeypatch):
     first = tmp_path / "first.png"
     second = tmp_path / "second.png"
     Image.new("RGB", (4, 4), "white").save(first)
@@ -206,9 +202,7 @@ def test_cli_rejects_too_many_or_missing_images(tmp_path, monkeypatch):
     assert too_many.value.code == 2
 
     missing = tmp_path / "missing.png"
-    monkeypatch.setattr(
-        "sys.argv", ["analyze_images.py", str(missing), "--output", str(out)]
-    )
+    monkeypatch.setattr("sys.argv", ["analyze_images.py", str(missing), "--output", str(out)])
     with pytest.raises(SystemExit) as missing_input:
         module.main()
     assert missing_input.value.code == 2
