@@ -99,6 +99,7 @@ STRICT_CLEAN_FILES = {
     "plugin_manager.py",
     "pricing_registry.py",
     "printing3d/__init__.py",
+    "printing3d/plate.py",
     "provider_key_rotation.py",
     "repository_index/__init__.py",
     "repository_index/provenance.py",
