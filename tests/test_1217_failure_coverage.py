@@ -241,8 +241,12 @@ def test_private_profile_rejects_oversize(tmp_path):
 def test_no_mqtt_connection_on_invalid_inputs():
     with pytest.raises(ValueError, match="missing printer credentials"):
         bambu_lan.read_live_status(
-            "owner", "ABC", "", host="192.168.31.12",
-            trusted_cert_pem="", timeout=1,
+            "owner",
+            "ABC",
+            "",
+            host="192.168.31.12",
+            trusted_cert_pem="",
+            timeout=1,
         )
 
 
