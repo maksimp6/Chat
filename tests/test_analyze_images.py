@@ -154,6 +154,7 @@ def test_comparison_reports_dimensions_and_true_difference(tmp_path):
     assert "not geometrically registered" in result["warning"]
     with Image.open(tmp_path / result["output"]) as output:
         assert output.size == (20, 10)
+        assert output.getpixel((0, 0)) == (255, 255, 255)
 
 
 def test_cli_writes_single_image_report(tmp_path, monkeypatch):
