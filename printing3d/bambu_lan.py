@@ -7,6 +7,8 @@ access code from a local secret provider, never from repository configuration.
 from __future__ import annotations
 
 import importlib
+import hashlib
+import hmac
 import json
 import ssl
 import time
@@ -35,9 +37,41 @@ def consume_print_report(
     if len(payload) > 256 * 1024:
         raise ValueError("oversized printer message")
     decoded = json.loads(payload)
-    if not isinstance(decoded, dict):
+    if not isinstance(decoded, dict) or not isinstance(decoded.get("print"), dict):
         raise ValueError("invalid printer report")
+    if "gcode_state" not in decoded["print"]:
+        raise ValueError("not a printer state report")
     return record_bambu_print_report(owner_id, printer_id, decoded, timestamp)
+
+
+def _certificate_fingerprint(pem: str) -> bytes:
+    """Require a configured PEM; do not accept arbitrary network certificates."""
+    if not pem or "BEGIN CERTIFICATE" not in pem:
+        raise ValueError("trusted printer certificate required")
+    try:
+        der = ssl.PEM_cert_to_DER_cert(pem)
+    except ValueError as exc:
+        raise ValueError("invalid printer certificate") from exc
+    return hashlib.sha256(der).digest()
+
+
+def _install_tls_pin(client: Any, expected_fingerprint: bytes) -> None:
+    """Check the handshake peer before Paho transmits its MQTT CONNECT credentials.
+
+    Paho reconnect invokes on_socket_open *before* _send_connect.  All reconnects
+    use the same callback; mismatch raises and prevents MQTT credential delivery.
+    """
+    def on_socket_open(_client: Any, _userdata: Any, sock: Any) -> None:
+        if not isinstance(sock, ssl.SSLSocket):
+            raise ssl.SSLError("printer MQTT socket is not TLS")
+        cert = sock.getpeercert(binary_form=True)
+        if not cert or not hmac.compare_digest(
+            hashlib.sha256(cert).digest(), expected_fingerprint
+        ):
+            raise ssl.SSLError("printer TLS peer differs from trusted certificate")
+
+    client.suppress_exceptions = False
+    client.on_socket_open = on_socket_open
 
 
 def _install_callbacks(
@@ -58,9 +92,18 @@ def _install_callbacks(
     def on_subscribe(_client: Any, _userdata: Any, _mid: Any, reasons: Any, _props: Any) -> None:
         if any(reason.is_failure for reason in reasons):
             failures.append("MQTT subscription rejected")
+        else:
+            from .bambu_requests import encode_pushall, request_topic
+
+            _client.publish(request_topic(serial), encode_pushall("alice_status_1"), qos=0)
 
     def on_message(_client: Any, _userdata: Any, message: Any) -> None:
         try:
+            decoded = json.loads(message.payload)
+            if not isinstance(decoded, dict) or not isinstance(decoded.get("print"), dict):
+                return
+            if "gcode_state" not in decoded["print"]:
+                return  # Partial reports/ACKs are not evidence of state changes.
             changed = consume_print_report(
                 owner_id, serial, message.topic, message.payload, clock()
             )
@@ -86,11 +129,12 @@ def read_live_status(
     """Wait for one unsolicited report. Never publish commands or credentials.
 
     Bambu LAN firmware uses a device-local self-signed TLS certificate.
-    The connection is LAN-scoped, but certificate identity cannot be verified
-    without a separately pinned trust anchor.
+    The connection is LAN-scoped. Its exact DER certificate is verified via a
+    pre-CONNECT TLS socket hook, because the device leaf may lack X.509 CA KU.
     """
     if not access_code or not host or timeout <= 0 or timeout > 120:
         raise ValueError("missing printer credentials or invalid timeout")
+    expected_fingerprint = _certificate_fingerprint(trusted_cert_pem)
     topic = printer_report_topic(serial)
     received: list[dict[str, Any]] = []
     failures: list[str] = []
