@@ -100,6 +100,7 @@ STRICT_CLEAN_FILES = {
     "pricing_registry.py",
     "printing3d/__init__.py",
     "printing3d/downtime.py",
+    "printing3d/bambu_telemetry.py",
     "provider_key_rotation.py",
     "repository_index/__init__.py",
     "repository_index/provenance.py",
