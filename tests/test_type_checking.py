@@ -54,6 +54,7 @@ STRICT_CLEAN_FILES = {
     "agent_memory/client.py",
     "agent_shell/store.py",
     "memory_engine/__init__.py",
+    "memory_engine/replication.py",
     "memory_engine/store.py",
     "agent_office/__init__.py",
     "agent_office/dispatch_model.py",
