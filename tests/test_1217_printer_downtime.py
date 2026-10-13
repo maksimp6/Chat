@@ -1,4 +1,5 @@
 """Contract regression tests for #1217 printer downtime intervals."""
+
 from printing3d.downtime import DowntimeTracker
 
 
