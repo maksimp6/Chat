@@ -33,6 +33,7 @@ public class LauncherActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView clock;
+    private AgentStatusClient agentStatus;
     private EditText search;
     private GridView grid;
     private List<ResolveInfo> allApps;
@@ -51,6 +52,8 @@ public class LauncherActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_launcher);
         clock = (TextView) findViewById(R.id.clock);
+        agentStatus = new AgentStatusClient(this, (TextView) findViewById(R.id.status));
+        agentStatus.start();
         search = (EditText) findViewById(R.id.search);
         grid = (GridView) findViewById(R.id.apps);
 
@@ -88,6 +91,12 @@ public class LauncherActivity extends Activity {
     protected void onResume() {
         super.onResume();
         handler.post(tick);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        agentStatus.stop();
     }
 
     @Override

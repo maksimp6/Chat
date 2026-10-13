@@ -38,6 +38,15 @@
         android:text="Alice Pro"
         android:textColor="#FFFFFF" />
 
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Проверка агента..."
+        android:textColor="#8A94A6"
+        android:textSize="12sp" />
+
     <GridView
         android:id="@+id/apps"
         android:layout_width="match_parent"
