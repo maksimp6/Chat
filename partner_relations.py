@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 
-from db import get_conn
+from db import get_store
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 
@@ -74,87 +74,7 @@ def _trace_event(cfg: Optional[dict[str, Any]], event_type: str, payload: dict[s
 
 
 def init_partner_relations_tables() -> None:
-    conn = get_conn()
-    try:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS partners (
-                id TEXT PRIMARY KEY,
-                owner_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                organization TEXT NOT NULL DEFAULT '',
-                email TEXT NOT NULL DEFAULT '',
-                phone TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'lead',
-                notes TEXT NOT NULL DEFAULT '',
-                metadata_json TEXT NOT NULL DEFAULT '{}',
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_partners_owner_updated
-               ON partners(owner_id, updated_at DESC)"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS partner_contacts (
-                id TEXT PRIMARY KEY,
-                owner_id TEXT NOT NULL,
-                partner_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT '',
-                email TEXT NOT NULL DEFAULT '',
-                phone TEXT NOT NULL DEFAULT '',
-                notes TEXT NOT NULL DEFAULT '',
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_partner_contacts_owner_partner
-               ON partner_contacts(owner_id, partner_id, updated_at DESC)"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS partner_messages (
-                id TEXT PRIMARY KEY,
-                owner_id TEXT NOT NULL,
-                partner_id TEXT NOT NULL,
-                direction TEXT NOT NULL,
-                subject TEXT NOT NULL DEFAULT '',
-                body TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'recorded',
-                reference_type TEXT NOT NULL DEFAULT '',
-                reference_id TEXT NOT NULL DEFAULT '',
-                external_ref TEXT NOT NULL DEFAULT '',
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_partner_messages_owner_partner
-               ON partner_messages(owner_id, partner_id, created_at ASC)"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS partner_followups (
-                id TEXT PRIMARY KEY,
-                owner_id TEXT NOT NULL,
-                partner_id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                due_at INTEGER,
-                status TEXT NOT NULL DEFAULT 'open',
-                notes TEXT NOT NULL DEFAULT '',
-                reference_type TEXT NOT NULL DEFAULT '',
-                reference_id TEXT NOT NULL DEFAULT '',
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            )"""
-        )
-        conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_partner_followups_owner_due
-               ON partner_followups(owner_id, status, due_at ASC)"""
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    get_store()
 
 
 def _validate_status(value: str, allowed: tuple[str, ...], field: str) -> str:
@@ -165,76 +85,23 @@ def _validate_status(value: str, allowed: tuple[str, ...], field: str) -> str:
 
 
 def _partner_row(row: Any) -> dict[str, Any]:
-    return {
-        "id": row["id"],
-        "name": row["name"],
-        "organization": row["organization"],
-        "email": row["email"],
-        "phone": row["phone"],
-        "status": row["status"],
-        "notes": row["notes"],
-        "metadata": _parse(row["metadata_json"], {}),
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }
+    return {key: value for key, value in row.items() if key != "owner_id"}
 
 
 def _contact_row(row: Any) -> dict[str, Any]:
-    return {
-        "id": row["id"],
-        "partner_id": row["partner_id"],
-        "name": row["name"],
-        "role": row["role"],
-        "email": row["email"],
-        "phone": row["phone"],
-        "notes": row["notes"],
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }
+    return {key: value for key, value in row.items() if key != "owner_id"}
 
 
 def _message_row(row: Any) -> dict[str, Any]:
-    return {
-        "id": row["id"],
-        "partner_id": row["partner_id"],
-        "direction": row["direction"],
-        "subject": row["subject"],
-        "body": row["body"],
-        "status": row["status"],
-        "reference_type": row["reference_type"],
-        "reference_id": row["reference_id"],
-        "external_ref": row["external_ref"],
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }
+    return {key: value for key, value in row.items() if key != "owner_id"}
 
 
 def _followup_row(row: Any) -> dict[str, Any]:
-    return {
-        "id": row["id"],
-        "partner_id": row["partner_id"],
-        "title": row["title"],
-        "due_at": row["due_at"],
-        "status": row["status"],
-        "notes": row["notes"],
-        "reference_type": row["reference_type"],
-        "reference_id": row["reference_id"],
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }
+    return {key: value for key, value in row.items() if key != "owner_id"}
 
 
 def _get_partner(owner_id: str, partner_id: str) -> Optional[dict[str, Any]]:
-    init_partner_relations_tables()
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM partners WHERE id = ? AND owner_id = ?",
-            (str(partner_id), owner_id),
-        ).fetchone()
-    finally:
-        conn.close()
-    return _partner_row(row) if row else None
+    return _get_owned("partner", str(partner_id), owner_id)
 
 
 def create_partner(
@@ -249,29 +116,23 @@ def create_partner(
     now = _now()
 
     init_partner_relations_tables()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO partners
-               (id, owner_id, name, organization, email, phone, status, notes, metadata_json, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                partner_id,
-                owner_id,
-                name,
-                str(arguments.get("organization") or "").strip(),
-                str(arguments.get("email") or "").strip(),
-                str(arguments.get("phone") or "").strip(),
-                status,
-                str(arguments.get("notes") or "").strip(),
-                _json(dict(arguments.get("metadata") or {})),
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _insert_owned(
+        "partner",
+        partner_id,
+        {
+            "id": partner_id,
+            "owner_id": owner_id,
+            "name": name,
+            "organization": str(arguments.get("organization") or "").strip(),
+            "email": str(arguments.get("email") or "").strip(),
+            "phone": str(arguments.get("phone") or "").strip(),
+            "status": status,
+            "notes": str(arguments.get("notes") or "").strip(),
+            "metadata": dict(arguments.get("metadata") or {}),
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
 
     _trace_event(
         cfg,
@@ -292,21 +153,12 @@ def list_partners(
     owner_id = _trusted_owner(cfg)
     status = str(arguments.get("status") or "").strip().lower()
     init_partner_relations_tables()
-    conn = get_conn()
-    try:
-        if status:
-            _validate_status(status, PARTNER_STATUSES, "partner status")
-            rows = conn.execute(
-                "SELECT * FROM partners WHERE owner_id = ? AND status = ? ORDER BY updated_at DESC, name ASC",
-                (owner_id, status),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM partners WHERE owner_id = ? ORDER BY updated_at DESC, name ASC",
-                (owner_id,),
-            ).fetchall()
-    finally:
-        conn.close()
+    if status:
+        _validate_status(status, PARTNER_STATUSES, "partner status")
+    rows = [
+        row for row in _owned_rows("partner", owner_id) if not status or row["status"] == status
+    ]
+    rows.sort(key=lambda row: (-row["updated_at"], row["name"]))
     return {"partners": [_partner_row(row) for row in rows]}
 
 
@@ -321,22 +173,15 @@ def get_partner(
     if not partner:
         raise ValueError("partner not found")
     init_partner_relations_tables()
-    conn = get_conn()
-    try:
-        contacts = conn.execute(
-            "SELECT * FROM partner_contacts WHERE owner_id = ? AND partner_id = ? ORDER BY updated_at DESC, name ASC",
-            (owner_id, partner_id),
-        ).fetchall()
-        messages = conn.execute(
-            "SELECT * FROM partner_messages WHERE owner_id = ? AND partner_id = ? ORDER BY created_at ASC",
-            (owner_id, partner_id),
-        ).fetchall()
-        followups = conn.execute(
-            "SELECT * FROM partner_followups WHERE owner_id = ? AND partner_id = ? ORDER BY due_at ASC NULLS LAST, created_at ASC",
-            (owner_id, partner_id),
-        ).fetchall()
-    finally:
-        conn.close()
+    contacts = _owned_rows("contact", owner_id, partner_id)
+    contacts.sort(key=lambda row: (-row["updated_at"], row["name"]))
+    messages = sorted(
+        _owned_rows("message", owner_id, partner_id), key=lambda row: row["created_at"]
+    )
+    followups = sorted(
+        _owned_rows("followup", owner_id, partner_id),
+        key=lambda row: (row["due_at"] is None, row["due_at"] or 0, row["created_at"]),
+    )
 
     partner["contacts"] = [_contact_row(row) for row in contacts]
     partner["messages"] = [_message_row(row) for row in messages]
@@ -354,15 +199,7 @@ def delete_partner(
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE partners SET status = 'archived', updated_at = ? WHERE id = ? AND owner_id = ?",
-            (now, partner_id, owner_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _update_owned("partner", partner_id, owner_id, {"status": "archived", "updated_at": now})
     _trace_event(
         cfg,
         "partner_action",
@@ -395,27 +232,7 @@ def update_partner(
     }
     status = _validate_status(arguments.get("status") or "lead", PARTNER_STATUSES, "partner status")
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """UPDATE partners
-               SET name = ?, organization = ?, email = ?, phone = ?, status = ?, notes = ?, updated_at = ?
-             WHERE id = ? AND owner_id = ?""",
-            (
-                allowed["name"],
-                allowed["organization"],
-                allowed["email"],
-                allowed["phone"],
-                status,
-                allowed["notes"],
-                now,
-                partner_id,
-                owner_id,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _update_owned("partner", partner_id, owner_id, {**allowed, "status": status, "updated_at": now})
     _trace_event(
         cfg,
         "partner_action",
@@ -441,28 +258,22 @@ def add_contact(
         raise ValueError("partner not found")
     contact_id = str(arguments.get("id") or uuid4())
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO partner_contacts
-               (id, owner_id, partner_id, name, role, email, phone, notes, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                contact_id,
-                owner_id,
-                partner_id,
-                name,
-                str(arguments.get("role") or "").strip(),
-                str(arguments.get("email") or "").strip(),
-                str(arguments.get("phone") or "").strip(),
-                str(arguments.get("notes") or "").strip(),
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _insert_owned(
+        "contact",
+        contact_id,
+        {
+            "id": contact_id,
+            "owner_id": owner_id,
+            "partner_id": partner_id,
+            "name": name,
+            "role": str(arguments.get("role") or "").strip(),
+            "email": str(arguments.get("email") or "").strip(),
+            "phone": str(arguments.get("phone") or "").strip(),
+            "notes": str(arguments.get("notes") or "").strip(),
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
     _trace_event(
         cfg,
         "partner_action",
@@ -477,15 +288,7 @@ def add_contact(
 
 
 def _contact_for_owner(owner_id: str, contact_id: str) -> Optional[dict[str, Any]]:
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM partner_contacts WHERE id = ? AND owner_id = ?",
-            (contact_id, owner_id),
-        ).fetchone()
-    finally:
-        conn.close()
-    return _contact_row(row) if row else None
+    return _get_owned("contact", contact_id, owner_id)
 
 
 def list_contacts(
@@ -497,14 +300,10 @@ def list_contacts(
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT * FROM partner_contacts WHERE owner_id = ? AND partner_id = ? ORDER BY updated_at DESC, name ASC",
-            (owner_id, partner_id),
-        ).fetchall()
-    finally:
-        conn.close()
+    rows = sorted(
+        _owned_rows("contact", owner_id, partner_id),
+        key=lambda row: (-row["updated_at"], row["name"]),
+    )
     return {"contacts": [_contact_row(row) for row in rows]}
 
 
@@ -519,26 +318,11 @@ def update_contact(
     if not existing:
         raise ValueError("contact not found")
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """UPDATE partner_contacts
-               SET name = ?, role = ?, email = ?, phone = ?, notes = ?, updated_at = ?
-             WHERE id = ? AND owner_id = ?""",
-            (
-                str(arguments.get("name") or existing["name"]).strip(),
-                str(arguments.get("role") or existing["role"]).strip(),
-                str(arguments.get("email") or existing["email"]).strip(),
-                str(arguments.get("phone") or existing["phone"]).strip(),
-                str(arguments.get("notes") or existing["notes"]).strip(),
-                now,
-                contact_id,
-                owner_id,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    changes = {
+        field: str(arguments.get(field) or existing[field]).strip()
+        for field in ("name", "role", "email", "phone", "notes")
+    }
+    _update_owned("contact", contact_id, owner_id, {**changes, "updated_at": now})
     _trace_event(
         cfg,
         "partner_action",
@@ -562,15 +346,12 @@ def delete_contact(
     existing = _contact_for_owner(owner_id, contact_id)
     if not existing:
         raise ValueError("contact not found")
-    conn = get_conn()
-    try:
-        conn.execute(
-            "DELETE FROM partner_contacts WHERE id = ? AND owner_id = ?",
-            (contact_id, owner_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    key = "partners/contact/" + contact_id
+    with get_store().transaction() as tx:
+        row = tx.get(key)
+        if row is None or row["owner_id"] != owner_id:
+            raise ValueError("contact not found")
+        tx.delete(key)
     _trace_event(
         cfg,
         "partner_action",
@@ -600,30 +381,24 @@ def prepare_message(
     message_id = str(arguments.get("message_id") or uuid4())
     status = "prepared" if direction == "outgoing" else "recorded"
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO partner_messages
-               (id, owner_id, partner_id, direction, subject, body, status,
-                reference_type, reference_id, external_ref, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)""",
-            (
-                message_id,
-                owner_id,
-                partner_id,
-                direction,
-                str(arguments.get("subject") or "").strip(),
-                body,
-                status,
-                str(arguments.get("reference_type") or "").strip(),
-                str(arguments.get("reference_id") or "").strip(),
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _insert_owned(
+        "message",
+        message_id,
+        {
+            "id": message_id,
+            "owner_id": owner_id,
+            "partner_id": partner_id,
+            "direction": direction,
+            "subject": str(arguments.get("subject") or "").strip(),
+            "body": body,
+            "status": status,
+            "reference_type": str(arguments.get("reference_type") or "").strip(),
+            "reference_id": str(arguments.get("reference_id") or "").strip(),
+            "external_ref": "",
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
     _trace_event(
         cfg,
         "partner_message_prepared",
@@ -640,15 +415,7 @@ def prepare_message(
 
 
 def get_message(owner_id: str, message_id: str) -> Optional[dict[str, Any]]:
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM partner_messages WHERE id = ? AND owner_id = ?",
-            (message_id, owner_id),
-        ).fetchone()
-    finally:
-        conn.close()
-    return _message_row(row) if row else None
+    return _get_owned("message", message_id, owner_id)
 
 
 def queue_message(
@@ -664,17 +431,13 @@ def queue_message(
     if message["direction"] != "outgoing":
         raise ValueError("only outgoing messages can be queued")
     now = _now()
-    conn = get_conn()
-    try:
-        cur = conn.execute(
-            """UPDATE partner_messages
-               SET status = 'queued', updated_at = ?
-             WHERE id = ? AND owner_id = ? AND status IN ('prepared', 'queued')""",
-            (now, message_id, owner_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    changed = _update_owned(
+        "message",
+        message_id,
+        owner_id,
+        {"status": "queued", "updated_at": now},
+        allowed_statuses=("prepared", "queued"),
+    )
     _trace_event(
         cfg,
         "partner_message_queued",
@@ -682,7 +445,7 @@ def queue_message(
             "action": "message_send",
             "partner_id": message["partner_id"],
             "message_id": message_id,
-            "status": "queued" if cur.rowcount else message["status"],
+            "status": "queued" if changed else message["status"],
             "owner_id": owner_id,
             "transport": "not_configured",
         },
@@ -690,7 +453,7 @@ def queue_message(
     return {
         "message": get_message(owner_id, message_id),
         "delivery": {
-            "status": "queued",
+            "status": "queued" if changed else message["status"],
             "transport": "not_configured",
             "note": "Внешний канал доставки не настроен; сообщение сохранено в истории и ожидает transport adapter.",
         },
@@ -706,14 +469,7 @@ def get_thread(
         raise ValueError("partner_id is required")
     if not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT * FROM partner_messages WHERE owner_id = ? AND partner_id = ? ORDER BY created_at ASC",
-            (owner_id, partner_id),
-        ).fetchall()
-    finally:
-        conn.close()
+    rows = sorted(_owned_rows("message", owner_id, partner_id), key=lambda row: row["created_at"])
     return {"messages": [_message_row(row) for row in rows]}
 
 
@@ -725,15 +481,7 @@ def update_status(
     status = _validate_status(arguments.get("status"), PARTNER_STATUSES, "partner status")
     if not partner_id or not _get_partner(owner_id, partner_id):
         raise ValueError("partner not found")
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE partners SET status = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
-            (status, _now(), partner_id, owner_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _update_owned("partner", partner_id, owner_id, {"status": status, "updated_at": _now()})
     _trace_event(
         cfg,
         "partner_status_updated",
@@ -761,29 +509,23 @@ def create_followup(
     due_at = arguments.get("due_at")
     due_value = int(due_at) if due_at not in (None, "") else None
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO partner_followups
-               (id, owner_id, partner_id, title, due_at, status, notes,
-                reference_type, reference_id, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)""",
-            (
-                followup_id,
-                owner_id,
-                partner_id,
-                title,
-                due_value,
-                str(arguments.get("notes") or "").strip(),
-                str(arguments.get("reference_type") or "").strip(),
-                str(arguments.get("reference_id") or "").strip(),
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _insert_owned(
+        "followup",
+        followup_id,
+        {
+            "id": followup_id,
+            "owner_id": owner_id,
+            "partner_id": partner_id,
+            "title": title,
+            "due_at": due_value,
+            "status": "open",
+            "notes": str(arguments.get("notes") or "").strip(),
+            "reference_type": str(arguments.get("reference_type") or "").strip(),
+            "reference_id": str(arguments.get("reference_id") or "").strip(),
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
     _trace_event(
         cfg,
         "partner_followup_created",
@@ -798,15 +540,7 @@ def create_followup(
 
 
 def get_followup(owner_id: str, followup_id: str) -> Optional[dict[str, Any]]:
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM partner_followups WHERE id = ? AND owner_id = ?",
-            (followup_id, owner_id),
-        ).fetchone()
-    finally:
-        conn.close()
-    return _followup_row(row) if row else None
+    return _get_owned("followup", followup_id, owner_id)
 
 
 def complete_followup(
@@ -823,15 +557,7 @@ def complete_followup(
         arguments.get("status") or "completed", FOLLOWUP_STATUSES, "follow-up status"
     )
     now = _now()
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE partner_followups SET status = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
-            (status, now, followup_id, owner_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _update_owned("followup", followup_id, owner_id, {"status": status, "updated_at": now})
     _trace_event(
         cfg,
         "partner_followup_completed",
@@ -1371,3 +1097,51 @@ __all__ = [
     "init_partner_relations_tables",
     "partner_relations_bp",
 ]
+
+
+def _get_owned(kind: str, identity: str, owner_id: str) -> Optional[dict[str, Any]]:
+    row = get_store().get("partners/" + kind + "/" + identity)
+    return (
+        {key: value for key, value in row.items() if key != "owner_id"}
+        if row and row["owner_id"] == owner_id
+        else None
+    )
+
+
+def _owned_rows(kind: str, owner_id: str, partner_id: Optional[str] = None) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in get_store().items(prefix="partners/" + kind + "/").values()
+        if row["owner_id"] == owner_id and (partner_id is None or row["partner_id"] == partner_id)
+    ]
+
+
+def _insert_owned(kind: str, identity: str, row: dict[str, Any]) -> None:
+    key = "partners/" + kind + "/" + identity
+    with get_store().transaction() as tx:
+        if tx.get(key) is not None:
+            raise ValueError("record already exists")
+        if kind != "partner":
+            parent = tx.get("partners/partner/" + row["partner_id"])
+            if parent is None or parent["owner_id"] != row["owner_id"]:
+                raise ValueError("partner not found")
+        tx.set(key, row)
+
+
+def _update_owned(
+    kind: str,
+    identity: str,
+    owner_id: str,
+    changes: dict[str, Any],
+    *,
+    allowed_statuses: tuple[str, ...] = (),
+) -> bool:
+    key = "partners/" + kind + "/" + identity
+    with get_store().transaction() as tx:
+        row = tx.get(key)
+        if row is None or row["owner_id"] != owner_id:
+            raise ValueError("record not found")
+        if allowed_statuses and row["status"] not in allowed_statuses:
+            return False
+        tx.set(key, {**row, **changes})
+    return True

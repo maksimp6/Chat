@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from db import get_conn, init_db as init_runtime_db
+from db import get_store, init_db as init_runtime_db
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
 from trace_manager import ExecutionTrace
@@ -109,68 +109,23 @@ def resolve_commit(branch: str, commit_sha: Optional[str] = None) -> str:
 
 
 def init_environment_tables() -> None:
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS environments (
-                environment_id TEXT PRIMARY KEY,
-                branch_name TEXT NOT NULL,
-                commit_sha TEXT NOT NULL,
-                status TEXT NOT NULL,
-                url TEXT,
-                runtime_pid INTEGER,
-                runtime_port INTEGER,
-                data_namespace TEXT NOT NULL,
-                owner_id TEXT,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                started_at INTEGER,
-                stopped_at INTEGER,
-                deleted_at INTEGER,
-                error TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS environment_events (
-                event_id TEXT PRIMARY KEY,
-                environment_id TEXT NOT NULL,
-                operation TEXT NOT NULL,
-                status TEXT NOT NULL,
-                trace_id TEXT NOT NULL,
-                trace_json TEXT NOT NULL,
-                created_at INTEGER NOT NULL
-            )
-            """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_environments_owner ON environments(owner_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_environments_status ON environments(status)")
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_environment_events_env ON environment_events(environment_id)"
-        )
-        running_rows = conn.execute(
-            "SELECT environment_id FROM environments WHERE status = ?",
-            ("RUNNING",),
-        ).fetchall()
-        with _RUNTIME_WORKERS_LOCK:
-            active_runtime_ids = set(_RUNTIME_WORKERS)
-        for row in running_rows:
-            runtime_id = row["environment_id"] if hasattr(row, "keys") else row[0]
-            if runtime_id not in active_runtime_ids:
-                conn.execute(
-                    """
-                    UPDATE environments
-                       SET status = ?, runtime_pid = NULL, runtime_port = NULL,
-                           updated_at = ?, stopped_at = COALESCE(stopped_at, ?)
-                     WHERE environment_id = ?
-                    """,
-                    ("STOPPED", _now(), _now(), runtime_id),
+    with _RUNTIME_WORKERS_LOCK:
+        active = set(_RUNTIME_WORKERS)
+    store = get_store()
+    with store.transaction() as tx:
+        for key, row in store.items(prefix="environment/record/").items():
+            if row["status"] == "RUNNING" and row["environment_id"] not in active:
+                tx.set(
+                    key,
+                    {
+                        **row,
+                        "status": "STOPPED",
+                        "runtime_pid": None,
+                        "runtime_port": None,
+                        "updated_at": _now(),
+                        "stopped_at": row["stopped_at"] or _now(),
+                    },
                 )
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def _transition(current: str, target: str) -> None:
@@ -191,15 +146,8 @@ def _row_to_dict(row) -> Dict[str, Any]:
 
 
 def _get(environment_id: str) -> Optional[Dict[str, Any]]:
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM environments WHERE environment_id = ?",
-            (environment_id,),
-        ).fetchone()
-        return _row_to_dict(row) if row else None
-    finally:
-        conn.close()
+    row = get_store().get("environment/record/" + environment_id)
+    return _row_to_dict(row) if row is not None else None
 
 
 def _owned(case: Dict[str, Any], owner_id: Optional[str]) -> bool:
@@ -263,27 +211,20 @@ def _record_trace(
         trace.record_error(operation, error)
     trace.finalize()
     trace_json = trace.trace
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            INSERT INTO environment_events
-            (event_id, environment_id, operation, status, trace_id, trace_json, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(uuid.uuid4()),
-                environment["environment_id"],
-                operation,
-                status,
-                trace.trace_id,
-                json.dumps(trace_json, ensure_ascii=False),
-                _now(),
-            ),
+    with get_store().transaction() as tx:
+        event_id = str(uuid.uuid4())
+        tx.set(
+            "environment/event/" + event_id,
+            {
+                "event_id": event_id,
+                "environment_id": environment["environment_id"],
+                "operation": operation,
+                "status": status,
+                "trace_id": trace.trace_id,
+                "trace_json": trace_json,
+                "created_at": _now(),
+            },
         )
-        conn.commit()
-    finally:
-        conn.close()
     return trace_json
 
 
@@ -424,6 +365,9 @@ class EnvironmentRuntime:
             with _RUNTIME_WORKERS_LOCK:
                 _RUNTIME_WORKERS.pop(self.runtime_id, None)
             _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
+            from agent_memory.client import close_memory_clients
+
+            close_memory_clients(self.data_dir / "alice.memory")
             raise
 
     def submit(
@@ -494,6 +438,9 @@ class EnvironmentRuntime:
             if _RUNTIME_WORKERS.get(self.runtime_id) is self:
                 _RUNTIME_WORKERS.pop(self.runtime_id, None)
         _RUNTIME_DISPATCHER.unregister_runtime(self.runtime_id)
+        from agent_memory.client import close_memory_clients
+
+        close_memory_clients(self.data_dir / "alice.memory")
 
     def remove(self) -> None:
         if self.worktree.exists():
@@ -659,31 +606,10 @@ def create_environment(
         "deleted_at": None,
         "error": None,
     }
-    conn = get_conn()
-    try:
-        conn.execute(
-            """
-            INSERT INTO environments
-            (environment_id, branch_name, commit_sha, status, url, runtime_pid,
-             runtime_port, data_namespace, owner_id, created_at, updated_at,
-             started_at, stopped_at, deleted_at, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            tuple(item.values()),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    item["status"] = "STOPPED"
+    with get_store().transaction() as tx:
+        tx.set("environment/record/" + environment_id, item)
     _transition("CREATING", "STOPPED")
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE environments SET status = ?, updated_at = ? WHERE environment_id = ?",
-            ("STOPPED", _now(), environment_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
     item["status"] = "STOPPED"
     _record_trace(item, "CREATE_ENVIRONMENT", "SUCCESS", context=context)
     return item
@@ -691,18 +617,14 @@ def create_environment(
 
 def list_environments(owner_id: Optional[str] = None) -> list[Dict[str, Any]]:
     init_environment_tables()
-    conn = get_conn()
-    try:
-        if owner_id:
-            rows = conn.execute(
-                "SELECT * FROM environments WHERE owner_id = ? OR owner_id IS NULL ORDER BY created_at DESC",
-                (owner_id,),
-            ).fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM environments ORDER BY created_at DESC").fetchall()
-        return [_row_to_dict(row) for row in rows]
-    finally:
-        conn.close()
+    rows = [
+        row
+        for row in get_store().items(prefix="environment/record/").values()
+        if not owner_id or not row["owner_id"] or row["owner_id"] == owner_id
+    ]
+    return [
+        _row_to_dict(row) for row in sorted(rows, key=lambda row: row["created_at"], reverse=True)
+    ]
 
 
 def start_environment(
@@ -713,20 +635,16 @@ def start_environment(
     runtime = EnvironmentRuntime(item)
     try:
         thread_id = runtime.start()
-        conn = get_conn()
-        try:
-            conn.execute(
-                """
-                UPDATE environments
-                   SET status = ?, runtime_pid = NULL, runtime_port = NULL,
-                       started_at = ?, updated_at = ?, error = NULL
-                 WHERE environment_id = ?
-                """,
-                ("RUNNING", _now(), _now(), environment_id),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        _persist_environment(
+            environment_id,
+            {
+                "status": "RUNNING",
+                "runtime_pid": None,
+                "runtime_port": None,
+                "started_at": _now(),
+                "error": None,
+            },
+        )
         item.update(
             {
                 "status": "RUNNING",
@@ -746,15 +664,7 @@ def start_environment(
         )
         return item
     except Exception as exc:
-        conn = get_conn()
-        try:
-            conn.execute(
-                "UPDATE environments SET status = ?, error = ?, updated_at = ? WHERE environment_id = ?",
-                ("FAILED", str(exc), _now(), environment_id),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        _persist_environment(environment_id, {"status": "FAILED", "error": str(exc)})
         item.update({"status": "FAILED", "error": str(exc)})
         _record_trace(item, "START_ENVIRONMENT", "FAILED", context=context, error=str(exc))
         raise
@@ -769,15 +679,10 @@ def stop_environment(
         runtime = _RUNTIME_WORKERS.get(environment_id)
     if runtime is not None:
         runtime.stop()
-    conn = get_conn()
-    try:
-        conn.execute(
-            "UPDATE environments SET status = ?, runtime_pid = NULL, updated_at = ?, stopped_at = ? WHERE environment_id = ?",
-            ("STOPPED", _now(), _now(), environment_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    _persist_environment(
+        environment_id,
+        {"status": "STOPPED", "runtime_pid": None, "runtime_port": None, "stopped_at": _now()},
+    )
     item.update(
         {
             "status": "STOPPED",
@@ -811,10 +716,15 @@ def delete_environment(
     EnvironmentRuntime(item).remove()
     item.update({"status": "DELETING", "deleted_at": _now()})
     _record_trace(item, "DELETE_ENVIRONMENT", "SUCCESS", context=context)
-    conn = get_conn()
-    try:
-        conn.execute("DELETE FROM environments WHERE environment_id = ?", (environment_id,))
-        conn.commit()
-    finally:
-        conn.close()
+    with get_store().transaction() as tx:
+        tx.delete("environment/record/" + environment_id)
     return item
+
+
+def _persist_environment(environment_id: str, changes: Dict[str, Any]) -> None:
+    key = "environment/record/" + environment_id
+    with get_store().transaction() as tx:
+        old = tx.get(key)
+        if old is None:
+            raise KeyError("environment_not_found")
+        tx.set(key, {**old, **changes, "updated_at": _now()})

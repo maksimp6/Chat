@@ -106,8 +106,7 @@ def rotate_active_key(
             error=None,
             commit=False,
         )
-        if commit_before_revoke and hasattr(db, "commit"):
-            db.commit()
+        # Native promotion already passed the synchronous durability barrier.
         return provider_key_id, issued_at, expires_at
 
     provider_key_id, plaintext = provider.create_key(expires_at=expires_at)
@@ -131,8 +130,7 @@ def rotate_active_key(
         error=None,
         commit=False,
     )
-    if commit_before_revoke and hasattr(db, "commit"):
-        db.commit()
+    # Native promotion already passed the synchronous durability barrier.
     if old_provider_key_id:
         provider.revoke_key(old_provider_key_id)
     return provider_key_id, issued_at, expires_at

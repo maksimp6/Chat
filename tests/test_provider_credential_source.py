@@ -26,7 +26,7 @@ def test_yandex_request_path_requires_runtime_credential_store():
 def test_runtime_credential_resolution_has_no_environment_fallback_path():
     provider = (ROOT / "provider_credentials.py").read_text()
     mixin = (ROOT / "yandex_client_modules/request_mixin.py").read_text()
-    assert "get_conn()" in mixin
+    assert "get_store()" in mixin
     assert "decrypt_secret" in mixin
     assert "provider_credentials" in provider
 

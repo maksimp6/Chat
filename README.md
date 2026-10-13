@@ -17,7 +17,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
-- **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
+- **Native MemoryStore** for local/Termux and shared deployments, with one writer per durable journal.
 
 ## Architecture
 
@@ -59,7 +59,6 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 - Python: backend CI uses 3.14; Ruff targets 3.12.
 - Git.
-- Optional PostgreSQL 17, with `requirements-postgres.txt`.
 - For Android builds only: Android SDK API 37 and Gradle 9.5.0. CI runs Gradle with Java 25 and stages the embedded runtime with Python 3.13; the Android module declares JVM toolchain 17.
 
 ### Backend
@@ -75,7 +74,7 @@ Copy `.env.example` only for a fresh installation. Replace its placeholders and 
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL` only when selecting PostgreSQL.
+Alice stores authoritative runtime data in `memory_engine.MemoryStore`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
 
 ### Android
 

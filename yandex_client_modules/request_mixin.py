@@ -4,7 +4,7 @@ import os
 import requests
 
 from trace_manager import ExecutionTrace
-from db import get_conn
+from db import get_store
 from provider_credentials import resolve_client_credential
 
 try:
@@ -64,17 +64,14 @@ def _resolve_global_provider_credential(client, execution_trace=None):
             "ALICE_PROVIDER_CREDENTIAL_KEY is required for provider credentials"
         )
 
-    conn = get_conn()
-    try:
-        credential = resolve_client_credential(
-            client._config,
-            conn,
-            decrypt_secret,
-            encrypt_secret,
-            provider="yandex",
-        )
-    finally:
-        conn.close()
+    conn = get_store()
+    credential = resolve_client_credential(
+        client._config,
+        conn,
+        decrypt_secret,
+        encrypt_secret,
+        provider="yandex",
+    )
 
     if not isinstance(credential.project_id, str) or not credential.project_id.strip():
         raise YandexClientError("Active Yandex credential has no project_id")

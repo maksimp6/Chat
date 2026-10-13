@@ -33,7 +33,7 @@ jobs:
           core_dir=$(mktemp -d)
           cp -R memory_engine "$core_dir/"
           mkdir "$core_dir/tests"
-          cp tests/test_memory_checkpoint.py tests/test_memory_commit_safety.py tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py tests/test_memory_type_annotations.py "$core_dir/tests/"
+          cp tests/test_memory_checkpoint.py tests/test_memory_value_bounds.py tests/test_memory_commit_safety.py tests/test_memory_explicit_commit_contract.py tests/test_memory_v1_acceptance.py tests/test_memory_store.py tests/test_memory_standalone_boundary.py tests/test_memory_type_annotations.py "$core_dir/tests/"
           cd "$core_dir"
           python -m mypy --strict memory_engine
           python -m pytest -q

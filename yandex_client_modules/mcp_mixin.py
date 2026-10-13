@@ -135,11 +135,8 @@ class YandexMcpMixin:
         active_cats = None
         if conversation_id:
             try:
-                active_cats = (
-                    get_conv_settings(conversation_id).get("active_tool_categories")
-                    if get_conv_settings(conversation_id)
-                    else None
-                )
+                preferences = get_conv_settings(conversation_id) or {}
+                active_cats = preferences.get("active_tool_categories")
             except Exception:
                 active_cats = None
 
@@ -158,7 +155,7 @@ class YandexMcpMixin:
             ]
 
         hosted_tools = []
-        conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
+        conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
 
         raw_web_cfg = tools_config.get("web_search")

@@ -345,7 +345,7 @@ def _build_runtime_env(*, db_path: Path, port: int) -> dict[str, str]:
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     env["FLASK_DEBUG"] = "0"
-    env["ALICE_DB_PATH"] = str(db_path)
+    env["ALICE_MEMORY_PATH"] = str(db_path)
     env["ALICE_REQUIRE_SHORT_TOKEN"] = "0"
     env["ALICE_PROVIDER_CREDENTIALS_TOKEN"] = ""
     env.pop("ALICE_DATABASE_URL", None)
@@ -425,7 +425,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         server.stop()
         server = None
         if not db_path.exists() or db_path.stat().st_size <= 0:
-            raise SmokeFailure("SQLite database was not persisted")
+            raise SmokeFailure("Native MemoryStore journal was not persisted")
 
         server = _start_server(
             env=runtime_env,
@@ -473,7 +473,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             "status": status,
             "mode": "offline" if args.offline else "full",
             **git,
-            "database_backend": "sqlite",
+            "database_backend": "memory",
             "provider_inputs_present": provider_ready,
             "checks": checks,
             "blocked": blocked,
@@ -511,7 +511,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument(
         "--db-path",
-        help="Optional persistent SQLite path. Default is an isolated temporary database.",
+        help="Optional persistent native journal path. Default is an isolated temporary database.",
     )
     parser.add_argument(
         "--keep-db",

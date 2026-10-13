@@ -1,6 +1,6 @@
-import sqlite3
-
 import pytest
+
+from memory_engine.store import MemoryStore
 
 from agent_context import CacheLookup, ContextSlice, EvidenceVersion, TaskPacket, TaskScope
 from agent_memory import AgentMemoryStore, MemoryRecord
@@ -19,14 +19,7 @@ HEAD = "head-123"
 
 
 def _store(tmp_path):
-    path = tmp_path / "retrieval.db"
-
-    def connect():
-        conn = sqlite3.connect(path)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    return AgentMemoryStore(connect)
+    return AgentMemoryStore(MemoryStore(tmp_path / "retrieval.memory"))
 
 
 def _query(**overrides):

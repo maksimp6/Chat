@@ -1,3 +1,4 @@
+from agent_memory.client import close_memory_clients
 import pytest
 
 
@@ -47,7 +48,7 @@ def printing_db(tmp_path, monkeypatch):
 
     path = tmp_path / "printing3d.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_conn", db.get_conn)
+    monkeypatch.setattr(service, "get_store", db.get_store)
     db.init_db()
     service.init_3d_printing_tables()
     return path
@@ -374,54 +375,27 @@ def test_schema_migrates_legacy_print_orders(tmp_path, monkeypatch):
     import db
     import printing3d.service as service
 
-    path = tmp_path / "printing3d-legacy.db"
-    monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_conn", db.get_conn)
-
-    conn = db.get_conn()
-    conn.execute(
-        """
-        CREATE TABLE print_orders (
-            id TEXT PRIMARY KEY,
-            owner_id TEXT NOT NULL,
-            customer_name TEXT,
-            source TEXT NOT NULL DEFAULT 'manual',
-            title TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'lead',
-            currency TEXT NOT NULL DEFAULT 'RUB',
-            quoted_price REAL,
-            actual_revenue REAL,
-            quote_json TEXT NOT NULL DEFAULT '{}',
-            notes TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
-
+    evidence = b"SQLite format 3\0legacy order evidence"
+    legacy = tmp_path / "legacy.db"
+    legacy.write_bytes(evidence)
     service.init_3d_printing_tables()
-
-    conn = db.get_conn()
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(print_orders)").fetchall()}
-    conn.close()
-    assert {"actual_cost", "settled_at"} <= columns
+    created = service.create_order("owner", {"title": "Native order"})
+    close_memory_clients()
+    assert service.get_order("owner", created["id"]) == created
+    assert legacy.read_bytes() == evidence
 
 
 def test_order_row_recovers_from_invalid_quote_json(printing_db):
-    import printing3d.service as service
+    import db
     from printing3d import create_order, get_order
 
-    order = create_order("owner-a", {"title": "Broken quote cache"})
-    conn = service.get_conn()
-    conn.execute("UPDATE print_orders SET quote_json = ? WHERE id = ?", ("{", order["id"]))
-    conn.commit()
-    conn.close()
-
-    loaded = get_order("owner-a", order["id"])
-    assert loaded["quote"] == {}
-    assert "quote_json" not in loaded
+    order = create_order("owner-a", {"title": "Malformed native quote"})
+    key = "printing/order/" + order["id"]
+    with db.get_store().transaction() as tx:
+        tx.set(key, {**tx.get(key), "quote": "invalid"})
+    close_memory_clients()
+    with pytest.raises(ValueError, match="invalid native order record"):
+        get_order("owner-a", order["id"])
 
 
 def test_create_order_validation_and_actual_values(printing_db):

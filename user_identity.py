@@ -1,8 +1,7 @@
 """Durable Alice user identity backed by the file-native Memory DB.
 
-The public API stays stable while users, GitHub links and token hashes are stored
-as one atomic identity aggregate. Legacy SQL is consulted only by the bounded
-migration module before the first durable aggregate is committed.
+Users, GitHub links and token hashes are persisted atomically through the
+native MemoryStore. No SQL migration or compatibility layer is involved.
 """
 
 from __future__ import annotations
@@ -16,16 +15,15 @@ import time
 import uuid
 from typing import Any, Mapping, Optional
 
-from agent_memory.runtime_store import get_runtime_memory_db
-from agent_memory.user_identity_migration import ensure_user_identity_migrated
+from agent_memory.client import get_memory_client
 from agent_memory.user_identity_store import (
     GitHubAccountRecord,
     IdentityState,
+    IDENTITY_SCHEMA,
     UserIdentityStore,
     UserRecord,
 )
 from db import memory_file_path
-from db_backend import IntegrityError
 
 _INSTALLATION_RE = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 _SENSITIVE_KEY_RE = re.compile(
@@ -62,27 +60,27 @@ def _sanitize(value: Any) -> Any:
 
 
 def _store() -> UserIdentityStore:
-    store = UserIdentityStore(get_runtime_memory_db(memory_file_path()))
-    ensure_user_identity_migrated(store)
-    return store
+    return UserIdentityStore(get_memory_client(memory_file_path()))
 
 
 def _state() -> tuple[UserIdentityStore, IdentityState]:
     store = _store()
     state = store.load()
     if state is None:
-        raise RuntimeError("user identity migration did not produce durable state")
+        empty: IdentityState = {"schema": IDENTITY_SCHEMA, "users": {}, "github_accounts": {}}
+        store.save(empty)
+        state = empty
     return store, state
 
 
 def init_user_identity_table() -> None:
     with _IDENTITY_LOCK:
-        _store()
+        _state()
 
 
 def init_github_accounts_table() -> None:
     with _IDENTITY_LOCK:
-        _store()
+        _state()
 
 
 def _find_user_by_installation(
@@ -254,7 +252,7 @@ def _link_github_account(
             if user_id is None:
                 user_id = str(uuid.uuid4())
                 if user_id in state["users"]:
-                    raise IntegrityError("duplicate generated user id")
+                    raise ValueError("duplicate generated user id")
                 new_user = True
                 state["users"][user_id] = {
                     "installation_id": _github_installation_id(github_id),
@@ -293,20 +291,12 @@ def sign_in_with_github(
         raise ValueError("invalid github account")
 
     auth_token = _new_auth_token()
-    try:
-        user_id, new_user = _link_github_account(
-            github_id,
-            login,
-            current_user_id,
-            auth_token,
-        )
-    except IntegrityError:
-        user_id, new_user = _link_github_account(
-            github_id,
-            login,
-            current_user_id,
-            auth_token,
-        )
+    user_id, new_user = _link_github_account(
+        github_id,
+        login,
+        current_user_id,
+        auth_token,
+    )
     return {
         "user_id": user_id,
         "github_login": login,

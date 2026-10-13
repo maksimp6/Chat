@@ -1,9 +1,20 @@
+"""Extract facts and persist individual records directly in native MemoryStore."""
+
+from __future__ import annotations
+
+import hashlib
 import json
-import requests
 import os
-from db import get_conn, DB_PATH
+import time
+from typing import Any
+
+import requests
+
+from agent_memory.client import get_memory_client
+from db import memory_file_path
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+_FACT_PREFIX = "global_fact:"
 
 MEMORY_SCHEMA = {
     "type": "object",
@@ -15,11 +26,11 @@ MEMORY_SCHEMA = {
                 "properties": {
                     "category": {
                         "type": "string",
-                        "description": "Категория факта (например: 'git', 'paths', 'architecture', 'tools')",
+                        "description": "Категория факта",
                     },
                     "fact": {
                         "type": "string",
-                        "description": "Суть факта или договоренности в одном предложении",
+                        "description": "Краткий устойчивый факт",
                     },
                 },
                 "required": ["category", "fact"],
@@ -30,30 +41,60 @@ MEMORY_SCHEMA = {
 }
 
 
-def init_global_memory():
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS global_memory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT,
-            fact TEXT NOT NULL UNIQUE,
-            updated_at INTEGER NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+def init_global_memory() -> None:
+    """Open the native journal. There is no SQL schema to initialize."""
+    get_memory_client(memory_file_path())
 
 
-def extract_and_save_facts(dialog_messages: list):
-    """Анализирует диалог, извлекает факты и сохраняет в глобальную память."""
-    init_global_memory()
+def list_global_memory_facts() -> list[dict[str, Any]]:
+    """Return detached facts, most recent first, with stable tie ordering."""
+    raw = get_memory_client(memory_file_path()).items(prefix=_FACT_PREFIX)
+    facts = []
+    for name, value in raw.items():
+        if (
+            not isinstance(value, dict)
+            or not isinstance(value.get("category"), str)
+            or not isinstance(value.get("fact"), str)
+            or type(value.get("updated_at")) is not int
+        ):
+            raise ValueError(f"invalid native memory fact: {name}")
+        facts.append({"id": name[len(_FACT_PREFIX) :], **value})
+    return sorted(facts, key=lambda row: (-row["updated_at"], row["id"]))
 
+
+def save_global_memory_facts(facts: list[dict[str, Any]], *, now: int | None = None) -> int:
+    """Atomically insert unique facts without rewriting unaffected records."""
+    if not isinstance(facts, list):
+        raise ValueError("facts must be a list")
+    timestamp = int(time.time()) if now is None else int(now)
+    saved = 0
+    store = get_memory_client(memory_file_path())
+    with store.transaction() as tx:
+        for entry in facts:
+            if not isinstance(entry, dict):
+                continue
+            fact = entry.get("fact")
+            if not isinstance(fact, str):
+                continue
+            fact = fact.strip()
+            if not fact or len(fact) > 8192:
+                continue
+            category = entry.get("category", "general")
+            if not isinstance(category, str) or not category.strip():
+                category = "general"
+            key = _FACT_PREFIX + hashlib.sha256(fact.encode("utf-8")).hexdigest()
+            if tx.get(key) is not None:
+                continue
+            tx.set(key, {"category": category, "fact": fact, "updated_at": timestamp})
+            saved += 1
+    return saved
+
+
+def extract_and_save_facts(dialog_messages: list) -> int:
+    """Use the provider to extract stable facts, then commit only validated data."""
     if not dialog_messages:
         return 0
-
-    formatted_chat = "\n".join([f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:]])
-
+    formatted_chat = "\n".join(f"{msg['role']}: {msg['text']}" for msg in dialog_messages[-12:])
     payload = {
         "modelUri": f"gpt://{os.environ['YANDEX_PROJECT_ID']}/yandexgpt/latest",
         "completionOptions": {
@@ -64,14 +105,13 @@ def extract_and_save_facts(dialog_messages: list):
         "messages": [
             {
                 "role": "system",
-                "text": "Ты аналитик памяти. Извлеки из диалога устойчивые факты о путях, окружении Termux, конфигурациях Git и техническом стеке, которые пригодятся в других сессиях.",
+                "text": "Извлеки устойчивые факты о проектах, путях и конфигурации.",
             },
-            {"role": "user", "text": f"Проанализируй диалог и выдели факты:\n\n{formatted_chat}"},
+            {"role": "user", "text": f"Факты из диалога:\n\n{formatted_chat}"},
         ],
     }
-
     try:
-        resp = requests.post(
+        response = requests.post(
             API_URL,
             headers={
                 "Authorization": f"Api-Key {os.environ['YANDEX_API_KEY']}",
@@ -80,64 +120,27 @@ def extract_and_save_facts(dialog_messages: list):
             json=payload,
             timeout=30,
         )
-        if resp.status_code != 200:
+        if response.status_code != 200:
             return 0
-
-        data = resp.json()
-        raw_text = data["result"]["alternatives"][0]["message"]["text"]
-        parsed = json.loads(raw_text)
+        parsed = json.loads(response.json()["result"]["alternatives"][0]["message"]["text"])
         facts = parsed.get("facts", [])
-
-        conn = get_conn()
-        cur = conn.cursor()
-        now = (
-            int(requests.utils.datetime.datetime.utcnow().timestamp())
-            if hasattr(requests, "utils")
-            else 0
-        )
-
-        saved_count = 0
-        for item in facts:
-            cat = item.get("category", "general")
-            fact_text = item.get("fact", "").strip()
-            if not fact_text:
-                continue
-            try:
-                cur.execute(
-                    "INSERT OR IGNORE INTO global_memory (category, fact, updated_at) VALUES (?, ?, ?)",
-                    (cat, fact_text, now),
-                )
-                if cur.rowcount > 0:
-                    saved_count += 1
-            except Exception:
-                pass
-        conn.commit()
-        conn.close()
-        return saved_count
-    except Exception as e:
-        print(f"❌ Ошибка извлечения фактов: {e}")
+        if not isinstance(facts, list):
+            return 0
+        return save_global_memory_facts(facts, now=int(time.time()))
+    except (KeyError, ValueError, TypeError, requests.RequestException):
         return 0
 
 
 def get_global_memory_summary() -> str:
-    """Возвращает форматированный список всех глобальных фактов для system prompt."""
-    init_global_memory()
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT category, fact FROM global_memory ORDER BY category")
-    rows = cur.fetchall()
-    conn.close()
-
-    if not rows:
+    """Format current native memory facts for the system prompt."""
+    records = sorted(list_global_memory_facts(), key=lambda row: (row["category"], row["fact"]))
+    if not records:
         return ""
-
-    summary = "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n"
-    for r in rows:
-        summary += f"- [{r['category'].upper()}] {r['fact']}\n"
-    return summary
+    return "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n" + "".join(
+        f"- [{row['category'].upper()}] {row['fact']}\n" for row in records
+    )
 
 
 if __name__ == "__main__":
-    init_global_memory()
     print("Текущая глобальная память:")
     print(get_global_memory_summary() or "Память пока пуста.")

@@ -1,3 +1,4 @@
+from agent_memory.client import close_memory_clients
 import json
 import subprocess
 
@@ -139,14 +140,14 @@ def test_seed_stores_encrypted_credential(tmp_path, monkeypatch):
     alice_agent_runner.seed_provider_credential()
     alice_agent_runner.seed_provider_credential()  # idempotent
 
-    conn = db.get_conn()
+    conn = db.get_store()
     try:
-        stored = conn.execute("SELECT api_key_encrypted FROM provider_credentials").fetchall()
+        stored = list(conn.items(prefix="provider/credential/").values())
         credential = get_active_credential(conn, decrypt_secret)
     finally:
-        conn.close()
+        close_memory_clients()
     assert len(stored) == 1
-    assert "test-api-key" not in stored[0][0]
+    assert "test-api-key" not in stored[0]["api_key_encrypted"]
     assert credential.project_id == "test-project"
 
 

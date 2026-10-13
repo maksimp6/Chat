@@ -1,39 +1,67 @@
+"""The memory management panel reads native MemoryStore, not SQL."""
+
 from pathlib import Path
 
+from agent_memory.client import close_memory_clients, get_memory_client
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_memory_panel_api_initializes_storage_before_reading():
+def test_memory_panel_api_uses_native_fact_read():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    marker = '@app.route("/api/memory/manage", methods=["GET"])'
-    start = source.index(marker)
-    section = source[start : source.index("\n\n@app.route", start + len(marker))]
-    assert "init_global_memory()" in section
-    assert section.index("init_global_memory()") < section.index("conn = get_conn()")
+    start = source.index('@app.route("/api/memory/manage", methods=["GET"])')
+    section = source[start : source.index("\n\n@app.route", start + 20)]
+    assert "list_global_memory_facts()" in section
+    assert "get_conn()" not in section
 
 
-def test_memory_panel_api_returns_config_and_facts(tmp_path, monkeypatch):
+def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch):
     import db
     from app import app
-    from memory_extractor import init_global_memory
+    from memory_extractor import save_global_memory_facts
 
-    monkeypatch.delenv("ALICE_DB_BACKEND", raising=False)
-    monkeypatch.delenv("ALICE_DATABASE_URL", raising=False)
-    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "memory.db"))
-    db.init_db()
-    init_global_memory()
-    conn = db.get_conn()
-    conn.executemany(
-        "INSERT INTO global_memory (category, fact, updated_at) VALUES (?, ?, ?)",
-        [("profile", "Живёт в Москве", 1), ("profile", "Любит чай", 2)],
+    path = tmp_path / "facts.memory"
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
+    close_memory_clients()
+    save_global_memory_facts(
+        [
+            {"category": "profile", "fact": "Живёт в Москве"},
+            {"category": "profile", "fact": "Любит чай"},
+        ],
+        now=1,
     )
-    conn.commit()
-    conn.close()
-
+    store = get_memory_client(path)
+    # Read API order must be deterministic even for concurrent equal timestamps.
     response = app.test_client().get("/api/memory/manage")
-
     assert response.status_code == 200
     data = response.get_json()
     assert isinstance(data["config"], dict)
-    assert [fact["fact"] for fact in data["facts"]] == ["Любит чай", "Живёт в Москве"]
+    assert {item["fact"] for item in data["facts"]} == {"Живёт в Москве", "Любит чай"}
+    assert all(item["updated_at"] == 1 for item in data["facts"])
+    assert store.get("global_memory_config") is not None
+    close_memory_clients(path)
+
+
+def test_fact_deduplication_and_targeted_deletion(tmp_path, monkeypatch):
+    import db
+    from memory_manager import clear_global_memory, load_memory_config
+    from memory_extractor import list_global_memory_facts, save_global_memory_facts
+
+    path = tmp_path / "native.memory"
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
+    close_memory_clients()
+    assert (
+        save_global_memory_facts(
+            [{"category": "git", "fact": "one"}, {"category": "tools", "fact": "two"}], now=1
+        )
+        == 2
+    )
+    assert save_global_memory_facts([{"category": "git", "fact": "one"}], now=2) == 0
+    assert len(list_global_memory_facts()) == 2
+    config = load_memory_config()
+    clear_global_memory("git")
+    assert [item["fact"] for item in list_global_memory_facts()] == ["two"]
+    assert load_memory_config() == config
+    close_memory_clients(path)

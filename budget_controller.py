@@ -155,6 +155,18 @@ class BudgetController:
         self._repository = repository
         self._persistence_actor = persistence_actor
         self._lock = threading.RLock()
+        if self._repository is not None:
+            for account in self.accounts.values():
+                stored = self._repository.configure(self.budget_id, account)
+                for field_name in ("allocated", "spent", "reserved", "won", "loss_today"):
+                    setattr(account, field_name, Decimal(stored[field_name]))
+                account.loss_period = stored["loss_period"]
+                account.locked_until = (
+                    datetime.fromisoformat(stored["locked_until"])
+                    if stored["locked_until"]
+                    else None
+                )
+                account.limits = BudgetLimits(**stored["limits"])
         self._emit("budget_initialized", account_type="REAL", currency=real.currency)
 
     def account(self, account_type: AccountType) -> BudgetAccount:

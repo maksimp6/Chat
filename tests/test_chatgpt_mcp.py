@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 import pytest
 from flask import Flask
@@ -273,7 +274,33 @@ def test_project_tools_execute_through_mcp(client):
         assert isinstance(result, dict)
 
 
-def test_existing_git_read_tools_execute_through_mcp(client):
+@pytest.mark.parametrize("linked", [False, True])
+def test_existing_git_read_tools_execute_through_mcp(client, linked, tmp_path, monkeypatch):
+    if linked:
+        repository = tmp_path / "repository"
+        repository.mkdir()
+        (repository / "tracked.txt").write_text("synthetic\n", encoding="utf-8")
+        commands = [
+            ["init", "-q"],
+            ["add", "."],
+            [
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            ["worktree", "add", "-q", "-b", "linked", str(tmp_path / "linked")],
+        ]
+        for command in commands:
+            subprocess.run(
+                ["git", "-C", str(repository), *command], check=True, capture_output=True
+            )
+        monkeypatch.chdir(tmp_path / "linked")
     cases = [
         ("git_status", {"repo_path": "."}),
         ("git_log", {"repo_path": ".", "limit": 2}),
@@ -463,14 +490,12 @@ def test_mcp_initialize_handshake_is_supported(client):
 
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
     import db
-    from runtime_migrations import init_runtime_tables
 
     monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")
     monkeypatch.setenv("ALICE_MCP_USER_ID", "trace-user")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     db.init_db()
-    init_runtime_tables()
 
     from flask import Flask
 
