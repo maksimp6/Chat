@@ -3,6 +3,7 @@
 The caller owns authenticated MQTT transport and trusted clock timestamps.
 No printer commands or network writes are performed here.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
