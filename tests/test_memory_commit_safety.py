@@ -322,9 +322,10 @@ def test_malformed_changes_fail_closed_with_matching_checksum(tmp_path, changes)
 def test_invalid_utf8_value_never_reaches_journal(tmp_path):
     path = tmp_path / "state.memory"
     with MemoryStore(path) as store:
-        store.set("bad", "\ud800")
-        with pytest.raises(StoreError, match="JSON"):
-            store.commit()
+        with pytest.raises(StoreError, match="invalid Unicode"):
+            store.set("bad", "\ud800")
+        assert store.get("bad") is None
+        assert store.commit() == 0
         assert not path.exists()
         store.set("bad", "valid")
         assert store.commit() == 1
