@@ -137,9 +137,7 @@ def test_cli_writes_valid_report_and_refuses_report_collision(tmp_path, monkeypa
     source = tmp_path / "sample.png"
     Image.new("RGB", (4, 4), "white").save(source)
     out = tmp_path / "out"
-    monkeypatch.setattr(
-        "sys.argv", ["analyze_images.py", str(source), "--output", str(out)]
-    )
+    monkeypatch.setattr("sys.argv", ["analyze_images.py", str(source), "--output", str(out)])
     module.main()
 
     report = json.loads((out / "report.json").read_text(encoding="utf-8"))
