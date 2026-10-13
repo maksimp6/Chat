@@ -61,11 +61,17 @@ gradle :app:testDebugUnitTest
   panel starts no service or request. Separate buttons start/stop the service, check
   health/root/status/device metadata, parse a requested XML hierarchy, or decode and
   preview a requested PNG. Screen requests are never included in the API/root check.
-  Only one operation runs at a time; results have timestamps and can be copied without
+  Only one panel operation runs at a time across Activity recreation. Leaving the panel
+  cancels and disconnects its HTTP client; total request deadlines also stop dripping
+  responses. Results have timestamps and can be copied without
   screen content or credentials. The screenshot preview is protected from ordinary
   Android screenshots and dismissed when the activity leaves the foreground.
   Stop reports submission, not verified port closure. Unlock is explicitly unavailable:
   there is no unlock endpoint or C-driver adapter in this build. No input or grants.
+  Host-side Robolectric tests exercise the actual Activity, native bitmap preview and
+  lifecycle with synthetic responses; they do not prove Redmi 9 behavior. Complete
+  PNG validation and post-capture Keyguard hardening remain a dependency on draft #1216;
+  this panel does not accept or merge that security change.
   The service is not exported and never starts on its own.
 - Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
   (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as

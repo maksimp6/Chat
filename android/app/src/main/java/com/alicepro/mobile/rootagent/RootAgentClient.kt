@@ -5,9 +5,27 @@ import java.io.InputStream
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
+import java.io.Closeable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** In-app self-check against the loopback RootAgent API; the token never leaves the process. */
-class RootAgentClient(private val port: Int, private val token: () -> String) {
+class RootAgentClient(
+    private val port: Int,
+    private val connectionFactory: (URI) -> HttpURLConnection = { LoopbackHttpConnection(it) },
+    private val totalTimeoutMs: Long? = null,
+    private val token: () -> String,
+) : Closeable {
+    private val lock = Any()
+    private var active: HttpURLConnection? = null
+    private val closed = AtomicBoolean(false)
+
+    override fun close() {
+        closed.set(true)
+        val connection = synchronized(lock) { active }
+        connection?.disconnect()
+    }
     enum class Endpoint(val path: String, val maxBytes: Int = 4096) {
         HEALTH("/v1/health"), ROOT("/v1/root-probe"), STATUS("/v1/status"),
         DEVICE("/v1/device-info"), TREE("/v1/screen/tree", 12 * 1024 * 1024),
@@ -25,9 +43,9 @@ class RootAgentClient(private val port: Int, private val token: () -> String) {
     } catch (_: ResponseTooLarge) {
         Response(null, "", "response_too_large")
     } catch (_: java.net.SocketTimeoutException) {
-        Response(null, "", "timeout")
+        Response(null, "", if (closed.get()) "cancelled" else "timeout")
     } catch (_: IOException) {
-        Response(null, "", "unreachable")
+        Response(null, "", if (closed.get()) "cancelled" else "unreachable")
     }
 
     data class Report(val healthy: Boolean, val root: Boolean?, val error: String?)
@@ -67,7 +85,18 @@ class RootAgentClient(private val port: Int, private val token: () -> String) {
     }
 
     private fun get(path: String): Pair<Int, String> {
-        val connection = URI("http://${RootAgentServer.LOOPBACK}:$port$path").toURL().openConnection() as HttpURLConnection
+        if (closed.get()) throw IOException("cancelled")
+        val connection = connectionFactory(URI("http://${RootAgentServer.LOOPBACK}:$port$path"))
+        synchronized(lock) {
+            if (closed.get()) throw IOException("cancelled")
+            check(active == null) { "request already active" }
+            active = connection
+        }
+        val expired = AtomicBoolean(false)
+        val deadline = deadlines.schedule({
+            expired.set(true)
+            connection.disconnect()
+        }, totalTimeoutMs ?: if (path == Endpoint.TREE.path || path == Endpoint.CAPTURE.path) 28_000L else 8_000L, TimeUnit.MILLISECONDS)
         try {
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = if (path == Endpoint.TREE.path || path == Endpoint.CAPTURE.path) 28_000 else TIMEOUT_MS
@@ -77,8 +106,15 @@ class RootAgentClient(private val port: Int, private val token: () -> String) {
             val stream = if (status < 400) connection.inputStream else connection.errorStream
             val limit = Endpoint.entries.first { it.path == path }.maxBytes
             val body = stream?.use { readBounded(it, if (status < 400) limit else 4096) } ?: ""
+            if (closed.get()) throw IOException("cancelled")
+            if (expired.get()) throw java.net.SocketTimeoutException()
             return status to body
+        } catch (error: IOException) {
+            if (expired.get() && !closed.get()) throw java.net.SocketTimeoutException()
+            throw error
         } finally {
+            deadline.cancel(false)
+            synchronized(lock) { active = null }
             connection.disconnect()
         }
     }
@@ -99,5 +135,8 @@ class RootAgentClient(private val port: Int, private val token: () -> String) {
 
     private companion object {
         const val TIMEOUT_MS = 8_000
+        private val deadlines = Executors.newScheduledThreadPool(2) { run ->
+            Thread(run, "root-agent-deadline").apply { isDaemon = true }
+        }
     }
 }

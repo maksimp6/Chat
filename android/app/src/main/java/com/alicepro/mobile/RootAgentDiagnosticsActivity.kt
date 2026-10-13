@@ -25,12 +25,16 @@ import com.alicepro.mobile.rootagent.RootAgentTokenStore
 import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 
 /** Owner-operated diagnostics. No input, unlock, root grant or automatic screen requests. */
 class RootAgentDiagnosticsActivity : AppCompatActivity() {
-    private val worker = Executors.newSingleThreadExecutor()
+    internal var clientFactory: (() -> RootAgentClient)? = null
+    internal val hasRunningOperation: Boolean get() = running.get()
+    private var operation: Operation? = null
     private val controls = mutableListOf<Button>()
     private val results = linkedMapOf<String, String>()
     private lateinit var status: TextView
@@ -70,7 +74,7 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
                 RootAgentService.start(applicationContext)
                 val deadline = System.nanoTime() + 10_000_000_000L
                 var response = client.request(Endpoint.HEALTH)
-                while (response.code != 200 && System.nanoTime() < deadline) {
+                while (response.code != 200 && response.error != "cancelled" && System.nanoTime() < deadline) {
                     Thread.sleep(150)
                     response = client.request(Endpoint.HEALTH)
                 }
@@ -154,8 +158,15 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
     }
 
     private fun client(): RootAgentClient {
-        val token = RootAgentTokenStore(applicationContext).loadOrCreate()
-        return RootAgentClient(RootAgentService.PORT) { token }
+        val current = requireNotNull(operation)
+        current.client.get()?.let { return it }
+        val candidate = clientFactory?.invoke() ?: run {
+            val token = RootAgentTokenStore(applicationContext).loadOrCreate()
+            RootAgentClient(RootAgentService.PORT) { token }
+        }
+        current.client.set(candidate)
+        if (current.cancelled.get()) candidate.close()
+        return candidate
     }
 
     private fun queryButton(parent: LinearLayout, label: String, endpoint: Endpoint) {
@@ -165,14 +176,25 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
     private class UiResult(val text: String, val image: Bitmap? = null)
 
     private fun perform(label: String, operation: () -> UiResult) {
+        if (!visible || isFinishing || isDestroyed) return
+        if (!running.compareAndSet(false, true)) {
+            status.text = "Предыдущая проверка ещё завершается. Повторите после её отмены."
+            return
+        }
+        val current = Operation()
+        this.operation = current
         busy = true
         controls.forEach { it.isEnabled = false }
         progress.visibility = android.view.View.VISIBLE
         status.text = "$label · выполняется"
         worker.execute {
             val result = try { operation() } catch (_: Exception) { UiResult("Проверка не завершена. Данные не подтверждены.") }
+            finally {
+                current.client.get()?.close()
+                running.set(false)
+            }
             runOnUiThread {
-                if (isFinishing || isDestroyed) {
+                if (isFinishing || isDestroyed || current.cancelled.get()) {
                     result.image?.recycle()
                     return@runOnUiThread
                 }
@@ -234,7 +256,7 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
                 val width = options.outWidth
                 val height = options.outHeight
                 options.inJustDecodeBounds = false
-                while (maxOf(width, height) / options.inSampleSize > 1024) options.inSampleSize *= 2
+                options.inSampleSize = PreviewSampling.sampleSize(width, height)
                 val bitmap = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options))
                 UiResult("HTTP 200 · PNG декодирован\nРазмер: $width × $height · ${bytes.size} байт\nПредпросмотр уменьшен; это снимок на момент запроса.", bitmap)
             }
@@ -244,6 +266,7 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
     private fun failure(error: String) = when (error) {
         "timeout", "root_probe_timeout" -> "Время ожидания истекло"
         "response_too_large" -> "Ответ превышает допустимый размер"
+        "cancelled" -> "Проверка отменена"
         "unreachable" -> "API недоступен. Запустите сервис и повторите проверку."
         else -> "Проверка не подтверждена"
     }
@@ -262,6 +285,7 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
 
     override fun onStop() {
         visible = false
+        cancelOperation()
         preview?.dismiss()
         super.onStop()
     }
@@ -272,8 +296,34 @@ class RootAgentDiagnosticsActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        worker.shutdownNow()
+        cancelOperation()
         preview?.dismiss()
         super.onDestroy()
+    }
+
+    private fun cancelOperation() {
+        operation?.let {
+            it.cancelled.set(true)
+            it.client.get()?.close()
+        }
+        if (busy) {
+            busy = false
+            controls.forEach { it.isEnabled = true }
+            progress.visibility = android.view.View.GONE
+            status.text = "Проверка отменена"
+        }
+    }
+
+    private class Operation {
+        val cancelled = AtomicBoolean(false)
+        val client = AtomicReference<RootAgentClient?>()
+    }
+
+    private companion object {
+        // Survives Activity recreation: a new panel cannot overlap an old HTTP operation.
+        val running = AtomicBoolean(false)
+        val worker = Executors.newSingleThreadExecutor { run ->
+            Thread(run, "root-agent-diagnostics").apply { isDaemon = true }
+        }
     }
 }
