@@ -3,6 +3,7 @@
 No printer actions are published. The caller supplies a trusted serial and
 access code from a local secret provider, never from repository configuration.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -71,9 +72,7 @@ def read_live_status(
         else:
             client.subscribe(topic, qos=0)
 
-    def on_subscribe(
-        _client: Any, _userdata: Any, _mid: Any, reasons: Any, _props: Any
-    ) -> None:
+    def on_subscribe(_client: Any, _userdata: Any, _mid: Any, reasons: Any, _props: Any) -> None:
         if any(reason.is_failure for reason in reasons):
             failures.append("MQTT subscription rejected")
 
