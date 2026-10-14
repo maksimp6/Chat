@@ -19,6 +19,7 @@ jobs:
       github.event.pull_request.head.sha != null &&
       github.event.pull_request.head.label != null
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

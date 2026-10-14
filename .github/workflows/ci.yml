@@ -12,10 +12,14 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/ci
+
 jobs:
   changes:
     name: Platform changes
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     outputs:
       web: ${{ steps.classify.outputs.web }}
       backend: ${{ steps.classify.outputs.backend }}
@@ -80,6 +84,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     env:
       YANDEX_API_KEY: ci-test-placeholder
     steps:
@@ -137,38 +142,38 @@ jobs:
       - name: Run frontend JavaScript regression tests with coverage
         run: |
           set -euo pipefail
-          rm -rf coverage-js
-          mkdir -p coverage-js
-          : > frontend-test.log
+          rm -rf "$OUT/coverage-js"
+          mkdir -p "$OUT/coverage-js"
+          : > "$OUT/frontend-test.log"
 
           run_node() {
             local test_file="$1"
             shift
-            "$@" node "$test_file" 2>&1 | tee -a frontend-test.log
+            "$@" node "$test_file" 2>&1 | tee -a "$OUT/frontend-test.log"
           }
 
-          run_node tests/test_file_manager.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_dozzle_header.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_frontend_boot.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_project_tree.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_header_dom.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_frontend_smoke.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_browser_self_test_runner.js env NODE_V8_COVERAGE=coverage-js
+          run_node tests/test_file_manager.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_dozzle_header.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_frontend_boot.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_project_tree.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_header_dom.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_frontend_smoke.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_browser_self_test_runner.js env NODE_V8_COVERAGE="$OUT/coverage-js"
           run_node tests/test_frontend_runtime_safety.js env
           run_node tests/test_system_status.js env
           run_node tests/test_ui_action_contract.js env
           run_node tests/test_real_header_actions.js env
-          run_node tests/test_trace_summary.js env NODE_V8_COVERAGE=coverage-js
-          run_node tests/test_execution_surface.js env NODE_V8_COVERAGE=coverage-js
+          run_node tests/test_trace_summary.js env NODE_V8_COVERAGE="$OUT/coverage-js"
+          run_node tests/test_execution_surface.js env NODE_V8_COVERAGE="$OUT/coverage-js"
           run_node tests/test_model_catalog_diagnostics.js env
           run_node tests/test_settings_ui_security.js env
           run_node tests/test_ui_modal_contract.js env
           run_node tests/test_voice_recording.js env
-          run_node tests/test_browser_emulator.js env NODE_V8_COVERAGE=coverage-js
+          run_node tests/test_browser_emulator.js env NODE_V8_COVERAGE="$OUT/coverage-js"
 
-          test -n "$(find coverage-js -type f -name '*.json' -print -quit)"
+          test -n "$(find "$OUT/coverage-js" -type f -name '*.json' -print -quit)"
       - name: Report frontend coverage
-        run: python tests/report_frontend_coverage.py coverage-js frontend-coverage.json
+        run: python tests/report_frontend_coverage.py "$OUT/coverage-js" "$OUT/frontend-coverage.json"
       - name: Start Flask for live resource validation
         env:
           HOST: 127.0.0.1
@@ -176,8 +181,9 @@ jobs:
           FLASK_DEBUG: "0"
           ALICE_MEMORY_PATH: alice_ci_live.memory
         run: |
-          python app.py > flask-live.log 2>&1 &
-          echo $! > flask-live.pid
+          mkdir -p "$OUT"
+          python app.py > "$OUT/flask-live.log" 2>&1 &
+          echo $! > "$OUT/flask-live.pid"
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:5678/ >/dev/null; then
               break
@@ -192,36 +198,37 @@ jobs:
       - name: Stop Flask live validation server
         if: always()
         run: |
-          if [ -f flask-live.pid ]; then kill "$(cat flask-live.pid)" || true; fi
-          if [ -f flask-live.log ]; then tail -n 200 flask-live.log; fi
+          if [ -f "$OUT/flask-live.pid" ]; then kill "$(cat "$OUT/flask-live.pid")" || true; fi
+          if [ -f "$OUT/flask-live.log" ]; then tail -n 200 "$OUT/flask-live.log"; fi
 
       - name: Build and check C17 fallback control server
         run: bash scripts/build_c17_server.sh --check
       - name: Run Python application tests with coverage
         run: |
           started=$SECONDS
-          pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json -q
+          pytest -n auto --dist=loadfile --durations=30 --cov=. --cov-config=.coveragerc --cov-branch --cov-report=term-missing --cov-report=xml:$OUT/coverage.xml --cov-report=json:$OUT/coverage.json -q
           echo "- Parallel Python application tests: $((SECONDS - started))s" >> "$GITHUB_STEP_SUMMARY"
       - name: Generate validation report
         if: always()
         run: |
-          python tests/generate_ci_validation_report.py | tee ci-validation-report.md
-          cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$OUT"
+          python tests/generate_ci_validation_report.py | tee "$OUT/ci-validation-report.md"
+          cat "$OUT/ci-validation-report.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-${{ github.run_number }}
           path: |
-            coverage.xml
-            coverage.json
-            coverage-js/
-            frontend-coverage.json
-            frontend-test.log
-            ci-validation-report.md
+            ${{ env.OUT }}/coverage.xml
+            ${{ env.OUT }}/coverage.json
+            ${{ env.OUT }}/coverage-js/
+            ${{ env.OUT }}/frontend-coverage.json
+            ${{ env.OUT }}/frontend-test.log
+            ${{ env.OUT }}/ci-validation-report.md
             hot-file-metrics.json
             hot-file-metrics.md
-            flask-live.log
+            ${{ env.OUT }}/flask-live.log
           if-no-files-found: warn
       - name: Enforce coverage quality gates
         env:
@@ -242,7 +249,7 @@ jobs:
           fi
 
           git rev-parse --verify "$DIFF_BASE^{commit}"
-          diff-cover coverage.xml --compare-branch="$DIFF_BASE" --fail-under=100
+          diff-cover "$OUT/coverage.xml" --compare-branch="$DIFF_BASE" --fail-under=100
 
 
   infra:
@@ -277,7 +284,7 @@ jobs:
           shopt -s nullglob
           mapfile -t suites < <(printf '%s\n' tests/test_cloudru*.py tests/test_ci_*.py tests/test_platform*.py tests/test_*deploy*.py tests/test_rdc*.py | sort -u)
           test "${#suites[@]}" -gt 0
-          python -m pytest -q "${suites[@]}" --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:infra-coverage.xml
+          python -m pytest -q "${suites[@]}" --cov=. --cov-config=.coveragerc --cov-branch --cov-report=xml:$OUT/infra-coverage.xml
       - name: Enforce infrastructure changed-line coverage
         if: needs.changes.outputs.backend != 'true'
         env:
@@ -290,7 +297,7 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE_SHA"; fi
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD^"; fi
           git rev-parse --verify "$base^{commit}"
-          diff-cover infra-coverage.xml --compare-branch="$base" --fail-under=100
+          diff-cover "$OUT/infra-coverage.xml" --compare-branch="$base" --fail-under=100
 
   mcp:
     name: MCP worker tests
@@ -333,6 +340,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     env:
       ALICE_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/android/app/debug-signing.keystore
       ALICE_DEBUG_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS }}
@@ -401,6 +409,7 @@ jobs:
     if: always()
     needs: [changes, code-rules, backend, android, infra, mcp]
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
