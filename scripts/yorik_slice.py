@@ -57,8 +57,6 @@ def slice_model(root, mesh, out):
     env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(root / "bin/bambu-studio"),
-        "--arrange",
-        "1",
         "--slice",
         "0",
         "--export-3mf",
