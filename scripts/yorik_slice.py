@@ -9,13 +9,6 @@ import struct
 import subprocess
 import zipfile
 
-from alice_a1mini_pla_cube_slice import (
-    _read_sliced_archive,
-    _validate_gcode,
-    _validate_profile,
-    profiles,
-)
-from alice_a1mini_preview import embed_preview
 
 OUTPUT = "Yorik_A1mini_PLA.gcode.3mf"
 
@@ -48,6 +41,14 @@ def validate_result(path, count):
 
 
 def slice_model(root, mesh, out):
+    from alice_a1mini_pla_cube_slice import (
+        _read_sliced_archive,
+        _validate_gcode,
+        _validate_profile,
+        profiles,
+    )
+    from alice_a1mini_preview import embed_preview
+
     out.mkdir(parents=True, exist_ok=True)
     count = validate_mesh(mesh)
     machine, process, filament = profiles(root / "resources/profiles/BBL", out)
@@ -57,6 +58,12 @@ def slice_model(root, mesh, out):
     env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
         str(root / "bin/bambu-studio"),
+        "--arrange",
+        "0",
+        "--orient",
+        "0",
+        "--center",
+        "90,90",
         "--slice",
         "0",
         "--export-3mf",

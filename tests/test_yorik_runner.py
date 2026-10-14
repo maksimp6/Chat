@@ -11,6 +11,7 @@ import zipfile
 from unittest.mock import Mock, patch
 
 from scripts import yorik_runner as worker
+from scripts import yorik_slice as slicer
 
 HEAD = "a" * 40
 
@@ -145,6 +146,34 @@ class HandoffTests(unittest.TestCase):
             os.symlink(target, path)
             with self.assertRaises(OSError):
                 worker.load_config(path)
+
+
+class SliceAuditTests(unittest.TestCase):
+    def result(self, size, **changes):
+        plate = {"objects": [{"triangle_count": 23430, "bbox": size}]}
+        plate.update(changes)
+        return {"return_code": 0, "sliced_plates": [plate]}
+
+    def verify(self, data):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "result.json"
+            path.write_text(json.dumps(data))
+            return slicer.validate_result(path, 23430)
+
+    def test_real_rotated_cli_bbox_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.verify(self.result({"width": 45.111431, "depth": 45.111431, "height": 53.693531}))
+
+    def test_original_dimensions_pass(self):
+        self.verify(self.result({"width": 34, "depth": 34, "height": 53.693531}))
+
+    def test_warning_is_not_accepted_as_ready(self):
+        with self.assertRaises(ValueError):
+            self.verify(
+                self.result(
+                    {"width": 34, "depth": 34, "height": 53.693531}, warning_message="unsafe"
+                )
+            )
 
 
 class UploadTests(unittest.TestCase):
