@@ -4,17 +4,18 @@
 
 Use the smallest independent change that satisfies an issue or subtask.
 
-1. Inspect the issue and current `master`.
+1. Inspect the issue and current `develop`.
 2. Create a branch named for the issue/change.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
 5. Before publishing any non-RED implementation commit, run the fast `bash scripts/pre_push.sh` formatting gate from a real checkout/worktree when an authorized shell checkout is available. If no shell checkout is available, this local script is not mandatory and repository file APIs may be used to commit changes to the task branch. Explicitly report that the local gate was not run; do not claim local test success. Run focused tests separately when possible and required by the change; full suites and exact-head checks remain CI/final-handoff evidence. When the local formatting gate is run, it must finish with a clean worktree.
 6. Run the relevant backend/Android checks in CI.
 7. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
-8. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
+8. Push the focused branch to `origin` and create the PR against current `develop` using `gh pr create` or the available GitHub publication tool. Never target `master` from an agent task.
 9. If publication is blocked by missing remote, credentials, network access, or tooling, report the exact failing command/error and do not claim that a PR exists.
 10. Merge only after required checks and review policy are satisfied.
-11. Never rewrite `master` directly and never commit secrets.
+11. Never push, commit, or open agent PRs directly against `master`; never commit secrets.
+12. Only the repository owner may authorize a separate integration PR from `develop` into `master`. Agents must not initiate, merge, or retarget such a PR. GitHub branch protection must enforce this independently of instructions.
 
 Before dispatch or resuming an agent, apply the scoped work-admission checklist in
 `docs/agents/role-based-agent-office.md`. Record the canonical task and current
@@ -110,8 +111,8 @@ the cheapest backend/model that can reliably perform that role.
 
 Repository automation should prefer deterministic GitHub workflows and explicit tool execution. Model-backed execution is optional, never required by policy, and must not become a merge prerequisite.
 
-Every agent opens one focused pull request per issue. Only the maintainer
-merges, after green CI; agents never push to `master`.
+Every agent opens one focused pull request per issue targeting `develop`. Only the maintainer
+merges into `develop`, after green CI; agents never push to `master` or create PRs targeting it.
 
 ## Maintainer
 
@@ -144,10 +145,10 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   thread before merging.
 - The final corrected head is validated by required CI plus resolved review threads. Extra model review is optional and never a merge prerequisite.
 - Merge is fail-closed. Immediately before merge, verify the pull request is
-  synchronized with the current `master` (`behind master = 0`). Required
+  synchronized with the current `develop` (`behind develop = 0`). Required
   checks must be green on the exact current PR head after that synchronization,
   not merely on an earlier head or an older base.
-- If `master` advances before merge, synchronize the PR again and require the
+- If `develop` advances before merge, synchronize the PR again and require the
   protected checks to pass on the new synced head. Do not reuse green checks
   from the stale head.
 - After final-review fixes, do not request a second review cycle. Any new head
@@ -159,7 +160,7 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   `--merge`; use a currently allowed repository method (or let the API infer it),
   and treat the actual merge endpoint result as authoritative if repository
   metadata disagrees. Never force-update, rewrite, or bypass protection on
-  `master`.
+  `develop` or `master`.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
