@@ -65,7 +65,6 @@ LEGACY_ROOT_PYTHON = {
     "runtime_migrations.py",
     "runtime_tools.py",
     "sdk.py",
-    "send_logs.py",
     "session_manager.py",
     "session_profiles.py",
     "session_runtime.py",
@@ -178,3 +177,36 @@ def test_filesystem_tools_stay_rooted_at_repository_root():
     from tool_providers import filesystem
 
     assert filesystem.BASE_DIR == str(ROOT.resolve())
+
+
+MOVED_HELPERS = {
+    "analyze_logs.sh",
+    "analyze_modules.sh",
+    "crl.sh",
+    "debug.sh",
+    "file.sh",
+    "install_protobuf_env.sh",
+    "test_api.sh",
+    "view_logs.sh",
+    "view_module_logs.sh",
+}
+
+
+def test_operational_helpers_live_in_scripts_without_root_shims():
+    for name in sorted(MOVED_HELPERS):
+        assert not (ROOT / name).exists(), f"Operational helper still in root: {name}"
+        assert (ROOT / "scripts" / name).is_file(), name
+
+
+def test_only_startup_shell_entrypoint_remains_in_root():
+    assert {path.name for path in ROOT.glob("*.sh")} == {"start.sh"}
+
+
+def test_root_inventory_covers_each_remaining_python_file():
+    import re
+
+    inventory = (ROOT / "docs/architecture/root-file-inventory.md").read_text(encoding="utf-8")
+    documented = re.findall(r"\[([^] /]+\.py)\]\(../../[^)]+\)", inventory)
+    actual = {path.name for path in ROOT.glob("*.py")}
+    assert len(documented) == len(set(documented)), "Duplicate inventory entries"
+    assert set(documented) == actual, "Update root file inventory when relocating modules"
