@@ -25,15 +25,15 @@ MYPY_ERROR_BASELINE = {
     "misc": 1,
     "no-any-return": 36,
     "no-redef": 1,
-    "no-untyped-call": 329,
-    "no-untyped-def": 352,
+    "no-untyped-call": 327,
+    "no-untyped-def": 350,
     "operator": 10,
     "return": 1,
     "return-value": 6,
     "type-arg": 139,
     "union-attr": 16,
     "untyped-decorator": 52,
-    "var-annotated": 4,
+    "var-annotated": 3,
 }
 
 # Files with zero strict errors. Errors here fail outright.
