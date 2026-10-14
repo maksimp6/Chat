@@ -54,6 +54,37 @@ def place_mesh(mesh, destination):
     return destination
 
 
+def preview_mesh(source, destination):
+    """Cull microscopic triangles for raster preview only; preserve print input."""
+    raw = source.read_bytes()
+    count = struct.unpack_from("<I", raw, 80)[0]
+    faces = []
+    for index in range(count):
+        record = raw[84 + 50 * index : 84 + 50 * (index + 1)]
+        values = struct.unpack("<12fH", record)
+        a, b, c = values[3:6], values[6:9], values[9:12]
+        u, v = [b[j] - a[j] for j in range(3)], [c[j] - a[j] for j in range(3)]
+        cross = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        if sum(x * x for x in cross) >= 1e-14:
+            faces.append(record)
+    if not faces:
+        raise ValueError("empty raster preview")
+    destination.write_bytes(raw[:80] + struct.pack("<I", len(faces)) + b"".join(faces))
+    return count - len(faces)
+
+
+def validate_process(profile):
+    expected = {
+        "enable_support": "1",
+        "support_type": "normal(auto)",
+        "wall_loops": "3",
+        "wall_generator": "classic",
+        "detect_thin_wall": "0",
+    }
+    if any(profile.get(k) != v for k, v in expected.items()):
+        raise ValueError("slicer did not preserve the supported figurine process")
+
+
 def slice_model(root, mesh, out):
     from alice_a1mini_pla_cube_slice import (
         _read_sliced_archive,
@@ -68,7 +99,13 @@ def slice_model(root, mesh, out):
     placed = place_mesh(mesh, out / "yorik_on_bed.stl")
     machine, process, filament = profiles(root / "resources/profiles/BBL", out)
     settings = json.loads(process.read_text())
-    settings.update(enable_support="1", support_type="normal(auto)", wall_loops="3")
+    settings.update(
+        enable_support="1",
+        support_type="normal(auto)",
+        wall_loops="3",
+        wall_generator="classic",
+        detect_thin_wall="0",
+    )
     process.write_text(json.dumps(settings))
     env = dict(os.environ, LC_ALL="C", LD_LIBRARY_PATH=str(root / "bin"))
     command = [
@@ -93,9 +130,13 @@ def slice_model(root, mesh, out):
     destination = out / OUTPUT
     profile, gcode = _read_sliced_archive(destination)
     _validate_profile(profile)
+    validate_process(profile)
     _validate_gcode(gcode)
     plate = validate_result(out / "result.json", count)
-    preview = embed_preview(destination, placed)
+    preview_source = out / "yorik_preview_only.stl"
+    culled = preview_mesh(placed, preview_source)
+    preview = embed_preview(destination, preview_source)
+    preview["raster_only_omitted_microscopic_faces"] = culled
     with zipfile.ZipFile(destination) as archive:
         (out / "preview.png").write_bytes(archive.read("Metadata/plate_1.png"))
     audit = {

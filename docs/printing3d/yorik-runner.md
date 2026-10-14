@@ -46,3 +46,13 @@ There is no MQTT or start/heat/move operation in this worker.
 Before physical printing separately confirm the loaded PLA, 0.4 mm nozzle,
 Textured PEI plate, clear bed, supports and sliced preview. Real LCD/Handy display,
 physical printing and mechanical quality are separate acceptance evidence.
+
+Microscopic triangles below the pinned rasterizer threshold are omitted only from
+a derived thumbnail mesh. The complete original mesh is supplied to the slicer;
+G-code and model triangles are not removed. The audit records the raster-only
+omission count. The derived preview STL is never shipped as a printable part.
+
+The process uses fixed-width classic walls with thin-wall detection disabled.
+The variable-width path failed with a negative extrusion-spacing error on a
+microscopic contour (requested width 0.0429204 mm at a 0.2 mm layer). The exported
+process must preserve classic walls, three perimeters and enabled supports.

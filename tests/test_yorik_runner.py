@@ -161,6 +161,35 @@ class SliceAuditTests(unittest.TestCase):
             path.write_text(json.dumps(data))
             return slicer.validate_result(path, 23430)
 
+    def test_figurine_process_is_preserved(self):
+        profile = {
+            "enable_support": "1",
+            "support_type": "normal(auto)",
+            "wall_loops": "3",
+            "wall_generator": "classic",
+            "detect_thin_wall": "0",
+        }
+        slicer.validate_process(profile)
+        for key, value in (
+            ("enable_support", "0"),
+            ("wall_generator", "arachne"),
+            ("detect_thin_wall", "1"),
+        ):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                slicer.validate_process(dict(profile, **{key: value}))
+
+    def test_preview_culling_never_changes_print_mesh(self):
+        good = struct.pack("<12fH", 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0)
+        tiny = struct.pack("<12fH", 0, 0, 1, 0, 0, 0, 0.0001, 0, 0, 0, 0.0001, 0, 0)
+        original = bytes(80) + struct.pack("<I", 2) + good + tiny
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "print.stl"
+            target = Path(folder) / "raster_only.stl"
+            source.write_bytes(original)
+            self.assertEqual(slicer.preview_mesh(source, target), 1)
+            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(target.read_bytes()[84:], good)
+
     def test_explicit_placement_keeps_z_normals_and_face_order(self):
         triangle = struct.pack("<12fH", 0, 0, 1, -17, -17, 0, 17, -17, 0, 17, 17, 2, 0)
         original = bytes(80) + struct.pack("<I", 20000) + triangle * 20000
