@@ -12,6 +12,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  OUT: ${{ runner.temp }}/ci-out/release
+
 jobs:
   release:
     name: Build and publish release
@@ -132,7 +135,7 @@ jobs:
             echo "commit=$GITHUB_SHA"
             echo "build_number=$GITHUB_RUN_NUMBER"
             echo "apk=$APK"
-          } | tee android/release-metadata.txt
+          } | tee "$OUT/release-metadata.txt"
 
       - name: Publish GitHub Release
         env:
@@ -145,7 +148,7 @@ jobs:
             --generate-notes \
             android/app/build/outputs/apk/release/app-release.apk \
             android/app/build/outputs/apk/release/app-release.apk.sha256 \
-            android/release-metadata.txt
+            ${{ env.OUT }}/release-metadata.txt
 
       - name: Remove release keystore
         if: always()
