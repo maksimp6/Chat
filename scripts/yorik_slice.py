@@ -43,7 +43,7 @@ def validate_result(path, count):
         raise ValueError("mesh triangles changed")
     expected = {"width": 34, "depth": 34, "height": 53.7}
     if any(abs(float(size.get(k, 0)) - v) > 0.3 for k, v in expected.items()):
-        raise ValueError("Yorik dimensions changed")
+        raise ValueError(f"Yorik dimensions changed: {size!r}")
     return plate
 
 
