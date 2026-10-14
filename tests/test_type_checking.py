@@ -83,6 +83,8 @@ STRICT_CLEAN_FILES = {
     "knowledge_economics.py",
     "local_tool_agent.py",
     "mcp_server/runtime_bridge.py",
+    "memory_engine/__init__.py",
+    "memory_engine/store.py",
     "mcp_trace.py",
     "plugin_manager.py",
     "pricing_registry.py",
