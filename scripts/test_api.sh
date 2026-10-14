@@ -1,6 +1,11 @@
 #!/bin/bash
+
+# Resolve project paths independently of the caller's working directory.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd -- "$SCRIPT_DIR/.." || exit 1
+
 # === TEST_API.SH: Автоматическое тестирование API ===
-# Использование: ./test_api.sh
+# Использование: bash scripts/test_api.sh
 
 BASE_URL="http://localhost:8080"
 PASS=0

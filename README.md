@@ -4,6 +4,18 @@ Alice Pro — self-hosted AI assistant platform around Yandex AI Studio, MCP/loc
 
 The repository is actively evolving. This README separates shipped behavior from open scope: Issues define implementation scope and acceptance criteria; docs define contracts and operating rules; Discussions capture questions and decisions.
 
+## Repository navigation
+
+| Need                                    | Location                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Run the backend                         | `app.py`, `start.sh`                                                                                                  |
+| Web interface                           | `static/`, `templates/`                                                                                               |
+| Android client                          | `android/`                                                                                                            |
+| Tests                                   | `tests/`                                                                                                              |
+| Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                    |
+| Architecture and operating instructions | [docs index](docs/README.md)                                                                                          |
+| Remaining root cleanup                  | [file inventory](docs/architecture/root-file-inventory.md), [layout contract](docs/architecture/repository-layout.md) |
+
 ## What is shipped
 
 - **Yandex AI Studio Responses API** as the primary provider through the backend chat path.

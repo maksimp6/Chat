@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# Resolve project paths independently of the caller's working directory.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd -- "$SCRIPT_DIR/.." || exit 1
+
 # Скрипт для просмотра логов по модулям
 
 echo "╔══════════════════════════════════════════════════════════╗"
