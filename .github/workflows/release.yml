@@ -19,6 +19,8 @@ jobs:
   release:
     name: Build and publish release
     runs-on: ubuntu-latest
+    # 1 минута задана вручную: замера прогона нет
+    timeout-minutes: 1
     env:
       ALICE_RELEASE_STORE_PASSWORD: ${{ secrets.ALICE_RELEASE_STORE_PASSWORD }}
       ALICE_RELEASE_KEY_ALIAS: ${{ secrets.ALICE_RELEASE_KEY_ALIAS }}
