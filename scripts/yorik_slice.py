@@ -29,7 +29,9 @@ def validate_result(path, count):
     plate = plates[0]
     objects = plate.get("objects", [])
     if plate.get("warning_message") or len(objects) != 1:
-        raise ValueError("slicer warning or missing Yorik object")
+        raise ValueError(
+            f"slicer warning/object audit: {plate.get('warning_message')!r}; objects={len(objects)}"
+        )
     obj = objects[0]
     size = obj.get("bbox", {})
     if obj.get("triangle_count") != count:
@@ -111,7 +113,8 @@ def slice_model(root, mesh, out):
     command = [
         str(root / "bin/bambu-studio"),
         "--arrange",
-        "0",
+        "1",
+        "--allow-rotations=0",
         "--orient",
         "0",
         "--slice",
