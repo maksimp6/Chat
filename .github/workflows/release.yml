@@ -19,7 +19,6 @@ jobs:
   release:
     name: Build and publish release
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     env:
       ALICE_RELEASE_STORE_PASSWORD: ${{ secrets.ALICE_RELEASE_STORE_PASSWORD }}
       ALICE_RELEASE_KEY_ALIAS: ${{ secrets.ALICE_RELEASE_KEY_ALIAS }}

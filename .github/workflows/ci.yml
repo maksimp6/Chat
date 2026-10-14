@@ -19,7 +19,7 @@ jobs:
   changes:
     name: Platform changes
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 1
     outputs:
       web: ${{ steps.classify.outputs.web }}
       backend: ${{ steps.classify.outputs.backend }}
@@ -84,7 +84,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 2
     env:
       YANDEX_API_KEY: ci-test-placeholder
     steps:
@@ -340,7 +340,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 2
     env:
       ALICE_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/android/app/debug-signing.keystore
       ALICE_DEBUG_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS }}
@@ -409,7 +409,7 @@ jobs:
     if: always()
     needs: [changes, code-rules, backend, android, infra, mcp]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 1
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

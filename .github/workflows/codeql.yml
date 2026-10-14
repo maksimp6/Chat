@@ -18,7 +18,7 @@ jobs:
   analyze:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 2
     strategy:
       fail-fast: false
       matrix:
