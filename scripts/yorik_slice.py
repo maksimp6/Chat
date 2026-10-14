@@ -40,6 +40,20 @@ def validate_result(path, count):
     return plate
 
 
+def place_mesh(mesh, destination):
+    data = bytearray(mesh.read_bytes())
+    count = validate_mesh(mesh)
+    for index in range(count):
+        offset = 84 + 50 * index + 12
+        values = list(struct.unpack_from("<9f", data, offset))
+        for vertex in range(3):
+            values[3 * vertex] += 90
+            values[3 * vertex + 1] += 90
+        struct.pack_into("<9f", data, offset, *values)
+    destination.write_bytes(data)
+    return destination
+
+
 def slice_model(root, mesh, out):
     from alice_a1mini_pla_cube_slice import (
         _read_sliced_archive,
@@ -51,6 +65,7 @@ def slice_model(root, mesh, out):
 
     out.mkdir(parents=True, exist_ok=True)
     count = validate_mesh(mesh)
+    placed = place_mesh(mesh, out / "yorik_on_bed.stl")
     machine, process, filament = profiles(root / "resources/profiles/BBL", out)
     settings = json.loads(process.read_text())
     settings.update(enable_support="1", support_type="normal(auto)", wall_loops="3")
@@ -62,8 +77,6 @@ def slice_model(root, mesh, out):
         "0",
         "--orient",
         "0",
-        "--center",
-        "90,90",
         "--slice",
         "0",
         "--export-3mf",
@@ -74,7 +87,7 @@ def slice_model(root, mesh, out):
         str(filament),
         "--outputdir",
         str(out),
-        str(mesh),
+        str(placed),
     ]
     subprocess.run(command, cwd=out, env=env, timeout=300, check=True)
     destination = out / OUTPUT
@@ -82,7 +95,7 @@ def slice_model(root, mesh, out):
     _validate_profile(profile)
     _validate_gcode(gcode)
     plate = validate_result(out / "result.json", count)
-    preview = embed_preview(destination, mesh)
+    preview = embed_preview(destination, placed)
     with zipfile.ZipFile(destination) as archive:
         (out / "preview.png").write_bytes(archive.read("Metadata/plate_1.png"))
     audit = {

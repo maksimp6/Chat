@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import struct
 import unittest
 import zipfile
 from unittest.mock import Mock, patch
@@ -159,6 +160,22 @@ class SliceAuditTests(unittest.TestCase):
             path = Path(folder) / "result.json"
             path.write_text(json.dumps(data))
             return slicer.validate_result(path, 23430)
+
+    def test_explicit_placement_keeps_z_normals_and_face_order(self):
+        triangle = struct.pack("<12fH", 0, 0, 1, -17, -17, 0, 17, -17, 0, 17, 17, 2, 0)
+        original = bytes(80) + struct.pack("<I", 20000) + triangle * 20000
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "source.stl"
+            target = Path(folder) / "placed.stl"
+            source.write_bytes(original)
+            slicer.place_mesh(source, target)
+            data = target.read_bytes()
+        self.assertEqual(data[:84], original[:84])
+        for i in (0, 19999):
+            face = struct.unpack_from("<12fH", data, 84 + 50 * i)
+            self.assertEqual(face[:3], (0, 0, 1))
+            self.assertEqual(face[3:12], (73, 73, 0, 107, 73, 0, 107, 107, 2))
+        self.assertEqual(len(data), len(original))
 
     def test_real_rotated_cli_bbox_is_rejected(self):
         with self.assertRaises(ValueError):
