@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import zipfile
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from scripts import yorik_runner as worker
 
@@ -27,7 +27,10 @@ def package():
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as archive:
         archive.writestr("Metadata/project_settings.config", json.dumps(profile))
-        archive.writestr("Metadata/plate_1.gcode", "; HEADER_BLOCK_START\n" + "; test\n" * 900)
+        archive.writestr(
+            "Metadata/plate_1.gcode",
+            "; HEADER_BLOCK_START\nM109 S220\nM190 S60\nG1 X10 E1.5\n" + "; test\n" * 900,
+        )
     blob = stream.getvalue()
     audit = {
         "filename": worker.FILENAME,
@@ -93,10 +96,27 @@ class HandoffTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             worker.unpack_handoff(stream.getvalue(), HEAD)
 
-    def test_certificate_pin_required_on_control_and_data(self):
-        context = worker.PinnedContext("0" * 64)
-        self.assertEqual(context.pin, "0" * 64)
-        self.assertFalse(context.check_hostname)
+    def test_certificate_pin_mismatch_closes_connection(self):
+        connection = Mock()
+        connection.getpeercert.return_value = b"different certificate"
+        with patch.object(worker.ssl.SSLContext, "wrap_socket", return_value=connection):
+            with self.assertRaises(worker.ssl.SSLError):
+                worker.PinnedContext("0" * 64).wrap_socket(Mock())
+        connection.close.assert_called_once()
+
+    def test_comment_only_forged_gcode_is_rejected(self):
+        blob, audit = package()
+        stream = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(blob)) as original, zipfile.ZipFile(stream, "w") as archive:
+            archive.writestr(
+                "Metadata/project_settings.config",
+                original.read("Metadata/project_settings.config"),
+            )
+            archive.writestr("Metadata/plate_1.gcode", "; HEADER_BLOCK_START\n" + "; fake\n" * 900)
+        blob = stream.getvalue()
+        audit.update(size_bytes=len(blob), sha256=hashlib.sha256(blob).hexdigest())
+        with self.assertRaises(ValueError):
+            worker.validate_package(blob, audit, HEAD)
 
     def test_private_config_permissions_and_lan_host(self):
         with tempfile.TemporaryDirectory() as folder:

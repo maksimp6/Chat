@@ -149,6 +149,15 @@ def validate_package(blob, audit, head):
         raise ValueError("sliced profile disagrees with audit")
     if not gcode.startswith("; HEADER_BLOCK_START") or len(gcode) < 5000:
         raise ValueError("not a real sliced Bambu job")
+    commands = [line.split(";", 1)[0].strip() for line in gcode.splitlines()]
+    for command, target in (("M109", 220), ("M190", 60)):
+        if not any(re.match(rf"^{command}\s+S{target}(?:\s|$)", line) for line in commands):
+            raise ValueError("missing audited temperature commands")
+    if not any(
+        re.match(r"^G1\s", line) and re.search(r"\sE[0-9]+(?:\.[0-9]+)?(?:\s|$)", line)
+        for line in commands
+    ):
+        raise ValueError("missing extrusion commands")
     return digest
 
 
