@@ -29,7 +29,7 @@ authority or status system.
 
 ## Branch routing invariant
 
-Every routine agent/task PR MUST target `develop`, never `master`. Before any PR creation or update, inspect the actual base/head and current `develop` HEAD. If an existing routine PR targets `master`, correct its base to `develop` only after reviewing the resulting diff, conflicts, and CI impact; do not blindly retarget unrelated release/integration PRs. A separate integration PR from `develop` to `master` requires explicit owner authorization and the protected release checks. `OK` acknowledges a stage only, never grants merge permission.
+Every routine agent/task PR MUST target `develop`, never `master`. Before any PR creation or update, inspect the actual base/head and current `develop` HEAD. If an existing routine PR targets `master`, correct its base to `develop` only after reviewing the resulting diff, conflicts, and CI impact; do not blindly retarget unrelated release/integration PRs. A separate integration PR from `develop` to `master` requires explicit owner authorization and the protected release checks. Agents must not initiate, merge, or retarget such an integration PR; only the repository owner can explicitly authorize that workflow. GitHub branch protection must enforce this independently of agent instructions. `OK` acknowledges a stage only, never grants merge permission.
 
 ## Agent dispatch
 
