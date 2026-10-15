@@ -58,7 +58,9 @@ def test_snapshot_and_final_results_are_deep_independent():
 
 def test_failed_final_rebuild_keeps_trace_mutable():
     trace = _trace()
-    with patch("billing.aggregate_billing", side_effect=RuntimeError("billing unavailable")):
+    with patch(
+        "economy.billing.aggregate_billing", side_effect=RuntimeError("billing unavailable")
+    ):
         with pytest.raises(RuntimeError, match="billing unavailable"):
             trace.finalize()
 

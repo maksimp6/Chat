@@ -89,7 +89,7 @@ def _packet(scope=None, evidence=None):
             ),
         ),
         changed_files=(
-            "provider_credentials.py",
+            "provider_accounts/credentials.py",
             "tests/test_provider_credentials_secret_management.py",
         ),
         owner="Test Engineer",
@@ -131,7 +131,7 @@ def test_task_packet_contains_canonical_handoff_fields():
 
     assert payload["scope"]["work_item"] == "PR#548"
     assert payload["changed_files"] == [
-        "provider_credentials.py",
+        "provider_accounts/credentials.py",
         "tests/test_provider_credentials_secret_management.py",
     ]
     assert payload["owner"] == "Test Engineer"

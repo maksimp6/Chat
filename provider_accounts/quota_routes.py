@@ -7,8 +7,8 @@ import secrets
 
 from flask import Blueprint, jsonify, request
 
-from provider_quotas import assign_user_policy, get_usage, get_user_policy, upsert_policy
-from treasury_identity import get_current_owner_id
+from provider_accounts.quotas import assign_user_policy, get_usage, get_user_policy, upsert_policy
+from economy.treasury_identity import get_current_owner_id
 
 
 provider_quota_bp = Blueprint(

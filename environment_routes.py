@@ -15,7 +15,7 @@ from environment_manager import (
     register_runtime_operation,
 )
 from runtime import RuntimeNotFound, RuntimeOwnerViolation
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 environment_bp = Blueprint("environments", __name__, url_prefix="/api/environments")
 environment_gateway_bp = Blueprint("environment_gateway", __name__)

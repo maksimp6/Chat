@@ -29,9 +29,9 @@ from db import (
 )
 from partial_output import extract_last_response_text, format_partial_output_message
 from responses_tool_loop import run_tool_loop, extract_function_calls
-from billing import settle_billing_to_treasury
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
-from provider_quotas import ProviderQuotaExceeded
+from economy.billing import settle_billing_to_treasury
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from provider_accounts.quotas import ProviderQuotaExceeded
 from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
 from universal_tool_platform import (
     UniversalToolCall,

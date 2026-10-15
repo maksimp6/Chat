@@ -16,7 +16,7 @@ from uuid import uuid4
 from flask import Blueprint, jsonify, request
 
 from db import get_store
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 
 partner_relations_bp = Blueprint(

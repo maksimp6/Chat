@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from budget_controller import BudgetLimitExceeded, CloudBudgetGuard
+from economy.budget_controller import BudgetLimitExceeded, CloudBudgetGuard
 from cloud.base import CloudProviderError
 from cloud.registry import ensure_default_providers, resolve_provider_name
 from runtime_tools import ssh_runtime_exec

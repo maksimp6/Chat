@@ -24,7 +24,7 @@ def test_yandex_request_path_requires_runtime_credential_store():
 
 
 def test_runtime_credential_resolution_has_no_environment_fallback_path():
-    provider = (ROOT / "provider_credentials.py").read_text()
+    provider = (ROOT / "provider_accounts/credentials.py").read_text()
     mixin = (ROOT / "yandex_client_modules/request_mixin.py").read_text()
     assert "get_store()" in mixin
     assert "decrypt_secret" in mixin
@@ -32,8 +32,8 @@ def test_runtime_credential_resolution_has_no_environment_fallback_path():
 
 
 def test_provider_credential_resolution_has_no_environment_fallback():
-    provider = (ROOT / "provider_credentials.py").read_text()
-    routes = (ROOT / "provider_credentials_routes.py").read_text()
+    provider = (ROOT / "provider_accounts/credentials.py").read_text()
+    routes = (ROOT / "provider_accounts/credentials_routes.py").read_text()
     assert "def _env_key(" not in provider
     assert 'getattr(config, "API_KEY"' not in provider
     assert "CLOUDRU_API_KEY" not in provider

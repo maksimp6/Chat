@@ -7,7 +7,7 @@ import pytest
 
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
-from provider_credentials import (
+from provider_accounts.credentials import (
     CredentialError,
     NoActiveCredentialError,
     get_secret_management_ref,
@@ -293,7 +293,7 @@ def test_resolve_constructs_default_backend_client(isolated_db):
 
 
 def test_default_resolver_reuses_backend_scoped_client(isolated_db, monkeypatch):
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
     fake = FakeSecretManagementClient({("secret-1", "v1"): "cached-client-value"})
@@ -318,7 +318,7 @@ def test_atomic_upsert_tracks_immediately_previous_version(isolated_db):
 
 
 def test_rollback_detects_stale_concurrent_update(isolated_db, monkeypatch):
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     set_secret_management_ref(isolated_db, "purpose", "secret", "v1")
     set_secret_management_ref(isolated_db, "purpose", "secret", "v2")

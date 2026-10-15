@@ -13,8 +13,8 @@ from flask import Blueprint, jsonify, request
 from config import config
 from credential_crypto import decrypt_secret, encrypt_secret
 from db import get_store
-from provider_credentials import list_provider_credentials
-from provider_credentials import (
+from provider_accounts.credentials import list_provider_credentials
+from provider_accounts.credentials import (
     CLOUDRU,
     YANDEX,
     ProviderCredential,

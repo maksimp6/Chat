@@ -4,7 +4,7 @@ import pytest
 @pytest.fixture
 def treasury_db(tmp_path, monkeypatch):
     import db
-    import treasury
+    import economy.treasury as treasury
     from agent_memory.client import close_memory_clients
 
     path = tmp_path / "treasury.db"
@@ -19,8 +19,8 @@ def treasury_db(tmp_path, monkeypatch):
 
 
 def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-1"
     demo_top_up(owner_id, 10)
@@ -45,8 +45,8 @@ def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
 
 
 def test_partial_or_unknown_billing_is_never_posted(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-2"
     demo_top_up(owner_id, 10)
@@ -67,8 +67,8 @@ def test_partial_or_unknown_billing_is_never_posted(treasury_db):
 
 
 def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up
 
     demo_top_up("trusted-owner", 1)
     billing = {
@@ -83,7 +83,7 @@ def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
 
 
 def test_mismatched_billing_owner_is_rejected(treasury_db):
-    from billing import settle_billing_to_treasury
+    from economy.billing import settle_billing_to_treasury
 
     with pytest.raises(ValueError, match="does not match"):
         settle_billing_to_treasury(
@@ -98,7 +98,7 @@ def test_mismatched_billing_owner_is_rejected(treasury_db):
 
 
 def test_missing_owner_identity_is_safe_skip(treasury_db):
-    from billing import settle_billing_to_treasury
+    from economy.billing import settle_billing_to_treasury
 
     result = settle_billing_to_treasury(
         {"cost_status": "calculated", "total_cost": 1, "trace_id": "trace-missing-owner"},
@@ -109,8 +109,8 @@ def test_missing_owner_identity_is_safe_skip(treasury_db):
 
 
 def test_insufficient_balance_does_not_create_debit(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-3"
     demo_top_up(owner_id, 1)
@@ -153,7 +153,7 @@ def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
         method="GET",
         json={"owner_id": "attacker"},
     ):
-        from treasury_identity import TreasuryIdentityError, get_current_owner_id
+        from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
         with pytest.raises(TreasuryIdentityError):
             get_current_owner_id()
