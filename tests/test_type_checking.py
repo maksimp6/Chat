@@ -38,9 +38,11 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "economy/__init__.py",
     "economy/budget_repository.py",
     "db.py",
     "mcp_storage.py",
+    "provider_accounts/__init__.py",
     "provider_accounts/quotas.py",
     "economy/treasury.py",
     "agent_memory/repository.py",
