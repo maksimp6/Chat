@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { BrowserDom } = require("../browser/emulator/browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -15,14 +15,12 @@ function response(body) {
 }
 
 function boot(routes = {}) {
-  const browser = new BrowserDom();
-  const document = browser.parse(
+  const browser = new BrowserShim(
     '<div id="chatbox"></div><textarea id="msg-input"></textarea>' +
       '<button id="send-btn"></button><div id="voice-status"></div>' +
       '<button id="mic-btn" type="button"></button>',
   );
-  const window = browser.window;
-  window.document = document;
+  const { document, window } = browser;
   window.AliceDispatcher = {
     request: (url) => {
       const value = routes[url];
@@ -43,19 +41,14 @@ function boot(routes = {}) {
     setTimeout,
     clearTimeout,
   });
-  vm.runInContext(
-    fs.readFileSync(path.join(ROOT, "static", "chat.js"), "utf8"),
-    context,
-  );
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "static", "chat.js"), "utf8"), context);
   return { context, document };
 }
 
 function rendered(document) {
   return Array.from(document.querySelectorAll(".msg")).map((node) => ({
-    role: node.className.split(/\s+/).find((name) =>
-      ["user", "bot", "error"].includes(name),
-    ),
-    text: node.textContent.trim(),
+    role: node.className.split(/\s+/).find((name) => ["user", "bot", "error"].includes(name)),
+    text: node.textContent.replace("📋", "").trim(),
   }));
 }
 
@@ -65,18 +58,7 @@ function rendered(document) {
   context.addMessage("human", "user", false, 0, null, 0, null, null, null, {
     id: "m1",
   });
-  context.addMessage(
-    "assistant",
-    "assistant",
-    false,
-    0,
-    null,
-    0,
-    null,
-    null,
-    null,
-    { id: "m2" },
-  );
+  context.addMessage("assistant", "assistant", false, 0, null, 0, null, null, null, { id: "m2" });
   context.addMessage("ignored", "system", false, 0, null, 0, null, null, null, {
     id: "m3",
   });
@@ -86,18 +68,7 @@ function rendered(document) {
     { role: "bot", text: "assistant" },
   ]);
 
-  context.addMessage(
-    "assistant",
-    "assistant",
-    false,
-    0,
-    null,
-    0,
-    null,
-    null,
-    null,
-    { id: "m2" },
-  );
+  context.addMessage("assistant", "assistant", false, 0, null, 0, null, null, null, { id: "m2" });
   assert.equal(rendered(document).length, 2);
 
   const history = boot({
