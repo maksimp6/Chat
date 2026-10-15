@@ -62,7 +62,7 @@ def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, m
 
 
 def test_department_archive_is_persisted(monkeypatch):
-    import departments
+    import organization.departments as departments
 
     monkeypatch.setenv("ALICE_DEPARTMENTS_ADMIN_TOKEN", "test-admin")
     departments.upsert_department({"id": "test", "name": "Test"})
@@ -96,7 +96,7 @@ def test_keys_keep_unique_identity_and_missing_keys_fail(monkeypatch):
 
 
 def test_partner_native_crud_and_status_authority():
-    import partner_relations as partners
+    import organization.partner_relations as partners
 
     ctx = {"_universal_context": {"call": SimpleNamespace(user_id="owner", metadata={})}}
     parent = partners.create_partner({"id": "parent", "name": "Original"}, ctx)
@@ -123,7 +123,7 @@ def test_partner_native_crud_and_status_authority():
 
 
 def test_partner_changed_or_foreign_records_never_acknowledge_mutation(monkeypatch):
-    import partner_relations as partners
+    import organization.partner_relations as partners
 
     ctx = {"_universal_context": {"call": SimpleNamespace(user_id="owner", metadata={})}}
     partners.create_partner({"id": "parent", "name": "Parent"}, ctx)
@@ -407,7 +407,7 @@ def test_provider_clients_use_same_native_credential_writer(monkeypatch):
 
 
 def test_government_rejects_changed_owner_at_publication(monkeypatch):
-    import government
+    import organization.government as government
 
     monkeypatch.setattr(government, "_current_owner", lambda: "owner")
     case = government.create_case(user_id="owner")

@@ -38,7 +38,7 @@ from universal_tool_platform import (
     UniversalToolExecutor,
     tool_call_requires_approval,
 )
-from conversation_ownership import (
+from conversations.ownership import (
     init_conversation_ownership_table,
     set_owner,
     check_access,

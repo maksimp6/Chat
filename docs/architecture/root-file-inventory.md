@@ -21,14 +21,8 @@
 | [app.py](../../app.py) | Корневые точки входа и конфигурация |
 | [archiver.py](../../archiver.py) | Память, данные и диалоги |
 | [config.py](../../config.py) | Корневые точки входа и конфигурация |
-| [conversation_metadata.py](../../conversation_metadata.py) | Память, данные и диалоги |
-| [conversation_ownership.py](../../conversation_ownership.py) | Память, данные и диалоги |
 | [credential_crypto.py](../../credential_crypto.py) | Провайдеры, credentials и квоты |
 | [db.py](../../db.py) | Память, данные и диалоги |
-| [departments.py](../../departments.py) | Web, идентификация и бизнес |
-| [file_manager.py](../../file_manager.py) | Yandex client |
-| [file_routes.py](../../file_routes.py) | Web, идентификация и бизнес |
-| [government.py](../../government.py) | Web, идентификация и бизнес |
 | [key_manager.py](../../key_manager.py) | Провайдеры, credentials и квоты |
 | [mcp_routes.py](../../mcp_routes.py) | MCP |
 | [memory_db.py](../../memory_db.py) | Память, данные и диалоги |
@@ -36,11 +30,6 @@
 | [memory_manager.py](../../memory_manager.py) | Память, данные и диалоги |
 | [model_discovery.py](../../model_discovery.py) | Провайдеры, credentials и квоты |
 | [partial_output.py](../../partial_output.py) | Агенты и выполнение инструментов |
-| [partner_relations.py](../../partner_relations.py) | Web, идентификация и бизнес |
-| [plugin_execution.py](../../plugin_execution.py) | Агенты и выполнение инструментов |
-| [plugin_manager.py](../../plugin_manager.py) | Web, идентификация и бизнес |
-| [plugin_routes.py](../../plugin_routes.py) | Web, идентификация и бизнес |
-| [project_tree.py](../../project_tree.py) | Web, идентификация и бизнес |
 | [runtime_api.py](../../runtime_api.py) | Сессии, окружения и runtime |
 | [runtime_tools.py](../../runtime_tools.py) | Сессии, окружения и runtime |
 | [sdk.py](../../sdk.py) | Агенты и выполнение инструментов |

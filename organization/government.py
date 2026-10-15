@@ -450,7 +450,7 @@ GOVERNMENT_TOOLS = {
 
 
 def ensure_government_department() -> None:
-    from departments import get_department, upsert_department
+    from organization.departments import get_department, upsert_department
 
     if get_department("government"):
         return

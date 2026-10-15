@@ -4,7 +4,7 @@ import re
 import pytest
 import requests
 
-import file_manager
+import workspace.files as file_manager
 from yandex_client_modules.client import YandexClientError
 
 

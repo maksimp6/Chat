@@ -38,6 +38,10 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "conversations/__init__.py",
+    "workspace/__init__.py",
+    "plugin_system/__init__.py",
+    "organization/__init__.py",
     "agent_runtime/__init__.py",
     "sessions/__init__.py",
     "remote_runtime/__init__.py",
@@ -92,7 +96,7 @@ STRICT_CLEAN_FILES = {
     "cloud/models.py",
     "cloud/policy.py",
     "cloud/registry.py",
-    "conversation_ownership.py",
+    "conversations/ownership.py",
     "identity/__init__.py",
     "invocation/__init__.py",
     "invocation/context.py",
@@ -101,7 +105,7 @@ STRICT_CLEAN_FILES = {
     "agent_runtime/local_tool_agent.py",
     "mcp_server/runtime_bridge.py",
     "mcp_server/trace.py",
-    "plugin_manager.py",
+    "plugin_system/manager.py",
     "economy/pricing_registry.py",
     "printing3d/__init__.py",
     "provider_accounts/key_rotation.py",
