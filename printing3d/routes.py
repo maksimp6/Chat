@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 from .finance import get_payback_status, set_financing_plan
 from .service import (

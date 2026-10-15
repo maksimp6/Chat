@@ -7,7 +7,7 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from invocation.context import InvocationContext
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 from .dispatcher import RuntimeDispatcher, RuntimeScopeViolation
 

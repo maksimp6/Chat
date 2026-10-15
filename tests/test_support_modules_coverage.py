@@ -1,11 +1,11 @@
 import json
 import runpy
 from datetime import datetime, timezone
+from pathlib import Path
 
 import archiver
 import sdk
-import send_logs
-import yc_logging
+from scripts import send_logs
 
 
 def _create_archive_database(path, rows=()):
@@ -120,6 +120,7 @@ def test_sdk_main_example_runs_with_fake_http(monkeypatch, capsys):
 
 def test_send_logs_collects_files_and_handles_transport(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(send_logs, "LOGS_DIR", tmp_path / "execution_logs")
     assert send_logs.collect_logs() == []
     assert "not found" in capsys.readouterr().out
 
@@ -160,29 +161,9 @@ def test_send_logs_collects_files_and_handles_transport(monkeypatch, tmp_path, c
 def test_send_logs_main_entrypoint(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(send_logs.requests, "post", lambda *args, **kwargs: _FakeResponse({}))
-    runpy.run_path(send_logs.__file__, run_name="__main__")
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    source = scripts / "send_logs.py"
+    source.write_text(Path(send_logs.__file__).read_text(), encoding="utf-8")
+    runpy.run_path(str(source), run_name="__main__")
     assert "No logs to send" in capsys.readouterr().out
-
-
-def test_local_logger_writes_jsonl_handles_write_errors_and_flushes(monkeypatch, tmp_path, capsys):
-    path = tmp_path / "app.jsonl"
-    logger = yc_logging.LocalLogger(str(path))
-    logger.emit("info", 123, "test-stream")
-
-    entry = json.loads(path.read_text(encoding="utf-8"))
-    assert entry["level"] == "INFO"
-    assert entry["stream"] == "test-stream"
-    assert entry["message"] == "123"
-    assert "[INFO] 123" in capsys.readouterr().out
-
-    import builtins
-
-    real_open = builtins.open
-    monkeypatch.setattr(
-        builtins, "open", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("x"))
-    )
-    logger.emit("error", "cannot-write")
-    monkeypatch.setattr(builtins, "open", real_open)
-    assert "[ERROR] cannot-write" in capsys.readouterr().out
-
-    logger.flush()

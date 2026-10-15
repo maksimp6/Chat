@@ -12,7 +12,7 @@ from agent_retrieval import (
     record_retrieval,
 )
 from agent_retrieval.service import _bm25_scores, _bound_hits, _cache_matches_query
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 HEAD = "head-123"
