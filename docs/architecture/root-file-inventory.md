@@ -1,9 +1,9 @@
 # Инвентаризация файлов корня
 
 Задача: [#430](https://github.com/maksimp6/Chat/issues/430).
-База инвентаризации: `1575bc3365187592dd6b3034b89051563fc6fa0b` (master).
+База инвентаризации: ветка `develop`, уборка [#1245](https://github.com/maksimp6/Chat/pull/1245).
 
-После переноса служебных утилит остаются **82 Python-файла** в корне.
+После переноса служебных утилит остаются **63 Python-файла** в корне.
 Это инвентаризация текущих файлов и очередь связных переносов, а не утверждение,
 что пакетная миграция завершена. Группы обозначают ответственность; конкретные
 пакеты и публичные импорты определяются контрактом каждого следующего PR.
@@ -12,8 +12,7 @@
 `alice_agent_runner.py` и `cli_agent.py` имеют CLI entrypoints, но содержат
 реализацию: сначала выделить её в пакет, затем решить судьбу entrypoints.
 Остальные файлы — существующий пакетный долг; ни один не объявляется мёртвым
-по одному имени. `db_backend.py` и migration-модули не удаляются в этой
-структурной работе: их судьба зависит от отдельной принятой миграции хранения.
+по одному имени.
 
 | Файл сейчас | Ответственность |
 | --- | --- |
@@ -25,18 +24,13 @@
 | [billing.py](../../billing.py) | Учёт, бюджет и цены |
 | [budget_controller.py](../../budget_controller.py) | Учёт, бюджет и цены |
 | [budget_repository.py](../../budget_repository.py) | Учёт, бюджет и цены |
-| [chatgpt_mcp.py](../../chatgpt_mcp.py) | MCP |
 | [cli_agent.py](../../cli_agent.py) | Корневые точки входа и конфигурация |
-| [cloud/cloudru/api_key_provider.py](../../cloud/cloudru/api_key_provider.py) | Провайдеры, credentials и квоты |
-| [cloud/cloudru/iam.py](../../cloud/cloudru/iam.py) | Провайдеры, credentials и квоты |
-| [cloud/cloudru/iam_routes.py](../../cloud/cloudru/iam_routes.py) | Провайдеры, credentials и квоты |
 | [compute_resources.py](../../compute_resources.py) | Учёт, бюджет и цены |
 | [config.py](../../config.py) | Корневые точки входа и конфигурация |
 | [conversation_metadata.py](../../conversation_metadata.py) | Память, данные и диалоги |
 | [conversation_ownership.py](../../conversation_ownership.py) | Память, данные и диалоги |
 | [credential_crypto.py](../../credential_crypto.py) | Провайдеры, credentials и квоты |
 | [db.py](../../db.py) | Память, данные и диалоги |
-| [db_backend.py](../../db_backend.py) | Память, данные и диалоги |
 | [departments.py](../../departments.py) | Web, идентификация и бизнес |
 | [environment_manager.py](../../environment_manager.py) | Сессии, окружения и runtime |
 | [environment_routes.py](../../environment_routes.py) | Сессии, окружения и runtime |
@@ -49,13 +43,10 @@
 | [local_tool_agent.py](../../local_tool_agent.py) | Агенты и выполнение инструментов |
 | [logger.py](../../logger.py) | Трассировка и журналирование |
 | [mcp_routes.py](../../mcp_routes.py) | MCP |
-| [mcp_server/storage.py](../../mcp_server/storage.py) | MCP |
-| [mcp_server/trace.py](../../mcp_server/trace.py) | MCP |
 | [memory_db.py](../../memory_db.py) | Память, данные и диалоги |
 | [memory_extractor.py](../../memory_extractor.py) | Память, данные и диалоги |
 | [memory_manager.py](../../memory_manager.py) | Память, данные и диалоги |
 | [model_discovery.py](../../model_discovery.py) | Провайдеры, credentials и квоты |
-| [observability_migrations.py](../../observability_migrations.py) | Память, данные и диалоги |
 | [partial_output.py](../../partial_output.py) | Агенты и выполнение инструментов |
 | [partner_relations.py](../../partner_relations.py) | Web, идентификация и бизнес |
 | [plugin_execution.py](../../plugin_execution.py) | Агенты и выполнение инструментов |
@@ -71,13 +62,11 @@
 | [reasoning_plan.py](../../reasoning_plan.py) | Агенты и выполнение инструментов |
 | [responses_tool_loop.py](../../responses_tool_loop.py) | Агенты и выполнение инструментов |
 | [runtime_api.py](../../runtime_api.py) | Сессии, окружения и runtime |
-| [runtime_migrations.py](../../runtime_migrations.py) | Память, данные и диалоги |
 | [runtime_tools.py](../../runtime_tools.py) | Сессии, окружения и runtime |
 | [sdk.py](../../sdk.py) | Агенты и выполнение инструментов |
 | [session_manager.py](../../session_manager.py) | Сессии, окружения и runtime |
 | [session_profiles.py](../../session_profiles.py) | Сессии, окружения и runtime |
 | [session_runtime.py](../../session_runtime.py) | Сессии, окружения и runtime |
-| [identity/short_token_auth.py](../../identity/short_token_auth.py) | Web, идентификация и бизнес |
 | [ssh_runtime.py](../../ssh_runtime.py) | Сессии, окружения и runtime |
 | [ssh_runtime_settings.py](../../ssh_runtime_settings.py) | Сессии, окружения и runtime |
 | [storage.py](../../storage.py) | Память, данные и диалоги |
@@ -88,16 +77,7 @@
 | [treasury.py](../../treasury.py) | Учёт, бюджет и цены |
 | [treasury_identity.py](../../treasury_identity.py) | Учёт, бюджет и цены |
 | [universal_tool_platform.py](../../universal_tool_platform.py) | Агенты и выполнение инструментов |
-| [identity/user_identity.py](../../identity/user_identity.py) | Web, идентификация и бизнес |
 | [voice_routes.py](../../voice_routes.py) | Web, идентификация и бизнес |
-| [yandex_client_modules/api_key_provider.py](../../yandex_client_modules/api_key_provider.py) | Провайдеры, credentials и квоты |
-| [yandex_client_modules/api_logger.py](../../yandex_client_modules/api_logger.py) | Трассировка и журналирование |
-| [yandex_client_modules/client.py](../../yandex_client_modules/client.py) | Yandex client |
-| [yandex_client_modules/metadata_validator.py](../../yandex_client_modules/metadata_validator.py) | Yandex client |
-| [yandex_client_modules/request_builder.py](../../yandex_client_modules/request_builder.py) | Yandex client |
-| [yandex_client_modules/request_utils.py](../../yandex_client_modules/request_utils.py) | Yandex client |
-| [yandex_client_modules/response_parser.py](../../yandex_client_modules/response_parser.py) | Yandex client |
-| [yandex_client_modules/response_poller.py](../../yandex_client_modules/response_poller.py) | Yandex client |
 | [yc_logging.py](../../yc_logging.py) | Трассировка и журналирование |
 
 ## Где искать остальные файлы

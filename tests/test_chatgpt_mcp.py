@@ -60,8 +60,6 @@ def test_tools_list_is_deterministic_and_read_only(client):
     assert all("securitySchemes" in tool for tool in tools)
 
 
-
-
 def test_every_registered_tool_is_exposed_through_mcp(client):
     response = mcp_request(client, "tools/list")
     assert response.status_code == 200
