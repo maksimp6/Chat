@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import db
 
-from provider_quotas import (
+from provider_accounts.quotas import (
     ProviderQuotaExceeded,
     assign_user_policy,
     get_usage,

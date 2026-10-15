@@ -1,6 +1,6 @@
 import unittest
 
-from pricing_registry import PricingRegistry, PricingSnapshot, attach_pricing_snapshot
+from economy.pricing_registry import PricingRegistry, PricingSnapshot, attach_pricing_snapshot
 
 
 class PricingRegistryTests(unittest.TestCase):

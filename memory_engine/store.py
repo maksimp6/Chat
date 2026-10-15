@@ -9,6 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
+from itertools import chain
 import fcntl
 import hashlib
 import json
@@ -20,6 +21,9 @@ from typing import Any, Iterator, Protocol, TypeVar
 
 
 MAX_JOURNAL_FRAME_BYTES = 1024 * 1024  # 1 MiB including newline
+MAX_VALUE_DEPTH = 64
+MAX_VALUE_NODES = 100_000
+MAX_VALUE_TEXT_BYTES = MAX_JOURNAL_FRAME_BYTES
 
 ValueT = TypeVar("ValueT")
 
@@ -33,19 +37,64 @@ def _validate_name(name: str) -> None:
         raise StoreError("name must be a nonempty string")
 
 
+def _check_text_budget(value: Any, used: int) -> int:
+    """Check UTF-8 incrementally without allocating a full encoded text copy."""
+    if type(value) is not str:
+        return used
+    for offset in range(0, len(value), 16384):
+        try:
+            used += len(value[offset : offset + 16384].encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise StoreError("invalid Unicode text") from exc
+        if used > MAX_VALUE_TEXT_BYTES:
+            raise StoreError("value text exceeds size limit")
+    return used
+
+
+def _walk_value(value: Any) -> Iterator[Any]:
+    """Bound traversal before recursive copying/encoding; allow shared subtrees."""
+    stack: list[tuple[Iterator[Any], int, int | None]] = [(iter((value,)), 0, None)]
+    active: set[int] = set()
+    nodes = 0
+    text_bytes = 0
+    while stack:
+        children, depth, identity = stack[-1]
+        try:
+            item = next(children)
+        except StopIteration:
+            stack.pop()
+            if identity is not None:
+                active.remove(identity)
+            continue
+        nodes += 1
+        if depth > MAX_VALUE_DEPTH or nodes > MAX_VALUE_NODES:
+            raise StoreError("value structure exceeds limit")
+        text_bytes = _check_text_budget(item, text_bytes)
+        yield item
+        if type(item) in (list, tuple, dict):
+            identity = id(item)
+            if identity in active:
+                raise StoreError("cyclic value structure")
+            active.add(identity)
+            descendants = chain(item.keys(), item.values()) if type(item) is dict else iter(item)
+            stack.append((descendants, depth + 1, identity))
+
+
+def _validate_value_shape(value: Any) -> None:
+    """Reject unsafe container graphs before copying into client staging."""
+    for _item in _walk_value(value):
+        pass
+
+
 def _validate_value(value: Any) -> None:
     """Reject JSON coercions that would change RAM values after replay."""
-    if value is None or type(value) in (str, bool, int):
-        return
-    if type(value) is float and math.isfinite(value):
-        return
-    if type(value) is list:
-        for item in value:
-            _validate_value(item)
-    elif type(value) is dict and all(type(key) is str for key in value):
-        for item in value.values():
-            _validate_value(item)
-    else:
+    for item in _walk_value(value):
+        if item is None or type(item) in (str, bool, int, list):
+            continue
+        if type(item) is float and math.isfinite(item):
+            continue
+        if type(item) is dict and all(type(key) is str for key in item):
+            continue
         raise StoreError("unsupported JSON value")
 
 
@@ -149,6 +198,7 @@ class _JournalStore:
         self._sequence: int = 0
         self._digest: str = "0" * 64
         self._failed: bool = False
+        self._ram_valid: bool = True
         self._closed: bool = False
         self._active_transaction: bool = False
         try:
@@ -167,12 +217,14 @@ class _JournalStore:
         """Return confirmed in-memory sequence without reading the journal."""
         with self._lock:
             self._ensure_open()
-            return DatabaseInfo(last_commit=self._sequence)
+            return DatabaseInfo(last_commit=self._sequence if self._ram_valid else None)
 
     @property
     def last_commit(self) -> Commit:
         with self._lock:
             self._ensure_open()
+            if not self._ram_valid:
+                raise StoreError("recovery required; RAM publication was interrupted")
             return Commit(self._sequence, self._digest)
 
     @staticmethod
@@ -247,7 +299,15 @@ class _JournalStore:
                 else:
                     state.get(namespace, {}).pop(key, None)
             return state, payload["seq"], next_digest
-        except (ValueError, KeyError, TypeError, UnicodeError, AttributeError, StoreError) as exc:
+        except (
+            ValueError,
+            KeyError,
+            TypeError,
+            UnicodeError,
+            AttributeError,
+            StoreError,
+            RecursionError,
+        ) as exc:
             raise StoreError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
@@ -257,6 +317,8 @@ class _JournalStore:
         """Return a deep copy of the last confirmed value from RAM."""
         with self._lock:
             self._ensure_open()
+            if not self._ram_valid:
+                raise StoreError("recovery required; RAM publication was interrupted")
             return deepcopy(self._state.get(namespace, {}).get(key))
 
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
@@ -327,11 +389,19 @@ class _JournalStore:
         if not changes:
             return
         frame, digest = self._encode_frame(changes)
-        self._append_frame(frame)
-        # Publish only confirmed changes to the RAM view seen by readers.
-        self._apply_changes(changes)
-        self._sequence += 1
-        self._digest = digest
+        try:
+            self._append_frame(frame)
+            # Publish only confirmed changes to the RAM view seen by readers.
+            self._ram_valid = False
+            self._apply_changes(changes)
+            self._sequence += 1
+            self._digest = digest
+            self._ram_valid = True
+        except BaseException:
+            # A complete frame may exist even when append or RAM publication
+            # was interrupted. Retrying from stale metadata would break replay.
+            self._failed = True
+            raise
 
     def set(self, namespace: str, key: str, value: Any) -> None:
         """Synchronous durable write; reject direct writes inside a transaction."""
@@ -339,6 +409,7 @@ class _JournalStore:
             self._ensure_open()
             if self._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
+            _validate_value_shape(value)
             self._commit_changes(
                 [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
             )
@@ -535,9 +606,11 @@ class _JournalStore:
                 raise StoreError("backup source does not exist")
             try:
                 self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
+                self._ram_valid = False
                 self._state = state
                 self._sequence = sequence
                 self._digest = digest
+                self._ram_valid = True
             except OSError as exc:
                 self._failed = True
                 raise StoreError("restore failed; recovery required") from exc
@@ -607,6 +680,7 @@ class MemoryStore:
             if self._engine._active_transaction:
                 raise StoreError("direct mutation during transaction is forbidden")
             _validate_name(name)
+            _validate_value_shape(value)
             self._pending[name] = deepcopy(value)
 
     def commit(self) -> int:
@@ -636,7 +710,10 @@ class MemoryStore:
                 try:
                     yield wrapper
                     for change in wrapper._pending_changes():
-                        tx.set(change["namespace"], change["key"], change["value"])
+                        if change["op"] == "delete":
+                            tx.delete(change["namespace"], change["key"])
+                        else:
+                            tx.set(change["namespace"], change["key"], change["value"])
                 finally:
                     wrapper._closed = True
 
@@ -670,6 +747,33 @@ class MemoryStore:
     def __exit__(self, *_args: object) -> None:
         self.close()
 
+    def delete(self, name: str) -> None:
+        """Durably delete an existing named value without an empty commit."""
+        _validate_name(name)
+        with self._engine._lock:
+            self._engine._ensure_open()
+            if self._engine._failed:
+                raise StoreError("recovery required")
+            if self._pending or self._engine._active_transaction:
+                raise StoreError("delete requires an idle store")
+            if name in self._engine._state.get(self._NAMESPACE, {}):
+                self._engine.delete(self._NAMESPACE, name)
+
+    def items(self, prefix: str = "") -> dict[str, Any]:
+        """Read a detached snapshot of committed and staged named values."""
+        if not isinstance(prefix, str):
+            raise StoreError("prefix must be a string")
+        with self._engine._lock:
+            self._engine._ensure_open()
+            self._engine.last_commit
+            values = self._engine._state.get(self._NAMESPACE, {})
+            names = set(values) | set(self._pending)
+            return {
+                name: deepcopy(self._pending[name] if name in self._pending else values[name])
+                for name in sorted(names)
+                if name.startswith(prefix)
+            }
+
 
 class Transaction:
     """Private overlay for one atomic name/value transaction."""
@@ -678,6 +782,7 @@ class Transaction:
         self._committed = committed
         self._owner = get_ident()
         self._pending: dict[str, Any] = {}
+        self._deleted: set[str] = set()
         self._closed = False
 
     def _ensure_open(self) -> None:
@@ -689,19 +794,35 @@ class Transaction:
     def get(self, name: str) -> Any | None:
         self._ensure_open()
         _validate_name(name)
+        if name in self._deleted:
+            return None
         return deepcopy(self._pending[name] if name in self._pending else self._committed.get(name))
 
     def set(self, name: str, value: Any) -> None:
         self._ensure_open()
         _validate_name(name)
+        _validate_value_shape(value)
+        self._deleted.discard(name)
         self._pending[name] = deepcopy(value)
 
     def _pending_changes(self) -> list[dict[str, Any]]:
         self._ensure_open()
-        return [
+        changes = [
             {"op": "set", "namespace": "values", "key": name, "value": value}
-            for name, value in sorted(self._pending.items())
+            for name, value in self._pending.items()
         ]
+        changes.extend(
+            {"op": "delete", "namespace": "values", "key": name} for name in self._deleted
+        )
+        return sorted(changes, key=lambda change: change["key"])
+
+    def delete(self, name: str) -> None:
+        """Stage a deletion in the same atomic journal transaction."""
+        self._ensure_open()
+        _validate_name(name)
+        self._pending.pop(name, None)
+        if name in self._committed:
+            self._deleted.add(name)
 
 
 class _JournalTransaction:
@@ -730,6 +851,7 @@ class _JournalTransaction:
     def set(self, namespace: str, key: str, value: Any) -> None:
         """Stage a copy of the value without publishing it."""
         self._ensure_open()
+        _validate_value_shape(value)
         self._changes[(namespace, key)] = {
             "op": "set",
             "namespace": namespace,

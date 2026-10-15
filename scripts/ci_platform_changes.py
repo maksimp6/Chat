@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 
 PLATFORMS = ("web", "backend", "android", "infra", "database", "mcp")
-JOBS = ("backend", "postgres", "android", "infra", "mcp")
+JOBS = ("backend", "android", "infra", "mcp")
 SHARED_INPUTS = {
     ".github/workflows/ci.yml",
     ".python-version",
@@ -38,23 +38,16 @@ MCP_PREFIXES = (
 
 
 def _runtime_platforms(path: str) -> set[str]:
-    if (
-        path
-        in {
-            "db.py",
-            "db_backend.py",
-            "memory_db.py",
-            "provider_credentials.py",
-            "requirements-postgres.txt",
-        }
-        or path.startswith("migrations/")
-        or "postgres" in path.lower()
-    ):
+    if path in {
+        "db.py",
+        "db_backend.py",
+        "memory_db.py",
+        "provider_accounts/credentials.py",
+    } or path.startswith("migrations/"):
         return {"backend", "database"}
     if path.startswith("tests/") and path.endswith(".py"):
         return {"backend"}
     if path.endswith(".py"):
-        # Keep SQL compatibility coverage until the runtime migration is complete.
         return {"backend", "database"}
     if path.startswith(("docs/", ".github/ISSUE_TEMPLATE/", ".agents/")) or path.endswith(".md"):
         return set()
@@ -117,7 +110,7 @@ def validate_results(plan: Mapping[str, bool], results: Mapping[str, str]) -> No
         if results.get(job) != "success":
             raise ValueError(f"required check failed: {job}")
     for job in JOBS:
-        required = plan["database"] if job == "postgres" else plan[job]
+        required = plan[job]
         allowed = {"success"} if required else {"success", "skipped"}
         if results.get(job) not in allowed:
             raise ValueError(f"platform check missing, failed or unexpectedly skipped: {job}")

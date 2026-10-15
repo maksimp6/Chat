@@ -1,7 +1,15 @@
-import json
-from db import get_conn, get_config, set_config
-from memory_extractor import init_global_memory
+"""Native MemoryStore configuration and fact controls."""
 
+from __future__ import annotations
+
+from copy import deepcopy
+from typing import Any
+
+from agent_memory.client import get_memory_client
+from db import memory_file_path
+from memory_extractor import list_global_memory_facts
+
+_MEMORY_CONFIG_KEY = "global_memory_config"
 DEFAULT_CONFIG = {
     "enabled": True,
     "max_context_facts": 15,
@@ -10,67 +18,58 @@ DEFAULT_CONFIG = {
 }
 
 
-def load_memory_config() -> dict:
-    cfg = get_config("memory_config")
-    if not cfg:
-        set_config("memory_config", DEFAULT_CONFIG)
-        return DEFAULT_CONFIG
-    if isinstance(cfg, str):
-        try:
-            return json.loads(cfg)
-        except Exception:
-            return DEFAULT_CONFIG
-    return cfg
+def load_memory_config() -> dict[str, Any]:
+    store = get_memory_client(memory_file_path())
+    with store.transaction() as tx:
+        value = tx.get(_MEMORY_CONFIG_KEY)
+        if value is None:
+            value = deepcopy(DEFAULT_CONFIG)
+            tx.set(_MEMORY_CONFIG_KEY, value)
+        if not isinstance(value, dict):
+            raise ValueError("invalid native memory configuration")
+        return value
 
 
-def save_memory_config(new_config: dict):
-    current = load_memory_config()
-    current.update(new_config)
-    set_config("memory_config", current)
+def save_memory_config(new_config: dict) -> None:
+    if not isinstance(new_config, dict):
+        raise ValueError("memory config must be an object")
+    store = get_memory_client(memory_file_path())
+    with store.transaction() as tx:
+        current = tx.get(_MEMORY_CONFIG_KEY)
+        if current is None:
+            current = deepcopy(DEFAULT_CONFIG)
+        if not isinstance(current, dict):
+            raise ValueError("invalid native memory configuration")
+        current.update(new_config)
+        tx.set(_MEMORY_CONFIG_KEY, current)
 
 
 def get_controlled_memory_summary() -> str:
     cfg = load_memory_config()
     if not cfg.get("enabled", True):
         return ""
-
-    init_global_memory()
     limit = cfg.get("max_context_facts", 15)
-    allowed_cats = cfg.get("categories_allowed", [])
-
-    conn = get_conn()
-    cur = conn.cursor()
-
-    if allowed_cats:
-        placeholders = ",".join(["?"] * len(allowed_cats))
-        cur.execute(
-            f"SELECT category, fact FROM global_memory WHERE category IN ({placeholders}) ORDER BY updated_at DESC LIMIT ?",
-            (*allowed_cats, limit),
-        )
-    else:
-        cur.execute(
-            "SELECT category, fact FROM global_memory ORDER BY updated_at DESC LIMIT ?", (limit,)
-        )
-
-    rows = cur.fetchall()
-    conn.close()
-
-    if not rows:
+    if type(limit) is not int or limit < 0:
+        raise ValueError("max_context_facts must be a nonnegative integer")
+    allowed = cfg.get("categories_allowed", [])
+    if not isinstance(allowed, list):
+        raise ValueError("categories_allowed must be a list")
+    facts = [
+        item for item in list_global_memory_facts() if not allowed or item["category"] in allowed
+    ][:limit]
+    if not facts:
         return ""
-
-    summary = "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n"
-    for r in rows:
-        summary += f"- [{r['category'].upper()}] {r['fact']}\n"
-    return summary
+    return "\n[ГЛОБАЛЬНАЯ ПАМЯТЬ ПРОЕКТОВ]\n" + "".join(
+        f"- [{item['category'].upper()}] {item['fact']}\n" for item in facts
+    )
 
 
-def clear_global_memory(category: str = None):
-    init_global_memory()
-    conn = get_conn()
-    cur = conn.cursor()
-    if category:
-        cur.execute("DELETE FROM global_memory WHERE category = ?", (category,))
-    else:
-        cur.execute("DELETE FROM global_memory")
-    conn.commit()
-    conn.close()
+def clear_global_memory(category: str | None = None) -> None:
+    """Remove matching facts in one journal transaction; preserve config."""
+    store = get_memory_client(memory_file_path())
+    with store.transaction() as tx:
+        for key, record in store.items(prefix="global_fact:").items():
+            if not isinstance(record, dict):
+                raise ValueError("invalid native memory fact")
+            if category is None or record.get("category") == category:
+                tx.delete(key)
