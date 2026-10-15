@@ -36,11 +36,13 @@ class TraceContextFilter(logging.Filter):
     """Attach trace_id/invocation_id of the bound Execution Trace to records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.trace_id = record.invocation_id = None
+        trace_id = invocation_id = None
         trace = get_current_trace()
         if trace is not None:
-            record.trace_id = getattr(trace, "trace_id", None)
-            record.invocation_id = trace.trace.get("invocation_id") or record.trace_id
+            trace_id = getattr(trace, "trace_id", None)
+            invocation_id = trace.trace.get("invocation_id") or trace_id
+        setattr(record, "trace_id", trace_id)
+        setattr(record, "invocation_id", invocation_id)
         return True
 
 
