@@ -123,6 +123,8 @@ STRICT_CLEAN_FILES = {
     "session_profiles.py",
     "ssh_runtime.py",
     "storage.py",
+    "observability/__init__.py",
+    "observability/system_log.py",
     "observability/trace_timing.py",
     "tool_providers/__init__.py",
     "identity/user_identity.py",
