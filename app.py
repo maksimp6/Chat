@@ -40,6 +40,7 @@ from environment_manager import init_environment_tables
 from identity.short_token_auth import install_short_token_auth
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
+from observability import system_log
 from identity.github_oauth import (
     current_github_login,
     github_auth_bp,
@@ -61,7 +62,7 @@ from printing3d import init_3d_printing_tables
 from printing3d.routes import printing3d_bp
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.DEBUG)
+system_log.configure()
 install_short_token_auth(app)
 install_rdc_pairing(app)
 
@@ -93,7 +94,7 @@ def _static_asset_version():
 
 STATIC_ASSET_VERSION = _static_asset_version()
 
-logger = logging.getLogger("alice_app")
+logger = system_log.get_logger("app")
 logger.info("[BOOT] hello: Alice Pro backend module loaded")
 
 app.register_blueprint(mcp_bp)

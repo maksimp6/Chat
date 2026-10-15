@@ -15,7 +15,7 @@ _current_trace: ContextVar["ExecutionTrace | None"] = ContextVar(
     "alice_execution_trace", default=None
 )
 
-from trace_security import (
+from observability.trace_security import (
     MAX_DEPTH,
     MAX_ITEMS,
     MAX_REPR,
@@ -23,7 +23,11 @@ from trace_security import (
     safe_repr,
     sanitize_trace_value,
 )
-from trace_timing import infer_response_start, request_timing_for_step, step_correlation_id
+from observability.trace_timing import (
+    infer_response_start,
+    request_timing_for_step,
+    step_correlation_id,
+)
 
 
 def get_current_trace() -> Optional["ExecutionTrace"]:

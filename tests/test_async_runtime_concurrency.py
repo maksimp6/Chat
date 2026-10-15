@@ -28,7 +28,11 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
     )
     from invocation.trace import create_invocation_trace
     from session_manager import create_session
-    from trace_manager import bind_current_trace, get_current_trace, reset_current_trace
+    from observability.trace_manager import (
+        bind_current_trace,
+        get_current_trace,
+        reset_current_trace,
+    )
 
     session = await asyncio.to_thread(create_session, metadata={"suite": "async-concurrency"})
 
@@ -398,7 +402,11 @@ async def test_to_thread_worker_keeps_bound_trace_context_isolated(async_runtime
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
     from session_manager import create_session
-    from trace_manager import bind_current_trace, get_current_trace, reset_current_trace
+    from observability.trace_manager import (
+        bind_current_trace,
+        get_current_trace,
+        reset_current_trace,
+    )
 
     session = await asyncio.to_thread(
         create_session,

@@ -85,7 +85,7 @@ bash scripts/pre_push.sh
 - `README.md`: описание, shipped/roadmap, debug Android, MIT.
 - `yandex_client_modules/client.py` и `yandex_client_modules/`: Responses API.
 - `universal_tool_platform.py`: UniversalToolExecutor, контекст и вызовы.
-- `trace_manager.py`: ExecutionTrace, запросы, инструменты, время, ошибки, billing.
+- `observability/trace_manager.py`: ExecutionTrace, запросы, инструменты, время, ошибки, billing.
 - `android/app/src/main/java/com/alicepro/mobile/MainActivity.kt`: WebView.
 
 Страница не заявляет production-ready, публичный deployment, стабильный Android

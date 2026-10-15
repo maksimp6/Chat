@@ -34,7 +34,6 @@ LEGACY_ROOT_PYTHON = {
     "knowledge_economics.py",
     "local_agent_gateway.py",
     "local_tool_agent.py",
-    "logger.py",
     "mcp_routes.py",
     "memory_db.py",
     "memory_extractor.py",
@@ -64,14 +63,10 @@ LEGACY_ROOT_PYTHON = {
     "ssh_runtime_settings.py",
     "storage.py",
     "tool_registry.py",
-    "trace_manager.py",
-    "trace_security.py",
-    "trace_timing.py",
     "treasury.py",
     "treasury_identity.py",
     "universal_tool_platform.py",
     "voice_routes.py",
-    "yc_logging.py",
 }
 
 APPROVED_ROOT_PYTHON = PROJECT_ROOT_PYTHON | LEGACY_ROOT_PYTHON
@@ -192,3 +187,24 @@ def test_root_inventory_covers_each_remaining_python_file():
     actual = {path.name for path in ROOT.glob("*.py")}
     assert len(documented) == len(set(documented)), "Duplicate inventory entries"
     assert set(documented) == actual, "Update root file inventory when relocating modules"
+
+
+def test_observability_modules_live_in_package_not_repository_root():
+    legacy_names = {
+        "logger.py",
+        "yc_logging.py",
+        "trace_manager.py",
+        "trace_security.py",
+        "trace_timing.py",
+    }
+    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
+    assert not still_in_root, f"Observability modules still in root: {still_in_root}"
+    package = ROOT / "observability"
+    for name in (
+        "__init__.py",
+        "trace_manager.py",
+        "trace_security.py",
+        "trace_timing.py",
+        "system_log.py",
+    ):
+        assert (package / name).is_file()

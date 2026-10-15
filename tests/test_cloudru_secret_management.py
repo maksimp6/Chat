@@ -9,7 +9,7 @@ import requests
 from cloud.base import CloudProviderError
 from cloud.cloudru.secret_management import CloudRuSecretManagementClient
 from cloud.cloudru.iam import CloudRuIamError
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def _client(monkeypatch, **kwargs):

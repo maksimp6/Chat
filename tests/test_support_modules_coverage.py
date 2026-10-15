@@ -6,7 +6,6 @@ from pathlib import Path
 import archiver
 import sdk
 from scripts import send_logs
-import yc_logging
 
 
 def _create_archive_database(path, rows=()):
@@ -168,27 +167,3 @@ def test_send_logs_main_entrypoint(monkeypatch, tmp_path, capsys):
     source.write_text(Path(send_logs.__file__).read_text(), encoding="utf-8")
     runpy.run_path(str(source), run_name="__main__")
     assert "No logs to send" in capsys.readouterr().out
-
-
-def test_local_logger_writes_jsonl_handles_write_errors_and_flushes(monkeypatch, tmp_path, capsys):
-    path = tmp_path / "app.jsonl"
-    logger = yc_logging.LocalLogger(str(path))
-    logger.emit("info", 123, "test-stream")
-
-    entry = json.loads(path.read_text(encoding="utf-8"))
-    assert entry["level"] == "INFO"
-    assert entry["stream"] == "test-stream"
-    assert entry["message"] == "123"
-    assert "[INFO] 123" in capsys.readouterr().out
-
-    import builtins
-
-    real_open = builtins.open
-    monkeypatch.setattr(
-        builtins, "open", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("x"))
-    )
-    logger.emit("error", "cannot-write")
-    monkeypatch.setattr(builtins, "open", real_open)
-    assert "[ERROR] cannot-write" in capsys.readouterr().out
-
-    logger.flush()

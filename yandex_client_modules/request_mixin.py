@@ -3,7 +3,7 @@ import time
 import os
 import requests
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from db import get_store
 from provider_credentials import resolve_client_credential
 

@@ -5,7 +5,7 @@ import logging
 import json as _json
 from yandex_client_modules.client import YandexResponsesClient
 from config import Config, calculate_full_cost
-from trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
+from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
     start_invocation,

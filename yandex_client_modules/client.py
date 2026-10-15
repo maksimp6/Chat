@@ -1,4 +1,4 @@
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 import uuid
 import json
 import time

@@ -1,7 +1,7 @@
 import json
 import time
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from tool_registry import registry
 import mcp_server.storage as mcp_storage
 from db import get_conv_settings

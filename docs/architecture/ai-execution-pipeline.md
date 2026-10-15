@@ -32,7 +32,7 @@ response
 - `responses_tool_loop.py` — protocol helper для Responses API;
 - `universal_tool_platform.py` — единый контракт и pipeline выполнения инструментов;
 - `tool_registry.py` — единый каталог инструментов;
-- `trace_manager.py` и связанные trace-модули — наблюдаемость;
+- `observability/` (trace_manager и связанные) trace-модули — наблюдаемость;
 - treasury/billing слой — учёт стоимости и лимитов.
 
 ## Адаптеры

@@ -38,4 +38,4 @@
 В сообщении ассистента отображать сворачиваемый блок `🔧 Технические данные`, внутри рендерить данные trace. Текст основного сообщения остаётся чистым.
 
 ## 8. Совместимость
-Перед внесением изменений изучить `yandex_client_modules/client.py`, `mcp_routes.py`, `tool_registry.py`, `logger.py`, `db.py`. Не создавать дублирующих сущностей.
+Перед внесением изменений изучить `yandex_client_modules/client.py`, `mcp_routes.py`, `tool_registry.py`, `observability/system_log.py`, `db.py`. Не создавать дублирующих сущностей.

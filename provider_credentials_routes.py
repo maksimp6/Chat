@@ -30,7 +30,7 @@ from provider_credentials import (
 )
 from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
 from cloud.cloudru.iam import CloudRuIamClient
-from trace_manager import traced_operation
+from observability.trace_manager import traced_operation
 from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 from model_discovery import invalidate_model_discovery_cache
 

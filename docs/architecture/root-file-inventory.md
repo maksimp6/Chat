@@ -41,7 +41,6 @@
 | [knowledge_economics.py](../../knowledge_economics.py) | Учёт, бюджет и цены |
 | [local_agent_gateway.py](../../local_agent_gateway.py) | Агенты и выполнение инструментов |
 | [local_tool_agent.py](../../local_tool_agent.py) | Агенты и выполнение инструментов |
-| [logger.py](../../logger.py) | Трассировка и журналирование |
 | [mcp_routes.py](../../mcp_routes.py) | MCP |
 | [memory_db.py](../../memory_db.py) | Память, данные и диалоги |
 | [memory_extractor.py](../../memory_extractor.py) | Память, данные и диалоги |
@@ -71,14 +70,10 @@
 | [ssh_runtime_settings.py](../../ssh_runtime_settings.py) | Сессии, окружения и runtime |
 | [storage.py](../../storage.py) | Память, данные и диалоги |
 | [tool_registry.py](../../tool_registry.py) | Агенты и выполнение инструментов |
-| [trace_manager.py](../../trace_manager.py) | Трассировка и журналирование |
-| [trace_security.py](../../trace_security.py) | Трассировка и журналирование |
-| [trace_timing.py](../../trace_timing.py) | Трассировка и журналирование |
 | [treasury.py](../../treasury.py) | Учёт, бюджет и цены |
 | [treasury_identity.py](../../treasury_identity.py) | Учёт, бюджет и цены |
 | [universal_tool_platform.py](../../universal_tool_platform.py) | Агенты и выполнение инструментов |
 | [voice_routes.py](../../voice_routes.py) | Web, идентификация и бизнес |
-| [yc_logging.py](../../yc_logging.py) | Трассировка и журналирование |
 
 ## Где искать остальные файлы
 

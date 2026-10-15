@@ -24,7 +24,7 @@ from provider_credentials import (
     get_cloudru_iam_credentials,
 )
 from provider_key_rotation import rotate_active_key
-from trace_manager import traced_operation
+from observability.trace_manager import traced_operation
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_cloudru_provider_key_rotation")

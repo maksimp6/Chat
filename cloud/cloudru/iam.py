@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 import requests
 
-from trace_manager import get_current_trace
+from observability.trace_manager import get_current_trace
 
 
 API_KEYS_PATH = "/api/v1/service-accounts/credentials/api-keys"
