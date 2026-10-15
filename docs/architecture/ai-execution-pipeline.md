@@ -28,7 +28,7 @@ response
 ## Канонические компоненты
 
 - `invocation/` — идентичность и жизненный цикл одного запуска;
-- `yandex_client.py` и `yandex_client_modules/` — текущий primary provider adapter;
+- `yandex_client_modules/client.py` и `yandex_client_modules/` — текущий primary provider adapter;
 - `responses_tool_loop.py` — protocol helper для Responses API;
 - `universal_tool_platform.py` — единый контракт и pipeline выполнения инструментов;
 - `tool_registry.py` — единый каталог инструментов;

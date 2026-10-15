@@ -76,7 +76,7 @@ token_value = resolve_secret_management_value(db, "alice_short_token")
 - **Администрирование.** Создание секретов, новых версий, отключение старых
   версий и управление правами доступа выполняется существующей
   административной парой `CLOUDRU_IAM_KEY_ID` / `CLOUDRU_IAM_KEY_SECRET`
-  (`cloudru_iam.py`), которая уже используется для ротации provider-ключей
+  (`cloud/cloudru/iam.py`), которая уже используется для ротации provider-ключей
   (`provider_key_rotation.py`) и деплоя (`container_apps_client.py`). Эта пара
   не участвует в чтении секретов на runtime-пути и не должна попадать в
   конфигурацию обычной сессии или модели.
@@ -111,7 +111,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
   протокол `cloud.base.CloudProvider` и не регистрируется в
   `cloud/registry.py`, поэтому он структурно недостижим из generic
   cloud-инструментов (`cloud/tools.py`), которые вызывает модель;
-  административный клиент (`cloudru_iam.py`) для чтения payload значений не
+  административный клиент (`cloud/cloudru/iam.py`) для чтения payload значений не
   используется вовсе.
 - вложенные ошибки: если код, вызвавший `resolve_secret_management_value`,
   падает позже с уже полученным значением в области видимости и попадает в
@@ -163,7 +163,7 @@ Bootstrap-идентичность (`CLOUDRU_SECRET_MANAGEMENT_KEY_ID/SECRET`) �
 Назначения (`purpose`), которые эпик #440/#475 планирует перевести на эту
 схему:
 
-- `alice_short_token` — короткий токен доступа (`short_token_auth.py`,
+- `alice_short_token` — короткий токен доступа (`identity/short_token_auth.py`,
   `ALICE_SHORT_TOKEN`);
 - `github_oauth_client_id` / `github_oauth_client_secret` — GitHub OAuth
   (`identity/github_oauth.py`);

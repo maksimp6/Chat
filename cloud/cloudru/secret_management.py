@@ -20,7 +20,7 @@ Design constraints from issue #477, enforced here rather than left to callers:
   a key pair that should be granted a viewer-only Secret Management role in
   Cloud.ru IAM. This is deliberately a different pair from the admin
   ``CLOUDRU_IAM_KEY_ID``/``CLOUDRU_IAM_KEY_SECRET`` used elsewhere
-  (``cloudru_iam.py``, ``provider_key_rotation.py``) for key/version
+  (``cloud/cloudru/iam.py``, ``provider_key_rotation.py``) for key/version
   administration, so an ordinary session/model process that only needs to
   resolve a pinned secret never holds admin rights. Bootstrapping this
   identity from plain environment variables (not from a secret this client
@@ -55,7 +55,7 @@ import requests
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from cloudru_iam import CloudRuIamClient, CloudRuIamError
+from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from trace_manager import get_current_trace
 
 

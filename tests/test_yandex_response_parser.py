@@ -1,6 +1,6 @@
 import unittest
 
-from yandex_response_parser import extract_reasoning_and_text, extract_text, extract_usage
+from yandex_client_modules.response_parser import extract_reasoning_and_text, extract_text, extract_usage
 
 
 class YandexResponseParserTests(unittest.TestCase):

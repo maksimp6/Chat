@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 import json as _json
-from yandex_client import YandexResponsesClient
+from yandex_client_modules.client import YandexResponsesClient
 from config import Config, calculate_full_cost
 from trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
@@ -14,8 +14,8 @@ from invocation.manager import (
     persist_invocation_trace,
 )
 from invocation.trace import create_invocation_trace
-from mcp_trace import record_yandex_mcp_activity
-import mcp_storage
+from mcp_server.trace import record_yandex_mcp_activity
+import mcp_server.storage as mcp_storage
 from tool_registry import registry
 from db import (
     get_conversations,

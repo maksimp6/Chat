@@ -3,7 +3,7 @@
 The client exchanges a service-account key pair for a short-lived IAM token,
 then calls Cloud.ru static API-key management endpoints. Runtime Foundation
 Models requests use the separate Api-Key authentication handled by
-cloudru_api_key_provider.py.
+cloud/cloudru/api_key_provider.py.
 """
 
 from __future__ import annotations

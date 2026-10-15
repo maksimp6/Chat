@@ -12,11 +12,11 @@ import base64
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tool_registry import registry
-import mcp_storage
+import mcp_server.storage as mcp_storage
 from db import get_conv_settings
-from yandex_request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_request_builder import build_response_payload
-from yandex_api_logger import api_logger
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.request_builder import build_response_payload
+from yandex_client_modules.api_logger import api_logger
 
 from yandex_client_modules.errors import YandexClientError
 from yandex_client_modules.conversations import YandexConversationMixin

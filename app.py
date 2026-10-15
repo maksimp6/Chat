@@ -17,12 +17,12 @@ from db import (
     get_conv_settings,
 )
 from mcp_routes import mcp_bp
-from chatgpt_mcp import chatgpt_mcp_bp
+from mcp_server import chatgpt_mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
 from local_agent_gateway import local_agent_bp, init_local_agent_tables
-from cloudru_iam_routes import cloudru_iam_bp
+from cloud.cloudru.iam_routes import cloudru_iam_bp
 from provider_credentials_routes import provider_credentials_bp
 from provider_quota_routes import provider_quota_bp
 from partner_relations import (
@@ -32,12 +32,12 @@ from partner_relations import (
 )
 from treasury import init_treasury_tables, get_account, demo_top_up
 from treasury_identity import TreasuryIdentityError, get_current_owner_id
-from user_identity import init_user_identity_table, register_anonymous_user
+from identity.user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from government import government_bp, init_government_tables, ensure_government_department
 from environment_routes import environment_bp, environment_gateway_bp
 from environment_manager import init_environment_tables
-from short_token_auth import install_short_token_auth
+from identity.short_token_auth import install_short_token_auth
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
 from identity.github_oauth import (
@@ -46,7 +46,7 @@ from identity.github_oauth import (
     github_login_enabled,
     login_path,
 )
-from user_identity import init_github_accounts_table
+from identity.user_identity import init_github_accounts_table
 from conversation_ownership import (
     init_conversation_ownership_table,
     check_access,

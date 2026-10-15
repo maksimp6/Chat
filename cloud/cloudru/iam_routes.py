@@ -9,7 +9,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
-from cloudru_iam import CloudRuIamClient, CloudRuIamError
+from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from key_manager import store_secret
 
 cloudru_iam_bp = Blueprint("cloudru_iam", __name__, url_prefix="/api/cloudru/iam")

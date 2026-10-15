@@ -3,11 +3,11 @@ import time
 
 from trace_manager import ExecutionTrace
 from tool_registry import registry
-import mcp_storage
+import mcp_server.storage as mcp_storage
 from db import get_conv_settings
 
-from yandex_request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_api_logger import api_logger
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.api_logger import api_logger
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 

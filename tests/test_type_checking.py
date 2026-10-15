@@ -40,7 +40,7 @@ MYPY_ERROR_BASELINE = {
 STRICT_CLEAN_FILES = {
     "budget_repository.py",
     "db.py",
-    "mcp_storage.py",
+    "mcp_server/storage.py",
     "provider_quotas.py",
     "treasury.py",
     "agent_memory/repository.py",
@@ -95,7 +95,7 @@ STRICT_CLEAN_FILES = {
     "knowledge_economics.py",
     "local_tool_agent.py",
     "mcp_server/runtime_bridge.py",
-    "mcp_trace.py",
+    "mcp_server/trace.py",
     "plugin_manager.py",
     "pricing_registry.py",
     "printing3d/__init__.py",
@@ -125,9 +125,9 @@ STRICT_CLEAN_FILES = {
     "storage.py",
     "trace_timing.py",
     "tool_providers/__init__.py",
-    "user_identity.py",
+    "identity/user_identity.py",
     "treasury_identity.py",
-    "yandex_api_logger.py",
+    "yandex_client_modules/api_logger.py",
 }
 
 ERROR_LINE = re.compile(r"^(?P<path>[^:]+\.py):\d+(?::\d+)?: error: .*\[(?P<code>[a-z-]+)\]$")

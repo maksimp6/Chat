@@ -1,6 +1,6 @@
 from pathlib import Path
 import logging
-import yandex_api_logger
+import yandex_client_modules.api_logger as yandex_api_logger
 
 
 def test_api_logger_uses_project_root_log_path():

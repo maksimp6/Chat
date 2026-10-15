@@ -27,9 +27,9 @@
 | [budget_repository.py](../../budget_repository.py) | Учёт, бюджет и цены |
 | [chatgpt_mcp.py](../../chatgpt_mcp.py) | MCP |
 | [cli_agent.py](../../cli_agent.py) | Корневые точки входа и конфигурация |
-| [cloudru_api_key_provider.py](../../cloudru_api_key_provider.py) | Провайдеры, credentials и квоты |
-| [cloudru_iam.py](../../cloudru_iam.py) | Провайдеры, credentials и квоты |
-| [cloudru_iam_routes.py](../../cloudru_iam_routes.py) | Провайдеры, credentials и квоты |
+| [cloud/cloudru/api_key_provider.py](../../cloud/cloudru/api_key_provider.py) | Провайдеры, credentials и квоты |
+| [cloud/cloudru/iam.py](../../cloud/cloudru/iam.py) | Провайдеры, credentials и квоты |
+| [cloud/cloudru/iam_routes.py](../../cloud/cloudru/iam_routes.py) | Провайдеры, credentials и квоты |
 | [compute_resources.py](../../compute_resources.py) | Учёт, бюджет и цены |
 | [config.py](../../config.py) | Корневые точки входа и конфигурация |
 | [conversation_metadata.py](../../conversation_metadata.py) | Память, данные и диалоги |
@@ -49,8 +49,8 @@
 | [local_tool_agent.py](../../local_tool_agent.py) | Агенты и выполнение инструментов |
 | [logger.py](../../logger.py) | Трассировка и журналирование |
 | [mcp_routes.py](../../mcp_routes.py) | MCP |
-| [mcp_storage.py](../../mcp_storage.py) | MCP |
-| [mcp_trace.py](../../mcp_trace.py) | MCP |
+| [mcp_server/storage.py](../../mcp_server/storage.py) | MCP |
+| [mcp_server/trace.py](../../mcp_server/trace.py) | MCP |
 | [memory_db.py](../../memory_db.py) | Память, данные и диалоги |
 | [memory_extractor.py](../../memory_extractor.py) | Память, данные и диалоги |
 | [memory_manager.py](../../memory_manager.py) | Память, данные и диалоги |
@@ -77,7 +77,7 @@
 | [session_manager.py](../../session_manager.py) | Сессии, окружения и runtime |
 | [session_profiles.py](../../session_profiles.py) | Сессии, окружения и runtime |
 | [session_runtime.py](../../session_runtime.py) | Сессии, окружения и runtime |
-| [short_token_auth.py](../../short_token_auth.py) | Web, идентификация и бизнес |
+| [identity/short_token_auth.py](../../identity/short_token_auth.py) | Web, идентификация и бизнес |
 | [ssh_runtime.py](../../ssh_runtime.py) | Сессии, окружения и runtime |
 | [ssh_runtime_settings.py](../../ssh_runtime_settings.py) | Сессии, окружения и runtime |
 | [storage.py](../../storage.py) | Память, данные и диалоги |
@@ -88,16 +88,16 @@
 | [treasury.py](../../treasury.py) | Учёт, бюджет и цены |
 | [treasury_identity.py](../../treasury_identity.py) | Учёт, бюджет и цены |
 | [universal_tool_platform.py](../../universal_tool_platform.py) | Агенты и выполнение инструментов |
-| [user_identity.py](../../user_identity.py) | Web, идентификация и бизнес |
+| [identity/user_identity.py](../../identity/user_identity.py) | Web, идентификация и бизнес |
 | [voice_routes.py](../../voice_routes.py) | Web, идентификация и бизнес |
-| [yandex_api_key_provider.py](../../yandex_api_key_provider.py) | Провайдеры, credentials и квоты |
-| [yandex_api_logger.py](../../yandex_api_logger.py) | Трассировка и журналирование |
-| [yandex_client.py](../../yandex_client.py) | Yandex client |
-| [yandex_metadata_validator.py](../../yandex_metadata_validator.py) | Yandex client |
-| [yandex_request_builder.py](../../yandex_request_builder.py) | Yandex client |
-| [yandex_request_utils.py](../../yandex_request_utils.py) | Yandex client |
-| [yandex_response_parser.py](../../yandex_response_parser.py) | Yandex client |
-| [yandex_response_poller.py](../../yandex_response_poller.py) | Yandex client |
+| [yandex_client_modules/api_key_provider.py](../../yandex_client_modules/api_key_provider.py) | Провайдеры, credentials и квоты |
+| [yandex_client_modules/api_logger.py](../../yandex_client_modules/api_logger.py) | Трассировка и журналирование |
+| [yandex_client_modules/client.py](../../yandex_client_modules/client.py) | Yandex client |
+| [yandex_client_modules/metadata_validator.py](../../yandex_client_modules/metadata_validator.py) | Yandex client |
+| [yandex_client_modules/request_builder.py](../../yandex_client_modules/request_builder.py) | Yandex client |
+| [yandex_client_modules/request_utils.py](../../yandex_client_modules/request_utils.py) | Yandex client |
+| [yandex_client_modules/response_parser.py](../../yandex_client_modules/response_parser.py) | Yandex client |
+| [yandex_client_modules/response_poller.py](../../yandex_client_modules/response_poller.py) | Yandex client |
 | [yc_logging.py](../../yc_logging.py) | Трассировка и журналирование |
 
 ## Где искать остальные файлы

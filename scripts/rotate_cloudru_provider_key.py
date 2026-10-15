@@ -12,8 +12,8 @@ import logging
 import os
 from datetime import timedelta
 
-from cloudru_api_key_provider import CloudRuApiKeyProvider
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
+from cloud.cloudru.iam import CloudRuIamClient
 from credential_crypto import decrypt_secret, encrypt_secret
 from db import get_store
 from provider_credentials import (

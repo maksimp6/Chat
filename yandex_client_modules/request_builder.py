@@ -1,10 +1,10 @@
 """Request payload helpers for the Yandex Responses API.
 
-This module contains pure request-shaping logic extracted from yandex_client.py.
+This module contains pure request-shaping logic extracted from yandex_client_modules/client.py.
 It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
-from yandex_metadata_validator import validate_metadata
+from yandex_client_modules.metadata_validator import validate_metadata
 
 
 TEMPERATURE_MIN = 0.0

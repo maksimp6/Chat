@@ -16,7 +16,7 @@ from typing import Optional
 
 import requests
 
-from cloudru_iam import CloudRuIamClient, CloudRuIamError
+from cloud.cloudru.iam import CloudRuIamClient, CloudRuIamError
 from trace_manager import get_current_trace
 
 

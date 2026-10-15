@@ -18,7 +18,7 @@ def test_engine_does_not_import_alice_modules():
                 imported.append(node.module)
         assert not any(
             name == "db"
-            or name.startswith(("agent_shell", "tool_providers", "flask", "mcp_storage"))
+            or name.startswith(("agent_shell", "tool_providers", "flask", "mcp_server.storage"))
             for name in imported
         ), source_file.name
 

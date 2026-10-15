@@ -83,7 +83,7 @@ bash scripts/pre_push.sh
 Сверено с develop `9d658587871007a041f1981c084a80d2de6d78bd`:
 
 - `README.md`: описание, shipped/roadmap, debug Android, MIT.
-- `yandex_client.py` и `yandex_client_modules/`: Responses API.
+- `yandex_client_modules/client.py` и `yandex_client_modules/`: Responses API.
 - `universal_tool_platform.py`: UniversalToolExecutor, контекст и вызовы.
 - `trace_manager.py`: ExecutionTrace, запросы, инструменты, время, ошибки, billing.
 - `android/app/src/main/java/com/alicepro/mobile/MainActivity.kt`: WebView.
