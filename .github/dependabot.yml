@@ -4,11 +4,14 @@
 # grouped PR per directory; every major release gets its own PR.
 # Security updates are not grouped here and ignore the cooldown and the
 # open-pull-requests-limit, so they stay separate and visible.
+# Version updates target `develop` (the integration branch); `master` is the
+# owner's personal branch and receives no automated PRs.
 version: 2
 
 updates:
   - package-ecosystem: pip
     directory: "/"
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -24,6 +27,7 @@ updates:
 
   - package-ecosystem: gradle
     directory: "/android"
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -39,6 +43,7 @@ updates:
 
   - package-ecosystem: github-actions
     directory: "/"
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -58,6 +63,7 @@ updates:
       - "/deploy/chrome-worker"
       - "/deploy/oauth-idp"
       - "/deploy/remote-desktop-commander"
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -76,6 +82,7 @@ updates:
       - "/"
       - "/deploy/chrome-worker"
       - "/deploy/remote-desktop-commander"
+    target-branch: develop
     schedule:
       interval: monthly
     cooldown:

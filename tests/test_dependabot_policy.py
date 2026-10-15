@@ -29,6 +29,11 @@ def test_every_configured_directory_exists(update):
 
 
 @pytest.mark.parametrize("update", UPDATES, ids=lambda update: update["package-ecosystem"])
+def test_version_updates_target_develop_never_master(update):
+    assert update["target-branch"] == "develop"
+
+
+@pytest.mark.parametrize("update", UPDATES, ids=lambda update: update["package-ecosystem"])
 def test_minor_and_patch_are_grouped_and_majors_stay_separate(update):
     groups = update["groups"]
     assert len(groups) == 1
