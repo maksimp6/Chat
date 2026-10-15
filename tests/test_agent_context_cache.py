@@ -9,7 +9,7 @@ from agent_context import (
     TaskScope,
     record_context_cache_lookup,
 )
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def _scope(*, head="head-1", skills=("github-ci-diagnosis", "github-pr-readiness")):

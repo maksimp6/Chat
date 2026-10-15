@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import db
 import mcp_routes
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 class TestChatMemoryStoreIntegration(unittest.TestCase):

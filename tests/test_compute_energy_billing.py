@@ -88,7 +88,7 @@ def _burn_cpu(seconds):
 
 
 def test_waiting_is_not_billed_as_compute():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     time.sleep(0.2)
@@ -100,7 +100,7 @@ def test_waiting_is_not_billed_as_compute():
 
 
 def test_cpu_work_is_measured_at_recorded_work():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     _burn_cpu(0.05)
@@ -113,7 +113,7 @@ def test_cpu_work_is_measured_at_recorded_work():
 
 def test_repeated_finalize_bills_compute_once(monkeypatch):
     monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     trace.add_event("work_done")
@@ -127,7 +127,7 @@ def test_repeated_finalize_bills_compute_once(monkeypatch):
 
 def test_reading_snapshots_is_not_billed(monkeypatch):
     monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     _burn_cpu(0.02)
@@ -142,7 +142,7 @@ def test_reading_snapshots_is_not_billed(monkeypatch):
 
 
 def test_new_work_after_snapshot_is_billed():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     trace.add_event("work_done")
@@ -155,7 +155,7 @@ def test_new_work_after_snapshot_is_billed():
 
 
 def test_work_recorded_on_other_thread_is_not_attributed():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     worker = threading.Thread(target=lambda: trace.add_event("worker_event"))
@@ -168,7 +168,7 @@ def test_work_recorded_on_other_thread_is_not_attributed():
 
 
 def test_tool_call_records_cpu_ms():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     trace.track_tool_execution("noop", {}, lambda: {"ok": True})
@@ -178,7 +178,7 @@ def test_tool_call_records_cpu_ms():
 
 def test_compute_billing_failure_does_not_break_finalize(monkeypatch):
     import economy.compute_resources as compute_resources
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     def broken(*args, **kwargs):
         raise RuntimeError("pricing unavailable")

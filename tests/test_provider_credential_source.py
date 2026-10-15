@@ -11,7 +11,7 @@ def test_config_has_no_yandex_api_key_source():
 
 
 def test_yandex_client_does_not_read_config_api_key():
-    client = (ROOT / "yandex_client.py").read_text()
+    client = (ROOT / "yandex_client_modules/client.py").read_text()
     assert "config.API_KEY" not in client
     assert 'Authorization"] = "Api-Key " + config.API_KEY' not in client
 

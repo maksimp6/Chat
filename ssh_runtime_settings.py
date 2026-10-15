@@ -17,7 +17,7 @@ from typing import Any, Mapping
 
 from db import get_config, set_config
 from ssh_runtime import SSHRuntime, SSHRuntimeError
-from trace_manager import get_current_trace
+from observability.trace_manager import get_current_trace
 
 logger = logging.getLogger("ssh_runtime_settings")
 

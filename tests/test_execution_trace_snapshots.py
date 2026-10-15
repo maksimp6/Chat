@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def _trace() -> ExecutionTrace:

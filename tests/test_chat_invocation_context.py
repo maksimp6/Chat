@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import mcp_routes
 from app import app
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def test_chat_uses_invocation_context_identifiers():

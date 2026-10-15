@@ -3,7 +3,7 @@ import time
 import os
 import requests
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from db import get_store
 from provider_accounts.credentials import resolve_client_credential
 
@@ -12,8 +12,8 @@ try:
 except ImportError:  # pragma: no cover
     decrypt_secret = None
     encrypt_secret = None
-from yandex_request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_request_builder import build_response_payload
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.request_builder import build_response_payload
 from yandex_client_modules.errors import YandexClientError
 from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, reserve_request
 

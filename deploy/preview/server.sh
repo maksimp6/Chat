@@ -180,7 +180,7 @@ runtime_smoke() {
   prepare_runtime_smoke "$key" "$workdir"
 
   cat > "$smoke_script" <<'PY'
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 from tool_registry import registry
 

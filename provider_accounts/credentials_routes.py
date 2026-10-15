@@ -28,10 +28,10 @@ from provider_accounts.credentials import (
     get_cloudru_iam_credentials,
     save_cloudru_iam_credentials,
 )
-from cloudru_api_key_provider import CloudRuApiKeyProvider
-from cloudru_iam import CloudRuIamClient
-from trace_manager import traced_operation
-from yandex_api_key_provider import YandexApiKeyProvider
+from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
+from cloud.cloudru.iam import CloudRuIamClient
+from observability.trace_manager import traced_operation
+from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 from model_discovery import invalidate_model_discovery_cache
 
 

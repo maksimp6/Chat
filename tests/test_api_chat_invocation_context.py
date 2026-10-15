@@ -5,7 +5,7 @@ from mcp_routes import chat
 from app import app
 from invocation.context import InvocationContext
 from invocation.manager import get_invocation
-from trace_manager import get_current_trace
+from observability.trace_manager import get_current_trace
 
 
 class ApiChatInvocationContextTests(unittest.TestCase):

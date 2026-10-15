@@ -7,7 +7,7 @@ import json
 import uuid
 from typing import Any
 from db import get_store
-from trace_manager import get_current_trace
+from observability.trace_manager import get_current_trace
 
 
 class BudgetPersistenceError(RuntimeError):
