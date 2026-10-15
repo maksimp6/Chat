@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from provider_credentials import create_schema, issue_window, rotation_needed
-from provider_key_rotation import rotate_active_key
+from provider_accounts.credentials import create_schema, issue_window, rotation_needed
+from provider_accounts.key_rotation import rotate_active_key
 
 
 class FakeProvider:
@@ -22,7 +22,7 @@ class FakeProvider:
 
 def test_rotation_promotes_one_global_key_for_12_hours():
     import db
-    from provider_credentials import replace_active_credential, list_provider_credentials
+    from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     store = db.get_store()
@@ -79,7 +79,7 @@ class FakeReissueProvider:
 
 def test_reissue_rotation_keeps_cloudru_provider_key_id():
     import db
-    from provider_credentials import replace_active_credential, list_provider_credentials
+    from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     store = db.get_store()

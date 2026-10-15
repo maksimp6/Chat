@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from agent_memory.client import get_memory_client
 from db import memory_file_path
 from .context import InvocationContext
-from session_manager import create_session, restore_session
+from sessions.manager import create_session, restore_session
 
 _INVOCATION_PREFIX = "runtime_invocation:"
 _SENSITIVE_KEY_RE = re.compile(

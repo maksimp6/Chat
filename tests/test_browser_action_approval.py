@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from app import app
 from mcp_routes import AliceClient, _tool_call_needs_approval, _tool_call_parts
-from yandex_client import YandexResponsesClient
+from yandex_client_modules.client import YandexResponsesClient
 
 
 BROWSER_META = {
