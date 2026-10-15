@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict, Optional
 
-from session_manager import create_session, get_session
-from session_runtime import DEFAULT_SESSIONS, ReadyMadeSession
+from sessions.manager import create_session, get_session
+from sessions.runtime import DEFAULT_SESSIONS, ReadyMadeSession
 
 
 _PROFILE_MAP = {profile.id: profile for profile in DEFAULT_SESSIONS}

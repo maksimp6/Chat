@@ -92,7 +92,7 @@ def run_issue_task(
         start_invocation,
     )
     from invocation.trace import create_invocation_trace
-    from responses_tool_loop import extract_function_calls
+    from agent_runtime.responses_tool_loop import extract_function_calls
     from yandex_client_modules.parsers import extract_reasoning_and_text
 
     if client_factory is None:

@@ -9,7 +9,7 @@ from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
 from db import get_store
-from session_manager import create_session, get_session
+from sessions.manager import create_session, get_session
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")
 _DEPT_ID_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-_"

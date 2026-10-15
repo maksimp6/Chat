@@ -27,7 +27,7 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
         persist_invocation_trace,
     )
     from invocation.trace import create_invocation_trace
-    from session_manager import create_session
+    from sessions.manager import create_session
     from observability.trace_manager import (
         bind_current_trace,
         get_current_trace,
@@ -104,7 +104,7 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
         get_invocation,
         start_invocation,
     )
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     session = await asyncio.to_thread(create_session, metadata={"suite": "async-cancellation"})
     entered = threading.Event()
@@ -195,13 +195,13 @@ async def test_async_harness_leaves_no_owned_pending_tasks(async_runtime_db):
 
 @pytest.mark.asyncio
 async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypatch):
-    import agent_gateway
+    import agent_runtime.gateway as agent_gateway
     from concurrent.futures import (
         ThreadPoolExecutor as RealThreadPoolExecutor,
         TimeoutError as FutureTimeoutError,
     )
 
-    from agent_gateway import AgentDescriptor, AgentGateway
+    from agent_runtime.gateway import AgentDescriptor, AgentGateway
 
     slow_started = threading.Event()
     timeout_observed = threading.Event()
@@ -401,7 +401,7 @@ async def test_async_provider_quota_reservations_are_atomic(async_runtime_db):
 async def test_to_thread_worker_keeps_bound_trace_context_isolated(async_runtime_db):
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
-    from session_manager import create_session
+    from sessions.manager import create_session
     from observability.trace_manager import (
         bind_current_trace,
         get_current_trace,
@@ -448,7 +448,7 @@ async def test_late_worker_finish_cannot_overwrite_cancelled_invocation(async_ru
         get_invocation,
         start_invocation,
     )
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     session = await asyncio.to_thread(
         create_session,
@@ -508,7 +508,7 @@ async def test_late_worker_finish_cannot_overwrite_cancelled_invocation(async_ru
 @pytest.mark.asyncio
 async def test_runtime_invocation_work_leaves_no_owned_pending_tasks(async_runtime_db):
     from invocation.manager import create_invocation, finish_invocation, start_invocation
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     current = asyncio.current_task()
     before = set(asyncio.all_tasks())

@@ -6,8 +6,8 @@ import os
 import subprocess
 from typing import Any
 
-from ssh_runtime import SSHRuntime, SSHRuntimeError
-from ssh_runtime_settings import assert_operation_allowed, build_runtime
+from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
+from remote_runtime.ssh_settings import assert_operation_allowed, build_runtime
 
 # Tests may inject a runtime instance. Production resolves the persisted
 # SSH Runtime settings for every operation so settings changes take effect

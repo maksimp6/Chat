@@ -21,7 +21,7 @@ from mcp_server import chatgpt_mcp_bp
 from file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
-from local_agent_gateway import local_agent_bp, init_local_agent_tables
+from agent_runtime.local_gateway import local_agent_bp, init_local_agent_tables
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from provider_accounts.credentials_routes import provider_credentials_bp
 from provider_accounts.quota_routes import provider_quota_bp
@@ -35,8 +35,8 @@ from economy.treasury_identity import TreasuryIdentityError, get_current_owner_i
 from identity.user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from government import government_bp, init_government_tables, ensure_government_department
-from environment_routes import environment_bp, environment_gateway_bp
-from environment_manager import init_environment_tables
+from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
+from remote_runtime.environments import init_environment_tables
 from identity.short_token_auth import install_short_token_auth
 from rdc_connection.pairing import install_rdc_pairing
 from invocation.problems import problem
@@ -54,7 +54,7 @@ from conversation_ownership import (
     delete_owner,
     get_owned_conversation,
 )
-from ssh_runtime_settings import public_settings, save_settings, test_connection
+from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
 from plugin_routes import plugin_bp
 from project_tree import project_tree_bp
 from voice_routes import voice_bp
