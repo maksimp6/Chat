@@ -16,26 +16,20 @@
 
 | Файл сейчас | Ответственность |
 | --- | --- |
-| [agent_gateway.py](../../agent_gateway.py) | Агенты и выполнение инструментов |
 | [alice_agent_runner.py](../../alice_agent_runner.py) | Корневые точки входа и конфигурация |
 | [api_contracts.py](../../api_contracts.py) | Агенты и выполнение инструментов |
 | [app.py](../../app.py) | Корневые точки входа и конфигурация |
 | [archiver.py](../../archiver.py) | Память, данные и диалоги |
-| [cli_agent.py](../../cli_agent.py) | Корневые точки входа и конфигурация |
 | [config.py](../../config.py) | Корневые точки входа и конфигурация |
 | [conversation_metadata.py](../../conversation_metadata.py) | Память, данные и диалоги |
 | [conversation_ownership.py](../../conversation_ownership.py) | Память, данные и диалоги |
 | [credential_crypto.py](../../credential_crypto.py) | Провайдеры, credentials и квоты |
 | [db.py](../../db.py) | Память, данные и диалоги |
 | [departments.py](../../departments.py) | Web, идентификация и бизнес |
-| [environment_manager.py](../../environment_manager.py) | Сессии, окружения и runtime |
-| [environment_routes.py](../../environment_routes.py) | Сессии, окружения и runtime |
 | [file_manager.py](../../file_manager.py) | Yandex client |
 | [file_routes.py](../../file_routes.py) | Web, идентификация и бизнес |
 | [government.py](../../government.py) | Web, идентификация и бизнес |
 | [key_manager.py](../../key_manager.py) | Провайдеры, credentials и квоты |
-| [local_agent_gateway.py](../../local_agent_gateway.py) | Агенты и выполнение инструментов |
-| [local_tool_agent.py](../../local_tool_agent.py) | Агенты и выполнение инструментов |
 | [mcp_routes.py](../../mcp_routes.py) | MCP |
 | [memory_db.py](../../memory_db.py) | Память, данные и диалоги |
 | [memory_extractor.py](../../memory_extractor.py) | Память, данные и диалоги |
@@ -47,16 +41,9 @@
 | [plugin_manager.py](../../plugin_manager.py) | Web, идентификация и бизнес |
 | [plugin_routes.py](../../plugin_routes.py) | Web, идентификация и бизнес |
 | [project_tree.py](../../project_tree.py) | Web, идентификация и бизнес |
-| [reasoning_plan.py](../../reasoning_plan.py) | Агенты и выполнение инструментов |
-| [responses_tool_loop.py](../../responses_tool_loop.py) | Агенты и выполнение инструментов |
 | [runtime_api.py](../../runtime_api.py) | Сессии, окружения и runtime |
 | [runtime_tools.py](../../runtime_tools.py) | Сессии, окружения и runtime |
 | [sdk.py](../../sdk.py) | Агенты и выполнение инструментов |
-| [session_manager.py](../../session_manager.py) | Сессии, окружения и runtime |
-| [session_profiles.py](../../session_profiles.py) | Сессии, окружения и runtime |
-| [session_runtime.py](../../session_runtime.py) | Сессии, окружения и runtime |
-| [ssh_runtime.py](../../ssh_runtime.py) | Сессии, окружения и runtime |
-| [ssh_runtime_settings.py](../../ssh_runtime_settings.py) | Сессии, окружения и runtime |
 | [storage.py](../../storage.py) | Память, данные и диалоги |
 | [tool_registry.py](../../tool_registry.py) | Агенты и выполнение инструментов |
 | [universal_tool_platform.py](../../universal_tool_platform.py) | Агенты и выполнение инструментов |

@@ -1,4 +1,4 @@
-import local_tool_agent
+import agent_runtime.local_tool_agent as local_tool_agent
 from universal_tool_platform import UniversalToolDefinition
 
 

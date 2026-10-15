@@ -127,7 +127,7 @@ def test_insufficient_balance_does_not_create_debit(treasury_db):
 def test_invocation_user_id_flows_into_trace_billing_context(treasury_db):
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     session = create_session()
     context = create_invocation(

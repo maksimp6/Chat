@@ -342,7 +342,7 @@ def test_native_budget_daily_rollover_and_cooldown_are_durable():
 
 
 def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
-    import local_agent_gateway as gateway
+    import agent_runtime.local_gateway as gateway
 
     monkeypatch.setenv("ALICE_LOCAL_AGENT_BOOTSTRAP_TOKEN", "bootstrap")
     app = Flask(__name__)
@@ -424,7 +424,7 @@ def test_government_rejects_changed_owner_at_publication(monkeypatch):
 def test_environment_failed_start_is_persisted_and_missing_metadata_is_not_acknowledged(
     monkeypatch,
 ):
-    import environment_manager as environments
+    import remote_runtime.environments as environments
 
     identity = "test-environment"
     record = {

@@ -10,25 +10,19 @@ PROJECT_ROOT_PYTHON = {
 # Existing debt only. New root Python modules must not be added here.
 # Delete entries as modules move into packages.
 LEGACY_ROOT_PYTHON = {
-    "agent_gateway.py",
     "alice_agent_runner.py",
     "api_contracts.py",
     "archiver.py",
-    "cli_agent.py",
     "conversation_metadata.py",
     "conversation_ownership.py",
     "credential_crypto.py",
     "db.py",
     "db_backend.py",
     "departments.py",
-    "environment_manager.py",
-    "environment_routes.py",
     "file_manager.py",
     "file_routes.py",
     "government.py",
     "key_manager.py",
-    "local_agent_gateway.py",
-    "local_tool_agent.py",
     "mcp_routes.py",
     "memory_db.py",
     "memory_extractor.py",
@@ -40,16 +34,9 @@ LEGACY_ROOT_PYTHON = {
     "plugin_manager.py",
     "plugin_routes.py",
     "project_tree.py",
-    "reasoning_plan.py",
-    "responses_tool_loop.py",
     "runtime_api.py",
     "runtime_tools.py",
     "sdk.py",
-    "session_manager.py",
-    "session_profiles.py",
-    "session_runtime.py",
-    "ssh_runtime.py",
-    "ssh_runtime_settings.py",
     "storage.py",
     "tool_registry.py",
     "universal_tool_platform.py",
@@ -223,3 +210,24 @@ def test_economy_and_provider_modules_live_in_packages_not_repository_root():
             assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
     assert not (ROOT / "billing.py").exists()
     assert not (ROOT / "provider_credentials.py").exists()
+
+
+def test_agent_session_and_remote_runtime_modules_live_in_packages():
+    moved = {
+        "agent_runtime": [
+            "gateway",
+            "local_gateway",
+            "local_tool_agent",
+            "cli",
+            "responses_tool_loop",
+            "reasoning_plan",
+        ],
+        "sessions": ["manager", "profiles", "runtime"],
+        "remote_runtime": ["ssh", "ssh_settings", "environments", "environment_routes"],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "session_manager.py").exists()
+    assert not (ROOT / "agent_gateway.py").exists()

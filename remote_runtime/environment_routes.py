@@ -2,7 +2,7 @@
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from environment_manager import (
+from remote_runtime.environments import (
     create_environment,
     delete_environment,
     list_environments,
