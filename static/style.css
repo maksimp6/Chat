@@ -332,6 +332,13 @@ body {
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
+.alice-pro-app .msg.error {
+  align-self: flex-start;
+  background: var(--bg-bubble-bot);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-bottom-left-radius: 4px;
+}
 
 .alice-pro-app .billing-bubble {
   display: inline-block;
