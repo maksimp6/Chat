@@ -15,7 +15,12 @@ from provider_credentials import (
     rollback_secret_management_ref,
     set_secret_management_ref,
 )
-from trace_manager import ExecutionTrace, bind_current_trace, get_current_trace, reset_current_trace
+from observability.trace_manager import (
+    ExecutionTrace,
+    bind_current_trace,
+    get_current_trace,
+    reset_current_trace,
+)
 
 
 @pytest.fixture()

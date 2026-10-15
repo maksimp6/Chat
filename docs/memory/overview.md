@@ -18,7 +18,7 @@
   `agent_memory:<memory_id>`.
 - `conversation_ownership.py` и `agent_memory/conversation_ownership_store.py`
   фиксируют владельцев через атомарные операции на ключах `conversation_owner:`.
-- `user_identity.py` сохраняет пользователей, токены и GitHub account mapping
+- `identity/user_identity.py` сохраняет пользователей, токены и GitHub account mapping
   в MemoryStore без чтения SQL.
 - `session_manager.py` и `invocation/manager.py` используют ключи
   `runtime_session:` и `runtime_invocation:` для жизненного цикла,

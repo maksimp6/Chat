@@ -13,7 +13,7 @@ import hashlib
 import threading
 from typing import Any, Callable, Optional
 
-from trace_manager import get_current_trace
+from observability.trace_manager import get_current_trace
 
 KEY_TTL = timedelta(hours=12)
 ROTATE_BEFORE = timedelta(hours=1)

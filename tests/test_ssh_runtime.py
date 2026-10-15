@@ -143,7 +143,7 @@ class SSHRuntimeTests(unittest.TestCase):
 
     @patch("ssh_runtime.subprocess.run")
     def test_runtime_tool_trace_preserves_audit_details_and_redacts_secrets(self, run):
-        from trace_manager import ExecutionTrace
+        from observability.trace_manager import ExecutionTrace
         from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
         from tool_registry import ToolRegistry
         from runtime_tools import RUNTIME_TOOLS

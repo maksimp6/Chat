@@ -2,7 +2,7 @@ import json
 
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
-from mcp_trace import record_yandex_mcp_activity
+from mcp_server.trace import record_yandex_mcp_activity
 
 
 def test_yandex_mcp_activity_is_correlated_with_invocation_trace():

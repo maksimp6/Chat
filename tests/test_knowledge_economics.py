@@ -10,7 +10,7 @@ from knowledge_economics import (
     calculate_provider_storage_cost,
     record_knowledge_operation,
 )
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 class KnowledgeEconomicsTests(unittest.TestCase):

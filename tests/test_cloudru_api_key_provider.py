@@ -4,14 +4,14 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
-from cloudru_api_key_provider import CloudRuApiKeyProvider
+from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
 
 
 def test_validate_key_uses_foundation_models_api_key_auth():
     response = Mock()
     response.raise_for_status.return_value = None
 
-    with patch("cloudru_api_key_provider.requests.get", return_value=response) as get:
+    with patch("cloud.cloudru.api_key_provider.requests.get", return_value=response) as get:
         CloudRuApiKeyProvider(base_url="https://foundation-models.example/v1").validate_key(
             "cloudru-secret"
         )
@@ -27,7 +27,7 @@ def test_validate_key_maps_401_to_unauthorized():
     response.raise_for_status.side_effect = error
     error.response = response
 
-    with patch("cloudru_api_key_provider.requests.get", return_value=response):
+    with patch("cloud.cloudru.api_key_provider.requests.get", return_value=response):
         with pytest.raises(PermissionError):
             CloudRuApiKeyProvider().validate_key("bad")
 

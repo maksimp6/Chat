@@ -17,11 +17,7 @@ LEGACY_ROOT_PYTHON = {
     "billing.py",
     "budget_controller.py",
     "budget_repository.py",
-    "chatgpt_mcp.py",
     "cli_agent.py",
-    "cloudru_api_key_provider.py",
-    "cloudru_iam.py",
-    "cloudru_iam_routes.py",
     "compute_resources.py",
     "conversation_metadata.py",
     "conversation_ownership.py",
@@ -38,10 +34,7 @@ LEGACY_ROOT_PYTHON = {
     "knowledge_economics.py",
     "local_agent_gateway.py",
     "local_tool_agent.py",
-    "logger.py",
     "mcp_routes.py",
-    "mcp_storage.py",
-    "mcp_trace.py",
     "memory_db.py",
     "memory_extractor.py",
     "memory_manager.py",
@@ -63,32 +56,17 @@ LEGACY_ROOT_PYTHON = {
     "runtime_api.py",
     "runtime_tools.py",
     "sdk.py",
-    "send_logs.py",
     "session_manager.py",
     "session_profiles.py",
     "session_runtime.py",
-    "short_token_auth.py",
     "ssh_runtime.py",
     "ssh_runtime_settings.py",
     "storage.py",
     "tool_registry.py",
-    "trace_manager.py",
-    "trace_security.py",
-    "trace_timing.py",
     "treasury.py",
     "treasury_identity.py",
     "universal_tool_platform.py",
-    "user_identity.py",
     "voice_routes.py",
-    "yandex_api_key_provider.py",
-    "yandex_api_logger.py",
-    "yandex_client.py",
-    "yandex_metadata_validator.py",
-    "yandex_request_builder.py",
-    "yandex_request_utils.py",
-    "yandex_response_parser.py",
-    "yandex_response_poller.py",
-    "yc_logging.py",
 }
 
 APPROVED_ROOT_PYTHON = PROJECT_ROOT_PYTHON | LEGACY_ROOT_PYTHON
@@ -176,3 +154,57 @@ def test_filesystem_tools_stay_rooted_at_repository_root():
     from tool_providers import filesystem
 
     assert filesystem.BASE_DIR == str(ROOT.resolve())
+
+
+MOVED_HELPERS = {
+    "analyze_logs.sh",
+    "analyze_modules.sh",
+    "crl.sh",
+    "debug.sh",
+    "file.sh",
+    "install_protobuf_env.sh",
+    "test_api.sh",
+    "view_logs.sh",
+    "view_module_logs.sh",
+}
+
+
+def test_operational_helpers_live_in_scripts_without_root_shims():
+    for name in sorted(MOVED_HELPERS):
+        assert not (ROOT / name).exists(), f"Operational helper still in root: {name}"
+        assert (ROOT / "scripts" / name).is_file(), name
+
+
+def test_only_startup_shell_entrypoint_remains_in_root():
+    assert {path.name for path in ROOT.glob("*.sh")} == {"start.sh"}
+
+
+def test_root_inventory_covers_each_remaining_python_file():
+    import re
+
+    inventory = (ROOT / "docs/architecture/root-file-inventory.md").read_text(encoding="utf-8")
+    documented = re.findall(r"\[([^] /]+\.py)\]\(../../[^)]+\)", inventory)
+    actual = {path.name for path in ROOT.glob("*.py")}
+    assert len(documented) == len(set(documented)), "Duplicate inventory entries"
+    assert set(documented) == actual, "Update root file inventory when relocating modules"
+
+
+def test_observability_modules_live_in_package_not_repository_root():
+    legacy_names = {
+        "logger.py",
+        "yc_logging.py",
+        "trace_manager.py",
+        "trace_security.py",
+        "trace_timing.py",
+    }
+    still_in_root = sorted(name for name in legacy_names if (ROOT / name).exists())
+    assert not still_in_root, f"Observability modules still in root: {still_in_root}"
+    package = ROOT / "observability"
+    for name in (
+        "__init__.py",
+        "trace_manager.py",
+        "trace_security.py",
+        "trace_timing.py",
+        "system_log.py",
+    ):
+        assert (package / name).is_file()

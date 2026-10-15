@@ -12,7 +12,7 @@ from typing import Optional
 
 from flask import g, has_request_context, request
 
-from user_identity import authenticate_user_token
+from identity.user_identity import authenticate_user_token
 
 
 class TreasuryIdentityError(ValueError):
