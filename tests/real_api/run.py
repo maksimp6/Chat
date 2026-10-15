@@ -30,6 +30,18 @@ class AcceptanceFailure(RuntimeError):
     """Only fixed, non-secret failure codes cross the CLI boundary."""
 
 
+def android_system_ancestor(path: Path, info) -> bool:
+    """Termux's platform-owned ancestors, never arbitrary writable directories."""
+    if sys.platform != "android":
+        return False
+    expected = {
+        Path("/data"): (1000, 1000, 0o771),
+        Path("/data/data"): (1000, 1000, 0o771),
+        Path("/data/data/com.termux/files"): (os.getuid(), os.getuid(), 0o771),
+    }
+    return expected.get(path) == (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode))
+
+
 def private_directory(path: Path) -> Path:
     """Reject symlinks and other-owner/writable parents before creating state."""
     path = path.expanduser().absolute()
@@ -39,7 +51,9 @@ def private_directory(path: Path) -> Path:
         if parent.exists():
             mode = parent.stat()
             unsafe_write = stat.S_IMODE(mode.st_mode) & 0o022 and not mode.st_mode & stat.S_ISVTX
-            if mode.st_uid not in {0, os.getuid()} or unsafe_write:
+            if (
+                mode.st_uid not in {0, os.getuid()} or unsafe_write
+            ) and not android_system_ancestor(parent, mode):
                 raise AcceptanceFailure("unsafe_directory")
     path.mkdir(parents=True, mode=0o700, exist_ok=True)
     mode = path.stat()

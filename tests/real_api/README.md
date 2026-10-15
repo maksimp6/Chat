@@ -38,6 +38,10 @@ The code is public; keys and artifacts must never enter Git or Library uploads.
 The existing input JSON must contain `api_key`, be a regular nonsymlink file
 owned by the runner UID with mode **0600** in a **0700** directory outside any
 Git checkout. Hardlinks and unsafe writable ancestors are rejected. The runner
+recognizes only Android's exact system-owned `/data` and `/data/data` (UID/GID
+1000, 0771), and Termux's app-owned `files` ancestor (app UID/GID, 0771).
+These platform exceptions never relax the final 0700/0600 requirements.
+The runner
 does not print, replace, or chmod this input. The existing Redmi 9 input is
 `~/.config/alice-qwen/yandex-secret.json`; do not paste its value into a command.
 

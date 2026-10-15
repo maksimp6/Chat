@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import threading
+from types import SimpleNamespace
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -14,6 +15,22 @@ SPEC = importlib.util.spec_from_file_location(
 )
 live = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(live)
+
+
+def test_android_exceptions_require_exact_platform_path_owner_and_mode(monkeypatch):
+    info = SimpleNamespace(st_uid=1000, st_gid=1000, st_mode=0o40771)
+    monkeypatch.setattr(live.sys, "platform", "linux")
+    assert not live.android_system_ancestor(Path("/data"), info)
+    monkeypatch.setattr(live.sys, "platform", "android")
+    assert live.android_system_ancestor(Path("/data"), info)
+    assert live.android_system_ancestor(Path("/data/data"), info)
+    assert not live.android_system_ancestor(Path("/data/other"), info)
+    info.st_mode = 0o40777
+    assert not live.android_system_ancestor(Path("/data"), info)
+    info.st_mode, info.st_uid = 0o40771, 2000
+    assert not live.android_system_ancestor(Path("/data"), info)
+    info.st_uid = info.st_gid = os.getuid()
+    assert live.android_system_ancestor(Path("/data/data/com.termux/files"), info)
 
 
 def secret_file(tmp_path):
