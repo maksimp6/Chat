@@ -20,7 +20,7 @@ RUNTIME = (
     "storage.py",
     "runtime/storage.py",
     "agent_memory/client.py",
-    "conversation_ownership.py",
+    "conversations/ownership.py",
     "identity/user_identity.py",
     "agent_memory/repository.py",
     "agent_shell/store.py",

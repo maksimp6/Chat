@@ -13,15 +13,9 @@ LEGACY_ROOT_PYTHON = {
     "alice_agent_runner.py",
     "api_contracts.py",
     "archiver.py",
-    "conversation_metadata.py",
-    "conversation_ownership.py",
     "credential_crypto.py",
     "db.py",
     "db_backend.py",
-    "departments.py",
-    "file_manager.py",
-    "file_routes.py",
-    "government.py",
     "key_manager.py",
     "mcp_routes.py",
     "memory_db.py",
@@ -29,11 +23,6 @@ LEGACY_ROOT_PYTHON = {
     "memory_manager.py",
     "model_discovery.py",
     "partial_output.py",
-    "partner_relations.py",
-    "plugin_execution.py",
-    "plugin_manager.py",
-    "plugin_routes.py",
-    "project_tree.py",
     "runtime_api.py",
     "runtime_tools.py",
     "sdk.py",
@@ -231,3 +220,18 @@ def test_agent_session_and_remote_runtime_modules_live_in_packages():
             assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
     assert not (ROOT / "session_manager.py").exists()
     assert not (ROOT / "agent_gateway.py").exists()
+
+
+def test_workspace_plugin_organization_and_conversation_modules_live_in_packages():
+    moved = {
+        "workspace": ["files", "file_routes", "project_tree"],
+        "plugin_system": ["manager", "routes", "execution"],
+        "organization": ["government", "departments", "partner_relations"],
+        "conversations": ["metadata", "ownership"],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "file_manager.py").exists()
+    assert not (ROOT / "plugin_manager.py").exists()

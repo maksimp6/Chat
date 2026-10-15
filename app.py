@@ -18,14 +18,14 @@ from db import (
 )
 from mcp_routes import mcp_bp
 from mcp_server import chatgpt_mcp_bp
-from file_routes import file_bp
+from workspace.file_routes import file_bp
 from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
 from agent_runtime.local_gateway import local_agent_bp, init_local_agent_tables
 from cloud.cloudru.iam_routes import cloudru_iam_bp
 from provider_accounts.credentials_routes import provider_credentials_bp
 from provider_accounts.quota_routes import provider_quota_bp
-from partner_relations import (
+from organization.partner_relations import (
     partner_relations_bp,
     init_partner_relations_tables,
     ensure_partner_department,
@@ -33,8 +33,12 @@ from partner_relations import (
 from economy.treasury import init_treasury_tables, get_account, demo_top_up
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 from identity.user_identity import init_user_identity_table, register_anonymous_user
-from departments import departments_bp, init_department_tables
-from government import government_bp, init_government_tables, ensure_government_department
+from organization.departments import departments_bp, init_department_tables
+from organization.government import (
+    government_bp,
+    init_government_tables,
+    ensure_government_department,
+)
 from remote_runtime.environment_routes import environment_bp, environment_gateway_bp
 from remote_runtime.environments import init_environment_tables
 from identity.short_token_auth import install_short_token_auth
@@ -48,15 +52,15 @@ from identity.github_oauth import (
     login_path,
 )
 from identity.user_identity import init_github_accounts_table
-from conversation_ownership import (
+from conversations.ownership import (
     init_conversation_ownership_table,
     check_access,
     delete_owner,
     get_owned_conversation,
 )
 from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
-from plugin_routes import plugin_bp
-from project_tree import project_tree_bp
+from plugin_system.routes import plugin_bp
+from workspace.project_tree import project_tree_bp
 from voice_routes import voice_bp
 from printing3d import init_3d_printing_tables
 from printing3d.routes import printing3d_bp

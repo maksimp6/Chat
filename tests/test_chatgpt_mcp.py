@@ -396,7 +396,7 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     db.init_db()
 
-    from conversation_ownership import init_conversation_ownership_table, set_owner
+    from conversations.ownership import init_conversation_ownership_table, set_owner
 
     init_conversation_ownership_table()
     db.create_conversation("conversation-a", "A", "model")

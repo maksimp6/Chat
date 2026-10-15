@@ -1062,7 +1062,7 @@ def partner_followup_complete(followup_id: str):
 
 
 def ensure_partner_department() -> None:
-    from departments import get_department, upsert_department
+    from organization.departments import get_department, upsert_department
 
     if get_department("partner-relations"):
         return

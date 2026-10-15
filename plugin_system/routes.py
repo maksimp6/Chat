@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 
-from plugin_manager import PluginError, plugin_manager
+from plugin_system.manager import PluginError, plugin_manager
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
 plugin_bp = Blueprint("plugins", __name__, url_prefix="/api/plugins")
