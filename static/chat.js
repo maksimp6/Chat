@@ -90,7 +90,7 @@ function renderApprovalCard(toolCall, origMsg) {
         } else {
           addMessage(
             "⚠️ Ошибка выполнения: " + (data.error || `HTTP ${result.status}`),
-            "bot",
+            "error",
             false,
             0,
             null,
@@ -103,7 +103,7 @@ function renderApprovalCard(toolCall, origMsg) {
       })
       .catch(() => {
         card.remove();
-        addMessage("Сетевая ошибка при выполнении действия", "bot", false, 0);
+        addMessage("Сетевая ошибка при выполнении действия", "error", false, 0);
       });
   });
 
@@ -266,14 +266,53 @@ function formatInline(text) {
     .replace(/`(.+?)`/g, "<code>$1</code>");
 }
 
-function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning, usage, trace) {
+var CHAT_UI_ROLES = {
+  user: "user",
+  human: "user",
+  assistant: "bot",
+  bot: "bot",
+  model: "bot",
+  error: "error",
+};
+
+function normalizeChatRole(role) {
+  return CHAT_UI_ROLES[String(role || "").toLowerCase()] || null;
+}
+
+function findRenderedMessage(chatbox, messageId) {
+  if (!messageId) return null;
+  return (
+    Array.from(chatbox.children).find(function (node) {
+      return node.dataset && node.dataset.messageId === String(messageId);
+    }) || null
+  );
+}
+
+function addMessage(
+  text,
+  role,
+  save,
+  cost,
+  timings,
+  totalDurationMs,
+  reasoning,
+  usage,
+  trace,
+  options,
+) {
   const chatbox = document.getElementById("chatbox");
-  if (!chatbox) return;
+  if (!chatbox) return null;
+  const uiRole = normalizeChatRole(role);
+  if (!uiRole) return null;
+  const messageId = options && options.id;
+  const existing = findRenderedMessage(chatbox, messageId);
+  if (existing) return existing;
   const emptyState = chatbox.querySelector(".empty-state");
   if (emptyState) emptyState.remove();
 
   const msg = document.createElement("div");
-  msg.className = `msg ${role}`;
+  msg.className = `msg ${uiRole}`;
+  if (messageId) msg.dataset.messageId = String(messageId);
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   let htmlContent = "";
@@ -451,6 +490,7 @@ function addMessage(text, role, save, cost, timings, totalDurationMs, reasoning,
   if (metaWrap.children.length > 0) msg.appendChild(metaWrap);
   chatbox.appendChild(msg);
   chatbox.scrollTop = chatbox.scrollHeight;
+  return msg;
 }
 
 function loadHistory(convId) {
@@ -461,22 +501,23 @@ function loadHistory(convId) {
     .then((r) => r.json())
     .then((data) => {
       try {
-        if (data.messages && data.messages.length) {
-          data.messages.forEach((msg) => {
-            const role = msg.role === "assistant" ? "bot" : "user";
-            addMessage(
-              msg.text,
-              role,
-              false,
-              msg.cost || 0,
-              msg.timings,
-              0,
-              msg.reasoning,
-              msg.usage,
-              msg.trace,
-            );
-          });
-        } else {
+        let rendered = 0;
+        (data.messages || []).forEach((msg) => {
+          const node = addMessage(
+            msg.text,
+            msg.role,
+            false,
+            msg.cost || 0,
+            msg.timings,
+            0,
+            msg.reasoning,
+            msg.usage,
+            msg.trace,
+            { id: msg.id },
+          );
+          if (node) rendered += 1;
+        });
+        if (!rendered) {
           const empty = document.createElement("div");
           empty.className = "empty-state";
           empty.textContent = "Начните диалог";
@@ -558,11 +599,12 @@ document.addEventListener("DOMContentLoaded", function () {
             data.reasoning,
             data.usage,
             data.trace,
+            { id: data.message_id },
           );
         } else if (data.error) {
           addMessage(
             "⚠️ Ошибка: " + data.error,
-            "bot",
+            "error",
             false,
             data.cost || 0,
             data.timings,
@@ -574,7 +616,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           addMessage(
             `⚠️ Ошибка HTTP ${result.status}`,
-            "bot",
+            "error",
             false,
             0,
             null,
@@ -586,7 +628,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       })
       .catch((e) => {
-        addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "bot", false, 0);
+        addMessage("⚠️ Ошибка: " + (e.message || "Сетевой сбой"), "error", false, 0);
       });
   }
 
