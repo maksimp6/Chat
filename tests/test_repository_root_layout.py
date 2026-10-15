@@ -163,3 +163,31 @@ def test_filesystem_tools_stay_rooted_at_repository_root():
     from tool_providers import filesystem
 
     assert filesystem.BASE_DIR == str(ROOT.resolve())
+
+
+def test_economy_and_provider_modules_live_in_packages_not_repository_root():
+    moved = {
+        "economy": [
+            "billing",
+            "budget_controller",
+            "budget_repository",
+            "compute_resources",
+            "knowledge_economics",
+            "pricing_registry",
+            "treasury",
+            "treasury_identity",
+        ],
+        "provider_accounts": [
+            "credentials",
+            "credentials_routes",
+            "key_rotation",
+            "quota_routes",
+            "quotas",
+        ],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "billing.py").exists()
+    assert not (ROOT / "provider_credentials.py").exists()
