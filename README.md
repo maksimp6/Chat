@@ -6,15 +6,16 @@ The repository is actively evolving. This README separates shipped behavior from
 
 ## Repository navigation
 
-| Need                                    | Location                                                                                                              |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Run the backend                         | `app.py`, `start.sh`                                                                                                  |
-| Web interface                           | `static/`, `templates/`                                                                                               |
-| Android client                          | `android/`                                                                                                            |
-| Tests                                   | `tests/`                                                                                                              |
-| Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                    |
-| Architecture and operating instructions | [docs index](docs/README.md)                                                                                          |
-| Remaining root cleanup                  | [file inventory](docs/architecture/root-file-inventory.md), [layout contract](docs/architecture/repository-layout.md) |
+| Need                                    | Location                                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Run the backend                         | `app.py`, `start.sh`                                                                                                        |
+| Web interface                           | `static/`, `templates/`                                                                                                     |
+| Android client                          | `android/`                                                                                                                  |
+| Tests                                   | `tests/`                                                                                                                    |
+| Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                          |
+| Architecture and operating instructions | [docs index](docs/README.md)                                                                                                |
+| Python package map                      | [layout contract](docs/architecture/repository-layout.md), [remaining root files](docs/architecture/root-file-inventory.md) |
+| Logging and diagnostics                 | [Execution Trace and system log](docs/backend/logging.md)                                                                   |
 
 ## What is shipped
 
@@ -51,7 +52,7 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 As of 2026-10-06, `master` includes Memory DB Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
 
-These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
+These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. `develop` is the integration branch and the repository default; every PR targets it. A PR must be synchronized with current `develop`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path (squash). `master` is the owner's personal branch and is not a PR target.
 
 The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Alice Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Memory DB Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
 
@@ -115,7 +116,7 @@ For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Runtime tools
 Issue → branch → implementation → tests → PR → CI → review → merge → verification
 ```
 
-Keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
+Open pull requests against `develop` and keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
 
 ## Testing
 
