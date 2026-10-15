@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from compute_resources import build_compute_billing_item, get_energy_pricing
+from economy.compute_resources import build_compute_billing_item, get_energy_pricing
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +53,7 @@ def test_invalid_env_values_are_ignored(monkeypatch, raw):
 
 
 def test_not_billed_compute_does_not_make_ai_billing_partial():
-    from billing import aggregate_billing
+    from economy.billing import aggregate_billing
 
     ai = {"type": "ai", "cost_status": "calculated", "total_cost": 0.11}
     compute = build_compute_billing_item(2.0)
@@ -67,7 +67,7 @@ def test_not_billed_compute_does_not_make_ai_billing_partial():
 
 
 def test_calculated_compute_cost_is_added_to_total():
-    from billing import aggregate_billing
+    from economy.billing import aggregate_billing
 
     ai = {"type": "ai", "cost_status": "calculated", "total_cost": 0.11}
     compute = build_compute_billing_item(
@@ -177,7 +177,7 @@ def test_tool_call_records_cpu_ms():
 
 
 def test_compute_billing_failure_does_not_break_finalize(monkeypatch):
-    import compute_resources
+    import economy.compute_resources as compute_resources
     from observability.trace_manager import ExecutionTrace
 
     def broken(*args, **kwargs):

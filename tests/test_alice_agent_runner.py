@@ -130,7 +130,7 @@ def test_seed_requires_yandex_secrets(monkeypatch):
 def test_seed_stores_encrypted_credential(tmp_path, monkeypatch):
     import db
     from credential_crypto import decrypt_secret
-    from provider_credentials import get_active_credential
+    from provider_accounts.credentials import get_active_credential
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "creds.db"))
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", "ci-run-key")

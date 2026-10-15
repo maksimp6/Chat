@@ -5,7 +5,7 @@ import requests
 
 from observability.trace_manager import ExecutionTrace
 from db import get_store
-from provider_credentials import resolve_client_credential
+from provider_accounts.credentials import resolve_client_credential
 
 try:
     from credential_crypto import decrypt_secret, encrypt_secret
@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.request_builder import build_response_payload
 from yandex_client_modules.errors import YandexClientError
-from provider_quotas import ProviderQuotaExceeded, record_usage, reserve_request
+from provider_accounts.quotas import ProviderQuotaExceeded, record_usage, reserve_request
 
 
 def _resolve_quota_user_id(execution_trace=None):
@@ -24,7 +24,7 @@ def _resolve_quota_user_id(execution_trace=None):
         if user_id:
             return str(user_id).strip()
     try:
-        from treasury_identity import get_current_owner_id
+        from economy.treasury_identity import get_current_owner_id
 
         return get_current_owner_id(required=False)
     except Exception:

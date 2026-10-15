@@ -38,11 +38,13 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
-    "budget_repository.py",
+    "economy/__init__.py",
+    "provider_accounts/__init__.py",
+    "economy/budget_repository.py",
     "db.py",
     "mcp_server/storage.py",
-    "provider_quotas.py",
-    "treasury.py",
+    "provider_accounts/quotas.py",
+    "economy/treasury.py",
     "agent_memory/repository.py",
     "invocation/manager.py",
     "session_manager.py",
@@ -92,14 +94,14 @@ STRICT_CLEAN_FILES = {
     "invocation/__init__.py",
     "invocation/context.py",
     "invocation/problems.py",
-    "knowledge_economics.py",
+    "economy/knowledge_economics.py",
     "local_tool_agent.py",
     "mcp_server/runtime_bridge.py",
     "mcp_server/trace.py",
     "plugin_manager.py",
-    "pricing_registry.py",
+    "economy/pricing_registry.py",
     "printing3d/__init__.py",
-    "provider_key_rotation.py",
+    "provider_accounts/key_rotation.py",
     "repository_index/__init__.py",
     "repository_index/provenance.py",
     "rdc_connection/__init__.py",
@@ -128,7 +130,7 @@ STRICT_CLEAN_FILES = {
     "observability/trace_timing.py",
     "tool_providers/__init__.py",
     "identity/user_identity.py",
-    "treasury_identity.py",
+    "economy/treasury_identity.py",
     "yandex_client_modules/api_logger.py",
 }
 

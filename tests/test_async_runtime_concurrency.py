@@ -283,7 +283,7 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypat
 async def test_async_budget_reservations_do_not_oversubscribe_balance():
     from decimal import Decimal
 
-    from budget_controller import (
+    from economy.budget_controller import (
         AccountType,
         BudgetAccount,
         BudgetController,
@@ -322,7 +322,7 @@ async def test_async_budget_reservations_do_not_oversubscribe_balance():
 async def test_async_budget_harness_exposes_missing_lock_oversubscription():
     from decimal import Decimal
 
-    from budget_controller import AccountType, BudgetAccount, BudgetController, BudgetLimits
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetController, BudgetLimits
 
     limits = BudgetLimits("50", "300", "300")
     controller = BudgetController(
@@ -355,7 +355,7 @@ async def test_async_budget_harness_exposes_missing_lock_oversubscription():
 
 @pytest.mark.asyncio
 async def test_async_provider_quota_reservations_are_atomic(async_runtime_db):
-    from provider_quotas import (
+    from provider_accounts.quotas import (
         ProviderQuotaExceeded,
         assign_user_policy,
         get_usage,

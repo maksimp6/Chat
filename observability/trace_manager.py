@@ -413,7 +413,7 @@ class ExecutionTrace:
         if not isinstance(clean_raw, dict) or not isinstance(clean_raw.get("usage"), dict):
             return
         try:
-            from billing import build_ai_billing_item, aggregate_billing
+            from economy.billing import build_ai_billing_item, aggregate_billing
 
             model = clean_raw.get("model")
             if not model:
@@ -710,7 +710,7 @@ class ExecutionTrace:
         cpu_ms = timings.get("billable_cpu_ms")
         wall_ms = timings.get("billable_wall_ms")
         try:
-            from compute_resources import build_compute_billing_item
+            from economy.compute_resources import build_compute_billing_item
 
             return build_compute_billing_item(
                 None if cpu_ms is None else cpu_ms / 1000,
@@ -780,7 +780,7 @@ class ExecutionTrace:
                 max(0.0, end_perf - self.start_perf) * 1000, 2
             )
 
-        from billing import aggregate_billing
+        from economy.billing import aggregate_billing
 
         billing = snapshot.get("billing") or {}
         # Billing items are source facts.  Never use a previously generated total

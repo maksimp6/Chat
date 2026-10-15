@@ -145,7 +145,7 @@ def test_partner_changed_or_foreign_records_never_acknowledge_mutation(monkeypat
 
 
 def test_provider_validation_and_iam_metadata_use_native_store():
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     store = db.get_store()
     credentials.create_schema(store)
@@ -211,7 +211,7 @@ def test_provider_validation_and_iam_metadata_use_native_store():
 
 
 def test_quotas_require_valid_policy_and_preserve_disabled_authority():
-    import provider_quotas as quotas
+    import provider_accounts.quotas as quotas
 
     with pytest.raises(ValueError):
         quotas.upsert_policy("", period_seconds=1, max_requests=-1)
@@ -227,7 +227,7 @@ def test_quotas_require_valid_policy_and_preserve_disabled_authority():
 
 
 def test_treasury_rejects_invalid_financial_mutation():
-    import treasury
+    import economy.treasury as treasury
 
     before = db.get_store().last_commit
     with pytest.raises(ValueError):
@@ -236,8 +236,8 @@ def test_treasury_rejects_invalid_financial_mutation():
 
 
 def test_budget_controller_hydrates_confirmed_accounts_after_restart():
-    from budget_controller import AccountType, BudgetAccount, BudgetLimits, BudgetController
-    from budget_repository import BudgetRepository
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits, BudgetController
+    from economy.budget_repository import BudgetRepository
 
     def make(kind):
         return BudgetAccount(
@@ -269,8 +269,8 @@ def test_budget_controller_hydrates_confirmed_accounts_after_restart():
     "violation", ["account", "cooldown-argument", "single", "daily", "total", "locked"]
 )
 def test_native_budget_enforces_authoritative_financial_limits(violation):
-    from budget_controller import AccountType, BudgetAccount, BudgetLimits
-    from budget_repository import BudgetRepository, BudgetPersistenceError
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits
+    from economy.budget_repository import BudgetRepository, BudgetPersistenceError
 
     repo = BudgetRepository()
     account = BudgetAccount(
@@ -310,8 +310,8 @@ def test_native_budget_enforces_authoritative_financial_limits(violation):
 
 
 def test_native_budget_daily_rollover_and_cooldown_are_durable():
-    from budget_controller import AccountType, BudgetAccount, BudgetLimits
-    from budget_repository import BudgetRepository
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits
+    from economy.budget_repository import BudgetRepository
 
     repo = BudgetRepository()
     repo.configure(
@@ -388,9 +388,9 @@ def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
 
 def test_provider_clients_use_same_native_credential_writer(monkeypatch):
     from cryptography.fernet import Fernet
-    from provider_credentials import replace_active_credential
+    from provider_accounts.credentials import replace_active_credential
     from credential_crypto import encrypt_secret
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
     from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIAL_KEY", Fernet.generate_key().decode())
@@ -487,7 +487,7 @@ def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch
 
 
 def test_quota_disable_between_policy_read_and_admission_prevents_reservation(monkeypatch):
-    import provider_quotas as quotas
+    import provider_accounts.quotas as quotas
 
     quotas.upsert_policy("flipped", period_seconds=60, max_requests=1)
     quotas.assign_user_policy("owner", "flipped")

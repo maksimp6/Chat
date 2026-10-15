@@ -11,8 +11,8 @@ import logging
 
 from credential_crypto import encrypt_secret
 from db import get_store
-from provider_credentials import list_provider_credentials, create_schema, rotation_needed
-from provider_key_rotation import rotate_active_key
+from provider_accounts.credentials import list_provider_credentials, create_schema, rotation_needed
+from provider_accounts.key_rotation import rotate_active_key
 from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 
 logging.basicConfig(level=logging.INFO)

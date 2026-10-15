@@ -43,7 +43,7 @@ def seed_provider_credential() -> None:
         raise RuntimeError("YANDEX_API_KEY and YANDEX_PROJECT_ID are required")
     from credential_crypto import decrypt_secret, encrypt_secret
     from db import get_store
-    from provider_credentials import bootstrap_credential
+    from provider_accounts.credentials import bootstrap_credential
 
     conn = get_store()
     bootstrap_credential(conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret)

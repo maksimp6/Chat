@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import base64
 
-import provider_credentials_routes as routes
+import provider_accounts.credentials_routes as routes
 
 
 class FakeProvider:
@@ -31,7 +31,7 @@ def test_status_never_returns_secret(monkeypatch, tmp_path):
     monkeypatch.setattr(routes.config, "API_KEY", "", raising=False)
 
     conn = db.get_store()
-    from provider_credentials import replace_active_credential
+    from provider_accounts.credentials import replace_active_credential
 
     replace_active_credential(
         conn,

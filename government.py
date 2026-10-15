@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 from db import get_store
-from treasury_identity import get_current_owner_id, TreasuryIdentityError
+from economy.treasury_identity import get_current_owner_id, TreasuryIdentityError
 
 government_bp = Blueprint("government", __name__, url_prefix="/api/government")
 

@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 from cloud.base import CloudProviderError
 
 if TYPE_CHECKING:
-    from budget_repository import BudgetRepository
+    from economy.budget_repository import BudgetRepository
 
 
 class AccountType(str, Enum):

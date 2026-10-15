@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Protocol, Any
 
-from provider_credentials import (
+from provider_accounts.credentials import (
     fingerprint_key,
     issue_window,
     promote_rotated_key,

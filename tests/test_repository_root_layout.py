@@ -14,11 +14,7 @@ LEGACY_ROOT_PYTHON = {
     "alice_agent_runner.py",
     "api_contracts.py",
     "archiver.py",
-    "billing.py",
-    "budget_controller.py",
-    "budget_repository.py",
     "cli_agent.py",
-    "compute_resources.py",
     "conversation_metadata.py",
     "conversation_ownership.py",
     "credential_crypto.py",
@@ -31,7 +27,6 @@ LEGACY_ROOT_PYTHON = {
     "file_routes.py",
     "government.py",
     "key_manager.py",
-    "knowledge_economics.py",
     "local_agent_gateway.py",
     "local_tool_agent.py",
     "mcp_routes.py",
@@ -44,13 +39,7 @@ LEGACY_ROOT_PYTHON = {
     "plugin_execution.py",
     "plugin_manager.py",
     "plugin_routes.py",
-    "pricing_registry.py",
     "project_tree.py",
-    "provider_credentials.py",
-    "provider_credentials_routes.py",
-    "provider_key_rotation.py",
-    "provider_quota_routes.py",
-    "provider_quotas.py",
     "reasoning_plan.py",
     "responses_tool_loop.py",
     "runtime_api.py",
@@ -63,8 +52,6 @@ LEGACY_ROOT_PYTHON = {
     "ssh_runtime_settings.py",
     "storage.py",
     "tool_registry.py",
-    "treasury.py",
-    "treasury_identity.py",
     "universal_tool_platform.py",
     "voice_routes.py",
 }
@@ -208,3 +195,31 @@ def test_observability_modules_live_in_package_not_repository_root():
         "system_log.py",
     ):
         assert (package / name).is_file()
+
+
+def test_economy_and_provider_modules_live_in_packages_not_repository_root():
+    moved = {
+        "economy": [
+            "billing",
+            "budget_controller",
+            "budget_repository",
+            "compute_resources",
+            "knowledge_economics",
+            "pricing_registry",
+            "treasury",
+            "treasury_identity",
+        ],
+        "provider_accounts": [
+            "credentials",
+            "credentials_routes",
+            "key_rotation",
+            "quota_routes",
+            "quotas",
+        ],
+    }
+    for package, modules in moved.items():
+        assert (ROOT / package / "__init__.py").is_file()
+        for module in modules:
+            assert (ROOT / package / f"{module}.py").is_file(), f"{package}/{module}.py"
+    assert not (ROOT / "billing.py").exists()
+    assert not (ROOT / "provider_credentials.py").exists()

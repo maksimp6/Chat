@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from knowledge_economics import (
+from economy.knowledge_economics import (
     KnowledgeCostConfig,
     Policy,
     PolicyBudgetController,

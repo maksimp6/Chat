@@ -154,7 +154,7 @@ def settle_billing_to_treasury(billing: Dict[str, Any], owner_id: Optional[str])
         return {"status": "skipped", "reason": "billing_reference_missing"}
 
     reference = "billing:" + str(trace_key)
-    from treasury import record_expense
+    from economy.treasury import record_expense
 
     _, created = record_expense(
         str(owner_id),

@@ -21,11 +21,7 @@
 | [api_contracts.py](../../api_contracts.py) | Агенты и выполнение инструментов |
 | [app.py](../../app.py) | Корневые точки входа и конфигурация |
 | [archiver.py](../../archiver.py) | Память, данные и диалоги |
-| [billing.py](../../billing.py) | Учёт, бюджет и цены |
-| [budget_controller.py](../../budget_controller.py) | Учёт, бюджет и цены |
-| [budget_repository.py](../../budget_repository.py) | Учёт, бюджет и цены |
 | [cli_agent.py](../../cli_agent.py) | Корневые точки входа и конфигурация |
-| [compute_resources.py](../../compute_resources.py) | Учёт, бюджет и цены |
 | [config.py](../../config.py) | Корневые точки входа и конфигурация |
 | [conversation_metadata.py](../../conversation_metadata.py) | Память, данные и диалоги |
 | [conversation_ownership.py](../../conversation_ownership.py) | Память, данные и диалоги |
@@ -38,7 +34,6 @@
 | [file_routes.py](../../file_routes.py) | Web, идентификация и бизнес |
 | [government.py](../../government.py) | Web, идентификация и бизнес |
 | [key_manager.py](../../key_manager.py) | Провайдеры, credentials и квоты |
-| [knowledge_economics.py](../../knowledge_economics.py) | Учёт, бюджет и цены |
 | [local_agent_gateway.py](../../local_agent_gateway.py) | Агенты и выполнение инструментов |
 | [local_tool_agent.py](../../local_tool_agent.py) | Агенты и выполнение инструментов |
 | [mcp_routes.py](../../mcp_routes.py) | MCP |
@@ -51,13 +46,7 @@
 | [plugin_execution.py](../../plugin_execution.py) | Агенты и выполнение инструментов |
 | [plugin_manager.py](../../plugin_manager.py) | Web, идентификация и бизнес |
 | [plugin_routes.py](../../plugin_routes.py) | Web, идентификация и бизнес |
-| [pricing_registry.py](../../pricing_registry.py) | Учёт, бюджет и цены |
 | [project_tree.py](../../project_tree.py) | Web, идентификация и бизнес |
-| [provider_credentials.py](../../provider_credentials.py) | Провайдеры, credentials и квоты |
-| [provider_credentials_routes.py](../../provider_credentials_routes.py) | Провайдеры, credentials и квоты |
-| [provider_key_rotation.py](../../provider_key_rotation.py) | Провайдеры, credentials и квоты |
-| [provider_quota_routes.py](../../provider_quota_routes.py) | Провайдеры, credentials и квоты |
-| [provider_quotas.py](../../provider_quotas.py) | Провайдеры, credentials и квоты |
 | [reasoning_plan.py](../../reasoning_plan.py) | Агенты и выполнение инструментов |
 | [responses_tool_loop.py](../../responses_tool_loop.py) | Агенты и выполнение инструментов |
 | [runtime_api.py](../../runtime_api.py) | Сессии, окружения и runtime |
@@ -70,8 +59,6 @@
 | [ssh_runtime_settings.py](../../ssh_runtime_settings.py) | Сессии, окружения и runtime |
 | [storage.py](../../storage.py) | Память, данные и диалоги |
 | [tool_registry.py](../../tool_registry.py) | Агенты и выполнение инструментов |
-| [treasury.py](../../treasury.py) | Учёт, бюджет и цены |
-| [treasury_identity.py](../../treasury_identity.py) | Учёт, бюджет и цены |
 | [universal_tool_platform.py](../../universal_tool_platform.py) | Агенты и выполнение инструментов |
 | [voice_routes.py](../../voice_routes.py) | Web, идентификация и бизнес |
 

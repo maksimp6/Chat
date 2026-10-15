@@ -16,14 +16,14 @@ from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
 from cloud.cloudru.iam import CloudRuIamClient
 from credential_crypto import decrypt_secret, encrypt_secret
 from db import get_store
-from provider_credentials import (
+from provider_accounts.credentials import (
     CLOUDRU,
     list_provider_credentials,
     create_schema,
     rotation_needed,
     get_cloudru_iam_credentials,
 )
-from provider_key_rotation import rotate_active_key
+from provider_accounts.key_rotation import rotate_active_key
 from observability.trace_manager import traced_operation
 
 logging.basicConfig(level=logging.INFO)

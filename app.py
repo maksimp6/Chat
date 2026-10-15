@@ -23,15 +23,15 @@ from runtime_api import runtime_bp
 from runtime import current_runtime_base_path
 from local_agent_gateway import local_agent_bp, init_local_agent_tables
 from cloud.cloudru.iam_routes import cloudru_iam_bp
-from provider_credentials_routes import provider_credentials_bp
-from provider_quota_routes import provider_quota_bp
+from provider_accounts.credentials_routes import provider_credentials_bp
+from provider_accounts.quota_routes import provider_quota_bp
 from partner_relations import (
     partner_relations_bp,
     init_partner_relations_tables,
     ensure_partner_department,
 )
-from treasury import init_treasury_tables, get_account, demo_top_up
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
+from economy.treasury import init_treasury_tables, get_account, demo_top_up
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 from identity.user_identity import init_user_identity_table, register_anonymous_user
 from departments import departments_bp, init_department_tables
 from government import government_bp, init_government_tables, ensure_government_department
@@ -149,7 +149,7 @@ init_user_identity_table()
 init_github_accounts_table()
 init_conversation_ownership_table()
 init_department_tables()
-from provider_quotas import init_quota_tables
+from provider_accounts.quotas import init_quota_tables
 
 init_quota_tables()
 init_partner_relations_tables()
