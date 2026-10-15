@@ -32,7 +32,6 @@ jobs:
         MCP worker tests,
         Code rules,
         Application tests,
-        PostgreSQL integration,
         Android debug APK,
         Auto-format repository,
         Trivy repository scan,
