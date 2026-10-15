@@ -4,7 +4,7 @@
 
 Use the smallest independent change that satisfies an issue or subtask.
 
-1. Inspect the issue and current `develop` HEAD. Treat `master` as the protected production branch, not the default development target.
+1. Inspect the issue and current `develop` HEAD. `master` is the owner's personal branch: it is not a development target and never an agent PR target.
 2. Create a branch named for the issue/change.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
