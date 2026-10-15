@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { BrowserDom } = require("../browser/emulator/browser_dom");
+const { BrowserShim } = require("../browser/emulator/browser_dom");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -15,14 +15,12 @@ function response(body) {
 }
 
 function boot(routes = {}) {
-  const browser = new BrowserDom();
-  const document = browser.parse(
+  const browser = new BrowserShim(
     '<div id="chatbox"></div><textarea id="msg-input"></textarea>' +
       '<button id="send-btn"></button><div id="voice-status"></div>' +
       '<button id="mic-btn" type="button"></button>',
   );
-  const window = browser.window;
-  window.document = document;
+  const { document, window } = browser;
   window.AliceDispatcher = {
     request: (url) => {
       const value = routes[url];
@@ -50,7 +48,7 @@ function boot(routes = {}) {
 function rendered(document) {
   return Array.from(document.querySelectorAll(".msg")).map((node) => ({
     role: node.className.split(/\s+/).find((name) => ["user", "bot", "error"].includes(name)),
-    text: node.textContent.trim(),
+    text: node.textContent.replace("📋", "").trim(),
   }));
 }
 
