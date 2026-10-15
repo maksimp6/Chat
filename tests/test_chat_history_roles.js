@@ -43,18 +43,13 @@ function boot(routes = {}) {
     setTimeout,
     clearTimeout,
   });
-  vm.runInContext(
-    fs.readFileSync(path.join(ROOT, "static", "chat.js"), "utf8"),
-    context,
-  );
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "static", "chat.js"), "utf8"), context);
   return { context, document };
 }
 
 function rendered(document) {
   return Array.from(document.querySelectorAll(".msg")).map((node) => ({
-    role: node.className.split(/\s+/).find((name) =>
-      ["user", "bot", "error"].includes(name),
-    ),
+    role: node.className.split(/\s+/).find((name) => ["user", "bot", "error"].includes(name)),
     text: node.textContent.trim(),
   }));
 }
@@ -65,18 +60,7 @@ function rendered(document) {
   context.addMessage("human", "user", false, 0, null, 0, null, null, null, {
     id: "m1",
   });
-  context.addMessage(
-    "assistant",
-    "assistant",
-    false,
-    0,
-    null,
-    0,
-    null,
-    null,
-    null,
-    { id: "m2" },
-  );
+  context.addMessage("assistant", "assistant", false, 0, null, 0, null, null, null, { id: "m2" });
   context.addMessage("ignored", "system", false, 0, null, 0, null, null, null, {
     id: "m3",
   });
@@ -86,18 +70,7 @@ function rendered(document) {
     { role: "bot", text: "assistant" },
   ]);
 
-  context.addMessage(
-    "assistant",
-    "assistant",
-    false,
-    0,
-    null,
-    0,
-    null,
-    null,
-    null,
-    { id: "m2" },
-  );
+  context.addMessage("assistant", "assistant", false, 0, null, 0, null, null, null, { id: "m2" });
   assert.equal(rendered(document).length, 2);
 
   const history = boot({
