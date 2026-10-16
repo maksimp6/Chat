@@ -13,7 +13,6 @@
 - [Рабочий процесс разработки](development_workflow.md) — formatter, локальные проверки, CI и fail-closed merge gate
 - [Правила надёжного кода](development/reliability.md) — идемпотентность операций и правила Power of Ten для Python/JS; «храповик» `tests/test_reliability_rules.py`
 - [Правила именования](development/naming.md) — тексты UI, код фронтенда, файлы, Python-модули, ветки и PR; проверка `tests/test_naming_conventions.py`
-- [Облачное окружение Claude Code для Cloud.ru](development/claude-cloud-ops-environment.md) — настройка, setup script, переменные и инструменты (Cloud.ru CLI, EDS, gh, Docker)
 - [Продакшен-конфиги и секреты деплоя](development/production-deploy-secrets.md) — решение: отдельное защищённое место и хранение секретов в Cloud.ru (не реализовано)
 - [Agent shell: стартовый каркас](agents/agent-shell.md) — хранилище задач, исполнитель и первая read-only задача для запуска агентов в своём контейнере
 - [Production deployment](production-deployment.md) — VPS production runbook; наличие runbook не заменяет post-deploy verification
@@ -30,10 +29,12 @@
 - [3D Printing Business](printing3d.md) — shipped-контур заказов, P&L, финансирования и AI-first оценки
 - [ChatGPT Apps SDK](mcp/chatgpt_apps.md) — подключение Alice Pro к ChatGPT через MCP
 - [Сообщество ботов](integrations/chatgpt-bot-community.md) — интеграция ChatGPT, MCP и A2A-ботов
+- [Work Map: trips.db](integrations/work-map-trips.md) — ручной прототип обработки `trips.db` и границы будущей интеграции; в Alice Pro не реализовано
 - [Конспекты внешней документации](notes/README.md) — переработанные знания и выводы для Alice Pro
 - [Markdown-зеркала](mirrors/README.md) — близкие к источнику локальные копии внешней документации
 - [Markdown-зеркало Cloud.ru](integrations/cloudru-docs-mirror.md) — спецификация crawler/fetch pipeline и manifest для Cloud.ru
-- [Агенты](agents/overview.md) — архитектура и взаимодействие AI-агентов
+- [Агенты Alice](agents/overview.md) — runtime-агенты и адаптеры приложения (чат, голос, CLI, инструменты)
+- [Роли разработки в репозитории](agents/role-based-agent-office.md) — GitHub-роли (Team Lead, Backend, Docs Engineer и др.), не часть runtime Alice
 - [Фронтенд](frontend/overview.md) — структура пользовательского интерфейса
 - [Бэкенд](backend/overview.md) — архитектура серверной части
 - [База данных](database/overview.md) — модели данных и схема БД
@@ -44,3 +45,6 @@
 - [Работа с памятью](memory/overview.md) — управление данными в оперативной памяти
 
 - [Структура репозитория](architecture/repository-layout.md) — правила размещения модулей и план очистки корня
+
+- [Инвентаризация файлов корня](architecture/root-file-inventory.md) — ответственность всех оставшихся root Python-файлов
+- [Служебные скрипты](../scripts/README.md) — команды диагностики и разработки

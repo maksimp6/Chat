@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional
 
-from treasury_identity import get_current_owner_id
+from economy.treasury_identity import get_current_owner_id
 
 from .finance import assess_financing, get_payback_status, set_financing_plan
 from .service import (

@@ -42,14 +42,11 @@ def seed_provider_credential() -> None:
     if not api_key or not project_id:
         raise RuntimeError("YANDEX_API_KEY and YANDEX_PROJECT_ID are required")
     from credential_crypto import decrypt_secret, encrypt_secret
-    from db import get_conn
-    from provider_credentials import bootstrap_credential
+    from db import get_store
+    from provider_accounts.credentials import bootstrap_credential
 
-    conn = get_conn()
-    try:
-        bootstrap_credential(conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret)
-    finally:
-        conn.close()
+    conn = get_store()
+    bootstrap_credential(conn, api_key, project_id, encrypt_secret, decrypt=decrypt_secret)
 
 
 def changed_files(repo_root: Path = ROOT) -> List[str]:
@@ -95,7 +92,7 @@ def run_issue_task(
         start_invocation,
     )
     from invocation.trace import create_invocation_trace
-    from responses_tool_loop import extract_function_calls
+    from agent_runtime.responses_tool_loop import extract_function_calls
     from yandex_client_modules.parsers import extract_reasoning_and_text
 
     if client_factory is None:

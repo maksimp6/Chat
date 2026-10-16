@@ -1,6 +1,6 @@
 import unittest
 
-from trace_security import safe_repr, sanitize_trace_value
+from observability.trace_security import safe_repr, sanitize_trace_value
 
 
 class TraceSecurityTests(unittest.TestCase):

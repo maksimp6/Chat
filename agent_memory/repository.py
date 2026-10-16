@@ -1,157 +1,53 @@
-"""SQLite/PostgreSQL-compatible repository for shared agent memory."""
+"""Native MemoryStore repository for source-linked agent memory records."""
 
 from __future__ import annotations
 
-import json
 import time
-from typing import Any, Callable
+from typing import Any
 
-from db import get_conn
+from agent_memory.client import get_memory_client
+from db import memory_file_path
+from memory_engine.store import MemoryStore
 
 from .models import MemoryLookup, MemoryRecord
 
 
+_MEMORY_PREFIX = "agent_memory:"
+
+
 class AgentMemoryStore:
-    """Persist compact derived memory while GitHub/source references remain authoritative."""
+    """Persist validated records as independent native MemoryStore journal keys."""
 
-    def __init__(self, connection_factory: Callable[[], Any] | None = None) -> None:
-        self._connection_factory = connection_factory or get_conn
-
-    def _connect(self):
-        conn = self._connection_factory()
-        self._ensure_schema(conn)
-        return conn
+    def __init__(self, store: MemoryStore | None = None) -> None:
+        self._store = store if store is not None else get_memory_client(memory_file_path())
 
     @staticmethod
-    def _ensure_schema(conn: Any) -> None:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS agent_memory (
-                memory_id TEXT PRIMARY KEY,
-                kind TEXT NOT NULL,
-                scope TEXT NOT NULL,
-                text TEXT NOT NULL,
-                provenance_json TEXT NOT NULL,
-                source_version TEXT NOT NULL,
-                payload_json TEXT NOT NULL,
-                confidence REAL NOT NULL,
-                freshness_json TEXT NOT NULL,
-                sensitivity TEXT NOT NULL,
-                visibility_json TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                expires_at INTEGER,
-                superseded_by TEXT
-            )
-            """
-        )
-        cur.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_agent_memory_kind_scope_status
-            ON agent_memory(kind, scope, status)
-            """
-        )
-        conn.commit()
-
-    def create_schema(self) -> None:
-        conn = self._connection_factory()
-        try:
-            self._ensure_schema(conn)
-        finally:
-            conn.close()
+    def _key(memory_id: str) -> str:
+        return _MEMORY_PREFIX + str(memory_id)
 
     @staticmethod
-    def _json(value: Any) -> str:
-        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-    @staticmethod
-    def _record_from_row(row: Any) -> MemoryRecord:
-        return MemoryRecord(
-            memory_id=row["memory_id"],
-            kind=row["kind"],
-            scope=row["scope"],
-            text=row["text"],
-            provenance=json.loads(row["provenance_json"]),
-            source_version=row["source_version"],
-            payload=json.loads(row["payload_json"]),
-            confidence=float(row["confidence"]),
-            freshness=json.loads(row["freshness_json"]),
-            sensitivity=row["sensitivity"],
-            visibility=tuple(json.loads(row["visibility_json"])),
-            status=row["status"],
-            created_at=int(row["created_at"]),
-            updated_at=int(row["updated_at"]),
-            expires_at=int(row["expires_at"]) if row["expires_at"] is not None else None,
-            superseded_by=row["superseded_by"],
-        )
+    def _record_from_value(value: Any) -> MemoryRecord:
+        if not isinstance(value, dict):
+            raise ValueError("invalid agent memory record")
+        return MemoryRecord(**value)
 
     def upsert(self, record: MemoryRecord) -> MemoryRecord:
-        conn = self._connect()
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                INSERT INTO agent_memory (
-                    memory_id, kind, scope, text, provenance_json, source_version,
-                    payload_json, confidence, freshness_json, sensitivity,
-                    visibility_json, status, created_at, updated_at, expires_at,
-                    superseded_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(memory_id) DO UPDATE SET
-                    kind = excluded.kind,
-                    scope = excluded.scope,
-                    text = excluded.text,
-                    provenance_json = excluded.provenance_json,
-                    source_version = excluded.source_version,
-                    payload_json = excluded.payload_json,
-                    confidence = excluded.confidence,
-                    freshness_json = excluded.freshness_json,
-                    sensitivity = excluded.sensitivity,
-                    visibility_json = excluded.visibility_json,
-                    status = excluded.status,
-                    created_at = agent_memory.created_at,
-                    updated_at = excluded.updated_at,
-                    expires_at = excluded.expires_at,
-                    superseded_by = excluded.superseded_by
-                """,
-                (
-                    record.memory_id,
-                    record.kind,
-                    record.scope,
-                    record.text,
-                    self._json(record.as_dict()["provenance"]),
-                    record.source_version,
-                    self._json(record.as_dict()["payload"]),
-                    record.confidence,
-                    self._json(record.as_dict()["freshness"]),
-                    record.sensitivity,
-                    self._json(list(record.visibility)),
-                    record.status,
-                    record.created_at,
-                    record.updated_at,
-                    record.expires_at,
-                    record.superseded_by,
-                ),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        key = self._key(record.memory_id)
+        with self._store.transaction() as tx:
+            existing = tx.get(key)
+            data = record.as_dict()
+            if existing is not None:
+                original = self._record_from_value(existing)
+                data["created_at"] = original.created_at
+            tx.set(key, data)
         stored = self.get(record.memory_id)
         if stored is None:
             raise RuntimeError("memory upsert did not persist")
         return stored
 
     def get(self, memory_id: str) -> MemoryRecord | None:
-        conn = self._connect()
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM agent_memory WHERE memory_id = ?", (str(memory_id),))
-            row = cur.fetchone()
-            return None if row is None else self._record_from_row(row)
-        finally:
-            conn.close()
+        value = self._store.get(self._key(memory_id))
+        return None if value is None else self._record_from_value(value)
 
     def lookup(
         self,
@@ -209,37 +105,23 @@ class AgentMemoryStore:
         visible_to: str | None = None,
         now: int | None = None,
     ) -> list[MemoryRecord]:
-        conditions: list[str] = []
-        params: list[Any] = []
+        records = [
+            self._record_from_value(item)
+            for item in self._store.items(prefix=_MEMORY_PREFIX).values()
+        ]
         if kind is not None:
-            conditions.append("kind = ?")
-            params.append(str(kind))
+            records = [item for item in records if item.kind == str(kind)]
         if scope is not None:
-            conditions.append("scope = ?")
-            params.append(str(scope))
+            records = [item for item in records if item.scope == str(scope)]
         if status is not None:
-            conditions.append("status = ?")
-            params.append(str(status))
-
-        sql = "SELECT * FROM agent_memory"
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
-        sql += " ORDER BY updated_at DESC, memory_id ASC"
-
-        conn = self._connect()
-        try:
-            cur = conn.cursor()
-            cur.execute(sql, tuple(params))
-            records = [self._record_from_row(row) for row in cur.fetchall()]
-        finally:
-            conn.close()
-
+            records = [item for item in records if item.status == str(status)]
+        records.sort(key=lambda item: (-item.updated_at, item.memory_id))
         if status == "active":
-            records = [record for record in records if not record.is_expired(now=now)]
+            records = [item for item in records if not item.is_expired(now=now)]
         if visible_to is None:
             return records
         role = str(visible_to)
-        return [record for record in records if not record.visibility or role in record.visibility]
+        return [item for item in records if not item.visibility or role in item.visibility]
 
     def mark_stale(self, memory_id: str, *, reason: str, now: int | None = None) -> bool:
         record = self.get(memory_id)
@@ -287,15 +169,12 @@ class AgentMemoryStore:
         return True
 
     def delete(self, memory_id: str) -> bool:
-        conn = self._connect()
-        try:
-            cur = conn.cursor()
-            cur.execute("DELETE FROM agent_memory WHERE memory_id = ?", (str(memory_id),))
-            changed = cur.rowcount > 0
-            conn.commit()
-            return changed
-        finally:
-            conn.close()
+        key = self._key(memory_id)
+        with self._store.transaction() as tx:
+            if tx.get(key) is None:
+                return False
+            tx.delete(key)
+        return True
 
     def export_records(self) -> list[dict[str, Any]]:
         records = self.list_records(status=None)

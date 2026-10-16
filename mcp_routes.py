@@ -3,9 +3,9 @@
 from flask import Blueprint, request, jsonify
 import logging
 import json as _json
-from yandex_client import YandexResponsesClient
+from yandex_client_modules.client import YandexResponsesClient
 from config import Config, calculate_full_cost
-from trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
+from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
     start_invocation,
@@ -14,8 +14,8 @@ from invocation.manager import (
     persist_invocation_trace,
 )
 from invocation.trace import create_invocation_trace
-from mcp_trace import record_yandex_mcp_activity
-import mcp_storage
+from mcp_server.trace import record_yandex_mcp_activity
+import mcp_server.storage as mcp_storage
 from tool_registry import registry
 from db import (
     get_conversations,
@@ -28,17 +28,17 @@ from db import (
     get_conversation_title,
 )
 from partial_output import extract_last_response_text, format_partial_output_message
-from responses_tool_loop import run_tool_loop, extract_function_calls
-from billing import settle_billing_to_treasury
-from treasury_identity import TreasuryIdentityError, get_current_owner_id
-from provider_quotas import ProviderQuotaExceeded
+from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
+from economy.billing import settle_billing_to_treasury
+from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
+from provider_accounts.quotas import ProviderQuotaExceeded
 from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
 from universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
     tool_call_requires_approval,
 )
-from conversation_ownership import (
+from conversations.ownership import (
     init_conversation_ownership_table,
     set_owner,
     check_access,

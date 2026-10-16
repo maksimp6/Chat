@@ -1,13 +1,13 @@
 import json
 import time
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from tool_registry import registry
-import mcp_storage
+import mcp_server.storage as mcp_storage
 from db import get_conv_settings
 
-from yandex_request_utils import sanitize_for_log as _sanitize_for_log
-from yandex_api_logger import api_logger
+from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
+from yandex_client_modules.api_logger import api_logger
 from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
@@ -135,11 +135,8 @@ class YandexMcpMixin:
         active_cats = None
         if conversation_id:
             try:
-                active_cats = (
-                    get_conv_settings(conversation_id).get("active_tool_categories")
-                    if get_conv_settings(conversation_id)
-                    else None
-                )
+                preferences = get_conv_settings(conversation_id) or {}
+                active_cats = preferences.get("active_tool_categories")
             except Exception:
                 active_cats = None
 
@@ -158,7 +155,7 @@ class YandexMcpMixin:
             ]
 
         hosted_tools = []
-        conv_settings = get_conv_settings(conversation_id) if conversation_id else {}
+        conv_settings = get_conv_settings(conversation_id) or {} if conversation_id else {}
         tools_config = (conv_settings or {}).get("tools_config") or params.get("tools_config") or {}
 
         raw_web_cfg = tools_config.get("web_search")

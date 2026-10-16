@@ -1,135 +1,54 @@
+"""Native runtime persistence contracts after removing SQL migration code."""
+
 import pytest
 
 import invocation.manager as invocation_manager
-import runtime_migrations
-from db_backend import IntegrityError, OperationalError
+from agent_memory.client import close_memory_clients
+from sessions.manager import get_session
 
 
-class _Rows:
-    def __init__(self, rows=None):
-        self._rows = rows or []
-        self.rowcount = 1
+@pytest.fixture
+def native_store(tmp_path, monkeypatch):
+    import db
 
-    def fetchall(self):
-        return self._rows
-
-
-class _MigrationConnection:
-    def __init__(self, *, alter_error=None):
-        self.alter_error = alter_error
-        self.statements = []
-        self.committed = False
-        self.closed = False
-
-    def execute(self, sql, params=None):
-        normalized = " ".join(sql.split())
-        self.statements.append(normalized)
-        if normalized.startswith("PRAGMA table_info(sessions)"):
-            return _Rows([{"name": "id"}])
-        if normalized.startswith("PRAGMA table_info(invocations)"):
-            return _Rows([{"name": "id"}])
-        if normalized.startswith("ALTER TABLE") and self.alter_error is not None:
-            raise self.alter_error
-        return _Rows()
-
-    def commit(self):
-        self.committed = True
-
-    def close(self):
-        self.closed = True
+    path = tmp_path / "native.memory"
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "unused.db"))
+    close_memory_clients()
+    yield path
+    close_memory_clients()
 
 
-def test_runtime_migrations_add_only_missing_columns(monkeypatch):
-    conn = _MigrationConnection()
-    monkeypatch.setattr(runtime_migrations, "get_conn", lambda: conn)
+def test_first_use_reuses_session_after_duplicate_create_race(native_store, monkeypatch):
+    from sessions.manager import create_session
 
-    runtime_migrations.init_runtime_tables()
+    real_create = create_session
 
-    assert any("ALTER TABLE sessions ADD COLUMN completed_at" in sql for sql in conn.statements)
-    assert any("ALTER TABLE invocations ADD COLUMN trace_json" in sql for sql in conn.statements)
-    assert conn.committed is True
-    assert conn.closed is True
+    def racing_create(*args, **kwargs):
+        real_create(*args, **kwargs)
+        raise ValueError("Session already exists")
 
-
-def test_runtime_migrations_ignore_duplicate_column_race(monkeypatch):
-    conn = _MigrationConnection(alter_error=OperationalError("duplicate column name: completed_at"))
-    monkeypatch.setattr(runtime_migrations, "get_conn", lambda: conn)
-
-    runtime_migrations.init_runtime_tables()
-
-    assert conn.closed is True
-
-
-def test_runtime_migrations_reraise_unexpected_alter_failure(monkeypatch):
-    conn = _MigrationConnection(alter_error=OperationalError("database unavailable"))
-    monkeypatch.setattr(runtime_migrations, "get_conn", lambda: conn)
-
-    with pytest.raises(OperationalError, match="database unavailable"):
-        runtime_migrations.init_runtime_tables()
-    assert conn.closed is True
-
-
-class _InvocationConnection:
-    def __init__(self):
-        self.committed = False
-        self.closed = False
-
-    def execute(self, _sql, _params=None):
-        return _Rows()
-
-    def commit(self):
-        self.committed = True
-
-    def close(self):
-        self.closed = True
-
-
-def test_create_invocation_recovers_when_session_race_is_lost(monkeypatch):
-    restored = iter([None, {"id": "session-race", "status": "active"}])
-    conn = _InvocationConnection()
-    monkeypatch.setattr(invocation_manager, "init_runtime_tables", lambda: None)
-    monkeypatch.setattr(invocation_manager, "restore_session", lambda _session_id: next(restored))
-
-    def lose_race(*_args, **_kwargs):
-        raise IntegrityError("session already exists")
-
-    monkeypatch.setattr(invocation_manager, "create_session", lose_race)
-    monkeypatch.setattr(invocation_manager, "get_conn", lambda: conn)
-
+    monkeypatch.setattr(invocation_manager, "create_session", racing_create)
     context = invocation_manager.create_invocation("session-race", "conversation-race")
-
     assert context.session_id == "session-race"
-    assert context.conversation_id == "conversation-race"
-    assert conn.committed is True
-    assert conn.closed is True
+    assert get_session("session-race")["id"] == "session-race"
+    assert invocation_manager.get_invocation(context.invocation_id)["status"] == "created"
 
 
-def test_create_invocation_reraises_when_race_winner_cannot_be_reloaded(monkeypatch):
-    monkeypatch.setattr(invocation_manager, "init_runtime_tables", lambda: None)
-    monkeypatch.setattr(invocation_manager, "restore_session", lambda _session_id: None)
+def test_first_use_fails_if_duplicate_session_has_no_winner(native_store, monkeypatch):
+    monkeypatch.setattr(invocation_manager, "restore_session", lambda _sid: None)
 
-    def lose_race(*_args, **_kwargs):
-        raise IntegrityError("session already exists")
+    def duplicate(*args, **kwargs):
+        raise ValueError("Session already exists")
 
-    monkeypatch.setattr(invocation_manager, "create_session", lose_race)
-
-    with pytest.raises(IntegrityError, match="session already exists"):
+    monkeypatch.setattr(invocation_manager, "create_session", duplicate)
+    with pytest.raises(ValueError, match="Session already exists"):
         invocation_manager.create_invocation("session-race", "conversation-race")
 
 
-class _InvocationAlterFailureConnection(_MigrationConnection):
-    def execute(self, sql, params=None):
-        normalized = " ".join(sql.split())
-        if normalized.startswith("ALTER TABLE invocations"):
-            self.statements.append(normalized)
-            raise OperationalError("invocation migration unavailable")
-        return super().execute(sql, params)
-
-
-def test_runtime_migrations_reraise_unexpected_invocation_alter_failure(monkeypatch):
-    conn = _InvocationAlterFailureConnection()
-    monkeypatch.setattr(runtime_migrations, "get_conn", lambda: conn)
-
-    with pytest.raises(OperationalError, match="invocation migration unavailable"):
-        runtime_migrations.init_runtime_tables()
-    assert conn.closed is True
+def test_runtime_rejects_missing_session_without_side_effects(native_store):
+    with pytest.raises(ValueError, match="Session not found"):
+        invocation_manager.create_invocation(
+            "absent", "conversation-race", create_missing_session=False
+        )
+    assert get_session("absent") is None
