@@ -4,6 +4,19 @@ Alice Pro — self-hosted AI assistant platform around Yandex AI Studio, MCP/loc
 
 The repository is actively evolving. This README separates shipped behavior from open scope: Issues define implementation scope and acceptance criteria; docs define contracts and operating rules; Discussions capture questions and decisions.
 
+## Repository navigation
+
+| Need                                    | Location                                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Run the backend                         | `app.py`, `start.sh`                                                                                                        |
+| Web interface                           | `static/`, `templates/`                                                                                                     |
+| Android client                          | `android/`                                                                                                                  |
+| Tests                                   | `tests/`                                                                                                                    |
+| Developer and diagnostic tools          | [scripts guide](scripts/README.md)                                                                                          |
+| Architecture and operating instructions | [docs index](docs/README.md)                                                                                                |
+| Python package map                      | [layout contract](docs/architecture/repository-layout.md), [remaining root files](docs/architecture/root-file-inventory.md) |
+| Logging and diagnostics                 | [Execution Trace and system log](docs/backend/logging.md)                                                                   |
+
 ## What is shipped
 
 - **Yandex AI Studio Responses API** as the primary provider through the backend chat path.
@@ -17,7 +30,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
 - **Files, knowledge and Departments** integrations with local Execution Trace persistence.
 - **Android debug client** with WebView integration, diagnostics, updates and a reproducible debug-build path.
-- **SQLite by default** for local/Termux runs; PostgreSQL is optional for shared deployments.
+- **Native Kristall** for local/Termux and shared deployments, with one writer per durable journal.
 
 ## Architecture
 
@@ -37,11 +50,11 @@ Secrets are sanitized at the trace/log boundary. Provider requests, continuation
 
 ## Current status
 
-As of 2026-10-06, `master` includes Memory DB Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
+As of 2026-10-06, `master` includes Kristall Wave 1 (conversation ownership and user identity migrated to file-native storage), Alice Dev worker as a separate coding worker, ChatGPT OAuth discovery with PKCE, platform-aware CI routing, and capability-only secret delivery. Earlier (2026-09-29): fail-closed merge gate, canonical formatter lifecycle, runner dependency caching and CI timing telemetry, deduplicated Python/frontend test execution, lazy PostgreSQL test reset, async runtime concurrency/cancellation/timeout coverage, Cloud.ru Secret Management hardening, and Container Apps v2 client contract ([changelog](docs/changelog.md)). Copilot review is automatic; maintainers request one final Codex review only after the current head is green and ready to merge.
 
-These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. The current `master` is protected by the documented fail-closed workflow: a PR must be synchronized with current `master`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path.
+These are repository capabilities, not evidence that the public production deployment, external MCP connection, or live Cloud.ru Container Apps rollout has been verified. `develop` is the integration branch and the repository default; every PR targets it. A PR must be synchronized with current `develop`, required checks must be green on the exact current head, review threads must be resolved, and merge happens through the protected GitHub path (squash). `master` is the owner's personal branch and is not a PR target.
 
-The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Alice Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Memory DB Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
+The Cloud.ru platform migration is tracked in [#440](https://github.com/maksimp6/Chat/issues/440). Alice Dev worker is implemented as a separate coding worker; legacy cloudru-rdc.yml and production-deploy.yml remain unchanged. Resource-scoped ownership, replacement decision, and accepted cutover criteria are tracked in [#869](https://github.com/maksimp6/Chat/issues/869). Kristall Wave 1 is shipped; further migration of shared state (sessions, runtime events, conversation metadata) remains roadmap. Object Storage migration, durable background workers, and full production cutover remain separate work.
 
 Still experimental or roadmap unless the corresponding issue is complete:
 
@@ -59,7 +72,6 @@ Still experimental or roadmap unless the corresponding issue is complete:
 
 - Python: backend CI uses 3.14; Ruff targets 3.12.
 - Git.
-- Optional PostgreSQL 17, with `requirements-postgres.txt`.
 - For Android builds only: Android SDK API 37 and Gradle 9.5.0. CI runs Gradle with Java 25 and stages the embedded runtime with Python 3.13; the Android module declares JVM toolchain 17.
 
 ### Backend
@@ -75,7 +87,7 @@ Copy `.env.example` only for a fresh installation. Replace its placeholders and 
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-SQLite is the default for local/Termux/proot Ubuntu use. Set `ALICE_DATABASE_URL` only when selecting PostgreSQL.
+Alice stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
 
 ### Android
 
@@ -104,7 +116,7 @@ For security-sensitive reports, follow [SECURITY.md](SECURITY.md). Runtime tools
 Issue → branch → implementation → tests → PR → CI → review → merge → verification
 ```
 
-Keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
+Open pull requests against `develop` and keep changes independently testable. Follow [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the [sprint workflow](docs/development/sprint-workflow.md). Issues are the canonical source for scope and acceptance; a Discussion is not a substitute for an issue or a passing CI check.
 
 ## Testing
 

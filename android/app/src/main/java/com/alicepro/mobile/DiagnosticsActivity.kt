@@ -235,10 +235,12 @@ class DiagnosticsActivity : AppCompatActivity() {
     private fun checkRootAgent() {
         RootAgentService.start(this)
         Thread {
+            var screen: RootAgentClient.ScreenReport? = null
             val report = try {
                 val token = RootAgentTokenStore(applicationContext).loadOrCreate()
                 Thread.sleep(ROOT_AGENT_STARTUP_MS)
-                RootAgentClient(RootAgentService.PORT) { token }.selfCheck()
+                val client = RootAgentClient(RootAgentService.PORT) { token }
+                client.selfCheck().also { if (it.root == true) screen = client.screenCheck() }
             } catch (error: Exception) {
                 AppLogger.error("DiagnosticsActivity", "RootAgent self-check failed", error)
                 RootAgentClient.Report(healthy = false, root = null, error = "self_check_failed")
@@ -248,11 +250,17 @@ class DiagnosticsActivity : AppCompatActivity() {
                     true -> "есть (uid 0)"
                     false -> "нет"
                     null -> "неизвестно"
-                } + (report.error?.let { "\nОшибка: $it" } ?: "")
+                } + (report.error?.let { "\nОшибка: $it" } ?: "") + screenLines(screen)
             AppLogger.info(
                 "DiagnosticsActivity",
                 "RootAgent self-check",
-                mapOf("healthy" to report.healthy.toString(), "root" to report.root.toString()),
+                mapOf(
+                    "healthy" to report.healthy.toString(),
+                    "root" to report.root.toString(),
+                    "keyguard_locked" to screen?.keyguardLocked.toString(),
+                    "tree_http" to screen?.tree.toString(),
+                    "capture_http" to screen?.capture.toString(),
+                ),
             )
             runOnUiThread {
                 if (!isFinishing) {
@@ -277,6 +285,19 @@ class DiagnosticsActivity : AppCompatActivity() {
 
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = onSelected()
         }
+
+    private fun screenLines(screen: RootAgentClient.ScreenReport?): String {
+        if (screen == null) return ""
+        val lock = when (screen.keyguardLocked) {
+            true -> "заблокирован"
+            false -> "разблокирован"
+            null -> "неизвестно"
+        }
+        return "\nЭкран: $lock" +
+            "\nДерево экрана: HTTP ${screen.tree ?: "-"}" +
+            "\nСкриншот: HTTP ${screen.capture ?: "-"}" +
+            (screen.error?.let { "\nОшибка экрана: $it" } ?: "")
+    }
 
     private companion object {
         const val ROOT_AGENT_STARTUP_MS = 700L
