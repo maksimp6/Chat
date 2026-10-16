@@ -1,4 +1,4 @@
-"""Invocation lifecycle and trace persistence on native MemoryStore."""
+"""Invocation lifecycle and trace persistence on native Kristall."""
 
 from __future__ import annotations
 

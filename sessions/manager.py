@@ -1,4 +1,4 @@
-"""Durable runtime sessions stored directly as MemoryStore journal records."""
+"""Durable runtime sessions stored directly as Kristall journal records."""
 
 from __future__ import annotations
 

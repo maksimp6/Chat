@@ -1,4 +1,4 @@
-"""Checkpoint and crash-consistency regressions for the accepted MemoryStore."""
+"""Checkpoint and crash-consistency regressions for the accepted Kristall."""
 
 import os
 import errno
@@ -12,12 +12,12 @@ import tempfile
 
 import pytest
 
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall, KristallError
 
 
 def test_long_journal_compacts_and_reopens_with_monotonic_sequence(tmp_path):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         for index in range(250):
             db.set("value", index)
             assert db.commit() == index + 1
@@ -27,7 +27,7 @@ def test_long_journal_compacts_and_reopens_with_monotonic_sequence(tmp_path):
         assert db.get("value") == 249
         db.set("next", "ok")
         assert db.commit() == 251
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("value") == 249
         assert reopened.get("next") == "ok"
         assert reopened.last_commit.sequence == 251
@@ -38,9 +38,9 @@ def test_sigkill_during_checkpoint_preserves_acknowledged_state(tmp_path, phase)
     path = tmp_path / "state.memory"
     script = """
 import os, signal, sys
-from memory_engine import MemoryStore
+from kristall import Kristall
 path, phase = sys.argv[1:]
-with MemoryStore(path) as db:
+with Kristall(path) as db:
     for i in range(80):
         db.set('value', i); db.commit()
     original = os.replace
@@ -60,7 +60,7 @@ with MemoryStore(path) as db:
         check=False,
     )
     assert result.returncode == -signal.SIGKILL, result.stderr
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("value") == 79
         assert recovered.last_commit.sequence == 80
         recovered.set("after", "restart")
@@ -69,16 +69,16 @@ with MemoryStore(path) as db:
 
 def test_checkpoint_rejects_pending_and_oversized_snapshot(tmp_path):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("value", "confirmed")
         db.commit()
         db.set("pending", 1)
-        with pytest.raises(StoreError, match="staged"):
+        with pytest.raises(KristallError, match="staged"):
             db.checkpoint()
         assert db.get("pending") == 1
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("big", "x" * (1024 * 1024))
-        with pytest.raises(StoreError, match="frame exceeds size"):
+        with pytest.raises(KristallError, match="frame exceeds size"):
             db.commit()
         assert db.get("value") == "confirmed"
 
@@ -86,13 +86,13 @@ def test_checkpoint_rejects_pending_and_oversized_snapshot(tmp_path):
 def test_checkpoint_backup_restore_roundtrip(tmp_path):
     path = tmp_path / "source.memory"
     backup = tmp_path / "backup.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         for i in range(40):
             db.set("count", i)
             db.commit()
         db.checkpoint()
         db.backup(backup)
-    with MemoryStore(tmp_path / "target.memory") as target:
+    with Kristall(tmp_path / "target.memory") as target:
         target.restore(backup)
         assert target.get("count") == 39
         assert target.last_commit.sequence == 40
@@ -100,19 +100,19 @@ def test_checkpoint_backup_restore_roundtrip(tmp_path):
 
 def test_oversized_checkpoint_preserves_journal_and_writable_store(tmp_path):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         for index in range(3):
             db.set(str(index), "x" * 400_000)
             db.commit()
         original = path.read_bytes()
         confirmed = db.last_commit
-        with pytest.raises(StoreError, match="checkpoint exceeds"):
+        with pytest.raises(KristallError, match="checkpoint exceeds"):
             db.checkpoint()
         assert path.read_bytes() == original
         assert db.last_commit == confirmed
         db.set("after", "ok")
         assert db.commit() == 4
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("2") == "x" * 400_000
         assert recovered.get("after") == "ok"
 
@@ -122,7 +122,7 @@ def test_oversized_checkpoint_preserves_journal_and_writable_store(tmp_path):
 )
 def test_checkpoint_io_failure_blocks_writes_until_reopen(tmp_path, monkeypatch, phase):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("saved", {"count": 1})
         db.commit()
         original = path.read_bytes()
@@ -165,18 +165,18 @@ def test_checkpoint_io_failure_blocks_writes_until_reopen(tmp_path, monkeypatch,
                 patch.setattr(os, "replace", failing_replace)
             else:
                 patch.setattr(os, "fsync", failing_fsync)
-            with pytest.raises(StoreError, match="checkpoint failed"):
+            with pytest.raises(KristallError, match="checkpoint failed"):
                 db.checkpoint()
         assert db.last_commit == confirmed
         assert db.get("saved") == {"count": 1}
         if phase != "directory_fsync":
             assert path.read_bytes() == original
         assert not list(tmp_path.glob(".alice-checkpoint-*"))
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             db.set("later", 2)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             db.commit()
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("saved") == {"count": 1}
         assert recovered.last_commit.sequence == 1
         recovered.set("later", 2)
@@ -185,7 +185,7 @@ def test_checkpoint_io_failure_blocks_writes_until_reopen(tmp_path, monkeypatch,
 
 def test_checkpoint_verification_failure_preserves_original(tmp_path, monkeypatch):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("saved", 1)
         db.commit()
         original = path.read_bytes()
@@ -198,7 +198,7 @@ def test_checkpoint_verification_failure_preserves_original(tmp_path, monkeypatc
                     real_inspect(candidate) if candidate == path else ({}, 0, "0" * 64)
                 ),
             )
-            with pytest.raises(StoreError, match="verification failed"):
+            with pytest.raises(KristallError, match="verification failed"):
                 db.checkpoint()
         assert path.read_bytes() == original
         assert not list(tmp_path.glob(".alice-checkpoint-*"))
@@ -233,27 +233,27 @@ def test_invalid_checkpoint_with_valid_checksum_fails_closed(tmp_path, field, va
     digest = hashlib.sha256(bytes(32) + encoded).hexdigest()
     path.write_text(json.dumps({"payload": payload, "digest": digest}) + "\n")
     original = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt"):
+        Kristall(path)
     assert path.read_bytes() == original
 
 
 def test_checkpoint_remains_first_and_preserves_writer_lock(tmp_path):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         assert db.checkpoint() == 0
         assert not path.exists()
         db.set("saved", 1)
         db.commit()
         with db.transaction():
-            with pytest.raises(StoreError, match="idle"):
+            with pytest.raises(KristallError, match="idle"):
                 db.checkpoint()
         db.checkpoint()
         checkpoint = path.read_bytes()
         assert db.checkpoint() == 1
         assert path.read_bytes() == checkpoint
-        with pytest.raises(StoreError, match="writer"):
-            MemoryStore(path)
+        with pytest.raises(KristallError, match="writer"):
+            Kristall(path)
         db.set("next", 2)
         db.commit()
     # A checkpoint after another committed frame would reset history illegally.
@@ -266,12 +266,12 @@ def test_checkpoint_remains_first_and_preserves_writer_lock(tmp_path):
     record["digest"] = hashlib.sha256(bytes.fromhex(previous_digest) + encoded).hexdigest()
     with path.open("ab") as journal:
         journal.write(json.dumps(record).encode() + b"\n")
-    with pytest.raises(StoreError, match="corrupt"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt"):
+        Kristall(path)
 
 
 def test_checkpoint_validator_rejects_non_string_key_before_publication():
-    from memory_engine.store import _validate_checkpoint
+    from kristall.store import _validate_checkpoint
 
     with pytest.raises(ValueError, match="checkpoint key"):
         _validate_checkpoint({"seq": 1, "changes": [], "state": {"values": {1: "invalid"}}})
@@ -283,7 +283,7 @@ def test_interrupted_checkpoint_never_allows_a_stale_digest_commit(
     tmp_path, monkeypatch, phase, interruption
 ):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("saved", {"count": 1})
         db.commit()
         confirmed = db.last_commit
@@ -309,17 +309,17 @@ def test_interrupted_checkpoint_never_allows_a_stale_digest_commit(
                 db.checkpoint()
         assert db.get("saved") == {"count": 1}
         assert db.last_commit == confirmed
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             db.set("next", 2)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             db.commit()
         assert not list(tmp_path.glob(".alice-checkpoint-*"))
-    with MemoryStore(path) as recovered:
+    with Kristall(path) as recovered:
         assert recovered.get("saved") == {"count": 1}
         assert recovered.last_commit.sequence == 1
         recovered.set("next", 2)
         assert recovered.commit() == 2
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("saved") == {"count": 1}
         assert reopened.get("next") == 2
 
@@ -327,7 +327,7 @@ def test_interrupted_checkpoint_never_allows_a_stale_digest_commit(
 @pytest.mark.parametrize("damage", ["checksum", "truncated", "missing", "valid_other_state"])
 def test_checkpoint_preserves_changed_source_evidence_and_blocks_writer(tmp_path, damage):
     path = tmp_path / "state.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("saved", "confirmed")
         db.commit()
         confirmed = db.last_commit
@@ -349,15 +349,15 @@ def test_checkpoint_preserves_changed_source_evidence_and_blocks_writer(tmp_path
                 record["digest"] = hashlib.sha256(bytes(32) + encoded).hexdigest()
                 evidence = json.dumps(record).encode() + b"\n"
             path.write_bytes(evidence)
-        with pytest.raises(StoreError, match="source.*recovery required"):
+        with pytest.raises(KristallError, match="source.*recovery required"):
             db.checkpoint()
         assert (path.read_bytes() if path.exists() else None) == evidence
         assert not list(tmp_path.glob(".alice-checkpoint-*"))
         assert db.last_commit == confirmed
         assert db.get("saved") == "confirmed"
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             db.set("later", 2)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             db.commit()
 
 
@@ -369,13 +369,13 @@ def test_interrupted_restore_never_allows_an_empty_state_append(
 ):
     backup = tmp_path / "backup.memory"
     target = tmp_path / "target.memory"
-    with MemoryStore(tmp_path / "source.memory") as source:
+    with Kristall(tmp_path / "source.memory") as source:
         source.set("saved", {"count": 1})
         source.commit()
         if checkpointed:
             source.checkpoint()
         source.backup(backup)
-    with MemoryStore(target) as restored:
+    with Kristall(target) as restored:
         real_fsync = os.fsync
         real_copy = restored._engine._copy_verified_file
         with monkeypatch.context() as patch:
@@ -398,16 +398,16 @@ def test_interrupted_restore_never_allows_an_empty_state_append(
         assert restored.last_commit.sequence == 0
         assert restored.get("saved") is None
         assert not list(tmp_path.glob(".alice-copy-*"))
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             restored.set("next", 2)
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             restored.commit()
-    with MemoryStore(target) as recovered:
+    with Kristall(target) as recovered:
         assert recovered.get("saved") == {"count": 1}
         assert recovered.last_commit.sequence == 1
         recovered.set("next", 2)
         assert recovered.commit() == 2
-    with MemoryStore(target) as reopened:
+    with Kristall(target) as reopened:
         assert reopened.get("saved") == {"count": 1}
         assert reopened.get("next") == 2
 
@@ -418,12 +418,12 @@ def test_interrupted_restore_ram_publication_never_exposes_partial_metadata(
 ):
     backup = tmp_path / "backup.memory"
     target = tmp_path / "target.memory"
-    with MemoryStore(tmp_path / "source.memory") as source:
+    with Kristall(tmp_path / "source.memory") as source:
         source.set("saved", 1)
         source.commit()
         source.checkpoint()
         source.backup(backup)
-    with MemoryStore(target) as restored:
+    with Kristall(target) as restored:
         engine = restored._engine
         cls = type(engine)
         real_setattr = cls.__setattr__
@@ -438,13 +438,13 @@ def test_interrupted_restore_ram_publication_never_exposes_partial_metadata(
             with pytest.raises(interruption):
                 restored.restore(backup)
         assert restored.info().last_commit is None
-        with pytest.raises(StoreError, match="RAM publication"):
+        with pytest.raises(KristallError, match="RAM publication"):
             restored.last_commit
-        with pytest.raises(StoreError, match="RAM publication"):
+        with pytest.raises(KristallError, match="RAM publication"):
             restored.get("saved")
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             restored.commit()
-    with MemoryStore(target) as recovered:
+    with Kristall(target) as recovered:
         assert recovered.get("saved") == 1
         assert recovered.last_commit.sequence == 1
         recovered.set("next", 2)

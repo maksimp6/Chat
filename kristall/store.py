@@ -1,4 +1,4 @@
-"""Minimal synchronous typed key/value Memory DB.
+"""Minimal synchronous typed key/value Kristall.
 
 One process owns a store. File locking prevents concurrent process writers.
 No SQL, background flush, or unsafe pickle deserialization.
@@ -28,13 +28,13 @@ MAX_VALUE_TEXT_BYTES = MAX_JOURNAL_FRAME_BYTES
 ValueT = TypeVar("ValueT")
 
 
-class StoreError(RuntimeError):
+class KristallError(RuntimeError):
     """Persistence, integrity, or ownership failure."""
 
 
 def _validate_name(name: str) -> None:
     if not isinstance(name, str) or not name:
-        raise StoreError("name must be a nonempty string")
+        raise KristallError("name must be a nonempty string")
 
 
 def _check_text_budget(value: Any, used: int) -> int:
@@ -45,9 +45,9 @@ def _check_text_budget(value: Any, used: int) -> int:
         try:
             used += len(value[offset : offset + 16384].encode("utf-8"))
         except UnicodeEncodeError as exc:
-            raise StoreError("invalid Unicode text") from exc
+            raise KristallError("invalid Unicode text") from exc
         if used > MAX_VALUE_TEXT_BYTES:
-            raise StoreError("value text exceeds size limit")
+            raise KristallError("value text exceeds size limit")
     return used
 
 
@@ -68,13 +68,13 @@ def _walk_value(value: Any) -> Iterator[Any]:
             continue
         nodes += 1
         if depth > MAX_VALUE_DEPTH or nodes > MAX_VALUE_NODES:
-            raise StoreError("value structure exceeds limit")
+            raise KristallError("value structure exceeds limit")
         text_bytes = _check_text_budget(item, text_bytes)
         yield item
         if type(item) in (list, tuple, dict):
             identity = id(item)
             if identity in active:
-                raise StoreError("cyclic value structure")
+                raise KristallError("cyclic value structure")
             active.add(identity)
             descendants = chain(item.keys(), item.values()) if type(item) is dict else iter(item)
             stack.append((descendants, depth + 1, identity))
@@ -95,7 +95,7 @@ def _validate_value(value: Any) -> None:
             continue
         if type(item) is dict and all(type(key) is str for key in item):
             continue
-        raise StoreError("unsupported JSON value")
+        raise KristallError("unsupported JSON value")
 
 
 def _validate_journal_changes(changes: list[Any]) -> list[tuple[str, str, str, Any]]:
@@ -193,7 +193,7 @@ class _JournalStore:
             fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             self._lock_file.close()
-            raise StoreError("database already has a writer") from exc
+            raise KristallError("database already has a writer") from exc
         self._state: dict[str, dict[str, Any]] = {}
         self._sequence: int = 0
         self._digest: str = "0" * 64
@@ -209,9 +209,9 @@ class _JournalStore:
 
     def _ensure_open(self) -> None:
         if os.getpid() != self._pid:
-            raise StoreError("database handle belongs to another process")
+            raise KristallError("database handle belongs to another process")
         if self._closed:
-            raise StoreError("database is closed")
+            raise KristallError("database is closed")
 
     def info(self) -> DatabaseInfo:
         """Return confirmed in-memory sequence without reading the journal."""
@@ -224,7 +224,7 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if not self._ram_valid:
-                raise StoreError("recovery required; RAM publication was interrupted")
+                raise KristallError("recovery required; RAM publication was interrupted")
             return Commit(self._sequence, self._digest)
 
     @staticmethod
@@ -241,9 +241,9 @@ class _JournalStore:
                 if not frame:
                     break
                 if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                    raise StoreError("journal frame exceeds size limit")
+                    raise KristallError("journal frame exceeds size limit")
                 if not frame.endswith(b"\n"):
-                    raise StoreError("incomplete journal tail; recovery required")
+                    raise KristallError("incomplete journal tail; recovery required")
                 state, sequence, digest = _JournalStore._apply_verified_frame(
                     frame, state, sequence, digest
                 )
@@ -305,10 +305,10 @@ class _JournalStore:
             TypeError,
             UnicodeError,
             AttributeError,
-            StoreError,
+            KristallError,
             RecursionError,
         ) as exc:
-            raise StoreError("corrupt committed journal") from exc
+            raise KristallError("corrupt committed journal") from exc
 
     def _replay(self) -> None:
         self._state, self._sequence, self._digest = self._inspect_log(self.path)
@@ -318,13 +318,13 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if not self._ram_valid:
-                raise StoreError("recovery required; RAM publication was interrupted")
+                raise KristallError("recovery required; RAM publication was interrupted")
             return deepcopy(self._state.get(namespace, {}).get(key))
 
     def _encode_frame(self, changes: list[dict[str, Any]]) -> tuple[bytes, str]:
         for change in changes:
             if not isinstance(change["namespace"], str) or not isinstance(change["key"], str):
-                raise StoreError("namespace and key must be strings")
+                raise KristallError("namespace and key must be strings")
             if change["op"] == "set":
                 _validate_value(change["value"])
         payload = {"format": 1, "seq": self._sequence + 1, "changes": changes}
@@ -348,10 +348,10 @@ class _JournalStore:
                 + b"\n"
             )
             if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                raise StoreError("journal frame exceeds size limit")
+                raise KristallError("journal frame exceeds size limit")
             return frame, digest
         except (TypeError, ValueError, OverflowError) as exc:
-            raise StoreError("unsupported JSON value") from exc
+            raise KristallError("unsupported JSON value") from exc
 
     def _append_frame(self, frame: bytes) -> None:
         first_write = not self.path.exists()
@@ -371,7 +371,7 @@ class _JournalStore:
             # A failed fsync may still have written bytes: the disk outcome is
             # uncertain, so block future writes instead of claiming rollback.
             self._failed = True
-            raise StoreError("commit failed; recovery required") from exc
+            raise KristallError("commit failed; recovery required") from exc
 
     def _apply_changes(self, changes: list[dict[str, Any]]) -> None:
         for change in changes:
@@ -385,7 +385,7 @@ class _JournalStore:
         """Publish a transaction only after its delta journal is durable."""
         self._ensure_open()
         if self._failed:
-            raise StoreError("recovery required")
+            raise KristallError("recovery required")
         if not changes:
             return
         frame, digest = self._encode_frame(changes)
@@ -408,7 +408,7 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if self._active_transaction:
-                raise StoreError("direct mutation during transaction is forbidden")
+                raise KristallError("direct mutation during transaction is forbidden")
             _validate_value_shape(value)
             self._commit_changes(
                 [{"op": "set", "namespace": namespace, "key": key, "value": deepcopy(value)}]
@@ -419,7 +419,7 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if self._active_transaction:
-                raise StoreError("direct mutation during transaction is forbidden")
+                raise KristallError("direct mutation during transaction is forbidden")
             self._commit_changes([{"op": "delete", "namespace": namespace, "key": key}])
 
     @contextmanager
@@ -428,9 +428,9 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if self._failed:
-                raise StoreError("recovery required")
+                raise KristallError("recovery required")
             if self._active_transaction:
-                raise StoreError("nested transactions are not supported")
+                raise KristallError("nested transactions are not supported")
             self._active_transaction = True
             # Transaction writes stay in a private overlay; a successful exit
             # appends one record, while an exception discards staged changes.
@@ -469,14 +469,14 @@ class _JournalStore:
                 os.fsync(output.fileno())
             actual_state, sequence, digest = _JournalStore._inspect_log(temporary)
             if actual_state != expected_state or Commit(sequence, digest) != expected_commit:
-                raise StoreError("backup integrity mismatch")
+                raise KristallError("backup integrity mismatch")
             try:
                 if destination_must_be_new:
                     os.link(temporary, destination)
                 else:
                     os.replace(temporary, destination)
             except FileExistsError as exc:
-                raise StoreError("backup destination was created concurrently") from exc
+                raise KristallError("backup destination was created concurrently") from exc
             directory = os.open(str(destination.parent), os.O_RDONLY)
             try:
                 os.fsync(directory)
@@ -489,12 +489,12 @@ class _JournalStore:
         """Never compact over corruption or an unobserved source mutation."""
         try:
             state, sequence, digest = self._inspect_log(self.path)
-        except StoreError as exc:
+        except KristallError as exc:
             self._failed = True
-            raise StoreError("checkpoint source is corrupt; recovery required") from exc
+            raise KristallError("checkpoint source is corrupt; recovery required") from exc
         if state != self._state or Commit(sequence, digest) != self.last_commit:
             self._failed = True
-            raise StoreError("checkpoint source changed; recovery required")
+            raise KristallError("checkpoint source changed; recovery required")
 
     def checkpoint(self) -> int:
         """Atomically replace a long journal with one verified RAM-state frame."""
@@ -503,7 +503,7 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
-                raise StoreError("checkpoint requires a healthy idle store")
+                raise KristallError("checkpoint requires a healthy idle store")
             if self._sequence == 0:
                 return 0
             payload = {
@@ -532,7 +532,7 @@ class _JournalStore:
                 + b"\n"
             )
             if len(frame) > MAX_JOURNAL_FRAME_BYTES:
-                raise StoreError("checkpoint exceeds frame size limit")
+                raise KristallError("checkpoint exceeds frame size limit")
             temporary: Path | None = None
             replaced = False
             publication_started = False
@@ -547,7 +547,7 @@ class _JournalStore:
                     os.fsync(stream.fileno())
                 state, seq, verified_digest = self._inspect_log(temporary)
                 if state != self._state or seq != self._sequence or verified_digest != digest:
-                    raise StoreError("checkpoint verification failed")
+                    raise KristallError("checkpoint verification failed")
                 # Cancellation can arrive inside replace, after the path changed
                 # but before the return/assignment. Treat publication as uncertain
                 # from this point until the directory sync and RAM digest update.
@@ -564,7 +564,7 @@ class _JournalStore:
             except OSError as exc:
                 # A replace or directory fsync failure leaves publication uncertain.
                 self._failed = True
-                raise StoreError("checkpoint failed; recovery required") from exc
+                raise KristallError("checkpoint failed; recovery required") from exc
             except BaseException:
                 if publication_started:
                     self._failed = True
@@ -578,10 +578,10 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
-                raise StoreError("backup requires a healthy committed state")
+                raise KristallError("backup requires a healthy committed state")
             target = Path(destination)
             if target.resolve() == self.path.resolve() or target.exists():
-                raise StoreError("backup destination must be new")
+                raise KristallError("backup destination must be new")
             self._copy_verified_file(
                 self.path,
                 target,
@@ -595,15 +595,15 @@ class _JournalStore:
         with self._lock:
             self._ensure_open()
             if self._failed or self._active_transaction:
-                raise StoreError("restore requires a healthy idle store")
+                raise KristallError("restore requires a healthy idle store")
             if self._sequence or self._state or (self.path.exists() and self.path.stat().st_size):
-                raise StoreError("restore destination is not empty")
+                raise KristallError("restore destination is not empty")
             origin = Path(source)
             if origin.resolve() == self.path.resolve():
-                raise StoreError("cannot restore from the live database path")
+                raise KristallError("cannot restore from the live database path")
             state, sequence, digest = self._inspect_log(origin)
             if not origin.exists():
-                raise StoreError("backup source does not exist")
+                raise KristallError("backup source does not exist")
             try:
                 self._copy_verified_file(origin, self.path, state, Commit(sequence, digest))
                 self._ram_valid = False
@@ -613,7 +613,7 @@ class _JournalStore:
                 self._ram_valid = True
             except OSError as exc:
                 self._failed = True
-                raise StoreError("restore failed; recovery required") from exc
+                raise KristallError("restore failed; recovery required") from exc
             except BaseException:
                 # Restore may have replaced the destination before cancellation.
                 # Empty/partial RAM metadata cannot be used to append to that log.
@@ -624,9 +624,9 @@ class _JournalStore:
         """Release the exclusive writer lock when no transaction is active."""
         with self._lock:
             if os.getpid() != self._pid:
-                raise StoreError("database handle belongs to another process")
+                raise KristallError("database handle belongs to another process")
             if self._active_transaction:
-                raise StoreError("cannot close during active transaction")
+                raise KristallError("cannot close during active transaction")
             if not self._closed:
                 if not self._lock_file.closed:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
@@ -640,7 +640,7 @@ class _JournalStore:
         self.close()
 
 
-class MemoryStore:
+class Kristall:
     """Client-owned name/value facade over the durable journal engine.
 
     Staging is owned by this client instance. Use transaction() for concurrent
@@ -676,9 +676,9 @@ class MemoryStore:
         with self._engine._lock:
             self._engine._ensure_open()
             if self._engine._failed:
-                raise StoreError("recovery required")
+                raise KristallError("recovery required")
             if self._engine._active_transaction:
-                raise StoreError("direct mutation during transaction is forbidden")
+                raise KristallError("direct mutation during transaction is forbidden")
             _validate_name(name)
             _validate_value_shape(value)
             self._pending[name] = deepcopy(value)
@@ -688,9 +688,9 @@ class MemoryStore:
         with self._engine._lock:
             self._engine._ensure_open()
             if self._engine._failed:
-                raise StoreError("recovery required")
+                raise KristallError("recovery required")
             if self._engine._active_transaction:
-                raise StoreError("cannot commit during transaction")
+                raise KristallError("cannot commit during transaction")
             changes = [
                 {"op": "set", "namespace": self._NAMESPACE, "key": name, "value": value}
                 for name, value in sorted(self._pending.items())
@@ -704,7 +704,7 @@ class MemoryStore:
         """Serialize an atomic read-modify-write operation."""
         with self._engine._lock:
             if self._pending:
-                raise StoreError("transaction requires an idle store")
+                raise KristallError("transaction requires an idle store")
             with self._engine.transaction() as tx:
                 wrapper = Transaction(self._engine._state.get(self._NAMESPACE, {}))
                 try:
@@ -721,7 +721,7 @@ class MemoryStore:
         """Compact the confirmed journal without changing visible RAM values."""
         with self._engine._lock:
             if self._pending:
-                raise StoreError("checkpoint requires no staged values")
+                raise KristallError("checkpoint requires no staged values")
             return self._engine.checkpoint()
 
     def backup(self, destination: str | Path) -> None:
@@ -732,7 +732,7 @@ class MemoryStore:
         """Restore a verified backup into an empty store."""
         with self._engine._lock:
             if self._pending:
-                raise StoreError("restore requires no staged values")
+                raise KristallError("restore requires no staged values")
             self._engine.restore(source)
 
     def close(self) -> None:
@@ -741,7 +741,7 @@ class MemoryStore:
             self._engine.close()
             self._pending.clear()
 
-    def __enter__(self) -> "MemoryStore":
+    def __enter__(self) -> "Kristall":
         return self
 
     def __exit__(self, *_args: object) -> None:
@@ -753,16 +753,16 @@ class MemoryStore:
         with self._engine._lock:
             self._engine._ensure_open()
             if self._engine._failed:
-                raise StoreError("recovery required")
+                raise KristallError("recovery required")
             if self._pending or self._engine._active_transaction:
-                raise StoreError("delete requires an idle store")
+                raise KristallError("delete requires an idle store")
             if name in self._engine._state.get(self._NAMESPACE, {}):
                 self._engine.delete(self._NAMESPACE, name)
 
     def items(self, prefix: str = "") -> dict[str, Any]:
         """Read a detached snapshot of committed and staged named values."""
         if not isinstance(prefix, str):
-            raise StoreError("prefix must be a string")
+            raise KristallError("prefix must be a string")
         with self._engine._lock:
             self._engine._ensure_open()
             self._engine.last_commit
@@ -787,9 +787,9 @@ class Transaction:
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise StoreError("transaction is closed")
+            raise KristallError("transaction is closed")
         if self._owner != get_ident():
-            raise StoreError("transaction belongs to another thread")
+            raise KristallError("transaction belongs to another thread")
 
     def get(self, name: str) -> Any | None:
         self._ensure_open()
@@ -836,9 +836,9 @@ class _JournalTransaction:
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise StoreError("transaction is closed")
+            raise KristallError("transaction is closed")
         if self._owner != get_ident():
-            raise StoreError("transaction belongs to another thread")
+            raise KristallError("transaction belongs to another thread")
 
     def get(self, namespace: str, key: str) -> Any | None:
         """Read a staged value, falling back to committed state."""

@@ -4,7 +4,7 @@ import pytest
 import storage.db as db
 import mcp_server.storage as mcp_storage
 from agent_memory.client import close_memory_clients
-from memory_engine import StoreError
+from kristall import KristallError
 
 
 def _server_data(**overrides):
@@ -64,10 +64,10 @@ def test_missing_records_and_defaults():
 )
 def test_storage_failure_is_not_reported_as_empty_or_success(monkeypatch, operation):
     def fail():
-        raise StoreError("recovery required")
+        raise KristallError("recovery required")
 
     monkeypatch.setattr(mcp_storage, "get_store", fail)
-    with pytest.raises(StoreError, match="recovery required"):
+    with pytest.raises(KristallError, match="recovery required"):
         operation()
 
 
@@ -82,5 +82,5 @@ def test_failed_server_write_preserves_committed_state(monkeypatch):
     with pytest.raises(OSError):
         mcp_storage.update_server(sid, {"name": "failed"})
     assert mcp_storage.get_server(sid)["name"] == "Local Git"
-    with pytest.raises(StoreError, match="recovery required"):
+    with pytest.raises(KristallError, match="recovery required"):
         mcp_storage.update_server(sid, {"name": "retry"})

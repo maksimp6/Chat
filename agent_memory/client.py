@@ -1,4 +1,4 @@
-"""Alice-owned lifecycle for the standalone explicit-commit Memory DB.
+"""Alice-owned lifecycle for the standalone explicit-commit Kristall.
 
 The engine imports no Alice code. Callers share a single writer per canonical
 path, use transactions for concurrent mutations, and close at runtime shutdown.
@@ -7,18 +7,18 @@ path, use transactions for concurrent mutations, and close at runtime shutdown.
 from pathlib import Path
 from threading import RLock
 
-from memory_engine import MemoryStore
+from kristall import Kristall
 
 _LOCK = RLock()
-_CLIENTS: dict[Path, MemoryStore] = {}
+_CLIENTS: dict[Path, Kristall] = {}
 
 
-def get_memory_client(path: str | Path) -> MemoryStore:
+def get_memory_client(path: str | Path) -> Kristall:
     resolved = Path(path).expanduser().resolve()
     with _LOCK:
         client = _CLIENTS.get(resolved)
         if client is None:
-            client = MemoryStore(resolved)
+            client = Kristall(resolved)
             _CLIENTS[resolved] = client
         return client
 
