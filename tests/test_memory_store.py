@@ -173,6 +173,21 @@ def test_commit_does_not_copy_complete_ram_state(tmp_path, monkeypatch):
         assert db.last_commit.sequence == 3
 
 
+def test_json_encoder_failure_is_reported_as_kristall_error(tmp_path, monkeypatch):
+    """Encoder failures after validation surface as KristallError, not raw ValueError."""
+    import kristall.store as store_module
+
+    def failing_dumps(*_args, **_kwargs):
+        raise ValueError("encoder rejected value")
+
+    path = tmp_path / "alice.memory"
+    with Kristall(path) as db:
+        monkeypatch.setattr(store_module.json, "dumps", failing_dumps)
+        with pytest.raises(KristallError, match="unsupported JSON value") as info:
+            db.set("items", "encoder", {"ok": True})
+        assert isinstance(info.value.__cause__, ValueError)
+
+
 def test_invalid_json_value_does_not_poison_writer(tmp_path):
     path = tmp_path / "alice.memory"
     with Kristall(path) as db:
