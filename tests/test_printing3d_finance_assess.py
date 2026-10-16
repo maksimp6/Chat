@@ -254,7 +254,9 @@ def test_finance_assess_tool_is_read_only_and_uses_trusted_identity(assess_db, m
         captured["data"] = data
         return {"status": "ready"}
 
-    monkeypatch.setattr(printing_tools, "assess_financing", fake_assess)
+    import printing3d.finance as finance_domain
+
+    monkeypatch.setattr(finance_domain, "assess_financing", fake_assess)
 
     class Call:
         user_id = "trusted-owner"

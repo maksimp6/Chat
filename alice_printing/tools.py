@@ -7,14 +7,7 @@ from typing import Any, Mapping, Optional
 from economy.treasury_identity import get_current_owner_id
 
 from alice_printing.binding import printing_store as _store
-from printing3d.finance import assess_financing, get_payback_status, set_financing_plan
-from printing3d.service import (
-    ORDER_STATUSES,
-    calculate_quote,
-    create_order,
-    get_financial_summary,
-    list_orders,
-)
+from printing3d import finance, service
 
 QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")
 QUOTE_OPTIONAL_FIELDS = (
@@ -38,15 +31,15 @@ def _trusted_owner(cfg: Optional[dict[str, Any]] = None) -> str:
     return get_current_owner_id(required=True)
 
 
-def treasury_summary(
+def get_treasury_summary(
     _arguments: Mapping[str, Any],
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Read the current owner's realized 3D-printing P&L."""
-    return get_financial_summary(_store(), _trusted_owner(cfg))
+    return service.get_financial_summary(_store(), _trusted_owner(cfg))
 
 
-def orders_list(
+def list_orders(
     arguments: Mapping[str, Any],
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
@@ -54,32 +47,34 @@ def orders_list(
     owner_id = _trusted_owner(cfg)
     raw_status = arguments.get("status")
     status = str(raw_status).strip() if raw_status else None
-    return {"orders": list_orders(_store(), owner_id, status=status)}
+    return {"orders": service.list_orders(_store(), owner_id, status=status)}
 
 
-def finance_status(
+def get_finance_status(
     arguments: Mapping[str, Any],
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Read financing and payback status for the current owner."""
     month = arguments.get("month")
-    return get_payback_status(_store(), _trusted_owner(cfg), month=str(month) if month else None)
+    return finance.get_payback_status(
+        _store(), _trusted_owner(cfg), month=str(month) if month else None
+    )
 
 
-def finance_plan_set(
+def set_financing_plan(
     arguments: Mapping[str, Any],
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Store financing terms after approval at the universal tool boundary."""
-    return set_financing_plan(_store(), _trusted_owner(cfg), dict(arguments))
+    return finance.set_financing_plan(_store(), _trusted_owner(cfg), dict(arguments))
 
 
-def finance_assess(
+def assess_financing(
     arguments: Mapping[str, Any],
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Assess sparse AI-collected financing terms without persisting them."""
-    return assess_financing(_store(), _trusted_owner(cfg), dict(arguments))
+    return finance.assess_financing(_store(), _trusted_owner(cfg), dict(arguments))
 
 
 def _quote_input(arguments: Mapping[str, Any]) -> dict[str, Any]:
@@ -99,12 +94,12 @@ def quote(
         return {"status": "needs_input", "missing_fields": missing}
     return {
         "status": "ok",
-        "quote": calculate_quote(data),
+        "quote": service.calculate_quote(data),
         "assumed_defaults": [key for key in QUOTE_OPTIONAL_FIELDS if key not in data],
     }
 
 
-def order_create(
+def create_order_tool(
     arguments: Mapping[str, Any],
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
@@ -133,7 +128,7 @@ def order_create(
         if currency:
             data["currency"] = quote_input["currency"] = currency
         data["quote"] = quote_input
-    return {"order": create_order(_store(), _trusted_owner(cfg), data)}
+    return {"order": service.create_order(_store(), _trusted_owner(cfg), data)}
 
 
 def _nullable_number(minimum: float = 0) -> dict[str, Any]:
@@ -218,7 +213,7 @@ PRINTING3D_TOOLS = {
         "requires_approval": True,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": order_create,
+        "func": create_order_tool,
     },
     "printing3d.finance.assess": {
         "title": "3D Printing Finance Assess",
@@ -274,7 +269,7 @@ PRINTING3D_TOOLS = {
         "requires_approval": False,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": finance_assess,
+        "func": assess_financing,
     },
     "printing3d.finance.status": {
         "title": "3D Printing Finance Status",
@@ -296,7 +291,7 @@ PRINTING3D_TOOLS = {
         "requires_approval": False,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": finance_status,
+        "func": get_finance_status,
     },
     "printing3d.finance.plan.set": {
         "title": "3D Printing Finance Plan Set",
@@ -332,7 +327,7 @@ PRINTING3D_TOOLS = {
         "requires_approval": True,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": finance_plan_set,
+        "func": set_financing_plan,
     },
     "printing3d.treasury.summary": {
         "title": "3D Printing Treasury Summary",
@@ -346,7 +341,7 @@ PRINTING3D_TOOLS = {
         "requires_approval": False,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": treasury_summary,
+        "func": get_treasury_summary,
     },
     "printing3d.orders.list": {
         "title": "3D Printing Orders",
@@ -355,7 +350,7 @@ PRINTING3D_TOOLS = {
             {
                 "status": {
                     "anyOf": [
-                        {"type": "string", "enum": list(ORDER_STATUSES)},
+                        {"type": "string", "enum": list(service.ORDER_STATUSES)},
                         {"type": "null"},
                     ]
                 }
@@ -368,6 +363,6 @@ PRINTING3D_TOOLS = {
         "requires_approval": False,
         "supported_transports": ["responses_api", "local_agent", "mcp"],
         "executor": {"type": "local"},
-        "func": orders_list,
+        "func": list_orders,
     },
 }

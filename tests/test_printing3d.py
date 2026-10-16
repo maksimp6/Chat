@@ -243,7 +243,7 @@ def test_quote_tool_matches_service_and_lists_assumed_defaults():
 
 def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     from printing3d import list_orders
-    from alice_printing.tools import order_create, quote
+    from alice_printing.tools import create_order_tool, quote
 
     class Call:
         user_id = "trusted-owner"
@@ -251,7 +251,7 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     quote_args = {"material_grams": 80, "material_cost_per_kg": 2000, "print_hours": 3}
     expected = quote(quote_args)["quote"]["recommended_price"]
 
-    result = order_create(
+    result = create_order_tool(
         {"title": "Cable clip x10", "customer_name": "Ivan", "quote": quote_args},
         {"_universal_context": {"call": Call()}},
     )
@@ -265,12 +265,12 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
 
 
 def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
-    from alice_printing.tools import order_create
+    from alice_printing.tools import create_order_tool
 
     with pytest.raises(ValueError, match="status"):
-        order_create({"title": "X", "status": "paid"}, {})
+        create_order_tool({"title": "X", "status": "paid"}, {})
     with pytest.raises(ValueError, match="print_hours"):
-        order_create(
+        create_order_tool(
             {"title": "X", "quote": {"material_grams": 10, "material_cost_per_kg": 1000}},
             {},
         )
@@ -281,14 +281,14 @@ def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
     [{}, {"material_grams": None, "material_cost_per_kg": None, "print_hours": None}],
 )
 def test_order_create_tool_rejects_empty_or_all_null_quote(printing_db, empty_quote):
-    from alice_printing.tools import order_create
+    from alice_printing.tools import create_order_tool
 
     with pytest.raises(ValueError, match="quote is missing"):
-        order_create({"title": "X", "status": "accepted", "quote": empty_quote}, {})
+        create_order_tool({"title": "X", "status": "accepted", "quote": empty_quote}, {})
 
 
 def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db):
-    from alice_printing.tools import order_create
+    from alice_printing.tools import create_order_tool
 
     class Call:
         user_id = "trusted-owner"
@@ -296,14 +296,14 @@ def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db
     cfg = {"_universal_context": {"call": Call()}}
     quote_args = {"material_grams": 80, "material_cost_per_kg": 20, "print_hours": 3}
 
-    order = order_create({"title": "EUR order", "currency": "EUR", "quote": quote_args}, cfg)[
+    order = create_order_tool({"title": "EUR order", "currency": "EUR", "quote": quote_args}, cfg)[
         "order"
     ]
     assert order["currency"] == "EUR"
     assert order["quote"]["currency"] == "EUR"
 
     with pytest.raises(ValueError, match="currency"):
-        order_create(
+        create_order_tool(
             {"title": "X", "currency": "EUR", "quote": {**quote_args, "currency": "RUB"}},
             {},
         )
@@ -311,7 +311,7 @@ def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db
 
 def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     from printing3d import create_order, settle_order
-    from alice_printing.tools import treasury_summary
+    from alice_printing.tools import get_treasury_summary
 
     order = create_order(
         printing_store(), "trusted-owner", {"title": "Socket holder", "quoted_price": 300}
@@ -337,7 +337,7 @@ def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     class Call:
         user_id = "trusted-owner"
 
-    result = treasury_summary({}, {"_universal_context": {"call": Call()}})
+    result = get_treasury_summary({}, {"_universal_context": {"call": Call()}})
 
     assert result["total_orders"] == 1
     assert result["currencies"][0]["settled_profit"] == pytest.approx(220)
@@ -540,8 +540,8 @@ def test_printing3d_tool_helpers_cover_fallback_and_order_filters(printing_db, m
     )
 
     assert printing_tools._trusted_owner({}) == "fallback-owner"
-    all_orders = printing_tools.orders_list({}, {})
-    accepted = printing_tools.orders_list({"status": "accepted"}, {})
+    all_orders = printing_tools.list_orders({}, {})
+    accepted = printing_tools.list_orders({"status": "accepted"}, {})
 
     assert len(all_orders["orders"]) == 2
     assert [order["title"] for order in accepted["orders"]] == ["Fallback accepted"]
