@@ -31,7 +31,7 @@
 | `static/`, `templates/` | Web assets и шаблоны |
 | `android/` | Android client и сборка |
 | `scripts/` | Разработка, диагностика и ручные operational helpers |
-| `deploy/`, `cloud/`, `config/`, `alice_platform/` | Развёртывание и конфигурация платформы |
+| `deploy/`, `cloud/`, `config/`, `keel/` | Развёртывание и конфигурация платформы |
 | `tests/` | Проверки и fixtures |
 | `docs/` | Контракты, инструкции, архитектура |
 | `repository_index/` | Индекс репозитория |

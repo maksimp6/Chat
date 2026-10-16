@@ -5,8 +5,8 @@ import json
 import sys
 from pathlib import Path
 
-from alice_platform.config import load_config, ConfigError
-from alice_platform.health import generate_health_plan
+from keel.config import load_config, ConfigError
+from keel.health import generate_health_plan
 
 
 def cmd_validate(args):

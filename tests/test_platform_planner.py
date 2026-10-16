@@ -1,7 +1,7 @@
 """Tests for Alice Platform planner (desired vs observed state)."""
 
 import pytest
-from alice_platform.planner import (
+from keel.planner import (
     plan_actions,
     Action,
     ActionType,
