@@ -524,14 +524,22 @@ function applyHeaderFlexLayout(document, cssText) {
       }),
   );
 
-  assertLayoutRule(declarations, "flex-direction", "row");
+  assertLayoutRule(declarations, "flex-direction", "column");
   assertLayoutRule(declarations, "flex-wrap", "nowrap");
 
   const rows = header.querySelectorAll(".header-row");
   rows.forEach((row, index) => {
-    row._rect = { left: index * 100, top: 0, width: 100, height: 40 };
+    row._rect = { left: 0, top: index * 48, width: 360, height: 40 };
+    const wraps = row.classList.contains("header-row-secondary");
     row.children.forEach((child, childIndex) => {
-      child._rect = { left: row._rect.left + childIndex * 40, top: 0, width: 32, height: 32 };
+      const column = wraps ? childIndex % 8 : childIndex;
+      const line = wraps ? Math.floor(childIndex / 8) : 0;
+      child._rect = {
+        left: column * 42,
+        top: row._rect.top + line * 42,
+        width: 38,
+        height: 38,
+      };
     });
   });
 }
