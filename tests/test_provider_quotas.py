@@ -2,9 +2,8 @@ import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
-import db
-
-from provider_quotas import (
+import storage.db as db
+from provider_accounts.quotas import (
     ProviderQuotaExceeded,
     assign_user_policy,
     get_usage,

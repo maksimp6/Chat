@@ -82,7 +82,7 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Install dependencies
-        run: pip install -r requirements.txt -r requirements-postgres.txt
+        run: pip install -r requirements.txt
       - name: Check the container entrypoint
         if: inputs.action == 'deploy'
         run: |

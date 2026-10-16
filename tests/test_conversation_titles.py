@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def test_legacy_default_conversation_title_is_migrated(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
 
     db_path = tmp_path / "conversations.db"
     monkeypatch.setattr(db, "DB_PATH", str(db_path))
@@ -16,7 +16,7 @@ def test_legacy_default_conversation_title_is_migrated(tmp_path, monkeypatch):
 
 
 def test_conversation_title_update_accepts_owner_and_normalizes(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "titles.db"))
     db.init_db()
@@ -30,7 +30,7 @@ def test_conversation_title_update_accepts_owner_and_normalizes(tmp_path, monkey
 def test_default_title_is_replaced_by_first_non_empty_message_and_not_overwritten(
     tmp_path, monkeypatch
 ):
-    import db
+    import storage.db as db
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "titles.db"))
     db.init_db()

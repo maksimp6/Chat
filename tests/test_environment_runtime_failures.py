@@ -4,9 +4,9 @@ import time
 
 import pytest
 
-import environment_manager
-import environment_routes
-from environment_manager import (
+import remote_runtime.environments as environment_manager
+import remote_runtime.environment_routes as environment_routes
+from remote_runtime.environments import (
     EnvironmentRuntime,
     RuntimeHTTPStream,
     _RUNTIME_DISPATCHER,

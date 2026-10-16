@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from alice_platform.__main__ import cmd_health, cmd_validate, main
+from keel.__main__ import cmd_health, cmd_validate, main
 
 
 class TestCLIValidate:
@@ -40,20 +40,20 @@ class TestMainEntry:
     """CLI main entry point tests."""
 
     def test_main_validate_command(self):
-        with patch("sys.argv", ["alice_platform", "validate"]):
+        with patch("sys.argv", ["keel", "validate"]):
             assert main() == 0
 
     def test_main_health_command(self):
-        with patch("sys.argv", ["alice_platform", "health", "test"]):
+        with patch("sys.argv", ["keel", "health", "test"]):
             assert main() == 0
 
     @pytest.mark.parametrize("command", ["plan", "reconcile"])
     def test_unobserved_mutation_commands_are_not_exposed(self, command):
-        with patch("sys.argv", ["alice_platform", command, "test"]):
+        with patch("sys.argv", ["keel", command, "test"]):
             with pytest.raises(SystemExit) as exc:
                 main()
         assert exc.value.code == 2
 
     def test_main_no_args(self):
-        with patch("sys.argv", ["alice_platform"]):
+        with patch("sys.argv", ["keel"]):
             assert main() == 1
