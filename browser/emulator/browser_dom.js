@@ -505,43 +505,77 @@ function serialize(element) {
   );
 }
 
-function applyHeaderFlexLayout(document, cssText) {
+function applyHeaderFlexLayout(document, cssText, viewportWidth = 360) {
   const header = document.getElementById("header");
   if (!header) throw new Error("header not found");
 
-  const ruleMatches = [...cssText.matchAll(/\.alice-pro-app\s+#header\s*\{([\s\S]*?)\}/g)];
-  if (!ruleMatches.length) throw new Error("browser-layout rule for #header not found");
+  const readRule = (selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const matches = [...cssText.matchAll(new RegExp(escaped + "\\s*\\{([^}]*)\\}", "g"))];
+    if (!matches.length) throw new Error("browser-layout rule not found: " + selector);
+    return Object.fromEntries(
+      matches.at(-1)[1]
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => {
+          const index = part.indexOf(":");
+          return [part.slice(0, index).trim(), part.slice(index + 1).trim()];
+        }),
+    );
+  };
 
-  const ruleBody = ruleMatches.at(-1)[1];
-  const declarations = Object.fromEntries(
-    ruleBody
-      .split(";")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const index = part.indexOf(":");
-        return [part.slice(0, index).trim(), part.slice(index + 1).trim()];
-      }),
+  const headerRules = readRule(".alice-pro-app #header");
+  const secondaryRules = readRule(".alice-pro-app #header .header-row-secondary");
+  assertLayoutRule(headerRules, "flex-direction", "column");
+  assertLayoutRule(headerRules, "overflow-x", "visible");
+
+  // Structural emulator only: estimate line breaks from declared wrap, viewport width,
+  // button size and gap. This is not a browser's CSS layout engine or rendered evidence.
+  const wrapEnabled = secondaryRules["flex-wrap"] === "wrap";
+  const gap = viewportWidth <= 768 ? 8 : 12;
+  const buttonSize = 38;
+  const horizontalPadding = viewportWidth <= 768 ? 20 : 30;
+  const capacity = Math.max(
+    1,
+    Math.floor((viewportWidth - horizontalPadding + gap) / (buttonSize + gap)),
   );
-
-  assertLayoutRule(declarations, "flex-direction", "column");
-  assertLayoutRule(declarations, "flex-wrap", "nowrap");
-
   const rows = header.querySelectorAll(".header-row");
+  let secondaryLineCount = 1;
+  let maxRight = 0;
+
   rows.forEach((row, index) => {
-    row._rect = { left: 0, top: index * 48, width: 360, height: 40 };
-    const wraps = row.classList.contains("header-row-secondary");
-    row.children.forEach((child, childIndex) => {
-      const column = wraps ? childIndex % 8 : childIndex;
-      const line = wraps ? Math.floor(childIndex / 8) : 0;
+    const secondary = row.classList.contains("header-row-secondary");
+    const children = row.children;
+    const lineCount = secondary && wrapEnabled ? Math.ceil(children.length / capacity) : 1;
+    if (secondary) secondaryLineCount = lineCount;
+    row._rect = {
+      left: 0,
+      top: index === 0 ? 0 : 48,
+      width: viewportWidth,
+      height: lineCount * (buttonSize + gap),
+    };
+    children.forEach((child, childIndex) => {
+      const column = secondary && wrapEnabled ? childIndex % capacity : childIndex;
+      const line = secondary && wrapEnabled ? Math.floor(childIndex / capacity) : 0;
+      const left = 10 + column * (buttonSize + gap);
       child._rect = {
-        left: column * 42,
-        top: row._rect.top + line * 42,
-        width: 38,
-        height: 38,
+        left,
+        top: row._rect.top + line * (buttonSize + gap),
+        width: buttonSize,
+        height: buttonSize,
       };
+      maxRight = Math.max(maxRight, left + buttonSize);
     });
   });
+
+  return {
+    viewportWidth,
+    secondaryLineCount,
+    maxRight,
+    horizontalOverflow: maxRight > viewportWidth - 10,
+    layoutSource: "structural-emulator-not-rendered-browser",
+  };
 }
 
 function assertLayoutRule(declarations, property, expected) {
