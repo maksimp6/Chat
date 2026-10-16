@@ -6,7 +6,7 @@ models never become a confirmed zero-cost invocation.
 
 from typing import Any, Dict, Optional
 
-from config import ALL_MODELS, AUDIO_STT_PRICE_PER_SEC, AUDIO_TTS_PRICE_PER_SEC
+from core.config import ALL_MODELS, AUDIO_STT_PRICE_PER_SEC, AUDIO_TTS_PRICE_PER_SEC
 
 PRICING_CURRENCY = "RUB"
 PRICING_VERSION = "config-v1"

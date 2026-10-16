@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-import mcp_routes
+import chat.mcp_routes as mcp_routes
 from app import app
 from observability.trace_manager import ExecutionTrace
 

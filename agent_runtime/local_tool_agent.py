@@ -10,8 +10,8 @@ from typing import Any, Mapping, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from tool_registry import registry
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.registry import registry
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 logger = logging.getLogger("local_tool_agent")
 

@@ -8,7 +8,7 @@ import time
 from typing import Any, Mapping, Optional
 from uuid import uuid4
 from flask import Blueprint, jsonify, request
-from db import get_store
+from storage.db import get_store
 from sessions.manager import create_session, get_session
 
 departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments")

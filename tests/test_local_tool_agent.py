@@ -1,5 +1,5 @@
 import agent_runtime.local_tool_agent as local_tool_agent
-from universal_tool_platform import UniversalToolDefinition
+from tool_providers.universal_tool_platform import UniversalToolDefinition
 
 
 def _definition(name, *, requires_approval=False):

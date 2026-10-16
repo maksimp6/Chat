@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from .manager import get_invocation
+from invocation.manager import get_invocation
 
 
 def _sanitize_trace(value: Any) -> Any:
@@ -52,7 +52,7 @@ def get_invocation_trace(invocation_id: str) -> Optional[Dict[str, Any]]:
     if persisted:
         return _sanitize_trace(persisted)
 
-    from db import get_messages
+    from storage.db import get_messages
 
     for message in reversed(get_messages(invocation["conversation_id"])):
         trace = message.get("trace") or {}

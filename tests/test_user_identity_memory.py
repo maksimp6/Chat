@@ -1,12 +1,12 @@
-"""Identity works natively on the one durable MemoryStore instance."""
+"""Identity works natively on the one durable Kristall instance."""
 
 import pytest
 
-import db
+import storage.db as db
 import identity.user_identity as user_identity
 from agent_memory.client import close_memory_clients, get_memory_client
 from agent_memory.user_identity_store import IDENTITY_KEY, UserIdentityStore
-from memory_engine.store import StoreError
+from kristall.store import KristallError
 
 
 def _configure(monkeypatch, tmp_path):
@@ -47,11 +47,11 @@ def test_identity_write_failure_does_not_publish_partial_record(monkeypatch, tmp
     before = runtime.last_commit.sequence
 
     def fail_append(_frame):
-        raise StoreError("simulated journal write failure")
+        raise KristallError("simulated journal write failure")
 
     with monkeypatch.context() as patch:
         patch.setattr(runtime._engine, "_append_frame", fail_append)
-        with pytest.raises(StoreError, match="simulated journal"):
+        with pytest.raises(KristallError, match="simulated journal"):
             user_identity.register_anonymous_user("installation-write-failure", {})
     assert runtime.last_commit.sequence == before
     assert UserIdentityStore(runtime).load()["users"] == {}

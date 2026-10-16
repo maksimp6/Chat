@@ -26,7 +26,7 @@ from observability.trace_manager import (
 @pytest.fixture()
 def isolated_db(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "secrets.db")
     db.init_db()

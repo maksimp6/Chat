@@ -15,7 +15,7 @@ import subprocess
 import time
 from typing import Any, Mapping
 
-from db import get_config, set_config
+from storage.db import get_config, set_config
 from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 from observability.trace_manager import get_current_trace
 

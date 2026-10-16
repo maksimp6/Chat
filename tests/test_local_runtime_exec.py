@@ -1,13 +1,13 @@
 import subprocess
 from unittest.mock import patch
 
-from tool_registry import ToolRegistry
+from tool_providers.registry import ToolRegistry
 from observability.trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 def test_local_runtime_exec_runs_on_backend_host(tmp_path):
-    import runtime_tools
+    import tool_providers.runtime_tools as runtime_tools
 
     completed = subprocess.CompletedProcess(
         args=["/bin/bash", "-lc", "pwd"],
@@ -15,7 +15,7 @@ def test_local_runtime_exec_runs_on_backend_host(tmp_path):
         stdout=f"{tmp_path}\n",
         stderr="",
     )
-    with patch("runtime_tools.subprocess.run", return_value=completed) as run:
+    with patch("tool_providers.runtime_tools.subprocess.run", return_value=completed) as run:
         result = runtime_tools.local_runtime_exec(
             {
                 "command": "pwd",
@@ -39,7 +39,7 @@ def test_local_runtime_exec_runs_on_backend_host(tmp_path):
 
 
 def test_local_runtime_exec_reports_timeout(tmp_path):
-    import runtime_tools
+    import tool_providers.runtime_tools as runtime_tools
 
     timeout = subprocess.TimeoutExpired(
         ["/bin/bash", "-lc", "sleep 10"],
@@ -47,7 +47,7 @@ def test_local_runtime_exec_reports_timeout(tmp_path):
         output="partial stdout",
         stderr="partial stderr",
     )
-    with patch("runtime_tools.subprocess.run", side_effect=timeout):
+    with patch("tool_providers.runtime_tools.subprocess.run", side_effect=timeout):
         result = runtime_tools.local_runtime_exec(
             {
                 "command": "sleep 10",
@@ -108,7 +108,7 @@ def test_local_runtime_exec_uses_existing_approval_and_trace_pipeline(tmp_path):
         approved=True,
     )
 
-    with patch("runtime_tools.subprocess.run", return_value=completed):
+    with patch("tool_providers.runtime_tools.subprocess.run", return_value=completed):
         result = executor.execute_with_trace(approved_call, trace)
 
     assert result["success"] is True
@@ -129,7 +129,7 @@ def test_local_runtime_exec_uses_existing_approval_and_trace_pipeline(tmp_path):
 
 
 def test_local_output_limit_handles_none_and_truncates():
-    import runtime_tools
+    import tool_providers.runtime_tools as runtime_tools
 
     assert runtime_tools._limit_local_output(None, max_bytes=32) == ""
     truncated = runtime_tools._limit_local_output("x" * 100, max_bytes=32)
@@ -138,7 +138,7 @@ def test_local_output_limit_handles_none_and_truncates():
 
 
 def test_local_runtime_exec_validates_command_timeout_and_cwd(tmp_path):
-    import runtime_tools
+    import tool_providers.runtime_tools as runtime_tools
 
     try:
         runtime_tools.local_runtime_exec(
@@ -170,9 +170,9 @@ def test_local_runtime_exec_validates_command_timeout_and_cwd(tmp_path):
 
 
 def test_local_runtime_exec_reports_shell_start_failure(tmp_path):
-    import runtime_tools
+    import tool_providers.runtime_tools as runtime_tools
 
-    with patch("runtime_tools.subprocess.run", side_effect=OSError("no shell")):
+    with patch("tool_providers.runtime_tools.subprocess.run", side_effect=OSError("no shell")):
         result = runtime_tools.local_runtime_exec(
             {
                 "command": "pwd",
@@ -187,7 +187,7 @@ def test_local_runtime_exec_reports_shell_start_failure(tmp_path):
 
 
 def test_local_runtime_exec_reports_nonzero_exit(tmp_path):
-    import runtime_tools
+    import tool_providers.runtime_tools as runtime_tools
 
     completed = subprocess.CompletedProcess(
         args=["/bin/bash", "-lc", "false"],
@@ -195,7 +195,7 @@ def test_local_runtime_exec_reports_nonzero_exit(tmp_path):
         stdout="",
         stderr="failed",
     )
-    with patch("runtime_tools.subprocess.run", return_value=completed):
+    with patch("tool_providers.runtime_tools.subprocess.run", return_value=completed):
         result = runtime_tools.local_runtime_exec(
             {
                 "command": "false",

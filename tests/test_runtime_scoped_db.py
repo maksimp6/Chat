@@ -2,9 +2,9 @@
 
 from pathlib import Path
 import pytest
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
-from memory_engine import MemoryStore
+from kristall import Kristall
 from runtime import bind_runtime_request, current_runtime_data_root, current_runtime_id
 
 
@@ -22,9 +22,9 @@ def test_runtime_database_scope_is_private_and_context_is_restored(tmp_path):
     assert current_runtime_id() is None and current_runtime_data_root() is None
     assert db.get_config("probe") == "host"
     close_memory_clients()
-    with MemoryStore(first / "alice.memory") as store:
+    with Kristall(first / "alice.memory") as store:
         assert store.get("config/probe") == {"value": "alpha"}
-    with MemoryStore(second / "alice.memory") as store:
+    with Kristall(second / "alice.memory") as store:
         assert store.get("config/probe") == {"value": "beta"}
 
 

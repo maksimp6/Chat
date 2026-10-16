@@ -390,7 +390,7 @@ def test_mcp_requires_auth_when_not_configured(monkeypatch):
 
 
 def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
-    import db
+    import storage.db as db
 
     monkeypatch.setenv("ALICE_MCP_USER_ID", "user-a")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
@@ -482,7 +482,7 @@ def test_mcp_initialize_handshake_is_supported(client):
 
 
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
-    import db
+    import storage.db as db
 
     monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")

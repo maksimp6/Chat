@@ -4,11 +4,11 @@ import os
 import requests
 
 from observability.trace_manager import ExecutionTrace
-from db import get_store
+from storage.db import get_store
 from provider_accounts.credentials import resolve_client_credential
 
 try:
-    from credential_crypto import decrypt_secret, encrypt_secret
+    from secret_store.credential_crypto import decrypt_secret, encrypt_secret
 except ImportError:  # pragma: no cover
     decrypt_secret = None
     encrypt_secret = None

@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-import db
+import storage.db as db
 from flask import Flask, Response, jsonify
 
 from remote_runtime.environments import (

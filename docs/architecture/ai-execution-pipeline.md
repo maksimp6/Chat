@@ -66,7 +66,7 @@ response
 ## Уже переведено на canonical runtime
 
 - `cli_agent.py` — тонкий CLI/Termux-адаптер к `/api/conversations`, `/api/chat` и стандартному approval endpoint; прямых Yandex API calls и локального shell execution больше нет.
-- `alice_agent_runner.py` — GitHub issue adapter создаёт и запускает invocation, сохраняет финальный Execution Trace и завершает invocation как completed/failed.
+- `issue_runner.py` — GitHub issue adapter создаёт и запускает invocation, сохраняет финальный Execution Trace и завершает invocation как completed/failed.
 
 ## На апгрейд
 

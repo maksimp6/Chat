@@ -3,7 +3,7 @@ import pytest
 
 @pytest.fixture
 def treasury_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     import economy.treasury as treasury
     from agent_memory.client import close_memory_clients
 
