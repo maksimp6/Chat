@@ -181,7 +181,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Partner Relations: {e}")
 
         try:
-            from printing3d.tools import PRINTING3D_TOOLS
+            from alice_printing.tools import PRINTING3D_TOOLS
 
             for name, cfg in PRINTING3D_TOOLS.items():
                 self._register("3d", name, cfg)

@@ -10,6 +10,7 @@ from flask import Flask
 import storage.db as db
 from agent_memory.client import close_memory_clients
 from kristall import Kristall, KristallError
+from alice_printing.binding import printing_store
 
 
 def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
@@ -463,15 +464,19 @@ def test_environment_failed_start_is_persisted_and_missing_metadata_is_not_ackno
 def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch):
     import printing3d.service as printing
 
-    order = printing.create_order("owner", {"title": "Order", "quoted_price": 10})
-    printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+    order = printing.create_order(printing_store(), "owner", {"title": "Order", "quoted_price": 10})
+    printing.settle_order(printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2)
     real = printing.get_order
-    stale = {**real("owner", order["id"]), "settled_at": None, "status": "ready"}
+    stale = {**real(printing_store(), "owner", order["id"]), "settled_at": None, "status": "ready"}
     monkeypatch.setattr(printing, "get_order", lambda *_args: dict(stale))
     with pytest.raises(ValueError, match="already settled"):
-        printing.settle_order("owner", order["id"], actual_revenue=20, actual_cost=2)
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=20, actual_cost=2
+        )
     assert (
-        printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)["id"]
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2
+        )["id"]
         == order["id"]
     )
     with db.get_store().transaction() as tx:
@@ -480,9 +485,11 @@ def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch
             {**tx.get("printing/order/" + order["id"]), "status": "cancelled", "settled_at": None},
         )
     with pytest.raises(ValueError, match="cancelled"):
-        printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2
+        )
     db.get_store().delete("printing/order/" + order["id"])
-    printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+    printing.settle_order(printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2)
     assert db.get_store().get("printing/order/" + order["id"]) is None
 
 

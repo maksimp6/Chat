@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
-from storage.db import get_store
+from printing3d.store import PrintStore
 
 ORDER_STATUSES = (
     "lead",
@@ -86,17 +86,13 @@ def calculate_quote(data: dict) -> dict:
     }
 
 
-def init_3d_printing_tables() -> None:
-    get_store()
-
-
 def _row_to_order(row) -> dict:
     if not isinstance(row.get("quote"), dict):
         raise ValueError("invalid native order record")
     return row
 
 
-def create_order(owner_id: str, data: dict) -> dict:
+def create_order(store: PrintStore, owner_id: str, data: dict) -> dict:
     if not owner_id:
         raise ValueError("owner identity is required")
     if not isinstance(data, dict):
@@ -130,7 +126,6 @@ def create_order(owner_id: str, data: dict) -> dict:
 
     now = datetime.utcnow().isoformat()
     order_id = str(uuid4())
-    init_3d_printing_tables()
     record = {
         "id": order_id,
         "owner_id": owner_id,
@@ -148,41 +143,44 @@ def create_order(owner_id: str, data: dict) -> dict:
         "created_at": now,
         "updated_at": now,
     }
-    with get_store().transaction() as tx:
+    with store.transaction() as tx:
         tx.set("printing/order/" + order_id, record)
-    return get_order(owner_id, order_id)
+    return get_order(store, owner_id, order_id)
 
 
-def get_order(owner_id: str, order_id: str) -> dict | None:
-    row = get_store().get("printing/order/" + order_id)
+def get_order(store: PrintStore, owner_id: str, order_id: str) -> dict | None:
+    row = store.get("printing/order/" + order_id)
     return _row_to_order(row) if row is not None and row["owner_id"] == owner_id else None
 
 
-def list_orders(owner_id: str, *, status: str | None = None) -> list[dict]:
+def list_orders(store: PrintStore, owner_id: str, *, status: str | None = None) -> list[dict]:
     if status and status not in ORDER_STATUSES:
         raise ValueError("invalid order status")
     rows = [
         row
-        for row in get_store().items(prefix="printing/order/").values()
+        for row in store.items(prefix="printing/order/").values()
         if row["owner_id"] == owner_id and (not status or row["status"] == status)
     ]
     return sorted(rows, key=lambda row: row["created_at"], reverse=True)
 
 
-def update_order_status(owner_id: str, order_id: str, status: str) -> dict | None:
+def update_order_status(
+    store: PrintStore, owner_id: str, order_id: str, status: str
+) -> dict | None:
     if status not in ORDER_STATUSES:
         raise ValueError("invalid order status")
     if status == "paid":
         raise ValueError("paid status requires settlement")
     key = "printing/order/" + order_id
-    with get_store().transaction() as tx:
+    with store.transaction() as tx:
         row = tx.get(key)
         if row is not None and row["owner_id"] == owner_id:
             tx.set(key, {**row, "status": status, "updated_at": datetime.utcnow().isoformat()})
-    return get_order(owner_id, order_id)
+    return get_order(store, owner_id, order_id)
 
 
 def settle_order(
+    store: PrintStore,
     owner_id: str,
     order_id: str,
     *,
@@ -190,7 +188,7 @@ def settle_order(
     actual_cost=None,
 ) -> dict | None:
     """Finalize an order with actual revenue/cost values used by Treasury reporting."""
-    order = get_order(owner_id, order_id)
+    order = get_order(store, owner_id, order_id)
     if order is None:
         return None
 
@@ -223,13 +221,13 @@ def settle_order(
     cost = _money(_decimal(cost_source, "actual_cost"))
     now = datetime.utcnow().isoformat()
 
-    _publish_settlement(owner_id, order_id, revenue, cost, now)
-    return get_order(owner_id, order_id)
+    _publish_settlement(store, owner_id, order_id, revenue, cost, now)
+    return get_order(store, owner_id, order_id)
 
 
-def get_financial_summary(owner_id: str) -> dict:
+def get_financial_summary(store: PrintStore, owner_id: str) -> dict:
     """Return Treasury-facing 3D-printing P&L grouped by currency."""
-    orders = list_orders(owner_id)
+    orders = list_orders(store, owner_id)
     by_currency: dict[str, dict] = {}
 
     for order in orders:
@@ -283,10 +281,10 @@ def get_financial_summary(owner_id: str) -> dict:
 
 
 def _publish_settlement(
-    owner_id: str, order_id: str, revenue: float, cost: float, now: str
+    store: PrintStore, owner_id: str, order_id: str, revenue: float, cost: float, now: str
 ) -> None:
     key = "printing/order/" + order_id
-    with get_store().transaction() as tx:
+    with store.transaction() as tx:
         current = tx.get(key)
         if current is None or current["owner_id"] != owner_id:
             return None
