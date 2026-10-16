@@ -16,7 +16,7 @@ ENV ANDROID_HOME=/opt/android-sdk \
 ENV PATH=/opt/android-sdk/build-tools/35.0.0:${PATH}
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Android build-tools 35.0.0 (aapt2, d8, zipalign, apksigner) and platform android-35 (android.jar).
@@ -49,7 +49,7 @@ RUN set -eux; \
 # Smoke test: every tool the build script calls must exist and run.
 RUN set -eux; \
     test -f "${ANDROID_HOME}/platforms/android-35/android.jar"; \
-    command -v aapt2 d8 zipalign apksigner javac >/dev/null; \
+    command -v aapt2 d8 zipalign apksigner javac zip keytool >/dev/null; \
     aapt2 version; \
     d8 --version; \
     apksigner --version; \

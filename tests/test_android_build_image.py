@@ -100,3 +100,19 @@ def test_workflow_builds_the_image_then_the_direct_apk_inside_it():
     assert "docker build --tag alice-android-build:ci android/docker" in text
     assert "alice-android-build:ci" in text and "build_direct.sh" in text
     assert "secrets." not in text
+
+
+BUILD_SCRIPT = ROOT / "android" / "scripts" / "build_direct.sh"
+# External commands the direct build calls that are not provided by the JDK base image.
+# coreutils and findutils come with the Ubuntu base image; zip is not in it and must be installed.
+REQUIRED_EXTERNAL_TOOLS = ("zip",)
+
+
+def test_every_external_tool_the_build_script_calls_is_installed_in_the_image():
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+    dockerfile = _text()
+    for tool in REQUIRED_EXTERNAL_TOOLS:
+        if re.search(rf"(^|[\s(|]){tool}\s", script):
+            assert tool in dockerfile, (
+                f"build_direct.sh uses {tool} but the image does not install or check it"
+            )
