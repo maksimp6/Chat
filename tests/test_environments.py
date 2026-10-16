@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import db
-import environment_manager
-from environment_manager import (
+import storage.db as db
+import remote_runtime.environments as environment_manager
+from remote_runtime.environments import (
     create_environment,
     delete_environment,
     dispatch_environment_revision,
@@ -16,7 +16,7 @@ from environment_manager import (
     start_environment,
     stop_environment,
 )
-from environment_routes import environment_bp
+from remote_runtime.environment_routes import environment_bp
 from flask import Flask
 
 

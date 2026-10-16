@@ -1,10 +1,10 @@
-# Memory DB v1 durability and migration contract
+# Kristall v1 durability and migration contract
 
 Status: implementation contract for issue #776.
 
 ## Purpose
 
-Memory DB is the durable file-native storage engine for Alice. Alice depends on this API; the engine must not depend on Alice application code. Application and agents must never parse journal/checkpoint files directly.
+Kristall is the durable file-native storage engine for Alice. Alice depends on this API; the engine must not depend on Alice application code. Application and agents must never parse journal/checkpoint files directly.
 
 The working source of truth lives under a runtime-specific data root. Remote object/cloud storage is backup, not the live filesystem.
 
@@ -12,7 +12,7 @@ The append-only file is the only authoritative live database file.
 
 ## Single-file layout
 
-Memory DB v1 has one authoritative append-only file per runtime:
+Kristall v1 has one authoritative append-only file per runtime:
 
 ```text
 /data/alice/alice.memory
@@ -26,7 +26,7 @@ The only auxiliary file permitted is a short-lived `alice.memory.tmp` during com
 
 ## Synchronous write contract
 
-Memory DB v1 has one authoritative writer and one database write barrier.
+Kristall v1 has one authoritative writer and one database write barrier.
 
 A mutating operation is:
 
@@ -148,6 +148,6 @@ Fault tests must include forced process termination at storage stage boundaries.
 
 ## Container invariant
 
-The same Alice image digest contains runtime, Memory DB engine, tests/self-check, recovery, migration and backup/restore tooling. Persistent data is not an image layer.
+The same Alice image digest contains runtime, Kristall engine, tests/self-check, recovery, migration and backup/restore tooling. Persistent data is not an image layer.
 
 CI tests the digest that is later deployed; production must not rebuild a different artifact after validation.

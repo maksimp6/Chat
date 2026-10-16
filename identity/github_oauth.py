@@ -27,10 +27,10 @@ from urllib.parse import urlencode, urlsplit
 import requests
 from flask import Blueprint, jsonify, make_response, redirect, request
 
-from short_token_auth import COOKIE_NAME as SHORT_TOKEN_COOKIE
-from short_token_auth import _enabled as short_token_required
-from short_token_auth import grant_short_token_session
-from user_identity import get_github_login, lookup_user_token, sign_in_with_github
+from identity.short_token_auth import COOKIE_NAME as SHORT_TOKEN_COOKIE
+from identity.short_token_auth import _enabled as short_token_required
+from identity.short_token_auth import grant_short_token_session
+from identity.user_identity import get_github_login, lookup_user_token, sign_in_with_github
 
 logger = logging.getLogger("alice_github_auth")
 

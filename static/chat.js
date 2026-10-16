@@ -465,7 +465,7 @@ function addMessage(
       traceEl.appendChild(summary);
 
       // The Trace Viewer is a first-class chat action. Do not rely only on
-      // trace_viewer_auto.js parsing the generated HTML after the fact.
+      // trace_viewer_bridge.js parsing the generated HTML after the fact.
       traceEl.dataset.traceViewerDirect = "1";
       const openTraceBtn = document.createElement("button");
       openTraceBtn.type = "button";

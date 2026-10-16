@@ -3,7 +3,7 @@ import pytest
 
 @pytest.fixture
 def runtime_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     from agent_memory.client import close_memory_clients
 
     path = tmp_path / "runtime.db"
@@ -16,7 +16,7 @@ def runtime_db(tmp_path, monkeypatch):
 
 
 def test_session_restore(runtime_db):
-    from session_manager import create_session, restore_session, get_session
+    from sessions.manager import create_session, restore_session, get_session
 
     session = create_session(metadata={"profile": "developer"})
     restored = restore_session(session["id"])
@@ -28,7 +28,7 @@ def test_session_restore(runtime_db):
 
 
 def test_invocation_has_independent_context(runtime_db):
-    from session_manager import create_session
+    from sessions.manager import create_session
     from invocation.manager import (
         create_invocation,
         start_invocation,
@@ -51,7 +51,7 @@ def test_invocation_has_independent_context(runtime_db):
 
 
 def test_invocation_result_is_json_persisted(runtime_db):
-    from session_manager import create_session
+    from sessions.manager import create_session
     from invocation.manager import create_invocation, finish_invocation, get_invocation
 
     session = create_session()
@@ -66,7 +66,7 @@ def test_invocation_result_is_json_persisted(runtime_db):
 
 def test_invocation_trace_is_persisted_independently_of_messages(runtime_db):
     from invocation.manager import create_invocation, persist_invocation_trace, get_invocation
-    from session_manager import create_session
+    from sessions.manager import create_session
     from invocation.trace import create_invocation_trace
 
     session = create_session()

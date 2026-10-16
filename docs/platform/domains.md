@@ -88,7 +88,7 @@ agent-shell.maxxxpavlov.online:
 The platform generates health check URLs from domain configuration:
 
 ```bash
-python -m alice_platform health production
+python -m keel health production
 ```
 
 Output:

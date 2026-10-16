@@ -4,9 +4,9 @@ import contextlib
 import unittest
 from unittest.mock import patch
 
-import db
-import mcp_routes
-from trace_manager import ExecutionTrace
+import storage.db as db
+import chat.mcp_routes as mcp_routes
+from observability.trace_manager import ExecutionTrace
 
 
 class TestPreApiTiming(unittest.TestCase):
@@ -207,7 +207,7 @@ class TestPreApiTiming(unittest.TestCase):
                 )
 
     def test_provider_quota_response_is_recorded_before_trace_is_frozen(self):
-        from provider_quotas import ProviderQuotaExceeded
+        from provider_accounts.quotas import ProviderQuotaExceeded
 
         class QuotaClient:
             def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
