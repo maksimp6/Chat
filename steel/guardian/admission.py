@@ -1,6 +1,6 @@
-"""Deterministic, fail-closed admission policy for Steel workers.
+"""Deterministic, fail-closed admission decisions for Steel workers.
 
-This module evaluates requests only. It does not sandbox or execute workers.
+Admission is not a sandbox, resource limiter, or worker executor.
 """
 from dataclasses import dataclass
 from enum import Enum
@@ -36,14 +36,44 @@ class Request:
     limits: Limits
 
 
+def _valid_capabilities(value: object) -> bool:
+    return (
+        type(value) is frozenset
+        and all(type(item) is str and bool(item.strip()) for item in value)
+    )
+
+
+def _limit_values(value: object) -> tuple[int, ...] | None:
+    if not isinstance(value, Limits):
+        return None
+    fields = (
+        value.wall_seconds,
+        value.memory_bytes,
+        value.cpu_seconds,
+        value.output_bytes,
+        value.token_count,
+    )
+    if any(type(item) is not int or item <= 0 for item in fields):
+        return None
+    return fields
+
+
 def admit(request: Request, approval: Approval) -> Decision:
-    """Reject absent authority, invalid bounds, escalation, or over-budget work."""
+    """Deny invalid authority and limits before considering worker admission."""
+    if not isinstance(approval, Approval) or type(approval.approved) is not bool:
+        return Decision.MISSING_APPROVAL
     if not approval.approved:
         return Decision.MISSING_APPROVAL
-    requested = tuple(vars(request.limits).values())
-    ceiling = tuple(vars(approval.ceiling).values())
-    if any(type(value) is not int or value <= 0 for value in (*requested, *ceiling)):
+    if not isinstance(request, Request):
         return Decision.INVALID_LIMIT
+    requested = _limit_values(request.limits)
+    ceiling = _limit_values(approval.ceiling)
+    if requested is None or ceiling is None:
+        return Decision.INVALID_LIMIT
+    if not _valid_capabilities(request.capabilities):
+        return Decision.CAPABILITY_DENIED
+    if not _valid_capabilities(approval.capabilities):
+        return Decision.CAPABILITY_DENIED
     if not request.capabilities.issubset(approval.capabilities):
         return Decision.CAPABILITY_DENIED
     if any(value > cap for value, cap in zip(requested, ceiling, strict=True)):
