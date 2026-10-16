@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+        <permission
+        android:name="com.alicepro.mobile.STATUS"
+        android:protectionLevel="signature" />
+
     <application
         android:theme="@style/AppTheme"
         android:label="Alice Pro"
@@ -48,5 +52,9 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <service
+            android:name=".rootagent.LauncherStatusService"
+            android:exported="true"
+            android:permission="com.alicepro.mobile.STATUS" />
     </application>
 </manifest>
