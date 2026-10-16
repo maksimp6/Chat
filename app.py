@@ -312,8 +312,8 @@ def save_dialog_settings(conv_id):
     return jsonify({"status": "ok"})
 
 
-from memory_engine.manager import load_memory_config, save_memory_config, clear_global_memory
-from memory_engine.extractor import list_global_memory_facts
+from agent_memory.manager import load_memory_config, save_memory_config, clear_global_memory
+from agent_memory.extractor import list_global_memory_facts
 
 
 @app.route("/api/memory/manage", methods=["GET"])

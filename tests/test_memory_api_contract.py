@@ -18,7 +18,7 @@ def test_memory_panel_api_uses_native_fact_read():
 def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch):
     import storage.db as db
     from app import app
-    from memory_engine.extractor import save_global_memory_facts
+    from agent_memory.extractor import save_global_memory_facts
 
     path = tmp_path / "facts.memory"
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
@@ -45,8 +45,8 @@ def test_memory_panel_api_returns_config_and_sorted_facts(tmp_path, monkeypatch)
 
 def test_fact_deduplication_and_targeted_deletion(tmp_path, monkeypatch):
     import storage.db as db
-    from memory_engine.manager import clear_global_memory, load_memory_config
-    from memory_engine.extractor import list_global_memory_facts, save_global_memory_facts
+    from agent_memory.manager import clear_global_memory, load_memory_config
+    from agent_memory.extractor import list_global_memory_facts, save_global_memory_facts
 
     path = tmp_path / "native.memory"
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
