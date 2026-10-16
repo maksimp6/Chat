@@ -16,16 +16,13 @@ def test_valid_request():
 
 
 def test_missing_approval():
-    assert (
-        admit(Request(frozenset(), limits()), policy(approved=False)) is Decision.MISSING_APPROVAL
-    )
+    assert admit(Request(frozenset(), limits()), policy(approved=False)) is Decision.MISSING_APPROVAL
 
 
-def test_capability_escalation():
-    assert (
-        admit(Request(frozenset({"execute"}), limits()), policy())
-        is Decision.CAPABILITY_DENIED
-    )
+def test_capability_escalation_with_known_capability():
+    request = Request(frozenset({"inspect"}), limits())
+    approval = policy(capabilities=frozenset())
+    assert admit(request, approval) is Decision.CAPABILITY_DENIED
 
 
 def test_unknown_capability_is_denied_even_when_approved():
@@ -34,9 +31,7 @@ def test_unknown_capability_is_denied_even_when_approved():
     assert admit(request, approval) is Decision.MISSING_APPROVAL
 
 
-@pytest.mark.parametrize(
-    "field", ["wall_seconds", "memory_bytes", "cpu_seconds", "output_bytes", "token_count"]
-)
+@pytest.mark.parametrize("field", ["wall_seconds", "memory_bytes", "cpu_seconds", "output_bytes", "token_count"])
 def test_budget_overrun_each_field(field):
     values = vars(limits()) | {field: getattr(limits(), field) + 1}
     assert admit(Request(frozenset(), Limits(**values)), policy()) is Decision.BUDGET_EXCEEDED
