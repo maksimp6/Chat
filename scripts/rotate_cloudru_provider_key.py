@@ -12,19 +12,19 @@ import logging
 import os
 from datetime import timedelta
 
-from cloudru_api_key_provider import CloudRuApiKeyProvider
-from cloudru_iam import CloudRuIamClient
-from credential_crypto import decrypt_secret, encrypt_secret
-from db import get_conn
-from provider_credentials import (
+from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
+from cloud.cloudru.iam import CloudRuIamClient
+from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+from storage.db import get_store
+from provider_accounts.credentials import (
     CLOUDRU,
-    _fetch_one,
+    list_provider_credentials,
     create_schema,
     rotation_needed,
     get_cloudru_iam_credentials,
 )
-from provider_key_rotation import rotate_active_key
-from trace_manager import traced_operation
+from provider_accounts.key_rotation import rotate_active_key
+from observability.trace_manager import traced_operation
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("alice_cloudru_provider_key_rotation")
@@ -42,16 +42,16 @@ def _ttl() -> timedelta:
 
 @traced_operation("cloudru.rotation")
 def main() -> int:
-    conn = get_conn()
+    conn = get_store()
     try:
         create_schema(conn)
-        row = _fetch_one(
-            conn,
-            """SELECT id, provider_key_id, project_id, expires_at
-               FROM provider_credentials
-               WHERE provider = ? AND status = 'active'
-               LIMIT 1""",
-            (CLOUDRU,),
+        row = next(
+            (
+                item
+                for item in list_provider_credentials(conn, provider=CLOUDRU)
+                if item["status"] == "active"
+            ),
+            None,
         )
         if not row:
             logger.error("No active Cloud.ru provider key to rotate")
@@ -84,17 +84,17 @@ def main() -> int:
             )
             return 2
 
-        conn.execute("BEGIN IMMEDIATE")
-        row = _fetch_one(
-            conn,
-            """SELECT id, provider_key_id, project_id, expires_at
-               FROM provider_credentials
-               WHERE provider = ? AND status = 'active'
-               LIMIT 1""",
-            (CLOUDRU,),
+        pass
+        row = next(
+            (
+                item
+                for item in list_provider_credentials(conn, provider=CLOUDRU)
+                if item["status"] == "active"
+            ),
+            None,
         )
         if not row or not rotation_needed(row["expires_at"]):
-            conn.rollback()
+            pass
             return 0
 
         new_id, issued_at, expires_at = rotate_active_key(
@@ -109,7 +109,7 @@ def main() -> int:
             reissue_existing=True,
             ttl=_ttl(),
         )
-        conn.commit()
+        pass
         logger.info(
             "Rotated Cloud.ru Foundation Models provider key id=%s expires_at=%s",
             new_id,
@@ -118,13 +118,13 @@ def main() -> int:
         return 0
     except Exception:
         try:
-            conn.rollback()
+            pass
         except Exception:
             pass
         logger.exception("Cloud.ru provider-key rotation failed")
         return 1
     finally:
-        conn.close()
+        pass
 
 
 if __name__ == "__main__":

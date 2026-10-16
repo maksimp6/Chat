@@ -12,7 +12,7 @@ Dockerfile                         @maksimp6
 docker-compose.postgres.yml        @maksimp6
 
 # Данные и миграции
-/db.py                             @maksimp6
+/storage/db.py                     @maksimp6
 /db_backend.py                     @maksimp6
 
 # Android-клиент

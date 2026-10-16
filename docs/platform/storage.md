@@ -79,8 +79,8 @@ Storage configuration is validated for:
 In case of data loss, recover storage from the most recent snapshot:
 
 ```bash
-python -m alice_platform recovery list-snapshots --storage chrome-state
-python -m alice_platform recovery restore --storage chrome-state --snapshot 2024-10-01
+python -m keel recovery list-snapshots --storage chrome-state
+python -m keel recovery restore --storage chrome-state --snapshot 2024-10-01
 ```
 
 See `docs/platform/recovery.md` for detailed recovery procedures.

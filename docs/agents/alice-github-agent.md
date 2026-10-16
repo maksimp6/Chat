@@ -1,7 +1,7 @@
 # Alice as a GitHub agent
 
 Alice Pro can take a GitHub issue and work on her own code. The workflow is
-`.github/workflows/alice.yml`; the headless runner is `alice_agent_runner.py`.
+`.github/workflows/alice.yml`; the headless runner is `issue_runner.py`.
 
 ## How it works
 
@@ -61,7 +61,7 @@ maintainer's name, and commits are authored as `Alice Pro`. Delete that secret o
 Optional repository variable `ALICE_AGENT_MODEL` selects the model key from
 `config.py` (default `aliceai-llm`).
 
-Protect `master` with a required pull request and green CI, so Alice's draft PRs
+Protect `develop` with a required pull request and green CI, so Alice's draft PRs
 can never land without review.
 
 ## Limits

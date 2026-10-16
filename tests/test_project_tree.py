@@ -1,4 +1,4 @@
-import project_tree
+import workspace.project_tree as project_tree
 from app import app
 
 

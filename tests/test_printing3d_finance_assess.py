@@ -1,16 +1,18 @@
 import pytest
+from forge.binding import printing_store
 
 
 @pytest.fixture
 def assess_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
+    import forge.binding as binding
     import printing3d.service as service
 
     path = tmp_path / "printing3d-finance-assess.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_conn", db.get_conn)
+    monkeypatch.setattr(binding, "get_store", db.get_store)
     db.init_db()
-    service.init_3d_printing_tables()
+    binding.init_printing_tables()
     return path
 
 
@@ -37,7 +39,7 @@ def _candidate(**overrides):
 def test_assess_can_start_without_manual_finance_input(assess_db):
     from printing3d.finance import assess_financing
 
-    result = assess_financing("owner-a", {})
+    result = assess_financing(printing_store(), "owner-a", {})
 
     assert result["status"] == "needs_terms"
     assert result["purchase_mode"] == "credit"
@@ -64,6 +66,7 @@ def test_assess_uses_saved_credit_plan_and_realized_profit(assess_db):
     from printing3d.finance import assess_financing, set_financing_plan
 
     set_financing_plan(
+        printing_store(),
         "owner-a",
         {
             "printer_model": "Bambu Lab A1",
@@ -78,10 +81,12 @@ def test_assess_uses_saved_credit_plan_and_realized_profit(assess_db):
             "currency": "RUB",
         },
     )
-    order = create_order("owner-a", {"title": "Production", "quoted_price": 10000})
-    settle_order("owner-a", order["id"], actual_revenue=10000, actual_cost=2000)
+    order = create_order(
+        printing_store(), "owner-a", {"title": "Production", "quoted_price": 10000}
+    )
+    settle_order(printing_store(), "owner-a", order["id"], actual_revenue=10000, actual_cost=2000)
 
-    result = assess_financing("owner-a", {})
+    result = assess_financing(printing_store(), "owner-a", {})
 
     assert result["status"] == "ready"
     assert result["saved_plan_used"] is True
@@ -106,6 +111,7 @@ def test_assess_derives_down_payment_and_total_repayment_from_ai_terms(assess_db
     from printing3d.finance import assess_financing
 
     result = assess_financing(
+        printing_store(),
         "owner-a",
         _candidate(
             down_payment=None,
@@ -128,6 +134,7 @@ def test_assess_cash_purchase_uses_full_equipment_price_upfront(assess_db):
     from printing3d.finance import assess_financing
 
     result = assess_financing(
+        printing_store(),
         "owner-a",
         {
             "purchase_mode": "cash",
@@ -154,6 +161,7 @@ def test_assess_infers_cash_from_saved_cash_plan(assess_db):
     from printing3d.finance import assess_financing, set_financing_plan
 
     set_financing_plan(
+        printing_store(),
         "owner-a",
         {
             "printer_model": "Existing printer",
@@ -166,6 +174,7 @@ def test_assess_infers_cash_from_saved_cash_plan(assess_db):
     )
 
     result = assess_financing(
+        printing_store(),
         "owner-a",
         {"expected_monthly_profit": 5000},
     )
@@ -213,13 +222,14 @@ def test_assess_rejects_invalid_candidate_terms(assess_db, owner_id, payload, me
     from printing3d.finance import assess_financing
 
     with pytest.raises(ValueError, match=message):
-        assess_financing(owner_id, payload)
+        assess_financing(printing_store(), owner_id, payload)
 
 
 def test_assess_can_be_ready_without_profit_evidence(assess_db):
     from printing3d.finance import assess_financing
 
     result = assess_financing(
+        printing_store(),
         "owner-a",
         _candidate(expected_monthly_profit=None),
     )
@@ -234,17 +244,19 @@ def test_assess_can_be_ready_without_profit_evidence(assess_db):
 
 
 def test_finance_assess_tool_is_read_only_and_uses_trusted_identity(assess_db, monkeypatch):
-    import printing3d.tools as printing_tools
-    from tool_registry import ToolRegistry
+    import forge.tools as printing_tools
+    from tool_providers.registry import ToolRegistry
 
     captured = {}
 
-    def fake_assess(owner_id, data):
+    def fake_assess(_store, owner_id, data):
         captured["owner_id"] = owner_id
         captured["data"] = data
         return {"status": "ready"}
 
-    monkeypatch.setattr(printing_tools, "assess_financing", fake_assess)
+    import printing3d.finance as finance_domain
+
+    monkeypatch.setattr(finance_domain, "assess_financing", fake_assess)
 
     class Call:
         user_id = "trusted-owner"

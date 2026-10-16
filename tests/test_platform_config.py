@@ -5,7 +5,7 @@ import pytest
 import yaml
 from pathlib import Path
 
-from alice_platform.config import (
+from keel.config import (
     load_config,
     ConfigError,
 )

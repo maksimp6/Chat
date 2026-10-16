@@ -66,7 +66,7 @@ machine or changing workflow permissions.
    budget, approval boundary, and explicit pause conditions. A small routine
    task needs a compact record, not a new sign-off ceremony. Link accepted
    contract provenance when the stage reaches implementation or later.
-2. **Prepare and admit.** For a write stage, check the current `master`/PR head
+2. **Prepare and admit.** For a write stage, check the current `develop`/PR head
    and isolated branch. For read-only observation or review, check the relevant
    issue/PR and head when one exists. Check the role/backend, selected profile
    and skill versions, actual callable tools, inputs, and required approval.

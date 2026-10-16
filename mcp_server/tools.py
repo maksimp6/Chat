@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from agent_gateway import AgentGateway
-from conversation_ownership import check_access, get_owned_conversation, list_owned_conversations
-from db import get_messages
+from agent_runtime.gateway import AgentGateway
+from conversations.ownership import check_access, get_owned_conversation, list_owned_conversations
+from storage.db import get_messages
 from tool_providers.filesystem import grep_search, list_directory, read_file
 from invocation.api import get_invocation_status, get_invocation_trace
-from session_manager import get_session
-from tool_registry import registry
+from sessions.manager import get_session
+from tool_providers.registry import registry
 
-from .auth import _auth_mode
-from .protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
-from .runtime_bridge import _authorize_invocation
+from mcp_server.auth import _auth_mode
+from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
+from mcp_server.runtime_bridge import _authorize_invocation
 
 
 def _tool(
@@ -38,7 +38,7 @@ def _tool(
 
 
 def _system_status(_arguments: dict[str, Any], _user: Optional[str]) -> dict[str, Any]:
-    from config import ALL_MODELS
+    from core.config import ALL_MODELS
 
     categories = registry.get_available_categories()
     return {
