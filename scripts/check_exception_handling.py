@@ -16,6 +16,7 @@ reviewed change that lowers counts or adds an explicitly justified handler.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -25,7 +26,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "scripts" / "exception_handling_baseline.json"
 SUFFIXES = (".js", ".mjs", ".java", ".kt")
-EXCLUDED_PARTS = frozenset({".git", "node_modules", "tests", "build"})
+EXCLUDED_ANYWHERE = frozenset({".git", "node_modules"})
+# Only top-level directories: static/tests/ and similar project code is scanned.
+EXCLUDED_TOP_LEVEL = frozenset({"tests", "build"})
 # Vendored third-party library, not project-owned code.
 EXCLUDED_FILES = frozenset({"static/eruda.js"})
 
@@ -37,8 +40,9 @@ _TOKEN = re.compile(
     r"|/\*.*?\*/",
     re.DOTALL,
 )
-_TRY = re.compile(r"\btry\s*\{")
+_TRY = re.compile(r"\btry\s*[({]")  # `try (` is Java try-with-resources
 _CATCH = re.compile(r"\bcatch\s*(?:\([^)]*\))?\s*\{")
+_ARROW_CATCH = re.compile(r"\.catch\s*\(\s*(?:\([^)]*\)|\w+)\s*=>\s*\{")
 
 
 @dataclass
@@ -80,29 +84,38 @@ def _block_body(source: str, open_brace: int) -> str:
 def scan_source(source: str) -> Counts:
     code = _strip_comments(source)
     silent = 0
-    for match in _CATCH.finditer(code):
-        if not _block_body(code, match.end() - 1).strip():
-            silent += 1
+    for pattern in (_CATCH, _ARROW_CATCH):
+        for match in pattern.finditer(code):
+            if not _block_body(code, match.end() - 1).strip():
+                silent += 1
     return Counts(try_blocks=len(_TRY.findall(code)), silent_catches=silent)
 
 
-def _project_files() -> list[Path]:
+def _is_excluded(relative: Path) -> bool:
+    parts = relative.parts
+    if EXCLUDED_ANYWHERE & set(parts) or parts[0] in EXCLUDED_TOP_LEVEL:
+        return True
+    return relative.as_posix() in EXCLUDED_FILES
+
+
+def _project_files(root: Path = ROOT) -> list[Path]:
     files = []
-    for path in ROOT.rglob("*"):
-        if path.suffix not in SUFFIXES or not path.is_file():
-            continue
-        relative = path.relative_to(ROOT)
-        if EXCLUDED_PARTS & set(relative.parts):
-            continue
-        if relative.as_posix() in EXCLUDED_FILES:
-            continue
-        files.append(path)
+    for directory, dirnames, filenames in os.walk(root):
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if not _is_excluded((Path(directory) / name).relative_to(root))
+        ]
+        for name in filenames:
+            path = Path(directory, name)
+            if path.suffix in SUFFIXES and not _is_excluded(path.relative_to(root)):
+                files.append(path)
     return sorted(files)
 
 
 def scan_repository(root: Path = ROOT) -> Report:
     report = Report()
-    for path in _project_files():
+    for path in _project_files(root):
         counts = scan_source(path.read_text(encoding="utf-8", errors="strict"))
         relative = path.relative_to(root).as_posix()
         if counts.try_blocks:
@@ -112,8 +125,8 @@ def scan_repository(root: Path = ROOT) -> Report:
     return report
 
 
-def load_baseline(path: Path = BASELINE) -> dict[str, dict[str, int]]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+def load_baseline(path: Path | None = None) -> dict[str, dict[str, int]]:
+    data = json.loads((path or BASELINE).read_text(encoding="utf-8"))
     return {"try_blocks": data["try_blocks"], "silent_catches": data["silent_catches"]}
 
 
@@ -134,12 +147,14 @@ def compare(report: Report, baseline: dict[str, dict[str, int]]) -> list[str]:
     return problems
 
 
-def write_baseline(report: Report, path: Path = BASELINE) -> None:
+def write_baseline(report: Report, path: Path | None = None) -> None:
     data = {
         "try_blocks": dict(sorted(report.try_blocks.items())),
         "silent_catches": dict(sorted(report.silent_catches.items())),
     }
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (path or BASELINE).write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def main(argv: list[str]) -> int:

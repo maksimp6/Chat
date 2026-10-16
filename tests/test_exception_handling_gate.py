@@ -113,3 +113,28 @@ def test_main_fails_closed_on_regression(tmp_path, monkeypatch, capsys):
     )
     assert main([]) == 1
     assert "silent_catches grew in x.js" in capsys.readouterr().err
+
+
+def test_silent_arrow_promise_catch_is_counted():
+    assert scan_source("p.catch(() => {});").silent_catches == 1
+    assert scan_source("p.catch(e => {});").silent_catches == 1
+
+
+def test_arrow_promise_catch_that_reports_is_not_silent():
+    assert scan_source("p.catch(e => { log(e); });").silent_catches == 0
+
+
+def test_java_try_with_resources_is_counted():
+    source = "try (InputStream in = open()) { read(in); }"
+    assert scan_source(source).try_blocks == 1
+
+
+def test_directories_named_tests_are_scanned_below_top_level(tmp_path):
+    from scripts.check_exception_handling import _project_files
+
+    nested = tmp_path / "static" / "tests"
+    nested.mkdir(parents=True)
+    (nested / "ui.js").write_text("try { a(); } catch (e) {}", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "skip.js").write_text("try { a(); }", encoding="utf-8")
+    assert _project_files(tmp_path) == [nested / "ui.js"]
