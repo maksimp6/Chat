@@ -38,6 +38,7 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "printing3d/slicer.py",
     "chat/__init__.py",
     "storage/__init__.py",
     "api/__init__.py",
