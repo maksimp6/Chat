@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:25-bookworm-slim
 
 ARG CHROME_VERSION=154.0.8037.97-1
 
