@@ -38,6 +38,7 @@ def test_header_preserves_all_existing_navigation_buttons():
     for button_id in expected:
         assert 'id="' + button_id + '"' in html
 
+
 def test_dynamic_header_actions_target_secondary_row():
     memory = Path("static/memory_panel.js").read_text(encoding="utf-8")
     header = Path("static/header_actions.js").read_text(encoding="utf-8")
