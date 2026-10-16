@@ -1568,22 +1568,22 @@ body {
 
 /* Header actions keep their existing rows and wrap secondary actions instead of scrolling. */
 .alice-pro-app #header {
- flex-direction: column;
- align-items: stretch;
- flex-wrap: nowrap;
- overflow-x: visible;
- overflow-y: visible;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  overflow-x: visible;
+  overflow-y: visible;
 }
 
 .alice-pro-app #header .header-row {
- flex: 0 1 auto;
- min-width: 0;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .alice-pro-app #header .header-row-secondary {
  flex-wrap: wrap;
- overflow-x: visible;
- overflow-y: visible;
+  overflow-x: visible;
+  overflow-y: visible;
  padding-bottom: 0;
 }
 
