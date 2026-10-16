@@ -425,7 +425,7 @@ def run_smoke(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         server.stop()
         server = None
         if not db_path.exists() or db_path.stat().st_size <= 0:
-            raise SmokeFailure("Native MemoryStore journal was not persisted")
+            raise SmokeFailure("Native Kristall journal was not persisted")
 
         server = _start_server(
             env=runtime_env,

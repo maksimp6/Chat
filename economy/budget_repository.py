@@ -1,4 +1,4 @@
-"""Native durable budget accounts and idempotent operations on MemoryStore."""
+"""Native durable budget accounts and idempotent operations on Kristall."""
 
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone

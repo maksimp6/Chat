@@ -1,4 +1,4 @@
-"""The memory management panel reads native MemoryStore, not SQL."""
+"""The memory management panel reads native Kristall, not SQL."""
 
 from pathlib import Path
 

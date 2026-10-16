@@ -1,12 +1,12 @@
-"""Synchronous Memory DB with client-owned explicit name/value commits."""
+"""Synchronous Kristall with client-owned explicit name/value commits."""
 
-from memory_engine.store import (
+from kristall.store import (
     Commit,
     DatabaseInfo,
     DatabaseInfoContract,
-    MemoryStore,
+    Kristall,
     Store,
-    StoreError,
+    KristallError,
     Transaction,
 )
 
@@ -14,8 +14,8 @@ __all__ = [
     "Commit",
     "DatabaseInfo",
     "DatabaseInfoContract",
-    "MemoryStore",
+    "Kristall",
     "Store",
-    "StoreError",
+    "KristallError",
     "Transaction",
 ]

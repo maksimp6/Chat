@@ -1,4 +1,4 @@
-"""Alice chat/config repositories backed by the native durable MemoryStore."""
+"""Alice chat/config repositories backed by the native durable Kristall."""
 
 from __future__ import annotations
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 import time
 from typing import Any
 from runtime.request_context import current_runtime_data_root
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall, KristallError
 
 DB_PATH = os.getenv("ALICE_DB_PATH", "alice.memory")
 
@@ -31,10 +31,10 @@ def memory_file_path() -> Path:
 def _require_native_activation(path: Path, legacy: Path) -> None:
     """Never silently replace legacy authority with a new empty database."""
     if not path.exists() and legacy.exists():
-        raise StoreError("legacy data exists; explicit verified native activation required")
+        raise KristallError("legacy data exists; explicit verified native activation required")
 
 
-def get_store() -> MemoryStore:
+def get_store() -> Kristall:
     """Alice owns the shared writer; repositories never close it individually."""
     from agent_memory.client import get_memory_client
 

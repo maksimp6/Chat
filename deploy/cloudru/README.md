@@ -1,4 +1,4 @@
-# Alice Pro: EDS + Container Apps + нативный MemoryStore
+# Alice Pro: EDS + Container Apps + нативный Kristall
 
 Комплект для Codex и оператора, проверен 2026-09-28. Это подготовленные шаблоны
 и runbook, **не выполненный деплой**. Канонический репозиторий
@@ -179,7 +179,7 @@ placeholder `REPLACE_FROM_SECRET_STORE` пока не native secret reference.
 ## Проверка результата и rollback
 
 Перед открытием трафика проверить /healthz, негативный anonymous access,
-GitHub owner login, чужой GitHub ID, MCP OAuth, чат, чтение/запись MemoryStore,
+GitHub owner login, чужой GitHub ID, MCP OAuth, чат, чтение/запись Kristall,
 сохранность после новой ревизии и холодного старта, streaming, отсутствие
 секретов/дубликатов в логах и восстановление backup.
 

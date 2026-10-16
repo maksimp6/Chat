@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import pytest
-from memory_engine import MemoryStore
+from kristall import Kristall
 from scripts import cloudru_deploy_preflight as preflight
 
 
@@ -126,7 +126,7 @@ def test_rejects_unbounded_scaling_and_mutable_image(inputs):
 def test_probe_preserves_valid_journal_and_refuses_active_writer(inputs):
     config, env = inputs
     path = Path(env["ALICE_MEMORY_PATH"])
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("probe", {"value": 1})
         store.commit()
         before = path.read_bytes()
@@ -180,7 +180,7 @@ def test_explicit_probe_reports_only_verified_existing_source(
     config, env = inputs
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    with MemoryStore(env["ALICE_MEMORY_PATH"]) as store:
+    with Kristall(env["ALICE_MEMORY_PATH"]) as store:
         store.set("value", 1)
         store.commit()
     path = tmp_path / "deployment.json"

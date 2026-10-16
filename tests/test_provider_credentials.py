@@ -106,7 +106,7 @@ def test_provider_credentials_are_isolated():
 
 
 def test_create_schema_migrates_legacy_global_index():
-    from memory_engine import MemoryStore, StoreError
+    from kristall import Kristall, KristallError
     from tempfile import TemporaryDirectory
     from pathlib import Path
 
@@ -114,8 +114,8 @@ def test_create_schema_migrates_legacy_global_index():
         path = Path(root) / "legacy.db"
         evidence = b"SQLite format 3\0legacy evidence"
         path.write_bytes(evidence)
-        with pytest.raises(StoreError):
-            MemoryStore(path)
+        with pytest.raises(KristallError):
+            Kristall(path)
         assert path.read_bytes() == evidence
 
 

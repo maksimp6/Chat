@@ -1,7 +1,7 @@
-"""Durable Alice user identity backed by the file-native Memory DB.
+"""Durable Alice user identity backed by the file-native Kristall.
 
 Users, GitHub links and token hashes are persisted atomically through the
-native MemoryStore. No SQL migration or compatibility layer is involved.
+native Kristall. No SQL migration or compatibility layer is involved.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Owner writes use native MemoryStore transactions, not SQL or adapters."""
+"""Owner writes use native Kristall transactions, not SQL or adapters."""
 
 from pathlib import Path
 
