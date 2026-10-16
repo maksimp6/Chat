@@ -3,8 +3,8 @@
 from typing import List, Any, Dict
 import logging
 
-from alice_platform.planner import Action, ActionType
-from alice_platform.providers.cloudru import (
+from keel.planner import Action, ActionType
+from keel.providers.cloudru import (
     create_container,
     update_container,
     delete_container,
