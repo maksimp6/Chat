@@ -4,33 +4,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 PROJECT_ROOT_PYTHON = {
     "app.py",
-    "config.py",
 }
 
-# Existing debt only. New root Python modules must not be added here.
-# Delete entries as modules move into packages.
-LEGACY_ROOT_PYTHON = {
-    "alice_agent_runner.py",
-    "api_contracts.py",
-    "archiver.py",
-    "credential_crypto.py",
-    "db.py",
-    "db_backend.py",
-    "key_manager.py",
-    "mcp_routes.py",
-    "memory_db.py",
-    "memory_extractor.py",
-    "memory_manager.py",
-    "model_discovery.py",
-    "partial_output.py",
-    "runtime_api.py",
-    "runtime_tools.py",
-    "sdk.py",
-    "storage.py",
-    "tool_registry.py",
-    "universal_tool_platform.py",
-    "voice_routes.py",
-}
+# Root Python modules are not allowed; every module lives in a package.
+LEGACY_ROOT_PYTHON: set[str] = set()
 
 APPROVED_ROOT_PYTHON = PROJECT_ROOT_PYTHON | LEGACY_ROOT_PYTHON
 

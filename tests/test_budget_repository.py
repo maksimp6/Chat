@@ -3,7 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 import pytest
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
 from economy.budget_repository import BudgetPersistenceError, BudgetRepository
 from economy.budget_controller import AccountType, BudgetAccount, BudgetLimits

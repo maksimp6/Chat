@@ -41,8 +41,8 @@ def seed_provider_credential() -> None:
     project_id = os.getenv("YANDEX_PROJECT_ID", "").strip()
     if not api_key or not project_id:
         raise RuntimeError("YANDEX_API_KEY and YANDEX_PROJECT_ID are required")
-    from credential_crypto import decrypt_secret, encrypt_secret
-    from db import get_store
+    from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+    from storage.db import get_store
     from provider_accounts.credentials import bootstrap_credential
 
     conn = get_store()
@@ -96,8 +96,8 @@ def run_issue_task(
     from yandex_client_modules.parsers import extract_reasoning_and_text
 
     if client_factory is None:
-        from config import Config
-        from mcp_routes import AliceClient
+        from core.config import Config
+        from chat.mcp_routes import AliceClient
 
         seed_provider_credential()
 

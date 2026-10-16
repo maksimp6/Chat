@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 import logging
 import json as _json
 from yandex_client_modules.client import YandexResponsesClient
-from config import Config, calculate_full_cost
+from core.config import Config, calculate_full_cost
 from observability.trace_manager import ExecutionTrace, bind_current_trace, reset_current_trace
 from invocation.manager import (
     create_invocation,
@@ -16,8 +16,8 @@ from invocation.manager import (
 from invocation.trace import create_invocation_trace
 from mcp_server.trace import record_yandex_mcp_activity
 import mcp_server.storage as mcp_storage
-from tool_registry import registry
-from db import (
+from tool_providers.registry import registry
+from storage.db import (
     get_conversations,
     create_conversation,
     get_messages,
@@ -27,13 +27,13 @@ from db import (
     maybe_update_conversation_title,
     get_conversation_title,
 )
-from partial_output import extract_last_response_text, format_partial_output_message
+from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
 from agent_runtime.responses_tool_loop import run_tool_loop, extract_function_calls
 from economy.billing import settle_billing_to_treasury
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 from provider_accounts.quotas import ProviderQuotaExceeded
 from agent_skills.registry import SkillRegistry, SkillRegistryError, compose_skill_instructions
-from universal_tool_platform import (
+from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
     tool_call_requires_approval,

@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 import time
 from typing import Any
-from db import get_store
+from storage.db import get_store
 
 _DEFAULTS = {
     "server_url": "",

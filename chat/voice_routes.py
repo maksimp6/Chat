@@ -15,8 +15,8 @@ from typing import Any
 import requests
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
-from config import Config, TEXT_MODELS
-from mcp_routes import AliceClient
+from core.config import Config, TEXT_MODELS
+from chat.mcp_routes import AliceClient
 from conversations.ownership import check_access
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 

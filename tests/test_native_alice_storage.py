@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import base64
 import pytest
 from flask import Flask
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
 from memory_engine import MemoryStore, StoreError
 
@@ -77,7 +77,7 @@ def test_department_archive_is_persisted(monkeypatch):
 
 
 def test_keys_keep_unique_identity_and_missing_keys_fail(monkeypatch):
-    import key_manager as keys
+    import secret_store.key_manager as keys
 
     monkeypatch.setenv("ALICE_KEY_MANAGER_KEY", base64.urlsafe_b64encode(b"1" * 32).decode())
     keys.create_schema(db.get_store())
@@ -389,7 +389,7 @@ def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
 def test_provider_clients_use_same_native_credential_writer(monkeypatch):
     from cryptography.fernet import Fernet
     from provider_accounts.credentials import replace_active_credential
-    from credential_crypto import encrypt_secret
+    from secret_store.credential_crypto import encrypt_secret
     import provider_accounts.credentials_routes as routes
     from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 

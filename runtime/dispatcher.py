@@ -7,8 +7,8 @@ from pathlib import Path
 from threading import RLock, local
 from typing import Any, Callable, Mapping
 
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
-from storage import (
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from storage.contracts import (
     StorageCredentialsMissing,
     StorageError,
     StorageProvider,

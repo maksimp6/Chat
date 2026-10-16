@@ -14,8 +14,8 @@ from datetime import timedelta
 
 from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
 from cloud.cloudru.iam import CloudRuIamClient
-from credential_crypto import decrypt_secret, encrypt_secret
-from db import get_store
+from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+from storage.db import get_store
 from provider_accounts.credentials import (
     CLOUDRU,
     list_provider_credentials,

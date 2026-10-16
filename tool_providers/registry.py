@@ -11,7 +11,7 @@ import copy
 import logging
 from typing import Any, Mapping, Optional
 
-from universal_tool_platform import UniversalToolDefinition
+from tool_providers.universal_tool_platform import UniversalToolDefinition
 
 logger = logging.getLogger("tool_registry")
 
@@ -158,7 +158,7 @@ class ToolRegistry:
             logger.error(f"[REGISTRY] Ошибка загрузки Theme: {e}")
 
         try:
-            from runtime_tools import RUNTIME_TOOLS
+            from tool_providers.runtime_tools import RUNTIME_TOOLS
 
             for name, cfg in RUNTIME_TOOLS.items():
                 self._register("runtime", name, cfg)

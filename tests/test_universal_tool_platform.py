@@ -1,7 +1,7 @@
 import sys
 import types
 
-from universal_tool_platform import (
+from tool_providers.universal_tool_platform import (
     UniversalToolCall,
     UniversalToolExecutor,
     UniversalToolResult,

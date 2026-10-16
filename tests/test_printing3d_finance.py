@@ -3,7 +3,7 @@ import pytest
 
 @pytest.fixture
 def finance_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     import printing3d.service as service
 
     path = tmp_path / "printing3d-finance.db"
@@ -238,7 +238,7 @@ def test_finance_routes_require_owner(finance_db, monkeypatch):
 def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, monkeypatch):
     from printing3d import create_order, settle_order
     import printing3d.tools as printing_tools
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     class Call:
         user_id = "trusted-finance-owner"

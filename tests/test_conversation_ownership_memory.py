@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import conversations.ownership as ownership
-import db
+import storage.db as db
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
 from agent_memory.client import close_memory_clients, get_memory_client
 

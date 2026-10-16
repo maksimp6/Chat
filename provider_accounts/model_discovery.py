@@ -10,7 +10,7 @@ from typing import Any
 
 import requests
 
-from config import TEXT_MODELS, VOICE_MODELS
+from core.config import TEXT_MODELS, VOICE_MODELS
 
 logger = logging.getLogger(__name__)
 

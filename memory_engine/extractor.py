@@ -11,7 +11,7 @@ from typing import Any
 import requests
 
 from agent_memory.client import get_memory_client
-from db import memory_file_path
+from storage.db import memory_file_path
 
 API_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 _FACT_PREFIX = "global_fact:"

@@ -23,7 +23,7 @@ from agent_memory.user_identity_store import (
     UserIdentityStore,
     UserRecord,
 )
-from db import memory_file_path
+from storage.db import memory_file_path
 
 _INSTALLATION_RE = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 _SENSITIVE_KEY_RE = re.compile(

@@ -2,7 +2,7 @@
 
 import pytest
 
-import db
+import storage.db as db
 import identity.user_identity as user_identity
 from agent_memory.client import close_memory_clients, get_memory_client
 from agent_memory.user_identity_store import IDENTITY_KEY, UserIdentityStore

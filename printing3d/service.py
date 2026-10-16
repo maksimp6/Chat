@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
-from db import get_store
+from storage.db import get_store
 
 ORDER_STATUSES = (
     "lead",

@@ -43,7 +43,7 @@ def test_quote_rejects_impossible_margin_and_fee():
 
 @pytest.fixture
 def printing_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     import printing3d.service as service
 
     path = tmp_path / "printing3d.db"
@@ -164,7 +164,7 @@ def test_settlement_is_idempotent_when_retried_without_new_values(printing_db):
 
 
 def test_printing3d_tools_are_registered_read_only():
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     registry = ToolRegistry()
     definitions = {item["name"]: item for item in registry.get_definitions()}
@@ -181,7 +181,7 @@ def test_printing3d_tools_are_registered_read_only():
 
 
 def test_quote_tool_is_read_only_and_order_create_requires_approval():
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     registry = ToolRegistry()
     quote_tool = registry.get_tool_meta("printing3d.quote")
@@ -372,7 +372,7 @@ def test_quote_validation_edges():
 
 
 def test_schema_migrates_legacy_print_orders(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     import printing3d.service as service
 
     evidence = b"SQLite format 3\0legacy order evidence"
@@ -386,7 +386,7 @@ def test_schema_migrates_legacy_print_orders(tmp_path, monkeypatch):
 
 
 def test_order_row_recovers_from_invalid_quote_json(printing_db):
-    import db
+    import storage.db as db
     from printing3d import create_order, get_order
 
     order = create_order("owner-a", {"title": "Malformed native quote"})
@@ -514,7 +514,7 @@ def test_printing3d_tool_helpers_cover_fallback_and_order_filters(printing_db, m
 def test_registry_survives_printing3d_tool_import_failure(monkeypatch):
     import builtins
 
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     real_import = builtins.__import__
 
