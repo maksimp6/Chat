@@ -8,7 +8,7 @@ from .manager import get_invocation
 def _sanitize_trace(value: Any) -> Any:
     """Apply the same trace-level secret filtering before API exposure."""
     try:
-        from trace_manager import ExecutionTrace
+        from observability.trace_manager import ExecutionTrace
 
         return ExecutionTrace._sanitize_trace_value(value)
     except Exception:

@@ -76,7 +76,7 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 
 ## Other Evolution tasks
 
-Use `cloudru_iam.py`, `cloudru_iam_routes.py` and `provider_key_rotation.py` for
+Use `cloud/cloudru/iam.py`, `cloud/cloudru/iam_routes.py` and `provider_key_rotation.py` for
 existing key flows. Consult `docs/integrations/cloudru-iam-wizard.md` and
 `docs/provider-key-rotation.md` before changing them.
 

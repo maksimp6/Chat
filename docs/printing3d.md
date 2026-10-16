@@ -27,7 +27,7 @@ Alice Pro уже содержит первый рабочий business slice д�
 
 ## Модели как код
 
-Модели для печати хранятся в [`3d-models/`](../3d-models/README.md) как
+Модели для печати хранятся в [`printing3d/models/`](../printing3d/models/README.md) как
 исходники OpenSCAD со сгенерированными STL и 3MF. Это просто файлы в
 репозитории, а не asset workflow приложения: Alice Pro их не читает и не
 обрабатывает.

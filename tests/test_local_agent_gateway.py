@@ -3,7 +3,7 @@ import json
 import pytest
 from flask import Flask
 
-import local_agent_gateway
+import agent_runtime.local_gateway as local_agent_gateway
 
 
 @pytest.fixture()

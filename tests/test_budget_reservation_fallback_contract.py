@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from budget_controller import (
+from economy.budget_controller import (
     AccountType,
     BudgetAccount,
     BudgetController,

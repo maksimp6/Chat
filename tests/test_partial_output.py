@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 from partial_output import extract_last_response_text, format_partial_output_message
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 class TestPartialOutputExtraction(unittest.TestCase):
