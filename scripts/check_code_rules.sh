@@ -5,6 +5,9 @@ set -euo pipefail
 
 python scripts/check_filenames.py
 
+# Only absolute imports are allowed (TID252 with ban-relative-imports = all).
+python -m ruff check --select TID252 --no-cache --exclude node_modules .
+
 python -m pytest -q -p no:cacheprovider \
   tests/test_naming_conventions.py \
   tests/test_ci_platform_changes.py \
