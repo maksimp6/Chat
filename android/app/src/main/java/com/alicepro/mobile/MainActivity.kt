@@ -261,6 +261,8 @@ class MainActivity : AppCompatActivity() {
         AppLogger.info("LocalAgent", "Starting outbound local agent", mapOf("gateway" to gatewayUrl))
 
         if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+        Python.getInstance().getModule("printer_native_bridge")
+            .callAttr("install_context", applicationContext)
 
         Thread {
             try {
@@ -281,6 +283,8 @@ class MainActivity : AppCompatActivity() {
     private fun startPythonServer(apiKey: String) {
         AppLogger.info("Python", "Starting embedded server")
         if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+        Python.getInstance().getModule("printer_native_bridge")
+            .callAttr("install_context", applicationContext)
 
         Thread {
             try {
