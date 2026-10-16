@@ -25,6 +25,8 @@ Alice Pro уже содержит первый рабочий business slice д�
 - [HTTP API](api/printing3d.md)
 - [Universal/MCP tools](mcp/printing3d-tools.md)
 
+Где продавать изделия: [каналы продаж](notes/printing3d/sales-channels.md).
+
 ## Модели как код
 
 Модели для печати хранятся в [`printing3d/models/`](../printing3d/models/README.md) как
