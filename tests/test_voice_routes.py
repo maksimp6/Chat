@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import pytest
 
-import voice_routes
+import chat.voice_routes as voice_routes
 from app import app
 
 

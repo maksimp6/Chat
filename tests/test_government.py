@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-import db
+import storage.db as db
 from flask import Flask
 
 from organization.government import (
@@ -14,7 +14,7 @@ from organization.government import (
     submit_case,
     validate_data,
 )
-from tool_registry import ToolRegistry
+from tool_providers.registry import ToolRegistry
 
 
 def _setup(tmp):

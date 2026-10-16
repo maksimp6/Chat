@@ -3,8 +3,8 @@ import runpy
 from datetime import datetime, timezone
 from pathlib import Path
 
-import archiver
-import sdk
+import storage.archiver as archiver
+import yandex_client_modules.sdk as sdk
 from scripts import send_logs
 
 

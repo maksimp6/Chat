@@ -1,6 +1,6 @@
 import os
 import tempfile
-import db
+import storage.db as db
 from flask import Flask
 from organization.departments import (
     init_department_tables,

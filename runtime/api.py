@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 
-from api_contracts import ContractViolation, validate_api_contract
+from api.contracts import ContractViolation, validate_api_contract
 from invocation.api import get_invocation_status, get_invocation_trace
 from invocation.manager import create_invocation
 from sessions.manager import create_session, get_session

@@ -16,27 +16,7 @@
 
 | Файл сейчас | Ответственность |
 | --- | --- |
-| [alice_agent_runner.py](../../alice_agent_runner.py) | Корневые точки входа и конфигурация |
-| [api_contracts.py](../../api_contracts.py) | Агенты и выполнение инструментов |
 | [app.py](../../app.py) | Корневые точки входа и конфигурация |
-| [archiver.py](../../archiver.py) | Память, данные и диалоги |
-| [config.py](../../config.py) | Корневые точки входа и конфигурация |
-| [credential_crypto.py](../../credential_crypto.py) | Провайдеры, credentials и квоты |
-| [db.py](../../db.py) | Память, данные и диалоги |
-| [key_manager.py](../../key_manager.py) | Провайдеры, credentials и квоты |
-| [mcp_routes.py](../../mcp_routes.py) | MCP |
-| [memory_db.py](../../memory_db.py) | Память, данные и диалоги |
-| [memory_extractor.py](../../memory_extractor.py) | Память, данные и диалоги |
-| [memory_manager.py](../../memory_manager.py) | Память, данные и диалоги |
-| [model_discovery.py](../../model_discovery.py) | Провайдеры, credentials и квоты |
-| [partial_output.py](../../partial_output.py) | Агенты и выполнение инструментов |
-| [runtime_api.py](../../runtime_api.py) | Сессии, окружения и runtime |
-| [runtime_tools.py](../../runtime_tools.py) | Сессии, окружения и runtime |
-| [sdk.py](../../sdk.py) | Агенты и выполнение инструментов |
-| [storage.py](../../storage.py) | Память, данные и диалоги |
-| [tool_registry.py](../../tool_registry.py) | Агенты и выполнение инструментов |
-| [universal_tool_platform.py](../../universal_tool_platform.py) | Агенты и выполнение инструментов |
-| [voice_routes.py](../../voice_routes.py) | Web, идентификация и бизнес |
 
 ## Где искать остальные файлы
 

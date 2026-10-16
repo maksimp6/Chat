@@ -19,8 +19,8 @@ from runtime import (
     RuntimeOperationNotFound,
     RuntimeScopeViolation,
 )
-from tool_registry import registry
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.registry import registry
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 # Runtime-scoped MCP calls enter the same dispatcher boundary as preview code.

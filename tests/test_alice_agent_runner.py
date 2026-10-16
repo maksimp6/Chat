@@ -4,12 +4,12 @@ import subprocess
 
 import pytest
 
-import alice_agent_runner
+import agent_runtime.alice_agent_runner as alice_agent_runner
 
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     root = tmp_path / "repo"
@@ -128,8 +128,8 @@ def test_seed_requires_yandex_secrets(monkeypatch):
 
 
 def test_seed_stores_encrypted_credential(tmp_path, monkeypatch):
-    import db
-    from credential_crypto import decrypt_secret
+    import storage.db as db
+    from secret_store.credential_crypto import decrypt_secret
     from provider_accounts.credentials import get_active_credential
 
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "creds.db"))
@@ -176,7 +176,7 @@ def test_cli_writes_result_file(repo, tmp_path, monkeypatch):
 
 
 def test_default_client_seeds_credential_and_uses_alice_client(repo, monkeypatch):
-    import mcp_routes
+    import chat.mcp_routes as mcp_routes
 
     seeded = []
     created = []

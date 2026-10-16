@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from flask import Flask
 
-import db
+import storage.db as db
 import identity.short_token_auth as short_token_auth
 from identity import github_oauth as github_auth
 from identity.user_identity import (

@@ -1,7 +1,7 @@
 """Native MCP storage behavior, lifecycle and uncertain-write failures."""
 
 import pytest
-import db
+import storage.db as db
 import mcp_server.storage as mcp_storage
 from agent_memory.client import close_memory_clients
 from memory_engine import StoreError

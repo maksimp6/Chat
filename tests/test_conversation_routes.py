@@ -62,7 +62,7 @@ def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
 
 
 def test_create_conversation_hides_provider_exception(monkeypatch):
-    import mcp_routes
+    import chat.mcp_routes as mcp_routes
 
     internal_marker = "provider-create-internal-marker"
 

@@ -84,7 +84,7 @@ def test_new_memory_store_is_the_only_accepted_engine():
 
 
 def test_runtime_has_no_sql_connection_boundary():
-    import db
+    import storage.db as db
 
     assert not hasattr(db, "get_conn")
     assert not hasattr(db.get_store(), "execute")

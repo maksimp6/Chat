@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from db import get_store
+from storage.db import get_store
 
 
 DEFAULT_POLICY = "default"

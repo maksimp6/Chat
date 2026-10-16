@@ -3,7 +3,7 @@ import pytest
 
 @pytest.fixture
 def assess_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     import printing3d.service as service
 
     path = tmp_path / "printing3d-finance-assess.db"
@@ -235,7 +235,7 @@ def test_assess_can_be_ready_without_profit_evidence(assess_db):
 
 def test_finance_assess_tool_is_read_only_and_uses_trusted_identity(assess_db, monkeypatch):
     import printing3d.tools as printing_tools
-    from tool_registry import ToolRegistry
+    from tool_providers.registry import ToolRegistry
 
     captured = {}
 

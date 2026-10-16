@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from db import get_store
+from storage.db import get_store
 
 DatabaseRow = dict[str, Any]
 

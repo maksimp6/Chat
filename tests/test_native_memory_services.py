@@ -4,12 +4,12 @@ from types import SimpleNamespace
 import runpy
 import pytest
 import requests
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
 from agent_memory.repository import AgentMemoryStore
-import memory_extractor as extractor
-import memory_manager as manager
+import agent_memory.extractor as extractor
+import agent_memory.manager as manager
 import sessions.manager as sessions
 from invocation import manager as invocations
 
@@ -119,7 +119,7 @@ def test_extraction_only_commits_valid_provider_result(answer, monkeypatch):
 
 
 def test_memory_cli_prints_empty_summary(capsys):
-    runpy.run_module("memory_extractor", run_name="__main__")
+    runpy.run_module("agent_memory.extractor", run_name="__main__")
     assert "Память пока пуста" in capsys.readouterr().out
 
 
