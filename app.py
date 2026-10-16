@@ -66,8 +66,8 @@ from remote_runtime.ssh_settings import public_settings, save_settings, test_con
 from plugin_system.routes import plugin_bp
 from workspace.project_tree import project_tree_bp
 from chat.voice_routes import voice_bp
-from printing3d import init_3d_printing_tables
-from printing3d.routes import printing3d_bp
+from alice_printing import init_printing_tables
+from alice_printing.routes import printing3d_bp
 
 app = Flask(__name__)
 system_log.configure()
@@ -152,7 +152,7 @@ def _set_web_cache_headers(response):
 init_db()
 init_local_agent_tables()
 init_treasury_tables()
-init_3d_printing_tables()
+init_printing_tables()
 init_user_identity_table()
 init_github_accounts_table()
 init_conversation_ownership_table()

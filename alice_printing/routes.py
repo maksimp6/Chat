@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
+from alice_printing.binding import printing_store as _store
 from printing3d.finance import get_payback_status, set_financing_plan
 from printing3d.service import (
     calculate_quote,
@@ -46,7 +47,7 @@ def orders_list():
     if owner is None:
         return _auth_error()
     try:
-        return jsonify({"orders": list_orders(owner, status=request.args.get("status"))})
+        return jsonify({"orders": list_orders(_store(), owner, status=request.args.get("status"))})
     except ValueError:
         return jsonify({"error": "invalid order status"}), 400
 
@@ -60,7 +61,7 @@ def orders_create():
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be an object"}), 400
     try:
-        return jsonify(create_order(owner, payload)), 201
+        return jsonify(create_order(_store(), owner, payload)), 201
     except ValueError:
         return jsonify({"error": "invalid order"}), 400
 
@@ -70,7 +71,7 @@ def order_get(order_id):
     owner = _owner_id()
     if owner is None:
         return _auth_error()
-    order = get_order(owner, order_id)
+    order = get_order(_store(), owner, order_id)
     if order is None:
         return jsonify({"error": "order not found"}), 404
     return jsonify(order)
@@ -85,7 +86,7 @@ def order_status(order_id):
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be an object"}), 400
     try:
-        order = update_order_status(owner, order_id, str(payload.get("status") or ""))
+        order = update_order_status(_store(), owner, order_id, str(payload.get("status") or ""))
     except ValueError:
         return jsonify({"error": "invalid order status"}), 400
     if order is None:
@@ -105,6 +106,7 @@ def order_settle(order_id):
         return jsonify({"error": "request body must be an object"}), 400
     try:
         order = settle_order(
+            _store(),
             owner,
             order_id,
             actual_revenue=payload.get("actual_revenue"),
@@ -122,7 +124,7 @@ def treasury_summary():
     owner = _owner_id()
     if owner is None:
         return _auth_error()
-    return jsonify(get_financial_summary(owner))
+    return jsonify(get_financial_summary(_store(), owner))
 
 
 @printing3d_bp.route("/finance/plan", methods=["PUT"])
@@ -134,7 +136,7 @@ def finance_plan_set():
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be an object"}), 400
     try:
-        return jsonify(set_financing_plan(owner, payload))
+        return jsonify(set_financing_plan(_store(), owner, payload))
     except ValueError:
         return jsonify({"error": "invalid finance plan"}), 400
 
@@ -145,6 +147,6 @@ def finance_status():
     if owner is None:
         return _auth_error()
     try:
-        return jsonify(get_payback_status(owner, month=request.args.get("month")))
+        return jsonify(get_payback_status(_store(), owner, month=request.args.get("month")))
     except ValueError:
         return jsonify({"error": "invalid finance status request"}), 400

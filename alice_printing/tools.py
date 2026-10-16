@@ -6,6 +6,7 @@ from typing import Any, Mapping, Optional
 
 from economy.treasury_identity import get_current_owner_id
 
+from alice_printing.binding import printing_store as _store
 from printing3d.finance import assess_financing, get_payback_status, set_financing_plan
 from printing3d.service import (
     ORDER_STATUSES,
@@ -42,7 +43,7 @@ def treasury_summary(
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Read the current owner's realized 3D-printing P&L."""
-    return get_financial_summary(_trusted_owner(cfg))
+    return get_financial_summary(_store(), _trusted_owner(cfg))
 
 
 def orders_list(
@@ -53,7 +54,7 @@ def orders_list(
     owner_id = _trusted_owner(cfg)
     raw_status = arguments.get("status")
     status = str(raw_status).strip() if raw_status else None
-    return {"orders": list_orders(owner_id, status=status)}
+    return {"orders": list_orders(_store(), owner_id, status=status)}
 
 
 def finance_status(
@@ -62,7 +63,7 @@ def finance_status(
 ) -> dict[str, Any]:
     """Read financing and payback status for the current owner."""
     month = arguments.get("month")
-    return get_payback_status(_trusted_owner(cfg), month=str(month) if month else None)
+    return get_payback_status(_store(), _trusted_owner(cfg), month=str(month) if month else None)
 
 
 def finance_plan_set(
@@ -70,7 +71,7 @@ def finance_plan_set(
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Store financing terms after approval at the universal tool boundary."""
-    return set_financing_plan(_trusted_owner(cfg), dict(arguments))
+    return set_financing_plan(_store(), _trusted_owner(cfg), dict(arguments))
 
 
 def finance_assess(
@@ -78,7 +79,7 @@ def finance_assess(
     cfg: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Assess sparse AI-collected financing terms without persisting them."""
-    return assess_financing(_trusted_owner(cfg), dict(arguments))
+    return assess_financing(_store(), _trusted_owner(cfg), dict(arguments))
 
 
 def _quote_input(arguments: Mapping[str, Any]) -> dict[str, Any]:
@@ -132,7 +133,7 @@ def order_create(
         if currency:
             data["currency"] = quote_input["currency"] = currency
         data["quote"] = quote_input
-    return {"order": create_order(_trusted_owner(cfg), data)}
+    return {"order": create_order(_store(), _trusted_owner(cfg), data)}
 
 
 def _nullable_number(minimum: float = 0) -> dict[str, Any]:
