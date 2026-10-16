@@ -4,6 +4,10 @@ Admission is not a sandbox, resource limiter, or worker executor.
 """
 from dataclasses import dataclass
 from enum import Enum
+from typing import cast
+
+
+KNOWN_CAPABILITIES = frozenset({"inspect"})
 
 
 class Decision(str, Enum):
@@ -37,9 +41,12 @@ class Request:
 
 
 def _valid_capabilities(value: object) -> bool:
-    return (
-        type(value) is frozenset
-        and all(type(item) is str and bool(item.strip()) for item in value)
+    if type(value) is not frozenset:
+        return False
+    capabilities = cast(frozenset[object], value)
+    return all(
+        type(item) is str and bool(item.strip()) and item in KNOWN_CAPABILITIES
+        for item in capabilities
     )
 
 
@@ -58,11 +65,18 @@ def _limit_values(value: object) -> tuple[int, ...] | None:
     return fields
 
 
+def _authority_valid(approval: object) -> bool:
+    return (
+        isinstance(approval, Approval)
+        and type(approval.approved) is bool
+        and approval.approved
+        and _valid_capabilities(approval.capabilities)
+    )
+
+
 def admit(request: Request, approval: Approval) -> Decision:
-    """Deny invalid authority and limits before considering worker admission."""
-    if not isinstance(approval, Approval) or type(approval.approved) is not bool:
-        return Decision.MISSING_APPROVAL
-    if not approval.approved:
+    """Deny unknown capabilities, invalid bounds, and unauthorized work."""
+    if not _authority_valid(approval):
         return Decision.MISSING_APPROVAL
     if not isinstance(request, Request):
         return Decision.INVALID_LIMIT
@@ -71,8 +85,6 @@ def admit(request: Request, approval: Approval) -> Decision:
     if requested is None or ceiling is None:
         return Decision.INVALID_LIMIT
     if not _valid_capabilities(request.capabilities):
-        return Decision.CAPABILITY_DENIED
-    if not _valid_capabilities(approval.capabilities):
         return Decision.CAPABILITY_DENIED
     if not request.capabilities.issubset(approval.capabilities):
         return Decision.CAPABILITY_DENIED
