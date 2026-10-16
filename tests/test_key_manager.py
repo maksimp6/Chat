@@ -4,7 +4,7 @@ import base64
 
 import pytest
 
-from key_manager import (
+from secret_store.key_manager import (
     KeyExpiredError,
     KeyManagerError,
     KeyRevokedError,
@@ -29,7 +29,7 @@ def setup_env(monkeypatch):
 def isolated_db(monkeypatch, tmp_path):
     setup_env(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    import db
+    import storage.db as db
 
     db.DB_PATH = str(tmp_path / "keys.db")
     db.init_db()

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, develop]
   pull_request:
 
 concurrency:
@@ -97,7 +97,7 @@ jobs:
             requirements.txt
             requirements-dev.txt
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22.22.2"
           cache: npm
@@ -127,7 +127,7 @@ jobs:
       - name: Compile tracked Python sources
         run: git ls-files '*.py' -z | xargs -0 -r python -m py_compile
       - name: Validate Alice Platform config
-        run: python -m alice_platform validate
+        run: python -m keel validate
       - name: Validate frontend JavaScript policy
         run: python tests/validate_frontend_modules.py
       - name: Validate runtime Python policy
@@ -210,7 +210,7 @@ jobs:
           cat ci-validation-report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ github.run_number }}
           path: |
@@ -267,7 +267,7 @@ jobs:
             requirements.txt
             requirements-dev.txt
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.22.2"
       - name: Install infrastructure test dependencies
@@ -307,7 +307,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22.22.2"
           cache: npm
@@ -357,7 +357,7 @@ jobs:
         working-directory: android
         run: python scripts/stage_python.py
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           gradle-version: "9.5.0"
       - name: Materialize stable debug keystore
@@ -388,7 +388,7 @@ jobs:
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload debug APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: alice-pro-debug-apk-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk

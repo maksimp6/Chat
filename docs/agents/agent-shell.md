@@ -15,7 +15,7 @@ yet start a model; handlers are plain Python functions registered by task kind.
   that touched a secret cannot leak it.
 - `agent_shell/handlers.py`: built-in task kinds. The first, `cloudru_status`, is read-only
   and reuses `scripts/cloudru_check.py`.
-- `alice_task`: runs Alice headlessly (`alice_agent_runner.run_issue_task`) on a task text:
+- `alice_task`: runs Alice headlessly (`issue_runner.run_issue_task`) on a task text:
   `{"issue": 7, "title": "...", "body": "...", "model": "aliceai-llm"}` (model optional).
   Alice only has her sandboxed filesystem tools and never commits, pushes or runs commands.
   If she stops at an approval-gated tool the task fails with `needs_approval` (never

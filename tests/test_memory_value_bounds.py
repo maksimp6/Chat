@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall, KristallError
 
 
 def nested(depth):
@@ -23,24 +23,24 @@ def test_invalid_shape_is_rejected_before_copy_and_writer_remains_usable(tmp_pat
     if shape != "deep":
         value = []
         value.append(value if shape == "cycle" else (value,))
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("saved", 1)
         store.commit()
         before = path.read_bytes()
         if mode == "staging":
-            with pytest.raises(StoreError, match="structure|cyclic"):
+            with pytest.raises(KristallError, match="structure|cyclic"):
                 store.set("bad", value)
             assert store.get("bad") is None
         else:
             with store.transaction() as tx:
-                with pytest.raises(StoreError, match="structure|cyclic"):
+                with pytest.raises(KristallError, match="structure|cyclic"):
                     tx.set("bad", value)
                 assert tx.get("bad") is None
         assert path.read_bytes() == before
         assert store.info().last_commit == 1
         store.set("next", 2)
         assert store.commit() == 2
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("saved") == 1
         assert reopened.get("next") == 2
 
@@ -48,25 +48,25 @@ def test_invalid_shape_is_rejected_before_copy_and_writer_remains_usable(tmp_pat
 def test_depth_boundary_and_shared_values_round_trip(tmp_path):
     shared = [1, 2]
     path = tmp_path / "boundary.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("limit", nested(64))
-        with pytest.raises(StoreError, match="structure"):
+        with pytest.raises(KristallError, match="structure"):
             store.set("over", nested(65))
         store.set("shared", {"a": shared, "b": shared})
         store.commit()
         store.checkpoint()
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("limit") == nested(64)
         assert reopened.get("shared") == {"a": [1, 2], "b": [1, 2]}
 
 
 def test_dictionary_keys_count_toward_node_budget(tmp_path, monkeypatch):
-    import memory_engine.store as module
+    import kristall.store as module
 
     monkeypatch.setattr(module, "MAX_VALUE_NODES", 5)
-    with MemoryStore(tmp_path / "nodes.memory") as store:
+    with Kristall(tmp_path / "nodes.memory") as store:
         store.set("limit", {"a": 1, "b": 2})
-        with pytest.raises(StoreError, match="structure"):
+        with pytest.raises(KristallError, match="structure"):
             store.set("over", {"a": 1, "b": 2, "c": 3})
         assert store.get("over") is None
         assert store.commit() == 1
@@ -83,16 +83,16 @@ def test_correct_digest_does_not_bypass_depth_limit_on_replay(tmp_path, depth):
     path = tmp_path / "invalid.memory"
     path.write_text(frame)
     before = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt committed journal"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt committed journal"):
+        Kristall(path)
     assert path.read_bytes() == before
 
 
 def test_unsupported_json_types_still_fail_at_commit(tmp_path):
-    with MemoryStore(tmp_path / "types.memory") as store:
+    with Kristall(tmp_path / "types.memory") as store:
         for value in ((1, 2), {1: "value"}, float("nan")):
             store.set("value", value)
-            with pytest.raises(StoreError, match="unsupported JSON"):
+            with pytest.raises(KristallError, match="unsupported JSON"):
                 store.commit()
         store.set("value", "corrected")
         assert store.commit() == 1
@@ -101,47 +101,47 @@ def test_unsupported_json_types_still_fail_at_commit(tmp_path):
 @pytest.mark.parametrize("mode", ["staging", "transaction"])
 @pytest.mark.parametrize("value", ["\ud800", {"\ud800": "ok"}, {"ok": "\udfff"}])
 def test_invalid_unicode_rejected_without_replacing_staging(tmp_path, mode, value):
-    with MemoryStore(tmp_path / "unicode.memory") as store:
+    with Kristall(tmp_path / "unicode.memory") as store:
         store.set("saved", 1)
         store.commit()
         if mode == "staging":
             store.set("pending", "old")
-            with pytest.raises(StoreError, match="invalid Unicode"):
+            with pytest.raises(KristallError, match="invalid Unicode"):
                 store.set("pending", value)
             assert store.get("pending") == "old"
             assert store.commit() == 2
         else:
             with store.transaction() as tx:
                 tx.set("pending", "old")
-                with pytest.raises(StoreError, match="invalid Unicode"):
+                with pytest.raises(KristallError, match="invalid Unicode"):
                     tx.set("pending", value)
                 assert tx.get("pending") == "old"
 
 
 def test_text_budget_counts_utf8_bytes_and_dictionary_keys(tmp_path, monkeypatch):
-    import memory_engine.store as module
+    import kristall.store as module
 
     monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 10)
-    with MemoryStore(tmp_path / "text.memory") as store:
+    with Kristall(tmp_path / "text.memory") as store:
         store.set("unicode", "Ж" * 5)
         for value in ("Ж" * 6, ["abcd", "efgh", "ijk"], {"abcd": "efghijk"}):
-            with pytest.raises(StoreError, match="text exceeds"):
+            with pytest.raises(KristallError, match="text exceeds"):
                 store.set("rejected", value)
         assert store.get("rejected") is None
         assert store.commit() == 1
-    with MemoryStore(tmp_path / "text.memory") as reopened:
+    with Kristall(tmp_path / "text.memory") as reopened:
         assert reopened.get("unicode") == "Ж" * 5
 
 
 def test_text_chunk_boundary_and_invalid_late_unicode(tmp_path, monkeypatch):
-    import memory_engine.store as module
+    import kristall.store as module
 
     monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 32769)
-    with MemoryStore(tmp_path / "chunks.memory") as store:
+    with Kristall(tmp_path / "chunks.memory") as store:
         store.set("limit", "a" * 32769)
-        with pytest.raises(StoreError, match="text exceeds"):
+        with pytest.raises(KristallError, match="text exceeds"):
             store.set("over", "a" * 32770)
-        with pytest.raises(StoreError, match="invalid Unicode"):
+        with pytest.raises(KristallError, match="invalid Unicode"):
             store.set("invalid", "a" * 16384 + "\ud800")
         assert store.commit() == 1
 
@@ -150,7 +150,7 @@ def test_text_chunk_boundary_and_invalid_late_unicode(tmp_path, monkeypatch):
 def test_replay_rejects_correctly_hashed_invalid_text_without_changing_source(
     tmp_path, monkeypatch, value
 ):
-    import memory_engine.store as module
+    import kristall.store as module
 
     monkeypatch.setattr(module, "MAX_VALUE_TEXT_BYTES", 10)
     payload = {
@@ -163,6 +163,6 @@ def test_replay_rejects_correctly_hashed_invalid_text_without_changing_source(
     path = tmp_path / "invalid-text.memory"
     path.write_text(json.dumps({"digest": digest, "payload": payload}) + "\n")
     before = path.read_bytes()
-    with pytest.raises(StoreError, match="corrupt committed journal"):
-        MemoryStore(path)
+    with pytest.raises(KristallError, match="corrupt committed journal"):
+        Kristall(path)
     assert path.read_bytes() == before

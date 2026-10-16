@@ -13,7 +13,7 @@ CI определяет затронутые платформы по полно�
   OAuth и credential handoff. Выполняются отдельно от Python application suite.
 - `Application tests`: Python/web-контракт приложения и его существующие coverage
   gates. Изменения runtime Python дополнительно проверяют совместимость с SQL до
-  завершения миграции Memory DB.
+  завершения миграции Kristall.
 - `Android debug APK`: native Android/build изменения и общий web-контракт.
   `android/scripts/stage_python.py` пока включает общие Python-файлы в APK;
   классификация не объявляет эти файлы архитектурно независимыми и не меняет

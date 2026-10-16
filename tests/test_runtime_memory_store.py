@@ -3,7 +3,7 @@
 import pytest
 
 from agent_memory.client import close_memory_clients, get_memory_client
-from memory_engine.store import StoreError
+from kristall.store import KristallError
 
 
 def test_registry_owns_one_native_engine_and_reopens(tmp_path):
@@ -12,12 +12,12 @@ def test_registry_owns_one_native_engine_and_reopens(tmp_path):
     assert first is get_memory_client(path)
     first.set("a", 1)
     first.commit()
-    with pytest.raises(StoreError, match="already has a writer"):
-        from memory_engine.store import MemoryStore
+    with pytest.raises(KristallError, match="already has a writer"):
+        from kristall.store import Kristall
 
-        MemoryStore(path)
+        Kristall(path)
     close_memory_clients(path)
-    with pytest.raises(StoreError, match="closed"):
+    with pytest.raises(KristallError, match="closed"):
         first.get("a")
     reopened = get_memory_client(path)
     assert reopened is not first

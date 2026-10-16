@@ -1,26 +1,26 @@
-"""RED-first standalone Memory DB API: name/value staging and explicit commit.
+"""RED-first standalone Kristall API: name/value staging and explicit commit.
 
 These tests describe the accepted v1 public behavior. Existing namespaced,
-auto-committing MemoryStore must fail until it is replaced.
+auto-committing Kristall must fail until it is replaced.
 """
 
-from memory_engine import MemoryStore
+from kristall import Kristall
 
 
 def test_set_is_staged_until_explicit_commit(tmp_path):
     path = tmp_path / "db.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("theme", "gray")
         assert db.get("theme") == "gray"
         assert db.last_commit.sequence == 0
         assert db.commit() == 1
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("theme") == "gray"
 
 
 def test_multiple_sets_commit_atomically(tmp_path):
     path = tmp_path / "db.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("theme", "gray")
         db.set("theme", "dark")
         db.set("language", "ru")
@@ -32,11 +32,11 @@ def test_multiple_sets_commit_atomically(tmp_path):
 
 def test_uncommitted_changes_are_not_recovered(tmp_path):
     path = tmp_path / "db.memory"
-    with MemoryStore(path) as db:
+    with Kristall(path) as db:
         db.set("saved", 1)
         db.commit()
         db.set("unsaved", 2)
-    with MemoryStore(path) as reopened:
+    with Kristall(path) as reopened:
         assert reopened.get("saved") == 1
         assert reopened.get("unsaved") is None
 
@@ -45,7 +45,7 @@ def test_two_workers_cannot_claim_same_task(tmp_path):
     """Only a durably committed claim counts as a successful claim."""
     import threading
 
-    with MemoryStore(tmp_path / "tasks.memory") as db:
+    with Kristall(tmp_path / "tasks.memory") as db:
         db.set("tasks/1", {"status": "queued"})
         db.commit()
         claimed: list[int] = []

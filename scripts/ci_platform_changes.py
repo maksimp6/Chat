@@ -39,10 +39,10 @@ MCP_PREFIXES = (
 
 def _runtime_platforms(path: str) -> set[str]:
     if path in {
-        "db.py",
+        "storage/db.py",
         "db_backend.py",
-        "memory_db.py",
-        "provider_credentials.py",
+        "storage/memory_db.py",
+        "provider_accounts/credentials.py",
     } or path.startswith("migrations/"):
         return {"backend", "database"}
     if path.startswith("tests/") and path.endswith(".py"):
@@ -79,7 +79,7 @@ def _path_platforms(path: str) -> set[str]:
                 "cloud/",
                 "scripts/cloudru_",
                 "scripts/ci_",
-                "alice_platform/",
+                "keel/",
                 "config/alice/",
                 ".github/workflows/",
             )

@@ -4,12 +4,12 @@ import pytest
 
 import invocation.manager as invocation_manager
 from agent_memory.client import close_memory_clients
-from session_manager import get_session
+from sessions.manager import get_session
 
 
 @pytest.fixture
 def native_store(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
 
     path = tmp_path / "native.memory"
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))
@@ -20,7 +20,7 @@ def native_store(tmp_path, monkeypatch):
 
 
 def test_first_use_reuses_session_after_duplicate_create_race(native_store, monkeypatch):
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     real_create = create_session
 
