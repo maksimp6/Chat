@@ -1566,22 +1566,25 @@ body {
   font-size: 13px;
 }
 
-/* Header actions stay on one horizontal line; narrow screens scroll instead of wrapping. */
+/* Header actions keep their existing rows and wrap secondary actions instead of scrolling. */
 .alice-pro-app #header {
-  flex-direction: row;
-  align-items: center;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
+ flex-direction: column;
+ align-items: stretch;
+ flex-wrap: nowrap;
+ overflow-x: visible;
+ overflow-y: visible;
 }
 
 .alice-pro-app #header .header-row {
-  flex: 0 0 auto;
+ flex: 0 1 auto;
+ min-width: 0;
 }
 
 .alice-pro-app #header .header-row-secondary {
-  overflow: visible;
-  padding-bottom: 0;
+ flex-wrap: wrap;
+ overflow-x: visible;
+ overflow-y: visible;
+ padding-bottom: 0;
 }
 
 /* === UNIFIED BUTTON CONTRACT === */
