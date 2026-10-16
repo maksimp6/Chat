@@ -86,7 +86,11 @@ async function flush() {
   // These are not claims about real browser rendering or Android IME behavior.
   const assertResponsiveLayout = (layout) => {
     assert.equal(layout.layoutSource, "structural-emulator-not-rendered-browser");
-    assert.equal(layout.horizontalOverflow, false, "horizontal overflow at " + layout.viewportWidth + "px");
+    assert.equal(
+      layout.horizontalOverflow,
+      false,
+      "horizontal overflow at " + layout.viewportWidth + "px",
+    );
     assert.ok(layout.secondaryLineCount >= 1);
     if (layout.viewportWidth <= 440) {
       assert.ok(
