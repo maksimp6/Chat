@@ -1,11 +1,11 @@
 import pytest
-from alice_printing.binding import printing_store
+from forge.binding import printing_store
 
 
 @pytest.fixture
 def finance_db(tmp_path, monkeypatch):
     import storage.db as db
-    import alice_printing.binding as binding
+    import forge.binding as binding
     import printing3d.service as service
 
     path = tmp_path / "printing3d-finance.db"
@@ -244,14 +244,14 @@ def test_finance_routes_require_owner(finance_db, monkeypatch):
 
 def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, monkeypatch):
     from printing3d import create_order, settle_order
-    import alice_printing.tools as printing_tools
+    import forge.tools as printing_tools
     from tool_providers.registry import ToolRegistry
 
     class Call:
         user_id = "trusted-finance-owner"
 
     cfg = {"_universal_context": {"call": Call()}}
-    plan = printing_tools.finance_plan_set(_full_plan(), cfg)
+    plan = printing_tools.set_financing_plan(_full_plan(), cfg)
     assert plan["owner_id"] == "trusted-finance-owner"
 
     order = create_order(
@@ -266,7 +266,7 @@ def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, mo
         actual_revenue=1000,
         actual_cost=200,
     )
-    status = printing_tools.finance_status({"month": None}, cfg)
+    status = printing_tools.get_finance_status({"month": None}, cfg)
     assert status["cumulative_realized_profit"] == pytest.approx(800)
 
     registry = ToolRegistry()
@@ -282,5 +282,5 @@ def test_finance_tools_use_trusted_identity_and_approval_boundary(finance_db, mo
         "get_current_owner_id",
         lambda required=True: "fallback-finance-owner",
     )
-    fallback = printing_tools.finance_plan_set(_full_plan(), {})
+    fallback = printing_tools.set_financing_plan(_full_plan(), {})
     assert fallback["owner_id"] == "fallback-finance-owner"

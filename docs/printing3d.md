@@ -100,5 +100,5 @@ python -m printing3d.slicer model.stl model.gcode
 - `printing3d/` — самостоятельный домен: расчёт, заказы, финансы, слайсер. Не
   импортирует модули Alice Pro (проверяется `tests/test_printing3d_standalone_boundary.py`).
   Хранилище передаётся явно через протокол `printing3d.store.PrintStore`.
-- `alice_printing/` — подключение к Alice Pro: HTTP-маршруты, инструменты Alice и
+- `forge/` — подключение к Alice Pro: HTTP-маршруты, инструменты Alice и
   привязка к нативному хранилищу и владельцу.

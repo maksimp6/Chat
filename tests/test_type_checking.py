@@ -38,8 +38,8 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
-    "alice_printing/__init__.py",
-    "alice_printing/binding.py",
+    "forge/__init__.py",
+    "forge/binding.py",
     "printing3d/store.py",
     "printing3d/slicer.py",
     "chat/__init__.py",
