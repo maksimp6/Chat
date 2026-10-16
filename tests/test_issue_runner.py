@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-import agent_runtime.alice_agent_runner as alice_agent_runner
+import agent_runtime.issue_runner as issue_runner
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ class FakeClient:
 
 
 def _run(repo, client, body="Please add a docstring."):
-    return alice_agent_runner.run_issue_task(
+    return issue_runner.run_issue_task(
         7, "Add docstring", body, client_factory=lambda: client, repo_root=repo
     )
 
@@ -124,7 +124,7 @@ def test_seed_requires_yandex_secrets(monkeypatch):
     monkeypatch.delenv("YANDEX_API_KEY", raising=False)
     monkeypatch.delenv("YANDEX_PROJECT_ID", raising=False)
     with pytest.raises(RuntimeError, match="YANDEX_API_KEY"):
-        alice_agent_runner.seed_provider_credential()
+        issue_runner.seed_provider_credential()
 
 
 def test_seed_stores_encrypted_credential(tmp_path, monkeypatch):
@@ -137,8 +137,8 @@ def test_seed_stores_encrypted_credential(tmp_path, monkeypatch):
     monkeypatch.setenv("YANDEX_API_KEY", "test-api-key")
     monkeypatch.setenv("YANDEX_PROJECT_ID", "test-project")
 
-    alice_agent_runner.seed_provider_credential()
-    alice_agent_runner.seed_provider_credential()  # idempotent
+    issue_runner.seed_provider_credential()
+    issue_runner.seed_provider_credential()  # idempotent
 
     conn = db.get_store()
     try:
@@ -163,10 +163,10 @@ def test_cli_writes_result_file(repo, tmp_path, monkeypatch):
         captured.update(issue=issue, title=title_text, body=body_text, model=model)
         return {"status": "no_changes", "changed_files": []}
 
-    monkeypatch.setattr(alice_agent_runner, "run_issue_task", fake_run)
+    monkeypatch.setattr(issue_runner, "run_issue_task", fake_run)
     monkeypatch.setenv("ALICE_AGENT_MODEL", "yandexgpt-5-pro")
 
-    code = alice_agent_runner.main(
+    code = issue_runner.main(
         ["--issue", "3", "--title-file", str(title), "--body-file", str(body), "--out", str(out)]
     )
 
@@ -186,10 +186,10 @@ def test_default_client_seeds_credential_and_uses_alice_client(repo, monkeypatch
             super().__init__(_message("ok"))
             created.append(config)
 
-    monkeypatch.setattr(alice_agent_runner, "seed_provider_credential", lambda: seeded.append(1))
+    monkeypatch.setattr(issue_runner, "seed_provider_credential", lambda: seeded.append(1))
     monkeypatch.setattr(mcp_routes, "AliceClient", DefaultClient)
 
-    result = alice_agent_runner.run_issue_task(7, "t", "b", repo_root=repo)
+    result = issue_runner.run_issue_task(7, "t", "b", repo_root=repo)
 
     assert seeded == [1]
     assert len(created) == 1
@@ -200,12 +200,12 @@ def test_cli_exit_code_signals_failure(tmp_path, monkeypatch):
     for name in ("title.txt", "body.txt"):
         (tmp_path / name).write_text("x", encoding="utf-8")
     monkeypatch.setattr(
-        alice_agent_runner,
+        issue_runner,
         "run_issue_task",
         lambda *args: {"status": "failed", "changed_files": []},
     )
 
-    code = alice_agent_runner.main(
+    code = issue_runner.main(
         [
             "--issue",
             "1",

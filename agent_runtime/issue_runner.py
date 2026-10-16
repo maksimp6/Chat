@@ -139,7 +139,7 @@ def run_issue_task(
         result["summary"] = (reply or "").strip()[:MAX_SUMMARY_CHARS]
     except Exception as exc:
         trace.record_error(
-            "alice_agent_runner",
+            "issue_runner",
             "GitHub issue agent failed",
             error_type=type(exc).__name__,
         )
