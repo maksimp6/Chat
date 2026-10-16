@@ -1,11 +1,11 @@
 import pytest
-from alice_printing.binding import printing_store
+from forge.binding import printing_store
 
 
 @pytest.fixture
 def assess_db(tmp_path, monkeypatch):
     import storage.db as db
-    import alice_printing.binding as binding
+    import forge.binding as binding
     import printing3d.service as service
 
     path = tmp_path / "printing3d-finance-assess.db"
@@ -244,7 +244,7 @@ def test_assess_can_be_ready_without_profit_evidence(assess_db):
 
 
 def test_finance_assess_tool_is_read_only_and_uses_trusted_identity(assess_db, monkeypatch):
-    import alice_printing.tools as printing_tools
+    import forge.tools as printing_tools
     from tool_providers.registry import ToolRegistry
 
     captured = {}

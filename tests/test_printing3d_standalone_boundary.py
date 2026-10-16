@@ -30,6 +30,6 @@ def test_domain_imports_only_stdlib_and_itself():
 
 
 def test_host_binding_lives_outside_the_domain():
-    assert (ROOT / "alice_printing" / "binding.py").exists()
+    assert (ROOT / "forge" / "binding.py").exists()
     assert not (DOMAIN / "routes.py").exists()
     assert not (DOMAIN / "tools.py").exists()

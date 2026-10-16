@@ -6,7 +6,7 @@ from typing import Any, Mapping, Optional
 
 from economy.treasury_identity import get_current_owner_id
 
-from alice_printing.binding import printing_store as _store
+from forge.binding import printing_store as _store
 from printing3d import finance, service
 
 QUOTE_REQUIRED_FIELDS = ("material_grams", "material_cost_per_kg", "print_hours")

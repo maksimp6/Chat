@@ -66,8 +66,8 @@ from remote_runtime.ssh_settings import public_settings, save_settings, test_con
 from plugin_system.routes import plugin_bp
 from workspace.project_tree import project_tree_bp
 from chat.voice_routes import voice_bp
-from alice_printing import init_printing_tables
-from alice_printing.routes import printing3d_bp
+from forge import init_printing_tables
+from forge.routes import printing3d_bp
 
 app = Flask(__name__)
 system_log.configure()

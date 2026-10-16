@@ -1,6 +1,6 @@
 from agent_memory.client import close_memory_clients
 import pytest
-from alice_printing.binding import printing_store
+from forge.binding import printing_store
 
 
 def test_quote_calculates_cost_risk_fee_and_profit():
@@ -45,7 +45,7 @@ def test_quote_rejects_impossible_margin_and_fee():
 @pytest.fixture
 def printing_db(tmp_path, monkeypatch):
     import storage.db as db
-    import alice_printing.binding as binding
+    import forge.binding as binding
     import printing3d.service as service
 
     path = tmp_path / "printing3d.db"
@@ -204,7 +204,7 @@ def test_quote_tool_is_read_only_and_order_create_requires_approval():
 
 
 def test_quote_tool_reports_missing_cost_drivers_instead_of_zero_price():
-    from alice_printing.tools import quote
+    from forge.tools import quote
 
     result = quote({"material_grams": 120, "material_cost_per_kg": None, "print_hours": None})
 
@@ -216,7 +216,7 @@ def test_quote_tool_reports_missing_cost_drivers_instead_of_zero_price():
 
 def test_quote_tool_matches_service_and_lists_assumed_defaults():
     from printing3d import calculate_quote
-    from alice_printing.tools import quote
+    from forge.tools import quote
 
     args = {
         "material_grams": 120,
@@ -243,7 +243,7 @@ def test_quote_tool_matches_service_and_lists_assumed_defaults():
 
 def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
     from printing3d import list_orders
-    from alice_printing.tools import create_order_tool, quote
+    from forge.tools import create_order_tool, quote
 
     class Call:
         user_id = "trusted-owner"
@@ -265,7 +265,7 @@ def test_order_create_tool_recalculates_price_for_trusted_owner(printing_db):
 
 
 def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
-    from alice_printing.tools import create_order_tool
+    from forge.tools import create_order_tool
 
     with pytest.raises(ValueError, match="status"):
         create_order_tool({"title": "X", "status": "paid"}, {})
@@ -281,14 +281,14 @@ def test_order_create_tool_rejects_unsafe_status_and_partial_quote(printing_db):
     [{}, {"material_grams": None, "material_cost_per_kg": None, "print_hours": None}],
 )
 def test_order_create_tool_rejects_empty_or_all_null_quote(printing_db, empty_quote):
-    from alice_printing.tools import create_order_tool
+    from forge.tools import create_order_tool
 
     with pytest.raises(ValueError, match="quote is missing"):
         create_order_tool({"title": "X", "status": "accepted", "quote": empty_quote}, {})
 
 
 def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db):
-    from alice_printing.tools import create_order_tool
+    from forge.tools import create_order_tool
 
     class Call:
         user_id = "trusted-owner"
@@ -311,7 +311,7 @@ def test_order_create_tool_keeps_order_and_quote_currency_consistent(printing_db
 
 def test_treasury_summary_tool_uses_trusted_call_identity(printing_db):
     from printing3d import create_order, settle_order
-    from alice_printing.tools import get_treasury_summary
+    from forge.tools import get_treasury_summary
 
     order = create_order(
         printing_store(), "trusted-owner", {"title": "Socket holder", "quoted_price": 300}
@@ -395,7 +395,7 @@ def test_quote_validation_edges():
 
 def test_schema_migrates_legacy_print_orders(tmp_path, monkeypatch):
     import storage.db as db
-    import alice_printing.binding as binding
+    import forge.binding as binding
     import printing3d.service as service
 
     evidence = b"SQLite format 3\0legacy order evidence"
@@ -527,7 +527,7 @@ def test_settlement_edge_cases_and_quote_defaults(printing_db):
 
 def test_printing3d_tool_helpers_cover_fallback_and_order_filters(printing_db, monkeypatch):
     from printing3d import create_order
-    import alice_printing.tools as printing_tools
+    import forge.tools as printing_tools
 
     monkeypatch.setattr(
         printing_tools,
@@ -555,7 +555,7 @@ def test_registry_survives_printing3d_tool_import_failure(monkeypatch):
     real_import = builtins.__import__
 
     def guarded_import(name, *args, **kwargs):
-        if name == "alice_printing.tools":
+        if name == "forge.tools":
             raise ImportError("printing3d tool import test")
         return real_import(name, *args, **kwargs)
 

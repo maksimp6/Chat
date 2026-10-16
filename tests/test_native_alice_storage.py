@@ -10,7 +10,7 @@ from flask import Flask
 import storage.db as db
 from agent_memory.client import close_memory_clients
 from kristall import Kristall, KristallError
-from alice_printing.binding import printing_store
+from forge.binding import printing_store
 
 
 def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
