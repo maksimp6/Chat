@@ -139,7 +139,7 @@ def get_financing_plan(owner_id: str) -> dict[str, Any] | None:
 
 
 def _month_profit(owner_id: str, currency: str, month: str) -> Decimal:
-    from .service import list_orders
+    from printing3d.service import list_orders
 
     profit = Decimal("0")
     for order in list_orders(owner_id, status="paid"):
@@ -155,7 +155,7 @@ def _month_profit(owner_id: str, currency: str, month: str) -> Decimal:
 
 
 def _cumulative_profit(owner_id: str, currency: str) -> Decimal:
-    from .service import get_financial_summary
+    from printing3d.service import get_financial_summary
 
     summary = get_financial_summary(owner_id)
     for bucket in summary["currencies"]:

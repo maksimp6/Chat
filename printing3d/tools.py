@@ -6,8 +6,8 @@ from typing import Any, Mapping, Optional
 
 from economy.treasury_identity import get_current_owner_id
 
-from .finance import assess_financing, get_payback_status, set_financing_plan
-from .service import (
+from printing3d.finance import assess_financing, get_payback_status, set_financing_plan
+from printing3d.service import (
     ORDER_STATUSES,
     calculate_quote,
     create_order,

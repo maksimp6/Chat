@@ -10,9 +10,9 @@ from invocation.api import get_invocation_status, get_invocation_trace
 from sessions.manager import get_session
 from tool_providers.registry import registry
 
-from .auth import _auth_mode
-from .protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
-from .runtime_bridge import _authorize_invocation
+from mcp_server.auth import _auth_mode
+from mcp_server.protocol import MCP_PATH, SUPPORTED_PROTOCOL_VERSIONS, _server_info
+from mcp_server.runtime_bridge import _authorize_invocation
 
 
 def _tool(

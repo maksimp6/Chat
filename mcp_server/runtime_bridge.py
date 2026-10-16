@@ -43,7 +43,7 @@ def _authorize_invocation(invocation: Mapping[str, Any], authenticated_user: Opt
     Legacy invocations may predate user ownership.  They are therefore only
     accessible when anonymous/developer access is explicitly enabled.
     """
-    from .auth import _auth_mode
+    from mcp_server.auth import _auth_mode
 
     owner_id = _owner_id_from_invocation(invocation)
     if owner_id and authenticated_user and owner_id == authenticated_user:
@@ -71,7 +71,7 @@ def _handle_call(
     runtime_id: str | None = None,
     resource_runtime_id: str | None = None,
 ) -> dict[str, Any]:
-    from .protocol import _server_info
+    from mcp_server.protocol import _server_info
 
     if not isinstance(arguments, dict):
         raise ValueError("arguments must be an object")

@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from invocation.context import InvocationContext
 from observability.trace_manager import ExecutionTrace
 
-from .dispatcher import RuntimeDispatcher, RuntimeScopeViolation
+from runtime.dispatcher import RuntimeDispatcher, RuntimeScopeViolation
 
 
 def _freeze(value: Any) -> Any:

@@ -1,6 +1,6 @@
 """Synchronous Memory DB with client-owned explicit name/value commits."""
 
-from .store import (
+from memory_engine.store import (
     Commit,
     DatabaseInfo,
     DatabaseInfoContract,

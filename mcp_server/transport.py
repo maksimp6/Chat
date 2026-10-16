@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 from flask import Blueprint, Response, jsonify, request
 
-from .auth import _require_auth
-from .protocol import (
+from mcp_server.auth import _require_auth
+from mcp_server.protocol import (
     DEFAULT_PROTOCOL_VERSION,
     MCP_PATH,
     OAUTH_SCOPE,
@@ -15,8 +15,8 @@ from .protocol import (
     _request_protocol_version,
     _server_info,
 )
-from .runtime_bridge import _handle_call
-from .tools import _tools_list
+from mcp_server.runtime_bridge import _handle_call
+from mcp_server.tools import _tools_list
 
 chatgpt_mcp_bp = Blueprint("chatgpt_mcp", __name__)
 
