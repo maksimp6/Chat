@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from yandex_api_key_provider import YandexApiKeyProvider
+from yandex_client_modules.api_key_provider import YandexApiKeyProvider
 
 
 def provider():
@@ -15,7 +15,7 @@ def provider():
     )
 
 
-@patch("yandex_api_key_provider.requests.post")
+@patch("yandex_client_modules.api_key_provider.requests.post")
 def test_create_key_returns_resource_id_and_secret(mock_post):
     response = Mock()
     response.json.return_value = {
@@ -33,7 +33,7 @@ def test_create_key_returns_resource_id_and_secret(mock_post):
     assert "iam-secret" not in str(body)
 
 
-@patch("yandex_api_key_provider.requests.delete")
+@patch("yandex_client_modules.api_key_provider.requests.delete")
 def test_revoke_key_calls_yandex_resource_endpoint(mock_delete):
     response = Mock()
     mock_delete.return_value = response
@@ -46,12 +46,12 @@ def test_revoke_key_calls_yandex_resource_endpoint(mock_delete):
 
 
 def test_validate_key_is_local_only():
-    with patch("yandex_api_key_provider.requests.get") as mock_get:
+    with patch("yandex_client_modules.api_key_provider.requests.get") as mock_get:
         provider().validate_key("provider-secret")
         mock_get.assert_not_called()
 
 
-@patch("yandex_api_key_provider.requests.post")
+@patch("yandex_client_modules.api_key_provider.requests.post")
 def test_create_key_defaults_to_runtime_ai_scopes(mock_post, monkeypatch):
     monkeypatch.delenv("YANDEX_API_KEY_SCOPES", raising=False)
     response = Mock()

@@ -5,10 +5,10 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from flask import Flask
 
-import db
-import short_token_auth
+import storage.db as db
+import identity.short_token_auth as short_token_auth
 from identity import github_oauth as github_auth
-from user_identity import (
+from identity.user_identity import (
     authenticate_user_token,
     get_github_login,
     init_github_accounts_table,
@@ -358,7 +358,7 @@ def test_concurrent_first_sign_in_uses_one_identity(temp_db):
 
 def test_duplicate_uuid_does_not_publish_partial_state(temp_db, monkeypatch):
     import uuid as uuid_module
-    import user_identity
+    import identity.user_identity as user_identity
 
     existing = register_anonymous_user("web-installation-0005", {})
     monkeypatch.setattr(user_identity.uuid, "uuid4", lambda: uuid_module.UUID(existing["user_id"]))
@@ -379,7 +379,7 @@ def test_stale_bootstrap_cannot_overwrite_promoted_user_token(temp_db, monkeypat
     import threading
     import time
 
-    import user_identity
+    import identity.user_identity as user_identity
 
     anon = register_anonymous_user("web-installation-0006", {})
     bootstrap_read = threading.Event()

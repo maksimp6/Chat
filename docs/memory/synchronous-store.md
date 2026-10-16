@@ -1,4 +1,4 @@
-# Synchronous Memory DB: functional core and Alice task adapter
+# Synchronous Kristall: functional core and Alice task adapter
 
 The accepted owner contracts are [#1045](https://github.com/maksimp6/Chat/issues/1045)
 and [#1046](https://github.com/maksimp6/Chat/issues/1046), within
@@ -9,7 +9,7 @@ PyPI, transport schemas, mirroring and build-performance work stay separate.
 ## Public contract
 
 `Store[ValueT]` has one name/value API: `get(name)`, `set(name, value)`, and
-`commit() -> int`. `MemoryStore` implements it. Names are nonempty strings;
+`commit() -> int`. `Kristall` implements it. Names are nonempty strings;
 missing names return `None`. JSON `null` is therefore indistinguishable from
 missing through this API. Values are finite JSON scalars, lists and string-keyed
 dictionaries. Tuples, non-string dictionary keys, nonfinite floats and arbitrary
@@ -23,9 +23,9 @@ Staging belongs to the client instance, not individual threads; concurrent
 read-modify-write consumers must use `transaction()`.
 
 ```python
-from memory_engine import MemoryStore
+from kristall import Kristall
 
-with MemoryStore("alice.memory") as store:
+with Kristall("alice.memory") as store:
     store.set("settings/theme", "gray")
     assert store.commit() == 1
     with store.transaction() as tx:
@@ -72,7 +72,7 @@ replication. Historical SQL backups are untouched.
 ## Alice integration
 
 `agent_memory.client` owns the application writer registry and explicit shutdown.
-Canonical path aliases share one `MemoryStore`; the library has no Alice imports
+Canonical path aliases share one `Kristall`; the library has no Alice imports
 or global database owner. Stop consumers before `close_memory_clients()`.
 
 `agent_shell.TaskStore` uses a typed, versioned task aggregate through this adapter.
@@ -103,9 +103,9 @@ coverage includes fresh-process reopen, SIGKILL before append/after fsync/after
 ACK, failed fsync without publication, invalid values, corruption, transactions,
 writer ownership, backup and isolated restore. Alice tests cover task behavior,
 concurrent runners, failed durable claim, and fresh-process interrupted-task
-recovery. The dedicated Memory DB workflow runs core verification independently.
+recovery. The dedicated Kristall workflow runs core verification independently.
 
-Alice now uses the native MemoryStore writer for chat/messages/settings/config,
+Alice now uses the native Kristall writer for chat/messages/settings/config,
 identity and ownership, sessions, agent memory, invocation/Trace, MCP selection,
 local-agent jobs, environments, provider metadata/encrypted credentials, quotas,
 Treasury and business workflows. Records are separate native names; mutations

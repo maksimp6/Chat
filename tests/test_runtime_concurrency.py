@@ -5,7 +5,7 @@ import pytest
 
 @pytest.fixture
 def runtime_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     from agent_memory.client import close_memory_clients
 
     path = tmp_path / "runtime.db"
@@ -18,7 +18,7 @@ def runtime_db(tmp_path, monkeypatch):
 
 
 def test_parallel_invocations_keep_context_and_trace_isolated(runtime_db):
-    from session_manager import create_session
+    from sessions.manager import create_session
     from invocation.manager import create_invocation, finish_invocation, get_invocation
 
     session = create_session(metadata={"suite": "concurrency"})

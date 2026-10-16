@@ -2,8 +2,8 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
-from trace_manager import ExecutionTrace
-from yandex_client import YandexClientError, YandexResponsesClient
+from observability.trace_manager import ExecutionTrace
+from yandex_client_modules.client import YandexClientError, YandexResponsesClient
 
 
 class TestExecutionTraceResponses(unittest.TestCase):

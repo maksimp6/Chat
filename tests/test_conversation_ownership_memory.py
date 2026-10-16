@@ -1,11 +1,11 @@
-"""Owner writes use native MemoryStore transactions, not SQL or adapters."""
+"""Owner writes use native Kristall transactions, not SQL or adapters."""
 
 from pathlib import Path
 
 import pytest
 
-import conversation_ownership as ownership
-import db
+import conversations.ownership as ownership
+import storage.db as db
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
 from agent_memory.client import close_memory_clients, get_memory_client
 
