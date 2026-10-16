@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 
 def test_header_actions_wrap_into_multiple_rows_without_horizontal_overflow():
@@ -19,10 +18,22 @@ def test_header_actions_wrap_into_multiple_rows_without_horizontal_overflow():
 def test_header_preserves_all_existing_navigation_buttons():
     html = Path("templates/index.html").read_text(encoding="utf-8")
     expected = [
-        "menu-btn", "system-status-btn", "model-btn", "tools-btn", "ssh-runtime-btn",
-        "mcp-btn", "settings-btn", "file-manager-btn", "treasury-btn", "dozzle-btn",
-        "project-tree-btn", "departments-btn", "update-app-btn", "provider-credentials-btn",
-        "memory-btn", "theme-toggle",
+        "menu-btn",
+        "system-status-btn",
+        "model-btn",
+        "tools-btn",
+        "ssh-runtime-btn",
+        "mcp-btn",
+        "settings-btn",
+        "file-manager-btn",
+        "treasury-btn",
+        "dozzle-btn",
+        "project-tree-btn",
+        "departments-btn",
+        "update-app-btn",
+        "provider-credentials-btn",
+        "memory-btn",
+        "theme-toggle",
     ]
     for button_id in expected:
         assert 'id="' + button_id + '"' in html
