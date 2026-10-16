@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from .manager import get_invocation
+from invocation.manager import get_invocation
 
 
 def _sanitize_trace(value: Any) -> Any:

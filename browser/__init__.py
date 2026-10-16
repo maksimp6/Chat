@@ -1,6 +1,6 @@
 """Browser capability, adapter, and orchestration package."""
 
-from .orchestration import (
+from browser.orchestration import (
     BrowserDagBudget,
     BrowserDagResult,
     BrowserRoleDag,
@@ -31,7 +31,7 @@ __all__ = [
     "synthesize_browser_dag",
 ]
 
-from .semantic import (
+from browser.semantic import (
     Evidence,
     MergedEvidence,
     SemanticDiff,
@@ -42,7 +42,7 @@ from .semantic import (
     merge_evidence,
 )
 
-from .pipeline import (
+from browser.pipeline import (
     BrowserSynthesisPolicy,
     BrowserSynthesisResult,
     EscalationDecision,

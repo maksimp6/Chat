@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 from agent_memory.client import get_memory_client
 from storage.db import memory_file_path
-from .context import InvocationContext
+from invocation.context import InvocationContext
 from sessions.manager import create_session, restore_session
 
 _INVOCATION_PREFIX = "runtime_invocation:"

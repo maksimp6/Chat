@@ -1,6 +1,6 @@
 """3D printing business domain for Alice Pro."""
 
-from .service import (
+from printing3d.service import (
     calculate_quote,
     create_order,
     get_financial_summary,

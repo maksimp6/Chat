@@ -4,8 +4,8 @@ from flask import Blueprint, jsonify, request
 
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
-from .finance import get_payback_status, set_financing_plan
-from .service import (
+from printing3d.finance import get_payback_status, set_financing_plan
+from printing3d.service import (
     calculate_quote,
     create_order,
     get_financial_summary,
