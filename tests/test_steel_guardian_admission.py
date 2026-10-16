@@ -17,8 +17,7 @@ def test_valid_request():
 
 def test_missing_approval():
     assert (
-        admit(Request(frozenset(), limits()), policy(approved=False))
-        is Decision.MISSING_APPROVAL
+        admit(Request(frozenset(), limits()), policy(approved=False)) is Decision.MISSING_APPROVAL
     )
 
 
@@ -64,9 +63,7 @@ def test_invalid_request_capabilities(capabilities):
     assert admit(Request(capabilities, limits()), policy()) is Decision.CAPABILITY_DENIED
 
 
-@pytest.mark.parametrize(
-    "capabilities", [{"inspect"}, frozenset({""}), frozenset({1}), None]
-)
+@pytest.mark.parametrize("capabilities", [{"inspect"}, frozenset({""}), frozenset({1}), None])
 def test_invalid_approval_capabilities(capabilities):
     approval = Approval(capabilities, limits(), True)
     assert admit(Request(frozenset(), limits()), approval) is Decision.MISSING_APPROVAL
