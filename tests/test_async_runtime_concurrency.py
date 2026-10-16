@@ -7,20 +7,15 @@ import pytest
 @pytest.fixture
 def async_runtime_db(tmp_path, monkeypatch):
     import db
-    import invocation.manager as invocation_manager
-    import runtime_migrations
-    import session_manager
+    from agent_memory.client import close_memory_clients
 
     path = tmp_path / "async-concurrency.db"
-    if not db.postgres_url_from_env():
-        monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(session_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
-
+    monkeypatch.setattr(db, "DB_PATH", str(path))
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
-    return path
+    yield path
+    close_memory_clients()
 
 
 @pytest.mark.asyncio
@@ -32,8 +27,12 @@ async def test_async_tasks_keep_invocation_and_trace_context_isolated(async_runt
         persist_invocation_trace,
     )
     from invocation.trace import create_invocation_trace
-    from session_manager import create_session
-    from trace_manager import bind_current_trace, get_current_trace, reset_current_trace
+    from sessions.manager import create_session
+    from observability.trace_manager import (
+        bind_current_trace,
+        get_current_trace,
+        reset_current_trace,
+    )
 
     session = await asyncio.to_thread(create_session, metadata={"suite": "async-concurrency"})
 
@@ -105,7 +104,7 @@ async def test_cancelled_task_does_not_corrupt_sibling_invocation(async_runtime_
         get_invocation,
         start_invocation,
     )
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     session = await asyncio.to_thread(create_session, metadata={"suite": "async-cancellation"})
     entered = threading.Event()
@@ -196,13 +195,13 @@ async def test_async_harness_leaves_no_owned_pending_tasks(async_runtime_db):
 
 @pytest.mark.asyncio
 async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypatch):
-    import agent_gateway
+    import agent_runtime.gateway as agent_gateway
     from concurrent.futures import (
         ThreadPoolExecutor as RealThreadPoolExecutor,
         TimeoutError as FutureTimeoutError,
     )
 
-    from agent_gateway import AgentDescriptor, AgentGateway
+    from agent_runtime.gateway import AgentDescriptor, AgentGateway
 
     slow_started = threading.Event()
     timeout_observed = threading.Event()
@@ -284,7 +283,7 @@ async def test_agent_gateway_timeout_does_not_block_sibling_async_call(monkeypat
 async def test_async_budget_reservations_do_not_oversubscribe_balance():
     from decimal import Decimal
 
-    from budget_controller import (
+    from economy.budget_controller import (
         AccountType,
         BudgetAccount,
         BudgetController,
@@ -323,7 +322,7 @@ async def test_async_budget_reservations_do_not_oversubscribe_balance():
 async def test_async_budget_harness_exposes_missing_lock_oversubscription():
     from decimal import Decimal
 
-    from budget_controller import AccountType, BudgetAccount, BudgetController, BudgetLimits
+    from economy.budget_controller import AccountType, BudgetAccount, BudgetController, BudgetLimits
 
     limits = BudgetLimits("50", "300", "300")
     controller = BudgetController(
@@ -356,7 +355,7 @@ async def test_async_budget_harness_exposes_missing_lock_oversubscription():
 
 @pytest.mark.asyncio
 async def test_async_provider_quota_reservations_are_atomic(async_runtime_db):
-    from provider_quotas import (
+    from provider_accounts.quotas import (
         ProviderQuotaExceeded,
         assign_user_policy,
         get_usage,
@@ -402,8 +401,12 @@ async def test_async_provider_quota_reservations_are_atomic(async_runtime_db):
 async def test_to_thread_worker_keeps_bound_trace_context_isolated(async_runtime_db):
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
-    from session_manager import create_session
-    from trace_manager import bind_current_trace, get_current_trace, reset_current_trace
+    from sessions.manager import create_session
+    from observability.trace_manager import (
+        bind_current_trace,
+        get_current_trace,
+        reset_current_trace,
+    )
 
     session = await asyncio.to_thread(
         create_session,
@@ -445,7 +448,7 @@ async def test_late_worker_finish_cannot_overwrite_cancelled_invocation(async_ru
         get_invocation,
         start_invocation,
     )
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     session = await asyncio.to_thread(
         create_session,
@@ -505,7 +508,7 @@ async def test_late_worker_finish_cannot_overwrite_cancelled_invocation(async_ru
 @pytest.mark.asyncio
 async def test_runtime_invocation_work_leaves_no_owned_pending_tasks(async_runtime_db):
     from invocation.manager import create_invocation, finish_invocation, start_invocation
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     current = asyncio.current_task()
     before = set(asyncio.all_tasks())

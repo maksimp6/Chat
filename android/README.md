@@ -58,7 +58,9 @@ gradle :app:testDebugUnitTest
 `RootAgentService` serving a loopback-only API on `127.0.0.1:8766`.
 
 - Started only from **Diagnostics → RootAgent: проверить**, which also runs an in-app
-  self-check (health + root probe) and shows the result; **RootAgent: остановить** stops it.
+  self-check (health + root probe; with root, also `/v1/status`, `/v1/screen/tree` and
+  `/v1/screen/capture`, reporting only the lock flag and HTTP codes, never screen content) and
+  shows the result; **RootAgent: остановить** stops it.
   The service is not exported and never starts on its own.
 - Routes: `GET /v1/health`, `GET /v1/device-info` (Build model/device/SDK), `GET /v1/status`
   (`{"keyguard_locked": bool}` from a root `dumpsys window`; missing or unexpected fields count as
@@ -76,7 +78,9 @@ gradle :app:testDebugUnitTest
   it never leaves the app process. Requests with `Origin`, a cross-site `Sec-Fetch-Site` or a
   foreign `Host` are refused, so WebView pages and DNS rebinding cannot reach the API.
 - JVM unit tests in `app/src/test/java/com/alicepro/mobile/rootagent/` cover the bounded shell,
-  the HTTP boundary and the self-check client. Real-device smoke on the Redmi 9 is still pending.
+  the HTTP boundary and the self-check client. Redmi 9 smoke (2026-10-13, #650): loopback-only
+  listener, 401 without or with a wrong token, 403 with a foreign `Origin`, self-check
+  `root: true` once Magisk allows the app uid. Magisk must grant root to Alice Pro explicitly.
 
 ## System insets
 

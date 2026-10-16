@@ -8,7 +8,7 @@ def assess_db(tmp_path, monkeypatch):
 
     path = tmp_path / "printing3d-finance-assess.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(service, "get_conn", db.get_conn)
+    monkeypatch.setattr(service, "get_store", db.get_store)
     db.init_db()
     service.init_3d_printing_tables()
     return path

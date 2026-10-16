@@ -13,15 +13,13 @@ from invocation.manager import (
     start_invocation,
 )
 from invocation.trace import create_invocation_trace
-from runtime_migrations import init_runtime_tables
-from session_manager import create_session, get_session, restore_session
+from sessions.manager import create_session, get_session, restore_session
 
 
 def setup_db(tmpdir):
     old_path = db.DB_PATH
     db.DB_PATH = os.path.join(tmpdir, "runtime.db")
     db.init_db()
-    init_runtime_tables()
     return old_path
 
 

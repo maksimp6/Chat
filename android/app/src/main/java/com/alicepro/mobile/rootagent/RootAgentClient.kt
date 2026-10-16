@@ -9,6 +9,9 @@ import java.net.URI
 class RootAgentClient(private val port: Int, private val token: () -> String) {
     data class Report(val healthy: Boolean, val root: Boolean?, val error: String?)
 
+    /** Screen-route self-check: only the lock flag and HTTP codes, never screen content. */
+    data class ScreenReport(val keyguardLocked: Boolean?, val tree: Int?, val capture: Int?, val error: String?)
+
     fun selfCheck(): Report {
         return try {
             val (healthStatus, _) = get("/v1/health")
@@ -21,6 +24,22 @@ class RootAgentClient(private val port: Int, private val token: () -> String) {
             }
         } catch (_: IOException) {
             Report(false, null, "unreachable")
+        }
+    }
+
+    fun screenCheck(): ScreenReport {
+        return try {
+            val (statusCode, statusBody) = get("/v1/status")
+            val locked = when {
+                statusCode != 200 -> null
+                statusBody.contains("\"keyguard_locked\":false") -> false
+                else -> true
+            }
+            val tree = get("/v1/screen/tree").first
+            val capture = get("/v1/screen/capture").first
+            ScreenReport(locked, tree, capture, if (statusCode != 200) "status_http_$statusCode" else null)
+        } catch (_: IOException) {
+            ScreenReport(null, null, null, "unreachable")
         }
     }
 

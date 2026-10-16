@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
           ALICE_PROVIDER_CREDENTIAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
           export ALICE_PROVIDER_CREDENTIAL_KEY
-          export ALICE_DB_PATH="$RUNNER_TEMP/alice.db"
+          export ALICE_MEMORY_PATH="$RUNNER_TEMP/alice.memory"
           # A failed run is still reported on the issue by the last step.
           python alice_agent_runner.py \
             --issue "$ISSUE_NUMBER" \

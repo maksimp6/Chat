@@ -1,6 +1,6 @@
 import pytest
 
-from session_profiles import clone_profile, get_profile, list_profiles, session_profile
+from sessions.profiles import clone_profile, get_profile, list_profiles, session_profile
 
 
 def test_builtin_profiles_are_available():
@@ -22,17 +22,15 @@ def test_missing_profile_returns_none():
 @pytest.fixture
 def runtime_db(tmp_path, monkeypatch):
     import db
-    import session_manager
-    import runtime_migrations
+    from agent_memory.client import close_memory_clients
 
-    path = tmp_path / "profiles.db"
+    path = tmp_path / "runtime.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(session_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
-
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
-    return path
+    yield path
+    close_memory_clients()
 
 
 def test_clone_persists_independent_session(runtime_db):
