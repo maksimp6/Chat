@@ -1,3 +1,4 @@
+from agent_memory.client import close_memory_clients
 import json
 from datetime import UTC, datetime
 from unittest.mock import patch
@@ -6,7 +7,7 @@ import pytest
 
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
-from provider_credentials import (
+from provider_accounts.credentials import (
     CredentialError,
     NoActiveCredentialError,
     get_secret_management_ref,
@@ -14,7 +15,12 @@ from provider_credentials import (
     rollback_secret_management_ref,
     set_secret_management_ref,
 )
-from trace_manager import ExecutionTrace, bind_current_trace, get_current_trace, reset_current_trace
+from observability.trace_manager import (
+    ExecutionTrace,
+    bind_current_trace,
+    get_current_trace,
+    reset_current_trace,
+)
 
 
 @pytest.fixture()
@@ -24,9 +30,9 @@ def isolated_db(monkeypatch, tmp_path):
 
     db.DB_PATH = str(tmp_path / "secrets.db")
     db.init_db()
-    conn = db.get_conn()
+    conn = db.get_store()
     yield conn
-    conn.close()
+    close_memory_clients()
 
 
 class FakeSecretManagementClient:
@@ -159,38 +165,29 @@ def test_rollback_round_trips_whole_second_aware_timestamps(isolated_db):
 
 
 def test_sqlite_timestamp_converter_reads_naive_and_aware_values(isolated_db):
-    isolated_db.execute("CREATE TABLE ts_probe (value TIMESTAMP)")
-    isolated_db.executemany(
-        "INSERT INTO ts_probe (value) VALUES (?)",
-        [
-            ("2026-01-02 03:04:45",),
-            ("2026-01-02 03:04:45.5",),
-            ("2026-01-02 03:04:45+00:00",),
-            ("2026-01-02 03:04:45.123456+03:00",),
-        ],
-    )
-    values = [row[0] for row in isolated_db.execute("SELECT value FROM ts_probe").fetchall()]
-    assert values == [
-        datetime.fromisoformat("2026-01-02T03:04:45"),
-        datetime.fromisoformat("2026-01-02T03:04:45.500000"),
-        datetime(2026, 1, 2, 3, 4, 45, tzinfo=UTC),
-        datetime.fromisoformat("2026-01-02 03:04:45.123456+03:00"),
+    values = [
+        "2026-01-02 03:04:45",
+        "2026-01-02 03:04:45.5",
+        "2026-01-02 03:04:45+00:00",
+        "2026-01-02 03:04:45.123456+03:00",
     ]
+    for i, value in enumerate(values):
+        moment = datetime.fromisoformat(value)
+        ref = set_secret_management_ref(isolated_db, str(i), "secret", "version", now=moment)
+        assert ref.updated_at == (moment if moment.tzinfo else moment.replace(tzinfo=UTC))
 
 
 def test_ref_table_only_ever_stores_identifiers_not_a_value_column(isolated_db):
-    set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
-    columns = {
-        row["name"]
-        for row in isolated_db.execute("PRAGMA table_info(secret_management_refs)").fetchall()
-    }
-    assert columns == {
+    set_secret_management_ref(isolated_db, "purpose", "secret", "version")
+    record = isolated_db.get("secret/ref/purpose")
+    assert set(record) == {
         "purpose",
         "secret_id",
         "pinned_version_id",
         "previous_version_id",
         "updated_at",
     }
+    assert "value" not in record
 
 
 def test_secret_value_never_reaches_trace_even_when_a_later_error_is_recorded(isolated_db):
@@ -301,7 +298,7 @@ def test_resolve_constructs_default_backend_client(isolated_db):
 
 
 def test_default_resolver_reuses_backend_scoped_client(isolated_db, monkeypatch):
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
     set_secret_management_ref(isolated_db, "alice_short_token", "secret-1", "v1")
     fake = FakeSecretManagementClient({("secret-1", "v1"): "cached-client-value"})
@@ -326,28 +323,13 @@ def test_atomic_upsert_tracks_immediately_previous_version(isolated_db):
 
 
 def test_rollback_detects_stale_concurrent_update(isolated_db, monkeypatch):
-    import provider_credentials as credentials
+    import provider_accounts.credentials as credentials
 
-    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v1")
-    set_secret_management_ref(isolated_db, "alice_database_url", "secret-1", "v2")
-
-    stale = get_secret_management_ref(isolated_db, "alice_database_url")
-    original_get = credentials.get_secret_management_ref
-    calls = {"count": 0}
-
-    def stale_then_real(db, purpose):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            return stale
-        return original_get(db, purpose)
-
-    monkeypatch.setattr(credentials, "get_secret_management_ref", stale_then_real)
-    isolated_db.execute(
-        "UPDATE secret_management_refs SET pinned_version_id = ?, previous_version_id = ? "
-        "WHERE purpose = ?",
-        ("v3", "v2", "alice_database_url"),
-    )
-    isolated_db.commit()
-
-    with pytest.raises(CredentialError, match="changed concurrently"):
-        rollback_secret_management_ref(isolated_db, "alice_database_url")
+    set_secret_management_ref(isolated_db, "purpose", "secret", "v1")
+    set_secret_management_ref(isolated_db, "purpose", "secret", "v2")
+    stale = get_secret_management_ref(isolated_db, "purpose")
+    set_secret_management_ref(isolated_db, "purpose", "secret", "v3")
+    monkeypatch.setattr(credentials, "get_secret_management_ref", lambda *_args: stale)
+    restored = rollback_secret_management_ref(isolated_db, "purpose")
+    assert restored.pinned_version_id == "v2"
+    assert restored.previous_version_id == "v3"

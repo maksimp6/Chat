@@ -1,9 +1,10 @@
 import json
+import subprocess
 
 import pytest
 from flask import Flask
 
-import chatgpt_mcp
+import mcp_server as chatgpt_mcp
 import mcp_server
 from invocation.context import InvocationContext
 from invocation.trace import create_invocation_trace
@@ -57,13 +58,6 @@ def test_tools_list_is_deterministic_and_read_only(client):
     assert body["result"]["ttlMs"] > 0
     assert all("inputSchema" in tool for tool in tools)
     assert all("securitySchemes" in tool for tool in tools)
-
-
-def test_chatgpt_mcp_compatibility_shim_reexports_package_api():
-    assert chatgpt_mcp.chatgpt_mcp_bp is mcp_server.chatgpt_mcp_bp
-    assert chatgpt_mcp.mcp_runtime_dispatcher is mcp_server.mcp_runtime_dispatcher
-    assert chatgpt_mcp.registry is mcp_server.registry
-    assert chatgpt_mcp.DEFAULT_PROTOCOL_VERSION == mcp_server.DEFAULT_PROTOCOL_VERSION
 
 
 def test_every_registered_tool_is_exposed_through_mcp(client):
@@ -258,7 +252,7 @@ def test_project_read_tools_are_exposed_and_read_only(client):
 def test_project_tools_execute_through_mcp(client):
     cases = [
         ("alice_list_project_files", {"path": "."}),
-        ("alice_read_project_file", {"path": "chatgpt_mcp.py", "length": 1024}),
+        ("alice_read_project_file", {"path": "app.py", "length": 1024}),
         ("alice_search_project", {"query": "UniversalToolExecutor", "file_pattern": "*.py"}),
     ]
     for name, arguments in cases:
@@ -273,7 +267,33 @@ def test_project_tools_execute_through_mcp(client):
         assert isinstance(result, dict)
 
 
-def test_existing_git_read_tools_execute_through_mcp(client):
+@pytest.mark.parametrize("linked", [False, True])
+def test_existing_git_read_tools_execute_through_mcp(client, linked, tmp_path, monkeypatch):
+    if linked:
+        repository = tmp_path / "repository"
+        repository.mkdir()
+        (repository / "tracked.txt").write_text("synthetic\n", encoding="utf-8")
+        commands = [
+            ["init", "-q"],
+            ["add", "."],
+            [
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            ["worktree", "add", "-q", "-b", "linked", str(tmp_path / "linked")],
+        ]
+        for command in commands:
+            subprocess.run(
+                ["git", "-C", str(repository), *command], check=True, capture_output=True
+            )
+        monkeypatch.chdir(tmp_path / "linked")
     cases = [
         ("git_status", {"repo_path": "."}),
         ("git_log", {"repo_path": ".", "limit": 2}),
@@ -376,7 +396,7 @@ def test_mcp_conversation_tools_are_owner_scoped(client, monkeypatch, tmp_path):
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     db.init_db()
 
-    from conversation_ownership import init_conversation_ownership_table, set_owner
+    from conversations.ownership import init_conversation_ownership_table, set_owner
 
     init_conversation_ownership_table()
     db.create_conversation("conversation-a", "A", "model")
@@ -463,14 +483,12 @@ def test_mcp_initialize_handshake_is_supported(client):
 
 def test_mcp_tool_call_is_persisted_in_execution_trace(monkeypatch, tmp_path):
     import db
-    from runtime_migrations import init_runtime_tables
 
     monkeypatch.delenv("ALICE_MCP_ALLOW_ANONYMOUS", raising=False)
     monkeypatch.setenv("ALICE_MCP_BEARER_TOKEN", "trace-token")
     monkeypatch.setenv("ALICE_MCP_USER_ID", "trace-user")
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "alice.db"))
     db.init_db()
-    init_runtime_tables()
 
     from flask import Flask
 

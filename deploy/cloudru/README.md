@@ -1,4 +1,4 @@
-# Alice Pro: EDS + Container Apps + внешний PostgreSQL
+# Alice Pro: EDS + Container Apps + нативный MemoryStore
 
 Комплект для Codex и оператора, проверен 2026-09-28. Это подготовленные шаблоны
 и runbook, **не выполненный деплой**. Канонический репозиторий
@@ -27,10 +27,9 @@ python scripts/cloudru_deploy_preflight.py --help
 |---|---|---|
 | `eds.config.example.json` | EDS через `EDS_CONFIG` | UUID проекта; API key отдельно в env |
 | `control-plane.env.example` | Защищённый deploy runner | EDS и IAM credentials, выбранные IDs |
-| `runtime.env.example` | Environment контейнера | DB DSN, app secrets, OAuth, разрешённые GitHub IDs |
-| `deployment.example.json` | Наш preflight/runbook | SHA, image digest, project, public origin, DB и egress evidence |
+| `runtime.env.example` | Environment контейнера | ALICE_MEMORY_PATH, app secrets, OAuth, разрешённые GitHub IDs |
+| `deployment.example.json` | Наш preflight/runbook | SHA, image digest, project, public origin, persistence/restore evidence |
 | `container-app.create.example.json` | Evolution Container Apps API adapter | Реальный project/image и секреты только в памяти запроса |
-| `postgres/*` | Администратор PostgreSQL/backup runner | Bind IP, DNS/TLS, client CIDRs, роли, backup profile |
 | `services.md` | Следующие интеграции | Приоритеты, подтверждённые возможности и текущие задачи |
 | `dns/*`, `api-gateway/*` | DNS/Gateway operator | Шаблон зоны/CNAME и OpenAPI starter; заполнить IDs и все routes |
 | `logging/*` | App/platform log operator | JSON stdout event, service-specific logs and redaction checks |
@@ -58,13 +57,13 @@ python scripts/cloudru_deploy_preflight.py --help
 | EDS | `EDS_PROJECT_ID`, `EDS_API_KEY`, ID существующего приложения для deploy |
 | Evolution API | `CLOUDRU_PROJECT_ID`, разрешённая IAM Key ID/Key Secret пара |
 | App access | `ALICE_REQUIRE_SHORT_TOKEN=1`, отдельный `ALICE_SHORT_TOKEN` |
-| БД | `ALICE_DATABASE_URL` в формате из `postgres/README.md` |
+| БД | `ALICE_MEMORY_PATH` на подтверждённом постоянном файловом хранилище; один writer |
 | Encrypted credentials | `ALICE_PROVIDER_CREDENTIAL_KEY`; сохранить прежний при миграции |
 | Вход владельца | GitHub client ID/secret, явные allowed IDs, HTTPS callback URI |
 | S3, если включён | Bucket/region/tenant + отдельные S3 key ID/secret, минимум прав |
 | AI backend | Alice currently uses Yandex AI Studio in Yandex Cloud; this deployment needs no Cloud.ru model key |
 
-Для новых app/encryption/DB secrets использовать случайные высокоэнтропийные
+Для новых app/encryption secrets использовать случайные высокоэнтропийные
 значения через защищённый генератор и Secret Management. Не менять существующий
 ключ шифрования автоматически: иначе сохранённые provider credentials не прочитать.
 Секреты EDS и широкие deploy IAM права в контейнер не попадают. Secret Management
@@ -87,9 +86,10 @@ Bootstrap identity для чтения Secret Management должна сущес
 2. Установить EDS v0.4.0, проверить authorized env/config по наличию, затем сделать
    read-only inventory с пагинацией. Последняя проверка runner не нашла EDS key
    или application ID. IAM-пара не заменяет продуктовый ключ EDS.
-3. Подготовить внешний PostgreSQL по `postgres/README.md`: подтверждённый egress,
-   firewall/HBA, TLS CA и DNS, роли, backup/restore. Public IP без этих настроек
-   не завершает задачу. Не создавать новую VM неявно.
+3. Подтвердить постоянное файловое хранилище для нативного журнала, один writer
+   на путь и восстановление проверенного backup в отдельный каталог. Ephemeral
+   filesystem контейнера не считается durable storage. Подготовка production
+   cutover требует отдельной приёмки; существующие SQL данные не изменять.
 4. Заполнить application env и callback в GitHub OAuth App. Зарегистрированный
    callback должен точно совпадать с публичным origin и `/auth/github/callback`.
    Для изменяемого домена сначала подготовить endpoint без пользовательского
@@ -106,22 +106,22 @@ Bootstrap identity для чтения Secret Management должна сущес
 python scripts/cloudru_deploy_preflight.py --config deploy/cloudru/deployment.local.json
 # Дополнительно проверить существующую EDS цель:
 python scripts/cloudru_deploy_preflight.py --config deploy/cloudru/deployment.local.json --workflow
-# Из целевого runtime, с CA-файлом и установленным requirements-postgres.txt:
+# Из целевого runtime, с существующим нативным журналом и остановленным writer:
 python scripts/cloudru_deploy_preflight.py --config deploy/cloudru/deployment.local.json --check-db
 ```
 
 Preflight не читает секреты из EDS config, не вызывает cloud API, не проверяет
-membership SHA в master, реальную доступность image, подлинность egress evidence
+membership SHA в master, реальную доступность image, подлинность persistence/restore evidence
 или соответствие всех API payload. Это отдельные проверки оператора/pipeline.
 Без `--check-db` он не открывает сетевых соединений. Успех означает `CONFIG_VALID`;
 `deployment_ready=false` остаётся явным, потому что rollout checks ещё нужны.
-Профиль намеренно фиксирует первоначальный sizing/имена/port и узкие CIDRs;
+Профиль намеренно фиксирует первоначальный sizing/имена/port и единственный writer;
 изменение профиля требует осмысленного изменения validator, а не обхода ошибки.
 
 ## Workflow Studio и API rollout
 
 В EDS v0.4.0 create **сразу деплоит**. Сначала установить, как pipeline применит
-runtime env, DB CA и доступ к registry до публикации. CLI не умеет настроить эти
+runtime env, постоянное хранилище и доступ к registry до публикации. CLI не умеет настроить эти
 поля. Если в Workflow Studio нет подходящего pre-publication hook, использовать
 его только после реализации такого pipeline или выбрать существующий API flow.
 
@@ -134,8 +134,8 @@ production deploy не готов. Нельзя публиковать прои�
 `python scripts/cloudru_deploy.py deploy --tag FULL_MASTER_SHA --env NAME ...`.
 Он передаёт env **по именам** и собирает git archive, но новый preflight не
 подключён к нему автоматически. До вызова выполнить проверки выше и убедиться
-в наличии API v2 исправлений. Существующий workflow требует PostgreSQL и auth,
-но его проверка URI scheme не заменяет verify-full/egress/backup проверки здесь.
+в наличии API v2 исправлений. Workflow использует нативное хранилище и auth; проверка конфигурации
+не заменяет реальную проверку persistence и restore.
 Не запускать одновременно оба deploy контроллера; выбрать один источник rollout.
 
 JSON-пример env содержит заглушки. Adapter должен заменить значения в памяти
@@ -172,19 +172,19 @@ stdout/stderr, Container Apps system/request logs, Gateway log group, Cloud audi
 Container Apps API.
 
 `identities-and-secrets.md` перечисляет IAM users/service accounts, EDS key,
-Workflow Studio API, Gateway users/keys, FM/S3 keys, DB roles и certificate
+Workflow Studio API, Gateway users/keys, FM/S3 keys и certificate
 material. Runtime secret injection остаётся gated adapter/pipeline work (#477);
 placeholder `REPLACE_FROM_SECRET_STORE` пока не native secret reference.
 
 ## Проверка результата и rollback
 
 Перед открытием трафика проверить /healthz, негативный anonymous access,
-GitHub owner login, чужой GitHub ID, MCP OAuth, чат, чтение/запись PostgreSQL,
+GitHub owner login, чужой GitHub ID, MCP OAuth, чат, чтение/запись MemoryStore,
 сохранность после новой ревизии и холодного старта, streaming, отсутствие
 секретов/дубликатов в логах и восстановление backup.
 
 Сохранить **редактированный** отчёт: source SHA, image digest, project/container/
-application/revision/run IDs, статус TLS/CRUD/auth/restore, время проверки и
+application/revision/run IDs, статус CRUD/auth/persistence/restore, время проверки и
 известные ограничения. Не публиковать raw app show/job logs или DSN.
 
 Rollback — возврат проверенного предыдущего digest/revision с совместимой схемой
@@ -195,8 +195,8 @@ rollback БД; сначала остановить запись и исполь�
 
 ## Оставшиеся внешние входные данные
 
-Нужны реальный DevServices key/project/application, выбранный PostgreSQL endpoint
-и административный канал, гарантированные client CIDRs, CA, runtime secrets,
+Нужны реальный DevServices key/project/application, подтверждённое постоянное
+хранилище, isolated restore evidence, runtime secrets,
 registry digest, публичный origin и pipeline с подтверждением точного SHA.
 Запрос подготовки конфигов не выдаёт эти значения и не подтверждает их наличие.
 
@@ -205,3 +205,15 @@ registry digest, публичный origin и pipeline с подтвержден
 [создание контейнера](https://cloud.ru/docs/container-apps-evolution/ug/topics/guides__container-create),
 [логи](https://cloud.ru/docs/container-apps-evolution/ug/topics/concepts__logging),
 [аудит](https://cloud.ru/docs/container-apps-evolution/ug/topics/monitoring__audit-logging-events).
+
+
+## Native storage transition
+
+The deployment example uses schema version 2 and `memory_engine.MemoryStore`.
+PostgreSQL provisioning, SQL backups and SQL driver installation are retired.
+`--check-db` verifies an existing journal under its exclusive writer lock; it
+never repairs, replaces or deletes source data. Static config success is not
+proof of a persistent cloud filesystem. Provide persistence and isolated-restore
+evidence for the tested image before production rollout. A serverless container
+with an ephemeral filesystem is not an accepted durable live storage target.
+Historical SQL data/backups remain untouched; production cutover is separate.

@@ -3,7 +3,7 @@ import tempfile
 
 import db
 
-from partner_relations import (
+from organization.partner_relations import (
     PARTNER_TOOLS,
     add_contact,
     create_followup,

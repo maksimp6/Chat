@@ -12,8 +12,7 @@ from invocation.manager import (
     get_invocation,
     start_invocation,
 )
-from runtime_migrations import init_runtime_tables
-from session_manager import create_session, get_session, restore_session, update_session
+from sessions.manager import create_session, get_session, restore_session, update_session
 
 
 class PersistentRuntimeRecordsTests(unittest.TestCase):
@@ -21,12 +20,17 @@ class PersistentRuntimeRecordsTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.old_db_path = db.DB_PATH
         db.DB_PATH = os.path.join(self.temp_dir.name, "runtime.db")
+        from agent_memory.client import close_memory_clients
+
+        close_memory_clients()
         db.init_db()
-        init_runtime_tables()
         db.create_conversation("conversation-1", "Test", "test-model")
         db.create_conversation("conversation-2", "Test 2", "test-model")
 
     def tearDown(self):
+        from agent_memory.client import close_memory_clients
+
+        close_memory_clients()
         db.DB_PATH = self.old_db_path
         self.temp_dir.cleanup()
 

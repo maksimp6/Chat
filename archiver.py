@@ -1,46 +1,22 @@
-import threading
-from datetime import datetime, timedelta, timezone
+"""Explicit maintenance of the same native journal used by Alice."""
 
-import db as database
+from __future__ import annotations
+import threading
+from agent_memory.client import get_memory_client
 
 
 class DatabaseArchiver:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._mutex = threading.Lock()
-        self.schema_version = "1.2"
+        self.schema_version = "memory-v1"
 
     def run_archive(self) -> bool:
         if not self._mutex.acquire(blocking=False):
-            print("⚠️ Archival task already running. Skipping.")
             return False
-
-        conn = database.get_conn(self.db_path)
         try:
-            cursor = conn.cursor()
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-
-            cursor.execute(
-                "SELECT id, content, created_at FROM messages WHERE created_at < ?",
-                (cutoff,),
-            )
-            rows = cursor.fetchall()
-
-            if not rows:
-                return True
-
-            cursor.execute("DELETE FROM messages WHERE created_at < ?", (cutoff,))
-            conn.commit()
-            print(
-                f"💼 Successfully archived {len(rows)} records under schema v{self.schema_version}."
-            )
+            # Compaction preserves all chat records; maintenance is not data deletion.
+            get_memory_client(self.db_path).checkpoint()
             return True
-
-        except Exception as exc:
-            conn.rollback()
-            print(f"❌ Transaction failed, rolling back: {exc}")
-            return False
         finally:
-            conn.close()
             self._mutex.release()
-            print("🔓 Mutex released successfully.")

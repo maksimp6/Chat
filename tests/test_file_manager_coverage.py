@@ -4,8 +4,8 @@ import re
 import pytest
 import requests
 
-import file_manager
-from yandex_client import YandexClientError
+import workspace.files as file_manager
+from yandex_client_modules.client import YandexClientError
 
 
 class FakeResponse:

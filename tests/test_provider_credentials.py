@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from provider_credentials import (
+from provider_accounts.credentials import (
     ExpiredCredentialError,
     NoActiveCredentialError,
     get_active_key,
@@ -16,8 +16,12 @@ class FakeDb:
     def __init__(self, row):
         self.row = row
 
-    def fetch_one(self, _query):
-        return self.row
+    def get(self, key):
+        if self.row is None:
+            return None
+        if key.startswith("provider/active/"):
+            return self.row["id"]
+        return {**self.row, "status": "active", "provider_key_id": self.row.get("yandex_key_id")}
 
 
 def test_get_active_key_decrypts_active_unexpired_key():
@@ -69,7 +73,7 @@ def test_issue_window_is_12_hours():
 
 
 def test_fingerprint_is_stable_and_non_secret():
-    from provider_credentials import fingerprint_key
+    from provider_accounts.credentials import fingerprint_key
 
     secret = "sk-provider-secret"
     fingerprint = fingerprint_key(secret)
@@ -78,169 +82,86 @@ def test_fingerprint_is_stable_and_non_secret():
 
 
 def test_provider_credentials_are_isolated():
-    import sqlite3
+    import db
+    from provider_accounts.credentials import replace_active_credential, get_active_credential
 
-    from provider_credentials import create_schema, get_active_credential
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, provider_key_id, provider, project_id,
-            issued_at, expires_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
-        (
-            "cipher-yandex",
-            "yandex-key",
-            "yandex",
-            "project-yandex",
-            "2026-01-01T00:00:00+00:00",
-            "2026-01-02T00:00:00+00:00",
-        ),
-    )
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, provider_key_id, provider, project_id,
-            issued_at, expires_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
-        (
-            "cipher-cloudru",
-            "cloudru-key",
-            "cloudru",
-            "",
-            "2026-01-01T00:00:00+00:00",
-            "2026-01-02T00:00:00+00:00",
-        ),
-    )
-    conn.commit()
-
-    yandex = get_active_credential(
-        conn,
-        lambda value: "yandex-secret" if value == "cipher-yandex" else "wrong",
-        provider="yandex",
-        now=datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
-    )
-    cloudru = get_active_credential(
-        conn,
-        lambda value: "cloudru-secret" if value == "cipher-cloudru" else "wrong",
-        provider="cloudru",
-        now=datetime(2026, 1, 1, 1, tzinfo=timezone.utc),
-    )
-
-    assert yandex.api_key == "yandex-secret"
-    assert yandex.provider == "yandex"
-    assert yandex.provider_key_id == "yandex-key"
-    assert cloudru.api_key == "cloudru-secret"
-    assert cloudru.provider == "cloudru"
-    assert cloudru.provider_key_id == "cloudru-key"
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    store = db.get_store()
+    for provider in ("yandex", "cloudru"):
+        replace_active_credential(
+            store,
+            provider + "-secret",
+            "project",
+            lambda value: "cipher:" + value,
+            provider,
+            provider_key_id=provider + "-key",
+            now=now,
+        )
+    for provider in ("yandex", "cloudru"):
+        credential = get_active_credential(
+            store, lambda value: value.removeprefix("cipher:"), now=now, provider=provider
+        )
+        assert credential.api_key == provider + "-secret"
+        assert credential.provider_key_id == provider + "-key"
 
 
 def test_create_schema_migrates_legacy_global_index():
-    import sqlite3
+    from memory_engine import MemoryStore, StoreError
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
 
-    from provider_credentials import create_schema
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    conn.execute(
-        """CREATE TABLE provider_credentials (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            api_key_encrypted TEXT NOT NULL,
-            yandex_key_id TEXT,
-            project_id TEXT NOT NULL,
-            issued_at TIMESTAMP NOT NULL,
-            expires_at TIMESTAMP NOT NULL,
-            status TEXT NOT NULL DEFAULT 'active',
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )"""
-    )
-    conn.execute(
-        "CREATE UNIQUE INDEX one_active_key ON provider_credentials(status) WHERE status = 'active'"
-    )
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, yandex_key_id, project_id, issued_at, expires_at, status)
-           VALUES ('cipher', 'old-yandex-id', 'project-1',
-                   '2026-01-01T00:00:00+00:00', '2026-01-02T00:00:00+00:00', 'active')"""
-    )
-    create_schema(conn)
-    indexes = {
-        row["name"]
-        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
-    }
-    row = conn.execute(
-        "SELECT provider, provider_key_id FROM provider_credentials WHERE id=1"
-    ).fetchone()
-
-    assert "one_active_key" not in indexes
-    assert "one_active_key_per_provider" in indexes
-    assert row["provider"] == "yandex"
-    assert row["provider_key_id"] == "old-yandex-id"
+    with TemporaryDirectory() as root:
+        path = Path(root) / "legacy.db"
+        evidence = b"SQLite format 3\0legacy evidence"
+        path.write_bytes(evidence)
+        with pytest.raises(StoreError):
+            MemoryStore(path)
+        assert path.read_bytes() == evidence
 
 
 def test_provider_health_metadata_has_no_secret():
-    import sqlite3
-
+    import db
     from cryptography.fernet import Fernet
-    from provider_credentials import create_schema, record_health_check, replace_active_credential
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-    fernet = Fernet(Fernet.generate_key())
-
-    meta = replace_active_credential(
-        conn,
-        "secret-health",
-        "project-1",
-        lambda value: fernet.encrypt(value.encode("utf-8")).decode("utf-8"),
-        "yandex",
-        provider_key_id="yandex-health",
+    from provider_accounts.credentials import (
+        record_health_check,
+        replace_active_credential,
+        list_provider_credentials,
     )
-    record_health_check(conn, "yandex", status="connected")
 
-    row = conn.execute(
-        """SELECT fingerprint, last_check_status, last_check_error
-           FROM provider_credentials WHERE id = ?""",
-        (meta.id,),
-    ).fetchone()
-    conn.close()
-
+    fernet = Fernet(Fernet.generate_key())
+    store = db.get_store()
+    replace_active_credential(
+        store,
+        "secret-health",
+        "project",
+        lambda value: fernet.encrypt(value.encode()).decode(),
+        "yandex",
+    )
+    record_health_check(store, "yandex", status="connected")
+    row = list_provider_credentials(store)[0]
     assert row["fingerprint"]
     assert row["last_check_status"] == "connected"
     assert row["last_check_error"] is None
-    assert "secret-health" not in str(dict(row))
+    assert "secret-health" not in str(row)
+    assert "api_key_encrypted" not in row
 
 
 def test_manual_provider_credential_does_not_fabricate_remote_key_id():
-    import sqlite3
+    import db
+    from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
-    from provider_credentials import create_schema, replace_active_credential
-
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
     credential = replace_active_credential(
-        conn,
-        "manual-cloudru-secret",
-        "",
-        lambda value: "encrypted:" + value,
-        "cloudru",
+        db.get_store(), "manual-secret", "", lambda value: "cipher", "cloudru"
     )
-    row = conn.execute(
-        "SELECT provider_key_id, fingerprint FROM provider_credentials WHERE id = ?",
-        (credential.id,),
-    ).fetchone()
-    conn.close()
-
+    row = list_provider_credentials(db.get_store())[0]
+    assert row["id"] == credential.id
     assert row["provider_key_id"] is None
     assert row["fingerprint"]
 
 
 def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
     from flask import Flask
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     class FakeClient:
         def validate_key(self, api_key):
@@ -265,7 +186,7 @@ def test_provider_credentials_update_returns_provider_auth_error(monkeypatch):
 
 
 def test_provider_credentials_update_rejects_admin_auth_before_provider_validation(monkeypatch):
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     monkeypatch.setenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", "expected-token")
     app = __import__("flask").Flask(__name__)
@@ -286,7 +207,7 @@ def test_provider_credentials_update_rejects_admin_auth_before_provider_validati
 
 def test_provider_credentials_update_accepts_yandex_static_key_without_remote_probe(monkeypatch):
     from flask import Flask
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     calls = []
 
@@ -301,7 +222,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
         def close(self):
             pass
 
-    monkeypatch.setattr(routes, "get_conn", lambda: FakeConn())
+    monkeypatch.setattr(routes, "get_store", lambda: FakeConn())
     monkeypatch.setattr(
         routes,
         "replace_active_credential",
@@ -326,7 +247,7 @@ def test_provider_credentials_update_accepts_yandex_static_key_without_remote_pr
 
 def test_provider_credentials_update_logs_storage_error_and_returns_detail(monkeypatch, caplog):
     from flask import Flask
-    import provider_credentials_routes as routes
+    import provider_accounts.credentials_routes as routes
 
     class FakeClient:
         def validate_key(self, api_key):
@@ -335,7 +256,7 @@ def test_provider_credentials_update_logs_storage_error_and_returns_detail(monke
     monkeypatch.setattr(routes, "_provider_client", lambda provider, project_id=None: FakeClient())
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIALS_TOKEN", raising=False)
     monkeypatch.setattr(
-        routes, "get_conn", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded"))
+        routes, "get_store", lambda: (_ for _ in ()).throw(RuntimeError("sqlite exploded"))
     )
 
     app = Flask(__name__)

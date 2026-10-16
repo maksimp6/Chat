@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta, timezone
-import sqlite3
 
-from provider_credentials import create_schema, issue_window, rotation_needed
-from provider_key_rotation import rotate_active_key
+from provider_accounts.credentials import create_schema, issue_window, rotation_needed
+from provider_accounts.key_rotation import rotate_active_key
 
 
 class FakeProvider:
@@ -22,48 +21,35 @@ class FakeProvider:
 
 
 def test_rotation_promotes_one_global_key_for_12_hours():
-    now = datetime(2026, 1, 1, 11, tzinfo=timezone.utc)
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-    issued, expires = issue_window(now)
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, yandex_key_id, project_id, issued_at, expires_at, status)
-           VALUES (?, ?, ?, ?, ?, 'active')""",
-        (
-            "old-cipher",
-            "aje-old-key",
-            "project-1",
-            now - timedelta(hours=11),
-            now + timedelta(minutes=30),
-        ),
-    )
-    conn.commit()
+    import db
+    from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    store = db.get_store()
+    old = replace_active_credential(
+        store,
+        "old",
+        "project-1",
+        lambda value: "cipher",
+        "yandex",
+        provider_key_id="aje-old-key",
+        now=now - timedelta(hours=11),
+    )
     provider = FakeProvider()
-    new_id, new_issued, new_expires = rotate_active_key(
-        db=conn,
+    new_id, issued, expires = rotate_active_key(
+        db=store,
         provider=provider,
         encrypt=lambda value: "enc:" + value,
-        old_id=1,
+        old_id=old.id,
         project_id="project-1",
         old_provider_key_id="aje-old-key",
         now=now,
         commit_before_revoke=True,
     )
-
-    rows = conn.execute(
-        "SELECT yandex_key_id, status, expires_at FROM provider_credentials ORDER BY id"
-    ).fetchall()
-    active = [row for row in rows if row["status"] == "active"]
-
+    active = [row for row in list_provider_credentials(store) if row["status"] == "active"]
     assert new_id == "aje-new-key"
-    assert new_issued == issued
-    assert new_expires == expires
-    assert new_expires - new_issued == timedelta(hours=12)
-    assert len(active) == 1
-    assert active[0]["yandex_key_id"] == "aje-new-key"
+    assert expires - issued == timedelta(hours=12)
+    assert len(active) == 1 and active[0]["provider_key_id"] == new_id
     assert provider.revoked == ["aje-old-key"]
 
 
@@ -92,49 +78,35 @@ class FakeReissueProvider:
 
 
 def test_reissue_rotation_keeps_cloudru_provider_key_id():
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    create_schema(conn)
-    conn.execute(
-        """INSERT INTO provider_credentials
-           (api_key_encrypted, provider_key_id, provider, project_id,
-            issued_at, expires_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'active')""",
-        (
-            "old-cipher",
-            "cloudru-key",
-            "cloudru",
-            "",
-            now - timedelta(days=89),
-            now + timedelta(hours=30),
-        ),
-    )
-    conn.commit()
+    import db
+    from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    store = db.get_store()
+    old = replace_active_credential(
+        store,
+        "old",
+        "",
+        lambda value: "cipher",
+        "cloudru",
+        provider_key_id="cloudru-key",
+        now=now - timedelta(hours=11),
+    )
     provider = FakeReissueProvider()
-    new_id, _, new_expires = rotate_active_key(
-        db=conn,
+    new_id, issued, expires = rotate_active_key(
+        db=store,
         provider=provider,
         encrypt=lambda value: "enc:" + value,
-        old_id=1,
+        old_id=old.id,
         project_id="",
         old_provider_key_id="cloudru-key",
         now=now,
-        commit_before_revoke=True,
         provider_name="cloudru",
         reissue_existing=True,
-        ttl=timedelta(days=90),
+        ttl=timedelta(days=1),
+        commit_before_revoke=True,
     )
-
-    rows = conn.execute(
-        "SELECT provider_key_id, provider, status FROM provider_credentials ORDER BY id"
-    ).fetchall()
-    active = [row for row in rows if row["status"] == "active"]
-
     assert new_id == "cloudru-key"
-    assert new_expires - now == timedelta(days=90)
-    assert provider.reissued[0][0] == "cloudru-key"
-    assert len(active) == 1
-    assert active[0]["provider"] == "cloudru"
-    assert active[0]["provider_key_id"] == "cloudru-key"
+    assert expires - issued == timedelta(days=1)
+    assert len([row for row in list_provider_credentials(store) if row["status"] == "active"]) == 1
+    assert provider.reissued == [("cloudru-key", expires)]

@@ -42,7 +42,7 @@ def test_patch_conversation_model_rejects_unauthorized_conversation(monkeypatch)
 
 
 def test_list_conversations_rejects_invalid_owner_token(monkeypatch):
-    from treasury_identity import TreasuryIdentityError
+    from economy.treasury_identity import TreasuryIdentityError
 
     def raise_invalid_token(*, required=False):
         raise TreasuryIdentityError("invalid authenticated owner token")

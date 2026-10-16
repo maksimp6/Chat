@@ -25,6 +25,13 @@ Alice Pro уже содержит первый рабочий business slice д�
 - [HTTP API](api/printing3d.md)
 - [Universal/MCP tools](mcp/printing3d-tools.md)
 
+## Модели как код
+
+Модели для печати хранятся в [`printing3d/models/`](../printing3d/models/README.md) как
+исходники OpenSCAD со сгенерированными STL и 3MF. Это просто файлы в
+репозитории, а не asset workflow приложения: Alice Pro их не читает и не
+обрабатывает.
+
 ## Бизнес-границы
 
 3D P&L не пополняет и не изменяет существующий Treasury paper balance.

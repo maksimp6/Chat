@@ -1,3 +1,4 @@
+from agent_memory.client import close_memory_clients
 import json
 
 import pytest
@@ -8,20 +9,17 @@ from api_contracts import validate_api_contract
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     import db
-    import runtime_migrations
-    import session_manager
-    import invocation.manager as invocation_manager
+    from agent_memory.client import close_memory_clients
     import app as app_module
 
     path = tmp_path / "api.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(session_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
     app_module.app.config["TESTING"] = True
-    return app_module.app.test_client()
+    yield app_module.app.test_client()
+    close_memory_clients()
 
 
 def test_session_and_invocation_api(client):
@@ -109,17 +107,9 @@ def test_trace_endpoint_returns_correlated_persisted_trace(client):
     )
     trace_data = trace.finalize()
 
-    conn = db.get_conn()
-    conn.execute(
-        "INSERT INTO conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-        ("conversation-trace", "Trace", "aliceai-llm", 1, 1),
-    )
-    conn.execute(
-        "INSERT INTO messages (conversation_id, role, content, created_at, trace_json) VALUES (?, ?, ?, ?, ?)",
-        ("conversation-trace", "assistant", "ok", 1, json.dumps(trace_data)),
-    )
-    conn.commit()
-    conn.close()
+    db.create_conversation("conversation-trace", "Trace", "aliceai-llm")
+    db.add_message("conversation-trace", "assistant", "ok", trace=trace_data)
+    close_memory_clients()
 
     response = client.get(f"/api/invocations/{invocation['invocation_id']}/trace")
     assert response.status_code == 200
