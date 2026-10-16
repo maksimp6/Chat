@@ -70,16 +70,8 @@ python app.py
 
 Локально `db.py` использует `alice_pro.db` относительно рабочего каталога;
 путь можно задать через `ALICE_DB_PATH`.
-Для PostgreSQL установите дополнительные зависимости и настройте
-`ALICE_DATABASE_URL` перед запуском:
-
-```bash
-python -m pip install -r requirements-postgres.txt
-```
-
-Выбор backend не означает переноса существующих данных.
-Полнота PostgreSQL-совместимости отслеживается в
-[#442](https://github.com/maksimp6/Chat/issues/442).
+PostgreSQL backend выведен из эксплуатации (#1191): дополнительные зависимости
+не нужны, `ALICE_DATABASE_URL` не используется.
 
 ## Проверка работоспособности
 
