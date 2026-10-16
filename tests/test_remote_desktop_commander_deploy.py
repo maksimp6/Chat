@@ -183,7 +183,7 @@ def test_image_uses_frozen_dependency_graph():
     package = json.loads((DEPLOY / "package.json").read_text())
     lock = json.loads((DEPLOY / "package-lock.json").read_text())
     assert package["dependencies"] == {
-        "@modelcontextprotocol/sdk": "1.31.0",
+        "@modelcontextprotocol/sdk": "1.32.1",
         "@wonderwhy-er/desktop-commander": "0.2.52",
     }
     assert package["overrides"] == {"sharp": "0.35.4", "exceljs": {"uuid": "11.1.1"}}
