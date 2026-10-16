@@ -4,7 +4,7 @@ Alice Platform is a configuration-driven deployment system that uses three layer
 
 1. **Documentation** (docs/platform/) — explains rules and principles
 2. **Configuration** (config/alice/) — contains desired state facts (YAML)
-3. **Code** (alice_platform/) — validates config and reconciles reality to desired state
+3. **Code** (keel/) — validates config and reconciles reality to desired state
 
 This document explains the platform structure and principles.
 
@@ -135,21 +135,21 @@ The config system enforces nine validation rules automatically:
 
 ### Validation
 ```bash
-python -m alice_platform validate [--config-dir config/alice]
+python -m keel validate [--config-dir config/alice]
 ```
 Checks all YAML files for schema, semantic, and policy violations.
 
 ### Planning
 ```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
+python -m keel plan test
+python -m keel plan production
 ```
 Compares desired state (config) to observed state (cloud provider) and shows planned changes.
 
 ### Health Checks
 ```bash
-python -m alice_platform health test
-python -m alice_platform health production
+python -m keel health test
+python -m keel health production
 ```
 Lists URLs and expected authentication methods for each service in the lane.
 

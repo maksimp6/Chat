@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-import mcp_routes
+import chat.mcp_routes as mcp_routes
 from agent_skills.registry import SkillRegistryError
 from app import app
 

@@ -2,9 +2,13 @@ from flask import Flask, request, jsonify, render_template
 import os
 import logging
 import json
-from config import TEXT_MODELS, VOICE_MODELS, get_donation_url
-from model_discovery import ModelDiscoveryError, get_model_discovery, static_model_catalog
-from db import (
+from core.config import TEXT_MODELS, VOICE_MODELS, get_donation_url
+from provider_accounts.model_discovery import (
+    ModelDiscoveryError,
+    get_model_discovery,
+    static_model_catalog,
+)
+from storage.db import (
     init_db,
     get_conversations,
     create_conversation,
@@ -16,10 +20,10 @@ from db import (
     save_conv_settings,
     get_conv_settings,
 )
-from mcp_routes import mcp_bp
+from chat.mcp_routes import mcp_bp
 from mcp_server import chatgpt_mcp_bp
 from workspace.file_routes import file_bp
-from runtime_api import runtime_bp
+from runtime.api import runtime_bp
 from runtime import current_runtime_base_path
 from agent_runtime.local_gateway import local_agent_bp, init_local_agent_tables
 from cloud.cloudru.iam_routes import cloudru_iam_bp
@@ -61,9 +65,9 @@ from conversations.ownership import (
 from remote_runtime.ssh_settings import public_settings, save_settings, test_connection
 from plugin_system.routes import plugin_bp
 from workspace.project_tree import project_tree_bp
-from voice_routes import voice_bp
-from printing3d import init_3d_printing_tables
-from printing3d.routes import printing3d_bp
+from chat.voice_routes import voice_bp
+from forge import init_printing_tables
+from forge.routes import printing3d_bp
 
 app = Flask(__name__)
 system_log.configure()
@@ -148,7 +152,7 @@ def _set_web_cache_headers(response):
 init_db()
 init_local_agent_tables()
 init_treasury_tables()
-init_3d_printing_tables()
+init_printing_tables()
 init_user_identity_table()
 init_github_accounts_table()
 init_conversation_ownership_table()
@@ -308,8 +312,8 @@ def save_dialog_settings(conv_id):
     return jsonify({"status": "ok"})
 
 
-from memory_manager import load_memory_config, save_memory_config, clear_global_memory
-from memory_extractor import list_global_memory_facts
+from agent_memory.manager import load_memory_config, save_memory_config, clear_global_memory
+from agent_memory.extractor import list_global_memory_facts
 
 
 @app.route("/api/memory/manage", methods=["GET"])

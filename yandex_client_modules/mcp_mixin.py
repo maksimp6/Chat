@@ -2,13 +2,13 @@ import json
 import time
 
 from observability.trace_manager import ExecutionTrace
-from tool_registry import registry
+from tool_providers.registry import registry
 import mcp_server.storage as mcp_storage
-from db import get_conv_settings
+from storage.db import get_conv_settings
 
 from yandex_client_modules.request_utils import sanitize_for_log as _sanitize_for_log
 from yandex_client_modules.api_logger import api_logger
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 class YandexMcpMixin:

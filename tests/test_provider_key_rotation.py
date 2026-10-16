@@ -21,7 +21,7 @@ class FakeProvider:
 
 
 def test_rotation_promotes_one_global_key_for_12_hours():
-    import db
+    import storage.db as db
     from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -78,7 +78,7 @@ class FakeReissueProvider:
 
 
 def test_reissue_rotation_keeps_cloudru_provider_key_id():
-    import db
+    import storage.db as db
     from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)

@@ -9,7 +9,7 @@ from sessions.manager import get_session
 
 @pytest.fixture
 def native_store(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
 
     path = tmp_path / "native.memory"
     monkeypatch.setenv("ALICE_MEMORY_PATH", str(path))

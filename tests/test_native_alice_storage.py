@@ -7,9 +7,10 @@ from types import SimpleNamespace
 import base64
 import pytest
 from flask import Flask
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall, KristallError
+from forge.binding import printing_store
 
 
 def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
@@ -33,13 +34,13 @@ def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
 
 def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, monkeypatch):
     path = tmp_path / "values.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("saved", 1)
         store.commit()
-        with pytest.raises(StoreError, match="prefix"):
+        with pytest.raises(KristallError, match="prefix"):
             store.items(None)
         store.set("pending", 2)
-        with pytest.raises(StoreError, match="idle"):
+        with pytest.raises(KristallError, match="idle"):
             store.delete("saved")
         store.commit()
         store.delete("saved")
@@ -55,9 +56,9 @@ def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, m
         store.set("next", 3)
         with pytest.raises(MemoryError):
             store.commit()
-        with pytest.raises(StoreError, match="RAM publication"):
+        with pytest.raises(KristallError, match="RAM publication"):
             store.items()
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.delete("missing")
 
 
@@ -77,7 +78,7 @@ def test_department_archive_is_persisted(monkeypatch):
 
 
 def test_keys_keep_unique_identity_and_missing_keys_fail(monkeypatch):
-    import key_manager as keys
+    import secret_store.key_manager as keys
 
     monkeypatch.setenv("ALICE_KEY_MANAGER_KEY", base64.urlsafe_b64encode(b"1" * 32).decode())
     keys.create_schema(db.get_store())
@@ -389,7 +390,7 @@ def test_local_agent_heartbeat_lease_recovery_and_result_authority(monkeypatch):
 def test_provider_clients_use_same_native_credential_writer(monkeypatch):
     from cryptography.fernet import Fernet
     from provider_accounts.credentials import replace_active_credential
-    from credential_crypto import encrypt_secret
+    from secret_store.credential_crypto import encrypt_secret
     import provider_accounts.credentials_routes as routes
     from yandex_client_modules.request_mixin import _resolve_global_provider_credential
 
@@ -463,15 +464,19 @@ def test_environment_failed_start_is_persisted_and_missing_metadata_is_not_ackno
 def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch):
     import printing3d.service as printing
 
-    order = printing.create_order("owner", {"title": "Order", "quoted_price": 10})
-    printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+    order = printing.create_order(printing_store(), "owner", {"title": "Order", "quoted_price": 10})
+    printing.settle_order(printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2)
     real = printing.get_order
-    stale = {**real("owner", order["id"]), "settled_at": None, "status": "ready"}
+    stale = {**real(printing_store(), "owner", order["id"]), "settled_at": None, "status": "ready"}
     monkeypatch.setattr(printing, "get_order", lambda *_args: dict(stale))
     with pytest.raises(ValueError, match="already settled"):
-        printing.settle_order("owner", order["id"], actual_revenue=20, actual_cost=2)
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=20, actual_cost=2
+        )
     assert (
-        printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)["id"]
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2
+        )["id"]
         == order["id"]
     )
     with db.get_store().transaction() as tx:
@@ -480,9 +485,11 @@ def test_concurrent_settlement_does_not_replace_confirmed_financials(monkeypatch
             {**tx.get("printing/order/" + order["id"]), "status": "cancelled", "settled_at": None},
         )
     with pytest.raises(ValueError, match="cancelled"):
-        printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+        printing.settle_order(
+            printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2
+        )
     db.get_store().delete("printing/order/" + order["id"])
-    printing.settle_order("owner", order["id"], actual_revenue=10, actual_cost=2)
+    printing.settle_order(printing_store(), "owner", order["id"], actual_revenue=10, actual_cost=2)
     assert db.get_store().get("printing/order/" + order["id"]) is None
 
 
@@ -511,7 +518,7 @@ def test_implicit_startup_never_hides_existing_legacy_authority(tmp_path, monkey
     monkeypatch.setattr(db, "DB_PATH", str(path))
     evidence = b"legacy immutable evidence"
     path.write_bytes(evidence)
-    with pytest.raises(StoreError, match="explicit verified native activation"):
+    with pytest.raises(KristallError, match="explicit verified native activation"):
         db.init_db()
     assert path.read_bytes() == evidence
     assert not path.with_name("alice.memory").exists()

@@ -1,4 +1,4 @@
-"""Native durable budget accounts and idempotent operations on MemoryStore."""
+"""Native durable budget accounts and idempotent operations on Kristall."""
 
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
@@ -6,7 +6,7 @@ from decimal import Decimal
 import json
 import uuid
 from typing import Any
-from db import get_store
+from storage.db import get_store
 from observability.trace_manager import get_current_trace
 
 

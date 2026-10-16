@@ -181,8 +181,8 @@ runtime_smoke() {
 
   cat > "$smoke_script" <<'PY'
 from observability.trace_manager import ExecutionTrace
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
-from tool_registry import registry
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.registry import registry
 
 OWNER = "preview-runtime-owner"
 TARGET = "preview-runtime"
