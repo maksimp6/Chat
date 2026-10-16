@@ -1,5 +1,5 @@
 ---
-name: alice-runtime-debugging
+name: runtime-debugging
 description: Diagnose Alice Pro invocation, tool-loop, runtime isolation and Execution Trace failures.
 ---
 ## Purpose

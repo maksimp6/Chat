@@ -8,7 +8,7 @@ tools: [read, search, edit, execute]
 ---
 
 Follow `AGENTS.md`. Primary skills: `github-ci-diagnosis`,
-`issue-to-pr`, `alice-runtime-debugging`.
+`issue-to-pr`, `runtime-debugging`.
 
 Own reproducible bugs, regression coverage and CI diagnosis. Prefer focused tests before
 broad suites and avoid tests that only mirror implementation details.

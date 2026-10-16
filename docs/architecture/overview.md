@@ -54,7 +54,7 @@ Flask / app.py
 
 ### 4. AI‑адаптеры и агенты
 * `cli_agent.py` — CLI/Termux‑адаптер к каноническому backend runtime;
-* `alice_agent_runner.py` — GitHub issue adapter;
+* `issue_runner.py` — GitHub issue adapter;
 * `local_tool_agent.py` — Android/local tool adapter;
 * Yandex AI Studio подключается через общий provider/Responses pipeline, а не напрямую из интерфейсных адаптеров.
 

@@ -42,7 +42,7 @@ def default_handlers(check_run=None, run_issue=None):
             raise TaskFailed("invalid_payload")
         run = run_issue
         if run is None:
-            from agent_runtime.alice_agent_runner import DEFAULT_MODEL, run_issue_task as run
+            from agent_runtime.issue_runner import DEFAULT_MODEL, run_issue_task as run
 
             model = model or DEFAULT_MODEL
         result = run(issue, title, body, model)
