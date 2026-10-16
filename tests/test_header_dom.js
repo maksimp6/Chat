@@ -79,7 +79,11 @@ async function flush() {
       button.id + " has a negative left position",
     );
   }
-  assert.ok(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size > 1);
+  const secondaryButtons = document.getElementById("header-actions-2").querySelectorAll(".header-btn");
+  assert.ok(
+    new Set(secondaryButtons.map((button) => button.getBoundingClientRect().top)).size > 1,
+    "secondary-row buttons must wrap within the structural emulator",
+  );
   assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 2);
 
   // Structural emulator checks declared wrap at representative CSS viewport widths.
