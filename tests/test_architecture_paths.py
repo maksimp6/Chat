@@ -65,7 +65,9 @@ def test_existing_root_package_boundaries_reject_new_or_resurrected_modules(path
         architecture.validate_changes([architecture.Change("A", path)])
 
 
-@pytest.mark.parametrize("path", ["app.py", "config.py", "invocation/api.py", "browser/adapters.py"])
+@pytest.mark.parametrize(
+    "path", ["app.py", "config.py", "invocation/api.py", "browser/adapters.py"]
+)
 def test_existing_canonical_locations_are_allowed(path):
     architecture.validate_changes([architecture.Change("A", path)])
 
