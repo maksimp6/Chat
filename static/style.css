@@ -1581,10 +1581,10 @@ body {
 }
 
 .alice-pro-app #header .header-row-secondary {
- flex-wrap: wrap;
-  overflow-x: visible;
-  overflow-y: visible;
- padding-bottom: 0;
+  flex-wrap: wrap;
+   overflow-x: visible;
+   overflow-y: visible;
+  padding-bottom: 0;
 }
 
 /* === UNIFIED BUTTON CONTRACT === */
