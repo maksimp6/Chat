@@ -1,4 +1,4 @@
-"""Native MemoryStore repository for source-linked agent memory records."""
+"""Native Kristall repository for source-linked agent memory records."""
 
 from __future__ import annotations
 
@@ -6,19 +6,19 @@ import time
 from typing import Any
 
 from agent_memory.client import get_memory_client
-from db import memory_file_path
-from memory_engine.store import MemoryStore
+from storage.db import memory_file_path
+from kristall.store import Kristall
 
-from .models import MemoryLookup, MemoryRecord
+from agent_memory.models import MemoryLookup, MemoryRecord
 
 
 _MEMORY_PREFIX = "agent_memory:"
 
 
 class AgentMemoryStore:
-    """Persist validated records as independent native MemoryStore journal keys."""
+    """Persist validated records as independent native Kristall journal keys."""
 
-    def __init__(self, store: MemoryStore | None = None) -> None:
+    def __init__(self, store: Kristall | None = None) -> None:
         self._store = store if store is not None else get_memory_client(memory_file_path())
 
     @staticmethod

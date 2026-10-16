@@ -2,8 +2,8 @@
 
 import unittest
 from unittest.mock import patch
-from partial_output import extract_last_response_text, format_partial_output_message
-from trace_manager import ExecutionTrace
+from agent_runtime.partial_output import extract_last_response_text, format_partial_output_message
+from observability.trace_manager import ExecutionTrace
 
 
 class TestPartialOutputExtraction(unittest.TestCase):
@@ -283,7 +283,7 @@ class TestActiveChatRoute(unittest.TestCase):
 
     def test_partial_output_is_returned_and_persisted_when_pipeline_fails(self):
         from app import app
-        import mcp_routes
+        import chat.mcp_routes as mcp_routes
 
         captured = {}
         test_conversation_metadata = {"test_request": "true"}

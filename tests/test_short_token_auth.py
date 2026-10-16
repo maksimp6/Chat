@@ -1,6 +1,6 @@
 from flask import Flask
 
-import short_token_auth
+import identity.short_token_auth as short_token_auth
 
 
 def _client(monkeypatch, token=None, require=True, preview=False):
