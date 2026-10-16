@@ -2,6 +2,7 @@
 
 Admission is not a sandbox, resource limiter, or worker executor.
 """
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import cast
@@ -41,8 +42,10 @@ class Request:
 
 
 def _valid_capabilities(value: object) -> bool:
+    if type(value) is not frozenset:
+        return False
     capabilities = cast(frozenset[object], value)
-    return type(value) is frozenset and all(
+    return all(
         type(item) is str and bool(item.strip()) and item in KNOWN_CAPABILITIES
         for item in capabilities
     )
@@ -74,18 +77,20 @@ def _authority_valid(approval: object) -> bool:
 
 def admit(request: Request, approval: Approval) -> Decision:
     """Deny unknown capabilities, invalid bounds, and unauthorized work."""
+    decision = Decision.ALLOW
     if not _authority_valid(approval):
-        return Decision.MISSING_APPROVAL
-    if not isinstance(request, Request):
-        return Decision.INVALID_LIMIT
-    requested = _limit_values(request.limits)
-    ceiling = _limit_values(approval.ceiling)
-    if requested is None or ceiling is None:
-        return Decision.INVALID_LIMIT
-    if not _valid_capabilities(request.capabilities):
-        return Decision.CAPABILITY_DENIED
-    if not request.capabilities.issubset(approval.capabilities):
-        return Decision.CAPABILITY_DENIED
-    if any(value > cap for value, cap in zip(requested, ceiling, strict=True)):
-        return Decision.BUDGET_EXCEEDED
-    return Decision.ALLOW
+        decision = Decision.MISSING_APPROVAL
+    elif not isinstance(request, Request):
+        decision = Decision.INVALID_LIMIT
+    else:
+        requested = _limit_values(request.limits)
+        ceiling = _limit_values(approval.ceiling)
+        if requested is None or ceiling is None:
+            decision = Decision.INVALID_LIMIT
+        elif not _valid_capabilities(request.capabilities):
+            decision = Decision.CAPABILITY_DENIED
+        elif not request.capabilities.issubset(approval.capabilities):
+            decision = Decision.CAPABILITY_DENIED
+        elif any(value > cap for value, cap in zip(requested, ceiling, strict=True)):
+            decision = Decision.BUDGET_EXCEEDED
+    return decision
