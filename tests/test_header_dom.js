@@ -79,7 +79,9 @@ async function flush() {
       button.id + " has a negative left position",
     );
   }
-  const secondaryButtons = document.getElementById("header-actions-2").querySelectorAll(".header-btn");
+  const secondaryButtons = document
+    .getElementById("header-actions-2")
+    .querySelectorAll(".header-btn");
   assert.ok(
     new Set(secondaryButtons.map((button) => button.getBoundingClientRect().top)).size > 1,
     "secondary-row buttons must wrap within the structural emulator",
