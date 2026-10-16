@@ -43,7 +43,7 @@ from scripts.cloudru_browser_probe import (  # noqa: E402
 )
 from scripts.cloudru_deploy import _export_commit, _load_cloudru_credentials  # noqa: E402
 from scripts.cloudru_rdc import application_origin, verify_private_acl  # noqa: E402
-from storage import StorageObjectNotFound  # noqa: E402
+from storage.contracts import StorageObjectNotFound  # noqa: E402
 
 REGISTRY = "alice-chrome-browser"
 REPOSITORY = "chrome-worker"

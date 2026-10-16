@@ -1,6 +1,6 @@
 import os
 import tempfile
-import db
+import storage.db as db
 from identity.user_identity import (
     authenticate_user_token,
     get_anonymous_user,

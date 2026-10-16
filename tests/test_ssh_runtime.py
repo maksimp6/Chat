@@ -144,9 +144,9 @@ class SSHRuntimeTests(unittest.TestCase):
     @patch("remote_runtime.ssh.subprocess.run")
     def test_runtime_tool_trace_preserves_audit_details_and_redacts_secrets(self, run):
         from observability.trace_manager import ExecutionTrace
-        from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
-        from tool_registry import ToolRegistry
-        from runtime_tools import RUNTIME_TOOLS
+        from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+        from tool_providers.registry import ToolRegistry
+        from tool_providers.runtime_tools import RUNTIME_TOOLS
 
         registry = ToolRegistry()
         registry._tools["ssh_runtime_exec"] = RUNTIME_TOOLS["ssh_runtime_exec"]
@@ -169,7 +169,7 @@ class SSHRuntimeTests(unittest.TestCase):
         run.return_value.stdout = "deployed release-42\\n"
         run.return_value.stderr = "authorization: Bearer output-secret"
         # Use the real executor, but point the runtime tool at a test-local runtime.
-        import runtime_tools
+        import tool_providers.runtime_tools as runtime_tools
 
         original = runtime_tools.runtime
         runtime_tools.runtime = self.runtime()

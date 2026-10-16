@@ -3,7 +3,7 @@ import pytest
 
 @pytest.fixture
 def runtime_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     from agent_memory.client import close_memory_clients
 
     path = tmp_path / "runtime.db"

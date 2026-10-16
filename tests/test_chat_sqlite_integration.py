@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import db
-import mcp_routes
+import storage.db as db
+import chat.mcp_routes as mcp_routes
 from observability.trace_manager import ExecutionTrace
 
 

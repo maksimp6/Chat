@@ -3,7 +3,7 @@ import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
-import db
+import storage.db as db
 from invocation.manager import (
     create_invocation,
     fail_invocation,

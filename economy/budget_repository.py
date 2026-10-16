@@ -6,7 +6,7 @@ from decimal import Decimal
 import json
 import uuid
 from typing import Any
-from db import get_store
+from storage.db import get_store
 from observability.trace_manager import get_current_trace
 
 

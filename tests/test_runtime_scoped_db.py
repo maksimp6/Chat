@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import pytest
-import db
+import storage.db as db
 from agent_memory.client import close_memory_clients
 from memory_engine import MemoryStore
 from runtime import bind_runtime_request, current_runtime_data_root, current_runtime_id

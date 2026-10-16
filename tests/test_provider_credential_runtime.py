@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import credential_crypto
+import secret_store.credential_crypto as credential_crypto
 
 ROOT = Path(__file__).resolve().parents[1]
 

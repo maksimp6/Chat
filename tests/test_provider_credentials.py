@@ -82,7 +82,7 @@ def test_fingerprint_is_stable_and_non_secret():
 
 
 def test_provider_credentials_are_isolated():
-    import db
+    import storage.db as db
     from provider_accounts.credentials import replace_active_credential, get_active_credential
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -120,7 +120,7 @@ def test_create_schema_migrates_legacy_global_index():
 
 
 def test_provider_health_metadata_has_no_secret():
-    import db
+    import storage.db as db
     from cryptography.fernet import Fernet
     from provider_accounts.credentials import (
         record_health_check,
@@ -147,7 +147,7 @@ def test_provider_health_metadata_has_no_secret():
 
 
 def test_manual_provider_credential_does_not_fabricate_remote_key_id():
-    import db
+    import storage.db as db
     from provider_accounts.credentials import replace_active_credential, list_provider_credentials
 
     credential = replace_active_credential(

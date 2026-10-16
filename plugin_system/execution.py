@@ -7,7 +7,7 @@ from typing import Any, Mapping
 from invocation.context import InvocationContext
 from plugin_system.manager import PluginError, PluginManager
 from runtime import RuntimeDispatcher
-from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
 
 
 class PluginExecutionGateway:

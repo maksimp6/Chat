@@ -38,6 +38,11 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "chat/__init__.py",
+    "storage/__init__.py",
+    "api/__init__.py",
+    "yandex_client_modules/__init__.py",
+    "core/__init__.py",
     "conversations/__init__.py",
     "workspace/__init__.py",
     "plugin_system/__init__.py",
@@ -48,7 +53,7 @@ STRICT_CLEAN_FILES = {
     "economy/__init__.py",
     "provider_accounts/__init__.py",
     "economy/budget_repository.py",
-    "db.py",
+    "storage/db.py",
     "mcp_server/storage.py",
     "provider_accounts/quotas.py",
     "economy/treasury.py",
@@ -80,7 +85,7 @@ STRICT_CLEAN_FILES = {
     "alice_platform/providers/storage.py",
     "alice_platform/reconciler.py",
     "alice_platform/recovery.py",
-    "archiver.py",
+    "storage/archiver.py",
     "browser/__init__.py",
     "browser/emulator_adapter.py",
     "browser/capabilities.py",
@@ -131,7 +136,7 @@ STRICT_CLEAN_FILES = {
     "agent_memory/user_identity_store.py",
     "sessions/profiles.py",
     "remote_runtime/ssh.py",
-    "storage.py",
+    "storage/contracts.py",
     "observability/__init__.py",
     "observability/system_log.py",
     "observability/trace_timing.py",

@@ -295,7 +295,7 @@ def test_cli_uses_the_built_in_handlers_by_default_and_runs_as_a_module(
 
 
 def test_default_alice_task_uses_the_real_runner_and_its_default_model(store, monkeypatch):
-    import alice_agent_runner
+    import agent_runtime.alice_agent_runner as alice_agent_runner
 
     calls = []
 

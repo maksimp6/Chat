@@ -39,9 +39,9 @@ MCP_PREFIXES = (
 
 def _runtime_platforms(path: str) -> set[str]:
     if path in {
-        "db.py",
+        "storage/db.py",
         "db_backend.py",
-        "memory_db.py",
+        "storage/memory_db.py",
         "provider_accounts/credentials.py",
     } or path.startswith("migrations/"):
         return {"backend", "database"}
