@@ -41,10 +41,8 @@ class Request:
 
 
 def _valid_capabilities(value: object) -> bool:
-    if type(value) is not frozenset:
-        return False
     capabilities = cast(frozenset[object], value)
-    return all(
+    return type(value) is frozenset and all(
         type(item) is str and bool(item.strip()) and item in KNOWN_CAPABILITIES
         for item in capabilities
     )
