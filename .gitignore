@@ -22,11 +22,20 @@ alice_pro_files.tar.gz
 
 # Local tooling
 node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 app_logs.jsonl
 
-# pytest-cov data
+# Test coverage artifacts
 .coverage
+.coverage.*
 coverage.xml
+/coverage.json
+/coverage-js/
+/frontend-coverage.json
+/infra-coverage.xml
+htmlcov/
 
 agent_shell.sqlite3
 

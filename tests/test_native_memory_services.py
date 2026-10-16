@@ -10,7 +10,7 @@ from agent_memory.conversation_ownership_store import ConversationOwnershipStore
 from agent_memory.repository import AgentMemoryStore
 import memory_extractor as extractor
 import memory_manager as manager
-import session_manager as sessions
+import sessions.manager as sessions
 from invocation import manager as invocations
 
 

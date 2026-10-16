@@ -12,7 +12,7 @@ from invocation.manager import (
     start_invocation,
 )
 from invocation.trace import create_invocation_trace
-from trace_manager import bind_current_trace, reset_current_trace
+from observability.trace_manager import bind_current_trace, reset_current_trace
 from runtime import (
     RuntimeDispatcher,
     RuntimeNotFound,

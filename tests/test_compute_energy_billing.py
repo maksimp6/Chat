@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from compute_resources import build_compute_billing_item, get_energy_pricing
+from economy.compute_resources import build_compute_billing_item, get_energy_pricing
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +53,7 @@ def test_invalid_env_values_are_ignored(monkeypatch, raw):
 
 
 def test_not_billed_compute_does_not_make_ai_billing_partial():
-    from billing import aggregate_billing
+    from economy.billing import aggregate_billing
 
     ai = {"type": "ai", "cost_status": "calculated", "total_cost": 0.11}
     compute = build_compute_billing_item(2.0)
@@ -67,7 +67,7 @@ def test_not_billed_compute_does_not_make_ai_billing_partial():
 
 
 def test_calculated_compute_cost_is_added_to_total():
-    from billing import aggregate_billing
+    from economy.billing import aggregate_billing
 
     ai = {"type": "ai", "cost_status": "calculated", "total_cost": 0.11}
     compute = build_compute_billing_item(
@@ -88,7 +88,7 @@ def _burn_cpu(seconds):
 
 
 def test_waiting_is_not_billed_as_compute():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     time.sleep(0.2)
@@ -100,7 +100,7 @@ def test_waiting_is_not_billed_as_compute():
 
 
 def test_cpu_work_is_measured_at_recorded_work():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     _burn_cpu(0.05)
@@ -113,7 +113,7 @@ def test_cpu_work_is_measured_at_recorded_work():
 
 def test_repeated_finalize_bills_compute_once(monkeypatch):
     monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     trace.add_event("work_done")
@@ -127,7 +127,7 @@ def test_repeated_finalize_bills_compute_once(monkeypatch):
 
 def test_reading_snapshots_is_not_billed(monkeypatch):
     monkeypatch.setenv("ALICE_ELECTRICITY_PRICE_RUB_PER_KWH", "6")
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     _burn_cpu(0.02)
@@ -142,7 +142,7 @@ def test_reading_snapshots_is_not_billed(monkeypatch):
 
 
 def test_new_work_after_snapshot_is_billed():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     trace.add_event("work_done")
@@ -155,7 +155,7 @@ def test_new_work_after_snapshot_is_billed():
 
 
 def test_work_recorded_on_other_thread_is_not_attributed():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     worker = threading.Thread(target=lambda: trace.add_event("worker_event"))
@@ -168,7 +168,7 @@ def test_work_recorded_on_other_thread_is_not_attributed():
 
 
 def test_tool_call_records_cpu_ms():
-    from trace_manager import ExecutionTrace
+    from observability.trace_manager import ExecutionTrace
 
     trace = ExecutionTrace()
     trace.track_tool_execution("noop", {}, lambda: {"ok": True})
@@ -177,8 +177,8 @@ def test_tool_call_records_cpu_ms():
 
 
 def test_compute_billing_failure_does_not_break_finalize(monkeypatch):
-    import compute_resources
-    from trace_manager import ExecutionTrace
+    import economy.compute_resources as compute_resources
+    from observability.trace_manager import ExecutionTrace
 
     def broken(*args, **kwargs):
         raise RuntimeError("pricing unavailable")

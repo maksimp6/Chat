@@ -1,7 +1,7 @@
 """Invocation-scoped ExecutionTrace ownership helpers."""
 
 from .context import InvocationContext
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 
 
 def create_invocation_trace(context: InvocationContext) -> ExecutionTrace:

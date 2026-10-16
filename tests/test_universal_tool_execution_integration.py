@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from trace_manager import ExecutionTrace
+from observability.trace_manager import ExecutionTrace
 from universal_tool_platform import (
     UniversalToolExecutor,
     UniversalToolCall,

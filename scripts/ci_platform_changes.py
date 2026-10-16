@@ -42,7 +42,7 @@ def _runtime_platforms(path: str) -> set[str]:
         "db.py",
         "db_backend.py",
         "memory_db.py",
-        "provider_credentials.py",
+        "provider_accounts/credentials.py",
     } or path.startswith("migrations/"):
         return {"backend", "database"}
     if path.startswith("tests/") and path.endswith(".py"):

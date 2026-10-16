@@ -2,7 +2,7 @@
 
 import pytest
 import db
-import mcp_storage
+import mcp_server.storage as mcp_storage
 from agent_memory.client import close_memory_clients
 from memory_engine import StoreError
 

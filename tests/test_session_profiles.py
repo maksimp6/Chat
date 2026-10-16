@@ -1,6 +1,6 @@
 import pytest
 
-from session_profiles import clone_profile, get_profile, list_profiles, session_profile
+from sessions.profiles import clone_profile, get_profile, list_profiles, session_profile
 
 
 def test_builtin_profiles_are_available():
