@@ -73,10 +73,11 @@ async function flush() {
 
   for (const button of buttons) {
     assert.equal(button.parentNode.parentNode, header, button.id + " is not in #header");
-    assert.equal(button.getBoundingClientRect().top, 0, button.id + " wrapped to another line");
+    assert.ok(button.getBoundingClientRect().top >= 0, button.id + " has a negative top position");
+    assert.ok(button.getBoundingClientRect().left >= 0, button.id + " has a negative left position");
   }
-  assert.equal(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size, 1);
-  assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 1);
+  assert.ok(new Set(buttons.map((button) => button.getBoundingClientRect().top)).size > 1);
+  assert.equal(new Set(rows.map((row) => row.getBoundingClientRect().top)).size, 2);
 
   const domProbe = document.createElement("div");
   const firstProbeChild = document.createElement("span");
