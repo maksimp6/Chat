@@ -56,3 +56,17 @@ def test_memory_action_uses_document_delegation_for_dynamic_modal_lifecycle():
     assert 'event.target.closest("#memoryClearBtn")' in source
     assert "event.preventDefault();" in source
     assert "window.openMemoryModal();" not in source
+
+
+def test_header_contract_covers_portrait_landscape_and_android_ime_constraints():
+    html = Path("templates/index.html").read_text(encoding="utf-8")
+    css = Path("static/style.css").read_text(encoding="utf-8")
+    assert 'name="viewport"' in html
+    assert "viewport-fit=cover" in html
+    assert "height: 100dvh;" in css
+    assert "#text-ui" in css
+    assert "flex-shrink: 0;" in css
+    assert "padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));" in css
+    assert ".alice-pro-app #header {" in css
+    assert "overflow-x: visible;" in css
+    assert "overflow-y: visible;" in css
