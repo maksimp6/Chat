@@ -1,4 +1,4 @@
-"""Extract facts and persist individual records directly in native MemoryStore."""
+"""Extract facts and persist individual records directly in native Kristall."""
 
 from __future__ import annotations
 

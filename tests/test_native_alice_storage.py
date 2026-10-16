@@ -9,7 +9,7 @@ import pytest
 from flask import Flask
 import storage.db as db
 from agent_memory.client import close_memory_clients
-from memory_engine import MemoryStore, StoreError
+from kristall import Kristall, KristallError
 
 
 def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
@@ -33,13 +33,13 @@ def test_chat_repository_defaults_and_reset_are_durable(tmp_path, monkeypatch):
 
 def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, monkeypatch):
     path = tmp_path / "values.memory"
-    with MemoryStore(path) as store:
+    with Kristall(path) as store:
         store.set("saved", 1)
         store.commit()
-        with pytest.raises(StoreError, match="prefix"):
+        with pytest.raises(KristallError, match="prefix"):
             store.items(None)
         store.set("pending", 2)
-        with pytest.raises(StoreError, match="idle"):
+        with pytest.raises(KristallError, match="idle"):
             store.delete("saved")
         store.commit()
         store.delete("saved")
@@ -55,9 +55,9 @@ def test_native_delete_never_ignores_writer_failure_or_partial_state(tmp_path, m
         store.set("next", 3)
         with pytest.raises(MemoryError):
             store.commit()
-        with pytest.raises(StoreError, match="RAM publication"):
+        with pytest.raises(KristallError, match="RAM publication"):
             store.items()
-        with pytest.raises(StoreError, match="recovery required"):
+        with pytest.raises(KristallError, match="recovery required"):
             store.delete("missing")
 
 
@@ -511,7 +511,7 @@ def test_implicit_startup_never_hides_existing_legacy_authority(tmp_path, monkey
     monkeypatch.setattr(db, "DB_PATH", str(path))
     evidence = b"legacy immutable evidence"
     path.write_bytes(evidence)
-    with pytest.raises(StoreError, match="explicit verified native activation"):
+    with pytest.raises(KristallError, match="explicit verified native activation"):
         db.init_db()
     assert path.read_bytes() == evidence
     assert not path.with_name("alice.memory").exists()

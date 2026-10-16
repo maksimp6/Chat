@@ -1,4 +1,4 @@
-"""Real MemoryStore integration test for failed /api/chat partial output persistence."""
+"""Real Kristall integration test for failed /api/chat partial output persistence."""
 
 import os
 import tempfile
@@ -47,9 +47,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
                 patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
             ):
                 db.init_db()
-                db.create_conversation(
-                    conversation_id, "MemoryStore integration test", "aliceai-llm"
-                )
+                db.create_conversation(conversation_id, "Kristall integration test", "aliceai-llm")
 
                 app.config["TESTING"] = True
                 with app.test_client() as client:

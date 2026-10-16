@@ -1,4 +1,4 @@
-"""Native MemoryStore configuration and fact controls."""
+"""Native Kristall configuration and fact controls."""
 
 from __future__ import annotations
 

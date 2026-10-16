@@ -1,4 +1,4 @@
-"""Isolated native MemoryStore writers for serial and xdist application tests."""
+"""Isolated native Kristall writers for serial and xdist application tests."""
 
 from __future__ import annotations
 import os

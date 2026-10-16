@@ -1,7 +1,7 @@
 """Durable ownership boundary for user-facing conversations.
 
 Conversation metadata is read through the application DB boundary. Ownership is
-stored directly in the native MemoryStore with no SQL migration.
+stored directly in the native Kristall with no SQL migration.
 """
 
 from __future__ import annotations

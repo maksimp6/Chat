@@ -2,7 +2,7 @@
 
 Quotas are enforced before outbound provider requests and usage is recorded
 against the trusted user identity associated with the current invocation.
-The native MemoryStore write barrier serializes reservation and usage mutations.
+The native Kristall write barrier serializes reservation and usage mutations.
 """
 
 from __future__ import annotations

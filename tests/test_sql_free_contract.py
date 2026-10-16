@@ -1,7 +1,7 @@
 """Fail-closed red contract for the SQL-free Alice Pro runtime.
 
-This intentionally fails until runtime and CI have been migrated to MemoryStore.
-Keep the accepted memory_engine journal/snapshot implementation in scope.
+This intentionally fails until runtime and CI have been migrated to Kristall.
+Keep the accepted kristall journal/snapshot implementation in scope.
 """
 
 import ast
@@ -76,8 +76,8 @@ def test_ci_has_no_postgresql_job_or_required_dependency():
 
 
 def test_new_memory_store_is_the_only_accepted_engine():
-    source = (ROOT / "memory_engine/store.py").read_text(encoding="utf-8")
-    assert "class MemoryStore:" in source
+    source = (ROOT / "kristall/store.py").read_text(encoding="utf-8")
+    assert "class Kristall:" in source
     assert "class _JournalStore:" in source
     assert "import sqlite3" not in source
     assert "import psycopg" not in source
