@@ -1,6 +1,6 @@
-"""Alice-owned lifecycle for the standalone explicit-commit Kristall.
+"""Logos-owned lifecycle for the standalone explicit-commit Kristall.
 
-The engine imports no Alice code. Callers share a single writer per canonical
+The engine imports no Logos code. Callers share a single writer per canonical
 path, use transactions for concurrent mutations, and close at runtime shutdown.
 """
 
