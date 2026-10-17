@@ -3,7 +3,7 @@
 import ast
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1] / "memory_engine"
+ROOT = Path(__file__).resolve().parents[1] / "kristall"
 
 
 def test_engine_does_not_import_alice_modules():
@@ -18,7 +18,7 @@ def test_engine_does_not_import_alice_modules():
                 imported.append(node.module)
         assert not any(
             name == "db"
-            or name.startswith(("agent_shell", "tool_providers", "flask", "mcp_storage"))
+            or name.startswith(("agent_shell", "tool_providers", "flask", "mcp_server.storage"))
             for name in imported
         ), source_file.name
 
@@ -48,7 +48,7 @@ def test_public_store_does_not_override_incompatible_legacy_api():
     source = (ROOT / "store.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     public = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Kristall"
     )
     inherited = {base.id for base in public.bases if isinstance(base, ast.Name)}
     assert "_JournalStore" not in inherited, (
@@ -62,7 +62,7 @@ def test_public_contract_requires_annotated_parameters_and_returns():
     source = (ROOT / "store.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     public = next(
-        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "MemoryStore"
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Kristall"
     )
     methods = {
         node.name: node

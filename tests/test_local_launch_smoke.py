@@ -34,7 +34,7 @@ class _Session:
         return self.response
 
 
-def test_build_runtime_env_isolated_sqlite_and_valid_credential_key(monkeypatch, tmp_path):
+def test_build_runtime_env_isolated_memory_and_valid_credential_key(monkeypatch, tmp_path):
     monkeypatch.setenv("ALICE_DATABASE_URL", "postgresql://should-not-survive")
     monkeypatch.delenv("ALICE_PROVIDER_CREDENTIAL_KEY", raising=False)
 
@@ -44,7 +44,7 @@ def test_build_runtime_env_isolated_sqlite_and_valid_credential_key(monkeypatch,
     assert env["HOST"] == "127.0.0.1"
     assert env["PORT"] == "8765"
     assert env["FLASK_DEBUG"] == "0"
-    assert env["ALICE_DB_PATH"] == str(db_path)
+    assert env["ALICE_MEMORY_PATH"] == str(db_path)
     assert env["ALICE_REQUIRE_SHORT_TOKEN"] == "0"
     assert env["ALICE_PROVIDER_CREDENTIALS_TOKEN"] == ""
     assert "ALICE_DATABASE_URL" not in env

@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "templates" / "index.html"
 
-STATIC_FILE_ALLOWLIST = {"trace_viewer_auto.js", "trace_viewer_timing_fix.js"}
+STATIC_FILE_ALLOWLIST: set[str] = set()
 
 TEMPLATE_ID_ALLOWLIST = {
     "header-actions-2",

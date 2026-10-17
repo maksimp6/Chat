@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
-from cloudru_iam import CloudRuIamClient
-from cloudru_iam_routes import _parse_expiry, _validate_ips
+from cloud.cloudru.iam import CloudRuIamClient
+from cloud.cloudru.iam_routes import _parse_expiry, _validate_ips
 
 
 def test_cloudru_token_exchange_uses_service_account_key_pair():
@@ -12,7 +12,7 @@ def test_cloudru_token_exchange_uses_service_account_key_pair():
     response.content = b"{}"
     response.raise_for_status.return_value = None
 
-    with patch("cloudru_iam.requests.post", return_value=response) as post:
+    with patch("cloud.cloudru.iam.requests.post", return_value=response) as post:
         assert client._token() == "iam-token"
 
     assert post.call_args.kwargs["json"] == {"keyId": "id", "secret": "secret"}

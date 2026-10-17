@@ -3,8 +3,8 @@ import json
 import pytest
 
 from invocation.context import InvocationContext
-from plugin_execution import PluginExecutionGateway
-from plugin_manager import PluginError, PluginManager
+from plugin_system.execution import PluginExecutionGateway
+from plugin_system.manager import PluginError, PluginManager
 from runtime import RuntimeDispatcher
 
 

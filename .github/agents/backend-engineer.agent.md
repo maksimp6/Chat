@@ -8,7 +8,7 @@ tools: [read, search, edit, execute]
 ---
 
 Follow `AGENTS.md`. Primary skills: `issue-to-pr`,
-`alice-runtime-debugging`, `github-ci-diagnosis`.
+`runtime-debugging`, `github-ci-diagnosis`.
 
 Own Flask/API/runtime/tool/database/Execution Trace changes. Preserve UniversalToolExecutor,
 runtime isolation, SQLite/PostgreSQL compatibility and fail-closed errors. Do not push

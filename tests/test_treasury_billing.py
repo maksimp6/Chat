@@ -3,26 +3,24 @@ import pytest
 
 @pytest.fixture
 def treasury_db(tmp_path, monkeypatch):
-    import db
-    import invocation.manager as invocation_manager
-    import runtime_migrations
-    import treasury
+    import storage.db as db
+    import economy.treasury as treasury
+    from agent_memory.client import close_memory_clients
 
     path = tmp_path / "treasury.db"
     monkeypatch.setattr(db, "DB_PATH", str(path))
-    monkeypatch.setattr(invocation_manager, "get_conn", db.get_conn)
-    monkeypatch.setattr(runtime_migrations, "get_conn", db.get_conn)
-    monkeypatch.setattr(treasury, "get_conn", db.get_conn)
-
+    monkeypatch.setenv("ALICE_MEMORY_PATH", str(tmp_path / "alice.memory"))
+    monkeypatch.setattr(treasury, "get_store", db.get_store)
+    close_memory_clients()
     db.init_db()
-    runtime_migrations.init_runtime_tables()
     treasury.init_treasury_tables()
-    return path
+    yield path
+    close_memory_clients()
 
 
 def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-1"
     demo_top_up(owner_id, 10)
@@ -47,8 +45,8 @@ def test_calculated_billing_posts_once_and_keeps_trace_reference(treasury_db):
 
 
 def test_partial_or_unknown_billing_is_never_posted(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-2"
     demo_top_up(owner_id, 10)
@@ -69,8 +67,8 @@ def test_partial_or_unknown_billing_is_never_posted(treasury_db):
 
 
 def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up
 
     demo_top_up("trusted-owner", 1)
     billing = {
@@ -85,7 +83,7 @@ def test_billing_owner_is_bound_to_trusted_owner(treasury_db):
 
 
 def test_mismatched_billing_owner_is_rejected(treasury_db):
-    from billing import settle_billing_to_treasury
+    from economy.billing import settle_billing_to_treasury
 
     with pytest.raises(ValueError, match="does not match"):
         settle_billing_to_treasury(
@@ -100,7 +98,7 @@ def test_mismatched_billing_owner_is_rejected(treasury_db):
 
 
 def test_missing_owner_identity_is_safe_skip(treasury_db):
-    from billing import settle_billing_to_treasury
+    from economy.billing import settle_billing_to_treasury
 
     result = settle_billing_to_treasury(
         {"cost_status": "calculated", "total_cost": 1, "trace_id": "trace-missing-owner"},
@@ -111,8 +109,8 @@ def test_missing_owner_identity_is_safe_skip(treasury_db):
 
 
 def test_insufficient_balance_does_not_create_debit(treasury_db):
-    from billing import settle_billing_to_treasury
-    from treasury import demo_top_up, get_account
+    from economy.billing import settle_billing_to_treasury
+    from economy.treasury import demo_top_up, get_account
 
     owner_id = "user-3"
     demo_top_up(owner_id, 1)
@@ -129,7 +127,7 @@ def test_insufficient_balance_does_not_create_debit(treasury_db):
 def test_invocation_user_id_flows_into_trace_billing_context(treasury_db):
     from invocation.manager import create_invocation
     from invocation.trace import create_invocation_trace
-    from session_manager import create_session
+    from sessions.manager import create_session
 
     session = create_session()
     context = create_invocation(
@@ -155,7 +153,7 @@ def test_owner_identity_does_not_accept_client_body(treasury_db, monkeypatch):
         method="GET",
         json={"owner_id": "attacker"},
     ):
-        from treasury_identity import TreasuryIdentityError, get_current_owner_id
+        from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
         with pytest.raises(TreasuryIdentityError):
             get_current_owner_id()
