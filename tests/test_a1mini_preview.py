@@ -20,6 +20,12 @@ TYPES = b"""<Types><Default Extension="png" ContentType="image/png"/></Types>"""
 SETTINGS = b"""<?xml version="1.0"?><config><plate>
 <metadata key="gcode_file" value="Metadata/plate_1.gcode"/>
 </plate></config>"""
+# Thumbnail metadata that points at PNG members the archive does not contain.
+THUMBNAIL_SETTINGS = b"""<?xml version="1.0"?><config><plate>
+<metadata key="gcode_file" value="Metadata/plate_1.gcode"/>
+<metadata key="thumbnail_file" value="Metadata/plate_1.png"/>
+<metadata key="top_file" value="Metadata/top_1.png"/>
+</plate></config>"""
 GCODE = b"; HEADER_BLOCK_START\nG1 X10 Y10 E1\n"
 MD5 = hashlib.md5(GCODE).hexdigest().encode("ascii")
 
@@ -30,11 +36,12 @@ def archive(
     bad_rel: bool = False,
     no_gcode: bool = False,
     traversal: bool = False,
+    settings: bytes = SETTINGS,
 ) -> None:
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as z:
         z.writestr("_rels/.rels", b"<Relationships/>" if bad_rel else REL)
         z.writestr("[Content_Types].xml", TYPES)
-        z.writestr("Metadata/model_settings.config", SETTINGS)
+        z.writestr("Metadata/model_settings.config", settings)
         if not no_gcode:
             z.writestr("Metadata/plate_1.gcode", GCODE)
         z.writestr("Metadata/plate_1.gcode.md5", MD5)
@@ -77,7 +84,16 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_missing_thumbnails_are_rejected_before_staging(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "metadata"):
+        archive(self.path, settings=THUMBNAIL_SETTINGS)
+        with self.assertRaisesRegex(
+            RuntimeError, r"^missing referenced preview: Metadata/plate_1\.png$"
+        ):
+            audit_preview(self.path)
+
+    def test_thumbnail_metadata_mismatch_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError, r"^3MF preview metadata does not match image files$"
+        ):
             audit_preview(self.path)
 
     def test_bad_relationship_rolls_back(self) -> None:

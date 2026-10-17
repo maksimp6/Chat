@@ -42,6 +42,26 @@ OUTPUT = "Alice_BagClip_PR1113_A1mini_PLA_PROTOTYPE.gcode.3mf"
 NS = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
 
 
+def _triangle_indices(mesh: ET.Element, vertex_count: int) -> list[tuple[int, int, int]]:
+    """Return triangle vertex indices, rejecting missing, non-integer or out-of-range values.
+
+    Negative indices must not be accepted: Python would silently wrap them around.
+    """
+    faces = []
+    for triangle in mesh.findall(f"{NS}triangles/{NS}triangle"):
+        face = []
+        for key in ("v1", "v2", "v3"):
+            try:
+                index = int(triangle.get(key, ""))
+            except ValueError as exc:
+                raise RuntimeError("source 3MF has invalid triangle indices") from exc
+            if not 0 <= index < vertex_count:
+                raise RuntimeError("source 3MF has invalid triangle indices")
+            face.append(index)
+        faces.append((face[0], face[1], face[2]))
+    return faces
+
+
 def _source_geometry(
     root: ET.Element,
 ) -> dict[str, tuple[list[tuple[float, ...]], int]]:
@@ -54,7 +74,7 @@ def _source_geometry(
         if mesh is None:
             raise RuntimeError("3MF object without mesh")
         vertices = mesh.findall(f"{NS}vertices/{NS}vertex")
-        triangles = mesh.findall(f"{NS}triangles/{NS}triangle")
+        triangles = _triangle_indices(mesh, len(vertices))
         if not vertices or not triangles:
             raise RuntimeError("empty source object")
         points = []
@@ -127,11 +147,7 @@ def merge_plate_stl(source: Path, destination: Path) -> int:
             tuple(float(v.get(axis, "nan")) for axis in ("x", "y", "z"))
             for v in mesh.findall(f"{NS}vertices/{NS}vertex")
         ]
-        triangles = [
-            tuple(int(t.attrib[key]) for key in ("v1", "v2", "v3"))
-            for t in mesh.findall(f"{NS}triangles/{NS}triangle")
-        ]
-        obj_meshes[obj.attrib["id"]] = (pts, triangles)
+        obj_meshes[obj.attrib["id"]] = (pts, _triangle_indices(mesh, len(pts)))
     raw = bytearray(b"Alice bag clip PR1113: three separated parts".ljust(80, b" "))
     raw.extend(struct.pack("<I", sum(len(v[1]) for v in obj_meshes.values())))
     total = 0
@@ -140,10 +156,7 @@ def merge_plate_stl(source: Path, destination: Path) -> int:
         matrix = [float(x) for x in item.attrib["transform"].split()]
         shift = (matrix[9], matrix[10], matrix[11])
         for face in tris:
-            try:
-                a, b, c = [tuple(coords[n][i] + shift[i] for i in range(3)) for n in face]
-            except IndexError as exc:
-                raise RuntimeError("source 3MF has invalid triangle indices") from exc
+            a, b, c = [tuple(coords[n][i] + shift[i] for i in range(3)) for n in face]
             u = [b[i] - a[i] for i in range(3)]
             v = [c[i] - a[i] for i in range(3)]
             normal = (

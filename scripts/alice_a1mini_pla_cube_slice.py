@@ -31,6 +31,8 @@ PRINTER = "Bambu Lab A1 mini"
 NOZZLE_MM = "0.4"
 BED_TYPE = "Textured PEI Plate"
 SLICED_FILENAME = "Alice_Cube_20mm_Generic_PLA_A1mini.gcode.3mf"
+EXPECTED_LAYERS = 100  # 20 mm cube at the pinned 0.20 mm layer height
+_LAYER_HEADER = re.compile(r"^; total layer number: (\d+)[ \t\r]*$", re.MULTILINE)
 
 
 def cube_stl() -> bytes:
@@ -153,7 +155,20 @@ def _validate_profile(settings: dict[str, object]) -> None:
             raise RuntimeError(f"unsafe profile: {key}: expected {wanted!r}, got {actual!r}")
 
 
-def _validate_gcode(gcode: str) -> None:
+def _layer_count(gcode: str) -> int:
+    """Return the layer count from the G-code header; every occurrence must agree."""
+    counts = {int(value) for value in _LAYER_HEADER.findall(gcode)}
+    if not counts:
+        raise RuntimeError("G-code has no layer-count header")
+    if len(counts) != 1:
+        raise RuntimeError("G-code layer-count headers disagree")
+    (layers,) = counts
+    if layers <= 0:
+        raise RuntimeError("G-code layer count is not positive")
+    return layers
+
+
+def _validate_gcode(gcode: str) -> int:
     # Do not mistake commented material settings for executable G-code commands.
     commands = [
         line.strip()
@@ -165,10 +180,9 @@ def _validate_gcode(gcode: str) -> None:
             raise RuntimeError(f"G-code missing verified {command} S{target} temperature")
     if not gcode.startswith("; HEADER_BLOCK_START"):
         raise RuntimeError("not a Bambu Studio G-code header")
-    if "; total layer number:" not in gcode:
-        raise RuntimeError("G-code has no layer-count header")
     if len(gcode) < 5000:
         raise RuntimeError("G-code is unexpectedly small")
+    return _layer_count(gcode)
 
 
 def _validate_result(result_path: Path) -> dict[str, object]:
@@ -203,7 +217,9 @@ def _validate_result(result_path: Path) -> dict[str, object]:
 def audit(path: Path, result_path: Path) -> dict[str, object]:
     settings, gcode = _read_sliced_archive(path)
     _validate_profile(settings)
-    _validate_gcode(gcode)
+    layers = _validate_gcode(gcode)
+    if layers != EXPECTED_LAYERS:
+        raise RuntimeError(f"G-code layer count {layers} != expected {EXPECTED_LAYERS}")
     slice_info = _validate_result(result_path)
     blob = path.read_bytes()
     return {
@@ -217,7 +233,7 @@ def audit(path: Path, result_path: Path) -> dict[str, object]:
         "printer": PRINTER,
         "nozzle_mm": NOZZLE_MM,
         **slice_info,
-        "layers": 100,
+        "layers": layers,
         "source": "Bambu Studio 02.08.02.61 CLI",
     }
 

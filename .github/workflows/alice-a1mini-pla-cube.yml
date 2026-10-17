@@ -9,6 +9,7 @@ on:
       - "scripts/alice_a1mini_bagclip_slice.py"
       - "scripts/alice_a1mini_preview.py"
       - "tests/test_a1mini_preview.py"
+      - "tests/test_a1mini_slicer_validation.py"
   workflow_dispatch:
 
 permissions:
@@ -29,8 +30,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate preview render contracts offline
-        run: python3 -m unittest discover -s tests -p "test_a1mini_preview.py" -v
+      - name: Validate A1 mini slicer and preview contracts offline
+        run: python3 -m unittest discover -s tests -p "test_a1mini_*.py" -v
 
       - name: Install Bambu Studio native dependencies
         shell: bash
