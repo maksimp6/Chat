@@ -2,6 +2,11 @@
 
 This directory is the canonical repository skill tree.
 
+For trigger-based navigation, reusable engineering lessons and their source/coverage
+limits, see [the project lessons index](../../docs/lessons/README.md).
+The additional documentation packages do not change role allowlists or permissions;
+their role-scoped runtime integration is a separate change.
+
 A **role** owns responsibility. A **skill** defines a reusable procedure. A
 **tool/MCP capability** performs an action. A **provider/model** is the replaceable
 reasoning backend. Execution Trace records which skills were selected.
