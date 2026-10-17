@@ -77,7 +77,7 @@
     window.dispatchEvent(new CustomEvent("alice:diagnostic", { detail: details }));
   }
 
-  console.info("[BOOT] hello: Alice Pro frontend boot loaded");
+  console.info("[BOOT] hello: Logos frontend boot loaded");
   window.addEventListener(
     "error",
     function (event) {
