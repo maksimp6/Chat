@@ -456,7 +456,7 @@ class _JournalStore:
         import tempfile
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(prefix=".alice-copy-", dir=destination.parent)
+        fd, temp_name = tempfile.mkstemp(prefix=".kristall-copy-", dir=destination.parent)
         temporary = Path(temp_name)
         try:
             # Build and fsync the copy before publishing the destination path.
@@ -538,7 +538,9 @@ class _JournalStore:
             publication_started = False
             try:
                 self._verify_checkpoint_source()
-                fd, temp_name = tempfile.mkstemp(prefix=".alice-checkpoint-", dir=self.path.parent)
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=".kristall-checkpoint-", dir=self.path.parent
+                )
                 temporary = Path(temp_name)
                 with os.fdopen(fd, "wb") as stream:
                     if stream.write(frame) != len(frame):

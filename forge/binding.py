@@ -1,11 +1,11 @@
-"""Binds the 3D-printing domain to Alice Pro's storage and identity."""
+"""Binds the 3D-printing domain to the host storage and identity."""
 
 from printing3d.store import PrintStore
 from storage.db import get_store
 
 
 def printing_store() -> PrintStore:
-    """Return the shared native store; Alice owns its single writer."""
+    """Return the shared native store; the host owns its single writer."""
     return get_store()
 
 
