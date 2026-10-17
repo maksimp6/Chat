@@ -1,4 +1,4 @@
-"""Contracts shared by Alice's cloud and local browsing adapters.
+"""Contracts shared by Logos's cloud and local browsing adapters.
 
 This module deliberately contains no browser driver. Adapters must execute
 these contracts through UniversalToolExecutor and provide their own capability
