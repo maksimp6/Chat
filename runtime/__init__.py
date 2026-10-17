@@ -1,4 +1,4 @@
-"""Alice Pro scoped preview runtime primitives."""
+"""Logos scoped preview runtime primitives."""
 
 from runtime.dispatcher import (
     FILESYSTEM_READ_TEXT,

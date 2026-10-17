@@ -1,4 +1,4 @@
-"""Runtime short-token authentication for production and preview Alice Pro.
+"""Runtime short-token authentication for production and preview Logos.
 
 The token is supplied only through ALICE_SHORT_TOKEN. A token may be used as a
 URL path prefix. The prefix is consumed internally; no HTTP redirect is used.
@@ -106,7 +106,7 @@ def _login_page_response():
     html = (
         '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        '<title>Alice Pro</title></head><body style="font-family:sans-serif;'
+        '<title>Logos</title></head><body style="font-family:sans-serif;'
         'display:flex;min-height:90vh;align-items:center;justify-content:center">'
         f'<a href="{login_path()}" style="font-size:1.2em">Войти через GitHub</a>'
         "</body></html>"
