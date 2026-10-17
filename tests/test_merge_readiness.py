@@ -477,6 +477,17 @@ def test_merge_readiness_newer_failed_aggregate_supersedes_success():
     assert any(b.get("check") == "CI required" for b in result["blockers"])
 
 
+def test_merge_readiness_quota_notice_is_not_a_model_review_prerequisite():
+    value = platform_snapshot(
+        reviews=[{"user": {"login": "Copilot"}, "body": "Unable to review: quota limit reached."}]
+    )
+    assert merge_readiness.evaluate_snapshot(value)["ready"] is True
+    value["review_threads"] = [{"isResolved": False}]
+    result = merge_readiness.evaluate_snapshot(value)
+    assert result["ready"] is False
+    assert blocker_codes(result) == {"review_threads"}
+
+
 def test_merge_readiness_rejects_missing_solution_review_evidence():
     result = merge_readiness.evaluate_snapshot(snapshot(solution_review=None))
 

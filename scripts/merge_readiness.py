@@ -151,12 +151,8 @@ def collect_solution_review_evidence(
     base_sha: str,
 ) -> dict[str, Any] | None:
     """Collect trusted evidence from successful solution-review workflow runs."""
-    run_data = _gh_json(
-        [
-            f"/repos/{repo}/actions/workflows/solution-review.yml/runs"
-            "?event=workflow_dispatch&per_page=100"
-        ]
-    )
+    runs_path = f"/repos/{repo}/actions/workflows/solution-review.yml/runs"
+    run_data = _gh_json([f"{runs_path}?event=workflow_dispatch&per_page=100"])
     runs = run_data.get("workflow_runs", [])
     artifacts_by_run: dict[int, list[dict[str, Any]]] = {}
     for run in runs:
