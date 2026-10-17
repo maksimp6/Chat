@@ -47,7 +47,9 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
                 patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
             ):
                 db.init_db()
-                db.create_conversation(conversation_id, "Kristall integration test", "aliceai-llm")
+                db.create_conversation(
+                    conversation_id, "Kristall integration test", "logos-runtime"
+                )
 
                 app.config["TESTING"] = True
                 with app.test_client() as client:
@@ -56,7 +58,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
                         json={
                             "conversation_id": conversation_id,
                             "message": "trigger failure",
-                            "model": "aliceai-llm",
+                            "model": "logos-runtime",
                             "params": {},
                         },
                     )

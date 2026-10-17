@@ -1,11 +1,11 @@
 # Alice as a GitHub agent
 
 Alice Pro can take a GitHub issue and work on her own code. The workflow is
-`.github/workflows/alice.yml`; the headless runner is `issue_runner.py`.
+`.github/workflows/logos.yml`; the headless runner is `issue_runner.py`.
 
 ## How it works
 
-1. A maintainer (OWNER, MEMBER or COLLABORATOR) mentions `@alice` in an issue or
+1. A maintainer (OWNER, MEMBER or COLLABORATOR) mentions `@logos` in an issue or
    issue comment, or adds the `alice` label. Pull request comments are ignored.
 2. The runner creates a persisted invocation, marks it running, binds an `ExecutionTrace`, and then runs Alice with only her filesystem tools. They are sandboxed to the checkout
    (`tool_providers.filesystem.BASE_DIR`), so Alice edits her own code. She has no git,
@@ -59,7 +59,7 @@ Pull requests and Issues read and write). Its posts appear under the
 maintainer's name, and commits are authored as `Alice Pro`. Delete that secret once the App works.
 
 Optional repository variable `ALICE_AGENT_MODEL` selects the model key from
-`config.py` (default `aliceai-llm`).
+`config.py` (default `logos-runtime`).
 
 Protect `develop` with a required pull request and green CI, so Alice's draft PRs
 can never land without review.

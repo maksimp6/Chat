@@ -10,7 +10,7 @@ import requests
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5000"
-DEFAULT_MODEL = "aliceai-llm"
+DEFAULT_MODEL = "logos-runtime"
 DEFAULT_TIMEOUT = 60.0
 
 

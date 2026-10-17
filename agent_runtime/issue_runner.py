@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_MODEL = "aliceai-llm"
+DEFAULT_MODEL = "logos-runtime"
 TOOL_CATEGORIES = ["filesystem"]
 MAX_SUMMARY_CHARS = 4000
 
@@ -107,7 +107,7 @@ def run_issue_task(
     rules = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
     before = set(changed_files(repo_root))
     session = f"github-issue-{issue_number}"
-    invocation = create_invocation(session, session, metadata={"source": "alice.yml"})
+    invocation = create_invocation(session, session, metadata={"source": "logos.yml"})
     trace = create_invocation_trace(invocation)
     start_invocation(invocation.invocation_id)
     result: Dict[str, Any] = {

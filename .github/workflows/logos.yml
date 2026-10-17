@@ -1,7 +1,7 @@
 name: Alice
 
 # Alice Pro works on her own code from a GitHub issue.
-# Trigger: a maintainer (OWNER/MEMBER/COLLABORATOR) mentions "@alice" in an
+# Trigger: a maintainer (OWNER/MEMBER/COLLABORATOR) mentions "@logos" in an
 # issue or issue comment, or adds the "alice" label.
 # Alice only gets her filesystem tools inside this checkout; this workflow
 # checks the diff, commits it to alice/issue-<N> and opens a draft pull request.
@@ -14,7 +14,7 @@ name: Alice
 # Repository variable ALICE_APP_CLIENT_ID - client ID of that GitHub App.
 # Fallback until the App exists: ALICE_GITHUB_TOKEN, a personal fine-grained token
 # of the maintainer (posts appear under the maintainer's name).
-# Optional repository variable: ALICE_AGENT_MODEL (default aliceai-llm).
+# Optional repository variable: ALICE_AGENT_MODEL (default logos-runtime).
 
 on:
   issue_comment:
@@ -34,10 +34,10 @@ jobs:
     if: |
       !github.event.issue.pull_request && (
         (github.event_name == 'issue_comment' &&
-          contains(github.event.comment.body, '@alice') &&
+          contains(github.event.comment.body, '@logos') &&
           contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
         (github.event_name == 'issues' && github.event.action == 'opened' &&
-          (contains(github.event.issue.body, '@alice') || contains(github.event.issue.title, '@alice')) &&
+          (contains(github.event.issue.body, '@logos') || contains(github.event.issue.title, '@logos')) &&
           contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
         (github.event_name == 'issues' && github.event.action == 'labeled' &&
           github.event.label.name == 'alice'))
@@ -140,7 +140,7 @@ jobs:
           python - "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" <<'PY'
           import json, sys
           r = json.load(open(sys.argv[1], encoding="utf-8"))
-          # Never echo "@alice" back: a comment must not re-trigger this workflow.
+          # Never echo "@logos" back: a comment must not re-trigger this workflow.
           for key in ("summary",):
               if r.get(key):
                   r[key] = r[key].replace("@", "@\u200b")

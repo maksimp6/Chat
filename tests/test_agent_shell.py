@@ -180,13 +180,13 @@ def test_alice_task_runs_the_issue_agent_and_keeps_its_summary(store):
         role="docs-engineer",
         title="t",
         kind="alice_task",
-        payload={**PAYLOAD, "model": "aliceai-llm"},
+        payload={**PAYLOAD, "model": "logos-runtime"},
     )
     run_next(store, {"alice_task": handler})
     task = store.get(task_id)
     assert task["status"] == "done"
     assert task["result"]["changed_files"] == ["README.md"]
-    assert calls == [(7, "Fix typo", "The README has a typo.", "aliceai-llm")]
+    assert calls == [(7, "Fix typo", "The README has a typo.", "logos-runtime")]
 
 
 def test_alice_task_fails_with_a_fixed_code_and_keeps_the_result(store):
