@@ -20,10 +20,10 @@ def default_handlers(check_run=None, run_issue=None):
         return run(["containers", "registries"])
 
     def alice_task(payload):
-        """Runs Alice headlessly on a task text with her sandboxed filesystem tools.
+        """Runs Logos headlessly on a task text with its sandboxed filesystem tools.
 
-        Alice never commits, pushes or runs commands, and stops at approval-gated tools
-        instead of running them; this handler never approves anything on her behalf.
+        Logos never commits, pushes or runs commands, and stops at approval-gated tools
+        instead of running them; this handler never approves anything on its behalf.
         """
         issue = payload.get("issue")
         title = payload.get("title")

@@ -103,7 +103,7 @@ def _static_asset_version():
 STATIC_ASSET_VERSION = _static_asset_version()
 
 logger = system_log.get_logger("app")
-logger.info("[BOOT] hello: Alice Pro backend module loaded")
+logger.info("[BOOT] hello: Logos backend module loaded")
 
 app.register_blueprint(mcp_bp)
 app.register_blueprint(chatgpt_mcp_bp)

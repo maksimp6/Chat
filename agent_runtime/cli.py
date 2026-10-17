@@ -1,4 +1,4 @@
-"""Thin CLI/Termux adapter for the canonical Alice Pro runtime."""
+"""Thin CLI/Termux adapter for the canonical Logos runtime."""
 
 from __future__ import annotations
 
@@ -58,12 +58,12 @@ class CliClient:
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
-            raise CliError("Alice Pro backend is unavailable") from exc
+            raise CliError("Logos backend is unavailable") from exc
 
         try:
             data = response.json()
         except ValueError as exc:
-            raise CliError("Alice Pro backend returned invalid JSON") from exc
+            raise CliError("Logos backend returned invalid JSON") from exc
 
         if response.status_code >= 400:
             error = data.get("error") if isinstance(data, dict) else None
@@ -71,10 +71,10 @@ class CliClient:
             raise CliError(f"Alice Pro HTTP {response.status_code}: {message}")
 
         if not isinstance(data, dict):
-            raise CliError("Alice Pro backend returned an invalid response")
+            raise CliError("Logos backend returned an invalid response")
         return data
 
-    def create_conversation(self, *, title: str = "Alice Pro CLI") -> str:
+    def create_conversation(self, *, title: str = "Logos CLI") -> str:
         payload = self._request_json(
             "POST",
             "/api/conversations",
@@ -82,7 +82,7 @@ class CliClient:
         )
         conversation_id = str(payload.get("id") or "").strip()
         if not conversation_id:
-            raise CliError("Alice Pro did not return a conversation id")
+            raise CliError("Logos did not return a conversation id")
         return conversation_id
 
     def send_message(
@@ -165,7 +165,7 @@ def main() -> None:
     try:
         if not conversation_id:
             conversation_id = client.create_conversation(
-                title=os.getenv("ALICE_CLI_TITLE", "Alice Pro CLI").strip() or "Alice Pro CLI"
+                title=os.getenv("ALICE_CLI_TITLE", "Logos CLI").strip() or "Logos CLI"
             )
     except CliError as exc:
         print(f"Alice Pro CLI startup failed: {exc}")
@@ -173,8 +173,7 @@ def main() -> None:
 
     session_id = os.getenv("ALICE_SESSION_ID", "").strip() or conversation_id
     print(
-        "🚀 Alice Pro CLI подключён к каноническому runtime. "
-        "Введите запрос (или 'exit' для выхода):\n"
+        "🚀 Logos CLI подключён к каноническому runtime. Введите запрос (или 'exit' для выхода):\n"
     )
     print(f"Conversation: {conversation_id}\n")
 

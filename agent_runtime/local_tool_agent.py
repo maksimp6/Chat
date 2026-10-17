@@ -1,4 +1,4 @@
-"""Client/runtime for a protected Alice Pro Local Tool Agent."""
+"""Client/runtime for a protected Logos Local Tool Agent."""
 
 from __future__ import annotations
 
