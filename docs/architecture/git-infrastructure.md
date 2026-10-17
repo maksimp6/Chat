@@ -1,4 +1,7 @@
-# Alice Forge: architecture contract (Issue #1313)
+# Git infrastructure: architecture contract (Issue #1313)
+
+Naming: "Git infrastructure" is a neutral working name. "Forge" stays reserved for the
+3D printing workflow (`forge/` package, Bambu A1 mini). Do not use "Forge" for this module.
 
 Status: proposal, not deployment authorization.
 
@@ -10,7 +13,7 @@ Status: proposal, not deployment authorization.
 | Gitea | Mature Git hosting and web interface | External application and governance dependency | Alternative baseline |
 | GitLab | Full lifecycle and CI | High operational footprint for a minimal personal service | Not the first deployment target |
 | New Git implementation | Complete control | Protocol, object integrity, security and maintenance risk | Rejected |
-| Thin forge around existing Git | Small, independently deployable modules | Requires implementing authorization and collaboration | Chosen incremental research direction |
+| Thin Git service around existing Git | Small, independently deployable modules | Requires implementing authorization and collaboration | Chosen incremental research direction |
 
 No product selection or cutover is authorized by this document.
 
