@@ -45,8 +45,10 @@ def cube_with_open_top():
     return verts, tris
 
 
-def fixture_glb(mesh_name="test_mesh"):
+def fixture_glb(mesh_name="test_mesh", invert=False):
     verts, faces = cube_with_open_top()
+    if invert:
+        faces = [(a, c, b) for a, b, c in faces]
     position = b"".join(struct.pack("<3f", *v) for v in verts)
     index = b"".join(struct.pack("<H", vertex) for face in faces for vertex in face)
     binary = position + index
@@ -88,6 +90,21 @@ def fixture_glb(mesh_name="test_mesh"):
         + binary
     )
     return struct.pack("<4sII", b"glTF", 2, 12 + len(chunks)) + chunks
+
+
+def stl_signed_volume(path):
+    # Independent check on the written file: outward normals give positive volume.
+    rows = [
+        line.split()[1:4]
+        for line in path.read_text().splitlines()
+        if line.strip().startswith("vertex ")
+    ]
+    points = [tuple(float(value) for value in row) for row in rows]
+    total = 0.0
+    for index in range(0, len(points), 3):
+        (ax, ay, az), (bx, by, bz), (cx, cy, cz) = points[index : index + 3]
+        total += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)
+    return total / 6.0
 
 
 class MeshPipelineTests(unittest.TestCase):
@@ -133,7 +150,28 @@ class MeshPipelineTests(unittest.TestCase):
             self.assertEqual(data["final_faces"], 12)
             self.assertEqual(data["final_topology"]["open_edges"], 0)
             self.assertEqual(data["connected_components"], 1)
+            self.assertFalse(data["orientation_corrected"])
+            self.assertAlmostEqual(data["enclosed_volume_mm3"], 15**3, places=2)
+            self.assertAlmostEqual(stl_signed_volume(stl), 15**3, places=3)
             self.assertEqual(json.loads(report.read_text())["stl_sha256"], data["stl_sha256"])
+
+    def test_inside_out_source_is_flipped_outward(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            glb = folder / "inverted.glb"
+            glb.write_bytes(fixture_glb(invert=True))
+            data = convert(
+                glb,
+                "test_mesh",
+                folder / "inverted.stl",
+                folder / "inverted.json",
+                length_mm=15,
+                orientation="head",
+            )
+            self.assertTrue(data["orientation_corrected"])
+            self.assertAlmostEqual(data["enclosed_volume_mm3"], 15**3, places=2)
+            self.assertEqual(data["final_topology"]["winding_conflicts"], 0)
+            self.assertAlmostEqual(stl_signed_volume(folder / "inverted.stl"), 15**3, places=3)
 
     def test_invalid_glb_header(self):
         with tempfile.TemporaryDirectory() as temp:

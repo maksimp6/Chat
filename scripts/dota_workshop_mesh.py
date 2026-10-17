@@ -249,6 +249,17 @@ def components(faces: list) -> int:
     return len({root(i) for i in parents})
 
 
+def signed_volume(points: list, faces: list) -> float:
+    # Divergence theorem: positive for a closed mesh whose normals point outward.
+    total = 0.0
+    for a, b, c in faces:
+        ax, ay, az = points[a][:3]
+        bx, by, bz = points[b][:3]
+        cx, cy, cz = points[c][:3]
+        total += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)
+    return total / 6.0
+
+
 def physical_mesh(
     points: list, longest_mm: float, orientation: str = "weapon"
 ) -> tuple[list[tuple[float, float, float]], list[float]]:
@@ -317,6 +328,15 @@ def convert(
     physical, size = physical_mesh(verts, length_mm, orientation)
     if any(d > 180 for d in size):
         raise MeshError("Outside A1 mini build volume")
+    # Winding is consistent but may be globally inside-out; an inverted closed
+    # mesh has negative enclosed volume. Flip it so exported normals point outward.
+    volume = signed_volume(physical, repaired)
+    if abs(volume) <= 1e-9:
+        raise MeshError("Closed mesh encloses no volume")
+    orientation_corrected = volume < 0
+    if orientation_corrected:
+        repaired = [(a, c, b) for a, b, c in repaired]
+        volume = -volume
     stl.parent.mkdir(parents=True, exist_ok=True)
     export_ascii_stl(stl, physical, repaired)
     result = {
@@ -329,6 +349,8 @@ def convert(
         "final_faces": len(repaired),
         "final_topology": topology(repaired)[0],
         "connected_components": count,
+        "orientation_corrected": orientation_corrected,
+        "enclosed_volume_mm3": round(volume, 2),
         "dimensions_mm": [round(d, 2) for d in size],
         "stl_sha256": hashlib.sha256(stl.read_bytes()).hexdigest(),
         "print_ready": False,
