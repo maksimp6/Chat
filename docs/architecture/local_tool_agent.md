@@ -1,6 +1,6 @@
 # Cloud Gateway и Local Tool Agent
 
-Alice Pro разделяет центральный Gateway и локальный исполнитель.
+Logos разделяет центральный Gateway и локальный исполнитель.
 
 ## Поток
 
@@ -9,7 +9,7 @@ ChatGPT / UI / Agent
         |
         | HTTPS / MCP
         v
-Cloud.ru Alice Pro Gateway
+Cloud.ru Logos Gateway
         |
         | persistent local-agent job queue
         v
