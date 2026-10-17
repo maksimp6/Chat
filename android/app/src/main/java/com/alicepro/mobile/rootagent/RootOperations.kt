@@ -50,7 +50,7 @@ class RootOperations(
         } catch (_: IllegalArgumentException) {
             return Screenshot.Unavailable
         }
-        if (decoded.size < PNG_MAGIC.size || !decoded.copyOf(PNG_MAGIC.size).contentEquals(PNG_MAGIC)) {
+        if (!PngScreenshotValidator.valid(decoded)) {
             return Screenshot.Unavailable
         }
         return Screenshot.Answered(encoded)
@@ -87,7 +87,6 @@ class RootOperations(
         val TREE_ARGV = listOf("su", "-c", "uiautomator dump /proc/self/fd/1")
         private const val TREE_END = "</hierarchy>"
         val SCREENSHOT_ARGV = listOf("su", "-c", "screencap -p | base64")
-        private val PNG_MAGIC = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
         val STATUS_ARGV = listOf(
             "su", "-c",
             "dumpsys window | grep -E 'isKeyguardShowing|mShowingLockscreen|mKeyguardShowing'",

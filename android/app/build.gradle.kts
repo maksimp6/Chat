@@ -16,6 +16,7 @@ android {
         applicationId = "com.alicepro.mobile"
         minSdk = 26
         targetSdk = 35
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val buildNumber = providers.gradleProperty("aliceBuildNumber").orElse("1").get().toIntOrNull() ?: 1
         val commitHash = providers.gradleProperty("aliceCommitHash").orElse("unknown").get()
         val resolvedVersionName = providers.gradleProperty("aliceVersionName")
@@ -89,4 +90,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.webkit:webkit:1.12.1")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
