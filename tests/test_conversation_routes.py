@@ -77,7 +77,7 @@ def test_create_conversation_hides_provider_exception(monkeypatch):
     client = app_module.app.test_client()
     response = client.post(
         "/api/conversations",
-        json={"model": "aliceai-llm", "title": "Test"},
+        json={"model": "logos-runtime", "title": "Test"},
     )
 
     assert response.status_code == 502

@@ -87,7 +87,7 @@ the smoke-only environment variable names:
 - `YANDEX_API_KEY` → `ALICE_LAUNCH_SMOKE_YANDEX_API_KEY`
 - `YANDEX_PROJECT_ID` → `ALICE_LAUNCH_SMOKE_YANDEX_PROJECT_ID`
 
-Those secret names are already used by `.github/workflows/alice.yml`; this
+Those secret names are already used by `.github/workflows/logos.yml`; this
 workflow does not create a second credential source. The secret mappings are
 scoped only to the live smoke step. It also references the existing
 `production` GitHub Environment so its approval boundary remains

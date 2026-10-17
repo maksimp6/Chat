@@ -4,6 +4,7 @@ This module contains pure request-shaping logic extracted from yandex_client_mod
 It deliberately has no HTTP, database, tracing, or MCP side effects.
 """
 
+from core.config import upstream_model_id
 from yandex_client_modules.metadata_validator import validate_metadata
 
 
@@ -43,7 +44,7 @@ def build_response_payload(
         params["store"] = True
 
     payload = {
-        "model": "gpt://" + project_id + "/" + model_key + "/latest",
+        "model": "gpt://" + project_id + "/" + upstream_model_id(model_key) + "/latest",
         "input": params.get("input") or [{"role": "user", "content": message}],
         "background": is_background,
         "store": params.get("store", True),

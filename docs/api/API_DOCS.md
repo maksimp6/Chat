@@ -10,14 +10,14 @@
 
 - `message` (string, required): Текст сообщения
 - `conversation_id` (string, optional): ID диалога
-- `model` (string, optional): Модель (по умолчанию: aliceai-llm)
+- `model` (string, optional): Модель (по умолчанию: logos-runtime)
 
 **Пример:**
 
 ```bash
 curl -X POST http://localhost:8080/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"message":"Привет","model":"aliceai-llm"}'
+  -d '{"message":"Привет","model":"logos-runtime"}'
 ```
 
 ### 2. Vision API (Анализ изображений)

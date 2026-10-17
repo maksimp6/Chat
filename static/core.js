@@ -1,6 +1,6 @@
 let currentConvId = null;
 let conversations = [];
-let currentModel = "aliceai-llm";
+let currentModel = "logos-runtime";
 let currentModelType = "text";
 let modelsData = { text: {}, voice: {} };
 let coreInitialized = false;
@@ -65,8 +65,8 @@ window.changeModel = function (newModel, skipPatch) {
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   if (!textModels[newModel] && !voiceModels[newModel]) {
-    console.warn("[CORE] Unknown model:", newModel, "-> fallback to aliceai-llm");
-    newModel = "aliceai-llm";
+    console.warn("[CORE] Unknown model:", newModel, "-> fallback to logos-runtime");
+    newModel = "logos-runtime";
   }
   currentModel = newModel;
   currentModelType = voiceModels[currentModel] ? "voice" : "text";

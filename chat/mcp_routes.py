@@ -156,7 +156,7 @@ def chat():
     conv_id = None
     session_id = None
     message = None
-    model_key = "aliceai-llm"
+    model_key = "logos-runtime"
     partial_output = None
     error_message = None
     selected_skill_metadata = []
@@ -169,7 +169,7 @@ def chat():
         params = dict(data.get("params") or {})
         role = data.get("role") or params.pop("role", None)
         requested_skills = _normalize_requested_skills(data, params)
-        model_key = data.get("model") or params.get("model", "aliceai-llm")
+        model_key = data.get("model") or params.get("model", "logos-runtime")
 
         if not conv_id or not message:
             return jsonify({"error": "conversation_id и message обязательны"}), 400
@@ -576,7 +576,7 @@ def conversations():
         creation_trace.set_request(
             {
                 "operation": "create_conversation",
-                "model": data.get("model", "aliceai-llm"),
+                "model": data.get("model", "logos-runtime"),
             }
         )
         try:
@@ -599,7 +599,7 @@ def conversations():
                 }
             ), 502
         title = data.get("title") or "Новый чат"
-        model = data.get("model", "aliceai-llm")
+        model = data.get("model", "logos-runtime")
         create_conversation(conv_id, title, model)
         if owner_id:
             set_owner(conv_id, owner_id)
@@ -639,7 +639,7 @@ def execute_approved():
         conv_id = data.get("conversation_id")
         func_name = data.get("name")
         arguments = data.get("arguments", {})
-        model_key = data.get("model", "aliceai-llm")
+        model_key = data.get("model", "logos-runtime")
 
         tool_config = registry.get_tool_meta(func_name)
         if not tool_config:

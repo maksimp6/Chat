@@ -39,7 +39,7 @@ def test_chat_uses_invocation_context_identifiers():
                 json={
                     "conversation_id": "conv-context-test",
                     "message": "hello",
-                    "model": "aliceai-llm",
+                    "model": "logos-runtime",
                     "params": {},
                 },
             )
@@ -85,7 +85,7 @@ def test_chat_context_is_fresh_for_each_request():
                     json={
                         "conversation_id": "same-conversation",
                         "message": message,
-                        "model": "aliceai-llm",
+                        "model": "logos-runtime",
                         "params": {},
                     },
                 )

@@ -57,8 +57,9 @@ HOST = "0.0.0.0"
 PORT = 8080
 
 TEXT_MODELS = {
-    "aliceai-llm": {
-        "name": "Alice AI LLM",
+    "logos-runtime": {
+        "name": "Logos Runtime",
+        "upstream": "aliceai-llm",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.50,
@@ -93,8 +94,9 @@ TEXT_MODELS = {
         "tool": 0.20,
         "output": 0.20,
     },
-    "aliceai-llm-flash": {
-        "name": "Alice AI LLM Flash",
+    "logos-runtime-flash": {
+        "name": "Logos Runtime Flash",
+        "upstream": "aliceai-llm-flash",
         "type": "text",
         "capabilities": {"tools": None, "function_calling": None, "multimodal": None},
         "input": 0.10,
@@ -194,14 +196,21 @@ class Config:
 
 
 def get_model_info(model_key):
-    return ALL_MODELS.get(model_key, TEXT_MODELS["aliceai-llm"])
+    return ALL_MODELS.get(model_key, TEXT_MODELS["logos-runtime"])
+
+
+# The registry key is ours; the upstream id is the name Yandex knows the model by.
+# Keys that are not in the registry (including legacy stored keys) pass through unchanged.
+def upstream_model_id(model_key: str) -> str:
+    info = ALL_MODELS.get(model_key) or {}
+    return str(info.get("upstream", model_key))
 
 
 def get_model_uri(project_id, model_key):
     """Build the Yandex model URI from the active provider credential."""
     if not isinstance(project_id, str) or not project_id.strip():
         raise ValueError("Yandex project_id is required")
-    return "gpt://" + project_id.strip() + "/" + model_key + "/latest"
+    return "gpt://" + project_id.strip() + "/" + upstream_model_id(model_key) + "/latest"
 
 
 def calculate_cost(model_key, input_tokens, output_tokens=0, cached_tokens=0, tool_tokens=0):

@@ -88,7 +88,7 @@ stops converging.
 - `@codex` is the default repository implementation backend. Routine and mechanical
   Codex work uses **GPT-5.4 nano**; `.codex/config.toml` keeps nano/low defaults.
 - `@copilot` remains the native Copilot cloud agent and automatic PR reviewer.
-- `@alice` remains Alice Pro's self-improver for her own UI, translations,
+- `@logos` remains Alice Pro's self-improver for her own UI, translations,
   prompts, tools and docs.
 - Anthropic/Claude execution backends are not part of the repository execution
   path. Do not dispatch routine or maintainer work to Claude.
