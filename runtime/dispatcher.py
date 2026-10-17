@@ -1,4 +1,4 @@
-"""Scoped execution boundary for Alice Pro preview runtimes."""
+"""Scoped execution boundary for Logos preview runtimes."""
 
 from __future__ import annotations
 
