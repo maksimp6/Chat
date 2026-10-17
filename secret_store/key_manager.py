@@ -1,4 +1,4 @@
-"""Generic cryptography and secret-key lifecycle manager for Alice Pro.
+"""Generic cryptography and secret-key lifecycle manager for Logos.
 
 Secrets are encrypted at rest and are addressed by an opaque key reference.
 Plaintext values exist only during an explicit read/write operation and are

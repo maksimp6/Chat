@@ -1,4 +1,4 @@
-"""Alias, policy and audit boundary for Alice Secrets.
+"""Alias, policy and audit boundary for Logos Secrets.
 
 This module never stores or returns plaintext. It maps user-friendly aliases to
 canonical SecretRef metadata and authorizes a runtime purpose before resolution.

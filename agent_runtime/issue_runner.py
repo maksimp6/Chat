@@ -1,7 +1,7 @@
-"""Run Alice headlessly on a GitHub issue against her own checkout.
+"""Run Logos headlessly on a GitHub issue against its own checkout.
 
-Alice only gets her filesystem tools, which are sandboxed to this repository
-(tool_providers.filesystem.BASE_DIR). She never commits, pushes or runs commands:
+Logos only gets its filesystem tools, which are sandboxed to this repository
+(tool_providers.filesystem.BASE_DIR). Logos never commits, pushes or runs commands:
 the calling workflow reviews the diff and opens the pull request.
 """
 
@@ -23,7 +23,7 @@ MAX_SUMMARY_CHARS = 4000
 
 def build_prompt(issue_number: int, title: str, body: str, rules: str) -> str:
     return (
-        "You are Alice Pro working on your own source code in this repository.\n"
+        "You are Logos working on your own source code in this repository.\n"
         "Use only your filesystem tools. Make the smallest change that solves the task, "
         "add or update deterministic tests, and do not touch .github/ or secrets.\n"
         "When done, reply with a short summary of what you changed and why.\n\n"

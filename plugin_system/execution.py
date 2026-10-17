@@ -1,4 +1,4 @@
-"""Capability-gated plugin access to Alice's existing execution boundaries."""
+"""Capability-gated plugin access to the existing Logos execution boundaries."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# Alice Pro Android wrapper
+# Logos Android wrapper
 
 This module packages the existing Flask application in an Android shell using Chaquopy and a WebView. The backend source remains in the repository root and is staged into the Android Python source directory before packaging.
 
@@ -80,7 +80,7 @@ gradle :app:testDebugUnitTest
 - JVM unit tests in `app/src/test/java/com/alicepro/mobile/rootagent/` cover the bounded shell,
   the HTTP boundary and the self-check client. Redmi 9 smoke (2026-10-13, #650): loopback-only
   listener, 401 without or with a wrong token, 403 with a foreign `Origin`, self-check
-  `root: true` once Magisk allows the app uid. Magisk must grant root to Alice Pro explicitly.
+  `root: true` once Magisk allows the app uid. Magisk must grant root to Logos explicitly.
 
 ## System insets
 

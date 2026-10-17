@@ -1,1 +1,1 @@
-"""Sign-in methods for Alice Pro users."""
+"""Sign-in methods for Logos users."""

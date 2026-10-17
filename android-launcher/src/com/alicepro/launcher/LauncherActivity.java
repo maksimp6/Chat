@@ -26,10 +26,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/** Home screen: clock, Alice Pro shortcut, search and app grid with long-press actions. */
+/** Home screen: clock, Logos shortcut, search and app grid with long-press actions. */
 public class LauncherActivity extends Activity {
-    private static final String ALICE_PACKAGE = "com.alicepro.mobile";
-    private static final String ALICE_ACTIVITY = "com.alicepro.mobile.MainActivity";
+    private static final String LOGOS_PACKAGE = "com.alicepro.mobile";
+    private static final String LOGOS_ACTIVITY = "com.alicepro.mobile.MainActivity";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView clock;
@@ -80,9 +80,9 @@ public class LauncherActivity extends Activity {
             return true;
         });
 
-        findViewById(R.id.alice).setOnClickListener(v -> {
+        findViewById(R.id.logos).setOnClickListener(v -> {
             Intent intent = new Intent();
-            intent.setClassName(ALICE_PACKAGE, ALICE_ACTIVITY);
+            intent.setClassName(LOGOS_PACKAGE, LOGOS_ACTIVITY);
             startActivity(intent);
         });
     }

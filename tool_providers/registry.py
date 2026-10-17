@@ -1,4 +1,4 @@
-"""Provider-agnostic registry for Alice Pro tools.
+"""Provider-agnostic registry for Logos tools.
 
 Legacy tool definitions remain compatible: parameters/func are still
 accepted, while the registry also exposes a normalized Universal Tool

@@ -1,4 +1,4 @@
-"""Alice chat/config repositories backed by the native durable Kristall."""
+"""Logos chat/config repositories backed by the native durable Kristall."""
 
 from __future__ import annotations
 import json
@@ -35,7 +35,7 @@ def _require_native_activation(path: Path, legacy: Path) -> None:
 
 
 def get_store() -> Kristall:
-    """Alice owns the shared writer; repositories never close it individually."""
+    """Logos owns the shared writer; repositories never close it individually."""
     from agent_memory.client import get_memory_client
 
     return get_memory_client(memory_file_path())

@@ -1,4 +1,4 @@
-"""Structured planning contract for Alice Pro reasoning workflows.
+"""Structured planning contract for Logos reasoning workflows.
 
 This module models planning state, validation and replanning only.
 It does not expose or persist a model private chain-of-thought.
