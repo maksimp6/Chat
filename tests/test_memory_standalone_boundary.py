@@ -1,4 +1,4 @@
-"""Standalone-library architecture guards, independent of Alice runtime."""
+"""Standalone-library architecture guards, independent of Logos runtime."""
 
 import ast
 from pathlib import Path
@@ -6,8 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1] / "kristall"
 
 
-def test_engine_does_not_import_alice_modules():
-    """The reusable library may use the standard library, never Alice internals."""
+def test_engine_does_not_import_logos_modules():
+    """The reusable library may use the standard library, never Logos internals."""
     for source_file in ROOT.glob("*.py"):
         tree = ast.parse(source_file.read_text(encoding="utf-8"))
         imported = []

@@ -1,4 +1,4 @@
-"""Tests for Alice Platform config loading and validation."""
+"""Tests for Logos Platform config loading and validation."""
 
 import json
 import pytest

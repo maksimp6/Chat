@@ -1,4 +1,4 @@
-"""Regression tests for agent_runtime/cli.py after retiring the Alice class names (#1316).
+"""Regression tests for agent_runtime/cli.py after retiring the Logos class names (#1316).
 
 The class names are internal, so they change. The wire model key and the ALICE_*
 environment variables are compatibility contracts, so they must not change. The
@@ -81,7 +81,7 @@ def test_backend_receives_the_unchanged_model_key(monkeypatch):
     assert session.sent_json[-1]["model"] == "logos-runtime"
 
 
-def test_alice_environment_variables_still_configure_the_client(monkeypatch):
+def test_logos_environment_variables_still_configure_the_client(monkeypatch):
     monkeypatch.setenv("ALICE_BASE_URL", "http://env.test/")
     monkeypatch.setenv("ALICE_SHORT_TOKEN", "  env-token  ")
     monkeypatch.setenv("ALICE_MODEL", "env-model")
