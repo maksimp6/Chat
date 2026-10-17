@@ -14,6 +14,9 @@
             android:name=".DiagnosticsActivity"
             android:exported="false" />
         <activity
+            android:name=".RootAgentDiagnosticsActivity"
+            android:exported="false" />
+        <activity
             android:name=".BrowserTakeoverActivity"
             android:exported="true">
             <intent-filter>
