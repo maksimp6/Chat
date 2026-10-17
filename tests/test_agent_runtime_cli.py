@@ -27,8 +27,10 @@ class _Session:
     def __init__(self, response=None, error=None):
         self._response = response
         self._error = error
+        self.sent_json = []
 
-    def request(self, *args, **kwargs):
+    def request(self, method, url, **kwargs):
+        self.sent_json.append(kwargs.get("json"))
         if self._error is not None:
             raise self._error
         return self._response
@@ -69,6 +71,16 @@ def test_default_model_key_is_unchanged_for_the_backend_contract():
     assert cli.DEFAULT_MODEL == "aliceai-llm"
 
 
+def test_backend_receives_the_unchanged_model_key(monkeypatch):
+    monkeypatch.delenv("ALICE_MODEL", raising=False)
+    session = _Session(_Response(200, {"id": "conv-1"}))
+    client = cli.CliClient(base_url="http://backend.test", session=session)
+
+    client.create_conversation()
+
+    assert session.sent_json[-1]["model"] == "aliceai-llm"
+
+
 def test_alice_environment_variables_still_configure_the_client(monkeypatch):
     monkeypatch.setenv("ALICE_BASE_URL", "http://env.test/")
     monkeypatch.setenv("ALICE_SHORT_TOKEN", "  env-token  ")
@@ -82,7 +94,9 @@ def test_alice_environment_variables_still_configure_the_client(monkeypatch):
 
 
 def test_unreachable_backend_raises_cli_error_without_secret():
-    client = _client(error=requests.ConnectionError("refused"))
+    # requests embeds the full tokenized URL in its error text; the CLI must not echo it.
+    error = requests.ConnectionError("http://backend.test/secret-token/api/conversations refused")
+    client = _client(error=error)
 
     with pytest.raises(cli.CliError, match="backend is unavailable") as info:
         client.create_conversation()
