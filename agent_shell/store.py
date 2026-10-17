@@ -1,4 +1,4 @@
-"""Typed durable task repository using Alice's Kristall client.
+"""Typed durable task repository using Logos's Kristall client.
 
 One atomic aggregate keeps task IDs, state and events consistent. Separate
 TaskStore objects in the same process share a writer; another process is
