@@ -1,4 +1,4 @@
-"""Sign in to Alice Pro with a GitHub account (OAuth App web flow).
+"""Sign in to Logos with a GitHub account (OAuth App web flow).
 
 Configuration (all runtime environment variables):
 
@@ -87,7 +87,7 @@ def _is_secure() -> bool:
 
 def _page(message: str, status: int):
     html = (
-        '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Alice Pro</title>'
+        '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Logos</title>'
         f'</head><body style="font-family:sans-serif"><p>{message}</p>'
         f'<p><a href="{LOGIN_PATH}">Попробовать снова</a></p></body></html>'
     )
@@ -205,7 +205,7 @@ def github_callback():
 
     if not _account_allowed(account["id"]):
         logger.info("[GITHUB_AUTH] rejected account not in allowlist")
-        response = make_response(_page("Этому аккаунту GitHub вход в Alice Pro не разрешён.", 403))
+        response = make_response(_page("Этому аккаунту GitHub вход в Logos не разрешён.", 403))
         response.delete_cookie(STATE_COOKIE, path="/auth/github/")
         return response
 
