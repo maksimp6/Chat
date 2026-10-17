@@ -54,6 +54,12 @@ window.AliceTheme = {
   },
 };
 
+// Keys renamed in #1316; stored conversations may still carry the old names.
+const LEGACY_MODEL_KEYS = {
+  "aliceai-llm": "logos-runtime",
+  "aliceai-llm-flash": "logos-runtime-flash",
+};
+
 const savedTheme = window.AliceTheme.getStored();
 window.AliceTheme.apply(savedTheme, false);
 
@@ -62,6 +68,7 @@ function fetchWithTimeout(input, init, timeoutMs) {
 }
 
 window.changeModel = function (newModel, skipPatch) {
+  newModel = LEGACY_MODEL_KEYS[newModel] || newModel;
   var textModels = modelsData.text || {};
   var voiceModels = modelsData.voice || {};
   if (!textModels[newModel] && !voiceModels[newModel]) {

@@ -195,14 +195,32 @@ class Config:
     PORT = PORT
 
 
+# Keys renamed in #1316. Stored conversations and older clients may still send them.
+LEGACY_MODEL_KEYS = {
+    "aliceai-llm": "logos-runtime",
+    "aliceai-llm-flash": "logos-runtime-flash",
+}
+
+
+def canonical_model_key(model_key: str) -> str:
+    return LEGACY_MODEL_KEYS.get(model_key, model_key)
+
+
+def registry_key_for_upstream(upstream_id: str) -> str | None:
+    for key, info in TEXT_MODELS.items():
+        if info.get("upstream") == upstream_id:
+            return key
+    return None
+
+
 def get_model_info(model_key):
-    return ALL_MODELS.get(model_key, TEXT_MODELS["logos-runtime"])
+    return ALL_MODELS.get(canonical_model_key(model_key), TEXT_MODELS["logos-runtime"])
 
 
 # The registry key is ours; the upstream id is the name Yandex knows the model by.
 # Keys that are not in the registry (including legacy stored keys) pass through unchanged.
 def upstream_model_id(model_key: str) -> str:
-    info = ALL_MODELS.get(model_key) or {}
+    info = ALL_MODELS.get(canonical_model_key(model_key)) or {}
     return str(info.get("upstream", model_key))
 
 
