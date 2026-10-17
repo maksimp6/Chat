@@ -20,6 +20,7 @@ class MeshError(ValueError):
 
 
 _COMPONENTS = {5121: "B", 5123: "H", 5125: "I", 5126: "f"}
+_INTEGER_COMPONENTS = (5121, 5123, 5125)
 _DIMENSIONS = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
 
 
@@ -47,26 +48,46 @@ def read_glb(path: Path) -> tuple[dict, bytes]:
     return doc, parts[b"BIN\x00"]
 
 
-def accessor(doc: dict, binary: bytes, number: int) -> list[tuple]:
-    a = doc["accessors"][number]
+def _item(items: list, index, label: str) -> dict:
+    # Untrusted JSON: report a bad reference as MeshError, never IndexError.
+    if not isinstance(items, list) or not isinstance(index, int) or isinstance(index, bool):
+        raise MeshError(f"Unknown {label} index")
+    if not 0 <= index < len(items) or not isinstance(items[index], dict):
+        raise MeshError(f"Unknown {label} index")
+    return items[index]
+
+
+def accessor(
+    doc: dict, binary: bytes, number: int, kind: str, *, integer: bool = False
+) -> list[tuple]:
+    a = _item(doc.get("accessors", []), number, "accessor")
     if "sparse" in a or "bufferView" not in a:
         raise MeshError("Sparse or missing buffer view is unsupported")
-    view = doc["bufferViews"][a["bufferView"]]
+    view = _item(doc.get("bufferViews", []), a["bufferView"], "bufferView")
     if view.get("buffer", 0) != 0:
         raise MeshError("Only the GLB binary buffer is supported")
-    fmt = _COMPONENTS.get(a["componentType"])
-    dims = _DIMENSIONS.get(a["type"])
+    component = a.get("componentType")
+    shape = a.get("type")
+    fmt = _COMPONENTS.get(component) if isinstance(component, int) else None
+    dims = _DIMENSIONS.get(shape) if isinstance(shape, str) else None
     if not fmt or not dims or a.get("normalized", False):
         raise MeshError("Unsupported accessor type")
+    if shape != kind:
+        raise MeshError(f"Expected {kind} accessor")
+    if integer and component not in _INTEGER_COMPONENTS:
+        raise MeshError("Index accessor must use unsigned integer components")
+    count = a.get("count")
+    byte_length = view.get("byteLength")
+    if not isinstance(count, int) or not isinstance(byte_length, int):
+        raise MeshError("Accessor or buffer view is missing count or byteLength")
     unit = struct.calcsize("<" + fmt * dims)
     stride = view.get("byteStride", unit)
     offset = view.get("byteOffset", 0) + a.get("byteOffset", 0)
-    count = a["count"]
     if not (0 <= count <= 2_000_000) or stride < unit:
         raise MeshError("Invalid accessor shape")
     if count and (
         offset < 0
-        or offset + (count - 1) * stride + unit > view.get("byteOffset", 0) + view["byteLength"]
+        or offset + (count - 1) * stride + unit > view.get("byteOffset", 0) + byte_length
         or offset + (count - 1) * stride + unit > len(binary)
     ):
         raise MeshError("Accessor outside binary buffer")
@@ -80,8 +101,15 @@ def select_mesh(doc: dict, binary: bytes, name: str) -> tuple[list, list]:
     primitive = matches[0]["primitives"][0]
     if primitive.get("mode", 4) != 4:
         raise MeshError("Non-triangle mesh")
-    points = accessor(doc, binary, primitive["attributes"]["POSITION"])
-    indices = [index[0] for index in accessor(doc, binary, primitive["indices"])]
+    attributes = primitive.get("attributes")
+    if not isinstance(attributes, dict) or "POSITION" not in attributes:
+        raise MeshError("Primitive has no POSITION attribute")
+    if "indices" not in primitive:
+        raise MeshError("Non-indexed primitive is unsupported")
+    points = accessor(doc, binary, attributes["POSITION"], "VEC3")
+    indices = [
+        index[0] for index in accessor(doc, binary, primitive["indices"], "SCALAR", integer=True)
+    ]
     if not points or len(indices) % 3:
         raise MeshError("Empty mesh or invalid triangle indices")
     if any(not all(math.isfinite(v) for v in point) for point in points):
@@ -261,8 +289,13 @@ def signed_volume(points: list, faces: list) -> float:
 
 
 def physical_mesh(
-    points: list, longest_mm: float, orientation: str = "weapon"
+    points: list, faces: list, longest_mm: float, orientation: str = "weapon"
 ) -> tuple[list[tuple[float, float, float]], list[float]]:
+    # Only vertices used by a final triangle define the box and scale. Unused
+    # POSITION entries are never exported, so they must not change the size.
+    used = sorted({index for face in faces for index in face})
+    if not used:
+        raise MeshError("Mesh has no triangles")
     if orientation == "weapon":
         # Z is long, Y is thin: sword lies horizontally.
         oriented = [(p[2], p[0], p[1]) for p in points]
@@ -271,8 +304,9 @@ def physical_mesh(
         oriented = [(p[0], -p[2], p[1]) for p in points]
     else:
         raise MeshError("Unsupported orientation")
-    minimum = [min(p[i] for p in oriented) for i in range(3)]
-    maximum = [max(p[i] for p in oriented) for i in range(3)]
+    referenced = [oriented[index] for index in used]
+    minimum = [min(p[i] for p in referenced) for i in range(3)]
+    maximum = [max(p[i] for p in referenced) for i in range(3)]
     extent = [maximum[i] - minimum[i] for i in range(3)]
     if min(extent) <= 0 or longest_mm <= 0:
         raise MeshError("Invalid geometry scale")
@@ -325,7 +359,7 @@ def convert(
     count = components(repaired)
     if count != 1:
         raise MeshError(f"Source contains {count} disconnected shells")
-    physical, size = physical_mesh(verts, length_mm, orientation)
+    physical, size = physical_mesh(verts, repaired, length_mm, orientation)
     if any(d > 180 for d in size):
         raise MeshError("Outside A1 mini build volume")
     # Winding is consistent but may be globally inside-out; an inverted closed

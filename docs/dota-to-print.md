@@ -114,10 +114,16 @@ python3 -m unittest discover -s tests -p 'test_dota_workshop_mesh.py' -v
 \`\`\`
 
 In the cloud RDC scratch environment seven focused tests passed before the
-orientation fix. The current test file has eight tests, including an
-inside-out closed mesh that must be flipped outward; all eight pass locally at
-the current head. Full repository CI and independent review are not yet
-verified.
+orientation fix. The current test file has 21 tests: the inside-out flip,
+triangle-referenced scale, the disconnected-shell and A1 build-volume gates,
+GLB accessor and primitive rejection, orientation vectors, and the centroid-fan
+fallback. All 21 pass locally at the head of this change. Full repository CI
+and independent review are not yet verified.
+
+Scale and the build-volume gate use only vertices referenced by final triangles,
+so unused POSITION entries do not change `dimensions_mm`. The head demonstration
+numbers above predate this rule; re-measure them from the source GLB before
+relying on them.
 
 The report records `orientation_corrected` and `enclosed_volume_mm3`. A source
 whose STL hash was recorded before this fix may legitimately change if its
