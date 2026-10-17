@@ -105,7 +105,7 @@ export async function startGateway(options = {}) {
     }
     if (await credentialHandoff.handle(request, response, requestUrl)) return;
     if (oauth?.enabled && await oauth.handle(request, response, requestUrl)) return;
-    if (requestUrl.pathname !== "/mcp" || request.method !== "POST") {
+    if (requestUrl.pathname !== "/mcp") {
       request.resume();
       response.writeHead(404, { "Content-Type": "application/json" })
         .end('{"status":"not_found"}');
@@ -119,6 +119,16 @@ export async function startGateway(options = {}) {
           ? oauth.challenge()
           : 'Bearer realm="alice-dev"',
       }).end('{"status":"unauthorized"}');
+      return;
+    }
+    if (request.method !== "POST") {
+      // This stateless gateway has no standalone SSE stream or DELETE session.
+      // Authentication still runs first so connector probes can discover OAuth.
+      request.resume();
+      response.writeHead(405, {
+        "Content-Type": "application/json",
+        Allow: "POST",
+      }).end(request.method === "HEAD" ? undefined : '{"status":"method_not_allowed"}');
       return;
     }
     try {
