@@ -11,7 +11,7 @@
 справочник сервисов Evolution. Навык лежит в репозитории: он не устанавливает
 EDS и не создаёт ресурсы сам.
 
-Текущий AI backend Алисы — Yandex Cloud через Yandex AI Studio. Этот Cloud.ru
+Текущий AI backend Logos — Yandex Cloud через Yandex AI Studio. Этот Cloud.ru
 runbook готовит инфраструктуру приложения и не переключает AI-провайдера.
 Foundation Models, Guardrails и AI Agents в справочнике Evolution — каталог для
 отдельной будущей оценки, не часть текущего runtime или rollout.

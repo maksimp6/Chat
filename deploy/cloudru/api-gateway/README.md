@@ -2,7 +2,7 @@
 
 `alice-openapi.example.json` — намеренно маленький starter для
 Shared API Gateway OpenAPI template: `/healthz`, `/api/chat`, `/mcp`. Он **не
-описывает полный Flask route map Алисы** и не готов для импорта/публикации, пока
+описывает полный Flask route map Logos** и не готов для импорта/публикации, пока
 не заполнены UUID Container Apps, log group и limits, не добавлены остальные
 routes UI/API и не выполнены проверки ниже. Изменение файла само ничего в облаке
 не создаёт. OpenAPI JSON принимается Cloud Gateway; расширения документированы.
