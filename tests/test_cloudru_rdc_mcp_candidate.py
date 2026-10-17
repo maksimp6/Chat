@@ -374,16 +374,11 @@ def test_public_acceptance_workflows_run_regressions_and_have_time_limits():
         (root / ".github/workflows/cloudru-rdc-mcp-candidate.yml").read_text(),
         Loader=yaml.BaseLoader,
     )
-    paths = deploy["on"]["push"]["paths"]
-    for required in (
-        "cloud/cloudru/registry_client.py",
-        "requirements-deploy.txt",
-        "config/alice/alice-dev-delete-ids.txt",
-        "deploy/remote-desktop-commander/request-origin.mjs",
-        "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs",
-        ".github/workflows/cloudru-rdc-mcp-candidate.yml",
-    ):
-        assert required in paths
+    assert set(deploy["on"]) == {"workflow_dispatch"}
+    confirmation = deploy["on"]["workflow_dispatch"]["inputs"]["confirm_paid_deploy"]
+    assert confirmation["type"] == "boolean"
+    assert confirmation["required"] == "true"
+    assert confirmation["default"] == "false"
     steps = {step.get("name"): step for step in deploy["jobs"]["deploy"]["steps"]}
     assert steps["Verify OAuth discovery"]["timeout-minutes"] == "2"
     assert steps["Verify public MCP end to end"]["timeout-minutes"] == "2"
