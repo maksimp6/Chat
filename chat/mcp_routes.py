@@ -87,7 +87,7 @@ def _normalize_requested_skills(data, params):
     return [item.strip() for item in raw if item.strip()]
 
 
-class AliceClient(YandexResponsesClient):
+class LogosClient(YandexResponsesClient):
     def ask_with_mcp(self, message, model_key, conversation_id=None, params=None, trace=None):
         response = super().ask_with_mcp(
             message=message,
@@ -115,7 +115,7 @@ class AliceClient(YandexResponsesClient):
                     continuation_params = dict(base_params)
                     continuation_params["input"] = input_items
                     continuation_params["background"] = base_params.get("background", True)
-                    return super(AliceClient, self).ask_with_mcp(
+                    return super(LogosClient, self).ask_with_mcp(
                         message="",
                         model_key=model_key,
                         conversation_id=conversation_id,
@@ -240,7 +240,7 @@ def chat():
             invocation.conversation_id,
             message,
         )
-        client = AliceClient(Config)
+        client = LogosClient(Config)
 
         response = client.ask_with_mcp(
             message=message,
@@ -571,7 +571,7 @@ def conversations():
 
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
-        client = AliceClient(Config)
+        client = LogosClient(Config)
         creation_trace = ExecutionTrace()
         creation_trace.set_request(
             {
@@ -672,7 +672,7 @@ def execute_approved():
             } else 400
 
         execution_data = exec_res.get("data")
-        client = AliceClient(Config)
+        client = LogosClient(Config)
         prompt = (
             f"Пользователь подтвердил действие '{func_name}' с параметрами {arguments}.\n"
             f"Результат: {execution_data}.\nДай краткий ответ о завершении."

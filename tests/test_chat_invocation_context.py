@@ -28,7 +28,7 @@ def test_chat_uses_invocation_context_identifiers():
             return None
 
     with (
-        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
     ):
@@ -73,7 +73,7 @@ def test_chat_context_is_fresh_for_each_request():
             return None
 
     with (
-        patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+        patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
         patch.object(mcp_routes, "get_conv_settings", return_value={}),
         patch.object(mcp_routes, "add_message"),
     ):

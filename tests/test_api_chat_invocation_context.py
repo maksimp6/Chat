@@ -24,7 +24,7 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         with (
             patch("chat.mcp_routes.get_conv_settings", return_value={}),
             patch("chat.mcp_routes.add_message"),
-            patch("chat.mcp_routes.AliceClient.ask_with_mcp", side_effect=assert_trace_is_bound),
+            patch("chat.mcp_routes.LogosClient.ask_with_mcp", side_effect=assert_trace_is_bound),
         ):
             response = client.post(
                 "/api/chat",
@@ -46,7 +46,7 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         with (
             patch("chat.mcp_routes.get_conv_settings", return_value={}),
             patch("chat.mcp_routes.add_message"),
-            patch("chat.mcp_routes.AliceClient.ask_with_mcp", side_effect=RuntimeError("boom")),
+            patch("chat.mcp_routes.LogosClient.ask_with_mcp", side_effect=RuntimeError("boom")),
         ):
             response = client.post(
                 "/api/chat",
