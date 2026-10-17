@@ -128,14 +128,21 @@ export function createWorker(options = {}) {
     idleTimer = undefined;
   }
 
+  // Idle sleep never interrupts a running operation or a human takeover. A connected noVNC websocket
+  // counts as takeover activity, so an open human session keeps Chrome awake until its grant ends it.
+  function idleSleepAllowed() {
+    if (activeOperations > 0) return false;
+    if (takeoverEnabled && (takeover.status?.().active || takeover.openConnectionCount?.() > 0)) return false;
+    return true;
+  }
+
   function scheduleIdleSleep() {
     cancelIdleSleep();
     if (!context || closing) return;
     idleTimer = setTimeout(() => {
       idleTimer = undefined;
-      // An operation still running re-arms the timer when it settles, so idle sleep never interrupts it.
-      if (activeOperations > 0) return;
-      if (takeoverEnabled && takeover.status?.().active) {
+      // Busy or taken-over workers re-arm the timer here; a settling operation re-arms it too.
+      if (!idleSleepAllowed()) {
         scheduleIdleSleep();
         return;
       }
@@ -146,9 +153,21 @@ export function createWorker(options = {}) {
     idleTimer.unref?.();
   }
 
-  async function sleepWhenIdle() {
-    await mcp.close();
-    await sleep();
+  // Queued in the lifecycle so it sees activity that arrived while an earlier transition was running.
+  function sleepWhenIdle() {
+    return transition(async () => {
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      await mcp.close();
+      // Activity may have started while MCP sessions were closing; Chrome stays up for it.
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      await closeBrowser();
+    });
   }
 
   function trackActivity(operation) {
@@ -165,34 +184,42 @@ export function createWorker(options = {}) {
     return transition(async () => {
       if (context) return;
       const chromium = options.chromium ?? (await import("playwright-core")).chromium;
-      context = await chromium.launchPersistentContext(profileDir, {
+      const launched = await chromium.launchPersistentContext(profileDir, {
         executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
         headless: takeoverEnabled ? false : process.env.CHROME_HEADLESS !== "0",
         chromiumSandbox: false,
         args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
       });
-      context.on?.("close", () => {
+      context = launched;
+      launched.on?.("close", () => {
+        // A late close event from an earlier context must not clear a newer one.
+        if (context !== launched) return;
         context = undefined;
         page = undefined;
         state = "sleeping";
       });
-      page = context.pages()[0] ?? (await context.newPage());
+      page = launched.pages()[0] ?? (await launched.newPage());
       generation += 1;
       state = "awake";
       scheduleIdleSleep();
     });
   }
 
+  // The page is cleared before the close is awaited, so requests that arrive while Chrome closes
+  // see browser_sleeping (409) instead of operating on a closing page.
+  async function closeBrowser() {
+    const closingContext = context;
+    context = undefined;
+    page = undefined;
+    state = "sleeping";
+    cancelIdleSleep();
+    if (closingContext) await closingContext.close();
+    await stateStore.checkpoint();
+  }
+
   async function sleep() {
     await ready;
-    return transition(async () => {
-      if (context) await context.close();
-      context = undefined;
-      page = undefined;
-      state = "sleeping";
-      cancelIdleSleep();
-      await stateStore.checkpoint();
-    });
+    return transition(() => closeBrowser());
   }
 
   function callTool(name, args = {}) {
@@ -270,7 +297,8 @@ export function createWorker(options = {}) {
     ["POST /browser/v1/screenshot", ["screenshot", true]],
   ]);
 
-  const mcp = createPlaywrightMcp(async () => {
+  const createMcp = options.createMcp ?? createPlaywrightMcp;
+  const mcp = createMcp(async () => {
     await wake();
     return context;
   }, `${profileDir}/mcp-output`);

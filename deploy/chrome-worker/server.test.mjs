@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { createConnection, createServer as createTcpServer } from "node:net";
 import test from "node:test";
 
 import { createWorker } from "./server.mjs";
+import { createTakeover } from "./takeover.mjs";
+
+function listen(server) {
+  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server.address().port)));
+}
+
+async function waitFor(predicate, ms = 2000) {
+  const deadline = Date.now() + ms;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("condition_not_met");
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+}
 
 function fakeChromium() {
   const profile = { value: "" };
@@ -220,7 +234,8 @@ test("idle sleep does not interrupt a browser operation that is still running", 
   assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
   const screenshot = await app.worker.callTool("screenshot");
   assert.equal(screenshot.mediaType, "image/png");
-  // The 25 ms idle window elapsed during the 80 ms screenshot; Chrome must still be open.
+  // trackActivity cancels the idle timer that wake armed, so Chrome stays open for the whole
+  // 80 ms screenshot even though a 25 ms idle window would have passed in that time.
   assert.notEqual(fake.profile.closed, true);
 
   // After the operation settled, the browser sleeps once the idle window passes again.
@@ -228,4 +243,195 @@ test("idle sleep does not interrupt a browser operation that is still running", 
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   assert.equal(fake.profile.closed, true);
+});
+
+test("idle sleep waits for every overlapping browser operation, not only the first to settle", async (t) => {
+  const fake = fakeChromium();
+  const launch = fake.chromium.launchPersistentContext;
+  let screenshots = 0;
+  fake.chromium.launchPersistentContext = async (directory) => {
+    const context = await launch(directory);
+    context.pages()[0].screenshot = async () => {
+      screenshots += 1;
+      // The first screenshot settles while the second is still running.
+      await new Promise((resolve) => setTimeout(resolve, screenshots === 1 ? 5 : 150));
+      if (fake.profile.closed) throw new Error("Target closed");
+      return Buffer.from("png");
+    };
+    return context;
+  };
+  const worker = createWorker({ token: "test-token", profileDir: "/state/profile", chromium: fake.chromium, idleSleepMs: 25 });
+  t.after(() => worker.close());
+
+  await worker.callTool("wake");
+  const results = await Promise.allSettled([worker.callTool("screenshot"), worker.callTool("screenshot")]);
+  assert.deepEqual(results.map((result) => result.status), ["fulfilled", "fulfilled"]);
+  // The first settle re-armed the idle timer; it must not have put Chrome to sleep under the second screenshot.
+  assert.notEqual(fake.profile.closed, true);
+  await waitFor(() => fake.profile.closed === true);
+});
+
+test("idle sleep defers while a takeover grant is active or a takeover websocket is open", async (t) => {
+  let grantActive = true;
+  let openSockets = 0;
+  const fake = fakeChromium();
+  const takeover = {
+    startDisplay() {},
+    start() { throw new Error("must_not_start"); },
+    stop() {},
+    close() {},
+    status() { return grantActive ? { active: true, expiresAt: 0 } : { active: false }; },
+    openConnectionCount() { return openSockets; },
+    async proxyHttp() { return false; },
+    proxyUpgrade() {},
+  };
+  const worker = createWorker({ token: "test-token", profileDir: "/state/profile", chromium: fake.chromium, takeoverEnabled: true, takeoverRuntime: takeover, idleSleepMs: 10 });
+  t.after(() => worker.close());
+
+  await worker.callTool("wake");
+  // Grant issued, human not yet connected: Chrome stays awake.
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.notEqual(fake.profile.closed, true);
+
+  // Grant status cleared but a websocket is still connected: Chrome stays awake.
+  grantActive = false;
+  openSockets = 1;
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.notEqual(fake.profile.closed, true);
+
+  openSockets = 0;
+  await waitFor(() => fake.profile.closed === true);
+});
+
+test("idle sleep keeps Chrome open for a connected takeover websocket and ends both when the grant expires", async (t) => {
+  const upstreamSockets = new Set();
+  const upstream = createTcpServer((socket) => {
+    upstreamSockets.add(socket);
+    socket.on("error", () => {});
+    socket.on("close", () => upstreamSockets.delete(socket));
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => {
+    for (const socket of upstreamSockets) socket.destroy();
+    upstream.close();
+  });
+
+  const fake = fakeChromium();
+  const takeover = createTakeover({ ttlMs: 120, upstreamPort, spawnProcess: () => ({ kill() {} }) });
+  const worker = createWorker({ token: "test-token", profileDir: "/state/profile", chromium: fake.chromium, takeoverEnabled: true, takeoverRuntime: takeover, idleSleepMs: 20 });
+  t.after(() => worker.close());
+
+  await worker.callTool("wake");
+  const grant = takeover.start();
+  const frontend = createTcpServer();
+  const frontendPort = await listen(frontend);
+  const accepted = once(frontend, "connection");
+  const client = createConnection({ host: "127.0.0.1", port: frontendPort });
+  client.on("error", () => {});
+  t.after(() => client.destroy());
+  const [serverSocket] = await accepted;
+  frontend.close();
+  worker.takeover.proxyUpgrade(
+    { method: "GET", url: `/browser/v1/takeover/websockify?takeover_token=${grant.token}`, headers: {} },
+    serverSocket,
+    Buffer.alloc(0),
+  );
+
+  // Chrome must stay open for as long as the human socket is connected; the idle timer keeps re-arming.
+  let closedWhileConnected = false;
+  const deadline = Date.now() + 1000;
+  while (!serverSocket.destroyed && Date.now() < deadline) {
+    if (fake.profile.closed) closedWhileConnected = true;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(closedWhileConnected, false);
+  assert.equal(serverSocket.destroyed, true);
+  await waitFor(() => fake.profile.closed === true);
+});
+
+test("a request that arrives while Chrome closes for sleep gets browser_sleeping, not a failure", async (t) => {
+  const profile = { closing: false, closed: false };
+  let releaseClose;
+  const closeGate = new Promise((resolve) => { releaseClose = resolve; });
+  const page = {
+    url() { return "about:blank"; },
+    async title() { return "Synthetic page"; },
+    async screenshot() {
+      if (profile.closing) throw new Error("Target page, context or browser has been closed");
+      return Buffer.from("png");
+    },
+  };
+  const chromium = {
+    async launchPersistentContext() {
+      return {
+        pages: () => [page],
+        async close() {
+          profile.closing = true;
+          await closeGate;
+          profile.closed = true;
+        },
+      };
+    },
+  };
+  const app = await fixture({ chromium });
+  t.after(async () => { releaseClose(); await app.close(); });
+
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  const sleeping = app.request("/browser/v1/sleep", {});
+  await waitFor(() => profile.closing);
+
+  const during = await app.request("/browser/v1/screenshot", {});
+  assert.equal(during.status, 409);
+  assert.deepEqual(await during.json(), { error: "browser_sleeping" });
+
+  releaseClose();
+  assert.equal((await sleeping).status, 200);
+  assert.equal(profile.closed, true);
+});
+
+test("idle sleep re-checks activity after MCP sessions close and keeps Chrome for an operation that started meanwhile", async (t) => {
+  const fake = fakeChromium();
+  let mcpClosing = false;
+  let releaseMcp;
+  const mcpGate = new Promise((resolve) => { releaseMcp = resolve; });
+  let releaseScreenshot;
+  const screenshotGate = new Promise((resolve) => { releaseScreenshot = resolve; });
+  const launch = fake.chromium.launchPersistentContext;
+  fake.chromium.launchPersistentContext = async (directory) => {
+    const context = await launch(directory);
+    context.pages()[0].screenshot = async () => {
+      await screenshotGate;
+      if (fake.profile.closed) throw new Error("Target closed");
+      return Buffer.from("png");
+    };
+    return context;
+  };
+  const worker = createWorker({
+    token: "test-token",
+    profileDir: "/state/profile",
+    chromium: fake.chromium,
+    idleSleepMs: 25,
+    createMcp: () => ({
+      async handle() {},
+      async close() {
+        mcpClosing = true;
+        await mcpGate;
+      },
+    }),
+  });
+  t.after(async () => { releaseMcp(); releaseScreenshot(); await worker.close(); });
+
+  await worker.callTool("wake");
+  await waitFor(() => mcpClosing);
+
+  // A browser operation arrives while the idle sleep is still closing MCP sessions.
+  const screenshot = worker.callTool("screenshot");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  releaseMcp();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.notEqual(fake.profile.closed, true);
+
+  releaseScreenshot();
+  assert.equal((await screenshot).mediaType, "image/png");
+  await waitFor(() => fake.profile.closed === true);
 });
