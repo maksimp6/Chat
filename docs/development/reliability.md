@@ -69,6 +69,19 @@ and compares each rule's violation count with `RATCHET_BASELINE`.
   new count in the same change, so the improvement is locked in.
 - Rules at zero stay at zero.
 
+## Exception handling outside Python
+
+`scripts/check_exception_handling.py` ratchets `try {` blocks and silent catch
+blocks (empty, or only comments) in project-owned JavaScript, `.mjs`, Java and
+Kotlin, using `scripts/exception_handling_baseline.json`. The same rules apply:
+new handlers and silent catches fail, and fixes must lower the baseline.
+Python is covered by the ruff rules BLE001, S110, S112 and E722 above.
+Vendored code (`static/eruda.js`) and `tests/` are excluded.
+
+A handler that reports the error should stay, but a catch that only hides the
+failure is a defect. Narrow exceptions only at real external boundaries, and
+let the error propagate to a caller that can report it.
+
 ## Static types
 
 Python code is checked with `mypy --strict` (configured in `pyproject.toml`,
@@ -83,6 +96,13 @@ with two rules:
 New modules are written fully typed: annotate every function, use precise
 container types (`dict[str, int]`, not `dict`) and avoid `Any` outside
 boundaries that parse external JSON.
+
+For new and changed function contracts, `scripts/check_changed_types.py`
+provides deterministic source-level diagnostics used by the focused contract
+tests. It rejects missing parameter/return annotations, bare generic return or
+parameter annotations, `Any` return leakage, and unqualified
+`# type: ignore`. Semantic typing remains the responsibility of
+`mypy --strict`; the source checker is deliberately not a second type checker.
 
 ## Where the rules run
 

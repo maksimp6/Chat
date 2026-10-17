@@ -301,9 +301,19 @@ python scripts/merge_readiness.py \
   --repo maksimp6/Chat \
   --pr 123 \
   --base master \
+  --required-check "Platform changes" \
+  --required-check "CI required" \
+  --required-check "Infrastructure tests" \
+  --required-check "MCP worker tests" \
+  --required-check "Code rules" \
   --required-check "Application tests" \
   --required-check "PostgreSQL integration" \
   --required-check "Android debug APK" \
+  --required-check "Auto-format repository" \
+  --required-check "Trivy repository scan" \
+  --required-check "Zizmor GitHub Actions audit" \
+  --required-check "CodeQL (python)" \
+  --required-check "CodeQL (javascript-typescript)" \
   --pretty
 ```
 
@@ -338,11 +348,17 @@ CLI печатает JSON с полями `ready`, `head_sha`, `behind_by` и `b
 Workflow `Merge readiness snapshot` запускается для non-draft PR в `master` на:
 
 - `opened`, `synchronize`, `reopened`, `ready_for_review`;
-- review `submitted` / `dismissed`;
-- review-comment `created` / `edited` / `deleted`.
+- review `submitted` / `dismissed`.
+
+Изменения отдельных review-comments не запускают повторный polling run.
 
 Он checkout'ит exact `pull_request.head.sha`, использует только read-permissions и проверяет:
 
+- `Platform changes`;
+- `CI required`;
+- `Infrastructure tests`;
+- `MCP worker tests`;
+- `Code rules`;
 - `Application tests`;
 - `PostgreSQL integration`;
 - `Android debug APK`;
@@ -351,6 +367,22 @@ Workflow `Merge readiness snapshot` запускается для non-draft PR �
 - `Zizmor GitHub Actions audit`;
 - `CodeQL (python)`;
 - `CodeQL (javascript-typescript)`.
+
+`Platform changes` и `CI required` должны завершиться именно `success`.
+Их `skipped` или `neutral` не являются доказательством успешного планирования
+и проверки результатов. Последняя попытка check-run имеет приоритет над старым успехом.
+
+Платформенные jobs могут быть `skipped`, когда они не выбраны routing plan.
+Агрегатор `CI required` проверяет этот план и требует `success` от каждой выбранной
+платформы. Поэтому docs-only PR не запускает лишние платформы, а падение infra/MCP
+или пропуск выбранной job не скрывается за успешными legacy checks.
+Изменения состава jobs в `ci.yml` должны сопровождаться обновлением этого контракта
+и регрессиями в `tests/test_merge_readiness.py`.
+
+Отсутствие model review и сообщение Copilot об исчерпанной квоте сами по себе
+не блокируют readiness и не требуют повторного запроса модели. Это не разрешение
+на merge: обязательные checks и отсутствие unresolved review threads по-прежнему
+проверяются, а текущая защита ветки и ручное решение владельца не обходятся.
 
 Для missing/pending checks workflow ждёт не более `180 × 5` секунд, то есть 15 минут.
 Результат JSON публикуется в job log и GitHub Step Summary.

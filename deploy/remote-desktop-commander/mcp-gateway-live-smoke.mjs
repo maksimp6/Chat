@@ -1,8 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const endpoint = new URL(process.env.RDC_MCP_SMOKE_URL || "http://127.0.0.1:8766/mcp");
-const token = process.env.RDC_MCP_SMOKE_TOKEN || "local-smoke-token";
+const endpoint = new URL(process.env.ALICE_DEV_SMOKE_URL || "http://127.0.0.1:8766/mcp");
+const token = process.env.ALICE_DEV_SMOKE_TOKEN || "local-smoke-token";
 
 const denied = await fetch(endpoint, {
   method: "POST",

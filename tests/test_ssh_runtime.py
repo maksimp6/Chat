@@ -2,7 +2,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from ssh_runtime import SSHRuntime, SSHRuntimeError
+from remote_runtime.ssh import SSHRuntime, SSHRuntimeError
 
 
 class SSHRuntimeTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class SSHRuntimeTests(unittest.TestCase):
             }
         )
 
-    @patch("ssh_runtime.subprocess.run")
+    @patch("remote_runtime.ssh.subprocess.run")
     def test_execute_uses_linux_user_and_host_key_verification(self, run):
         run.return_value.returncode = 0
         run.return_value.stdout = "ok\n"
@@ -43,7 +43,7 @@ class SSHRuntimeTests(unittest.TestCase):
         self.assertIn("env -i", argv[-1])
         self.assertFalse(run.call_args.kwargs["shell"])
 
-    @patch("ssh_runtime.subprocess.run")
+    @patch("remote_runtime.ssh.subprocess.run")
     def test_write_file_sends_content_over_stdin(self, run):
         run.return_value.returncode = 0
         run.return_value.stdout = ""
@@ -61,7 +61,7 @@ class SSHRuntimeTests(unittest.TestCase):
         self.assertIn("realpath -e", run.call_args.args[0][-1])
         self.assertIn("mv -f", run.call_args.args[0][-1])
 
-    @patch("ssh_runtime.subprocess.run")
+    @patch("remote_runtime.ssh.subprocess.run")
     def test_timeout_is_reported(self, run):
         run.side_effect = subprocess.TimeoutExpired(["ssh"], 15)
         with self.assertRaises(SSHRuntimeError):
@@ -78,7 +78,7 @@ class SSHRuntimeTests(unittest.TestCase):
             )
 
     def test_trusted_identity_maps_to_linux_user(self):
-        with patch("ssh_runtime.subprocess.run") as run:
+        with patch("remote_runtime.ssh.subprocess.run") as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "alice-agent\\n"
             run.return_value.stderr = ""
@@ -122,7 +122,7 @@ class SSHRuntimeTests(unittest.TestCase):
             )
 
     def test_workspace_path_is_normalized_without_escape(self):
-        with patch("ssh_runtime.subprocess.run") as run:
+        with patch("remote_runtime.ssh.subprocess.run") as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "ok\n"
             run.return_value.stderr = ""
@@ -141,12 +141,12 @@ class SSHRuntimeTests(unittest.TestCase):
         with self.assertRaises(SSHRuntimeError):
             runtime.execute(target="preview", command="id -un")
 
-    @patch("ssh_runtime.subprocess.run")
+    @patch("remote_runtime.ssh.subprocess.run")
     def test_runtime_tool_trace_preserves_audit_details_and_redacts_secrets(self, run):
-        from trace_manager import ExecutionTrace
-        from universal_tool_platform import UniversalToolCall, UniversalToolExecutor
-        from tool_registry import ToolRegistry
-        from runtime_tools import RUNTIME_TOOLS
+        from observability.trace_manager import ExecutionTrace
+        from tool_providers.universal_tool_platform import UniversalToolCall, UniversalToolExecutor
+        from tool_providers.registry import ToolRegistry
+        from tool_providers.runtime_tools import RUNTIME_TOOLS
 
         registry = ToolRegistry()
         registry._tools["ssh_runtime_exec"] = RUNTIME_TOOLS["ssh_runtime_exec"]
@@ -169,7 +169,7 @@ class SSHRuntimeTests(unittest.TestCase):
         run.return_value.stdout = "deployed release-42\\n"
         run.return_value.stderr = "authorization: Bearer output-secret"
         # Use the real executor, but point the runtime tool at a test-local runtime.
-        import runtime_tools
+        import tool_providers.runtime_tools as runtime_tools
 
         original = runtime_tools.runtime
         runtime_tools.runtime = self.runtime()

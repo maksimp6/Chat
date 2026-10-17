@@ -4,17 +4,17 @@
 
 Use the smallest independent change that satisfies an issue or subtask.
 
-1. Inspect the issue and current `master`.
+1. Inspect the issue and current `develop` HEAD. `master` is the owner's personal branch: it is not a development target and never an agent PR target.
 2. Create a branch named for the issue/change.
 3. Implement the smallest vertical slice.
 4. Add or update deterministic regression tests.
-5. Before publishing any non-RED implementation commit, work from a real checkout/worktree and run the fast `bash scripts/pre_push.sh` formatting gate. Run focused tests separately when the change requires them; full suites remain CI/final-handoff evidence rather than part of every pre-push. The formatting gate must finish with a clean worktree; if the execution backend cannot provide a shell checkout, do not use repository file APIs as a substitute for this gate.
+5. Before publishing any non-RED implementation commit, run the fast `bash scripts/pre_push.sh` formatting gate from a real checkout/worktree when an authorized shell checkout is available. If no shell checkout is available, this local script is not mandatory and repository file APIs may be used to commit changes to the task branch. Explicitly report that the local gate was not run; do not claim local test success. Run focused tests separately when possible and required by the change; full suites and exact-head checks remain CI/final-handoff evidence. When the local formatting gate is run, it must finish with a clean worktree.
 6. Run the relevant backend/Android checks in CI.
 7. Publish the branch and open the PR yourself; do not stop at a local commit or "PR metadata".
-8. Push the focused branch to `origin` and create the PR against current `master` using `gh pr create` or the available GitHub publication tool.
+8. Push the focused branch to `origin` and create the PR against current `develop` using `gh pr create` or the available GitHub publication tool. Verify the actual PR base is `develop` after publication.
 9. If publication is blocked by missing remote, credentials, network access, or tooling, report the exact failing command/error and do not claim that a PR exists.
 10. Merge only after required checks and review policy are satisfied.
-11. Never rewrite `master` directly and never commit secrets.
+11. Never push or rewrite `master` directly, never push directly to `develop` from an agent task branch, and never commit secrets. Promote `develop` to `master` only through a separate explicitly authorized integration PR.
 
 Before dispatch or resuming an agent, apply the scoped work-admission checklist in
 `docs/agents/role-based-agent-office.md`. Record the canonical task and current
@@ -26,6 +26,10 @@ contract evidence from implementation onward. Pause a stage when its applicable
 prerequisites are missing or change; recheck before resuming.
 This is a checkpoint on the existing TaskPacket and PR workflow, not a parallel
 authority or status system.
+
+## Branch routing invariant
+
+Every routine agent/task PR MUST target `develop`, never `master`. Before any PR creation or update, inspect the actual base/head and current `develop` HEAD. If an existing routine PR targets `master`, correct its base to `develop` only after reviewing the resulting diff, conflicts, and CI impact; do not blindly retarget unrelated release/integration PRs. A separate integration PR from `develop` to `master` requires explicit owner authorization and the protected release checks. Agents must not initiate, merge, or retarget such an integration PR; only the repository owner can explicitly authorize that workflow. GitHub branch protection must enforce this independently of agent instructions. `OK` acknowledges a stage only, never grants merge permission.
 
 ## Agent dispatch
 
@@ -93,12 +97,25 @@ Do not create a new vendor-named agent profile when a reusable engineering role
 describes the work better. Prefer adding or refining a role profile, then choose
 the cheapest backend/model that can reliably perform that role.
 
+### Cost-control policy
+
+- Choose the cheapest sufficient tool, backend, and model. Prefer deterministic connectors, search, or page reads when they suffice; a static fetch is not a substitute for required interactive browser verification.
+- Before a new paid tool or agent run, require owner-approved task scope and budget; wallet balance is not spending permission. An expensive-model escalation, increased paid concurrency, or larger budget requires explicit owner approval unless already covered by that approval. Do not ask again for every safe step within the approved scope.
+- Pass supported step, call, and time limits as actual tool arguments. For a small browser diagnosis, default to at most 10 steps and 120 seconds when supported. Size longer workflows upfront within approval; these defaults are not spending authorization.
+- Track the remaining allowance across runs, continuations, and retries; stop before an action would exceed approved limits. Disclose an absent hard currency cap or uncertain billing before approval: step/time estimates are not a guarantee of the final charge. Do not silently extend the budget.
+- Record the provider's `run_id` or equivalent. A timeout or delayed response must not start a duplicate paid run; inspect, poll, or continue the existing run where supported. A new attempt requires a diagnosed cause and remaining approved budget, not a blind retry loop.
+- Keep one primary owner per objective and do not pay multiple agents to redo the same work. Across work you coordinate, default to one paid browser or agent run at a time; do not claim account-wide enforcement without verified shared coordination.
+- Reuse evidence only while the relevant commit, inputs, environment, and authorized account remain valid. Reuse suitable sessions, traces, and artifacts rather than repeating an up-to-date paid check merely for reassurance.
+- Do not enable automatic wallet reloads, recurring paid monitors, or other continuing spend without explicit owner approval.
+- Cost saving must never remove required security checks, deterministic regression tests, protected exact-head CI, or required real-scenario verification. Save money by removing redundant work, not required evidence.
+- Report the outcome, blockers, and provider-confirmed spend separately from estimates; mark unavailable cost data as unknown, not zero. Include separately billed model/tool charges when known. Do not hard-code provider prices into policy; obtain current pricing when a concrete budget decision depends on it.
+
 ### Model policy
 
 Repository automation should prefer deterministic GitHub workflows and explicit tool execution. Model-backed execution is optional, never required by policy, and must not become a merge prerequisite.
 
 Every agent opens one focused pull request per issue. Only the maintainer
-merges, after green CI; agents never push to `master`.
+merges, after green CI; agents never push directly to `develop` or `master`.
 
 ## Maintainer
 
@@ -130,13 +147,10 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   review findings. Fix or answer every automatic Copilot comment and resolve each
   thread before merging.
 - The final corrected head is validated by required CI plus resolved review threads. Extra model review is optional and never a merge prerequisite.
-- Merge is fail-closed. Immediately before merge, verify the pull request is
-  synchronized with the current `master` (`behind master = 0`). Required
+- Merge is fail-closed. For normal task PRs, immediately before merge verify the pull request targets and is synchronized with current `develop` (`behind develop = 0`). Only an explicitly authorized integration PR may target `master`; for that PR, verify synchronization with `master`. Required
   checks must be green on the exact current PR head after that synchronization,
   not merely on an earlier head or an older base.
-- If `master` advances before merge, synchronize the PR again and require the
-  protected checks to pass on the new synced head. Do not reuse green checks
-  from the stale head.
+- If the PR's actual base branch advances before merge, synchronize the PR again and require the protected checks to pass on the new synced head. Do not reuse green checks from the stale head.
 - After final-review fixes, do not request a second review cycle. Any new head
   still requires protected CI to pass and all review threads to remain resolved.
 - Use protected auto-merge while required checks or branch-protection gates are
@@ -146,7 +160,7 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
   `--merge`; use a currently allowed repository method (or let the API infer it),
   and treat the actual merge endpoint result as authoritative if repository
   metadata disagrees. Never force-update, rewrite, or bypass protection on
-  `master`.
+  `develop` or `master`. An `OK`/stage acceptance is not merge authorization.
 - The owner's explicit approval is still required for production deployments,
   database migrations that change or drop existing data, and changes to
   secrets, CODEOWNERS or branch protection.
@@ -158,8 +172,8 @@ starts the `maintainer_stall` clock only for actual executable-backend evidence.
 - Keep secrets out of logs, traces, issues, tests, and client-visible errors.
 - Prefer repository-local web UI assets. Do not introduce CDN-hosted UI dependencies without an explicit issue.
 - Android changes must preserve system-bar safety and stable debug/release signing boundaries.
-- PostgreSQL is an optional runtime backend selected only by ALICE_DATABASE_URL; SQLite remains the default local/Termux backend.
-- Database schema changes must keep both SQLite and PostgreSQL paths working.
+- The accepted persistence engine is native `kristall.store.Kristall` with one writer per journal path. Do not introduce SQL, SQLite, PostgreSQL, SQL migration code, alternative storage engines, or compatibility adapters.
+- Durable data changes must use native Kristall transactions and verified backup/restore. Keep SQL-free acceptance tests fail-closed until every runtime SQL consumer has been removed.
 - Preview/runtime modules under `runtime/` must use `RuntimeDispatcher` for shared database, filesystem, network, process, MCP/tool-registry, event, and cross-runtime resource access.
 - A preview runtime must never access another runtime's resources directly. Preserve the caller `runtime_id` and fail cross-runtime access with `RuntimeScopeViolation`.
 - Python threads are execution units, not isolation boundaries. Do not use process-global mutable runtime state as a substitute for `RuntimeContext` or dispatcher-owned scoped resources.

@@ -41,7 +41,7 @@ Flask / app.py
 * `app.py` — главный файл приложения;
 * `db.py` — работа с SQLite;
 * `config.py` — конфигурация;
-* `logger.py` — система логирования;
+* `observability/system_log.py` — системный лог (запуск и сбои до появления Trace);
 * `file_routes.py` — маршруты работы с файлами;
 * `mcp_routes.py` — маршруты MCP.
 
@@ -54,7 +54,7 @@ Flask / app.py
 
 ### 4. AI‑адаптеры и агенты
 * `cli_agent.py` — CLI/Termux‑адаптер к каноническому backend runtime;
-* `alice_agent_runner.py` — GitHub issue adapter;
+* `issue_runner.py` — GitHub issue adapter;
 * `local_tool_agent.py` — Android/local tool adapter;
 * Yandex AI Studio подключается через общий provider/Responses pipeline, а не напрямую из интерфейсных адаптеров.
 
@@ -87,4 +87,4 @@ Flask / app.py
 * **Фронтенд**: HTML, JavaScript, CSS (без React/Vite в основной версии);
 * **AI**: Yandex AI Studio;
 * **MCP**: собственные инструменты на Python;
-* **Логирование**: `logger.py` с ротацией файлов.
+* **Логирование**: `observability/system_log.py` (JSONL, ротация, `trace_id`/`invocation_id`).

@@ -10,6 +10,12 @@ import subprocess
 from typing import Any
 
 _ALLOWED_CONCLUSIONS = {"success", "neutral", "skipped"}
+# These control jobs prove routing and selected-platform execution. Unlike a
+# non-selected platform job, skipping them cannot be evidence of success.
+_CHECK_CONCLUSIONS = {
+    "Platform changes": {"success"},
+    "CI required": {"success"},
+}
 
 
 def _gh_json(args: list[str]) -> dict[str, Any]:
@@ -178,7 +184,7 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
                         "detail": f"{required_name}: status={status or 'unknown'}",
                     }
                 )
-            elif conclusion not in _ALLOWED_CONCLUSIONS:
+            elif conclusion not in _CHECK_CONCLUSIONS.get(required_name, _ALLOWED_CONCLUSIONS):
                 blockers.append(
                     {
                         "code": "check_failed",

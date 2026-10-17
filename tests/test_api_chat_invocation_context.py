@@ -1,11 +1,11 @@
 import unittest
 from unittest.mock import patch
 
-from mcp_routes import chat
+from chat.mcp_routes import chat
 from app import app
 from invocation.context import InvocationContext
 from invocation.manager import get_invocation
-from trace_manager import get_current_trace
+from observability.trace_manager import get_current_trace
 
 
 class ApiChatInvocationContextTests(unittest.TestCase):
@@ -22,9 +22,9 @@ class ApiChatInvocationContextTests(unittest.TestCase):
             return fake_response
 
         with (
-            patch("mcp_routes.get_conv_settings", return_value={}),
-            patch("mcp_routes.add_message"),
-            patch("mcp_routes.AliceClient.ask_with_mcp", side_effect=assert_trace_is_bound),
+            patch("chat.mcp_routes.get_conv_settings", return_value={}),
+            patch("chat.mcp_routes.add_message"),
+            patch("chat.mcp_routes.AliceClient.ask_with_mcp", side_effect=assert_trace_is_bound),
         ):
             response = client.post(
                 "/api/chat",
@@ -44,9 +44,9 @@ class ApiChatInvocationContextTests(unittest.TestCase):
         client = app.test_client()
 
         with (
-            patch("mcp_routes.get_conv_settings", return_value={}),
-            patch("mcp_routes.add_message"),
-            patch("mcp_routes.AliceClient.ask_with_mcp", side_effect=RuntimeError("boom")),
+            patch("chat.mcp_routes.get_conv_settings", return_value={}),
+            patch("chat.mcp_routes.add_message"),
+            patch("chat.mcp_routes.AliceClient.ask_with_mcp", side_effect=RuntimeError("boom")),
         ):
             response = client.post(
                 "/api/chat",
@@ -76,14 +76,14 @@ class ApiChatInvocationContextTests(unittest.TestCase):
 
         with (
             patch(
-                "mcp_routes.create_invocation",
+                "chat.mcp_routes.create_invocation",
                 side_effect=[RuntimeError("before trace"), context],
             ),
-            patch("mcp_routes.start_invocation"),
-            patch("mcp_routes.persist_invocation_trace"),
-            patch("mcp_routes.fail_invocation"),
-            patch("mcp_routes.add_message"),
-            patch("mcp_routes.record_yandex_mcp_activity", side_effect=assert_trace_is_bound),
+            patch("chat.mcp_routes.start_invocation"),
+            patch("chat.mcp_routes.persist_invocation_trace"),
+            patch("chat.mcp_routes.fail_invocation"),
+            patch("chat.mcp_routes.add_message"),
+            patch("chat.mcp_routes.record_yandex_mcp_activity", side_effect=assert_trace_is_bound),
         ):
             response = client.post(
                 "/api/chat",

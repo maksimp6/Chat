@@ -1,11 +1,27 @@
-name: Deploy lightweight RDC MCP candidate
+name: Deploy Alice Dev worker
 
 on:
   push:
     branches: [master]
     paths:
+      - "cloud/cloudru/container_apps_client.py"
+      - "cloud/cloudru/registry_client.py"
+      - "requirements-deploy.txt"
+      - ".python-version"
+      - "config/alice/alice-dev-delete-ids.txt"
+      - "deploy/remote-desktop-commander/config.json"
+      - "deploy/remote-desktop-commander/dependency-smoke.cjs"
+      - "deploy/remote-desktop-commander/dev-bootstrap.sh"
       - "deploy/remote-desktop-commander/Dockerfile.mcp"
       - "deploy/remote-desktop-commander/mcp-gateway.mjs"
+      - "deploy/remote-desktop-commander/mcp-gateway-origin.test.mjs"
+      - "deploy/remote-desktop-commander/request-origin.mjs"
+      - "deploy/remote-desktop-commander/credential-handoff.mjs"
+      - "deploy/remote-desktop-commander/credential-handoff.test.mjs"
+      - "deploy/remote-desktop-commander/oauth.mjs"
+      - "deploy/remote-desktop-commander/oauth.test.mjs"
+      - "deploy/remote-desktop-commander/oauth-discovery-smoke.mjs"
+      - "deploy/remote-desktop-commander/oauth-discovery-smoke.test.mjs"
       - "deploy/remote-desktop-commander/stdio-server.mjs"
       - "deploy/remote-desktop-commander/mcp-gateway-live-smoke.mjs"
       - "deploy/remote-desktop-commander/package.json"
@@ -17,8 +33,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: alice-cloudru-rdc-mcp-candidate
-  cancel-in-progress: false
+  group: alice-cloudru-alice-dev-${{ github.sha }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -29,12 +45,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version-file: .python-version
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+          cache: pip
+          cache-dependency-path: requirements-deploy.txt
+      - name: Install Python deploy dependencies
+        run: pip install -r requirements-deploy.txt
       - name: Deploy isolated candidate
         id: candidate
         env:
@@ -44,16 +62,37 @@ jobs:
           ALICE_SHORT_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
         run: |
           set -euo pipefail
-          python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/rdc-mcp-result.log
-          result="$(tail -n 1 /tmp/rdc-mcp-result.log)"
+          python scripts/cloudru_rdc_mcp_candidate.py deploy --sha "$GITHUB_SHA" | tee /tmp/alice-dev-result.log
+          result="$(python -c 'import json; lines=[json.loads(x) for x in open("/tmp/alice-dev-result.log") if x.strip().startswith("{")]; print(json.dumps(next(x for x in lines if x.get("status") == "ALICE_DEV_READY")))' )"
+          inventory="$(python -c 'import json; lines=[json.loads(x) for x in open("/tmp/alice-dev-result.log") if x.strip().startswith("{")]; print(json.dumps(next(x for x in lines if x.get("status") == "ALICE_DEV_INVENTORY")))' )"
           origin="$(python -c 'import json,sys; print(json.loads(sys.argv[1])["origin"])' "$result")"
           echo "origin=$origin" >> "$GITHUB_OUTPUT"
+          python -c 'import json,sys; r=json.loads(sys.argv[1]); print(json.dumps({"commit": sys.argv[2], "container_id": r["container_id"], "name": r["name"], "origin": r["origin"]}, sort_keys=True))' "$result" "$GITHUB_SHA" > "/tmp/alice-dev-container-$GITHUB_SHA.json"
+          {
+            echo "## Alice Dev containers"
+            echo
+            python -c 'import json,sys; d=json.loads(sys.argv[1]); [print("- `{}` — {} — id `{}`".format(x.get("name"), x.get("origin") or "no public address", x.get("id"))) for x in d["containers"]]' "$inventory"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Install MCP smoke dependencies
         working-directory: deploy/remote-desktop-commander
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-      - name: Verify public MCP end to end
+      - name: Verify OAuth discovery
+        timeout-minutes: 2
         working-directory: deploy/remote-desktop-commander
         env:
-          RDC_MCP_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp
-          RDC_MCP_SMOKE_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
+          ALICE_DEV_SMOKE_ORIGIN: ${{ steps.candidate.outputs.origin }}
+        run: node oauth-discovery-smoke.mjs
+      - name: Verify public MCP end to end
+        timeout-minutes: 2
+        working-directory: deploy/remote-desktop-commander
+        env:
+          ALICE_DEV_SMOKE_URL: ${{ steps.candidate.outputs.origin }}/mcp
+          ALICE_DEV_SMOKE_TOKEN: ${{ secrets.ALICE_SHORT_TOKEN }}
         run: node mcp-gateway-live-smoke.mjs
+      - name: Upload accepted container manifest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alice-dev-container-${{ github.sha }}
+          path: /tmp/alice-dev-container-${{ github.sha }}.json
+          retention-days: 90
+          if-no-files-found: error
