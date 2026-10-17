@@ -74,7 +74,7 @@ class WebsiteTests(unittest.TestCase):
         self.assertEqual(graph["og:url"], approved_url)
         self.assertEqual(graph["og:type"], "website")
         self.assertEqual(graph["og:locale"], "ru_RU")
-        self.assertIn("Alice Pro", graph["og:title"])
+        self.assertIn("Logos", graph["og:title"])
         self.assertTrue(graph["og:description"])
         self.assertFalse((SITE / "CNAME").exists())
         for forbidden in ("maxxxpavlov.ru", "example.invalid", "noindex", "APPROVED_ABSOLUTE_URL"):
