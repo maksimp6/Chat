@@ -36,8 +36,9 @@ allowlist: rename an entry, then delete it from the list.
   `_new`, `_old`, `_v2`, `_tmp`, `_auto`. Merge such code into the feature
   module or name the feature it adds.
 - Public browser globals are `window.Alice<Feature>` in PascalCase
-  (`AliceTraceSummary`, `AliceExecutionSurface`). Everything else stays inside
-  the module IIFE.
+  (`AliceTraceSummary`, `AliceExecutionSurface`). Globals added by the Logos
+  rename use the Logos prefix, `window.Logos<Feature>` (`LogosUIRuntime`,
+  `LogosEnvironments`). Everything else stays inside the module IIFE.
 - Functions and variables use `camelCase`. Constants use `UPPER_SNAKE_CASE`.
 - DOM `id` and CSS classes use `kebab-case` and name what the element is
   (`model-modal`, `msg-meta`). No positional or numbered names such as
