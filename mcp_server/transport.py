@@ -107,7 +107,7 @@ def mcp_post() -> Response:
                 "protocolVersion": protocol_version,
                 "capabilities": {"tools": {}},
                 "serverInfo": _server_info(),
-                "instructions": "Alice Pro MCP exposes audited tools through the Universal Tool Registry/Executor.",
+                "instructions": "Logos MCP exposes audited tools through the Universal Tool Registry/Executor.",
             },
         )
 
