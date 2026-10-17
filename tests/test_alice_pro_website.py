@@ -1,4 +1,4 @@
-"""Offline checks for the isolated, not-yet-published Alice Pro landing page."""
+"""Offline checks for the isolated, not-yet-published Logos landing page."""
 
 from html.parser import HTMLParser
 from pathlib import Path
