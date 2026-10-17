@@ -47,7 +47,7 @@ from storage.contracts import StorageObjectNotFound  # noqa: E402
 
 REGISTRY = "alice-chrome-browser"
 REPOSITORY = "chrome-worker"
-DESCRIPTION = "Alice persistent Google Chrome Playwright MCP; issue 751"
+DESCRIPTION = "Logos persistent Google Chrome Playwright MCP; issue 751"
 # Container Apps offers fixed CPU/memory pairs; Chrome measured ~340 MiB idle and
 # ~800 MiB on a heavy page, so 0.5 vCPU / 1 GiB is the economical size. Scaling
 # from zero lets Cloud.ru stop the only replica when idle (profile is saved on

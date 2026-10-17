@@ -26,7 +26,7 @@ from scripts.cloudru_deploy import _export_commit  # noqa: E402
 
 REGISTRY = "alice-rdc-probe"
 REPOSITORY = "chromium-probe"
-DESCRIPTION = "Alice RDC browser compatibility probe; no OAuth or user data"
+DESCRIPTION = "Logos RDC browser compatibility probe; no OAuth or user data"
 PROBE_ERROR_CODES = frozenset(
     {
         "authorization_failed",

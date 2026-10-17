@@ -25,12 +25,12 @@ from scripts.cloudru_browser_probe import REGISTRY, prepare_registry
 from scripts.cloudru_deploy import _export_commit
 
 REPOSITORY = "alice-dev"
-DESCRIPTION = "Alice lightweight development worker; issue 906"
+DESCRIPTION = "Logos lightweight development worker; issue 906"
 TOMBSTONES = Path(__file__).resolve().parents[1] / "config" / "alice" / "alice-dev-delete-ids.txt"
 
 
 def fail(code: str) -> None:
-    raise CloudProviderError("Alice Dev candidate operation failed", code=code)
+    raise CloudProviderError("Logos Dev candidate operation failed", code=code)
 
 
 def project_id() -> str:

@@ -141,7 +141,7 @@ jobs:
           set -euo pipefail
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Alice Pro $GITHUB_REF_NAME" \
+            --title "Logos $GITHUB_REF_NAME" \
             --generate-notes \
             android/app/build/outputs/apk/release/app-release.apk \
             android/app/build/outputs/apk/release/app-release.apk.sha256 \

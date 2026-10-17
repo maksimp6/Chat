@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and render Alice's canonical machine-readable integration catalog."""
+"""Validate and render Logos's canonical machine-readable integration catalog."""
 
 from __future__ import annotations
 
@@ -167,16 +167,16 @@ def _validate_verification(record: dict[str, Any], prefix: str, as_of: date) -> 
     e2e = record.get("e2e_verified") is True
     status = record.get("status")
     if implemented and not provider_exists:
-        errors.append(f"{prefix}: Alice implementation requires provider_exists")
+        errors.append(f"{prefix}: Logos implementation requires provider_exists")
     if e2e and not implemented:
         errors.append(f"{prefix}: e2e_verified requires alice_implemented")
     supported = provider_exists and implemented and e2e and last_verified is not None
     if status == "supported" and not supported:
         errors.append(f"{prefix}: supported requires provider + implementation + E2E verification")
     if status == "partial" and not implemented:
-        errors.append(f"{prefix}: partial requires an Alice implementation")
+        errors.append(f"{prefix}: partial requires a Logos implementation")
     if status == "planned" and implemented:
-        errors.append(f"{prefix}: planned cannot already be Alice-implemented")
+        errors.append(f"{prefix}: planned cannot already be Logos-implemented")
     return errors
 
 

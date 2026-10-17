@@ -1,4 +1,4 @@
-name: Alice A1 mini PLA cube slicer
+name: Logos A1 mini PLA cube slicer
 
 on:
   pull_request:

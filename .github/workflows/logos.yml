@@ -1,15 +1,15 @@
-name: Alice
+name: Logos
 
-# Alice Pro works on her own code from a GitHub issue.
+# Logos works on its own code from a GitHub issue.
 # Trigger: a maintainer (OWNER/MEMBER/COLLABORATOR) mentions "@logos" in an
 # issue or issue comment, or adds the "alice" label.
-# Alice only gets her filesystem tools inside this checkout; this workflow
+# Logos only gets its filesystem tools inside this checkout; this workflow
 # checks the diff, commits it to alice/issue-<N> and opens a draft pull request.
 #
 # Repository secrets (Settings -> Secrets and variables -> Actions):
-#   YANDEX_API_KEY, YANDEX_PROJECT_ID  - Yandex AI Studio credentials for Alice
+#   YANDEX_API_KEY, YANDEX_PROJECT_ID  - Yandex AI Studio credentials for Logos
 #   ALICE_APP_PRIVATE_KEY              - private key of the "Alice Pro" GitHub App, so
-#                                        Alice commits, opens PRs and comments under her
+#                                        Logos commits, opens PRs and comments under its
 #                                        own name; PRs opened with it run CI.
 # Repository variable ALICE_APP_CLIENT_ID - client ID of that GitHub App.
 # Fallback until the App exists: ALICE_GITHUB_TOKEN, a personal fine-grained token
@@ -29,8 +29,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  alice:
-    name: Alice works on the issue
+  logos:
+    name: Logos works on the issue
     if: |
       !github.event.issue.pull_request && (
         (github.event_name == 'issue_comment' &&
@@ -93,7 +93,7 @@ jobs:
             --issue "$ISSUE_NUMBER" \
             --title-file "$RUNNER_TEMP/title.txt" \
             --body-file "$RUNNER_TEMP/body.txt" \
-            --out "$RUNNER_TEMP/result.json" || echo "Alice runner reported a failure"
+            --out "$RUNNER_TEMP/result.json" || echo "Logos runner reported a failure"
 
       - name: Guard the diff
         run: |
@@ -101,11 +101,11 @@ jobs:
           git status --porcelain --untracked-files=all | cut -c4- > "$RUNNER_TEMP/files.txt"
           cat "$RUNNER_TEMP/files.txt"
           if grep -E '^(\.github/|\.env|.*\.(pem|key|jks|keystore)$)' "$RUNNER_TEMP/files.txt"; then
-            echo "::error::Alice may not change workflows, env files or keys."
+            echo "::error::Logos may not change workflows, env files or keys."
             exit 1
           fi
           if [ "$(wc -l < "$RUNNER_TEMP/files.txt")" -gt 20 ]; then
-            echo "::error::Alice changed more than 20 files."
+            echo "::error::Logos changed more than 20 files."
             exit 1
           fi
 
@@ -145,7 +145,7 @@ jobs:
               if r.get(key):
                   r[key] = r[key].replace("@", "@\u200b")
           b = r.get("billing", {})
-          print(f"Alice ({r.get('model')}) finished with status **{r['status']}**.\n")
+          print(f"Logos ({r.get('model')}) finished with status **{r['status']}**.\n")
           if r.get("summary"):
               print(r["summary"] + "\n")
           if r.get("pending_tools"):
@@ -169,14 +169,14 @@ jobs:
             fi
             git checkout -b "$branch"
             git add -A
-            git commit -m "Alice: work on issue #$ISSUE_NUMBER" -m "Closes #$ISSUE_NUMBER"
+            git commit -m "Logos: work on issue #$ISSUE_NUMBER" -m "Closes #$ISSUE_NUMBER"
             git push origin "$branch"
             {
               cat "$RUNNER_TEMP/report.md"
               printf '\nCloses #%s\n' "$ISSUE_NUMBER"
             } > "$RUNNER_TEMP/pr.md"
             url="$(gh pr create --repo "$REPOSITORY" --draft --head "$branch" \
-              --title "Alice: issue #$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/pr.md")"
+              --title "Logos: issue #$ISSUE_NUMBER" --body-file "$RUNNER_TEMP/pr.md")"
             printf '\nPull request: %s\n' "$url" >> "$RUNNER_TEMP/report.md"
           fi
           gh issue comment "$ISSUE_NUMBER" --repo "$REPOSITORY" --body-file "$RUNNER_TEMP/report.md"

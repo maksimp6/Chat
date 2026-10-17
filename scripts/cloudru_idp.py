@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy the central Alice OAuth identity provider to its own Container Apps service.
+"""Deploy the central Logos OAuth identity provider to its own Container Apps service.
 
 The IdP is stateless (sealed tokens, keys derived from one secret), so the container
 has no volume and scales to zero. Two lanes keep experiments away from production:
@@ -42,7 +42,7 @@ from scripts.cloudru_deploy import _export_commit, _load_cloudru_credentials  # 
 from scripts.cloudru_rdc import application_origin  # noqa: E402
 
 REPOSITORY = "oauth-idp"
-DESCRIPTION = "Alice central OAuth identity provider"
+DESCRIPTION = "Logos central OAuth identity provider"
 CPU = "0.1"
 MEMORY = "256Mi"
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")
@@ -536,7 +536,7 @@ def export_result(result, env=os.environ):
             stream.write("IDP_PUBLIC_URL=" + result["issuer"] + "\n")
     if env.get("GITHUB_STEP_SUMMARY"):
         lines = [
-            f"## Alice IdP ({result['lane']})\n",
+            f"## Logos IdP ({result['lane']})\n",
             f"- Issuer: `{result['issuer']}`",
             f"- Set on the Chrome worker of this lane: `BROWSER_IDP_ISSUER={result['issuer']}`",
         ]

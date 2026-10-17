@@ -1,6 +1,6 @@
 name: Agent observer
 
-# Watches the agent office (Claude, Codex, Copilot, Alice) every hour: builds a
+# Watches the agent office (Claude, Codex, Copilot, Logos) every hour: builds a
 # thread per issue and pull request and flags stuck work. The digest replaces
 # the body of the open issue labelled "agent-observer" (created on first run)
 # and is shown in the run summary. It reads GitHub and edits only that issue;
