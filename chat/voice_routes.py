@@ -1,4 +1,4 @@
-"""Voice assistant HTTP pipeline for SpeechKit STT/TTS and Alice chat."""
+"""Voice assistant HTTP pipeline for SpeechKit STT/TTS and Logos chat."""
 
 from __future__ import annotations
 
