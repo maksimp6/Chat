@@ -175,7 +175,7 @@ def test_cli_writes_result_file(repo, tmp_path, monkeypatch):
     assert json.loads(out.read_text(encoding="utf-8"))["status"] == "no_changes"
 
 
-def test_default_client_seeds_credential_and_uses_alice_client(repo, monkeypatch):
+def test_default_client_seeds_credential_and_uses_logos_client(repo, monkeypatch):
     import chat.mcp_routes as mcp_routes
 
     seeded = []
