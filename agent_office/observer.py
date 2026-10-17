@@ -45,7 +45,7 @@ AGENT_LABELS = {
     "claude": "Claude",
     "codex": "Codex",
     "copilot": "Copilot",
-    "alice": "Alice",
+    "alice": "Logos",
     "ci": "CI-бот",
     "human": "человек",
 }
