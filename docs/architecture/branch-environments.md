@@ -7,7 +7,7 @@
 
 ## 1. Problem
 
-Alice Pro needs multiple simultaneously usable application environments built from
+Logos needs multiple simultaneously usable application environments built from
 different Git branches/commits.
 
 An environment is an infrastructure boundary. It is not a Conversation,

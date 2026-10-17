@@ -1,7 +1,7 @@
 """Storage port for the 3D-printing domain.
 
-The domain code depends only on this protocol. The host (Alice Pro) passes a
-concrete store into each operation, so this package never imports Alice
+The domain code depends only on this protocol. The host (Logos) passes a
+concrete store into each operation, so this package never imports Logos
 storage or identity modules.
 """
 

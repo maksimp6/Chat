@@ -80,7 +80,7 @@ The short token is compared in memory, is never written into OAuth state, and
 never leaves the worker. A successful check completes the authorization-code
 flow with PKCE S256 and rotating refresh tokens.
 
-No GitHub OAuth application, callback registration, Alice deployment, or custom
+No GitHub OAuth application, callback registration, Logos deployment, or custom
 DNS is required for this temporary owner-authentication path. ChatGPT connects
 to `<BROWSER_PUBLIC_URL>/browser/v1/mcp` and enters the short token when the
 authorization page opens.

@@ -1,4 +1,4 @@
-"""Stage the existing Alice Pro Python/web runtime for the Android build."""
+"""Stage the existing Logos Python/web runtime for the Android build."""
 
 from __future__ import annotations
 

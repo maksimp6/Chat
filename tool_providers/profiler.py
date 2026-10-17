@@ -1,4 +1,4 @@
-"""Модуль профайлинга, инспекции и глубокого анализа приложения Alice Pro."""
+"""Модуль профайлинга, инспекции и глубокого анализа приложения Logos."""
 
 import cProfile
 import pstats
@@ -8,7 +8,7 @@ import sys
 import gc
 import logging
 
-logger = logging.getLogger("alice_profiler")
+logger = logging.getLogger("logos_profiler")
 
 
 def profile_application_performance(arguments: dict, cfg: dict = None) -> dict:
@@ -70,7 +70,7 @@ TOOL_REGISTRY = {
     },
     "inspect_app_internals": {
         "func": inspect_app_internals,
-        "description": "Получить полную карту внутренних компонентов, модулей и состояния базы данных Alice Pro.",
+        "description": "Получить полную карту внутренних компонентов, модулей и состояния базы данных Logos.",
         "parameters": {"type": "object", "properties": {}, "required": []},
     },
 }
