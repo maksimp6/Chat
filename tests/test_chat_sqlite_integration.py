@@ -44,7 +44,7 @@ class TestChatMemoryStoreIntegration(unittest.TestCase):
             with (
                 patch.object(db, "DB_PATH", db_path),
                 patch.dict(os.environ, {"ALICE_MEMORY_PATH": db_path}),
-                patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
+                patch.object(mcp_routes, "LogosClient", lambda _config: FakeClient()),
             ):
                 db.init_db()
                 db.create_conversation(conversation_id, "Kristall integration test", "aliceai-llm")

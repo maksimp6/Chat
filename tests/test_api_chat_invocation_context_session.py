@@ -16,7 +16,7 @@ class ApiChatSessionContextTests(unittest.TestCase):
         with (
             patch("chat.mcp_routes.get_conv_settings", return_value={}),
             patch("chat.mcp_routes.add_message"),
-            patch("chat.mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response),
+            patch("chat.mcp_routes.LogosClient.ask_with_mcp", return_value=fake_response),
         ):
             response = client.post(
                 "/api/chat",
@@ -46,7 +46,7 @@ class ApiChatSessionContextTests(unittest.TestCase):
         with (
             patch("chat.mcp_routes.get_conv_settings", return_value={}),
             patch("chat.mcp_routes.add_message"),
-            patch("chat.mcp_routes.AliceClient.ask_with_mcp", return_value=fake_response),
+            patch("chat.mcp_routes.LogosClient.ask_with_mcp", return_value=fake_response),
         ):
             response = client.post(
                 "/api/chat", json={"conversation_id": "conv-legacy-test", "message": "hello"}

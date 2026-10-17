@@ -16,7 +16,7 @@ import requests
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from core.config import Config, TEXT_MODELS
-from chat.mcp_routes import AliceClient
+from chat.mcp_routes import LogosClient
 from conversations.ownership import check_access
 from economy.treasury_identity import TreasuryIdentityError, get_current_owner_id
 
@@ -143,7 +143,7 @@ def _chat(text: str, conversation_id: str | None, model: str) -> str:
     text_model = (
         model if model in TEXT_MODELS else os.getenv("ALICE_VOICE_CHAT_MODEL", "aliceai-llm")
     )
-    client = AliceClient(Config)
+    client = LogosClient(Config)
     response = client.ask_with_mcp(
         message=text,
         model_key=text_model,

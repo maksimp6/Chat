@@ -97,12 +97,12 @@ def run_issue_task(
 
     if client_factory is None:
         from core.config import Config
-        from chat.mcp_routes import AliceClient
+        from chat.mcp_routes import LogosClient
 
         seed_provider_credential()
 
         def client_factory():
-            return AliceClient(Config)
+            return LogosClient(Config)
 
     rules = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
     before = set(changed_files(repo_root))
@@ -130,7 +130,7 @@ def run_issue_task(
         )
         pending = extract_function_calls(response)
         if pending:
-            # AliceClient stops instead of running approval-gated tools; never auto-approve.
+            # LogosClient stops instead of running approval-gated tools; never auto-approve.
             result["status"] = "needs_approval"
             result["pending_tools"] = sorted(
                 {call.get("name") or (call.get("function") or {}).get("name") for call in pending}
