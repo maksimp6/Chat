@@ -1,6 +1,6 @@
 # Provider quotas
 
-Alice Pro enforces optional per-user provider request quotas at the shared Yandex
+Logos enforces optional per-user provider request quotas at the shared Yandex
 Responses API request boundary.
 
 ## Policy

@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Alice Platform automates deployment of services from configuration. This document explains the deployment process, approval gates, and how to verify deployments.
+Keel Platform automates deployment of services from configuration. This document explains the deployment process, approval gates, and how to verify deployments.
 
 ## Deployment Overview
 

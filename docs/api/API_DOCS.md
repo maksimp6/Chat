@@ -1,4 +1,4 @@
-# Alice Pro - API Documentation
+# Logos - API Documentation
 
 ## Реализованные функции
 

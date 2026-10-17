@@ -1,4 +1,4 @@
-# Alice Pro: подготовка GitHub Pages
+# Logos: подготовка GitHub Pages
 
 Статус: **подготовлено для review; сайт не опубликован**. Пользователь утвердил
 `https://maxxxpavlov.online/` как адрес страницы проекта и Draft PR в `develop`.
@@ -9,7 +9,7 @@ Merge, включение Pages, подключение домена и DNS эт
 
 Каталог `website/` независим от приложения: HTML, CSS, SVG-иконка, robots.txt,
 sitemap.xml и `.nojekyll`, без JavaScript, сборщика, внешних шрифтов, аналитики
-или API. GitHub Pages не запускает Python backend Alice Pro.
+или API. GitHub Pages не запускает Python backend Logos.
 
 Canonical, Open Graph URL, sitemap и ссылка Sitemap в robots.txt согласованы с
 `https://maxxxpavlov.online/`. Подготовительный noindex снят в исходниках для

@@ -1,6 +1,6 @@
 # Release process
 
-Alice Pro uses semantic version tags in the form `vMAJOR.MINOR.PATCH`.
+Logos uses semantic version tags in the form `vMAJOR.MINOR.PATCH`.
 
 ## Release checklist
 
