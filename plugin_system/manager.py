@@ -1,4 +1,4 @@
-"""First-class plugin lifecycle and manifest management for Alice Pro.
+"""First-class plugin lifecycle and manifest management for Logos.
 
 Plugins are discovered from a configured local directory. The manager validates
 declarative manifests and never imports or executes plugin code. Privileged work
