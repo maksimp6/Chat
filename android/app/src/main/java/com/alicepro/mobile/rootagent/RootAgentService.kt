@@ -87,7 +87,7 @@ class RootAgentService : Service() {
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("Alice RootAgent")
+            .setContentTitle("Logos RootAgent")
             .setContentText("Локальный API 127.0.0.1:$PORT работает")
             .setOngoing(true)
             .build()

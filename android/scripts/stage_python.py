@@ -53,7 +53,7 @@ def main() -> None:
     clean_staged_backend()
     stage_python_files()
     stage_web_assets()
-    print(f"Staged Alice Pro runtime into {DEST}")
+    print(f"Staged Logos runtime into {DEST}")
 
 
 if __name__ == "__main__":
