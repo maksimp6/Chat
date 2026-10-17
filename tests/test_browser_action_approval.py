@@ -47,7 +47,7 @@ def test_chat_tool_call_helpers_apply_action_level_approval():
         assert _tool_call_needs_approval(_call("fill")) is True
 
 
-def test_alice_client_auto_loop_allows_browser_read_but_stops_click():
+def test_logos_client_auto_loop_allows_browser_read_but_stops_click():
     client = object.__new__(LogosClient)
 
     with (
