@@ -1,4 +1,4 @@
-"""3D printing business domain for Alice Pro, independent of the host app."""
+"""3D printing business domain for Logos, independent of the host app."""
 
 from printing3d.finance import (
     assess_financing,
