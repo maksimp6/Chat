@@ -1,4 +1,4 @@
-"""Logos Platform CLI."""
+"""Keel Platform CLI."""
 
 import argparse
 import json
@@ -56,7 +56,7 @@ def cmd_health(args):
 
 def main():
     """Main CLI entry point."""
-    parser = argparse.ArgumentParser(description="Logos Platform config management")
+    parser = argparse.ArgumentParser(description="Keel Platform config management")
     subparsers = parser.add_subparsers(dest="command", help="Command")
 
     # Validate command

@@ -1,1 +1,1 @@
-"""Providers for Logos Platform - read observed state from cloud/infrastructure."""
+"""Providers for Keel Platform - read observed state from cloud/infrastructure."""
