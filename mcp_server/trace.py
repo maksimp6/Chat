@@ -38,7 +38,7 @@ def _activity_key(item: Dict[str, Any], response_id: Any, step: Any) -> str:
 def record_yandex_mcp_activity(trace: Any) -> int:
     """Extract MCP activity exposed by Yandex Responses snapshots into the trace.
 
-    This observes the Responses payload only. Alice Pro never connects to or
+    This observes the Responses payload only. Logos never connects to or
     executes the external MCP server itself.
     """
     if trace is None or not hasattr(trace, "trace"):
