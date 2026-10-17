@@ -67,7 +67,7 @@ class RuntimeLoader:
         if not path.is_file():
             return False
         loader = importlib.machinery.SourceFileLoader(
-            f"_alice_revision_{self.revision}_{self.runtime_id}", str(path)
+            f"_logos_revision_{self.revision}_{self.runtime_id}", str(path)
         )
         source = loader.get_source(loader.name)
         if source is None:
