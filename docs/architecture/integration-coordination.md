@@ -1,7 +1,7 @@
 # Architecture integration coordination
 
 This document is the canonical architecture coordination guide for the active
-Alice Pro workstreams. Issue
+Logos workstreams. Issue
 [#350](https://github.com/maksimp6/Chat/issues/350) is authoritative for runtime
 and deployment architecture; issue
 [#343](https://github.com/maksimp6/Chat/issues/343) remains the umbrella

@@ -1,6 +1,6 @@
 # Threaded environment host
 
-Alice Pro application environments run inside one Python process. Each running
+Logos application environments run inside one Python process. Each running
 environment owns a managed worker thread and an immutable `RuntimeContext`.
 
 ## Request path
@@ -90,7 +90,7 @@ HTTP contract, so existing streaming remains unchanged.
 ## Preview CI follow-up (#341)
 
 Preview CI should build/test the requested commit, then authenticate to the
-running Alice Pro host and request creation of an environment for that exact
+running Logos host and request creation of an environment for that exact
 commit. It should poll the environment lifecycle and exercise the rendered shell
 through the environment gateway. Cleanup should delete that environment. It
 must not deploy a preview container, wait for a container-local Flask server, or
