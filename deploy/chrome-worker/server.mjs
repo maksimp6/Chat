@@ -116,41 +116,138 @@ export function createWorker(options = {}) {
   let page;
   let state = "sleeping";
   let generation = 0;
+  const idleSleepMs = Number(options.idleSleepMs ?? process.env.BROWSER_IDLE_SLEEP_MS ?? 300000);
+  const minimumIdleSleepMs = options.idleSleepMs === undefined ? 1000 : 10;
+  if (!Number.isFinite(idleSleepMs) || idleSleepMs < minimumIdleSleepMs) throw new Error("invalid_browser_idle_sleep_ms");
+  let idleTimer;
+  let closing = false;
+  // True only while the persistent context is closing; the page is already cleared at that point.
+  let browserClosing = false;
+  let activeOperations = 0;
+
+  function cancelIdleSleep() {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = undefined;
+  }
+
+  // Idle sleep never interrupts a running operation or a human takeover. A connected noVNC websocket
+  // counts as takeover activity, so an open human session keeps Chrome awake until its grant ends it.
+  function idleSleepAllowed() {
+    if (activeOperations > 0) return false;
+    if (takeoverEnabled && (takeover.status?.().active || takeover.openConnectionCount?.() > 0)) return false;
+    return true;
+  }
+
+  function scheduleIdleSleep() {
+    cancelIdleSleep();
+    if (!context || closing) return;
+    idleTimer = setTimeout(() => {
+      idleTimer = undefined;
+      // Busy or taken-over workers re-arm the timer here; a settling operation re-arms it too.
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      sleepWhenIdle().catch(() => {
+        process.stderr.write('{"event":"browser_idle_sleep_failed"}\n');
+      });
+    }, idleSleepMs);
+    idleTimer.unref?.();
+  }
+
+  // Queued in the lifecycle so it sees activity that arrived while an earlier transition was running.
+  function sleepWhenIdle() {
+    return transition(async () => {
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      await mcp.close();
+      // Activity may have started while MCP sessions were closing; Chrome stays up for it.
+      if (!idleSleepAllowed()) {
+        scheduleIdleSleep();
+        return;
+      }
+      await closeBrowser();
+    });
+  }
+
+  function trackActivity(operation) {
+    activeOperations += 1;
+    cancelIdleSleep();
+    return operation.finally(() => {
+      activeOperations -= 1;
+      scheduleIdleSleep();
+    });
+  }
 
   async function wake() {
     await ready;
     return transition(async () => {
       if (context) return;
       const chromium = options.chromium ?? (await import("playwright-core")).chromium;
-      context = await chromium.launchPersistentContext(profileDir, {
+      const launched = await chromium.launchPersistentContext(profileDir, {
         executablePath: options.executablePath ?? process.env.CHROME_EXECUTABLE_PATH ?? "/usr/bin/google-chrome-stable",
         headless: takeoverEnabled ? false : process.env.CHROME_HEADLESS !== "0",
         chromiumSandbox: false,
         args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
       });
-      context.on?.("close", () => {
+      context = launched;
+      launched.on?.("close", () => {
+        // A late close event from an earlier context must not clear a newer one.
+        if (context !== launched) return;
         context = undefined;
         page = undefined;
         state = "sleeping";
       });
-      page = context.pages()[0] ?? (await context.newPage());
+      page = launched.pages()[0] ?? (await launched.newPage());
       generation += 1;
       state = "awake";
+      scheduleIdleSleep();
     });
+  }
+
+  // The page is cleared before the close is awaited, so requests that arrive while Chrome closes
+  // see browser_sleeping (409) instead of operating on a closing page.
+  async function closeBrowser() {
+    const closingContext = context;
+    const closingPage = page;
+    const closingState = state;
+    context = undefined;
+    page = undefined;
+    state = "sleeping";
+    cancelIdleSleep();
+    if (closingContext) {
+      browserClosing = true;
+      // Promise.resolve().then() also turns a synchronous throw from close() into a rejection.
+      await Promise.resolve()
+        .then(() => closingContext.close())
+        .catch((error) => {
+          // A failed close keeps the persistent context, so the failure stays retriable and the next wake
+          // reuses it instead of launching a second context on the same profile. The checkpoint is skipped.
+          context = closingContext;
+          page = closingPage;
+          state = closingState;
+          scheduleIdleSleep();
+          throw error;
+        })
+        .finally(() => {
+          browserClosing = false;
+        });
+    }
+    await stateStore.checkpoint();
   }
 
   async function sleep() {
     await ready;
-    return transition(async () => {
-      if (context) await context.close();
-      context = undefined;
-      page = undefined;
-      state = "sleeping";
-      await stateStore.checkpoint();
-    });
+    return transition(() => closeBrowser());
   }
 
-  async function callTool(name, args = {}) {
+  function callTool(name, args = {}) {
+    return trackActivity(runTool(name, args));
+  }
+
+  async function runTool(name, args = {}) {
     await ready;
     if (name === "browser_status") {
       return { state, generation, url: page?.url() ?? null, title: page ? await page.title() : null, profile: stateStore.status() };
@@ -163,7 +260,13 @@ export function createWorker(options = {}) {
       await sleep();
       return { state, generation, profile: stateStore.status() };
     }
-    if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+    if (!page) {
+      // The next browser call wakes a sleeping browser, as the MCP path does. A call that arrives while
+      // Chrome is closing still gets browser_sleeping instead of queueing behind the close.
+      if (browserClosing) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+      await wake();
+      if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+    }
     if (name === "navigate") {
       await page.goto(safeUrl(args.url, allowedHosts), { waitUntil: "domcontentloaded" });
       return { url: page.url(), title: await page.title() };
@@ -221,7 +324,8 @@ export function createWorker(options = {}) {
     ["POST /browser/v1/screenshot", ["screenshot", true]],
   ]);
 
-  const mcp = createPlaywrightMcp(async () => {
+  const createMcp = options.createMcp ?? createPlaywrightMcp;
+  const mcp = createMcp(async () => {
     await wake();
     return context;
   }, `${profileDir}/mcp-output`);
@@ -287,8 +391,15 @@ export function createWorker(options = {}) {
         return json(response, 401, { error: "unauthorized" });
       }
       if (pathname === "/browser/v1/mcp") {
+        // A standing GET SSE stream lasts as long as the MCP session. Only request-bound work (the
+        // handshake, tool-call POSTs, DELETE) counts as browser activity, so the stream cannot hold Chrome awake.
+        if (request.method === "GET") {
+          await mcp.handle(request, response, undefined);
+          return;
+        }
         const message = request.method === "POST" ? await body(request) : undefined;
-        return await mcp.handle(request, response, message);
+        await trackActivity(mcp.handle(request, response, message));
+        return;
       }
       if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/start") {
         await wake();
@@ -316,7 +427,7 @@ export function createWorker(options = {}) {
     }
   }
 
-  return { handler, callTool, ready, takeover, async close() { await mcp.close(); await sleep(); takeover.close(); } };
+  return { handler, callTool, ready, takeover, async close() { closing = true; cancelIdleSleep(); await mcp.close(); await sleep(); takeover.close(); } };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
