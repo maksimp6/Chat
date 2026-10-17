@@ -1,14 +1,14 @@
-# Alice as a GitHub agent
+# Logos as a GitHub agent
 
-Alice Pro can take a GitHub issue and work on her own code. The workflow is
+Logos can take a GitHub issue and work on its own code. The workflow is
 `.github/workflows/logos.yml`; the headless runner is `issue_runner.py`.
 
 ## How it works
 
 1. A maintainer (OWNER, MEMBER or COLLABORATOR) mentions `@logos` in an issue or
    issue comment, or adds the `alice` label. Pull request comments are ignored.
-2. The runner creates a persisted invocation, marks it running, binds an `ExecutionTrace`, and then runs Alice with only her filesystem tools. They are sandboxed to the checkout
-   (`tool_providers.filesystem.BASE_DIR`), so Alice edits her own code. She has no git,
+2. The runner creates a persisted invocation, marks it running, binds an `ExecutionTrace`, and then runs Logos with only its filesystem tools. They are sandboxed to the checkout
+   (`tool_providers.filesystem.BASE_DIR`), so Logos edits its own code. It has no git,
    shell or network tools. Tools that need approval stop the run instead of
    being approved automatically.
 3. The diff is checked: no changes under `.github/`, env files or keys, and at
@@ -18,7 +18,7 @@ Alice Pro can take a GitHub issue and work on her own code. The workflow is
    opens a **draft** pull request that closes the issue. Full CI runs on it, and
    the maintainer (Claude, see `AGENTS.md`) marks the draft ready once CI is
    green, then reviews and merges it.
-5. The runner persists the final trace and closes the invocation as completed or failed. Alice then comments on the issue with her summary, status and the cost of the run from `ExecutionTrace` billing (tokens and rubles; CPU energy once compute billing is merged).
+5. The runner persists the final trace and closes the invocation as completed or failed. Logos then comments on the issue with its summary, status and the cost of the run from `ExecutionTrace` billing (tokens and rubles; CPU energy once compute billing is merged).
 
 ## Setup
 
@@ -27,7 +27,7 @@ Never paste a token into an issue, a chat or a commit.
 
 | Secret                  | Value                                          |
 | ----------------------- | ---------------------------------------------- |
-| `YANDEX_API_KEY`        | Yandex AI Studio API key for Alice             |
+| `YANDEX_API_KEY`        | Yandex AI Studio API key for Logos             |
 | `YANDEX_PROJECT_ID`     | Yandex AI Studio project (folder) ID           |
 | `ALICE_APP_PRIVATE_KEY` | Private key of the "Alice Pro" GitHub App      |
 
@@ -37,7 +37,7 @@ And this repository variable:
 | --------------------- | --------------------------------------- |
 | `ALICE_APP_CLIENT_ID` | Client ID of the "Alice Pro" GitHub App |
 
-Alice posts under her own name through the "Alice Pro" GitHub App. Create it
+Logos posts under its own name through the "Alice Pro" GitHub App. Create it
 under GitHub → Settings → Developer settings → GitHub Apps → New GitHub App:
 
 - Name: `Alice Pro`. Homepage: the repository URL. Webhook: off.
@@ -61,7 +61,7 @@ maintainer's name, and commits are authored as `Alice Pro`. Delete that secret o
 Optional repository variable `ALICE_AGENT_MODEL` selects the model key from
 `config.py` (default `logos-runtime`).
 
-Protect `develop` with a required pull request and green CI, so Alice's draft PRs
+Protect `develop` with a required pull request and green CI, so draft PRs from Logos
 can never land without review.
 
 ## Limits
@@ -70,7 +70,7 @@ can never land without review.
   16 tool rounds.
 - The issue text is passed to the model as task data after `AGENTS.md`. Only
   maintainers can trigger a run.
-- Alice's reports escape `@` mentions, so her own comments cannot trigger her
+- Reports from Logos escape `@` mentions, so its own comments cannot trigger it
   again.
 - The run uses a temporary database and a per-run credential encryption key.
   Nothing is settled to Treasury; the cost is only reported.
