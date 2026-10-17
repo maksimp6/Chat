@@ -113,5 +113,17 @@ Review applicable permission terms before sharing or selling physical models.
 python3 -m unittest discover -s tests -p 'test_dota_workshop_mesh.py' -v
 \`\`\`
 
-In the cloud RDC scratch environment seven focused tests passed. Full
-repository CI and independent review are not yet verified.
+In the cloud RDC scratch environment seven focused tests passed before the
+orientation fix. The current test file has eight tests, including an
+inside-out closed mesh that must be flipped outward; all eight pass locally at
+the current head. Full repository CI and independent review are not yet
+verified.
+
+The report records `orientation_corrected` and `enclosed_volume_mm3`. A source
+whose STL hash was recorded before this fix may legitimately change if its
+normals were inward-facing; regenerate and re-hash before relying on the
+documented SHA-256 values.
+
+Known limit: the importer reads mesh accessors only and ignores glTF scene-node
+transforms. Pose and axis conventions must be checked against the source GLB
+node graph during the preview review.
