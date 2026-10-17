@@ -4,7 +4,7 @@ Issue #105 verifies and restores the end-to-end voice assistant path.
 
 ## Pipeline
 
-`microphone -> browser recording -> /api/voice/audio -> SpeechKit STT -> existing Alice chat pipeline -> SpeechKit TTS -> browser playback`
+`microphone -> browser recording -> /api/voice/audio -> SpeechKit STT -> existing Logos chat pipeline -> SpeechKit TTS -> browser playback`
 
 The browser prefers OggOpus recording when the browser exposes it. A PCM/WAV fallback is used otherwise. SpeechKit synchronous recognition is limited to 1 MiB and 30 seconds, so the server rejects larger audio payloads.
 
