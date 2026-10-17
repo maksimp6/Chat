@@ -19,7 +19,7 @@ import zipfile
 from pathlib import Path
 
 if __package__:
-    from .alice_a1mini_preview import embed_preview
+    from scripts.alice_a1mini_preview import embed_preview
 else:
     from alice_a1mini_preview import embed_preview
 

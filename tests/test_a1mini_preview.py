@@ -12,7 +12,6 @@ from pathlib import Path
 from scripts.alice_a1mini_pla_cube_slice import cube_stl
 from scripts.alice_a1mini_preview import audit_preview, embed_preview
 
-
 REL = b"""<?xml version="1.0"?><Relationships>
 <Relationship Target="/Metadata/plate_1.png"/>
 <Relationship Target="/Metadata/plate_1_small.png"/>

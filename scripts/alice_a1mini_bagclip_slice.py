@@ -19,21 +19,21 @@ import zipfile
 from pathlib import Path
 
 if __package__:
-    from .alice_a1mini_preview import embed_preview
-    from .alice_a1mini_pla_cube_slice import (
+    from scripts.alice_a1mini_pla_cube_slice import (
         _read_sliced_archive,
         _validate_gcode,
         _validate_profile,
         profiles,
     )
+    from scripts.alice_a1mini_preview import embed_preview
 else:
-    from alice_a1mini_preview import embed_preview
     from alice_a1mini_pla_cube_slice import (
         _read_sliced_archive,
         _validate_gcode,
         _validate_profile,
         profiles,
     )
+    from alice_a1mini_preview import embed_preview
 
 SOURCE_SHA256 = "6c3005537a4b5bdd25bad2e4d9c29f9c858869b02884cf6c52fe907269a267d1"
 SOURCE_BYTES = 38279
