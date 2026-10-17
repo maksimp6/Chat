@@ -202,3 +202,30 @@ test("worker automatically checkpoints and sleeps after browser inactivity", asy
   assert.equal(app.fake.profile.closed, true);
   assert.equal(checkpoints.length, 1);
 });
+
+test("idle sleep does not interrupt a browser operation that is still running", async (t) => {
+  const fake = fakeChromium();
+  const launch = fake.chromium.launchPersistentContext;
+  fake.chromium.launchPersistentContext = async (directory) => {
+    const context = await launch(directory);
+    context.pages()[0].screenshot = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      return Buffer.from("png");
+    };
+    return context;
+  };
+  const app = await fixture({ idleSleepMs: 25, chromium: fake.chromium });
+  t.after(async () => { await app.worker.close(); await app.close(); });
+
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  const screenshot = await app.worker.callTool("screenshot");
+  assert.equal(screenshot.mediaType, "image/png");
+  // The 25 ms idle window elapsed during the 80 ms screenshot; Chrome must still be open.
+  assert.notEqual(fake.profile.closed, true);
+
+  // After the operation settled, the browser sleeps once the idle window passes again.
+  for (let attempt = 0; attempt < 200 && fake.profile.closed !== true; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(fake.profile.closed, true);
+});

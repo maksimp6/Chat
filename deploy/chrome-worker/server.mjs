@@ -121,6 +121,7 @@ export function createWorker(options = {}) {
   if (!Number.isFinite(idleSleepMs) || idleSleepMs < minimumIdleSleepMs) throw new Error("invalid_browser_idle_sleep_ms");
   let idleTimer;
   let closing = false;
+  let activeOperations = 0;
 
   function cancelIdleSleep() {
     if (idleTimer) clearTimeout(idleTimer);
@@ -130,20 +131,33 @@ export function createWorker(options = {}) {
   function scheduleIdleSleep() {
     cancelIdleSleep();
     if (!context || closing) return;
-    idleTimer = setTimeout(async () => {
+    idleTimer = setTimeout(() => {
       idleTimer = undefined;
+      // An operation still running re-arms the timer when it settles, so idle sleep never interrupts it.
+      if (activeOperations > 0) return;
       if (takeoverEnabled && takeover.status?.().active) {
         scheduleIdleSleep();
         return;
       }
-      try {
-        await mcp.close();
-        await sleep();
-      } catch {
+      sleepWhenIdle().catch(() => {
         process.stderr.write('{"event":"browser_idle_sleep_failed"}\n');
-      }
+      });
     }, idleSleepMs);
     idleTimer.unref?.();
+  }
+
+  async function sleepWhenIdle() {
+    await mcp.close();
+    await sleep();
+  }
+
+  function trackActivity(operation) {
+    activeOperations += 1;
+    cancelIdleSleep();
+    return operation.finally(() => {
+      activeOperations -= 1;
+      scheduleIdleSleep();
+    });
   }
 
   async function wake() {
@@ -181,14 +195,17 @@ export function createWorker(options = {}) {
     });
   }
 
-  async function callTool(name, args = {}) {
+  function callTool(name, args = {}) {
+    return trackActivity(runTool(name, args));
+  }
+
+  async function runTool(name, args = {}) {
     await ready;
     if (name === "browser_status") {
       return { state, generation, url: page?.url() ?? null, title: page ? await page.title() : null, profile: stateStore.status() };
     }
     if (name === "wake") {
       await wake();
-      scheduleIdleSleep();
       return { state, generation, profile: stateStore.status() };
     }
     if (name === "sleep") {
@@ -198,17 +215,14 @@ export function createWorker(options = {}) {
     if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
     if (name === "navigate") {
       await page.goto(safeUrl(args.url, allowedHosts), { waitUntil: "domcontentloaded" });
-      scheduleIdleSleep();
       return { url: page.url(), title: await page.title() };
     }
     if (name === "click") {
       await page.locator(String(args.locator ?? "")).click();
-      scheduleIdleSleep();
       return { ok: true };
     }
     if (name === "type") {
       await page.locator(String(args.locator ?? "")).fill(String(args.text ?? ""));
-      scheduleIdleSleep();
       return { ok: true };
     }
     if (name === "secret_fill") {
@@ -231,17 +245,14 @@ export function createWorker(options = {}) {
       } finally {
         secret = undefined;
       }
-      scheduleIdleSleep();
       return { ok: true };
     }
     if (name === "extract") {
       const text = await page.locator(String(args.locator ?? "body")).innerText();
-      scheduleIdleSleep();
       return { text: text.slice(0, MAX_TEXT_CHARS), truncated: text.length > MAX_TEXT_CHARS };
     }
     if (name === "screenshot") {
       const bytes = await page.screenshot({ type: "png" });
-      scheduleIdleSleep();
       return { mediaType: "image/png", data: bytes.toString("base64") };
     }
     throw Object.assign(new Error("unknown_operation"), { status: 404 });
@@ -326,8 +337,7 @@ export function createWorker(options = {}) {
       }
       if (pathname === "/browser/v1/mcp") {
         const message = request.method === "POST" ? await body(request) : undefined;
-        await mcp.handle(request, response, message);
-        scheduleIdleSleep();
+        await trackActivity(mcp.handle(request, response, message));
         return;
       }
       if (takeoverEnabled && request.method === "POST" && pathname === "/browser/v1/takeover/start") {
