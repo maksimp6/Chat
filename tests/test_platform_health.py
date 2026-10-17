@@ -1,4 +1,4 @@
-"""Tests for Alice Platform health checks (derived from config)."""
+"""Tests for Logos Platform health checks (derived from config)."""
 
 from urllib.parse import urlsplit
 
