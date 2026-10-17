@@ -1,6 +1,6 @@
 ---
 name: Backend Engineer
-description: Implements Alice Pro Flask, API, runtime, tool execution, database, trace, and server-side changes.
+description: Implements Logos Flask, API, runtime, tool execution, database, trace, and server-side changes.
 target: github-copilot
 model: gpt-5.4-mini
 user-invocable: true

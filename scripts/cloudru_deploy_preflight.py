@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Alice deployment inputs without rendering or sending secret values.
+"""Validate Logos deployment inputs without rendering or sending secret values.
 
 No cloud API calls. --check-db verifies an existing native journal with its writer lock.
 This is a configuration check, not a provisioner or a deployment approval gate.
@@ -131,7 +131,7 @@ def validate(config: object, env: dict, *, workflow: bool = False) -> list[str]:
         )
     ):
         errors.append(
-            "container: expected initial Alice profile (8080, 0.5 CPU, 1024Mi, scale 0..1)"
+            "container: expected initial Logos profile (8080, 0.5 CPU, 1024Mi, scale 0..1)"
         )
     database = config.get("database")
     if not isinstance(database, dict):
