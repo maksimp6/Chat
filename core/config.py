@@ -1,4 +1,4 @@
-"""Alice Pro - Configuration & Pricing"""
+"""Logos - Configuration & Pricing"""
 
 import logging
 import os

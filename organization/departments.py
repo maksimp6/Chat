@@ -1,4 +1,4 @@
-"""First-class Department registry and API for Alice Pro."""
+"""First-class Department registry and API for Logos."""
 
 from __future__ import annotations
 import json
