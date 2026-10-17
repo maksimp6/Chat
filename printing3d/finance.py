@@ -1,4 +1,4 @@
-"""Financing and payback tracking for the Alice Pro 3D-printing business."""
+"""Financing and payback tracking for the Logos 3D-printing business."""
 
 from __future__ import annotations
 
