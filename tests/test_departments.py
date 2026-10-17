@@ -1,8 +1,13 @@
 import os
 import tempfile
-import db
+import storage.db as db
 from flask import Flask
-from departments import init_department_tables, list_departments, upsert_department, departments_bp
+from organization.departments import (
+    init_department_tables,
+    list_departments,
+    upsert_department,
+    departments_bp,
+)
 
 
 def _app(tmp):

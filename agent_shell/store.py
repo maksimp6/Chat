@@ -1,4 +1,4 @@
-"""Typed durable task repository using Alice's Memory DB client.
+"""Typed durable task repository using Alice's Kristall client.
 
 One atomic aggregate keeps task IDs, state and events consistent. Separate
 TaskStore objects in the same process share a writer; another process is
@@ -16,7 +16,7 @@ import time
 from typing import Any, TypedDict, cast
 
 from agent_memory.client import get_memory_client
-from memory_engine import StoreError
+from kristall import KristallError
 
 ROLE_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 KIND_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
@@ -62,7 +62,7 @@ def _state(value: Any) -> TaskState:
         or not isinstance(value.get("tasks"), dict)
         or not isinstance(value.get("events"), dict)
     ):
-        raise StoreError("invalid task repository state")
+        raise KristallError("invalid task repository state")
     for key, task in value["tasks"].items():
         if (
             not isinstance(task, dict)
@@ -79,9 +79,9 @@ def _state(value: Any) -> TaskState:
             or type(task.get("needs_approval")) is not bool
             or not {"payload", "result", "error", "created_at", "updated_at"} <= task.keys()
         ):
-            raise StoreError("invalid task record")
+            raise KristallError("invalid task record")
     if set(value["events"]) != set(value["tasks"]):
-        raise StoreError("invalid task event ownership")
+        raise KristallError("invalid task event ownership")
     for events in value["events"].values():
         if not isinstance(events, list) or any(
             not isinstance(event, dict)
@@ -89,7 +89,7 @@ def _state(value: Any) -> TaskState:
             or type(event.get("at")) not in (int, float)
             for event in events
         ):
-            raise StoreError("invalid task events")
+            raise KristallError("invalid task events")
     return cast(TaskState, value)
 
 

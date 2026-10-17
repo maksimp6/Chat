@@ -1,21 +1,14 @@
 import json
-import sqlite3
-import uuid
+
+from kristall.store import Kristall
 
 import pytest
 
 from agent_memory import AgentMemoryStore, MemoryLookup, MemoryRecord
 
 
-def _sqlite_store(tmp_path):
-    path = tmp_path / "agent-memory.db"
-
-    def connect():
-        conn = sqlite3.connect(path)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    return AgentMemoryStore(connect)
+def _native_store(tmp_path):
+    return AgentMemoryStore(Kristall(tmp_path / "agent-memory.memory"))
 
 
 def _github_record(
@@ -32,14 +25,14 @@ def _github_record(
         memory_id=memory_id,
         kind=kind,
         scope=scope,
-        text="SQLite remains the local default.",
+        text="Kristall is the only native store.",
         provenance={
             "source_type": "github",
             "repository": "maksimp6/Chat",
             "refs": ["PR#582", "docs/architecture/agent-context-cache.md"],
         },
         source_version=source_version,
-        payload={"facts": [{"name": "database", "value": "sqlite"}]},
+        payload={"facts": [{"name": "database", "value": "memory"}]},
         confidence=0.95,
         visibility=visibility,
         expires_at=expires_at,
@@ -164,17 +157,13 @@ def test_expiration_and_lookup_status_validation():
         MemoryLookup(status="maybe", memory_id="m1")
 
 
-def test_explicit_schema_creation_is_idempotent(tmp_path):
-    store = _sqlite_store(tmp_path)
-
-    store.create_schema()
-    store.create_schema()
-
+def test_native_store_starts_empty(tmp_path):
+    store = _native_store(tmp_path)
     assert store.list_records() == []
 
 
-def test_sqlite_round_trip_freshness_and_visibility(tmp_path):
-    store = _sqlite_store(tmp_path)
+def test_native_round_trip_freshness_and_visibility(tmp_path):
+    store = _native_store(tmp_path)
     record = _github_record()
     stored = store.upsert(record)
 
@@ -210,7 +199,7 @@ def test_sqlite_round_trip_freshness_and_visibility(tmp_path):
 
 
 def test_upsert_fails_closed_when_persisted_record_cannot_be_read(tmp_path, monkeypatch):
-    store = _sqlite_store(tmp_path)
+    store = _native_store(tmp_path)
     monkeypatch.setattr(store, "get", lambda _memory_id: None)
 
     with pytest.raises(RuntimeError, match="did not persist"):
@@ -218,7 +207,7 @@ def test_upsert_fails_closed_when_persisted_record_cannot_be_read(tmp_path, monk
 
 
 def test_upsert_preserves_created_at_and_updates_content(tmp_path):
-    store = _sqlite_store(tmp_path)
+    store = _native_store(tmp_path)
     first = _github_record(now=100)
     store.upsert(first)
     second = MemoryRecord(
@@ -237,7 +226,7 @@ def test_upsert_preserves_created_at_and_updates_content(tmp_path):
 
 
 def test_mark_stale_and_supersede_require_existing_records(tmp_path):
-    store = _sqlite_store(tmp_path)
+    store = _native_store(tmp_path)
     first = _github_record(memory_id="old")
     replacement = _github_record(memory_id="new", source_version="sha-2")
     store.upsert(first)
@@ -269,7 +258,7 @@ def test_mark_stale_and_supersede_require_existing_records(tmp_path):
 
 
 def test_expired_record_is_stale_and_export_is_stable(tmp_path):
-    store = _sqlite_store(tmp_path)
+    store = _native_store(tmp_path)
     store.upsert(_github_record(memory_id="b", expires_at=105))
     store.upsert(_github_record(memory_id="a", source_version="sha-2"))
 
@@ -288,37 +277,22 @@ def test_expired_record_is_stale_and_export_is_stable(tmp_path):
     assert json.dumps(exported)
 
 
-def test_delete_and_selected_database_backend_round_trip():
-    memory_id = f"agent-memory-test-{uuid.uuid4()}"
-    store = AgentMemoryStore()
-    record = _github_record(memory_id=memory_id, scope="ci:selected-backend")
-    try:
-        stored = store.upsert(record)
-        assert stored.memory_id == memory_id
-        assert store.get(memory_id).source_version == "sha-1"
-    finally:
-        store.delete(memory_id)
-    assert store.get(memory_id) is None
+def test_delete_round_trip_on_native_memory_store(tmp_path):
+    store = _native_store(tmp_path)
+    record = _github_record(memory_id="deletion-case", scope="ci:native")
+    stored = store.upsert(record)
+    assert stored.memory_id == record.memory_id
+    assert store.get(record.memory_id).source_version == "sha-1"
+    assert store.delete(record.memory_id) is True
+    assert store.delete(record.memory_id) is False
+    assert store.get(record.memory_id) is None
 
 
-def test_separate_database_connections_each_initialize_schema(tmp_path):
-    first_path = tmp_path / "first.db"
-    second_path = tmp_path / "second.db"
-
-    def factory(path):
-        def connect():
-            conn = sqlite3.connect(path)
-            conn.row_factory = sqlite3.Row
-            return conn
-
-        return connect
-
-    first = AgentMemoryStore(factory(first_path))
-    second = AgentMemoryStore(factory(second_path))
-
+def test_separate_memory_store_paths_are_isolated(tmp_path):
+    first = AgentMemoryStore(Kristall(tmp_path / "first.memory"))
+    second = AgentMemoryStore(Kristall(tmp_path / "second.memory"))
     first.upsert(_github_record(memory_id="first-memory"))
     second.upsert(_github_record(memory_id="second-memory"))
-
     assert first.get("first-memory") is not None
     assert first.get("second-memory") is None
     assert second.get("second-memory") is not None
@@ -351,34 +325,17 @@ def test_memory_record_rejects_none_and_negative_timestamps():
         MemoryRecord(**{**common, "expires_at": -1})
 
 
-def test_create_schema_is_explicitly_callable_and_closes_connection(tmp_path):
-    path = tmp_path / "explicit-schema.db"
-    connections = []
-
-    def connect():
-        conn = sqlite3.connect(path)
-        conn.row_factory = sqlite3.Row
-        connections.append(conn)
-        return conn
-
-    store = AgentMemoryStore(connect)
-    store.create_schema()
-
-    probe = sqlite3.connect(path)
-    try:
-        table = probe.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agent_memory'"
-        ).fetchone()
-    finally:
-        probe.close()
-
-    assert table == ("agent_memory",)
-    with pytest.raises(sqlite3.ProgrammingError):
-        connections[0].execute("SELECT 1")
+def test_native_store_survives_verified_reopen(tmp_path):
+    path = tmp_path / "durable.memory"
+    with Kristall(path) as store:
+        repository = AgentMemoryStore(store)
+        repository.upsert(_github_record(memory_id="durable"))
+    with Kristall(path) as reopened:
+        assert AgentMemoryStore(reopened).get("durable").memory_id == "durable"
 
 
 def test_upsert_fails_closed_if_persisted_record_cannot_be_reloaded(tmp_path, monkeypatch):
-    store = _sqlite_store(tmp_path)
+    store = _native_store(tmp_path)
     record = _github_record(memory_id="reload-failure")
     monkeypatch.setattr(store, "get", lambda _memory_id: None)
 
@@ -387,7 +344,7 @@ def test_upsert_fails_closed_if_persisted_record_cannot_be_reloaded(tmp_path, mo
 
 
 def test_list_records_filters_by_scope(tmp_path):
-    store = _sqlite_store(tmp_path)
+    store = _native_store(tmp_path)
     store.upsert(_github_record(memory_id="repo", scope="repo:maksimp6/Chat"))
     store.upsert(_github_record(memory_id="issue", scope="issue:578"))
 

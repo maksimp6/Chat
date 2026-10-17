@@ -1,4 +1,4 @@
-# Synchronous Memory DB: functional core and Alice task adapter
+# Synchronous Kristall: functional core and Alice task adapter
 
 The accepted owner contracts are [#1045](https://github.com/maksimp6/Chat/issues/1045)
 and [#1046](https://github.com/maksimp6/Chat/issues/1046), within
@@ -9,7 +9,7 @@ PyPI, transport schemas, mirroring and build-performance work stay separate.
 ## Public contract
 
 `Store[ValueT]` has one name/value API: `get(name)`, `set(name, value)`, and
-`commit() -> int`. `MemoryStore` implements it. Names are nonempty strings;
+`commit() -> int`. `Kristall` implements it. Names are nonempty strings;
 missing names return `None`. JSON `null` is therefore indistinguishable from
 missing through this API. Values are finite JSON scalars, lists and string-keyed
 dictionaries. Tuples, non-string dictionary keys, nonfinite floats and arbitrary
@@ -23,9 +23,9 @@ Staging belongs to the client instance, not individual threads; concurrent
 read-modify-write consumers must use `transaction()`.
 
 ```python
-from memory_engine import MemoryStore
+from kristall import Kristall
 
-with MemoryStore("alice.memory") as store:
+with Kristall("alice.memory") as store:
     store.set("settings/theme", "gray")
     assert store.commit() == 1
     with store.transaction() as tx:
@@ -52,24 +52,9 @@ write or release their parent's writer lock. Supported platforms need POSIX
 
 Startup verifies frames in order, reading one line at a time. Unknown formats,
 malformed sequences, checksum failures and partial tails fail closed without
-modifying the source. Replay is idempotent. Replay time grows with the records
-appended since the last checkpoint. SHA chaining
+modifying the source. Replay is idempotent. Replay time still grows with journal
+length; checkpointing and bounded recovery remain future work. SHA chaining
 detects corruption, not an attacker able to rewrite the complete chain.
-
-`checkpoint()` requires no staged values or active transaction. Under the writer
-lock it verifies the source journal against confirmed RAM state, sequence and
-digest, then writes and verifies a snapshot, fsyncs it, atomically replaces the
-journal, and fsyncs the parent directory. The sequence stays unchanged; the digest
-becomes the new snapshot-chain baseline. Corrupt, missing or changed source data
-is preserved without replacement and blocks writes pending recovery. I/O errors
-or caller cancellation once publication starts also block further writes until
-verified reopen. An exception is not proof that replacement did not occur.
-
-The complete snapshot frame is capped at 1 MiB. An oversized snapshot is rejected
-without changing the valid journal or blocking ordinary commits. Checkpointing is
-explicit, with no background timer or automatic recovery-time guarantee; large
-states and a growing uncheckpointed journal still need future work. Compaction
-also verifies the complete current source, so its work grows with journal length.
 
 An append/fsync failure never acknowledges or publishes the staged transaction.
 The disk outcome can be uncertain, so subsequent mutations fail with recovery
@@ -80,17 +65,14 @@ performed. Callers must not treat an exception as proof that a write is absent.
 `backup()` verifies a consistent committed journal copy before publishing to a
 new destination. It excludes staging and refuses overwrite, including destination
 creation races. `restore()` validates before atomically publishing to an empty,
-idle target; staging and existing committed data prevent restore. An exception
-can occur after either a backup or restored store has already been published.
-A restore publication error or caller cancellation blocks subsequent writes until
-verified reopen; callers must not continue with the old empty RAM state. Backup targets
+idle target; staging and existing committed data prevent restore. Backup targets
 must be private to their owner. This is local backup evidence, not remote storage
 replication. Historical SQL backups are untouched.
 
 ## Alice integration
 
 `agent_memory.client` owns the application writer registry and explicit shutdown.
-Canonical path aliases share one `MemoryStore`; the library has no Alice imports
+Canonical path aliases share one `Kristall`; the library has no Alice imports
 or global database owner. Stop consumers before `close_memory_clients()`.
 
 `agent_shell.TaskStore` uses a typed, versioned task aggregate through this adapter.
@@ -121,10 +103,25 @@ coverage includes fresh-process reopen, SIGKILL before append/after fsync/after
 ACK, failed fsync without publication, invalid values, corruption, transactions,
 writer ownership, backup and isolated restore. Alice tests cover task behavior,
 concurrent runners, failed durable claim, and fresh-process interrupted-task
-recovery. The dedicated Memory DB workflow runs core verification independently.
+recovery. The dedicated Kristall workflow runs core verification independently.
 
-Full #776 acceptance is still incomplete: SQL-backed chat, sessions, context and
-other consumers remain, as do legacy import, large-state checkpoints, health and Trace work.
-Passing core/task tests does not establish a SQL-free application or production
-readiness. The aggregate draft #1042 contains unrelated work and must not be
-merged wholesale.
+Alice now uses the native Kristall writer for chat/messages/settings/config,
+identity and ownership, sessions, agent memory, invocation/Trace, MCP selection,
+local-agent jobs, environments, provider metadata/encrypted credentials, quotas,
+Treasury and business workflows. Records are separate native names; mutations
+use the shared write barrier. SQL drivers, connection adapters, SQL migrations,
+SQL query tool and PostgreSQL CI/deployment dependencies are retired.
+
+The Alice client adds detached prefix iteration and atomic deletion for these
+repositories. `items()` rejects incomplete RAM state; delete on a fenced writer
+fails even for a missing name. The application owns shared-writer shutdown;
+stopping a preview runtime releases only that runtime's writer before removal.
+
+Deployments require an explicit persistent `ALICE_MEMORY_PATH`, one writer
+process and independently verified restart/restore evidence. Cloud object storage
+remains backup, not the live filesystem. Repository implementation/testing does
+not approve production data cutover, delete historical backups or prove remote
+cloud persistence. No automatic SQL import or generic SQL compatibility adapter
+is provided. Startup refuses an implicit empty native database beside existing
+legacy data; an explicit native target belongs to separately verified activation. Full #776 cloud backup, large-state recovery and rollout acceptance
+remain separate. Aggregate #1042 must not be merged wholesale.
