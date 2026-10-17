@@ -23,7 +23,6 @@ Contents: [credentials](#do-not-mix-identities-or-credentials) ·
 | Foundation Models API key | Model API for a configured service account | A service-specific secret, separate from IAM/EDS; keep behind Logos provider-credentials boundary |
 | Object Storage S3 access pair | S3 object operations | Dedicated storage Key ID/Secret + tenant/region/bucket scope; not a Foundation Models key |
 | Logos GitHub OAuth client secret | Logos owner login with immutable GitHub account ID allowlist | Runtime app secret; different identity plane from Cloud.ru IAM |
-| PostgreSQL role/password | Logos runtime SQL access | Dedicated database role and TLS-verified DSN; do not reuse Cloud.ru credentials |
 | Certificate private key | TLS termination for a custom domain or database | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
 
 Do not print tokens, secrets, Authorization headers or raw config. Prefer short-lived
