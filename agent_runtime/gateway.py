@@ -1,4 +1,4 @@
-"""Provider-agnostic gateway for Alice Pro agents."""
+"""Provider-agnostic gateway for Logos agents."""
 
 from __future__ import annotations
 from collections import deque
