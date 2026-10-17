@@ -38,6 +38,7 @@ MYPY_ERROR_BASELINE = {
 
 # Files with zero strict errors. Errors here fail outright.
 STRICT_CLEAN_FILES = {
+    "steel/guardian/admission.py",
     "forge/__init__.py",
     "forge/binding.py",
     "printing3d/store.py",
