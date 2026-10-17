@@ -1,4 +1,4 @@
-"""Focused edge coverage for Alice Platform foundation."""
+"""Focused edge coverage for Logos Platform foundation."""
 
 import argparse
 import runpy
