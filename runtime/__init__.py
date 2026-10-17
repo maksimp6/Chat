@@ -1,6 +1,6 @@
 """Alice Pro scoped preview runtime primitives."""
 
-from .dispatcher import (
+from runtime.dispatcher import (
     FILESYSTEM_READ_TEXT,
     FILESYSTEM_WRITE_TEXT,
     TOOL_EXECUTE_OPERATION,
@@ -11,10 +11,10 @@ from .dispatcher import (
     RuntimeOwnerViolation,
     RuntimeScopeViolation,
 )
-from .loader import RuntimeHostAPI, RuntimeLoadError, RuntimeLoader
-from .conversation_agents import ConversationAgent, ConversationAgentRouter
-from .storage import RuntimeStorage
-from .request_context import (
+from runtime.loader import RuntimeHostAPI, RuntimeLoadError, RuntimeLoader
+from runtime.conversation_agents import ConversationAgent, ConversationAgentRouter
+from runtime.storage import RuntimeStorage
+from runtime.request_context import (
     bind_runtime_request,
     current_runtime_base_path,
     current_runtime_data_root,

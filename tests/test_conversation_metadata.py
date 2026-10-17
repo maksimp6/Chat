@@ -6,7 +6,7 @@ These tests replace the HTTP session, so CI never contacts the paid Yandex API.
 import unittest
 from unittest.mock import Mock
 
-from conversation_metadata import create_conversation_request
+from conversations.metadata import create_conversation_request
 
 
 class TestConversationMetadataRequest(unittest.TestCase):

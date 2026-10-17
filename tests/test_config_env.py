@@ -1,6 +1,6 @@
 import importlib
 
-import config
+import core.config as config
 
 
 def reload_config():

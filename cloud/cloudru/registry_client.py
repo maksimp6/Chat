@@ -22,7 +22,7 @@ from typing import Any, Callable
 
 from cloud.base import CloudProviderError
 from cloud.cloudru.client import CloudRuClient
-from cloudru_iam import CloudRuIamClient
+from cloud.cloudru.iam import CloudRuIamClient
 
 
 SERVICE = "artifact_registry"

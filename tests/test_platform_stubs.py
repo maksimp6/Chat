@@ -3,11 +3,11 @@
 from unittest.mock import patch
 
 import pytest
-from alice_platform.reconciler import reconcile
-from alice_platform.recovery import list_snapshots, restore_snapshot, rollback_config
-from alice_platform.providers.cloudru import CloudProviderUnavailable, get_observed_state
-from alice_platform.providers.dns import create_dns_record, update_dns_records, verify_dns
-from alice_platform.providers.storage import (
+from keel.reconciler import reconcile
+from keel.recovery import list_snapshots, restore_snapshot, rollback_config
+from keel.providers.cloudru import CloudProviderUnavailable, get_observed_state
+from keel.providers.dns import create_dns_record, update_dns_records, verify_dns
+from keel.providers.storage import (
     create_storage,
     delete_storage,
     create_snapshot,
@@ -34,7 +34,7 @@ class TestReconcilerImplemented:
 
     def test_reconcile_routes_create_through_provider_boundary(self):
         """Reconciler routing is testable without pretending the provider is available."""
-        from alice_platform.planner import Action, ActionType
+        from keel.planner import Action, ActionType
 
         actions = [
             Action(
@@ -45,7 +45,7 @@ class TestReconcilerImplemented:
             )
         ]
         config = {"services": {"test-service": {"resources": {"cpu": "0.5", "memory": "512Mi"}}}}
-        with patch("alice_platform.reconciler.create_container") as create:
+        with patch("keel.reconciler.create_container") as create:
             reconcile("test", actions, config)
         create.assert_called_once()
 

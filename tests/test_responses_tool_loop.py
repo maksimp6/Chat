@@ -1,6 +1,6 @@
 import pytest
 
-from responses_tool_loop import (
+from agent_runtime.responses_tool_loop import (
     build_continuation_input,
     extract_function_calls,
     make_function_call_output,

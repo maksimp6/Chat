@@ -19,7 +19,7 @@ Every commit triggers automatic validation:
 
 ```bash
 # Runs in CI (`.github/workflows/ci.yml`)
-python -m alice_platform validate
+python -m keel validate
 
 # Checks:
 # - Schema: valid YAML, required fields present
@@ -35,8 +35,8 @@ If validation fails, the PR cannot merge.
 To see what changes will be deployed:
 
 ```bash
-python -m alice_platform plan test
-python -m alice_platform plan production
+python -m keel plan test
+python -m keel plan production
 ```
 
 Example output:
@@ -62,7 +62,7 @@ Production changes require explicit approval before execution:
 ### For Manual Deployments
 
 ```bash
-python -m alice_platform deploy --lane production
+python -m keel deploy --lane production
 # Prompts for approval before applying changes
 ```
 
@@ -76,7 +76,7 @@ Set approval in environment:
   if: github.ref == 'refs/heads/master'
   env:
     ALICE_APPROVE: ${{ secrets.ALICE_APPROVE }}
-  run: python -m alice_platform deploy --lane production
+  run: python -m keel deploy --lane production
 ```
 
 The `ALICE_APPROVE` token is issued by:
@@ -89,7 +89,7 @@ The `ALICE_APPROVE` token is issued by:
 Test lane requires no approval:
 
 ```bash
-python -m alice_platform deploy --lane test
+python -m keel deploy --lane test
 ```
 
 Changes are applied immediately after planning.
@@ -100,13 +100,13 @@ After deployment, verify services are healthy:
 
 ```bash
 # Check service status
-python -m alice_platform status production
+python -m keel status production
 
 # Run health checks
-python -m alice_platform health production
+python -m keel health production
 
 # View recent logs
-python -m alice_platform logs oauth --lane production --tail 100
+python -m keel logs oauth --lane production --tail 100
 ```
 
 Expected output after successful deployment:
@@ -133,7 +133,7 @@ agent-shell: RUNNING (healthy, 1 replica)
 If deployment causes failures, rollback to previous configuration:
 
 ```bash
-python -m alice_platform recovery rollback-config --lane production
+python -m keel recovery rollback-config --lane production
 ```
 
 This reverts to the last deployed configuration.
@@ -174,8 +174,8 @@ Make changes in `test.yaml` only:
 ```bash
 git checkout -b add-test-feature
 # Edit config/alice/test.yaml
-python -m alice_platform validate
-python -m alice_platform plan test
+python -m keel validate
+python -m keel plan test
 git commit -m "Add test feature"
 git push
 # Merge PR → automatic test deployment
@@ -189,8 +189,8 @@ Make changes that affect both lanes:
 # Edit config/alice/platform.yaml (affects both lanes)
 # Or edit both production.yaml and test.yaml
 
-python -m alice_platform plan test
-python -m alice_platform plan production
+python -m keel plan test
+python -m keel plan production
 # Review plans, ensure consistency
 ```
 
@@ -209,10 +209,10 @@ If deploying from backups:
 git checkout tags/v1.0.0 -- config/alice/
 
 # Restore storage
-python -m alice_platform recovery restore --storage chrome-state --snapshot 2024-10-01
+python -m keel recovery restore --storage chrome-state --snapshot 2024-10-01
 
 # Deploy restored config
-python -m alice_platform deploy --lane production --approve
+python -m keel deploy --lane production --approve
 ```
 
 ## Future Work

@@ -1,20 +1,20 @@
-"""Real SQLite integration test for failed /api/chat partial output persistence."""
+"""Real Kristall integration test for failed /api/chat partial output persistence."""
 
 import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
-import db
-import mcp_routes
-from trace_manager import ExecutionTrace
+import storage.db as db
+import chat.mcp_routes as mcp_routes
+from observability.trace_manager import ExecutionTrace
 
 
-class TestChatSQLiteIntegration(unittest.TestCase):
-    def test_partial_output_and_trace_survive_sqlite_reload(self):
+class TestChatMemoryStoreIntegration(unittest.TestCase):
+    def test_partial_output_and_trace_survive_memory_reload(self):
         from app import app
 
-        conversation_id = "sqlite-integration-test"
+        conversation_id = "memory-integration-test"
 
         class FakeClient:
             def ask_with_mcp(self, message, model_key, conversation_id, params, trace=None):
@@ -40,13 +40,14 @@ class TestChatSQLiteIntegration(unittest.TestCase):
                 raise RuntimeError("Failure after model response")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = os.path.join(tmpdir, "integration.db")
+            db_path = os.path.join(tmpdir, "integration.memory")
             with (
                 patch.object(db, "DB_PATH", db_path),
+                patch.dict(os.environ, {"ALICE_MEMORY_PATH": db_path}),
                 patch.object(mcp_routes, "AliceClient", lambda _config: FakeClient()),
             ):
                 db.init_db()
-                db.create_conversation(conversation_id, "SQLite integration test", "aliceai-llm")
+                db.create_conversation(conversation_id, "Kristall integration test", "aliceai-llm")
 
                 app.config["TESTING"] = True
                 with app.test_client() as client:
@@ -86,6 +87,9 @@ class TestChatSQLiteIntegration(unittest.TestCase):
                 # Prove the data is really on disk and can be loaded by a new
                 # connection after the request has completed.
                 self.assertTrue(os.path.exists(db_path))
+                from agent_memory.client import close_memory_clients
+
+                close_memory_clients()
                 reloaded = db.get_messages(conversation_id)
                 self.assertEqual(reloaded, messages)
 
