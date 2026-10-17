@@ -1,10 +1,10 @@
 # Database backends
 
-Logos stores its server-side data in one native Kristall file store (`kristall.Kristall`). SQL backends are removed.
+Logos supports two database backends through the same application data-access layer.
 
 ## Default: SQLite
 
-Runtime data is kept in the native Kristall journal at `ALICE_MEMORY_PATH` (default: `alice.memory`). `ALICE_DATABASE_URL` is a retired setting: the runtime no longer reads it, and the deploy preflight rejects it.
+When `ALICE_DATABASE_URL` is not set, Logos uses the local SQLite database `alice_pro.db`. This is the default for development and Termux.
 
 No PostgreSQL service is required for this mode.
 

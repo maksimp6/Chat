@@ -6,7 +6,7 @@ Logos fetches the current text-model catalog from the configured Yandex AI Studi
 
 - The provider catalog is cached in-process for `MODEL_DISCOVERY_TTL_SECONDS` (default: 300 seconds).
 - `GET /api/models?refresh=1` forces an immediate refresh.
-- Provider model IDs are normalized to Logos registry keys, such as `logos-runtime`; model URIs use the upstream ID, such as `aliceai-llm`.
+- Provider model IDs are normalized to the IDs used by Logos model URIs.
 - Known pricing metadata is preserved when a discovered model matches the static catalog.
 - Voice models remain available from the existing voice catalog because the provider model catalog is text-model oriented.
 - If discovery fails or the provider credential is missing, `/api/models` returns the static catalog with `degraded: true` and the stable error code `model_discovery_unavailable`.
