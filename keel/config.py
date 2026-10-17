@@ -1,4 +1,4 @@
-"""Config loading and validation for Alice Platform."""
+"""Config loading and validation for Logos Platform."""
 
 import json
 import re
