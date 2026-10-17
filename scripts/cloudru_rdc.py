@@ -33,7 +33,7 @@ from scripts.cloudru_browser_probe import (  # noqa: E402
 )
 from storage.contracts import StorageObjectNotFound  # noqa: E402
 
-DESCRIPTION = "Logos persistent RDC + Chromium; issue 409"
+DESCRIPTION = "Alice persistent RDC + Chromium; issue 409"
 VOLUME = "rdc-state"
 MOUNT = "/rdc-state"
 HEALTH_KEYS = {

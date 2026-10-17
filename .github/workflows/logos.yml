@@ -29,7 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  logos:
+  alice:
     name: Logos works on the issue
     if: |
       !github.event.issue.pull_request && (

@@ -42,7 +42,7 @@ from scripts.cloudru_deploy import _export_commit, _load_cloudru_credentials  # 
 from scripts.cloudru_rdc import application_origin  # noqa: E402
 
 REPOSITORY = "oauth-idp"
-DESCRIPTION = "Logos central OAuth identity provider"
+DESCRIPTION = "Alice central OAuth identity provider"
 CPU = "0.1"
 MEMORY = "256Mi"
 IMAGE_RE = re.compile(re.escape(f"{REGISTRY}.cr.cloud.ru/{REPOSITORY}@sha256:") + "[0-9a-f]{64}")

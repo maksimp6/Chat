@@ -3,7 +3,7 @@
 
 Without tunnel settings this only runs ``python app.py``. With all of
 OPENAI_TUNNEL_ID, OPENAI_TUNNEL_API_KEY, ALICE_MCP_BEARER_TOKEN and
-ALICE_MCP_USER_ID it also runs openai/tunnel-client next to Alice. The tunnel
+ALICE_MCP_USER_ID it also runs openai/tunnel-client next to Logos. The tunnel
 client polls OpenAI over outbound HTTPS and forwards MCP requests from ChatGPT
 to Logos's /mcp on loopback, adding Logos's MCP bearer token itself.
 
