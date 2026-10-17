@@ -1,6 +1,6 @@
 ---
 name: runtime-debugging
-description: Diagnose Alice Pro invocation, tool-loop, runtime isolation and Execution Trace failures.
+description: Diagnose Logos invocation, tool-loop, runtime isolation and Execution Trace failures.
 ---
 ## Purpose
 Find failures across InvocationContext, provider calls, UniversalToolExecutor and Execution Trace without hiding errors.

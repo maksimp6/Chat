@@ -1,9 +1,9 @@
 ---
 name: cloudru-management
-description: "Prepare and operate Alice Pro on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Alice's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
+description: "Prepare and operate Logos on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Logos's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
 ---
 
-# Cloud.ru / Alice Pro
+# Cloud.ru / Logos
 
 Read repository `AGENTS.md` and the current issue first. Work from fresh `master`
 in a focused branch; publish a PR. Keep existing authorization in scope: do not
@@ -14,7 +14,7 @@ the repository's production/data/secret approval rules to actual live changes.
 
 1. Identify the interface in the table below. Do not interchange keys.
 2. Read [EDS reference](references/eds.md) for CLI work, or the
-   [deployment runbook](../../../deploy/cloudru/README.md) for Alice rollout.
+   [deployment runbook](../../../deploy/cloudru/README.md) for Logos rollout.
 3. Read [Evolution service and identity reference](references/evolution-services.md)
    for DNS, Gateway, workflow, logs, users/keys, secrets/certificates and AI.
    For JSON stdout and cloud log-stream configuration, also read
@@ -36,7 +36,7 @@ the repository's production/data/secret approval rules to actual live changes.
 |---|---|---|
 | `eds repo`, `eds wf` v0.4.0 | Repo and Workflow Studio | `EDS_API_KEY` as `X-API-KEY`, `EDS_PROJECT_ID` |
 | Evolution service APIs | Container Apps, IAM and other documented services | Service-specific auth; IAM Key ID/Key Secret where supported |
-| Existing Alice backend | IAM wizard, provider keys, S3, Container Apps | Existing provider adapters and redaction boundaries |
+| Existing Logos backend | IAM wizard, provider keys, S3, Container Apps | Existing provider adapters and redaction boundaries |
 | Cloud CLI Advanced | Advanced platform only | Its own AK/SK; not an Evolution IAM pair |
 
 EDS is **not** a universal infrastructure provisioner. It has no PostgreSQL,
@@ -46,7 +46,7 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 
 ## Deployment constraints
 
-- Alice runs in Container Apps. Do not introduce a replacement VM/Kubernetes
+- Logos runs in Container Apps. Do not introduce a replacement VM/Kubernetes
   runtime, Remote Desktop Commander or Supabase into this task.
 - Target durable data: external PostgreSQL with a public endpoint, certificate
   verification and verified narrow client CIDRs. Evolution Managed PostgreSQL

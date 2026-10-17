@@ -1,6 +1,6 @@
-# Alice Pro
+# Logos
 
-Alice Pro — self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces, billing and an Android WebView client.
+Logos — self-hosted AI assistant platform around Yandex AI Studio, MCP/local tools, agent orchestration, execution traces, billing and an Android WebView client.
 
 The repository is actively evolving. This README separates shipped behavior from open scope: Issues define implementation scope and acceptance criteria; docs define contracts and operating rules; Discussions capture questions and decisions.
 
@@ -24,7 +24,7 @@ The repository is actively evolving. This README separates shipped behavior from
 - **Invocation context and execution trace** for provider requests, polling, tool calls, errors, timing, continuations and billing correlation.
 - **Deterministic trace lifecycle**: snapshots are read-only and finalization is idempotent; see [execution trace lifecycle](docs/execution-trace-lifecycle.md).
 - **Agent Gateway and RuntimeDispatcher** for runtime-scoped invocations. The target architecture is one Python process with managed threads/contexts; threads are not a hostile-code security boundary.
-- **Alice GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Alice GitHub agent](docs/agents/alice-github-agent.md).
+- **Logos GitHub agent**: issue/label-triggered workflow, headless runner, filesystem-only sandboxed tools, draft PR output and CI/review gates. See [Logos GitHub agent](docs/agents/alice-github-agent.md).
 - **Compute energy accounting** based on measured CPU time and configured watts/price; if no electricity price is configured, the trace remains unpriced. See [compute energy billing](docs/compute-energy-billing.md).
 - **Treasury and billing controls**, internal usage accounting and demo balances.
 - **3D Printing Business**: quote calculation, owner-scoped orders and settlement, realized P&L, finance/payback tracking and AI-first purchase assessment. See [3D Printing Business](docs/printing3d.md).
@@ -87,7 +87,7 @@ Copy `.env.example` only for a fresh installation. Replace its placeholders and 
 
 Start the backend with `python app.py`. Open `http://localhost:8080` when using the template's `PORT=8080`; without `PORT`, `app.py` defaults to `5000`. In **Провайдеры**, save the Yandex API key together with its Project ID. The current web runtime resolves both from the active database credential; environment-only `YANDEX_API_KEY` / `YANDEX_PROJECT_ID` values do not configure the chat. See the [installation guide](docs/setup/installation.md) and [provider-key lifecycle](docs/provider-key-rotation.md).
 
-Alice stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
+Logos stores authoritative runtime data in `kristall.Kristall`; set `ALICE_MEMORY_PATH` to its journal on persistent storage. SQL drivers, SQL runtime adapters and the PostgreSQL CI lane are removed. Existing legacy data is preserved; deployment and production cutover still require explicit acceptance.
 
 ### Android
 
@@ -139,10 +139,10 @@ For frontend/runtime work, preserve the progressive-enhancement path and Browser
 - [API overview](docs/api/overview.md)
 - [MCP overview](docs/mcp/overview.md)
 - [3D Printing Business](docs/printing3d.md)
-- [Alice runtime agents](docs/agents/overview.md)
+- [Logos runtime agents](docs/agents/overview.md)
 - [Repository development roles](docs/agents/role-based-agent-office.md)
 - [Runtime Dispatcher policy](docs/runtime/runtime-dispatcher-policy.md)
-- [Alice GitHub agent](docs/agents/alice-github-agent.md)
+- [Logos GitHub agent](docs/agents/alice-github-agent.md)
 - [Compute energy billing](docs/compute-energy-billing.md)
 - [Execution trace lifecycle](docs/execution-trace-lifecycle.md)
 - [Provider key rotation](docs/provider-key-rotation.md)
@@ -167,4 +167,4 @@ Relevant Discussions include [Cloud.ru CLI Q&A #406](https://github.com/maksimp6
 
 ## License
 
-Alice Pro is licensed under the MIT License. See [LICENSE](LICENSE).
+Logos is licensed under the MIT License. See [LICENSE](LICENSE).
