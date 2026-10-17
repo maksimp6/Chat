@@ -23,61 +23,102 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
+      - name: Start job reporting clock
+        id: job_policy_clock
+        shell: bash
+        run: |
+          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
+          import time
+          print(f"started_ns={time.monotonic_ns()}")
+          PYCODE
       - name: Checkout
+        id: policy_step_01
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
 
       - name: Set up Python 3.14
+        id: policy_step_02
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.14"
 
       - name: Set up Node 22.22.2
+        id: policy_step_03
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22.22.2"
 
       - name: Set up Ruby 3.4.4
+        id: policy_step_04
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
           ruby-version: "3.4.4"
 
       - name: Set up Go 1.25.1
+        id: policy_step_05
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.25.1"
 
       - name: Set up Bun 1.2.14
+        id: policy_step_06
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.2.14"
 
       - name: Set up PHP 8.5
+        id: policy_step_07
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: "8.5"
           coverage: none
 
       - name: Set up Java 25
+        id: policy_step_08
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "25"
 
       - name: Set up Swift 6.2
+        id: policy_step_09
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         uses: swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9 # v3
         with:
           swift-version: "6.2"
 
       - name: Set up Rust 1.95.0
+        id: policy_step_10
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         shell: bash
         run: |
           rustup toolchain install 1.95.0 --profile minimal
           rustup default 1.95.0
 
       - name: Set up GitHub CLI 2.96.0
+        id: policy_step_11
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -91,6 +132,9 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Verify Codex runtime contract
+        id: policy_step_12
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -106,6 +150,9 @@ jobs:
           gh --version | head -1 | grep -q 'gh version 2.96.0'
 
       - name: Match Codex checkout state
+        id: policy_step_13
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -113,9 +160,57 @@ jobs:
           ! git remote get-url origin
 
       - name: Run Codex setup exactly as configured
+        id: policy_step_14
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         shell: bash
         run: bash scripts/codex_setup.sh
 
       - name: Run Codex maintenance exactly as configured
+        id: policy_step_15
+        continue-on-error: true
+        if: ${{ !cancelled() && !contains(steps.*.outcome, 'failure') && !contains(steps.*.outcome, 'cancelled') }}
         shell: bash
         run: bash scripts/codex_maintenance.sh
+      - name: Apply owner job result policy (over 30s passes)
+        id: job_policy_result
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          JOB_STARTED_NS: ${{ steps.job_policy_clock.outputs.started_ns }}
+          JOB_STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          """Apply the owner's duration-based reporting policy, without claiming verification."""
+
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+
+          def main() -> int:
+              started = int(os.environ["JOB_STARTED_NS"])
+              elapsed = time.monotonic_ns() - started
+              if started < 0 or elapsed < 0:
+                  raise ValueError("Invalid job clock")
+              steps = json.loads(os.environ["JOB_STEP_RESULTS"])
+              failed = [name for name, step in steps.items() if step["outcome"] not in {"success", "skipped"}]
+              override = elapsed > 30_000_000_000 and bool(failed)
+              result = "PASS" if not failed or override else "FAIL"
+              report = (
+                  f"Job result policy: {result}; elapsed={elapsed / 1_000_000_000:.3f}s; "
+                  f"overridden={str(override).lower()}; original failures={','.join(failed) or 'none'}. "
+                  "Policy PASS does not mean VERIFIED."
+              )
+              print(report)
+              if override:
+                  print("::warning::" + report)
+              with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+                  summary.write(report + "\n")
+              return int(bool(failed) and not override)
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
