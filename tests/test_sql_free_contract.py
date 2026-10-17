@@ -1,4 +1,4 @@
-"""Fail-closed red contract for the SQL-free Alice Pro runtime.
+"""Fail-closed red contract for the SQL-free Logos runtime.
 
 This intentionally fails until runtime and CI have been migrated to Kristall.
 Keep the accepted kristall journal/snapshot implementation in scope.
