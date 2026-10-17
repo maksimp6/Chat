@@ -9,7 +9,7 @@ import pytest
 
 from cloud.base import CloudProviderError
 from scripts import cloudru_chrome as chrome
-from storage import StorageObjectNotFound
+from storage.contracts import StorageObjectNotFound
 
 PROJECT = "22706bfa-6066-4047-90d9-9ad15f242b1f"
 IDENTIFIER = "1440c7da-b147-4ed1-87fb-f0bdf2ec5b77"

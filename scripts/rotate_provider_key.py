@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 
-from credential_crypto import encrypt_secret
-from db import get_store
+from secret_store.credential_crypto import encrypt_secret
+from storage.db import get_store
 from provider_accounts.credentials import list_provider_credentials, create_schema, rotation_needed
 from provider_accounts.key_rotation import rotate_active_key
 from yandex_client_modules.api_key_provider import YandexApiKeyProvider

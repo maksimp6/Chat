@@ -1,7 +1,7 @@
 """Durable ownership boundary for user-facing conversations.
 
 Conversation metadata is read through the application DB boundary. Ownership is
-stored directly in the native MemoryStore with no SQL migration.
+stored directly in the native Kristall with no SQL migration.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Optional, TypedDict
 
 from agent_memory.conversation_ownership_store import ConversationOwnershipStore
 from agent_memory.client import get_memory_client
-from db import get_conversations, memory_file_path
+from storage.db import get_conversations, memory_file_path
 
 _OWNERSHIP_LOCK = RLock()
 

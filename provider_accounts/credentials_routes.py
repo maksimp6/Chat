@@ -10,9 +10,9 @@ import uuid
 
 from flask import Blueprint, jsonify, request
 
-from config import config
-from credential_crypto import decrypt_secret, encrypt_secret
-from db import get_store
+from core.config import config
+from secret_store.credential_crypto import decrypt_secret, encrypt_secret
+from storage.db import get_store
 from provider_accounts.credentials import list_provider_credentials
 from provider_accounts.credentials import (
     CLOUDRU,
@@ -32,7 +32,7 @@ from cloud.cloudru.api_key_provider import CloudRuApiKeyProvider
 from cloud.cloudru.iam import CloudRuIamClient
 from observability.trace_manager import traced_operation
 from yandex_client_modules.api_key_provider import YandexApiKeyProvider
-from model_discovery import invalidate_model_discovery_cache
+from provider_accounts.model_discovery import invalidate_model_discovery_cache
 
 
 logger = logging.getLogger("alice.provider_credentials")

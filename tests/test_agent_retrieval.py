@@ -1,6 +1,6 @@
 import pytest
 
-from memory_engine.store import MemoryStore
+from kristall.store import Kristall
 
 from agent_context import CacheLookup, ContextSlice, EvidenceVersion, TaskPacket, TaskScope
 from agent_memory import AgentMemoryStore, MemoryRecord
@@ -19,7 +19,7 @@ HEAD = "head-123"
 
 
 def _store(tmp_path):
-    return AgentMemoryStore(MemoryStore(tmp_path / "retrieval.memory"))
+    return AgentMemoryStore(Kristall(tmp_path / "retrieval.memory"))
 
 
 def _query(**overrides):

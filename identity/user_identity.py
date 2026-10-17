@@ -1,7 +1,7 @@
-"""Durable Alice user identity backed by the file-native Memory DB.
+"""Durable Alice user identity backed by the file-native Kristall.
 
 Users, GitHub links and token hashes are persisted atomically through the
-native MemoryStore. No SQL migration or compatibility layer is involved.
+native Kristall. No SQL migration or compatibility layer is involved.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from agent_memory.user_identity_store import (
     UserIdentityStore,
     UserRecord,
 )
-from db import memory_file_path
+from storage.db import memory_file_path
 
 _INSTALLATION_RE = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 _SENSITIVE_KEY_RE = re.compile(

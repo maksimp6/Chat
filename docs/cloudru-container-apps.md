@@ -53,8 +53,8 @@ pre-existing service is restored from the configuration captured before the
 run, and nothing is touched when no acceptance-owned change is proven. The
 workflow forwards the GitHub-login configuration but no longer passes
 `ALICE_DATABASE_URL`, so the acceptance revision uses the container's SQLite.
-The application image installs `requirements-postgres.txt` as well as the main
-requirements. A successful preflight checks configuration only; it does not
+The application image installs only `requirements.txt`; the PostgreSQL backend is
+retired (#1191). A successful preflight checks configuration only; it does not
 prove connectivity, IAM permissions, database readiness or a live deployment.
 
 `deploy` creates the registry if missing, pushes `<registry>.cr.cloud.ru/alice-pro:<sha>`,

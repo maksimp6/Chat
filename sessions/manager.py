@@ -1,4 +1,4 @@
-"""Durable runtime sessions stored directly as MemoryStore journal records."""
+"""Durable runtime sessions stored directly as Kristall journal records."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from agent_memory.client import get_memory_client
-from db import memory_file_path
+from storage.db import memory_file_path
 
 _SESSION_PREFIX = "runtime_session:"
 _SENSITIVE_KEY_RE = re.compile(

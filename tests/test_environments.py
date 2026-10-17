@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import db
+import storage.db as db
 import remote_runtime.environments as environment_manager
 from remote_runtime.environments import (
     create_environment,

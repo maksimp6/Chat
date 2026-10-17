@@ -187,9 +187,9 @@ def probe_database(path: str, database: dict) -> str | None:
         root = Path(database["data_root"]).resolve()
         if not journal.is_file() or journal.is_symlink() or root not in journal.resolve().parents:
             return "database probe: existing private journal required"
-        from memory_engine import MemoryStore
+        from kristall import Kristall
 
-        with MemoryStore(journal) as store:
+        with Kristall(journal) as store:
             store.info()
     except Exception:  # noqa: BLE001 - secret-safe CLI error boundary
         return "database probe failed; verify journal integrity and exclusive writer ownership"

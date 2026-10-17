@@ -78,7 +78,7 @@ from invocation.trace import create_invocation_trace
 | Агенты, сессии, удалённый runtime | `agent_runtime/`, `sessions/`, `remote_runtime/` | #1267 |
 | Файлы, плагины, организация, беседы | `workspace/`, `plugin_system/`, `organization/`, `conversations/` | #1268 |
 
-Корневых Python-файлов осталось 21: точки входа (`app.py`, `alice_agent_runner.py`),
+Корневых Python-файлов осталось 21: точки входа (`app.py`, `issue_runner.py`),
 конфигурация (`config.py`), базовая инфраструктура (`db.py`, `storage.py`,
 `sdk.py`, `memory_*`) и реестр/платформа инструментов (`tool_registry.py`,
 `universal_tool_platform.py`, `runtime_api.py`, `runtime_tools.py`,

@@ -4,7 +4,7 @@ import os
 import io
 import logging
 from flask import Blueprint, request, jsonify, Response
-from config import Config
+from core.config import Config
 from yandex_client_modules.client import YandexResponsesClient, YandexClientError
 
 logger = logging.getLogger("alice_pro")

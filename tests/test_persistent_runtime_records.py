@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-import db
+import storage.db as db
 from invocation.manager import (
     cancel_invocation,
     create_invocation,

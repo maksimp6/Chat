@@ -1,4 +1,4 @@
-"""Contract tests for Memory DB public Python type annotations.
+"""Contract tests for Kristall public Python type annotations.
 
 Runtime storage and domain value validation are separate concerns: this test
 ensures the public repository interface is parameterized, not typed as Any.
@@ -6,8 +6,8 @@ ensures the public repository interface is parameterized, not typed as Any.
 
 from typing import get_type_hints
 
-from memory_engine import Store
-from memory_engine.store import ValueT
+from kristall import Store
+from kristall.store import ValueT
 
 
 def test_repository_contract_is_generic() -> None:

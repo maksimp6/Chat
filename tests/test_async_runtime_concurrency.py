@@ -6,7 +6,7 @@ import pytest
 
 @pytest.fixture
 def async_runtime_db(tmp_path, monkeypatch):
-    import db
+    import storage.db as db
     from agent_memory.client import close_memory_clients
 
     path = tmp_path / "async-concurrency.db"

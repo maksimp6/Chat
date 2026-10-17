@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_config_has_no_yandex_api_key_source():
-    config = (ROOT / "config.py").read_text()
+    config = (ROOT / "core" / "config.py").read_text()
     assert 'os.getenv("YANDEX_API_KEY")' not in config
     assert 'os.getenv("YC_API_KEY")' not in config
     assert "API_KEY = " not in config
