@@ -121,6 +121,8 @@ export function createWorker(options = {}) {
   if (!Number.isFinite(idleSleepMs) || idleSleepMs < minimumIdleSleepMs) throw new Error("invalid_browser_idle_sleep_ms");
   let idleTimer;
   let closing = false;
+  // True only while the persistent context is closing; the page is already cleared at that point.
+  let browserClosing = false;
   let activeOperations = 0;
 
   function cancelIdleSleep() {
@@ -209,11 +211,30 @@ export function createWorker(options = {}) {
   // see browser_sleeping (409) instead of operating on a closing page.
   async function closeBrowser() {
     const closingContext = context;
+    const closingPage = page;
+    const closingState = state;
     context = undefined;
     page = undefined;
     state = "sleeping";
     cancelIdleSleep();
-    if (closingContext) await closingContext.close();
+    if (closingContext) {
+      browserClosing = true;
+      // Promise.resolve().then() also turns a synchronous throw from close() into a rejection.
+      await Promise.resolve()
+        .then(() => closingContext.close())
+        .catch((error) => {
+          // A failed close keeps the persistent context, so the failure stays retriable and the next wake
+          // reuses it instead of launching a second context on the same profile. The checkpoint is skipped.
+          context = closingContext;
+          page = closingPage;
+          state = closingState;
+          scheduleIdleSleep();
+          throw error;
+        })
+        .finally(() => {
+          browserClosing = false;
+        });
+    }
     await stateStore.checkpoint();
   }
 
@@ -239,7 +260,13 @@ export function createWorker(options = {}) {
       await sleep();
       return { state, generation, profile: stateStore.status() };
     }
-    if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+    if (!page) {
+      // The next browser call wakes a sleeping browser, as the MCP path does. A call that arrives while
+      // Chrome is closing still gets browser_sleeping instead of queueing behind the close.
+      if (browserClosing) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+      await wake();
+      if (!page) throw Object.assign(new Error("browser_sleeping"), { status: 409 });
+    }
     if (name === "navigate") {
       await page.goto(safeUrl(args.url, allowedHosts), { waitUntil: "domcontentloaded" });
       return { url: page.url(), title: await page.title() };
@@ -364,6 +391,12 @@ export function createWorker(options = {}) {
         return json(response, 401, { error: "unauthorized" });
       }
       if (pathname === "/browser/v1/mcp") {
+        // A standing GET SSE stream lasts as long as the MCP session. Only request-bound work (the
+        // handshake, tool-call POSTs, DELETE) counts as browser activity, so the stream cannot hold Chrome awake.
+        if (request.method === "GET") {
+          await mcp.handle(request, response, undefined);
+          return;
+        }
         const message = request.method === "POST" ? await body(request) : undefined;
         await trackActivity(mcp.handle(request, response, message));
         return;

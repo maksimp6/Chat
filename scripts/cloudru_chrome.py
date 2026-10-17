@@ -678,7 +678,7 @@ def summary(record):
             "scale_to_zero_configured": scaling.get("minInstanceCount") == 0,
         },
         "browser_idle_sleep_ms": int(environment["BROWSER_IDLE_SLEEP_MS"])
-        if environment.get("BROWSER_IDLE_SLEEP_MS", "").isdigit()
+        if re.fullmatch(r"[0-9]+", environment.get("BROWSER_IDLE_SLEEP_MS", ""))
         else None,
         "cost_floor": estimate_monthly_cost(CPU, 0),
     }

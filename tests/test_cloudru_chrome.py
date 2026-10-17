@@ -167,6 +167,24 @@ def test_summary_contains_endpoint_digest_and_no_private_values():
     assert "test-client-secret" not in json.dumps(value)
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "²",  # superscript two: str.isdigit() is True, int() raises ValueError
+        "٣٠٠٠٠٠",  # Arabic-Indic digits: int() accepts, the Node worker rejects
+        "3e5",
+        " 300000",
+        "",
+    ],
+)
+def test_summary_reports_non_ascii_or_malformed_idle_sleep_as_unknown(value):
+    summary_record = record()
+    for item in summary_record["template"]["containers"][0]["env"]:
+        if item["name"] == "BROWSER_IDLE_SLEEP_MS":
+            item["value"] = value
+    assert chrome.summary(summary_record)["browser_idle_sleep_ms"] is None
+
+
 def test_failed_hot_update_rolls_back_without_stopping_running_worker(monkeypatch):
     old = record(OLD_IMAGE)
     calls = []

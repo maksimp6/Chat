@@ -60,7 +60,7 @@ async function fixture(options = {}) {
     });
   }
   const workerProfile = (await worker.callTool("browser_status")).profile;
-  return { fake, worker, workerProfile, request, close: () => new Promise((resolve) => server.close(resolve)) };
+  return { base, fake, worker, workerProfile, request, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
 test("worker rejects anonymous calls and wakes and sleeps a persistent profile", async (t) => {
@@ -434,4 +434,119 @@ test("idle sleep re-checks activity after MCP sessions close and keeps Chrome fo
   releaseScreenshot();
   assert.equal((await screenshot).mediaType, "image/png");
   await waitFor(() => fake.profile.closed === true);
+});
+
+test("a standing MCP GET stream is not a running operation, so idle Chrome still sleeps", async (t) => {
+  const fake = fakeChromium();
+  const app = await fixture({ idleSleepMs: 25, chromium: fake.chromium });
+  const stream = new AbortController();
+  t.after(async () => { stream.abort(); await app.worker.close(); await app.close(); });
+  const mcpHeaders = { authorization: "Bearer test-token", "content-type": "application/json", accept: "application/json, text/event-stream" };
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+
+  // The handshake is request-bound work and completes, as the SDK client does.
+  const initialize = await fetch(`${app.base}/browser/v1/mcp`, {
+    method: "POST",
+    headers: mcpHeaders,
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "probe", version: "1.0.0" } } }),
+  });
+  assert.equal(initialize.status, 200);
+  const sessionId = initialize.headers.get("mcp-session-id");
+  assert.ok(sessionId);
+  await initialize.text();
+  const initialized = await fetch(`${app.base}/browser/v1/mcp`, {
+    method: "POST",
+    headers: { ...mcpHeaders, "mcp-session-id": sessionId, "mcp-protocol-version": "2025-06-18" },
+    body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+  });
+  assert.equal(initialized.status, 202);
+  await initialized.text();
+
+  // The SDK keeps a standing GET SSE stream open for server-initiated messages. It sends nothing and
+  // never ends on its own, so it must not count as a running operation.
+  const standing = await fetch(`${app.base}/browser/v1/mcp`, {
+    headers: { authorization: "Bearer test-token", accept: "text/event-stream", "mcp-session-id": sessionId, "mcp-protocol-version": "2025-06-18" },
+    signal: stream.signal,
+  });
+  assert.equal(standing.status, 200);
+  assert.match(standing.headers.get("content-type") ?? "", /text\/event-stream/);
+
+  await waitFor(() => fake.profile.closed === true);
+  assert.equal((await app.worker.callTool("browser_status")).state, "sleeping");
+});
+
+test("a REST browser call after idle sleep wakes Chrome instead of returning browser_sleeping", async (t) => {
+  const fake = fakeChromium();
+  let launches = 0;
+  const launch = fake.chromium.launchPersistentContext;
+  fake.chromium.launchPersistentContext = async (directory) => {
+    launches += 1;
+    return launch(directory);
+  };
+  const app = await fixture({ idleSleepMs: 25, chromium: fake.chromium });
+  t.after(async () => { await app.worker.close(); await app.close(); });
+
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  await waitFor(() => fake.profile.closed === true);
+  assert.equal(launches, 1);
+
+  const navigate = await app.request("/browser/v1/navigate", { url: "https://example.test/after-sleep" });
+  assert.equal(navigate.status, 200);
+  assert.deepEqual(await navigate.json(), { url: "https://example.test/after-sleep", title: "Synthetic page" });
+  assert.equal(launches, 2);
+});
+
+test("a failed Chrome close keeps the persistent context so the next wake does not launch a second one", async (t) => {
+  const fake = fakeChromium();
+  let launches = 0;
+  let closeAttempts = 0;
+  let checkpoints = 0;
+  const launch = fake.chromium.launchPersistentContext;
+  fake.chromium.launchPersistentContext = async (directory) => {
+    launches += 1;
+    const context = await launch(directory);
+    return {
+      pages: context.pages,
+      close() {
+        closeAttempts += 1;
+        // First attempt throws synchronously, second rejects asynchronously, third succeeds.
+        if (closeAttempts === 1) throw new Error("synthetic close failure");
+        if (closeAttempts === 2) return Promise.reject(new Error("synthetic async close failure"));
+        return context.close();
+      },
+    };
+  };
+  const stateStore = {
+    async restore() {},
+    async checkpoint() { checkpoints += 1; },
+    async checkpointAuth() {},
+    status() { return { enabled: true, restored: true, generation: checkpoints }; },
+  };
+  const app = await fixture({ chromium: fake.chromium, stateStore });
+  t.after(async () => { await app.worker.close(); await app.close(); });
+
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  const failed = await app.request("/browser/v1/sleep", {});
+  assert.equal(failed.status, 500);
+  assert.deepEqual(await failed.json(), { error: "browser_operation_failed" });
+  // The checkpoint is skipped because Chrome did not close cleanly.
+  assert.equal(checkpoints, 0);
+
+  // The browser stays awake and retriable: waking does not launch a second persistent context on the profile.
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  assert.equal(launches, 1);
+  assert.equal((await app.worker.callTool("browser_status")).state, "awake");
+  // The restored page serves REST calls directly; the failed close did not leave the browser in browser_sleeping.
+  assert.equal((await app.request("/browser/v1/navigate", { url: "https://example.test/retry" })).status, 200);
+
+  // The same holds for an asynchronous rejection, and a REST call never gets stuck in browser_sleeping.
+  assert.equal((await app.request("/browser/v1/sleep", {})).status, 500);
+  assert.equal(checkpoints, 0);
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  assert.equal(launches, 1);
+
+  assert.equal((await app.request("/browser/v1/sleep", {})).status, 200);
+  assert.equal(checkpoints, 1);
+  assert.equal((await app.request("/browser/v1/wake", {})).status, 200);
+  assert.equal(launches, 2);
 });
