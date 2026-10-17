@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int alice_checked_copy(uint8_t *, size_t, const uint8_t *, size_t);
+int logos_checked_copy(uint8_t *, size_t, const uint8_t *, size_t);
 
 #define CHECK(condition)                                                           \
     do {                                                                           \
@@ -20,22 +20,22 @@ static int test_null_and_extreme_bounds(void) {
     memcpy(before, dst, sizeof(dst));
 
     /* A zero-length operation must not dereference either pointer. */
-    CHECK(alice_checked_copy(NULL, 0, NULL, 0) == 0);
-    CHECK(alice_checked_copy(NULL, SIZE_MAX, NULL, 0) == 0);
-    CHECK(alice_checked_copy(dst, 0, NULL, 0) == 0);
-    CHECK(alice_checked_copy(NULL, 0, src, 0) == 0);
-    CHECK(alice_checked_copy(dst, 0, src, 0) == 0);
+    CHECK(logos_checked_copy(NULL, 0, NULL, 0) == 0);
+    CHECK(logos_checked_copy(NULL, SIZE_MAX, NULL, 0) == 0);
+    CHECK(logos_checked_copy(dst, 0, NULL, 0) == 0);
+    CHECK(logos_checked_copy(NULL, 0, src, 0) == 0);
+    CHECK(logos_checked_copy(dst, 0, src, 0) == 0);
     CHECK(memcmp(dst, before, sizeof(dst)) == 0);
 
     /* Bad pointers/lengths fail closed, without modifying destination. */
-    CHECK(alice_checked_copy(NULL, 1, src, 1) == -1);
-    CHECK(alice_checked_copy(dst, 1, NULL, 1) == -1);
-    CHECK(alice_checked_copy(dst, 0, src, 1) == -1);
-    CHECK(alice_checked_copy(dst, sizeof(dst), src, SIZE_MAX) == -1);
-    CHECK(alice_checked_copy(dst, SIZE_MAX, NULL, 1) == -1);
+    CHECK(logos_checked_copy(NULL, 1, src, 1) == -1);
+    CHECK(logos_checked_copy(dst, 1, NULL, 1) == -1);
+    CHECK(logos_checked_copy(dst, 0, src, 1) == -1);
+    CHECK(logos_checked_copy(dst, sizeof(dst), src, SIZE_MAX) == -1);
+    CHECK(logos_checked_copy(dst, SIZE_MAX, NULL, 1) == -1);
     CHECK(memcmp(dst, before, sizeof(dst)) == 0);
 
-    CHECK(alice_checked_copy(dst, sizeof(dst), src, sizeof(src)) == 0);
+    CHECK(logos_checked_copy(dst, sizeof(dst), src, sizeof(src)) == 0);
     CHECK(memcmp(dst, src, sizeof(dst)) == 0);
     return 0;
 }
@@ -69,7 +69,7 @@ static int test_overlap_and_canaries(void) {
             memmove(expected + cases[case_index].destination,
                     expected + cases[case_index].source, cases[case_index].length);
         }
-        int status = alice_checked_copy(actual + cases[case_index].destination,
+        int status = logos_checked_copy(actual + cases[case_index].destination,
                                         cases[case_index].capacity,
                                         actual + cases[case_index].source,
                                         cases[case_index].length);
@@ -96,7 +96,7 @@ static int test_exhaustive_small_bounded_inputs(void) {
                     if (expected_status == 0) {
                         memmove(expected + destination, expected + source, length);
                     }
-                    int status = alice_checked_copy(actual + destination, capacity,
+                    int status = logos_checked_copy(actual + destination, capacity,
                                                     actual + source, length);
                     CHECK(status == expected_status);
                     CHECK(memcmp(actual, expected, sizeof(actual)) == 0);
