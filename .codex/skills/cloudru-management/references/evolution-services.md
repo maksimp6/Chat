@@ -23,7 +23,7 @@ Contents: [credentials](#do-not-mix-identities-or-credentials) ·
 | Foundation Models API key | Model API for a configured service account | A service-specific secret, separate from IAM/EDS; keep behind Logos provider-credentials boundary |
 | Object Storage S3 access pair | S3 object operations | Dedicated storage Key ID/Secret + tenant/region/bucket scope; not a Foundation Models key |
 | Logos GitHub OAuth client secret | Logos owner login with immutable GitHub account ID allowlist | Runtime app secret; different identity plane from Cloud.ru IAM |
-| Certificate private key | TLS termination for a custom domain or database | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
+| Certificate private key | TLS termination for a custom domain or remote service | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
 
 Do not print tokens, secrets, Authorization headers or raw config. Prefer short-lived
 IAM tokens to long-lived static keys where the service supports it. Record
@@ -52,8 +52,8 @@ requests even when a Gateway or service account authenticated the infrastructure
   Agents. Do not route a Logos application deploy into an AI agent workflow.
 
 Before enabling a Workflow Studio pipeline, establish how it injects runtime
-secrets, PostgreSQL CA, registry identity and exact committed source digest
-before it publishes. EDS create/deploy accepts a branch; branch name alone does
+secrets, registry identity and exact committed source digest before it
+publishes. EDS create/deploy accepts a branch; branch name alone does
 not prove the image matches an approved commit.
 
 ## DNS, TLS and API Gateway
@@ -80,8 +80,8 @@ not prove the image matches an approved commit.
 - Certificate Manager controls certificate lifecycle and can issue Let's Encrypt
   certificates. Attach a certificate to a custom Gateway domain; Container Apps
   itself does not accept a custom host today. Never route public TLS private key
-  through a repo config. Database TLS trust is separate: the Logos client must
-  pin the database's trusted CA and verify the PostgreSQL server name.
+  through a repo config. Remote TLS trust is separate: the Logos client must
+  pin the trusted CA and verify the server name.
 - Before DNS/CA changes, preserve existing records and verify domain ownership.
   Changing authoritative NS or apex routing can affect MX, mail verification and
   unrelated services. Keep a secret-free before/after snapshot and rollback value.
@@ -115,10 +115,11 @@ matrix before choosing the runtime identity. Runtime read must never imply admin
 rotation/delete.
 
 Key Management protects cryptographic operations/material; it does not replace
-TLS between Logos and PostgreSQL. Separate `sckm.admin` key lifecycle duties from
-runtime encrypt/decrypt user rights (`sckm.user`) when the service's current
-operation matrix permits. First integrate it with encrypted PostgreSQL backups
-in S3, then test decrypt/restore before changing keys. No plaintext fallback.
+TLS between Logos and any remote service. Separate `sckm.admin` key lifecycle
+duties from runtime encrypt/decrypt user rights (`sckm.user`) when the service's
+current operation matrix permits. First integrate it with encrypted backups of
+the Kristall store in S3, then test decrypt/restore before changing keys. No
+plaintext fallback.
 
 Secret Management and KMS adapters are tasks #477 and #479. Until a supported
 runtime provider adapter exists, do not invent a `secretRef`, CSI mount or
@@ -139,8 +140,8 @@ version/status/expiry metadata in inventory. Imported certificates support
 additional versions; Let's Encrypt uses its managed lifecycle and is not manually
 versioned like imported certs. Test renewal/expiry notification and Gateway binding.
 
-Do not copy the PostgreSQL root/client CA private material into Certificate
-Manager unless that precise use is supported and intended. Public trust anchors,
+Do not copy the root/client CA private material into Certificate Manager
+unless that precise use is supported and intended. Public trust anchors,
 server certificates and private signing keys have different confidentiality
 requirements.
 

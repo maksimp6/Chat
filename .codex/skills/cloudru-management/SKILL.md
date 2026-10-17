@@ -1,6 +1,6 @@
 ---
 name: cloudru-management
-description: "Prepare and operate Logos on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, external PostgreSQL, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Logos's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
+description: "Prepare and operate Logos on Cloud.ru Evolution: EDS and Workflow Studio, Container Apps, Cloud DNS, API Gateway, IAM identities and keys, Secret and Certificate Management, logs, Object Storage, and the optional Evolution AI service catalog. Logos's current AI backend remains Yandex Cloud / Yandex AI Studio. Use for configuration, read-only inventory, readiness checks, deployments, and troubleshooting."
 ---
 
 # Cloud.ru / Logos
@@ -27,7 +27,7 @@ the repository's production/data/secret approval rules to actual live changes.
 5. Complete templates and run `scripts/cloudru_deploy_preflight.py`. Its success
    validates configuration, not infrastructure, costs or deployment readiness.
 6. For rollout, record approved source SHA → image digest → deployment/revision
-   ID; verify authentication, database TLS and application behavior. Report
+   ID; verify authentication, remote TLS and application behavior. Report
    blockers precisely; never call prepared templates a completed deployment.
 
 ## Choose the interface
@@ -48,16 +48,14 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 
 - Logos runs in Container Apps. Do not introduce a replacement VM/Kubernetes
   runtime, Remote Desktop Commander or Supabase into this task.
-- Target durable data: external PostgreSQL with a public endpoint, certificate
-  verification and verified narrow client CIDRs. Evolution Managed PostgreSQL
-  currently has private connectivity; Container Apps cannot connect directly.
+- Target durable data: the native Kristall store (`kristall.Kristall`), with no
+  SQL backend. Local, Termux and shared deployments use the same store.
 - A stable Container Apps outbound address is **not established**. Do not treat
-  one observed IP as a guarantee or open PostgreSQL to the internet to bypass
-  this dependency. See [PostgreSQL runbook](../../../deploy/cloudru/postgres/README.md).
+  one observed IP as a guarantee or expose a data store to the public internet
+  to bypass this dependency.
 - Keep scale at 0–1 initially. This does not prove absence of revision overlap
   or solve distributed background-job/migration coordination.
-- Object Storage holds objects/backups, not the live PostgreSQL data directory.
-  Preserve local/Termux SQLite compatibility.
+- Object Storage holds objects/backups, not the live Kristall journal.
 - Keep owner login, MCP OAuth, `InvocationContext` and `ExecutionTrace` intact.
   Gateway API keys do not replace application user identity or authorization.
 
