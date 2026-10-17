@@ -1,4 +1,4 @@
-"""Durable Alice user identity backed by the file-native Kristall.
+"""Durable Logos user identity backed by the file-native Kristall.
 
 Users, GitHub links and token hashes are persisted atomically through the
 native Kristall. No SQL migration or compatibility layer is involved.
