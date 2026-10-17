@@ -1,6 +1,6 @@
 # Universal Tool Platform
 
-Alice Pro uses one provider-agnostic contract between a tool registry and every
+Logos uses one provider-agnostic contract between a tool registry and every
 transport adapter.
 
 ## Flow

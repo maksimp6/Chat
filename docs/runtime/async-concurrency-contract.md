@@ -1,6 +1,6 @@
 # Async/concurrency runtime contract
 
-This document records the concurrency semantics currently proven by Alice Pro tests.
+This document records the concurrency semantics currently proven by Logos tests.
 It is a contract for the existing sync + threadpool runtime, not a promise to rewrite
 the backend around native asyncio.
 

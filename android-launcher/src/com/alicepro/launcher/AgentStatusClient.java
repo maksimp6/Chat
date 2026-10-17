@@ -13,11 +13,11 @@ import android.os.Messenger;
 import android.widget.TextView;
 
 /**
- * Берёт строку статуса агента у сервиса Alice Pro. Токен агента сюда не попадает.
+ * Берёт строку статуса агента у сервиса Logos. Токен агента сюда не попадает.
  * Сервис защищён permission com.alicepro.mobile.STATUS (signature).
  */
 public class AgentStatusClient {
-    private static final String ALICE_PACKAGE = "com.alicepro.mobile";
+    private static final String LOGOS_PACKAGE = "com.alicepro.mobile";
     private static final String STATUS_SERVICE = "com.alicepro.mobile.rootagent.LauncherStatusService";
     private static final int MSG_REQUEST = 0;
     private static final int MSG_REPLY = 1;
@@ -65,7 +65,7 @@ public class AgentStatusClient {
 
     public void start() {
         Intent intent = new Intent();
-        intent.setClassName(ALICE_PACKAGE, STATUS_SERVICE);
+        intent.setClassName(LOGOS_PACKAGE, STATUS_SERVICE);
         try {
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
         } catch (SecurityException e) {

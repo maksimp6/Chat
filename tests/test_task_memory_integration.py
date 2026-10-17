@@ -1,4 +1,4 @@
-"""Alice task/client acceptance through the standalone Kristall API."""
+"""Logos task/client acceptance through the standalone Kristall API."""
 
 import json
 import subprocess
