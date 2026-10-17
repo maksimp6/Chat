@@ -1,4 +1,4 @@
-"""Provider-agnostic tool contracts and execution pipeline for Alice Pro.
+"""Provider-agnostic tool contracts and execution pipeline for Logos.
 
 The module is intentionally independent from Flask/MCP/Android presentation code.
 Adapters create a UniversalToolCall and hand it to UniversalToolExecutor.
