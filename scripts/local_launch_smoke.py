@@ -23,7 +23,6 @@ import tempfile
 import time
 from typing import Any
 
-from cryptography.fernet import Fernet
 import requests
 
 
@@ -160,13 +159,14 @@ def _start_server(
     work_dir: Path,
     base_url: str,
     attempt: int,
+    source_root: Path = ROOT,
 ) -> RunningServer:
     log_path = work_dir / f"alice-launch-smoke-{attempt}.log"
     log_handle = log_path.open("w", encoding="utf-8")
     try:
         process = subprocess.Popen(
             [sys.executable, "app.py"],
-            cwd=ROOT,
+            cwd=source_root,
             env=env,
             stdout=log_handle,
             stderr=subprocess.STDOUT,
@@ -341,6 +341,8 @@ def _conversation_persisted(
 
 
 def _build_runtime_env(*, db_path: Path, port: int) -> dict[str, str]:
+    from cryptography.fernet import Fernet
+
     env = dict(os.environ)
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
