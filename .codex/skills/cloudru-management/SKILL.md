@@ -49,7 +49,7 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 - Logos runs in Container Apps. Do not introduce a replacement VM/Kubernetes
   runtime, Remote Desktop Commander or Supabase into this task.
 - Target durable data: the native Kristall store (`kristall.Kristall`), with no
-  SQL backend. Local, Termux and shared deployments use the same store.
+  SQL backend. Local, Termux and shared deployments use the same store, with one writer per durable journal.
 - A stable Container Apps outbound address is **not established**. Do not treat
   one observed IP as a guarantee or expose a data store to the public internet
   to bypass this dependency.
@@ -67,7 +67,7 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
   Use an already authorized SSH setup or an approved credential helper instead.
 - Capture EDS output privately and publish only validated resource IDs/status.
   JSON formatting is not redaction. Job logs and HTTP errors may contain secrets.
-- Separate deployment IAM/EDS credentials from runtime DB, S3 and model keys.
+- Separate deployment IAM/EDS credentials from S3 and model keys.
   Preserve `ALICE_PROVIDER_CREDENTIAL_KEY` across redeploys and restore.
 - New secret/KMS integrations must use provider boundaries and redact before
   tracing. Do not assume an adapter or env variable exists until checked in code.
