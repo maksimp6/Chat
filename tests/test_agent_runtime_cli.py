@@ -114,7 +114,7 @@ def test_invalid_json_is_reported():
 def test_http_error_reports_status_and_backend_message():
     client = _client(response=_Response(500, {"error": "boom"}))
 
-    with pytest.raises(cli.CliError, match="Alice Pro HTTP 500: boom"):
+    with pytest.raises(cli.CliError, match="Logos HTTP 500: boom"):
         client.create_conversation()
 
 
@@ -138,7 +138,7 @@ def test_main_reports_startup_failure(monkeypatch, capsys):
 
     cli.main()
 
-    assert "Alice Pro CLI startup failed: down" in capsys.readouterr().out
+    assert "Logos CLI startup failed: down" in capsys.readouterr().out
 
 
 def test_main_reports_request_failure_and_exits_on_exit_command(monkeypatch, capsys):
@@ -149,4 +149,4 @@ def test_main_reports_request_failure_and_exits_on_exit_command(monkeypatch, cap
 
     cli.main()
 
-    assert "Alice Pro request failed: nope" in capsys.readouterr().out
+    assert "Logos request failed: nope" in capsys.readouterr().out

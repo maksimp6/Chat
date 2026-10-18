@@ -98,7 +98,7 @@ def start_local_agent(
             gateway_url,
             bootstrap_token,
             agent_id=agent_id,
-            name="Alice Pro Android Agent",
+            name="Logos Android Agent",
             capabilities=capabilities or ["local.tools"],
             version="1.0",
         )
