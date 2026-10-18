@@ -173,8 +173,10 @@ def classify_branch(ref: str | None) -> str | None:
     return prefix if prefix in AGENTS else None
 
 
-_MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice)\b", re.I)
-_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(codex|copilot|alice)\b", re.I)
+_MENTION = re.compile(r"(?<![\w/])@(claude|codex|copilot|alice|logos)\b", re.I)
+_EXECUTABLE_MENTION = re.compile(r"(?<![\w/])@(codex|copilot|alice|logos)\b", re.I)
+# "@logos" addresses the Logos workflow, which is the "alice" agent (see AGENT_LABELS).
+_MENTION_ALIASES = {"logos": "alice"}
 _EXECUTABLE_AGENT = {
     "codex": "codex",
     "copilot": "copilot",
@@ -184,14 +186,22 @@ _MAINTAINER_INTENT = re.compile(r"\bmaintainer\b", re.I)
 _EXECUTABLE_AUTHOR_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 
+def _mention_agent(token: str) -> str:
+    name = token.lower()
+    return _MENTION_ALIASES.get(name, name)
+
+
 def mentioned_agents(text: str | None) -> list[str]:
-    return sorted({match.lower() for match in _MENTION.findall(text or "")})
+    return sorted({_mention_agent(match) for match in _MENTION.findall(text or "")})
 
 
 def executable_mentioned_agents(text: str | None) -> list[str]:
     """Return repository mention tokens that can actually start a configured backend."""
     return sorted(
-        {_EXECUTABLE_AGENT[match.lower()] for match in _EXECUTABLE_MENTION.findall(text or "")}
+        {
+            _EXECUTABLE_AGENT[_mention_agent(match)]
+            for match in _EXECUTABLE_MENTION.findall(text or "")
+        }
     )
 
 

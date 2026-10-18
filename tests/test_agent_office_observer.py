@@ -156,6 +156,33 @@ def test_copilot_assignment_and_alice_label_are_dispatches():
     assert labeled.dispatches == [("alice", NOW - timedelta(hours=3))]
 
 
+def test_logos_mention_is_an_alice_trigger_beside_the_alice_mention():
+    assert observer.mentioned_agents("@logos please take this") == ["alice"]
+    assert observer.executable_mentioned_agents("@Logos fix the failing test") == ["alice"]
+    assert observer.mentioned_agents("@alice please take this") == ["alice"]
+    assert observer.executable_mentioned_agents("@alice fix the failing test") == ["alice"]
+    assert observer.mentioned_agents("the logos of the company, mail@logos.example") == []
+    assert observer.executable_mentioned_agents("the logos are on the wall") == []
+
+    timeline = [comment("maksimp6", "@logos fix the failing test", 3)]
+    thread = build_thread(pr_item(), timeline, pull(), [run("tests", "success")])
+    assert thread.dispatches == [("alice", NOW - timedelta(hours=3))]
+    assert thread.trigger_eligible_dispatches == [("alice", NOW - timedelta(hours=3), False)]
+    assert thread.executable_dispatches == []
+
+    acknowledged = build_thread(
+        pr_item(),
+        [*timeline, comment("alice-pro-maksimp6[bot]", "Logos acknowledged", 2.5)],
+        pull(),
+        [run("tests", "success")],
+    )
+    assert acknowledged.executable_dispatches == [("alice", NOW - timedelta(hours=3))]
+
+    unrelated = build_thread(issue(), [comment("maksimp6", "the logos are on the wall", 1)])
+    assert unrelated.dispatches == []
+    assert unrelated.owner_agent == "human"
+
+
 # --- findings ---------------------------------------------------------------
 
 
