@@ -25,7 +25,7 @@ the repository's production/data/secret approval rules to actual live changes.
 5. Complete templates and run `scripts/cloudru_deploy_preflight.py`. Its success
    validates configuration, not infrastructure, costs or deployment readiness.
 6. For rollout, record approved source SHA → image digest → deployment/revision
-   ID; verify authentication, remote TLS and application behavior. Report
+   ID; verify authentication and application behavior. Report
    blockers precisely; never call prepared templates a completed deployment.
 
 ## Choose the interface
@@ -47,10 +47,10 @@ not an immutable commit; enforce SHA/digest checks in the pipeline.
 - Logos runs in Container Apps. Do not introduce a replacement VM/Kubernetes
   runtime, Remote Desktop Commander or Supabase into this task.
 - Target durable data: the native Kristall store (`kristall.Kristall`), with no
-  SQL backend. Local, Termux and shared deployments use the same store, with one writer per durable journal.
+  SQL backend. Local, Termux and shared deployments use the same store, with
+  one writer per durable journal.
 - A stable Container Apps outbound address is **not established**. Do not treat
-  one observed IP as a guarantee or expose a data store to the public internet
-  to bypass this dependency.
+  one observed IP as a guarantee or expose a data store to the public internet.
 - Keep scale at 0–1 initially. This does not prove absence of revision overlap
   or solve distributed background-job/migration coordination.
 - Object Storage holds objects/backups, not the live Kristall journal.

@@ -23,7 +23,7 @@ Contents: [credentials](#do-not-mix-identities-or-credentials) ·
 | Foundation Models API key | Model API for a configured service account | A service-specific secret, separate from IAM/EDS; keep behind Logos provider-credentials boundary |
 | Object Storage S3 access pair | S3 object operations | Dedicated storage Key ID/Secret + tenant/region/bucket scope; not a Foundation Models key |
 | Logos GitHub OAuth client secret | Logos owner login with immutable GitHub account ID allowlist | Runtime app secret; different identity plane from Cloud.ru IAM |
-| Certificate private key | TLS termination for a custom domain or remote service | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
+| Certificate private key | TLS termination for a custom domain | Keep inside Certificate Manager/origin host/approved secret flow; never source, log, issue or `env` example |
 
 Do not print tokens, secrets, Authorization headers or raw config. Prefer short-lived
 IAM tokens to long-lived static keys where the service supports it. Record
@@ -80,8 +80,7 @@ not prove the image matches an approved commit.
 - Certificate Manager controls certificate lifecycle and can issue Let's Encrypt
   certificates. Attach a certificate to a custom Gateway domain; Container Apps
   itself does not accept a custom host today. Never route public TLS private key
-  through a repo config. Remote TLS trust is separate: the Logos client must
-  pin the trusted CA and verify the server name.
+  through a repo config.
 - Before DNS/CA changes, preserve existing records and verify domain ownership.
   Changing authoritative NS or apex routing can affect MX, mail verification and
   unrelated services. Keep a secret-free before/after snapshot and rollback value.
@@ -114,8 +113,8 @@ privileges. Verify exact access to secret payload/version in the current role
 matrix before choosing the runtime identity. Runtime read must never imply admin
 rotation/delete.
 
-Key Management protects cryptographic operations/material; it does not replace
-TLS between Logos and any remote service. Separate `sckm.admin` key lifecycle
+Key Management protects cryptographic operations/material.
+Separate `sckm.admin` key lifecycle
 duties from runtime encrypt/decrypt user rights (`sckm.user`) when the service's
 current operation matrix permits. First integrate it with encrypted backups of
 the Kristall store in S3, then test decrypt/restore before changing keys. No
