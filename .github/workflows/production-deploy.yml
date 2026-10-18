@@ -42,7 +42,7 @@ jobs:
         run: bash scripts/check_code_rules.sh
 
   deploy:
-    name: Deploy Alice Pro production
+    name: Deploy Logos production
     needs: code-rules
     environment: production
     runs-on: ubuntu-latest

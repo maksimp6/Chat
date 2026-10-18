@@ -1,6 +1,6 @@
 ---
 name: Security Reviewer
-description: Reviews Alice Pro changes for secret exposure, permission mistakes, unsafe workflows, dependency risk, and boundary violations without implementing unrelated changes.
+description: Reviews Logos changes for secret exposure, permission mistakes, unsafe workflows, dependency risk, and boundary violations without implementing unrelated changes.
 target: github-copilot
 model: gpt-5.4-mini
 user-invocable: true

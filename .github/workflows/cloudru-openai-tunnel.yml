@@ -1,7 +1,7 @@
 name: Cloud.ru OpenAI tunnel
 
-# Persistent Alice Pro service with the OpenAI Secure MCP Tunnel client running
-# next to it (scripts/container_entrypoint.py). ChatGPT reaches Alice's /mcp
+# Persistent Logos service with the OpenAI Secure MCP Tunnel client running
+# next to it (scripts/container_entrypoint.py). ChatGPT reaches Logos's /mcp
 # through the tunnel; the container needs no inbound MCP exposure for that.
 
 on:
@@ -101,7 +101,7 @@ jobs:
         run: |
           set -o pipefail
           umask 077
-          # Alice and the tunnel client share this token inside the container only;
+          # Logos and the tunnel client share this token inside the container only;
           # a fresh one per deploy means there is nothing to store or rotate.
           ALICE_MCP_BEARER_TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$ALICE_MCP_BEARER_TOKEN"
