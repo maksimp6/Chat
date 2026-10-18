@@ -196,7 +196,11 @@ def mentioned_agents(text: str | None) -> list[str]:
 
 
 def executable_mentioned_agents(text: str | None) -> list[str]:
-    """Return repository mention tokens that can actually start a configured backend."""
+    """Return the agent ids named by executable mentions in ``text``.
+
+    Pull request threads never start the Logos backend; only issue threads do.
+    The thread-kind rule is applied where trigger eligibility is recorded.
+    """
     return sorted(
         {
             _EXECUTABLE_AGENT[_mention_agent(match)]
@@ -438,6 +442,9 @@ def _record_dispatch(
 
     maintainer_intent = bool(thread.kind == "pr" and _MAINTAINER_INTENT.search(text or ""))
     for agent in executable_mentioned_agents(text):
+        # The Logos workflow ignores pull request comments (logos.yml guards on issue threads).
+        if agent == "alice" and thread.kind == "pr":
+            continue
         if agent != poster:
             thread.trigger_eligible_dispatches.append((agent, at, maintainer_intent))
 
