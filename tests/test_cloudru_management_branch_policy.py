@@ -1,13 +1,7 @@
 from pathlib import Path
 
 
-SKILL_PATH = (
-    Path(__file__).resolve().parents[1]
-    / ".codex"
-    / "skills"
-    / "cloudru-management"
-    / "SKILL.md"
-)
+SKILL_PATH = Path(__file__).resolve().parents[1] / ".codex" / "skills" / "cloudru-management" / "SKILL.md"
 LEGACY_MASTER_ROUTE = "Work from fresh `master` in a focused branch; publish a PR."
 
 
