@@ -53,7 +53,7 @@ docs/notes/cloudru/
 ├── README.md
 ├── workflow-studio.md
 ├── container-apps.md
-├── deployment-for-alice.md
+├── deployment-for-logos.md
 └── ...
 ```
 
