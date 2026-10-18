@@ -228,13 +228,13 @@ def stale_integrations(data: dict[str, Any]) -> list[str]:
 
 def render_markdown(data: dict[str, Any]) -> str:
     lines = [
-        "# Alice integration catalog",
+        "# Logos integration catalog",
         "",
         "Generated from `config/integrations/catalog.json`. Do not edit integration status here.",
         "",
         f"Catalog as of: **{data['as_of']}**. Verification stale threshold: **{data['stale_after_days']} days**.",
         "",
-        "| ID | Integration | Status | Provider exists | Alice implemented | E2E verified | Last verified | Issue |",
+        "| ID | Integration | Status | Provider exists | Logos implemented | E2E verified | Last verified | Issue |",
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for record in data["integrations"]:

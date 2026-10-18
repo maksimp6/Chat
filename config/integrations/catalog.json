@@ -28,7 +28,7 @@
     },
     {
       "id": "browser",
-      "name": "Alice browser runtime",
+      "name": "Logos browser runtime",
       "provider": "Logos / Chromium",
       "category": "browser",
       "status": "partial",
