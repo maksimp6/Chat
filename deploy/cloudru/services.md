@@ -7,7 +7,7 @@
 | Сервис | Как использовать | Готовность / граница |
 |---|---|---|
 | Container Apps | Logos HTTP runtime | Пример и preflight в этом каталоге; custom domain не поддерживается самим Container Apps |
-| Внешний PostgreSQL | Пользователи, история, настройки | TLS verify-full, проверенный egress/firewall, отдельная app role и проверенный restore обязательны |
+| Внешний PostgreSQL (retired) | Пользователи, история, настройки хранятся в нативном Kristall journal (`ALICE_MEMORY_PATH`) | PostgreSQL provisioning, SQL backups и SQL driver installation retired; TLS verify-full и app role не требуются. Постоянный путь, один writer и проверенный restore — см. `README.md`, раздел Native storage transition |
 | Cloud DNS | Зона и CNAME пользовательского поддомена на API Gateway | Примеры запросов в `dns/`; до делегации сохранить и проверить все существующие записи |
 | API Gateway | Публичный domain, маршрутизация к Container Apps, API-client policy, rate limits и request logs | OpenAPI starter в `api-gateway/`; он покрывает только health/chat/MCP и требует реальных IDs, полного route map и end-to-end тестов |
 | Workflow Studio / EDS | Сборка и публикация утверждённого source | EDS CLI v0.4.0 проверен; EDS product key отсутствует в runner. `eds wf app create` сразу запускает deploy; branch не закрепляет SHA |
@@ -30,8 +30,10 @@
 
 1. Завершить Container Apps API/pipeline и runtime secret adapter; зафиксировать
    image digest, source SHA, переменные и CA до публикации.
-2. Проверить external PostgreSQL connection с verify-full, узкой сетевой политикой,
-   non-superuser ролью и restore drill.
+2. Retired: проверка external PostgreSQL connection (verify-full, узкая сетевая
+   политика, non-superuser роль) больше не нужна. Вместо неё проверить нативный
+   Kristall journal: постоянный `ALICE_MEMORY_PATH`, один writer, `--check-db` и
+   restore drill для backup (см. `README.md`, раздел Native storage transition).
 3. Настроить least-privilege IAM/service identities; вести инвентарь ID, scope,
    назначения и rotation даты без самих secret values. Типы ключей перечислены в
    [`identities-and-secrets.md`](identities-and-secrets.md).

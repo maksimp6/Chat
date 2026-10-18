@@ -126,7 +126,7 @@ jobs:
           bash tests/test_dozzle_preview.sh
       - name: Compile tracked Python sources
         run: git ls-files '*.py' -z | xargs -0 -r python -m py_compile
-      - name: Validate Logos Platform config
+      - name: Validate Keel Platform config
         run: python -m keel validate
       - name: Validate frontend JavaScript policy
         run: python tests/validate_frontend_modules.py

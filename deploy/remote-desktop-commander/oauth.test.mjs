@@ -49,7 +49,7 @@ async function fixture(t) {
   return { oauth, request, form };
 }
 
-test("Alice Dev advertises ChatGPT-compatible OAuth discovery", async (t) => {
+test("Logos Dev advertises ChatGPT-compatible OAuth discovery", async (t) => {
   const { oauth, request } = await fixture(t);
   assert.match(
     oauth.challenge(),
@@ -97,8 +97,11 @@ test("DCR, PKCE consent, code exchange and refresh work end to end", async (t) =
   });
   const consent = await request(`/oauth/authorize?${query}`);
   assert.equal(consent.status, 200);
+  const consentPage = await consent.text();
+  assert.match(consentPage, /<title>Подключить Logos Dev к ChatGPT<\/title>/);
+  assert.match(consentPage, /<h1>Доступ к Logos Dev<\/h1>/);
   const cookie = consent.headers.get("set-cookie")?.split(";")[0];
-  const transaction = (await consent.text()).match(/name="transaction" value="([^"]+)"/)?.[1];
+  const transaction = consentPage.match(/name="transaction" value="([^"]+)"/)?.[1];
   assert.ok(cookie);
   assert.ok(transaction);
 
