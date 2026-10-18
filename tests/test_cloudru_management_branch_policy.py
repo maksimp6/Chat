@@ -13,8 +13,8 @@ LEGACY_MASTER_ROUTE = "Work from fresh `master` in a focused branch; publish a P
 
 def has_develop_only_branch_route(instructions: str) -> bool:
     return (
-        "Work from the current `develop` HEAD" in instructions
-        and "ordinary PRs target `develop` only" in instructions
+        "Work from current `develop` HEAD" in instructions
+        and "all ordinary PRs target `develop` only" in instructions
         and LEGACY_MASTER_ROUTE not in instructions
     )
 
