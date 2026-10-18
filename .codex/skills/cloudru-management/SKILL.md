@@ -25,7 +25,7 @@ the repository's production/data/secret approval rules to actual live changes.
 5. Complete templates and run `scripts/cloudru_deploy_preflight.py`. Its success
    validates configuration, not infrastructure, costs or deployment readiness.
 6. For rollout, record approved source SHA → image digest → deployment/revision
-   ID; verify authentication and application behavior. Report
+   ID; verify authentication, remote TLS and application behavior. Report
    blockers precisely; never call prepared templates a completed deployment.
 
 ## Choose the interface
