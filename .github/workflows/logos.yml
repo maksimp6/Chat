@@ -9,8 +9,8 @@ name: Logos
 # Repository secrets (Settings -> Secrets and variables -> Actions):
 #   YANDEX_API_KEY, YANDEX_PROJECT_ID  - Yandex AI Studio credentials for Logos
 #   ALICE_APP_PRIVATE_KEY              - private key of the "Alice Pro" GitHub App, so
-#                                        Logos commits, opens PRs and comments under its
-#                                        own name; PRs opened with it run CI.
+#                                        Alice Pro commits, opens PRs and comments under
+#                                        its own name; PRs opened with it run CI.
 # Repository variable ALICE_APP_CLIENT_ID - client ID of that GitHub App.
 # Fallback until the App exists: ALICE_GITHUB_TOKEN, a personal fine-grained token
 # of the maintainer (posts appear under the maintainer's name).
